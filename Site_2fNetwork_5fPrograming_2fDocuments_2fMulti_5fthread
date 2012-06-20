@@ -1,0 +1,136 @@
+#title 멀티 스레드 기반 소켓 프로그래밍
+
+[[TableOfcontents]]
+== 멀티 스레드 기술에 대하여 ==
+스레드에 대한 자세한 내용은 [wiki:Site/Thread Thread 미니 사이트]에 자세히 기술 되어 있다. 여기에서는 소켓 프로그래밍을 중심으로 멀티 스레드 기술이 가지는 특징을 집중적으로 살펴보도록 하겠다.
+
+운영체제는 프로그램의 실행 이미지인 프로세스를 최소 실행 단위로 작동한다. 다중 프로세스 운영체제는 이들 프로세스를 시 분할 방식으로 스위칭 하면서, 동시에 여러 개의 프로세스를 운용한다. (엄밀히 따지자면, 동시가 아닌 동시인 것 처럼 느껴지는 것이지만 이해하기 쉽게 '''동시'''라고 하겠다.)
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1KTRk4qaFPh0FKV0GSUhlp_o906YVIQQven5WCp2Qmvk&amp;w=693&amp;h=185">
+}}}
+
+이 프로세스는 여러 개의 문맥으로 이루어지는데, 어차피 다중 프로세스 운영체제가 프로세스를 스위칭 하는 거라면 문맥을 스위칭 할 수 있지 않을까 ? 간단히 말해서 코드단위로 스위칭 하는 것이다. 이렇게 스위칭 가능한 프로세스의 문맥을 '''스레드'''라고 한다. 프로세스는 최소한 하나 이상의 스레드로 구성되어 있다. 만약 두 개의 스레드로 구성된다면, 이를 멀티 스레드 프로그램이라고 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=13kF-eYkIkf4O4wyufc1tnrf-FjECh-ByYbNkdoJzSFM&amp;w=687&amp;h=221">
+}}}
+
+== 멀티 스레드 기반 소켓 프로그래밍 ==
+앞서 [wiki:Site/Network_Programing/Documents/multi_process 멀티 프로세스 기반의 소켓 프로그램]에서 여러 개의 프로세스(:12)를 동시에 운용함으로써, 다수의 클라이언트를 처리하는 방법을 알아보았다.  
+
+핵심은 서버 프로그램이 듣기 소켓과 연결 소켓이 분리되어 있는데, 듣기 소켓에 클라이언트 연결이 들어와서 연결 소켓이 만들어 지면, 연결 소켓을 상속 받는 새로운 자식 프로세스를 만들어서 클라이언트 요청을 처리하는데 있다.
+
+멀티 스레드도 이와 동일한 방식으로 다수의 클라이언트를 처리할 수 있다. 프로세스 대신 스레드를 이용하면 된다. 즉 듣기 소켓을 통해서 새로운 클라이언트가 들어오면 fork(:2) 함수를 이용해서 자식 프로세스를 만드는 대신에, pthread_create(:3)함수를 이용해서 새로운 스레드를 만드는 것이다. 이 스레드는 문맥을 포함한 코드 조각으로 듣기 소켓의 소켓 지정 번호를 매개 변수로 받아들일 수 있다. 이 듣기 소켓을 이용해서 클라이언트를 처리하는 식이다.   
+
+멀티 스레드 방식의 서버는 대게 다음과 같은 흐름을 가진다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1fGqoablvhySh3wJTZVWj4Psn8mQrocdZXsyFPK3QPeE&amp;w=691&amp;h=246">
+}}}
+
+=== 멀티 스레드 기반 서버 프로그램 예제 ===
+에코 서비스를 멀티 스레드 기반으로 만들어 보았다.
+{{{#!plain linenum
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+#define MAXLINE 1024
+
+void *myFunc(void *arg);
+
+int main(int argc, char **argv)
+{
+	int listenfd, sockfd;	
+	struct sockaddr_in sockaddr;
+
+	int socklen;
+	int th_id;
+
+	pthread_t thread_t;
+
+	if(argc != 2)
+	{
+		printf("Usage : %s [port]\n", argv[0]);
+	}
+	
+	if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		perror("socket error");
+		return 1;
+	}
+
+	memset((void *)&sockaddr,0x00,sizeof(sockaddr));
+	sockaddr.sin_family = AF_INET;
+	sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	sockaddr.sin_port = htons(atoi(argv[1]));
+
+	if( bind(listenfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1)
+	{
+		perror("bind error");
+		return 1;
+	}
+
+	if(listen(listenfd, 5) == -1)
+	{
+		perror("listen error");
+		return 1;
+	}
+
+	while(1)
+	{
+		sockfd = accept(listenfd, (struct sockaddr *)&sockaddr, &socklen);
+		if(sockfd == -1)
+		{
+			perror("accept error");
+			return 1;
+		}
+		th_id = pthread_create(&thread_t, NULL, myFunc, (void *)&sockfd);
+		if(th_id != 0)
+		{
+			perror("Thread Create Error");
+			return 1;
+		}
+		pthread_detach(thread_t);
+	}
+}
+
+void *myFunc(void *arg)
+{
+	int sockfd;
+	int readn, writen;
+	char buf[MAXLINE];
+	sockfd = *((int *)arg);
+
+	while(1)
+	{
+		readn = read(sockfd, buf, MAXLINE);
+		if(readn <= 0)
+		{
+			perror("Read Error");
+			return NULL;
+		}
+		writen = write(sockfd, buf, readn);
+		if(readn != writen)
+		{
+			printf("write error %d : %d\n", readn, writen);
+			return NULL;
+		}
+	}
+}
+}}}
+  1 - 57  socket -> bind -> listen -> accept의 일반적인 과정을 거친다.
+  58 - 63  accept(:2) 함수로 연결 소켓을 가져오면, 클라이언트와의 통신을 처리할 스레드 함수 myFunc를 호출한다. 연결 소켓을 스레드 함수의 매개 변수로 넘긴다.
+  64  워커 스레드를 기다릴 필요가 없으므로 detach 시켰다.
+
+테스트는 [wiki:Code/C/echo_client echo 클라이언트 프로그램]을 이용했다.
+=== 멀티 스레드 기반 소켓 프로그램의 장점과 단점 ===
+스레드는 코드 조각이므로 프로세스를 복사하는 멀티 프로세스 방식 보다 좀 더 작고 빠르게 작동하는 프로그램을 만들 수 있다. 반면 독립된 프로세스 단위로 구동되지 않기 때문에, 디버깅이 힘들다는 단점이 있다. 또한 하나의 스레드에 생긴 문제가 전체 프로세스에 문제를 줄 수 있다는 문제점도 있다. 
+
+만약 특별히 바쁜 서버가 아니라면, 멀티 스레드 보다는 멀티 프로세스 방식을 선택하는 게 낫다는게 내 의견이다.
+
+[[Category(5)]]

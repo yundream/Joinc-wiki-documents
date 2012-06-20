@@ -1,0 +1,90 @@
+#title GNS3 Layer 2 - VLAN
+
+[[TableOfContents]]
+== VLAN ==
+VLAN은 Virtual '''L'''ocal '''A'''rea Network의 줄임말이다. 그러니 VLNA을 명확히 이해할려면 LAN을 이해할 필요가 있다. LAN은 L2 레벨에서 물리적으로 직접 연결된 컴퓨터 네트워크를 일컫는다. 여기에 관여하는 네트워크 장비가 L2 switch로, 모든 컴퓨터는 switch를 매개로 해서 서로 (link)연결된다.
+
+같은 LAN에 있는 컴퓨터들은 물리적으로 직접 연결돼 있기 때문에 Router와 같은 장비가 필요 없다. 예를 들어 '''LAN A'''에 물려있는 노드들은 라우터를 거칠 필요 없이 직접 통신이 가능하다. 만약 LAN A와 LAN B가 통신하려고 한다면, router를 통해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1d0mBmzHCh0-Li61KSIemUyCzfeaf7VtSKt2dMsNZPy8&amp;w=576&amp;h=300">
+}}}
+
+또한 LAN은 같은 브로드캐스팅 도메인을 가진다. 하나의 Node에서 같은 LAN에 있는 다른 모든 Node로 패킷을 보낼 수 있음을 의미한다. 
+
+VLAN은 LAN을 (virtual)가상화하기 위해서 사용한다. 아래와 같은 이유로 VLAN을 사용한다.
+  * 성능 
+  * 편리한 관리
+  * 보안
+  * trunks
+  * 하드웨어 장비의 설정 없이, 노드를 다른 LAN으로 이동할 수 있다. 
+
+=== IEEE 802.1Q ===
+VLAN을 위해서 IEEE는 802.1Q 프로토콜을 만들었다. 이 프로토콜은 프레임 이더넷 헤더에 4byte의 VLAN 헤더를 추가한다. 802.1Q에 대한 자세한 내용은 [wiki:man/12/VLAN VLAN]문서를 참고한다.
+
+=== Untagged VLAN 과 tagged VLAN ===
+기본적으로 스위치의 모든 인터페이스 (포트)는 동일한 브로드캐스트 도메인을 가지고 있다. 즉 하나의 LAN으로 구성된다. VLAN을 이용하면 하나의 물리적 랜을 나누어서 두 개 이상의 가상의 랜으로 나눌 수가 있다. 이렇게 나누어진 랜을 VLAN이라고 한다. 즉 여러개의 브로드캐스팅 도메인을 가지게 된다. 
+
+스위치는 인터페이스에 VLAN ID를 tagging하는 식으로 VLAN을 구성한다. 이것을 tagged vlan이라고 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Uk-LbZphU5egemNm8JmswmXGXU4EjVqt37hSp08Qmj4&amp;w=515&amp;h=218">
+}}}
+
+원래 Node 1, 2, 3, 4는 같은 LAN에 포함된 노드들이다. 이 하나의 LAN을 2개의 VLAN으로 분리하기 위해서 스위치에 태깅을 했다. Node 1과 Node 2를 하나의 VLAN으로 묶기 위해서 2번을 태깅했고, Node 4와 Node 3을 묶기위해서 3번을 태깅 했다. 이제 부터 이 스위치는 마치 2개의 물리적 스위치로 구성한 것처럼 작동한다. VLAN ID가 2에 있는 Node와 NLAN ID4 3인 Node는 서로 다른 브로드캐스팅 도메인을 가지며, 직접 통신을 할 수 없게 된다.  
+
+다음과 같이 네트워크 환경을 구축했다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/ql7h5W8z8hw2TxmgwmAJFNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-sCs9EvSLaBw/TxQZPQ6qbBI/AAAAAAAAB90/ylHPqmW25Ak/s400/gns09.png" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/lh/sredir?uname=yundream&target=ALBUM&id=5035320731903558017&feat=embedwebsite"></a></td></tr></table>
+}}}
+  * CIDR : 192.168.110.0/24
+이 노드들은 모두 같은 LAN 영역에 있습니다. 이들을 두개의 VLAN으로 분리해 보겠습니다. 110.1과 110.2를 하나의 VLAN으로, 110.3과 110.4를 다른 VLAN으로 묶는다.
+
+묶는 방법은 간단하다. 거의 모든 L2 Switch들은 포트에 태깅을 할 수있는데, 포트에 서로 다른 번호를 태깅하므로써 VLAN구성이 가능하다. 각각 2번과 4번으로 묶었다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/6AIAqRmYcoGds36fXW632dMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-vKGjzs6PWRg/TxQbCmbLinI/AAAAAAAAB-A/UXwHe36b4Go/s640/gns10.png" height="493" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+VBOX1 & VBOX2와 VBOX3 & VBOX5 간에는 통신이 되지 않는걸 확인할 수 있다. tcpdump를 이용해서 packet 수준에서 데이터 통신을 확인해 봤다. VBOX2에 tcpdump를 띄웠다. 
+{{{#!plain
+VBOX2 # tcpdump -ne -i eth2
+}}}
+VBOX1에서 VBOX2로 icmp 패킷을 전송했다. 같은 번호로 태깅됐기 때문에 통신이 잘 될 것이다.  
+{{{#!plain
+VBOX2 # tcpdump -ne -i eth2
+...
+22:06:19.365289 08:00:27:2f:b4:64 > 08:00:27:f1:dd:55, ethtype IPv4 (0x8000), 
+length 98: 192.168.110.2 > 192.168.110.1: ICMP echo reply, id 993, seq 7, length 63
+...
+}}}
+VBOX3에서 VBOX2로 icmp 패킷을 전송해 보면, 아예 VBOX2로 icmp 패킷이 전송되지 않는 것을 확인할 수 있을 것이다. 
+
+패킷 캡춰 결과에서 주목할 부분은 '''ethtype IPv4 (0x8000)'''이다. 802.1q가 아니다. 지금 태깅은 스위치 포트에 번호를 주는 것으로만 구분하며, 이더넷 프레임에 802.1q 태깅을 하지 않기 때문이다.
+
+포트에 태깅을 하긴 하지만, 이더넷 프레임에는 태깅하지 않고 vlan을 구현하는 방법을 untaged vlan이라고 한다. 
+
+이제 tagged vlan을 만들어 보자. 스위치의 vlan 설정에서 access대신 '''dot1q'''를 선택한다. dot1q는 8021.q 태깅을 하겠다는 것을 의미한다. dot1q로 설정하면, 스위치는 이더넷 프레임에 vlan id (VID)를 추가해서 전송한다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/7CSmXZpITVyRmodmqe-vMdMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-SsdegbXJsCk/TxQpyA03XvI/AAAAAAAAB-Y/8lQ6Yp3PFe4/s640/gns12.png" height="493" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+VBOX5에서 VBOX2로 icmp를 전송하고, VBOX2는 tcpdump로 패킷을 확인해 보기로 했다.
+{{{#!plain
+VBOX5 # ping 192.168.110.2
+PING 192.168.110.2 (192.168.110.2) 56(84) bytes of data
+From 192.168.110.4 icmp_seq=1 Destination Host Unreachable
+From 192.168.110.4 icmp_seq=2 Destination Host Unreachable
+}}}
+
+예상했던데로, 데이터 통신이 안돼는 것을 확인할 수 있다. VBOX2 측은 어떨까.
+{{{#!plain
+22:43:35.366992 08:00:27:85:b0:e4 > ff:ff:ff:ff:ff:ff, ethtype 802.1Q (0x8100), 
+length 60: vlan 4, p 0, ethtype ARP, Request who-has 192.168.110.2 tell 192.168.110.4, length42
+}}}
+
+VBOX2까지 패킷이 전달되는 걸 확인할 수 있다. ICMP 대신 ARP 패킷이 도착했다는 점을 눈여겨 볼만하다. VBOX5 입장에서 VBOX2의 주소는 같은 서브넷의 주소다. 그러므로 L2 통신을 위해서 arp 캐쉬를 검색할 것이다. 하지만 arp 캐쉬에서 VBOX2의 MAC을 찾을 수 없으므로, 먼저 ARP를 브로드캐스팅을 한다. ethertype는 802.1Q로 태그된 이더넷 프레임이 도착했음을 알 수 있다. 
+
+통신은 안되지만 패킷이 전송되는 걸 확인할 수 있다. 그런데 왜 VBO2로 패킷이 가는거지 ?
+
+== VLAN과 가상화 ==
+가상화를 하려면 네트워크도 가상화해야 할거고, 필수적인 기술이 VLAN 이다. 하나의 노드에 VM 형태로 여러 운영체제가 올라가고, 각각의 VM이 네트워킹 가능해야 하기 때문이다. 하나의 물리적인 인터페이스의 두 개 이상의 가상 인터페이스가 연결되는 구조다. 이들 가상 인터페이스를 (분리)isolate 하기 위해서 VLAN을 사용한다.
+
+VLAN과 가상화는 다음 문서에서 다룰 생각이다. 

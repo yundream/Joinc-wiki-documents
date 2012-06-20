@@ -1,0 +1,200 @@
+#title 유닉스 파일 다루기
+ * 워낙 오래전 문서다. 업데이트가 필요 할 듯. 2009-12-9
+
+== 파일 다루기 ==
+Unix 는 모든것이 파일로 이루어진다. 일반적인 텍스트 정보, 바이너리 정보 뿐만 아니라, 소켓, 파이프(FIFO), 장치(device), 디렉토리까지 파일로 관리를 한게 된다. 이러한 개념은 Window 사용자에게는 생소한 개념이 될수가 있다.
+
+윈도 있어서 c: 드라이브가 Unix 상에서는 /dev/hda1 이라는 파일로 되어있다는 점 자체가 처음 Unix 를 접하는 사용자에게는 매우 혼동되는 개념으로 다가온다. 이렇듯 모든것이 파일로 관리된다는 개념이 처음에는 혼란을 가져다줄수 있지만, 동일한 접근 인터페이스를 제공해주므로 조금만 익숙해지면 매우 훌륭한 개념이란걸 알게 될것이다. 
+== 파일 열기==
+파일을 열기 위해서는 open() 함수를 사용하게 된다. 다음은 파일을 복사해주는 간단한 프로그램으로, 어떻게 파일을 열어서, 그내용을 읽고 쓰는지에 대한 내용을 담고 있다.
+
+예제 : echo_file.c
+{{{#!plain
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+    int fd_in, fd_out;
+    int n;
+    char line[255];
+
+    if (argc != 3)
+    {
+        printf("Usage : ./echo_file [원본파일이름] [복사파일이름]\n");
+        exit(0);
+    }
+
+    // 원본파일이 존재하는지,
+    // 동일한 이름의 복사파일이 존재하는지 검사한다.
+    if (access(argv[1], F_OK) != 0)
+    {
+        printf("파일이 존재하지 않음 : %s\n", argv[1]);
+        exit(0);
+    }
+    if (access(argv[2], F_OK) == 0)
+    {
+        printf("이미 파일이름이 존재하고 있음 : %s\n", argv[2]);
+        exit(0);
+    }
+
+    // 원본파일 읽기 전용으로 열기
+    if ((fd_in = open(argv[1], O_RDONLY)) < 0)
+    {
+        perror("file open error");
+        exit(0);
+    }
+
+    // 복사파일이름을 쓰기전용으로 열기
+    if ((fd_out = open(argv[2], O_WRONLY|O_CREAT)) < 0)
+    {
+        perror("file open error");
+        exit(0);
+    }
+
+    memset(line, '\0', 255);
+    while ( (n = read(fd_in, line, 255)) > 0)
+    {
+        write(fd_out, line, n);
+        memset(line, '\0', 255);
+    }
+    close(fd_in);
+    close(fd_out);
+}
+}}}
+
+프로그램을 시작하게 되면, 가장먼저 access(2) 함수를 이용해서 복사하고자 하는 파일이 있는지, 그리고 복사시킬 파일명이 존재하는지를 검사한다. access() 함수는 파일의 사용자 권한과 파일존재 여부를 테스트 하기 위해서
+쓰이는데, 아규먼트로 테스트할 파일명과, 테스트 모드를 입력한다. 
+
+테스트 모드는 R_OK, W_OK, F_OK, X_OK 가 있는데, 차례대로 "읽기가능", "쓰기가능", "파일인지", "실행가능" 여부를 테스트 하게 된다. 해당 모드에 대해서 참이라면 0을 반환하게 된다. 
+
+그다음에 open(2) 함수를 이용해서 원본파일을 읽기 전용으로 열고, 복사파일이름을 쓰기전용으로 연다. 복사파일을 열때 O_CREATE 를 이용해서 파일을 새로 생성 시켰음을 주목하라.
+open() 함수를 사용하게 되면, int 형의 파일지시자 를 되돌려 주는데, 이 파일지시자를 통하여서 파일을 조작하게 된다. open() 을 통하여 파일을 열때에는 파일을 읽기 전용으로 열지(O_RDONLY), 쓰기전용으로 열지(O_WRONLY), 읽기및 쓰기전용으로 열지(O_RDWR)등을 지정할수 있다. 그밖의 다양한 열기 상태를 지정할수 있는데, 이는 man 페이지를 참고 하기 바란다.
+
+open() 을 통해서 파일 열기에 성공했으면 read() 함수를 이용해서 원본파일로 부터 지정된 바이트만큼의 내용을 읽어와서, 복사시킬 파일로 write() 를 이용해서 내용을 쓰게 된다.
+
+모든 작업을 마치게 되면 open() 을 통해 생성된 파일 지시자를 close() 시켜준다. 보통 프로세스(프로그램)이 종료하게 되면, 자동적으로 open()된 파일지시자를 닫아주기는 하지만, 좋은 프로그래밍 습관을 위해서 반드시 close() 를 통해서 파일을 닫아주기 바란다.
+
+이번에는 위의 echo_file.c 의 stream 버젼을 만들어 보도록 하겠다. 파일 작업에는 open, write, read 으로 대표되는 일련의 계열과, fopen(3), fgets, fputs 로 대표되는 stream 계열중 택일 해서 작업이 가능하다.
+
+전자는 파일을 저수준에서 다루고자 할때 사용하며, 후자는 고수준에서 사용하고자 할 때 사용하는데(이를테면 간편하게 사용할적에), fopen 계열을 쓰면 파일을 line 단위로 읽어올수 있고, stream 을 사용하여 파일의 위치를 지정할수 있어서 파일의 조작이 간편하지만, open 을 쓸경우 fopen 으로 가능한 작업을 위해서 일일이 함수를 만들어서 사용해야 하는 불편함이 있다.
+
+단 open 계열을 사용할경우, fopen 계열에 비해서 더 좋은 성능을 보이고, 파일 기술자 조작, select 나 poll 등을 통한 다중 입/출력 등 파일을 세밀하게 조작할수 있다는 장점을 가진다.
+
+예제 : echo_file_f.c
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{   
+    FILE *fp_in;
+    FILE *fp_out;
+    
+    char buf_in[255];
+
+    if (argc != 3)
+    {
+        printf("Usage : ./echo_file [원본파일이름] [복사파일이름]\n");
+        exit(0);  
+    }
+
+    // 원본파일이 존재하는지, 
+    // 동일한 이름의 복사파일이 존재하는지 검사한다.  
+    if (access(argv[1], F_OK) != 0) 
+    { 
+        printf("파일이 존재하지 않음 : %s\n", argv[1]);
+        exit(0);
+    } 
+    if (access(argv[2], F_OK) == 0)
+    {  
+        printf("이미 파일이름이 존재하고 있음 : %s\n", argv[2]);
+        exit(0); 
+    }  
+
+    fp_in  = fopen(argv[1], "r");
+    if (fp_in == NULL)
+    {
+        perror("file open error 1 : ");
+        exit(0);
+    }
+    fp_out = fopen(argv[2], "w");
+    if (fp_out == NULL)
+    {
+        perror("file open error 2 : ");
+        exit(0);
+    }
+
+    memset(buf_in, '\0', 255);
+    while( fgets(buf_in, 255, fp_in) != NULL)
+    {
+        fputs(buf_in, fp_out);
+        memset(buf_in, '\0', 255);
+    }
+
+    fclose(fp_in);
+    fclose(fp_out);
+}
+}}}
+이 예제는 이전의 open 을 통한 예제와 fopen() 계열의 함수를 썼다는것 이외에 별로 특이한 점은 없는 프로그램이다.
+
+단지 이러한 다른 방법으로도 구현가능하다는 것을 보여주는 예제이다. 마지막으로 표준입력을 받아서 이것을 파일로 저장하는 간단한 라인 에디터 프로그램 예를 들어보겠다.
+
+예제 : line_edit.c
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+    FILE *fp_stdin;
+    FILE *fp_out;
+
+    char buf_in[255];
+
+    if (argc != 2)
+    {
+        printf("Usage : ./line_edit [저장파일이름]\n");
+        exit(0);
+    }
+    
+    if (access(argv[1], F_OK) == 0)
+    {   
+        printf("이미 파일이 존재하고 있음 : %s\n", argv[1]); 
+        exit(0);
+    }
+    
+    fp_out  = fopen(argv[1], "w");
+    if (fp_out == NULL)
+    {
+        perror("file open error 1 : ");
+        exit(0);
+    }
+    
+    while(fgets(buf_in, 255, stdin) != NULL)
+    {   
+        if (strncmp(buf_in,"quit", 5) == 0)
+            break;
+        fputs(buf_in, fp_out);
+    }
+
+    fclose(fp_out);
+}  
+}}}
+프로그램은 설명할게 별로 없을정도로 간단하다. 저장할 파일이름을 아규먼트로 주고 프로그램을 실행하면 사용자 입력(stdin)을 기다리는 프롬프트가 뜨게 되고, 원하는 문자열을 입력하면 된다. 모든 작업이 끝났다면 Ctrl+D 를 입력하거나, quit 를 입력하는 것으로 프로그램이 종료된다. 
+{{{#!plain
+[yundream@localhost test]# ./line_edit my_test6
+hello world?
+okokok?
+I like C 
+quit
+[yundream@localhost test]# 
+}}}
+        
+stdin(3) 은 표준 입/출력 스트림으로 (standard I/O streams), 표준출력은 FILE *stdout, 표준 에러는 FILE *stderr 로 정의 되어 있다.
+
+이상으로 파일의 읽고 쓰는 방법에 대해서 알아보았다. 다음 편에서는 파일의 상태를 알아보고 이를 바꾸는 방법에 대해서 알아보도록 하겠다.

@@ -1,0 +1,441 @@
+#title linux man pange : select - 입출력 다중화
+
+아래의 pselect 에 대한 내용은 따로 정리한다.
+
+'''pselect'''
+{{{#!plain
+int pselect(int nfds, fd_set *readfds, fd_set *writefds,
+           fd_set *exceptfds, const struct timespec *timeout,
+          const sigset_t *sigmask);
+}}}
+  * pselect는 struct timespec 구조체 사용한다. timespec 구조체를 사용함으로써 나노초까지 세밀하게 조정할 수 있게 되었다.
+   {{{#!plain
+struct timespec {
+    long    tv_sec;         /* seconds */
+    long    tv_nsec;        /* nanoseconds */
+};
+}}}
+  * pselect 는 Linux(:12) 커널 2.6.16에 추가되었다. 이전에는 glibc에서 애뮬레이트한 함수가 제공되었으나 버그를 가지고 있었다. 
+  * sigmask를 사용해서 시그널을 블럭시킬 수 있다. select의 경우 수행되는 도중에 시그널에 의한 인터럽트가 발생하게 되면, race condition 혹은 무한 블록킹 상태에 놓일 수 있었다. pselect를 사용하면 이러한 문제를 제거할 수 있다. 
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?name=select">select</a>(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. <a href="/modules/moniwiki/wiki.php/manSearch?name=select">select</a>(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN21"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN24"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN45"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	동기적 I/O(입출력) 다중화</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+
+int select(int n , fd_set *readfds, fd_set *writefds, fd_set *exceptfds, 
+		struct timeval *<a href="/modules/moniwiki/wiki.php/manSearch?name=timeout);
+
+FD_CLR">timeout);
+
+FD_CLR</a>(int fd, fd_set *set);
+<a href="/modules/moniwiki/wiki.php/manSearch?name=FD_ISSET">FD_ISSET</a>(int fd, fd_set *set);
+<a href="/modules/moniwiki/wiki.php/manSearch?name=FD_SET">FD_SET</a>(int fd, fd_set *set);
+<a href="/modules/moniwiki/wiki.php/manSearch?name=FD_ZERO">FD_ZERO</a>(fd_set *set);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		<B
+CLASS="EMPHASIS"
+>select</B
+>는 상태가 변경되는 파일기술자들의 
+		숫자를 기다린다.
+	</P
+><P
+>		세개의 독립적인 파일지시자 집합들을 검사한다. 
+		<B
+CLASS="EMPHASIS"
+>readfds</B
+>에는 읽어들인 데이타가 있는지가 검사되며, 
+		정확히는 읽기가 봉쇄되지 않았는지를 검사한다. 
+		봉쇄되지 않음을 검사함으로 (EOF)end-of-file가 발생하는 것도 
+		검사하고 리턴시킬수 있다. <B
+CLASS="EMPHASIS"
+>writefds</B
+>에 있는 것들은 
+		쓰기가 봉쇄되어 있는지가 검사된다. <B
+CLASS="EMPHASIS"
+>exceptfds</B
+>에 
+		있는 것들은 예외가 있는지가 검사된다. 종료시, 이 집합들은 
+		파일 기술자들이 실제로 변경된 상태가 무엇인지 가리키도록 수정된다. 
+	</P
+><P
+>		select가 리턴되었을때 파일지시자의 집합을 검사하기 위해서 
+		몇개의 매크로가 제공된다. FD_ZERO는 집합을 소거한다. 
+		FD_SET과 FD_CLR은 집합에서 주어진 기술자를 더하거나 뺀다. 
+		FD_ISSET는 기술자가 집합의 일부분인지 아닌지를 검사한다. 
+		FD_ISSET은 select가 리턴되었을때 사용할수 있다.    	  
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>n</B
+>는 세개의 집합중 가장 높은 파일지시자에다가 
+		1을 더한다. 이유는 파일지시자가 0(표준입력)번부터 시작하기 때문이다. 
+		가장 최근에 생성된 가장 큰 파일지시자의 번호가 4번이라면 <a href="/modules/moniwiki/wiki.php/manSearch?name=4+1">4+1</a>(0)=5
+		가 된다.
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>timeout</B
+>은 select가 반환하기전에 블럭킹될수 
+		있는 시간의 상위제한값이다. 0으로 지정되어 있으면 select는 즉시 
+		반환된다. 만일 timeout이 NULL이면, select는 무한히 봉쇄될수 있다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공시, select는 파일지정자집합에 표함된 숫자를 반환하며, 
+		리턴하기전에 타임아웃이 발생하면 0을 반환한다. 이러시 -1이 반환되며, 
+		errno는 적당한 값으로 설정된다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EBADF</DT
+><DD
+><P
+>	
+					유효하지 않은 파일 기술자가 집합중 하나에 들어있다.
+				</P
+></DD
+><DT
+>EINTR</DT
+><DD
+><P
+>					(블럭되지 않은)신호가 발생했다. 
+				</P
+></DD
+><DT
+>EINVAL</DT
+><DD
+><P
+>					<B
+CLASS="EMPHASIS"
+>n</B
+>이 음수이다.
+				</P
+></DD
+><DT
+>ENOMEM</DT
+><DD
+><P
+>					select가 내부 테이블들을 위한 메모리를 할당할 수 없다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN45"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+#define FD_MAX_SIZE 1024
+int <a href="/modules/moniwiki/wiki.php/manSearch?name=main">main</a>(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd, sockfd;
+    int state, client_len;
+    int pid;
+    int i, maxi, maxfd;
+
+    int client[FD_MAX_SIZE];
+
+    FILE *fp;
+    struct sockaddr_in clientaddr, serveraddr;
+
+    struct timeval tv;
+    fd_set readfds, otherfds, allfds;
+
+    int current_cli_num;
+
+    char buf[255];
+    char line[255];
+
+    if (argc != 2)
+    {
+        printf("Usage : ./zipcode [port]&#92;n");
+        printf("예    : ./zipcode 4444&#92;n");
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=exit">exit</a>(0);
+    }
+
+    <a href="/modules/moniwiki/wiki.php/manSearch?name=memset">memset</a>(line, 0x00, 255);
+    state = 0;
+
+    current_cli_num = 3;
+
+    // 주소 파일을 읽어들인다. 
+    if ((fp = <a href="/modules/moniwiki/wiki.php/manSearch?name=fopen">fopen</a>("zipcode.txt", "r")) == NULL)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("file open error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=exit">exit</a>(0);
+    }
+
+    if ((server_sockfd = <a href="/modules/moniwiki/wiki.php/manSearch?name=socket">socket</a>(AF_INET, SOCK_STREAM, 0)) &#60; 0)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("socket error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=exit">exit</a>(0);
+    }
+    bzero(&#38;serveraddr, <a href="/modules/moniwiki/wiki.php/manSearch?name=sizeof">sizeof</a>(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = <a href="/modules/moniwiki/wiki.php/manSearch?name=htonl">htonl</a>(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    state = bind (server_sockfd, (struct sockaddr *)&#38;serveraddr,
+                  <a href="/modules/moniwiki/wiki.php/manSearch?name=sizeof">sizeof</a>(serveraddr));
+    if (state == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("bind error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=exit">exit</a>(0);
+    }
+
+    state = <a href="/modules/moniwiki/wiki.php/manSearch?name=listen">listen</a>(server_sockfd, 5);
+    if (state == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("listen error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?name=exit">exit</a>(0);
+    }
+
+
+    client_sockfd = server_sockfd;
+
+    maxi = -1;
+    maxfd = server_sockfd;
+    for (i = 0; i &#60; FD_MAX_SIZE; i++)
+    {
+        client[i] = -1;
+    }
+
+    <a href="/modules/moniwiki/wiki.php/manSearch?name=FD_ZERO">FD_ZERO</a>(&#38;readfds);
+    <a href="/modules/moniwiki/wiki.php/manSearch?name=FD_SET">FD_SET</a>(server_sockfd, &#38;readfds);
+
+    <a href="/modules/moniwiki/wiki.php/manSearch?name=while">while</a>(1)
+    {
+
+        allfds = readfds;
+
+        state = select(maxfd + 1 , &#38;allfds, NULL,
+                      NULL, NULL);
+
+        if (<a href="/modules/moniwiki/wiki.php/manSearch?name=FD_ISSET">FD_ISSET</a>(server_sockfd, &#38;allfds))
+        {
+            client_len = <a href="/modules/moniwiki/wiki.php/manSearch?name=sizeof">sizeof</a>(clientaddr);
+            client_sockfd = accept(server_sockfd,
+                    (struct sockaddr *)&#38;clientaddr, &#38;client_len);
+            for (i = 0; i &#60; FD_MAX_SIZE; i++)
+            {
+                if (client[i] &#60; 0)
+                {
+                    client[i] = client_sockfd;
+                    printf("%d : %d&#92;n", i, client_sockfd);
+                    break;
+                }
+            }
+
+            printf("accept [%d]&#92;n", client_sockfd);
+            if (i == FD_MAX_SIZE)
+            {
+                <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("too many clients&#92;n");
+            }
+
+            <a href="/modules/moniwiki/wiki.php/manSearch?name=FD_SET">FD_SET</a>(client_sockfd,&#38;readfds);
+    
+            if (client_sockfd &#62; maxfd)
+                maxfd = client_sockfd;
+
+            if (i &#62; maxi)
+                maxi = i;
+
+            if (--state &#60;= 0)
+                continue;
+        }
+    
+        printf("maxi %d&#92;n", maxi);
+        for (i = 0; i &#60;= maxi; i++)
+        {
+            if ((sockfd = client[i]) &#60; 0)
+            {
+                continue;
+            }
+
+            printf("maxi %d&#92;n", maxi);
+            if (<a href="/modules/moniwiki/wiki.php/manSearch?name=FD_ISSET">FD_ISSET</a>(sockfd, &#38;allfds))
+            {
+                <a href="/modules/moniwiki/wiki.php/manSearch?name=printf">printf</a>("ok read&#92;n");
+                <a href="/modules/moniwiki/wiki.php/manSearch?name=memset">memset</a>(buf, 0x00, 255);
+                if (<a href="/modules/moniwiki/wiki.php/manSearch?name=read">read</a>(sockfd, buf, 255) &#60;= 0)
+                {
+                    <a href="/modules/moniwiki/wiki.php/manSearch?name=close">close</a>(sockfd);
+                    <a href="/modules/moniwiki/wiki.php/manSearch?name=perror">perror</a>("Close sockfd : ");
+                    <a href="/modules/moniwiki/wiki.php/manSearch?name=FD_CLR">FD_CLR</a>(sockfd, &#38;eadfds);
+                    client[i] = -1;
+                }
+                else
+                {
+                    printf("[%d] %s&#92;n", sockfd, buf);
+                }
+
+                if (--state &#60;= 0)
+                    break;
+            }
+        }
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		우편번호 검색 서버프로그램이다. 이 코드에 대한 자세한 설명은 
+		<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Network_Programing/Documents/select"
+TARGET="_top"
+>다중연결서버 만들기</a>(2)</A
+>문서를 참고하기 바란다.
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+=== 참고문헌 ===
+ * [wiki:Site/system_programing/File/select select를 이용한 입출력다중화]
+ * [wiki:Code/C/tail select를 이용한 tail 구현]
+ * [wiki:article/%B4%D9%C1%DF%BF%AC%B0%E1%20%BC%AD%B9%F6%20%B8%B8%B5%E9%B1%E2%203 poll을 이용한 입출력 다중화]

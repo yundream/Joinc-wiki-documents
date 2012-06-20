@@ -1,0 +1,120 @@
+#title C로 객체지향
+
+C로 Java의 String 구현. 구조체와 함수포인터(:12)를 이용. 
+
+  1. 그러나 가독성, 생산성, Type safety, 동적 타입지원 과 같은 장점을 포기하고 C로 객체지향을 해야 하는가라는 것에 대해서는 각자 알아서.. 
+  1. 이상하게 꼬아서 할 수 있는  방법을 찾느니, 쉽게 할 수 있는 방법을 찾는것 추천.
+{{{#!plain
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
+
+#define JOB_LEN 1
+#define JOB_EQU 2
+#define JOB_IND 3
+
+typedef struct _fun_class{
+      char *string;
+      int job;
+      int (*length)(struct _fun_class *);
+      int (*equals)(struct _fun_class *, char*);
+      int (*indexOf)(struct _fun_class *, char*);
+      int (*whichJob)(struct _fun_class *, char*, int);
+}_fun_class;
+ 
+
+int length(_fun_class *me)
+{
+   if(me->string)
+      return strlen(me->string);
+
+   return 0;
+}
+
+int equals(_fun_class *me, char *tgt)
+{
+   if(me->string){
+      return (strcmp(me->string, tgt))?0:1;
+   }
+   return 0;
+}
+
+int indexOf(_fun_class *me, char *tgt)
+{
+   if(me->string){
+      char *p;
+      p = strstr(me->string, tgt);
+      if(p){
+  return (p-(me->string));
+      }else{
+  return -1;
+      }
+
+   }
+   return -1;
+}
+
+ 
+
+int whichJob(struct _fun_class *me, char*str, int job)
+{
+   if(job == JOB_LEN){
+      return me->length(me);
+   }else if(job == JOB_EQU){
+      return me->equals(me, str);
+   }else if(job == JOB_IND){
+      return me->indexOf(me, str);
+   } /* if(job == JOB_LEN){ */
+
+   return 0;
+}
+
+_fun_class *my_new_string(char *str)
+{
+   _fun_class *myString;
+
+   myString = (_fun_class *)malloc(sizeof(_fun_class));
+
+   myString->length = length;
+   myString->equals = equals;
+   myString->indexOf = indexOf;
+   myString->whichJob = whichJob;
+   myString->job = 0;
+  
+   if(str){
+      myString->string = strdup(str);
+   }else{
+      myString->string = NULL;
+   }     
+}
+
+
+void my_delete_string(_fun_class *myString)
+{
+   if(myString->string) free(myString->string);
+   if(myString) free(myString);
+}
+
+ 
+
+int main()
+{
+   _fun_class *myString = NULL;
+
+   myString = my_new_string("아버지가 방에 들어 가신다.");
+
+   printf("str : %s\n", myString->string);
+   printf("length : %d\n", myString->length(myString));
+   printf("equals : %d\n", myString->equals(myString, "아버지"));
+   printf("equals : %d\n", myString->equals(myString, "아버지가 방에 들어 가신다."));
+   printf("indexOf : %d\n", myString->indexOf(myString, "방에"));
+   printf("indexOf : %d\n", myString->indexOf(myString, "가신"));
+
+
+   printf("JOB_LEN : %d\n", myString->whichJob(myString, "가방", JOB_LEN));
+   printf("JOB_EQU : %d\n", myString->whichJob(myString, "가방", JOB_EQU));
+   printf("JOB_IND : %d\n", myString->whichJob(myString, "가방", JOB_IND));
+
+   my_delete_string(myString);
+}
+}}}

@@ -1,0 +1,76 @@
+#title linux man page : getpwnam - 사용자 정보를 얻어온다.
+
+=== 사용법 ===
+{{{#!plain
+#include <sys/types.h>
+#include <pwd.h>
+
+struct passwd *getpwnam(const char *name);
+struct passwd *getpwuid(uid_t uid);
+}}}
+
+=== 설명 ===
+getpwnam() 함수는 로컬에 있는 패스워드(:12) 데이터베이스(:12)로 부터 파일들을 읽어들여서, 각 레코드를 가리키는 포인터를 리턴한다. /etc/passwd, NIS(:12), LDAP(:12) 등이 getpwnam함수가 사용하는 패스워드 데이터베이스이다. 인자로 사용자 이름을 넣으면, 해당 이름에 대한 패스워드 정보가 리턴된다. 
+
+getpwuid()함수는 패스워드 데이터베이스 레코드로 부터, UID(:12)를 리턴한다. 
+
+데이터는 ''passwd 구조체''에 저장되어서 리턴된다. passwd 구조체는 <pwd.h> 에 정의되어 있다.
+{{{#!plain
+struct passwd {
+    char   *pw_name;       /* user name */
+    char   *pw_passwd;     /* user password */
+    uid_t   pw_uid;        /* user ID */
+    gid_t   pw_gid;        /* group ID */
+    char   *pw_gecos;      /* real name */
+    char   *pw_dir;        /* home directory */
+    char   *pw_shell;      /* shell program */
+};
+}}}
+
+=== 리턴 값 ===
+getpwnam()과 getpwuid() 함수는 passwd 구조체를 리턴한다. 만약 이자로 주어지는 유저이름인 '''name'''에 대한 레코드가 없거나, 다른 원인으로 에러가 발생했다면, NULL을 리턴한다. 에러의 원인은 errno(:12)로 확인할 수 있다.
+
+=== 에러 ===
+다음과 같은 에러가 정의되어 있다.
+  EINTR
+    signal(:12)를 받아서 중단되었다.
+  EIO
+    I/O 에러
+  EMFILE
+    프로세스(:12)가 열수 있는 파일의 갯수를 초과해서, 더 이상 파일을 열수 없다.
+  ENFILE
+    시스템이 열수 있는 파일의 갯수를 초과해서, 더 이상 파일을 열 수 없다.
+  ENOMEM 
+    passwd 구조체를 위해 할당할만한 메모리 공간이 남아있지 않다.
+  ERAGNE
+    잘못된 버퍼공간을 사용하고 있다.
+
+=== 사용하는 파일 ===
+  /etc/passwd
+    로컬 패스워드 데이터베이스 파일
+
+=== 예제 ===
+{{{#!plain
+#include <sys/types.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <grp.h>
+#include <sys/types.h>
+
+int main()
+{
+    struct passwd *u_info;
+    struct group  *g_info;
+
+    // yundream의 uid와 post의 gid를 얻어서
+    // my.txt의 파일 권한을 변경한다.
+    u_info = getpwnam("yundream");
+    g_info = getgrnam("post");
+
+    chown("/home/test/my.txt", u_info->pw_uid, g_info->gr_gid);
+}
+}}}
+=== 참고 ===
+ * [wiki:Site/system_programing/Unix_Env/user_info 사용자 정보얻기]
+ * getpwent(3), setpwent(3), endpwent(3)
+ * getspent(3), getspnam(3), setspent(3), endspent(3) 

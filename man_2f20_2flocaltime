@@ -1,0 +1,47 @@
+#title perl 함수 : localtime
+
+=== localtime === 
+인자로 받은 unix time을 9개의 시간요소를 가진 배열로 리턴한다. 이때 시간은 지역시간으로 보정된다.
+{{{#!plain
+#  0    1    2     3     4    5     6     7     8
+ ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) =
+                                            localtime(time);
+}}}
+모든 요소는 숫자이며, C(:12)의 '''struct tm'''과 동일한 순서로 구성된다. 
+  || $sec  || 초   || 0~60  ||
+  || $min  || 분   || 0~60  ||
+  || $hour || 시   || 0~23  ||
+  || $mday || 일   || 1~31  ||
+  || $mon  || 월   || 0~11  ||
+  || $year || 년   || 0~    ||
+  || $wday || 일(주) || 0~6  ||
+  || $yday || 일(년) || 0~365  ||
+
+'''$mon'''은 0부터 시작한다. 0부터 11까지의 범위를 가지게 되기 때문에, 월을 출력하고자 할때는 여기에 +1을 해주어야 한다. 아래는 이러한 작업을 간단하게 해주는 코드다.
+{{{#!plain
+my @abbr= qw(1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월);
+#my @abbr = qw( Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec );
+($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) =
+                                            localtime(time);
+print "$abbr[$mon] $mday\n";
+}}}
+
+'''$year'''은 1900년을 기준으로 계산이 된다. $year가 108 이라면 '''2008'''이 되는 셈이다. 그러므로 연도 계산을 제대로 하려면 +1900을 해줘야 한다.
+{{{#!plain
+$year += 1900;
+}}}
+
+4자리가 아닌 2자리를 출력하는 간단한 방법을 소개한다. ( 2001 -> 01)
+{{{#!plain
+$year = sprintf("%2d", $year % 100);
+}}}
+
+scalar context를 사용하면 ctime(3) 값을 리턴한다.
+{{{#!plain
+$now_str = localtime; // Tue May 12 16:47:16 2009
+}}}
+
+지역시간대신 GMT(:12)를 사용하기 원한다면 gmtime(:12) 내장함수를 사용하도록 한다.
+
+
+

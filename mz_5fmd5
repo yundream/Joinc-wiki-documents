@@ -1,0 +1,368 @@
+== MD5 ==
+ * 보안을 위해서 인자를 스택을 통해서 복사된 블럭을 가져와서 사용하고 다른 함수들이 사용되면서 그 영역을 뭉개는 방법이 있고 제가 구현한 방법처럼 일반적인 포인터로 받아서 뒤에서 memset을 하여 없애는 2가지가 있습니다. 보안을 위해서는 제가 구현한 방법이 좀더 낮지 않을까라는 생각을 해보지만 이것도 뚫리겠죠? 혹시 보다 견고한 코드 만드신 분이 있다면 공개좀 해주십시요. 참고로 이 소스에서 사용후 반드시 Handle로 넘겨준 구조체는 memset을 하여 깨끗히 소거해줘야 합니다. 믿거나 말거나~
+ {{{#!vim c
+/*
+ Copyright (c) 2002 Information Equipment co.,LTD.
+ All Right Reserved.
+
+ Code by JaeHyuk Cho <minzkn@infoeq.com> 
+
+ This example !!!
+   - MD5 checksum calc
+   - Simple is best.
+   - libc version and nostdlib version 
+
+ Note !
+   - Not support clear memory (Security hole~) 
+*/
+
+/* Configuration */
+#if !defined(DEF_USE_STANDARD_C)
+#define DEF_USE_STANDARD_C    (0) /* 0 = nostdlib, 1 = libc */
+#endif
+
+
+
+
+
+
+#if DEF_USE_STANDARD_C == (1)
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#else
+
+extern int MZ_StringLength(void *);
+extern int MZ_SYSTEMCALL_Read(int, void *, int);
+extern int MZ_SYSTEMCALL_Write(int, void *, int);
+extern int MZ_SYSTEMCALL_Open(char *, int, int);
+extern int MZ_SYSTEMCALL_Close(int);
+extern void MZ_Puts(void *s_String);
+extern void MZ_ZeroMemory(void *, int);
+extern void MZ_CopyMemory(void *, void *, int);
+
+#endif
+
+#define DEF_MD5_S11 7
+#define DEF_MD5_S12 12
+#define DEF_MD5_S13 17
+#define DEF_MD5_S14 22
+#define DEF_MD5_S21 5
+#define DEF_MD5_S22 9
+#define DEF_MD5_S23 14
+#define DEF_MD5_S24 20
+#define DEF_MD5_S31 4
+#define DEF_MD5_S32 11
+#define DEF_MD5_S33 16
+#define DEF_MD5_S34 23
+#define DEF_MD5_S41 6
+#define DEF_MD5_S42 10
+#define DEF_MD5_S43 15
+#define DEF_MD5_S44 21
+
+#define DEF_MD5_F1(x,y,z) (((x) & (y)) | ((~x) & (z))) 
+#define DEF_MD5_F2(x,y,z) (((x) & (z)) | ((y) & (~z))) 
+#define DEF_MD5_F3(x,y,z) ((x) ^ (y) ^ (z))
+#define DEF_MD5_F4(x,y,z) ((y) ^ ((x) | (~z)))
+#define DEF_MD5_ROTATE_LEFT(x,n) (((x) << (n)) | ((x) >> (32 - (n))))
+
+#define DEF_MD5_FF(a,b,c,d,x,s,ac) { \
+	                              (a) += DEF_MD5_F1((b),(c),(d)) + (x) + (unsigned long)(ac); \
+			              (a)  = DEF_MD5_ROTATE_LEFT((a),(s)); \
+				      (a) += (b); \
+				     } 
+#define DEF_MD5_GG(a,b,c,d,x,s,ac) { \
+	                              (a) += DEF_MD5_F2((b),(c),(d)) + (x) + (unsigned long)(ac); \
+			              (a)  = DEF_MD5_ROTATE_LEFT((a),(s)); \
+				      (a) += (b); \
+				     } 
+#define DEF_MD5_HH(a,b,c,d,x,s,ac) { \
+	                              (a) += DEF_MD5_F3((b),(c),(d)) + (x) + (unsigned long)(ac); \
+			              (a)  = DEF_MD5_ROTATE_LEFT((a),(s)); \
+				      (a) += (b); \
+				     } 
+#define DEF_MD5_II(a,b,c,d,x,s,ac) { \
+	                              (a) += DEF_MD5_F4((b),(c),(d)) + (x) + (unsigned long)(ac); \
+			              (a)  = DEF_MD5_ROTATE_LEFT((a),(s)); \
+				      (a) += (b); \
+				     }
+
+typedef struct 
+{
+ unsigned long        State[4];
+ unsigned long        Count[2];
+ unsigned char        Buffer[64];
+}t_MD5_Context;
+
+void MZ_MD5_Init(t_MD5_Context *s_Context);
+void MZ_MD5_Update(t_MD5_Context *s_Context, void *s_Buffer, unsigned long s_Length);
+void MZ_MD5_TransForm(void *s_Buffer, void *s_In);
+void MZ_MD5_Final(t_MD5_Context *s_Context, void *s_Digest);
+
+int main(int s_Argc, char *s_Argv[]);
+
+static void MZ_MD5_Encode(unsigned char *s_Target, unsigned long *s_Source, unsigned long s_Length)
+{
+ unsigned long s_Count0, s_Count1;
+ for(s_Count0 = 0, s_Count1 = 0;s_Count1 < s_Length;s_Count0++, s_Count1 += 4)
+ {
+  s_Target[s_Count1 + 0] = (unsigned char)(s_Source[s_Count0] & 0xff);
+  s_Target[s_Count1 + 1] = (unsigned char)((s_Source[s_Count0] >> 8) & 0xff);
+  s_Target[s_Count1 + 2] = (unsigned char)((s_Source[s_Count0] >> 16) & 0xff);
+  s_Target[s_Count1 + 3] = (unsigned char)((s_Source[s_Count0] >> 24) & 0xff);
+ }
+}
+
+static void MZ_MD5_Decode(unsigned long *s_Target, unsigned char *s_Source, unsigned long s_Length)
+{
+ unsigned long s_Count0, s_Count1;
+ for(s_Count0 = 0, s_Count1 = 0;s_Count1 < s_Length;s_Count0++, s_Count1 += 4)
+ {
+  s_Target[s_Count0] = (((unsigned long)s_Source[s_Count1 + 0])       ) |
+                       (((unsigned long)s_Source[s_Count1 + 1]) << 8  ) |
+                       (((unsigned long)s_Source[s_Count1 + 2]) << 16 ) |
+                       (((unsigned long)s_Source[s_Count1 + 3]) << 24 ); 
+ } 
+}
+
+void MZ_MD5_Init(t_MD5_Context *s_Context)
+{
+ s_Context->State[0] = 0x67452301lu; s_Context->State[1] = 0xefcdab89lu;
+ s_Context->State[2] = 0x98badcfelu; s_Context->State[3] = 0x10325476lu;
+ s_Context->Count[0] = s_Context->Count[1]  = 0lu;
+}
+
+void MZ_MD5_Update(t_MD5_Context *s_Context, void *s_Buffer, unsigned long s_Length)
+{
+ unsigned long s_Count, s_Index, s_PartLen;
+ s_Index = (unsigned long)((s_Context->Count[0] >> 3) & 0x3flu);
+ s_Context->Count[0] += (s_Length << 3);
+ if(s_Context->Count[0] < (s_Length << 3))s_Context->Count[1]++;
+ s_Context->Count[1] += (s_Length >> 29);
+ s_PartLen = 64 - s_Index; 
+ if(s_Length >= s_PartLen)
+ {
+#if DEF_USE_STANDARD_C == (1) 
+  memcpy(&s_Context->Buffer[s_Index], s_Buffer, s_PartLen);
+#else
+  MZ_CopyMemory(&s_Context->Buffer[s_Index], s_Buffer, s_PartLen);
+#endif
+  MZ_MD5_TransForm(s_Context->State, s_Context->Buffer);
+  for(s_Count = s_PartLen; s_Count + 63 < s_Length;s_Count += 64)MZ_MD5_TransForm(s_Context->State, ((unsigned char *)s_Buffer) + s_Count);
+  s_Index = 0;	
+ }
+ else s_Count = 0;
+#if DEF_USE_STANDARD_C == (1) 
+ memcpy(&s_Context->Buffer[s_Index], ((unsigned char *)s_Buffer) + s_Count, s_Length - s_Count);
+#else
+ MZ_CopyMemory(&s_Context->Buffer[s_Index], ((unsigned char *)s_Buffer) + s_Count, s_Length - s_Count);
+#endif
+}
+
+void MZ_MD5_TransForm(void *s_Buffer, void *s_In)
+{
+ unsigned long a, b, c, d, s_In32[16];
+ a = *(((unsigned long *)s_Buffer) + 0);
+ b = *(((unsigned long *)s_Buffer) + 1);
+ c = *(((unsigned long *)s_Buffer) + 2);
+ d = *(((unsigned long *)s_Buffer) + 3);
+ MZ_MD5_Decode(s_In32, s_In, 64);
+ DEF_MD5_FF(a, b, c, d, s_In32[ 0], DEF_MD5_S11, 0xd76aa478); /* 1 */
+ DEF_MD5_FF(d, a, b, c, s_In32[ 1], DEF_MD5_S12, 0xe8c7b756); /* 2 */
+ DEF_MD5_FF(c, d, a, b, s_In32[ 2], DEF_MD5_S13, 0x242070db); /* 3 */
+ DEF_MD5_FF(b, c, d, a, s_In32[ 3], DEF_MD5_S14, 0xc1bdceee); /* 4 */
+ DEF_MD5_FF(a, b, c, d, s_In32[ 4], DEF_MD5_S11, 0xf57c0faf); /* 5 */
+ DEF_MD5_FF(d, a, b, c, s_In32[ 5], DEF_MD5_S12, 0x4787c62a); /* 6 */
+ DEF_MD5_FF(c, d, a, b, s_In32[ 6], DEF_MD5_S13, 0xa8304613); /* 7 */
+ DEF_MD5_FF(b, c, d, a, s_In32[ 7], DEF_MD5_S14, 0xfd469501); /* 8 */
+ DEF_MD5_FF(a, b, c, d, s_In32[ 8], DEF_MD5_S11, 0x698098d8); /* 9 */
+ DEF_MD5_FF(d, a, b, c, s_In32[ 9], DEF_MD5_S12, 0x8b44f7af); /* 10 */
+ DEF_MD5_FF(c, d, a, b, s_In32[10], DEF_MD5_S13, 0xffff5bb1); /* 11 */
+ DEF_MD5_FF(b, c, d, a, s_In32[11], DEF_MD5_S14, 0x895cd7be); /* 12 */
+ DEF_MD5_FF(a, b, c, d, s_In32[12], DEF_MD5_S11, 0x6b901122); /* 13 */
+ DEF_MD5_FF(d, a, b, c, s_In32[13], DEF_MD5_S12, 0xfd987193); /* 14 */
+ DEF_MD5_FF(c, d, a, b, s_In32[14], DEF_MD5_S13, 0xa679438e); /* 15 */
+ DEF_MD5_FF(b, c, d, a, s_In32[15], DEF_MD5_S14, 0x49b40821); /* 16 */
+ DEF_MD5_GG(a, b, c, d, s_In32[ 1], DEF_MD5_S21, 0xf61e2562); /* 17 */
+ DEF_MD5_GG(d, a, b, c, s_In32[ 6], DEF_MD5_S22, 0xc040b340); /* 18 */
+ DEF_MD5_GG(c, d, a, b, s_In32[11], DEF_MD5_S23, 0x265e5a51); /* 19 */
+ DEF_MD5_GG(b, c, d, a, s_In32[ 0], DEF_MD5_S24, 0xe9b6c7aa); /* 20 */
+ DEF_MD5_GG(a, b, c, d, s_In32[ 5], DEF_MD5_S21, 0xd62f105d); /* 21 */
+ DEF_MD5_GG(d, a, b, c, s_In32[10], DEF_MD5_S22,  0x2441453); /* 22 */
+ DEF_MD5_GG(c, d, a, b, s_In32[15], DEF_MD5_S23, 0xd8a1e681); /* 23 */
+ DEF_MD5_GG(b, c, d, a, s_In32[ 4], DEF_MD5_S24, 0xe7d3fbc8); /* 24 */
+ DEF_MD5_GG(a, b, c, d, s_In32[ 9], DEF_MD5_S21, 0x21e1cde6); /* 25 */
+ DEF_MD5_GG(d, a, b, c, s_In32[14], DEF_MD5_S22, 0xc33707d6); /* 26 */
+ DEF_MD5_GG(c, d, a, b, s_In32[ 3], DEF_MD5_S23, 0xf4d50d87); /* 27 */
+ DEF_MD5_GG(b, c, d, a, s_In32[ 8], DEF_MD5_S24, 0x455a14ed); /* 28 */
+ DEF_MD5_GG(a, b, c, d, s_In32[13], DEF_MD5_S21, 0xa9e3e905); /* 29 */
+ DEF_MD5_GG(d, a, b, c, s_In32[ 2], DEF_MD5_S22, 0xfcefa3f8); /* 30 */
+ DEF_MD5_GG(c, d, a, b, s_In32[ 7], DEF_MD5_S23, 0x676f02d9); /* 31 */
+ DEF_MD5_GG(b, c, d, a, s_In32[12], DEF_MD5_S24, 0x8d2a4c8a); /* 32 */
+ DEF_MD5_HH(a, b, c, d, s_In32[ 5], DEF_MD5_S31, 0xfffa3942); /* 33 */
+ DEF_MD5_HH(d, a, b, c, s_In32[ 8], DEF_MD5_S32, 0x8771f681); /* 34 */
+ DEF_MD5_HH(c, d, a, b, s_In32[11], DEF_MD5_S33, 0x6d9d6122); /* 35 */
+ DEF_MD5_HH(b, c, d, a, s_In32[14], DEF_MD5_S34, 0xfde5380c); /* 36 */
+ DEF_MD5_HH(a, b, c, d, s_In32[ 1], DEF_MD5_S31, 0xa4beea44); /* 37 */
+ DEF_MD5_HH(d, a, b, c, s_In32[ 4], DEF_MD5_S32, 0x4bdecfa9); /* 38 */
+ DEF_MD5_HH(c, d, a, b, s_In32[ 7], DEF_MD5_S33, 0xf6bb4b60); /* 39 */
+ DEF_MD5_HH(b, c, d, a, s_In32[10], DEF_MD5_S34, 0xbebfbc70); /* 40 */
+ DEF_MD5_HH(a, b, c, d, s_In32[13], DEF_MD5_S31, 0x289b7ec6); /* 41 */
+ DEF_MD5_HH(d, a, b, c, s_In32[ 0], DEF_MD5_S32, 0xeaa127fa); /* 42 */
+ DEF_MD5_HH(c, d, a, b, s_In32[ 3], DEF_MD5_S33, 0xd4ef3085); /* 43 */
+ DEF_MD5_HH(b, c, d, a, s_In32[ 6], DEF_MD5_S34,  0x4881d05); /* 44 */
+ DEF_MD5_HH(a, b, c, d, s_In32[ 9], DEF_MD5_S31, 0xd9d4d039); /* 45 */
+ DEF_MD5_HH(d, a, b, c, s_In32[12], DEF_MD5_S32, 0xe6db99e5); /* 46 */
+ DEF_MD5_HH(c, d, a, b, s_In32[15], DEF_MD5_S33, 0x1fa27cf8); /* 47 */
+ DEF_MD5_HH(b, c, d, a, s_In32[ 2], DEF_MD5_S34, 0xc4ac5665); /* 48 */
+ DEF_MD5_II(a, b, c, d, s_In32[ 0], DEF_MD5_S41, 0xf4292244); /* 49 */
+ DEF_MD5_II(d, a, b, c, s_In32[ 7], DEF_MD5_S42, 0x432aff97); /* 50 */
+ DEF_MD5_II(c, d, a, b, s_In32[14], DEF_MD5_S43, 0xab9423a7); /* 51 */
+ DEF_MD5_II(b, c, d, a, s_In32[ 5], DEF_MD5_S44, 0xfc93a039); /* 52 */
+ DEF_MD5_II(a, b, c, d, s_In32[12], DEF_MD5_S41, 0x655b59c3); /* 53 */
+ DEF_MD5_II(d, a, b, c, s_In32[ 3], DEF_MD5_S42, 0x8f0ccc92); /* 54 */
+ DEF_MD5_II(c, d, a, b, s_In32[10], DEF_MD5_S43, 0xffeff47d); /* 55 */
+ DEF_MD5_II(b, c, d, a, s_In32[ 1], DEF_MD5_S44, 0x85845dd1); /* 56 */
+ DEF_MD5_II(a, b, c, d, s_In32[ 8], DEF_MD5_S41, 0x6fa87e4f); /* 57 */
+ DEF_MD5_II(d, a, b, c, s_In32[15], DEF_MD5_S42, 0xfe2ce6e0); /* 58 */
+ DEF_MD5_II(c, d, a, b, s_In32[ 6], DEF_MD5_S43, 0xa3014314); /* 59 */
+ DEF_MD5_II(b, c, d, a, s_In32[13], DEF_MD5_S44, 0x4e0811a1); /* 60 */
+ DEF_MD5_II(a, b, c, d, s_In32[ 4], DEF_MD5_S41, 0xf7537e82); /* 61 */
+ DEF_MD5_II(d, a, b, c, s_In32[11], DEF_MD5_S42, 0xbd3af235); /* 62 */
+ DEF_MD5_II(c, d, a, b, s_In32[ 2], DEF_MD5_S43, 0x2ad7d2bb); /* 63 */
+ DEF_MD5_II(b, c, d, a, s_In32[ 9], DEF_MD5_S44, 0xeb86d391); /* 64 */
+ *(((unsigned long *)s_Buffer) + 0) += a;
+ *(((unsigned long *)s_Buffer) + 1) += b;
+ *(((unsigned long *)s_Buffer) + 2) += c;
+ *(((unsigned long *)s_Buffer) + 3) += d;
+#if DEF_USE_STANDARD_C == (1)
+ memset(&s_In32[0], 0, sizeof(s_In32));
+#else
+ MZ_ZeroMemory(&s_In32[0], sizeof(s_In32));
+#endif
+}
+
+
+void MZ_MD5_Final(t_MD5_Context *s_Context, void *s_Digest)
+{
+ unsigned char s_MD5_Padding[64] = {0x80, 0,}, s_Bits[8];
+ unsigned long s_Index, s_PaddingLen;
+ MZ_MD5_Encode(s_Bits, s_Context->Count, 8);
+ s_Index = (unsigned long)((s_Context->Count[0] >> 3) & 0x3f);
+ s_PaddingLen = (s_Index < 56) ? (56 - s_Index) : (120 - s_Index);
+ MZ_MD5_Update(s_Context, s_MD5_Padding, s_PaddingLen);
+ MZ_MD5_Update(s_Context, s_Bits, 8);
+ MZ_MD5_Encode(s_Digest, s_Context->State, 16);
+#if DEF_USE_STANDARD_C == (1)
+ memset(s_Context, 0, sizeof(*s_Context)); 
+#else
+ MZ_ZeroMemory(s_Context, sizeof(*s_Context)); 
+#endif
+}
+
+#if DEF_USE_STANDARD_C == (1)
+int main(int s_Argc, char *s_Argv[])
+{
+ if(s_Argc > 1)
+ {
+  int s_Handle, s_ArgcCount = 1;
+  t_MD5_Context s_MD5_Context;
+  unsigned char s_Buffer[32 << 10];
+  unsigned char s_Digest[16];
+  int s_ReadSize;
+  unsigned long long s_TotalSize;
+  while(s_ArgcCount < s_Argc)
+  {
+   fprintf(stdout, "- Filename : \"%s\"\n", s_Argv[s_ArgcCount]);	  
+   s_Handle = open(s_Argv[s_ArgcCount], O_RDONLY);
+   if(s_Handle >= 0)
+   {
+    s_TotalSize = 0llu;	   
+    MZ_MD5_Init(&s_MD5_Context);
+    do
+    {
+     s_ReadSize = read(s_Handle, &s_Buffer[0], sizeof(s_Buffer));
+     if(s_ReadSize > 0)
+     {
+      MZ_MD5_Update(&s_MD5_Context, &s_Buffer[0], s_ReadSize);
+      s_TotalSize += (unsigned long long)s_ReadSize;
+     }
+    }while(s_ReadSize > 0);   
+    MZ_MD5_Final(&s_MD5_Context, &s_Digest[0]);
+    fprintf(stdout, "\t[MD5] Total %llu bytes, Digest=0x", s_TotalSize);
+    for(s_ReadSize = 0;s_ReadSize < sizeof(s_Digest);s_ReadSize++)fprintf(stdout, "%02X", s_Digest[s_ReadSize]);
+    fprintf(stdout, "\n");
+    close(s_Handle);
+   }   
+   else fprintf(stderr, "\t[ERROR] Can not open file !\n");
+   s_ArgcCount++;
+  } 
+ }
+ else fprintf(stderr, "Usage: %s <file> [...]\n", s_Argv[0]); 
+ return(0);
+}
+#else
+int MZ_val2str(void *s_Buffer, int s_Value, int s_Base)
+{
+ int s_Return, s_Index; char s_Num[] = "0123456789ABCDEF", s_String[8];
+ for(s_Index = 0;s_Value > 0;s_String[s_Index++] = s_Num[s_Value % s_Base], s_Value /= s_Base );
+ for(s_Return = s_Index;s_Index > 0;*(((char *)s_Buffer)++) = s_String[--s_Index]);
+ *((char *)s_Buffer) = '\0';
+ return(s_Return); 
+}
+
+void MZ_PrintVal(int s_Value, int s_Place, int s_Base)
+{
+ char s_String[8 + 1]; int s_Margin;
+ for(s_Margin = MZ_val2str(&s_String[0], s_Value, s_Base);s_Margin < s_Place;s_Margin++, s_Base == 10 ? MZ_Puts(" "): MZ_Puts("0"));
+ MZ_Puts(&s_String[0]);
+}
+
+int main(int s_Argc, char *s_Argv[])
+{
+ int s_Handle, s_ArgcCount = 1, s_ReadSize, s_TotalSize;
+ t_MD5_Context s_MD5_Context;
+ unsigned char s_Buffer[32 << 10];
+ MZ_Puts("MZ_dump v1.0.0 - Code by JaeHyuk Cho <minzkn@infoeq.co.kr>\n\n");
+ if(s_Argc > 1)
+ {
+  while(s_ArgcCount < s_Argc)
+  {
+   MZ_Puts("- Filename : \""); MZ_Puts(s_Argv[s_ArgcCount]); MZ_Puts("\"\n");	  
+   s_Handle = MZ_SYSTEMCALL_Open(s_Argv[s_ArgcCount], 0, 0);
+   if(s_Handle >= 0)
+   {
+    s_TotalSize = 0llu;	   
+    MZ_MD5_Init(&s_MD5_Context);
+    do
+    {
+     s_ReadSize = MZ_SYSTEMCALL_Read(s_Handle, &s_Buffer[0], sizeof(s_Buffer));
+     if(s_ReadSize > 0)
+     {
+      MZ_MD5_Update(&s_MD5_Context, &s_Buffer[0], s_ReadSize);
+      s_TotalSize += s_ReadSize;
+     }
+    }while(s_ReadSize > 0);   
+    MZ_MD5_Final(&s_MD5_Context, &s_Buffer[0]);
+    MZ_Puts("\t[MD5] Total "); MZ_PrintVal(s_TotalSize, 0, 10); MZ_Puts(" bytes, Digest=0x");
+    for(s_ReadSize = 0;s_ReadSize < 0x10;s_ReadSize++)MZ_PrintVal(s_Buffer[s_ReadSize], 2, 16);
+    MZ_Puts("\n");
+    MZ_SYSTEMCALL_Close(s_Handle);
+   }   
+   else MZ_Puts("\t[ERROR] Can not open file !\n");
+   s_ArgcCount++;
+  } 
+  MZ_Puts("\n");
+ }
+ else MZ_Puts("Usage: md5 <file> [...]\n");
+ return(0);
+}
+#endif
+
+/* End of source */
+}}}

@@ -1,0 +1,53 @@
+'''Jwiki 관리 위키'''
+
+=== 변경 히스토리 === 
+==== UTF8을 ECU_KR로 변경 ====
+ * 2003/11/27
+ * 블로그 메크로에서 UTF8문자열로 출력되는 바람에 문자가 깨졌는데 이 문재 해결
+{{{#!vim php
+// 파일 이름 : plugin/rss.php 
+if (function_exists('iconv') and strtoupper($DBInfo->charset) != $charset)
+{
+  $new=iconv($charset,$DBInfo->charset,$out);
+}
+else
+{
+  // rss.php의 macro_Rss()함수
+  $despec = array(
+    0 => array("pipe", "r"),
+    1 => array("pipe", "w"),
+    2 => array("file", "/tmp/iconvout/", "w")
+    );
+    $process = proc_open("/usr/bin/iconv -f utf8 -t euc-kr", $despec, $pipes);
+    if (is_resource($process))
+    {
+        fwrite($pipes[0], $out);
+        fclose($pipes[0]);
+        while(!feof($pipes[1]))
+        {
+            $new .= fgets($pipes[1], 1024);
+        }
+        fclose($pipes[1]);
+        return $new;
+    }
+    else
+    {
+        echo "Converting Error ";
+    }
+    // ...
+}}}
+
+==== 함수사전 찾기 메크로 추가 ====
+ * 2003/11/16
+ * Joinc의 함수사전을 이용할 수 있도록 메크로 추가, 메크로 이름은 function  
+{{{#!vim php 
+function macro_function($formatter,$value='')
+{
+  return <<<EOF
+<form action="http://www.joinc.co.kr/modules.php?name=Encyclopedia&file=search" method="post">
+<input type="text" size="20" name="query">&nbsp;&nbsp;
+<input type="hidden" name="eid" value="2"><input type="submit" value="함수찾기"></form>
+EOF;
+}
+}}}
+

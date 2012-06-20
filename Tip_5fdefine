@@ -1,0 +1,57 @@
+----
+ 1. #define를 이용해서 C코드 간략화 하기 
+ 1. #define를 이용한 C코드 간략화 
+ 1. [yundream]
+ 1. Version 0.2 
+ 1. 2005/8/16
+----
+
+=== 설명 ===
+C는 Java와는 달리 실행되기 전에 컴파일과정을 거치게 된다. 이는 컴파일과정을 거치면서 여러가지 조건을 정의할 수 있다는 것을 의미한다. 이러한 조건정의는 보통 #define, #ifdef를 이용하며, 이들을 이용하면 플랫폼간 조건을 따르는 컴파일등이 가능하다. 전체적으로 코드를 간략화 시킬 수 있다.
+
+다음은 간단한 사용 예다.
+{{{#!plain
+#ifdef sun
+	// solaris
+static char *port="/dev/ttya";
+#endif
+
+#ifdef linux
+	// linux
+static char *port="/dev/ttyS0";
+#endif
+}}}
+
+=== #define 문의 효용성을 알아보자 ===
+#define 문은 특히 플랫폼간 호환되는 코드를 만들기 위해서 유용하게 사용할 수 있다. 위의 예에서 처럼 플랫폼간 다른 환경정의를 위해서 유용하게 사용할 수 있다. 그런데 문제는 과연 플랫폼간 특성을 위한 환경값들이 어떤 값으로 #define 문을 통해 정의되어 있는가 하는 점이다. 
+
+c 컴파일러를 이용하면 이러한 미리정의된(pre-defined) 값들을 알아낼 수 있다. 다음은 리눅스의 예이다. 
+{{{#!plain
+# touch /tmp/foo.h ; cpp -dM /tmp/foo.h
+#define __linux__ 1
+#define linux 1
+#define __i386__ 1
+#define __i386 1
+#define i386 1
+#define __unix 1
+#define __unix__ 1
+#define __linux 1
+#define __ELF__ 1
+#define unix 1
+}}}
+
+다음은 솔라리스에서 실행한 예의 일부분이다.
+{{{#!plain
+bash-2.03#  touch /tmp/foo.h ; cpp -dM /tmp/foo.h
+#define __DBL_MIN_EXP__ (-1021)
+#define __FLT_MIN__ 1.17549435e-38F
+#define __CHAR_BIT__ 8
+#define __sparc 1
+#define __WCHAR_MAX__ 2147483647
+#define __DBL_DENORM_MIN__ 4.9406564584124654e-324
+#define sun 1
+#define __FLT_EVAL_METHOD__ 0
+...
+}}}
+
+=== 변경사항 ===

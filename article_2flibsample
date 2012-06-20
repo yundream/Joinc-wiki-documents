@@ -1,0 +1,290 @@
+[[TableOfContents]]
+
+== Sample 공유 라이브러리 생성 및 설치 ==
+
+'''작성자:''' mwyun([멍])
+
+간단한 Sample 공유 라이브러리 생성 및 설치 및 함수 포인터 활용 예제이다.
+
+== ldconfig로 공유라이브러리 경로 지정 ==
+
+=== 라이브러리 만들기 ===
+
+{{{#!plain
+$ cd /home/mwyun/sample <= 작업디렉토리로 이동
+$ gcc -fPIC -g -c -Wall samplelib.c
+$ gcc -shared -W1,-soname,libsample.so -o libsample.so samplelib.o
+}}}
+
+=== 공유라이브러리 설치 ===
+
+{{{#!plain
+$ su - <- root 계정으로 전환
+$ install -m 744 libsample.so /usr/local/lib
+$ install -m 644 samplelib.h /usr/local/include
+
+$ vi /etc/ld.so.conf
+ /usr/local/lib <- 추가
+
+$ ldconfig
+}}}
+
+===  컴파일 ===
+
+{{{#!plain
+$ gcc -o sample sample.c -lsample -L/usr/local/lib -I/usr/local/include
+$ samplelib.h 파일은 /usr/local/include 디렉토리에서 찾는다.
+}}}
+
+=== 실 행 ===
+
+{{{#!plain
+$ ./sample
+call pcore->func(200)
+Hello, World!: 200
+call stest->func(100)
+Hello, World!: 100
+}}}
+
+== 일반계정의 환경변수 LD_LIBRARY_PATH에 지정 ==
+
+=== 라이브러리 만들기 ===
+
+{{{#!plain
+$ cd /home/mwyun/sample <= 작업디렉토리로 이동
+$ gcc -fPIC -g -c -Wall samplelib.c
+$ gcc -shared -W1,-soname,libsample.so -o libsample.so samplelib.o
+}}}
+
+=== 공유라이브러 패스설정 ===
+
+{{{#!plain
+$ export "LD_LIBRARY_PATH=/home/mwyun/sample:$LD_LIBRARY_PATH"
+$ env
+...
+LD_LIBRARY_PATH=/home/mwyun/sample: <- 등록확인
+}}}
+
+또는 .bash_profile에서 추가하고 source .bash_profile를 실행시키거나 로그아웃하고 다시 로그인해도 된다.
+
+=== 컴파일 ===
+
+{{{#!plain
+$ gcc -o sample sample.c -lsample -L./ (-L/home/mwyun/sample)
+}}}
+samplelib.h 파일은 현재 디렉토리에서 찾는다.
+
+=== 실행 ===
+
+{{{#!plain
+$ ./sample
+call pcore->func(200)
+Hello, World!: 200
+call stest->func(100)
+Hello, World!: 100
+}}}
+
+2가지 방식 모두 정상적으로 실행되었음을 확인할 수 있다.
+
+==  Makefile을 이용 ==
+
+=== root 계정용 Makefile ===
+
+ '''Makefile'''
+{{{#!plain
+CC = gcc
+CFLAGS = -fPIC -g -c -Wall
+TARGET = sample
+SRCS = sample.c
+OBJS= sample.o
+
+INCPATH = /usr/local/include
+LIBPATH = /usr/local/lib
+
+LIBS = libsample.so
+LIBNAME = sample
+LIBSRCS = samplelib.c
+LIBOBJS = samplelib.o
+
+all: $(LIBS) install $(TARGET) 
+
+$(TARGET) : $(OBJS)
+	$(CC) -o $(TARGET) $(OBJS) -l$(LIBNAME) -L$(LIBPATH)
+
+$(OBJS) : $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) -I$(INCPATH)
+
+$(LIBS) : $(LIBOBJS)
+	$(CC) -shared -W1,-soname,$(LIBS) -o $(LIBS) $(LIBOBJS)
+	
+$(LIBOBJS) : $(LIBSRCS)
+	$(CC) $(CFLAGS) $(LIBSRCS)
+# -l$(INCPATH) -I.
+	
+clean: uninstall
+	rm -rf $(TARGET) $(OBJS) $(LIBS) $(LIBOBJS) core
+
+install:
+	install -c -m 744 $(LIBS) $(LIBPATH) 
+	install -c -m 644 samplelib.h $(INCPATH) 
+	echo "$(LIBPATH)" >> /etc/ld.so.conf 
+	/sbin/ldconfig
+
+uninstall:
+	rm -f /usr/local/include/samplelib.h
+	rm -f /usr/local/lib/$(LIBS)
+}}}
+
+{{{#!plain
+$ Makefile libsample.so
+$ Makefile install
+$ Makefile sample
+}}}
+
+또는 배치실행: 컴파일, 설치
+{{{#!plain
+$ make all
+}}}
+
+삭제
+{{{#!plain
+$ make clean
+}}}
+
+실행
+{{{#!plain
+$ ./sample
+call pcore->func(200)
+Hello, World!: 200
+call stest->func(100)
+Hello, World!: 100
+}}}
+
+=== 일반 계정용 Makefile.usr ===
+
+'''Makefile.usr'''
+{{{#!plain
+CC = gcc
+CFLAGS = -fPIC -g -c -Wall
+TARGET = sample
+SRCS = sample.c
+OBJS= sample.o
+
+INCPATH = /home/mwyun/sample
+LIBPATH = /home/mwyun/sample
+
+LIBS = libsample.so
+LIBNAME = sample
+LIBSRCS = samplelib.c
+LIBOBJS = samplelib.o
+
+all: $(LIBS) $(TARGET) 
+
+$(TARGET) : $(OBJS)
+	$(CC) -o $(TARGET) $(OBJS) -l$(LIBNAME) -L$(LIBPATH)
+
+$(OBJS) : $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) -I$(INCPATH)
+
+$(LIBS) : $(LIBOBJS)
+	$(CC) -shared -W1,-soname,$(LIBS) -o $(LIBS) $(LIBOBJS)
+	
+$(LIBOBJS) : $(LIBSRCS)
+	$(CC) $(CFLAGS) $(LIBSRCS)
+	
+clean: 
+	rm -rf $(TARGET) $(OBJS) $(LIBS) $(LIBOBJS) core
+}}}
+
+{{{#!plain
+$ make -f Makefile.usr libsample.so
+$ make -f Makefile.usr install
+$ make -f Makefile.usr sample
+}}}
+
+또는 배치실행: 컴파일, 설치
+
+{{{#!plain
+$ make -f Makefile.usr all
+}}}
+
+삭제
+{{{#!plain
+$ make -f Makefile.usr clean
+}}}
+
+실행
+{{{#!plain
+$ ./sample
+./sample: error while loading shared libraries: libsample.so: cannot open shared object file: No such file or directory
+}}}
+
+위와 같이 공유 라이브러리를 찾을 수 없다고 에러가 발생한다.
+그러면 다음과 같이 export를 이용해서 공유 라이브러리 경로를 지정해준다.
+
+{{{#!plain
+$ export "LD_LIBRARY_PATH=/home/mwyun/sample:$LD_LIBRARY_PATH"
+$ ./samplecall pcore->func(200)
+Hello, World!: 200
+call stest->func(100)
+Hello, World!: 100
+}}}
+
+== 소스파일 ==
+
+=== samplelib.h ===
+{{{#!plain
+#ifndef __SAMPLELIB_H_
+#define __SAMPLELIB_H_
+
+struct core {
+	void (*func)(int id);
+};
+
+void full(struct core *pcore, void (*pfunc)(int id));
+
+#endif
+}}}
+
+=== samplelib.c ===
+{{{#!plain
+#include "samplelib.h"
+#include <stdio.h>
+
+void full(struct core *pcore, void (*pfunc)(int id))
+{
+	pcore->func = pfunc;
+	printf("call pcore->func(%d)\n", 200);
+	pcore->func(200);
+}
+}}}
+
+=== sample.c ===
+{{{#!plain
+#include "samplelib.h"
+#include <stdio.h>
+
+struct core stest;
+void test(int id);
+
+int main(int argc, char *argv[])
+{
+	full(&stest, test); // call full function
+
+	printf("call stest->func(%d)\n", 100);
+	stest.func(100); // call test function
+
+	return 0;
+}
+
+void test(int id)
+{
+	printf("Hello, World!: %d\n", id);
+}
+}}}
+
+  [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_libsample?action=download&value=sample.zip 소스파일 다운로드 ]
+
+== 참조사이트 ==
+ [http://kldp.org/HOWTO/html/Program-Library-HOWTO/shared-libraries.html 참조사이트]
+

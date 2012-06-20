@@ -1,0 +1,414 @@
+----
+ 1. rel2abspath
+ 1. 상대경로를 절대 경로로 바꿔주는 함수
+ 1. [acidd15]
+ 1. Version 0.1.0 
+ 1. 2005/05/22 
+----
+
+=== 설명 ===
+상대 경로를 절대 경로로 바꾸어 줍니다.뭐 가끔씩 필요할 때가 있겠죠?
+주석 다는게 습관이 안되서 죄송합니다.:-0
+=== 사용방법 ===
+int rel2abspath(char *abs_path,char *rel_path,char **abs_path_new); 
+
+char *abs_path : 절대경로 즉 현재 위치의 절대경로를 지정한다.
+char *rel_path : 상대경로를 지정한다.
+char *abs_path_new : 상대경로를 계산한 새로운 절대경로를 받아온다.이 변수는 사용후에 free를 할 의무가 있다.
+
+example:
+
+  아래의 소스를 test.c에 저장한 후에 gcc -o test test.c 로 컴파일 한다.
+
+  whoshell$ ./test 'http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code_C_rel2abspath?action=edit&template=code_Template' '../../'
+
+  whoshell$ ./test 'http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code_C_rel2abspath?action=edit&template=code_Template' '../../somedoc'
+
+  whoshell$ ./test 'http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code_C_rel2abspath?action=edit&template=code_Template' '/somedoc'
+
+  whoshell$ ./test 'http://www.joinc.co.kr/modules/moniwiki/wiki.php/../somedoc' ''
+
+=== 코드 ===
+{{{#!plain
+#include <stdio.h> 
+#include <malloc.h> 
+#include <string.h> 
+
+typedef struct path_element_t{ 
+  char *element; 
+  struct path_element_t *prev; 
+  struct path_element_t *next; 
+} path_element; 
+
+int rel2abspath(char *,char *,char **); 
+
+int main(int argc,char **argv){ 
+
+  char *buf=NULL; 
+
+  if(argc==3){ 
+
+    rel2abspath(argv[1],argv[2],&buf); 
+    printf("RESULT: %s\n",buf); 
+    if(buf) free(buf); 
+
+  }else{ 
+
+    printf("Usage: %s [abs_path] [rel_path]\n",argv[0]); 
+    printf("\nExample: %s 'http://unstable.elemental.com/mozilla/build/latest/mozilla/caps/dox/nsBasePrincipal_8cpp.html#a0' '.././../////./../'\n",argv[0]); 
+    return 1; 
+
+  } 
+
+  return 0; 
+
+} 
+
+int rel2abspath(char *abs_path,char *rel_path,char **buf){ 
+
+  char *path_n=NULL; 
+  char *abs_path_n=NULL; 
+  char *first_sep=NULL; 
+  char *abs_second_sep=NULL; 
+  char *rel_second_sep=NULL; 
+  char *last_offset=NULL; 
+  char *temp_path=NULL; 
+  char *abs_doc=NULL; 
+  char *rel_doc=NULL; 
+  char chr; 
+  int len=0; 
+  int count=0; 
+  path_element *head=NULL,*cur=NULL,*prev=NULL,*temp=NULL; 
+
+  //char *abs_path="http://sdfdsf/sdff/sd"; 
+  //char *rel_path="../xxxx"; 
+
+  //printf("%s\n",abs_path); 
+  //printf("%s\n",rel_path); 
+
+  if((first_sep=(char *)strchr((const char *)abs_path,(int)':'))){ 
+
+    if(first_sep[1]=='/'&&first_sep[2]=='/'){ 
+
+      first_sep+=3; 
+
+      if((first_sep=(char *)strchr((const char *)first_sep,(int)'/'))){ 
+
+        ++first_sep; 
+
+      }else{ 
+
+        //printf("Error.Not found/.\n"); 
+        return 1; 
+
+      } 
+
+    }else{ 
+
+      //printf("Error.Not found //.\n"); 
+      return 2; 
+
+    } 
+
+  }else{ 
+
+    //printf("Error.Not found :.\n"); 
+    return 3; 
+
+  } 
+
+  if((abs_second_sep=(char *)strrchr((const char *)first_sep,(int)'/'))){ 
+
+    ++abs_second_sep; 
+    abs_doc=abs_second_sep; 
+
+    //printf("%s\n",abs_second_sep); 
+
+    if(rel_path[0]!='/'){ 
+      len=abs_second_sep-first_sep; 
+    }else{ 
+      len=0; 
+    } 
+
+    if((rel_second_sep=(char *)strrchr((const char *)rel_path,(int)'/'))){ 
+      len+=strlen(rel_path); 
+    } 
+
+    path_n=(char *)malloc(sizeof(char)*len+1); 
+
+    if(rel_path[0]!='/'){ 
+      memcpy(path_n,first_sep,abs_second_sep-first_sep); 
+
+      if(rel_second_sep){ 
+        rel_doc=rel_second_sep+1; 
+        memcpy(path_n+(abs_second_sep-first_sep),rel_path,rel_second_sep-rel_path); 
+      }else{ 
+        rel_doc=rel_path; 
+      } 
+    }else{ 
+      if(rel_second_sep){ 
+        rel_doc=rel_second_sep+1; 
+        memcpy(path_n,rel_path,rel_second_sep-rel_path); 
+      }else{ 
+        rel_doc=rel_path; 
+      } 
+    } 
+
+    path_n[len]='\0'; 
+
+    //printf("%s\n",path_n); 
+
+  }else{ 
+
+    abs_doc=first_sep; 
+    len=0; 
+
+    if((rel_second_sep=(char *)strrchr((const char *)rel_path,(int)'/'))){ 
+      len+=strlen(rel_path); 
+    } 
+
+    path_n=(char *)malloc(sizeof(char)*len+1); 
+
+    if(rel_second_sep){ 
+      rel_doc=rel_second_sep+1; 
+      memcpy(path_n,rel_path,rel_second_sep-rel_path); 
+    }else{ 
+      rel_doc=rel_path; 
+    } 
+
+    path_n[len]='\0'; 
+
+  } 
+
+  last_offset=path_n; 
+
+  while('\0'!=(chr=*(path_n+count))){ 
+
+    switch(chr){ 
+
+      case '/': 
+
+        cur=(path_element *)malloc(sizeof(path_element)); 
+        memset(cur,0x0,sizeof(path_element)); 
+        cur->next=NULL; 
+        if(head==NULL){ 
+          head=cur; 
+        }else{ 
+          prev->next=cur; 
+        } 
+        cur->prev=prev; 
+        prev=cur; 
+
+        len=sizeof(char)*((path_n+count)-last_offset); 
+        cur->element=(char *)malloc(sizeof(char)*len+1); 
+        memcpy(cur->element,last_offset,len); 
+        cur->element[len]='\0'; 
+        //printf("%s\n",cur->element); 
+        
+        last_offset=path_n+count+1; 
+
+        break; 
+
+      default: 
+
+    } 
+
+    ++count; 
+
+  } 
+
+  if((path_n+count)-last_offset>0){ 
+
+    cur=(path_element *)malloc(sizeof(path_element)); 
+    memset(cur,0x0,sizeof(path_element)); 
+    cur->next=NULL; 
+    if(head==NULL){ 
+      head=cur; 
+    }else{ 
+      prev->next=cur; 
+    } 
+    cur->prev=prev; 
+    prev=cur; 
+
+    len=sizeof(char)*((path_n+count)-last_offset); 
+    cur->element=(char *)malloc(sizeof(char)*len+1); 
+    memcpy(cur->element,last_offset,len); 
+    cur->element[len]='\0'; 
+    //printf("%s\n",cur->element); 
+
+  } 
+
+  cur=head; 
+  while(cur!=NULL){ 
+
+    temp=cur; 
+
+    if(memcmp(cur->element,".",1)==0&&strlen(cur->element)==1){ 
+
+      if(cur->prev==NULL&&cur->next==NULL){// 앞 엘리먼트와 다음 엘리먼트가 null 일 경우 
+        head=NULL; 
+        cur=NULL; 
+        free(temp); 
+      }else if(cur->prev==NULL&&cur->next){// 앞 엘리먼트만 null 일 경우 
+        head=cur->next; 
+        head->prev=NULL; 
+        cur=cur->next; 
+        free(temp); 
+      }else if(cur->prev&&cur->next==NULL){// 다음 엘리먼트만 null 일 경우 
+        (cur->prev)->next=NULL; 
+        cur=NULL; 
+        free(temp); 
+      }else{// 전부 null 이 아닐 경우 
+        (cur->prev)->next=cur->next; 
+        (cur->next)->prev=cur->prev; 
+        cur=cur->next; 
+        free(temp); 
+      } 
+
+    }else if(memcmp(cur->element,"..",2)==0&&strlen(cur->element)==2){ 
+
+      if(cur->prev==NULL&&cur->next==NULL){// 앞 엘리먼트와 다음 엘리먼트가 null 일 경우 
+        head=NULL; 
+        cur=NULL; 
+        free(temp); 
+      }else if(cur->prev==NULL&&cur->next){// 앞 엘리먼트만 null 일 경우 
+        head=cur->next; 
+        head->prev=NULL; 
+        cur=cur->next; 
+        free(temp); 
+      }else if(cur->prev&&cur->next==NULL){// 다음 엘리먼트만 null 일 경우 
+        if((cur->prev)->prev){ 
+          ((cur->prev)->prev)->next=NULL; 
+          free(cur->prev); 
+          cur=NULL; 
+          free(temp); 
+        }else{ 
+          head=NULL; 
+          free(cur->prev); 
+          cur=NULL; 
+          free(temp); 
+        } 
+      }else{// 전부 null 이 아닐 경우 
+        if((cur->prev)->prev){ 
+          ((cur->prev)->prev)->next=cur->next; 
+          (cur->next)->prev=(cur->prev)->prev; 
+          free(cur->prev); 
+          cur=cur->next; 
+          free(temp); 
+        }else{ 
+          head=cur->next; 
+          head->prev=NULL; 
+          free(cur->prev); 
+          cur=cur->next; 
+          free(temp); 
+        } 
+      } 
+
+    }else{ 
+
+      cur=cur->next; 
+
+    } 
+
+  } 
+
+  cur=head; 
+  while(cur!=NULL){ 
+
+    temp=cur; 
+
+    if(strlen(cur->element)==0){ 
+
+      if(cur->prev==NULL&&cur->next==NULL){ 
+        head=NULL; 
+        cur=NULL; 
+        free(temp); 
+      }else if(cur->prev&&cur->next==NULL){ 
+        (cur->prev)->next=NULL; 
+        cur=NULL; 
+        free(temp); 
+      }else if(cur->prev==NULL&&cur->next){ 
+        head=cur->next; 
+        head->prev=NULL; 
+        cur=cur->next; 
+        free(temp); 
+      }else{ 
+        (cur->prev)->next=cur->next; 
+        (cur->next)->prev=cur->prev; 
+        cur=cur->next; 
+        free(temp); 
+      } 
+
+    }else{ 
+
+      cur=cur->next; 
+
+    } 
+
+  } 
+  
+
+  cur=head; 
+  len=0; 
+  while(cur!=NULL){ 
+
+    //printf("0x%08x 0x%08x 0x%08x %s\n",cur->prev,cur,cur->next,cur->element); 
+    len+=strlen(cur->element); 
+    ++len; 
+      
+    cur=cur->next; 
+
+  } 
+
+  len+=first_sep-abs_path; 
+
+  if(rel_doc==NULL||strlen(rel_doc)==0){ 
+
+    len+=strlen(abs_doc); 
+
+  }else{ 
+
+    len+=strlen(rel_doc); 
+
+  } 
+
+  abs_path_n=(char *)malloc(len+1); 
+  temp_path=abs_path_n; 
+  memcpy(abs_path_n,abs_path,first_sep-abs_path); 
+  abs_path_n+=(first_sep-abs_path); 
+
+  cur=head; 
+  while(cur!=NULL){ 
+
+    memcpy(abs_path_n,cur->element,strlen(cur->element)); 
+    abs_path_n+=strlen(cur->element); 
+    abs_path_n[0]='/'; 
+    ++abs_path_n; 
+
+    cur=cur->next; 
+
+  } 
+
+  if(rel_doc==NULL||strlen(rel_doc)==0){ 
+
+    memcpy(abs_path_n,abs_doc,strlen(abs_doc)); 
+    abs_path_n+=strlen(abs_doc); 
+
+  }else{ 
+
+    memcpy(abs_path_n,rel_doc,strlen(rel_doc)); 
+    abs_path_n+=strlen(rel_doc); 
+
+  } 
+
+  abs_path_n[0]='\0'; 
+  (*buf)=temp_path; 
+
+  return 0; 
+
+} 
+}}}
+
+=== 변경사항 ===
+
+==== 2005/05/22 ====

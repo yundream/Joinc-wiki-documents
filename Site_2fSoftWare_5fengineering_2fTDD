@@ -1,0 +1,524 @@
+#title C++ 프로그램에서 TDD - Test Driven Development 적용해보기 
+
+[[TableOfContents]]
+== TDD ==
+TDD는 소프트웨어 개발을 위한 방법론으로 '''짧은 개발 사이클을 반복적으로 수행하는'''것을 기본으로 하고 있습니다. 이를 위해서 개발자들은 자동화된 테스트 케이스를 만들어서 새로운 기능을 개발하고 기존의 기능을 분석하는 과정을 수행합니다. 라고 정의하고 있습니다
+
+TDD는 개발 방법론으로  테스트의 종류와 범위, 방법 사용 툴등 광범위한 범위에 걸친 지식을 필요로 합니다. 소프트웨어 공학의 한 분야로 봐야 하죠. 때문에 다루어야 할 양이 굉장히 많을 수 있는데요.
+
+애초에 목적을 가지고 TDD(:12)를 공부한게 아니고, 프로젝트를 진행하다가 TDD(:12)를 적용해야 하는 상황에서 부득이하게 TDD를 적용하게 됐습니다. 그래서 TDD와 관련한 저의 경험을 위주로 지극히 실용적인 측면에서 관련 내용을 정리하려고 합니다. 처음엔 툴 위주로 정리할 거구요. 나중에 TDD에 대한 이해가 충분하다 싶으면 공학적 측면에서 접근을 해보도록 하렵니다.
+
+언어와 환경은 다음과 같이 특정 할겁니다.
+  * 운영체제 : Linux(:12)
+  * 프로그래밍 언어 : C++
+  * 컴파일러 : GNU(:12) 컴파일러
+  * 유닛 테스트 프로그램 : cppunit
+  * 코드 커버리지 : gcov
+
+TDD에 대한 공학적인 정보는 아래의 문서를 참고하시기 바랍니다. 
+  * [http://en.wikipedia.org/wiki/Test-driven_development wikipedia TDD] 
+  * [http://code.google.com/p/tddbook/downloads/detail?name=TDD_PT.pdf TDD 실천법과 도구]
+
+== TDD의 장점 ==
+TDD의 가장 기본은 '''자동화된 유닛 테스트''' 환경을 갖추는 건데요. 여러 툴 주에서 cppunit을 선택하기로 했습니다.
+
+코드를 만들때는 반드시 cppunit를 이용해서 유닛 테스트를 진행할 것을 감안해서 만들어야 합니다. 코드의 구조 자체가 자동화된 유닛 테스트에 맞춰지는 거죠. 이렇게 해서 얻을 수 있는 잇점은 다음과 같습니다.
+   * 초기 단계 부터 결함을 발견할 수 있다.
+      보통 초기 단계에 발견된 결함은 쉽게 해결할 수 있죠.
+   * 결함이 확산되는 걸 막을 수 있다.
+      초기 단계에 코드가 충분히 테스트가 안되서 버그를 가진 코드는 다른 코드에도 계속 영향을 미치게 됩니다. 처음에는 문제가 아닌 것처럼 보이지만 나중에 큰 문제가 되는 경우도 있죠. 이 경우 어디에서 문제가 발생했는지 찾기가 힘들어집니다. 일단 만들어진 테스트 케이스는 개발 사이클 마다 계속 테스트 됩니다. 문제가 확산되는 걸 막을 수 있죠.
+   * 새로운 결함이 생기는 걸 방지할 수 있다.
+      일단 만들어진 유닛 테스트 코드는 매 개발 사이클 마다 실행이 됩니다. 새로운 코드를 만들게 되면, 이전 코드에 영향을 끼치게 됩니다. 그래서 이전에 잘 작동하던 코드에 문제가 생길 수 있죠. 이런 문제는 테스트 전에는 찾기가 힘들기 때문에 그냥 지나치기가 쉬운데요. 유닛 테스트를 하면, 이런 문제를 방지할 수 있습니다.
+   * 효율적으로 테스트 되는 코드는 좋은 구조를 가진다.
+      객체지향(:12)을 이해하고 프로그램을 만들면, 단지 객체지향적으로 개발하는 것 만으로도 좋은 구조의 프로그램이 만들어집니다. 마찬가지로 효율적으로 테스트 가능하도록 만드는 것만으로 좋은 구조의 코드를 만들 수 있습니다.
+
+== TDD는 테스트 방법이 아니다. ==
+TDD는 테스트 방법이 아닙니다. 만들어진 코드를 가지고 테스트를 어떻게 잘 할 것인가에 대한게 아닙니다. 개발을 할때, 각 유닛이 어떻게 테스트될 것인가를 고민하면서 만드는 거죠. '''Test Driven''' 말 그대로, 테스트가 앞서고 그 뒤에 코딩하는 겁니다. 그러므로 코드를 만든 후 나중에 TDD 툴을 사용하는 것은 TDD가 아닙니다. 코딩이 앞서고 그 뒤에 테스트가 이루어진 경우이기 때문입니다. 그냥 TDD 툴을 사용한거죠.
+
+어떤 방식으로 TDD를 지향하면서 개발할 것인가는 프로그래머의 역량과 지향하는 바에 따라 달라질건데요. 제 방식은 글 말미에서 소개할 생각입니다. 물론 기대는 마세요. 저는 정통으로 TDD를 지향하거나 하지는 않으니까요. 그냥 필요한 부분에서 현재 가지고 있는 수준에서 적절하게 적용할 뿐입니다. 그리고 TDD에 대한 저의 수준은 초보단계입니다.
+
+== cppunit ==
+cppunit는 c++을 위한 unit test 도구입니다. JUnit이라는 Java Unit test 도구를 C++용으로 포팅한 프로그램이라고 하네요.
+
+=== 설치 ===
+apt-get으로 설치하면 됩니다.
+{{{#!plain
+# apt-get install libcppunit libcppunit-dev 
+}}}
+
+=== cppunit 간단 테스트 ===
+이제 cppunit 테스트를 해보기로 했습니다. 개발단계부터 TDD를 지향하도록 코드를 만들어야 겠지만, 사용방법이 궁금한 관계로 이미 만들어진 코드를 cppunit을 적용하기로 했습니다. 
+
+테스트할 코드로 [http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code/C++/Simple_Config_Reader 간단 설정파일 리더]를 선택했습니다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1MMWLn1RX9ZyvHfY39NhN6DTorkzSrN2vzfdf7MaFOeA&amp;w=607&amp;h=258">
+}}}
+
+헤더파일의 이름은 "cfgreader.h"로 저장을 했습니다. main함수를 포함한 소스코드는 아래와 같이 개발했습니다. 파일이름은 main.cpp, 테스트 파일도 물론 준비했죠. 테스트 파일의 이름은 test.cfg 
+{{{#!plain
+#include "cfgreader.h"
+
+int main(int argc, char **argv)
+{
+    Config *agentCfg;
+    int rtv;
+    agentCfg = new Config();
+    rtv = agentCfg->openCfg("test.cfg");
+    if (rtv == -1)
+    {
+        perror("Error");
+    }
+    rtv = agentCfg->findSection("PLUGIN");
+    if (!rtv)
+    {
+        return 1;
+    }
+    while(agentCfg->nextItem())
+    {
+        printf("%s : %s\n",agentCfg->getKey(), agentCfg->getValue());
+    }
+    return 0;
+}
+}}}
+잘돌아가는게 확인 됐습니다.
+
+그럼 cppunit를 이용해서 테스트 코드를 개발해보겠습니다.
+
+유닛 테스트를 위한 헤더파일의 이름은 cfgtest.h로 했습니다. 구현은 cfgtest.cpp에 두기로 했습니다. 
+
+cfgtest.h
+{{{#!plain
+#include <cppunit/TestFixture.h>
+#include <cppunit/extensions/HelperMacros.h>
+
+class CfgTest: public CPPUNIT_NS::TestFixture
+{
+  CPPUNIT_TEST_SUITE(CfgTest);
+  CPPUNIT_TEST (openTest);   // 테스트 메서드 추가
+  CPPUNIT_TEST (readTest);   // 테스트 메서드 추가
+  CPPUNIT_TEST_SUITE_END();
+  public:
+    void setUp(void);
+
+  protected:
+    void openTest();
+    void readTest();
+};
+}}}
+
+cfgtest.cpp
+{{{#!plain
+#include "cfgtest.h"
+#include "cfgreader.h"
+
+CPPUNIT_TEST_SUITE_REGISTRATION(CfgTest);
+
+void CfgTest::setUp(void)
+{ 
+} 
+
+/* 
+ * 설정파일 Open 테스트를 위한 테스트 모듈
+ * test.cfg2는 존재하지 않는 파일이니 -1이 리턴되야 겠죠.
+ */
+void CfgTest::openTest()
+{   
+  Config *cfg = new Config();
+  CPPUNIT_ASSERT(cfg->openCfg("test.cfg") == 1);
+  CPPUNIT_ASSERT(cfg->openCfg("test.cfg2") == -1);
+}   
+
+/*
+ * 설정 read 테스트 모듈
+ */
+void CfgTest::readTest()
+{
+  Config *cfg = new Config();
+  CPPUNIT_ASSERT(cfg->openCfg("test.cfg") == 1);
+
+  // 센션을 제대로 찾는지 확인하고,
+  CPPUNIT_ASSERT(cfg->findSection("PLUGIN") == 1);
+
+  // nextItem으로 키와 값을 잘 가져오는지 확인합니다.
+  CPPUNIT_ASSERT(cfg->nextItem() != NULL);
+  CPPUNIT_ASSERT(strcmp(cfg->getKey(), "CPU") == 0);
+  CPPUNIT_ASSERT(strcmp(cfg->getValue(), "libmycpu.so") == 0);
+
+  CPPUNIT_ASSERT(cfg->nextItem() != NULL);
+  CPPUNIT_ASSERT(strcmp(cfg->getKey(), "MEM") == 0);
+  CPPUNIT_ASSERT(strcmp(cfg->getValue(), "libmymem.so") == 0);
+  
+  // 더 이상 가져올 아이템이 없을 때 NULL을 반환하는지도 테스트 해야 겠죠.
+  CPPUNIT_ASSERT(cfg->nextItem() == NULL);
+ 
+  // 존재하지 않는 섹션을 요청할 경우 반환 값도 확인합니다. 
+  CPPUNIT_ASSERT(cfg->findSection("PLUGIN2") != 1);
+} 
+}}}
+
+unittest.cpp 파일입니다.
+{{{#!plain
+#include <cppunit/CompilerOutputter.h>
+#include <cppunit/extensions/TestFactoryRegistry.h>
+#include <cppunit/TestResult.h>
+#include <cppunit/TestResultCollector.h>
+#include <cppunit/TestRunner.h>
+#include <cppunit/BriefTestProgressListener.h>
+
+int main(int argc, char **argv)
+{
+    CPPUNIT_NS :: TestResult testresult;
+
+    CPPUNIT_NS :: TestResultCollector collectedresults;
+    testresult.addListener (&collectedresults);
+
+    CPPUNIT_NS :: BriefTestProgressListener progress;
+    testresult.addListener (&progress);
+    CPPUNIT_NS :: TestRunner testrunner;
+    testrunner.addTest (CPPUNIT_NS :: TestFactoryRegistry :: getRegistry ().makeTest ());
+    testrunner.run (testresult);
+
+    CPPUNIT_NS :: CompilerOutputter compileroutputter (&collectedresults, std::cerr);
+    compileroutputter.write ();
+
+    return collectedresults.wasSuccessful () ? 0 : 1;
+}
+}}}
+
+이제 컴파일 하면 됩니다.
+{{{#!plain
+#g++ -o unittest unittest.cpp cfgtest.cpp -lcppunit
+}}}
+
+유닛 테스트 프로그램을 실행하면 다음과 같은 결과를 확인할 수 있습니다.
+{{{#!plain
+$ ./unittest 
+CfgTest::openTest : OK
+CfgTest::readTest : OK
+OK (2)
+}}}
+openTest와 readTest모두 성공적으로 통과한걸 확인할 수 있습니다. ASSERT 함수의 조건을 실패로 만든다음에 테스트를 하면 다음과 같이 실패 정보가 뜨는 걸 확인할 수 있습니다. 
+{{{#!plain
+$ ./unittest 
+CfgTest::openTest : OK
+CfgTest::readTest : assertion
+cfgtest.cpp:25:Assertion
+Test name: CfgTest::readTest
+assertion failed
+- Expression: strcmp(cfg->getValue(), "libmycpu.so") == 1
+- CPU Library : 
+
+Failures !!!
+Run: 2   Failure total: 1   Failures: 1   Errors: 0
+}}}
+
+=== cppunit 매크로들 ===
+cppunit 테스트를 위한 매크로 입니다.
+|| CPPUNIT_ASSERT(condition) || condition이 true인지를 검사                                  ||
+|| CPPUNIT_ASSERT(message, condition) || 유저가 정의한 메시지와 함께 condition의 true를 검사 ||
+|| CPPUNIT_ASSERT_EQUAL(expected, actual) || 두개의 값이 같은지를 검사                       ||
+|| CPPUNIT_ASSERT_EQUAL_MESSAGE(expected, actual)  ||                                        ||
+|| CPPUNIT_ASSERT_THROW(expression, ExceptionType) || ExceptionType 예외 발생을 검사         ||
+|| CPPUNIT_ASSERT_ASSERTION_FAIL(assertion)   || assertion이 실패한 경우 테스트 통과         ||
+|| CPPUNIT_ASSERT_ASSERTION_PASS(assertion)   || assertion이 성공한 경우 테스트 통과         ||
+CPPUNIT_ASSERT로도 왠만한 테스트는 수행할 수 있을 것 같네요.
+
+== 코드 커버리지 ==
+이렇게 해서 유닛테스트를 진행했는데요. 프로젝트 관리자 입장에서는 프로그램의 코드가 유닛 테스트를 통해서 충분히 테스트 됐는지가 궁금할 겁니다. 이것을 '''코드 커버리지'''라고 합니다.
+
+처음엔 유닛 테스트의 테스트 성공률로 오해를 했었드랬죠. 
+
+코드 커버리지의 개념은 간단합니다. 유닛테스트를 하면, 유닛 테스트로 실행되는 클래스 코드가 있을 건데요. 코드 커버리지 프로그램은 코드의 실행을 라인단위로 계수를 합니다. 그래서 전체 실행코드들 중 유닛 테스트로 몇 %가 실행됐는지를 백분율로 나타내는 겁니다. 
+
+1000라인으로 구성된 프로그램을 유닛테스트로 테스트했는데, 500라인이 실행됐다면 코드 커버리지는 50%가 되는 거죠.
+=== gcov ===
+다양한 코드 커버리지 프로그램이 있던데, gnu cc에서 제공하는 gcov를 사용하기로 했습니다. 코드커버리지 정보를 남길려면 '''-fprofile-arcs -ftest-coverage'''플래그로 컴파일 해야 합니다.
+{{{#!plain
+#g++ -o unittest unittest.cpp cfgtest.cpp -lcppunit -fprofile-arcs -ftest-coverage -g
+}}}
+
+컴파일하고 unittest 프로그램을 실행하면, 프로그램과 함께 실행된 코드에 대한 정보가 파일로 남습니다. 
+{{{#!plain
+# ./unittest
+}}}
+
+우리가 궁금한 것은 유닛 테스트에 사용한 cfgtest.cpp가 소스코드의 어느 정도 라인을 커버하는지이므로 다음과 같이 cfgtest.cpp에 대해서 gcov를 확인합니다. 
+{{{#!plain
+# gcov cfgtest.cpp
+... ...
+... ...
+File '/usr/include/cppunit/extensions/TestFixtureFactory.h'
+Lines executed:100.00% of 5
+/usr/include/cppunit/extensions/TestFixtureFactory.h:creating 'TestFixtureFactory.h.gcov'
+
+... ...
+... ...
+File 'cfgreader.h'
+Lines executed:93.48% of 46
+cfgreader.h:creating 'cfgreader.h.gcov'
+
+... ...
+}}}
+
+그러면 프로그램과 관련된 모든 코드에 대한 테스트 커버리지가 %로 표시가 됩니다. 우리가 관심있어하는 cfgreader.h의 경우 46라인에 대해서 93.48%의 커버리지를 보여주고 있군요. vi로 cfgreader.h.gcov 파일을 열어보겠습니다. 
+{{{#!plain
+        -:   38:    // 주어진 문자열을 Key와 Value로 나눈다.
+        2:   39:    int Split(char *data)
+        -:   40:    {
+        -:   41:        char *sp, *ep;
+        2:   42:        memset(key, 0x00, 80);
+        2:   43:        memset(value, 0x00, 256);
+        2:   44:        sp = strstr(data, "=");
+        2:   45:        ep = strstr(data, "\n");
+        2:   46:        memcpy(key, data, sp-data);
+        2:   47:        key[sp-data+1] = '\0';
+        -:   48:
+        2:   49:        memcpy(value, sp+1, (ep-sp));
+        2:   50:        value[ep-sp-1] = '\0';
+        2:   51:    }
+        -:   52:
+... ...
+... ...
+        -:  103:    char *getValue(string Section,char *Name)
+        -:  104:    {
+        -:  105:        rewind(fp);
+        -:  106:        char buf[256];
+        -:  107:        int NameLen = strlen(Name);
+        -:  108:        string SectionName;
+        -:  109:        SectionName = "["+Section+"]";
+        -:  110:        section_find = 0;
+        -:  111:        value[0] = '\0';
+        -:  112:        while(fgets(buf, 255, fp))
+        -:  113:        {
+        -:  114:            if (buf[0] == '#')
+        -:  115:               continue;
+        -:  116:
+        -:  117:            if (section_find == 1)
+        -:  118:            {
+        -:  119:                if(strncmp(buf, Name, NameLen) == 0)
+        -:  120:                {
+        -:  121:                    printf("%s", buf);
+        -:  122:                    Split(buf);
+        -:  123:                    return value;
+        -:  124:                }
+        -:  125:            }
+        -:  126:            else if (strncmp(SectionName.c_str(), buf, Section.length()+2) == 0)
+        -:  127:            {
+        -:  128:                printf("Find\n");
+        -:  129:                last_seek = ftell(fp);
+        -:  130:                printf("Last_seek %d\n", last_seek);
+        -:  131:                section_find = 1;
+        -:  132:            }
+        -:  133:        }
+        -:  134:        return NULL;
+        -:  135:    }
+
+}}}
+프로그램 실행중 해당 코드가 몇 번 호출되었는지에 대한정보가 나와 있군요. Split 메서드는 모두 테스트가 된걸 알 수 있습니다. 반면 getValue 메서드에 대한 테스트가 이루어지지 않았군요. getValue를 테스트에 참가시켜야 겠죠. 
+
+그래서 getValue 메서드에 대한 테스트 코드를 추가했습니다. 
+{{{#!plain
+  CPPUNIT_ASSERT( strcmp(cfg->getValue("PLUGIN", "CPU"), "libmycpu.so") == 0 );
+}}}
+컴파일 후 unittest를 실행하고 cfgtest.cpp에 대해서 gcov를 적용했더니 다음과 같은 결과가 나오네요.
+{{{#!plain
+File 'cfgreader.h'
+Lines executed:92.19% of 64
+cfgreader.h:creating 'cfgreader.h.gcov'
+}}}
+64라인 중 92.19%가 테스트가 이루어졌군요. 테스트 커버리지가 64라인으로 늘어났지만, 동시에 테스트 안된 코드가 늘어남으로써 전체 라인에 대한 테스트율은 좀 떨어졌습니다. vi로 살펴보죠. 
+{{{#!plain
+        -:  102:    // section과, key를 이용해서 value를 얻어온다.
+        1:  103:    char *getValue(string Section,char *Name)
+        -:  104:    {
+        1:  105:        rewind(fp);
+        -:  106:        char buf[256];
+        1:  107:        int NameLen = strlen(Name);
+        1:  108:        string SectionName;
+        1:  109:        SectionName = "["+Section+"]";
+        1:  110:        section_find = 0;
+        1:  111:        value[0] = '\0';
+       17:  112:        while(fgets(buf, 255, fp))
+        -:  113:        {
+       16:  114:            if (buf[0] == '#')
+    #####:  115:               continue;
+        -:  116:
+       16:  117:            if (section_find == 1)
+        -:  118:            {
+        1:  119:                if(strncmp(buf, Name, NameLen) == 0)
+        -:  120:                {
+        1:  121:                    Split(buf);
+        1:  122:                    return value;
+        -:  123:                }
+        -:  124:            }
+       15:  125:            else if (strncmp(SectionName.c_str(), buf, Section.length()+2) == 0)
+        -:  126:            {
+        1:  127:                last_seek = ftell(fp);
+        1:  128:                section_find = 1;
+        -:  129:            }
+        -:  130:        }
+    #####:  131:        return NULL;
+        -:  132:    }
+}}}
+'''####'''으로 표시된게, 실행이 안된 코드입니다. 여기에서 주석에 대한 테스트와, 설정 값을 찾지 못했을 경우에 대한 테스트가 이루어지지 않았음을 확인할 수 있습니다. cfg파일에 주석을 추가하고, 설정에 없는 섹션과 이름으로 테스트를 하면 테스트 커버리지를 늘릴 수 있겠죠.
+
+이런식으로 유닛테스트와 테스트 커버리지를 확인하면서, 코드의 완성도를 높이는 거죠. 테스트 커버리지는 가능한 100%가 되게 해서 모든 예외에 대한 테스트를 끝마치는게 좋겠지만, 프로그램의 특성에 따라서 90%나 80% 정도로 유연하게 잡으면 됩니다.
+
+=== lcov와 genhtml로 커버리지 통계 문서 만들기 ===
+이렇게 코드 커버리지를 테스트하긴 했지만 눈으로 보기에는 힘겹죠. lcov와 genhtml을 이용하면 커버리지 테스트 결과를 잘 정돈된 HTML(:12)문서로 변환해 줍니다.
+
+먼저 lcov 명령으로 커버리지 데이터에서 측정 데이터를 뽑아냅니다. lcov가 없다면 apt-get 등으로 설치하시고요.
+{{{#!plain
+# lcov -c -d unittest.dir/ -o lcov.cov
+}}}
+
+이제 genhtml로 html문서를 만듭니다.
+{{{#!plain
+# genhtml lcov.cov -o covhtml
+}}}
+covhtml 밑에 HTML 문서들이 만들어집니다. 확인해 볼까요 ?
+
+[[loadpage(lcov)]]
+
+== mock 객체 ==
+가능한 모든 코드를 유닛 테스트에 포함해야 함은 당연할 겁니다. 코드 커버리지를 높여야 합니다. 그러다보면, 여러 함수와 모듈의 흐름을 테스트해야 하는 경우가 생길 수 있습니다. 몇 개의 함수가 모여서 하나의 작업을 끝낼 때, 각 함수의 상태가 변할 때 전체 결과에 어떤 영향을 미치는지를 테스트할 수 있어야 하기 때문이죠.
+
+이렇게 작업단위로 테스트를 하다보면, 시스템 함수라든지 외부 라이브러리 라든지 프로그래머가 직접 제어할 수 없는 함수가 테스트 과정에 포함될 수 있습니다. 소켓 프로그램을 만들어 본다고 가정해보죠.  
+{{{#!plain
+socket -> bind -> listen -> accept
+}}}
+위와 같은 과정을 포함한 모듈을 테스트 한다고 가정해 보죠. 그러면 소켓 함수를 시뮬레이션 할 수 있어야 할 겁니다. read(:2)와 write(:2)함수를 시뮬레이션하려면 좀 더 복잡해 지겠죠. 이때 사용하는개 '''mock 객체'''인데요. 실제 객체를 대신해서, 시뮬레이션 하는 객체라고 보시면 됩니다. 
+
+=== googlemock ===
+google에서 제공하는 mock 프레임 워크 입니다. 평가가 좋더군요. 하지만 구글 프레임워크를 선택하진 않았습니다. 귀찮아서요. 결국 만들어진 프레임워크를 선택해야 겠지만, 저는 지금 시간이 없거든요. 그래서 간단하게 직접 만들어서 사용하게 됐습니다. 권장할 만한 상황은 아니죠.
+
+mock 프레임워크는 나중에 시간이 되면 본격적으로 도입해야 할 것 같습니다.
+
+=== 직접 만들어서 사용 ===
+mock 프레임워크를 사용하는게 권장할 만한 방법이겠으나, 이러저러한 이유로 직접 만들어서 사용하기로 했습니다. 문제가 되는 것은 시스템 함수를 시뮬레이션 하는 거였는데, 전 다음과 같은 방법으로 해결했습니다.
+  * Wrapper 함수를 만든다. 이때 Wrapper 함수는 2개를 만든다. 실제 작동하는 프로그램에서 사용할 것과 유닛 테스트용으로 사용할 함수. 
+
+read, write 함수를 예로 하자면 다음과 같이 랩퍼함수를 만드는 거죠.
+{{{#!plain
+#ifdef UNITTEST 
+ssize_t Read(int fd, void *buf, size_t count)
+{
+    return Mock::mocki();
+}
+#else
+ssize_t Read(int fd, void *buf, size_t count)
+{
+    return read(fd, buf, count);
+}
+#endif
+}}}
+'''-DUNITTEST'''로 컴파일하면, Mock 객체를 포함한 Read 함수가 호출되는 식입니다. 
+
+유닛테스트용 함수들은 리턴 값을 제어할 수 있어야 합니다. 함수의 리턴 값에따른 테스트가 가능해야 하기 때문이죠. 그래서 리턴값을 queue(:12)에 넣어서, queue의 값을 반환하도록 다음과 같은 Mock 함수를 만들었습니다. 대략 이런 식으로 만들었다는 걸 보여주는 코드이니, 내용에는 너무 신경쓰지 마세요.
+
+{{{#!plain
+#include <queue>
+namespace Mock
+{
+    queue<int> rtvi;
+    int mocki()
+    {
+        int rtv = rtvi.front();
+        rtvi.pop();
+        return rtv;
+    }
+    void will_return(int a)
+    {
+        rtvi.push(a);
+    }
+}
+}}}
+
+유닛 테스트 코드에서는 다음과 같이 사용하겠죠. TestCode는 Socket, Listen, Bind, Accept를 포함하고 있다고 가정하겠습니다. 
+{{{#!plain
+Mock::will_return(1);  // Socket
+Mock::will_return(1);  // Listen 
+Mock::will_return(1);  // Bind
+Mock::will_return(-1); // Accept
+CPPUNIT_ASSERT(TestCode());
+}}}
+그러면 socket, listen, bind가 1을 반환하는 것으로 시뮬레이션 되겠죠. accept는 -1이구요. 이제 will_return 값을 변경하는 것으로 함수의 조건이 변할 때를 테스트할 수 있습니다.  
+
+위의 will_return 함수는 사용하기가 불편합니다. queue에 넣고 꺼내가는 방식이라서 어느 함수가 어떤 값을 꺼내가는지가 한눈에 들어오지를 않습니다. 그러므로 아래 처럼 '''이름''' 기반으로 바꿀 필요가 있습니다.
+{{{#!plain
+Mock::will_return("Socket", 1);  // Socket
+}}}
+이렇게 하면 더 명확하겠죠. 그리고 int 값만 지정하고 있다는 문제가 있는데요. 다른 값들도 지정할 수 있도록 확장을 해야 겠죠. 
+
+그리고 추가해야 할 기능이 있는데요. read 함수를 시뮬레이션 한다고 가정해 보겠습니다. 그냥 리턴값만 지정해줘도 되겠지만, 값까지 넘겨야 테스트 과정이 명확할 겁니다. 어떤 값을 읽어와서 그것을 처리한 결과를 테스트할 수 있어야 하기 때문이죠. 이를 위해서 대략 다음과 같은 구조의 Mock 함수를 추가했습니다. 고도화 하는 건 머리를 좀 굴려야 할거구요. 여기에서는 방식만. 
+{{{#!plain
+namespace Mock
+{
+    void *cvalue;
+    int clen;
+    void set_value(void *value, ssize_t len)
+    {
+      cvalue = value;
+      clen = len; 
+    }
+    void get_value(void *buf)
+    {
+      memcpy(buf, cvalue, clen);
+    }
+}
+}}}
+
+이렇게 사용하려면 Read 랩퍼함수도 좀 변경 되야 겠죠.
+{{{#!plain
+ssize_t Read(int fd, void *buf, size_t count)
+{
+    Mock::get_value(buf);
+    return len;
+}
+}}}
+
+대략 이런 개념으로 만들었습니다. 음 간단하게 테스트 하는데는 큰 문제가 없긴 하더군요. 하지만 결국 검증된 mock 프레임워크로 갈아타야 하지 않을까라는 생각을 하고 있습니다.
+
+== cmake와 TDD ==
+빌드 프로그램으로 cmake(:12)를 사용하고 있습니다. automake에 비해서 아주 아주 아주 간단하게 사용할 수 있기 때문인데요. Unit Test를 위한 cmake 파일을 만들어봤습니다. 설명은 주석으로 대신했습니다. 쉽게 이해할 수 있을 겁니다.
+
+CMakeLists.txt
+{{{#!plain
+PROJECT(cfgreader)
+
+# 인클루드할 헤더파일의 위치 -I 옵션과 대응합니다.
+INCLUDE_DIRECTORIES(./)
+
+#################
+# 프로젝트 실행 파일 빌드용
+#################
+ADD_EXECUTABLE(cfgreader main.cpp)
+SET_TARGET_PROPERTIES(cfgreader PROPERTIES COMPILE_FLAGS -O0)
+
+#################
+# 유닛 테스트용 
+#################
+ADD_EXECUTABLE(unittest unittest.cpp cfgtest.cpp)
+
+# 유닛 테스트를 위해서 cppunit를 링크합니다.
+# 소스 커버리지 검사를 위해서 gcov를 링크합니다.
+# -lcppunit -lgcov 와 대응합니다.
+TARGET_LINK_LIBRARIES(unittest cppunit gcov)
+
+# 유닛 테스트와 코드 커버리지를 위한 컴파일 플래그를 지정합니다.
+SET_TARGET_PROPERTIES(unittest PROPERTIES COMPILE_FLAGS "-g -fprofile-arcs -ftest-coverage -DUNITTEST -DUNITTEST")
+}}}
+
+cmake 명령으로 Makefile을 만들고 make를 돌려주면 됩니다.
+{{{#!plain
+# cmake .
+# make cfgreader
+# make unittest
+}}}
+
+유닛테스트 결과 파일은 ./CMakeFiles/unittest.dir 에 만들어 집니다. gcov로 커버리지를 테스트하면 됩니다. 참 편합니다.
+
+== 관련 글 ==
+ * [wiki:Site/Development/Forum/manager/FlowDevelopment Flow 기반 프로그래밍]
+[[Category(14)]]

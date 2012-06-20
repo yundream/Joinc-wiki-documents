@@ -1,0 +1,271 @@
+#title bit 단위 선언
+[wiki:article_bit_단위_선언 HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>bit 단위 선언</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>dreamyun@yahoo.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>
+		네트웍 처리속도가 상당히 빨라지긴 했지만, 여전히 네트웍 자원은 
+		매우 중요하며, 특히 기업용 네트웍 어플리케이션을 제작할때는 
+		해당 어플리케이션이 어느정도의 네트웍 트래픽을 사용하는지가 
+		상당히 중요하다.   
+	</para>
+	<para>
+		이번장에서는 이러한 트래픽을 줄이기 위한 간단한 팁을 
+		소개하고자 한다. 	
+	</para>
+</section>
+
+<section>
+	<title>비트단위 선언</title>
+	<section id="bit">
+		<title>네트웍 프로토콜 처리를위한  비트단위 구조체 선언</title>
+		<para>
+			당신이 네트웍 프로그래밍에 관심을 가지고 있다면 
+			아마도 아래와 같은 IP 헤더구조를 많이 보아왔을것이다.  
+			<figure>
+				<title>IP 헤더구조</title>
+				<graphic fileref=http://www.joinc.co.kr/albums/album01/aaz.gif>
+			</figure>
+			위의 헤더를 보면 Version, IHL 등은 4bit 크기를 가진다. 
+			거기에 Flags 같은걸 보면 3비트 크기를 가진다. 어떻게 이런 비트단위 
+			선언이 가능할까?  
+		</para>
+		<para>
+			물론 계산기 노가다를 이용하면 
+			32bit int 형 변수를 하나 선언한다음에, 
+			Version, IHL, TOS, Total Length 에 들어갈 값으로 비트연산을 
+			해서 집어 넣으면 될것이다. 이걸 사용하는 측에서도 미리 
+			정의된 값을 이용해서 비트연산을 해서 값을 빼오면 
+			될것이다. 그러나 보통 복잡한게 아니다.          
+		</para>
+		<para>
+			다행히도 C 에서는 bit 단위로 선언할수 있도록 허용하고 있다. 
+			다음은 ip.h 에 선언되어 있는 ip 구조체이다.    
+		</para>
+		<para>
+			<emphasis>ip 구조체</emphasis>
+			<screen>
+struct ip
+  {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    unsigned int ip_hl:4;       /* header length */
+    unsigned int ip_v:4;        /* version */
+#endif
+#if __BYTE_ORDER == __BIG_ENDIAN
+    unsigned int ip_v:4;        /* version */
+    unsigned int ip_hl:4;       /* header length */
+#endif
+    u_int8_t ip_tos;            /* type of service */
+    u_short ip_len;         /* total length */
+    u_short ip_id;          /* identification */
+    u_short ip_off;         /* fragment offset field */
+#define IP_RF 0x8000            /* reserved fragment flag */
+#define IP_DF 0x4000            /* dont fragment flag */
+#define IP_MF 0x2000            /* more fragments flag */
+#define IP_OFFMASK 0x1fff       /* mask for fragmenting bits */
+    u_int8_t ip_ttl;            /* time to live */
+    u_int8_t ip_p;          /* protocol */
+    u_short ip_sum;         /* checksum */
+    struct in_addr ip_src, ip_dst;  /* source and dest address */
+  };
+			</screen>
+			ip.h 는 /usr/include/netinet 디렉토리에 위치한다. 
+			이 경로는 Linux Kernel 2.4.x 의 경우에 해당하며, 운영체제에 
+			따라 약강 다를수도 있다. 
+		</para>
+		<para>
+			위의 ip 구조체를 보면 version 과 header length 선언이 
+			ip_hl:4; ip_v:4; 와 같이 된걸 볼수 있을것이다. 이게 비트단위 
+			처리를 위한 선언방법이다. 
+		</para>
+		<para>
+			예를 들어 1bit 크기를 가지는 a 라는 변수를 선언하고 싶다면, 
+			a:1 이런식으로 선언하면 된다. 
+		</para>
+	</section>
+	<section>
+		<title>bit 단위 선언을 사용하는 이유</title>
+		<para>
+			이유는 주로 네트웍 응용 프로그램에서 패킷의 크기를 줄이기 
+			위한 목적으로 사용한다. IP 헤더의 Version 필드의 경우 
+			4bit 로 잡을경우 버젼 15 까지 나타낼수 있을것이다. 
+			그런데 이걸 int 형으로 잡을 경우 28bit 의 공간을 낭비하게 된다.  
+			낭비도 보통 낭비가 아니다. 하나의 패킷으로 봐서는 고작해야 
+			5-6 바이트 정도의 낭비이겠지만, 수많은 패킷이 돌아다니는 
+			네트웍상에서는 이러한 낭비가 쌓여서 전체 네트웍 의 성능을 
+			떨어트리게 될것이다. 이것을 인터넷으로 확대 시키면 엄청난 
+			양이 될것이다.   
+		</para>
+		<para>
+			네트웍 응용 어플리케이션을 제작할때도 이러한 규칙은 적용된다. 
+			가능하면 허용하는 한도내에서 전송되는 패킷의 크기를 줄이는 게 
+			여러모로 이익이다. '0' 혹은 '1' 의 값을 세팅하기 위해서 
+			굳이 4byte 혹은 2byte 크기의 int 나 short int 를 사용할 
+			필요는 없다.  
+		</para>
+		<para>
+			물론 왠만한 응용 어플이라면 굳이 저렇게 까지 bit 를 짜내어가면서 
+			플밍을 할필요는 없을것이다. 그러나 계속적으로 프로그래밍을 하다보면 
+			bit 단위로 짜내어야할 필요가 있을 그 때가 찾아온다.     
+		</para>
+	</section>
+	<section>
+		<title>테스트 코드</title>
+		<para>
+			다음은 간단한 테스트 코드이다.  
+		</para>
+		<para>
+			<emphasis>예제 : bit.c</emphasis>
+			<screen>	
+#include &lt;sys/types.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define LINUX_OS    1
+#define WIN_NT_OS   2
+#define WIN_DS_OS   3
+#define SUN_OS      4
+#define UNIX        5
+typedef struct __bit_dc
+{
+    unsigned int ver:4;
+    unsigned int len:4;
+    unsigned int hops:8;
+
+    unsigned int os:4;
+    unsigned int flag:1;
+    unsigned int type:1;
+    unsigned int pad:8;
+}bit_dc;
+
+struct t
+{
+    int a;
+};
+
+int main()
+{
+
+    bit_dc mybit;
+
+    memset((void *)&amp;mybit, 0x00, sizeof(mybit));
+    mybit.ver = 2;
+    mybit.len = 4;
+    mybit.hops = 32;
+    mybit.os = LINUX_OS;
+    mybit.flag = 1;
+    mybit.type = 0;
+
+    printf("sizeof  : %d\n", sizeof(mybit));
+    printf("version : %d\n", mybit.ver);
+    printf("lenth   : %d * 32\n", mybit.len);
+    printf("hops    : %d\n", mybit.hops);
+    printf("flag    : %d\n", mybit.flag);
+
+    return 1;
+}
+			</screen>
+			위의 코드를 실행해 보면 예상되는 값들이 출력될것이다.  
+		</para>
+	</section>
+	<section>
+		<title>bit 단위 선언시 주의해야 할점 - padding</title> 
+		<para>
+			운영체제는 보통 word 단위로 데이타를 처리하는걸 원칙으로 
+			한다. C 의 경우 기본 자료형인 int, long, char 등에 대해서는 
+			컴파일러가 그 사이즈를 분명하게 알고 있음으로, 각 형에 할당된 
+			크기만큼을 이용해서 작업을 하겠지만, 
+			구조체(struct) 의 경우에는 그 사이즈가 고정되어 있는게 아니다. 
+			그래서 보통의 컴파일러는 word 단위로 사이즈를 계산하도록 
+			되어 있다. 다음과 같은 구조체가 정의 되어 있다고 가정해보자 
+			<screen>
+struct __bit_dc2
+{
+    int ver:4;
+    int len:4;
+};
+			</screen>
+			실제 구조체가 사용하는 크기는 8bit 이겠지만, sizeof 를 이용해서 
+			크기를 계산해보면 4(byte)로 계산되어서 나올것이다. 
+			32bit 운영체제에서 1word 는 4byte 이기 때문이다. 
+			이렇게 word 단위로 메모리를 할당함으로써 생기는 여분의 쓰지않는 
+			공간이 생기는 것을 padding 이라고 한다. 그럼으로 
+			bit 단위로 구조체등을 
+			만들때는 padding 을 고려해서 작업을 해야 한다. 이를 고려하지 
+			않았을경우 만약 33bit 만큼 사용하도록 구조체가 선언되었다면 
+			이것의 sizeof 는 33 이 되는게 아니고 padding 이 발생해서 64bit 가 
+			되어 버린다. 31bit 를 낭비하는 셈이다. 
+			예제 bit.c 를 이용해서 실제로 테스트 해보기 바란다. 
+		</para>
+		<para>
+			이러한 padding 문제로 보통 구조체등을 선언 할때는 
+			여분의 공간이 있을경우 여분의 공간의 크기를 가지는 
+			쓰지않는 변수를 등록시킨다.  
+			<screen>
+struct __bit_dc2
+{
+    int ver:4;
+    int len:4;
+    int pad:24;  // (32-8)
+};
+			</screen>
+			<xref linkend="bit"> 에 있는 IP 해더구조를 봐도 32 bit 를 
+			채우기 위해서 padding 을 사용하고 있는걸 볼수 있다. 
+		</para>
+	</section>
+	<section>
+		<title>어디에 활용할수 있지?</title>
+		<para>
+			네트웍/시스템 프로그래밍에서 파일(혹은 패킷)의 크기를 줄이기 
+			위해서 사용할수 있을것이다(압축된 데이타를 만들수 있다). 
+			눈에 거의 보이지 않는 크기 감소이겠지만 
+			이러한 보이지 않는 크기를 생각해야 하는 경우를 대비할수 있다.  
+		</para>
+		<para>
+			Key 를 만들수 있다. DB와 연동해서 어플리케이션을 만들어야 할 
+			물론 각각의 값을 가지는 여러개의 필드로 구성할수 있지만, 
+			잘못하면 원본 데이타보다 인덱스(index) 데이타의 크기가 더 커질수 
+			있다. 
+			위의 방법을 잘 활용하면 하나의 필드를 이용해서 특정데이타의 키를 
+			생성할수 있다. 한마디로 DB 효율을 높일수 있다.    
+		</para>
+	</section>
+</section>
+
+<section>
+	<title>결론</title>
+	<para>
+		int:4; 와 같은 선언을 프로그래밍 용어로 뭐라고 하는지 
+		모르겠네요. 적당한 용어가 생각나지 않아서 
+		그냥 bit 단위 선언이라고 했는데, 용어 아시는분의 답변을 
+		부탁드립니다.(byte align 이라고 들어본것 같기는 한데 -.-?) 
+	</para>
+</section>
+
+</article>
+}}}

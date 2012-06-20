@@ -1,0 +1,124 @@
+#title 유닉스 환경 변수
+ 1. HTML포맷을 wiki포맷으로 변경
+ 1. main()의 인자로 환경변수 가져오는 방법 추가 
+
+환경변수는 실행 프로그램들에 운영체제(12) 의 환경과 실행 프로그램의 환경을 알려주기 위해서 주로 사용된다. 이러한 환경변수는 shell 에서 set 명령을 이용해서 확인가능하다.
+{{{#!plain
+[yundream@localhost test]$ set
+HOME=/home/yundream
+BASH=/bin/bash
+LANG=en_US
+TERM=xterm-color
+LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mysql/lib
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+....
+}}}
+
+쉘상에서 echo 명령어를 통해서도 가능하다.
+{{{#!plain
+[yundream@localhost test]$ echo $HOME
+/home/yundream
+}}}
+위의 환경변수들이 세팅되어 있기 때문에, 해당 프로그램들은 현재 사용자가 어떤 터미널을 사용하는지, 어떤 언어환경인지, 실행프로그램을 찾기 위해서 어떤 디렉토리를 검색해야 하는지를 알수 있게 된다. 이러한 환경변수의 조작은 setenv(3), getenv(3), putenv(3) 를 통해서 이루어진다.
+{{{#!plain
+#include <string.h>                                                            
+#include <stdio.h>                                                            
+#include <stdlib.h>                   
+#include <unistd.h>                                                             
+                                                                                
+#define LOG_FILE_NAME "my.dump"                                                 
+int main(int argc, char **argv)
+{
+    char *tmp_dir;
+    char log_file[30];
+    char *my_env;
+
+    int  fd;
+    if ((tmp_dir = getenv("TMP_DIR")) ==NULL)
+    {
+        printf("TMP_DIR 이 세팅되어 있지 않습니다\n" 
+               "TMP_DIR 를 먼저 세팅하셔야 합니다\n");
+        exit(0);
+    }
+
+    memset(log_file, '\0', 30);
+    sprintf(log_file, "%s/%s", tmp_dir, LOG_FILE_NAME);
+    printf("log_file is %s\n", log_file);
+
+    printf("your home directory is %s\n", getenv("HOME"));
+
+    my_env = (char *) malloc(40);
+    memset(my_env, '0', 40);
+
+    sprintf(my_env, "%s=%s", "USER_ENV", "hello yundream");
+
+    putenv("TEST_ENV=hello world");
+    putenv(my_env);
+    printf("여기에서 부터는 execl\n");
+
+    execl("/bin/sh","sh",0);
+}
+}}}
+
+위의 프로그램을 컴파일 해서 실행시켜 보자. 처음에 실행시키면,
+TMP_DIR 환경변수를 검사해서 이 값이 세팅되어 있지 않으면 에러메시지를
+보내고 프로그램이 종료되도록 되어 있다. 그러므로 먼저 TMP_DIR을 세팅해 주어야
+한다. 
+
+bash 쉘이라면
+{{{#!plain
+[yundream @localhost test]$ export TMP_DIR="/tmp"
+}}}
+
+csh 쉘이라면
+{{{#!plain
+[yundream @localhost test]$ setenv TMP_DIR="/tmp"
+}}}
+로 설정할수 있다. 환경변수 TMP_DIR 의 설정을 마치고 프로그램을 실행하면, setenv 를 통해서 환경변수 TMP_DIR 의 내용과 HOME 의 내용을  제대로 가져옴을 볼수 있을것이다.
+
+그리고 putenv() 를 이용해서 새로운 환경변수를 설정했다. putenv 의 사용법은
+쉘에서 처럼 '''변수명=값''' 의 형식으로 설정하면된다. 주의 할점은 putenv() 에 값을 입력할때, char * 형일경우 반드시 메모리 할당을 한 값을
+입력해야 한다는 점이다.
+
+putenv 를 마치고 나면 execl 함수를 이용해서 새로 쉘을 띄운다. 새로 뜬 쉘에서 echo $USER_ENV, echo $TEST_ENV 명령을 사용해 보면 putenv 를 통한 환경 설정이 제대로 적용되었음을 알수 있을것이다. 그러나 exit 를 통해서 원래 쉘로 되돌아온 다음에 echo 를 이용해보면 USER_ENV, TEST_ENV 의 값이 출력되지 않음을 보게 될것이다.
+
+putenv 와 setenv 를 통해서 설정된 환경변수는 현재프로그램과 그 프로그램에서 파생된(fork 혹은 exel 된) 프로그램에만 적용되기 때문이다.
+
+환경변수를 제대로 사용하면 프로그램의 작성이 매우 간편해짐을 알수 있다. 매번 복잡하게 프로그램의 인수로 프로그램을 작동시키는데 필요한 각종 설정을 입력할 필요도 없고, 프로그래밍 하기 곤란한 설정파일을 파싱하는 루틴을 만들필요도 없기 때문이다.
+
+단점은 프로그램의 사용자에게 사용상의 혼란을 줄수가 있다는 점과, 환경변수의 특성상, 해당환경변수를 100% 신뢰할수 없다라는 문제가 그것이다. 물론 전자의 경우는 사용자에게 메뉴얼을 숙지할수 있도록해주면 되고 (오라클을 설치할경우도 우리는 오라클 설치에 필요한 많은 환경설정을 위해서 메뉴얼을 숙지해야 한다). 후자의 경우도 이론상 100% 신뢰할수 없다라는 것이고, 약간만 주의를 기울인다면 문제 발생의 여지는 거의 없다고 할수 있다.
+
+환경변수는 프로세스의 스택영영에 저장되되고, putenv(), getenv()는 스택영영에 대한 사용자 레벨에서의 제어를 가능하도록 도와준다. 이외에도 좀더 낮은 수준에서 환경변수를 읽어 올 수 있는데, main()함수의 3번째 인자를 이용하는 방법이다. main()함수의 3번째 인자는 환경변수가 저장된 주소를 가르키며, 우리는 이 포인터를 이용해서 환경변수를 얻어올 수 있다. 다음은 간단한 예제 코드다 
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+
+int main(int argc, char **argv, char **env)
+{
+    while(*env)
+    {
+        printf("%s\n", *env);
+        env++;
+    }
+}
+}}}
+위의 프로그램을 실행시키면 다음과 같은 결과를 출력할 것이다. 결과는 물론 시스템에 따라서 달라질 수 있다.
+{{{#!plain
+[root@yundream test]# ./env 
+SSH_AGENT_PID=997
+KDE_MULTIHEAD=false
+HOSTNAME=yundream
+TERM=xterm
+SHELL=/bin/bash
+DESKTOP_STARTUP_ID=yundream;1079054007;831298;1040
+HISTSIZE=1000
+GTK2_RC_FILES=/etc/gtk-2.0/gtkrc:/root/.gtkrc-2.0:/root/.kde/share/config/gtkrc
+GS_LIB=/root/.fonts
+GTK_RC_FILES=/etc/gtk/gtkrc:/root/.gtkrc:/root/.kde/share/config/gtkrc
+WINDOWID=62914580
+OLDPWD=/root
+QTDIR=/usr/lib/qt-3.2
+KDE_FULL_SESSION=true
+USER=root
+....
+}}}

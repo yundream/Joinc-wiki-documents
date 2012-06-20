@@ -1,0 +1,81 @@
+#title Sajax - 간단한 PHP Ajax 프레임워크
+[[TableOfContents]]
+== 소개 ==
+Ajax를 이용한 웹 애플리케이션을 제작하는데 있어서 가장 큰 문제가 되는 것은 JavaScript의 사용이 될 것이다. 그래서 개발을 도와줄 툴킷을 찾고 있었다. 여러개의 툴킷 중에서 GWT와 Sajax에 특별히 관심이 가서, 우선 간단해 보이는 Sajax를 사용하고 평가해 보기로 했다. Sajax를 선택한 이유는 개인적으로 익숙한 PHP(:12)환경이기 때문이다. 
+
+Sajax는 http://www.modernmethod.com 에서 개발/배포하고 있다.
+
+== Sajax의 사용 ==
+=== 다운로드 ===
+http://www.modernmethod.com/sajax/download.phtml 에서 최신 Sajax를 다운로드 받을 수 있다. 테스트 환경은 다음과 같다.
+ * Sajax 0.12
+ * Linux Kernel(:12) 2.4.x
+ * PHP 5.x + Apache(:12) 2.x 
+
+=== 간단 예제 ===
+가장 먼저 '''Sajax라이브러리'''를 인클루드 시킨다.
+{{{#!html
+require("Sajax.php");
+}}}
+
+JavaScript 는 (적어도 내가 보기엔)상당히 다루기 까다로운 언어다. 게다가 언어의 성격과 스타일이 PHP와 많이 다르기 때문에, 특히나 JavaScript를 다루는데 어려움을 느낀다. Sajax는 PHP로 만든 함수를 JavaScript로 export 시킴으로써 이러한 문제를 해결하고 있다.  
+
+다음과 같은 방법으로 Sajax를 초기화 하고 PHP함수를 export 시킨다.
+{{{#!plain
+function multiply($x, $y)
+{
+	return $x * $y;
+}
+
+$sajax_request_type = "GET";
+sajax_init();
+sajax_export("multiply");        // 함수를 export 시킨다.
+sajax_handle_client_requeust();  // client instance를 생성한다.
+}}}
+
+이제 HTML 코드를 만든다.
+{{{#!plain
+<html>
+<head>
+	<title>Test</title>
+	<script>
+<?
+	sajax_show_javascript();
+?>
+	function set_math_result(result)
+	{
+		document.getElementById("z").value = result;
+	}
+	function do_the_math()
+	{
+		var x,y;
+		x = document.getElementById("x").value;
+		y = document.getElementById("y").value;
+
+		sajax_request_type = "POST";
+		x_multiply(x, y, set_math_result);
+	}
+	</script>
+</head>
+<body>
+<form name="f" action="#" return false;">
+	<input type="text" name="x" id="x" value="2" size="4"> *
+	<input type="text" name="y" id="y" value="4" size="4">
+	=
+	<input type="text" name="z" id="z" value="" size="5">
+	<input type="button" name="check" value="Calculate"
+onclick="do_the_math(); return false;">
+</form>
+</body>
+</html>
+}}}
+[http://www.joinc.co.kr/sajax.php 테스트 페이지]
+
+=== 주요 전역변수 ===
+ * sajax_version : sajax version
+ * sajax_debug_mode : 디버깅 모드를 활성화 할것인지를 결정, 기본은 0
+ * sajax_request_type : request type 설정, 기본은 GET
+ * sajax_remote_uri : 요청 URI, 기본은 현재 페이지
+ * sajax_failure_redirect : 실패했을 경우 부를 페이지
+
+위의 예제의 경우 '''sajax_remote_uri'''를 별도로 지정하지 않았으므로, 현재 페이지에 대해서 요청이 이루어진다.

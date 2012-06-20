@@ -1,0 +1,659 @@
+#title 리틀 엔디언과 빅 엔디언
+
+[[TableOfContents]]
+
+== yundream의 Endian 문서 ==
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>endian 에 대해서</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>endian 에 대해서</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>endian 에 대한 기초지식</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN13"
+>자세한 데이타 방식</A
+></DT
+></DL
+></DD
+><DT
+>2&#51208;. <A
+HREF="#AEN25"
+>Endian 이 실제 프로그래밍 환경에서 중요한가</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN29"
+>그럼 네트웍 상에서 어떤 문제가 발생하는가</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN43"
+>그럼 Endian 문제의 해결방법은 ?</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN53"
+>또 다른 해결책은 없나요</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN57"
+>Endian 체크하기</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN63"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. endian 에 대한 기초지식</A
+></H1
+>
+<P
+>		아마 네트웍 프로그래밍을 조금 해보았다면, Little-Endian, Big-Endian 
+		이라는 말을 들어 보았을것이다. 때로 order byte, byte order 라고 
+		말하기도 하며, 작은 끝돌이, 큰 끝돌이(--;) 라고 말하기도 한다. 
+		작은 끝돌이, 큰 끝돌이는 김치하 교수의 번역서에서 볼수 있는 단어들이다. 
+	</P
+><P
+>		결론부터 말하자면 엔디안 이란 컴퓨터에서 데이타가 저장되는 순서를 말하는 것이다. 
+		컴퓨터에서 데이타 저장은 여러분도 잘 아시다 시피 byte 단위로 저장이 된다. 그런데 
+		이 단위 저장을 할때 각 제조업체(CPU)에 따라서 저장이 되는 순서가 서로 다르다. 
+		예를들어 우리가 자주 사용하는 32bit 정수의 경우 한번에 4byte 의 데이타가 저장이 
+		되는데, 이때 가장 낮은 바이트부터 저장을 하는 방식이 있고, 가장 높은 바이트부터 
+		저장을 하는 방식이 존재한다. 전자를 Little Endian 이라고 하며, 후자를 Big Endian 
+		이라고 한다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>1.1&#51208;. 자세한 데이타 방식</A
+></H2
+><P
+>			즉 Little Endian 저장방식이 적용될경우 다음과 같이 저장되게 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    I : 32 bit int 형정수
+
+
+    |   1byte   |
+    +-----------+-----------+-----------+-----------+
+    |    I1     |    I2     |    I3     |    I4     |   
+    +-----------+-----------+-----------+-----------+
+
+ addr A   addr A+1      addr A+2     addr A+3
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			반면 Big Endian 은 다음과 같이 데이타가 저장될 것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    I : 32 bit int 형정수
+
+
+    |   1byte   |
+    +-----------+-----------+-----------+-----------+
+    |    I4     |    I3     |    I2     |    I1     |   
+    +-----------+-----------+-----------+-----------+
+
+ addr A   addr A+1      addr A+2     addr A+3
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			보면 알겠지만 서로 반대되는 순서로 데이타가 저장이 됨을 알수 있을것이다. 
+		</P
+><P
+>			그럼 좀더 실제적인 예를들어 보도록 하겠다. Little Endian 을 적용하는 가장 
+			대표적인 CPU는 Intel 계열 CPU 이며, Big Endian 을 적용하는 가장 대표적인 
+			CPU 는 Sparc 계열 CPU 이다. 
+		</P
+><P
+>			우리는 Endian 의 테스트를 위해서 간단한 쏘쓰를 하나 제작할 것이다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : endian.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main(int argc, char **argv)
+{
+    int fd;
+    int data=123456789;
+    char c[4];
+    fd = open("test_bin", O_CREAT|O_WRONLY);
+
+    write(fd, (void *)&#38;data, sizeof(int));
+    memcpy(c, (void *)&#38;data, sizeof(int));
+
+    close(fd);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램은 test_bin 이라는 이름의 파일을 open 한다음 int 형 정수를 
+			쓰는 일을한다. 우리는 위의 프로그램을 Intel Linux 와, Sparc Solaris 에서 
+			각각 실행시켜서 그 결과를 알아볼것이다. Sparck Solaris 에서 위의 프로그램을 
+			컴파일,실행한후 생성되는 test_bin 파일을 ftp 등을 통해서 리눅스로 가져와서 
+			테스트한다(동일한 환경에서 테스트하는게 혼동을 피할수 있음으로).  
+		</P
+><P
+>			Linux 에서 위의 프로그램을 실행후 만들어진 파일을 test_bin_linux 로 이름을 바꾸고, 
+			Solaris 에서 만들어진 파일은 test_bin_solaris 로 이름을 바꾸고 나서 od(1) 프로그램을 
+			이용해서 그값을 확인해 보았다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco endian]# od -x test_bin_linux 
+0000000 cd15 075b
+0000004
+[root@coco endian]# od -x test_bin_solaris 
+0000000 5b07 15cd
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 결과를 보면 Little Endian 과 Big Endian 의 차이점을 쉽게 이해할수 
+			있을것이다. 저장방식이 바이트 단위로 서로 전혀 반대임을 알수 있다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR>
+}}}
+[[adsense]]
+{{{#!html
+<H1
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2&#51208;. Endian 이 실제 프로그래밍 환경에서 중요한가</A
+></H1
+><P
+>		Endian 에 의한 byte order 은 해당 시스템의 CPU 에서 신경을 쓰므로, 
+		단지 하나의 시스템에서만 프로그래밍 작업을 한다면 Endian 에 대해서 
+		전혀 신경 쓸필요가 없다. 
+	</P
+><P
+>		그러나 네트웍프로그래밍을 할경우 이기종간의 (예를 들어 Sparc 과 Intel) 
+		통신을 염두에 두어야만한다. 이럴경우 Endian 에 신경을 써주지 않으면 
+		전혀 엉뚱한 결과를 가지고 오게 된다.   
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>2.1&#51208;. 그럼 네트웍 상에서 어떤 문제가 발생하는가</A
+></H2
+><P
+>			이번에는 서버 클라이언트 프로그램을 만들어 보도록 하자. 서버 프로그램은 
+			Sparc 솔라리스에, 클라이언트 프로그램은 Inten Linux 에서 각각 작동하도록 
+			할것이다.  
+		</P
+><P
+>			다음은 서버 프로그램이다.
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>server.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+#include &#60;sys/time.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd, sockfd;
+    struct sockaddr_in clientaddr, serveraddr;
+
+    int fd_num;
+
+    int state, client_len;
+    int i, maxi, maxfd;
+    int data;
+
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sockfd == -1)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+
+    bzero(&#38;serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    if(bind (server_sockfd, (struct sockaddr
+             *)&#38;serveraddr, sizeof(serveraddr)) &#60; 0)
+    {
+        perror("bind error ");
+        exit(0);
+    }
+
+    if (listen(server_sockfd, 5) &#60; 0)
+    {
+        perror("listen error : ");
+        exit(0);
+    }
+
+    client_sockfd = accept(server_sockfd, (struct
+                    sockaddr *)&#38;clientaddr, &#38;client_len);
+    read(client_sockfd, (void *)&#38;data, sizeof(int));
+    printf("%d&#92;n", data);
+    close(client_sockfd);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+		</P
+><P
+>			다음은 클라이언트 프로그램이다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>client.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+int main(int argc, char **argv)
+{
+    int client_sockfd;
+    struct sockaddr_in clientaddr;
+    int data = 123456789;
+    int client_len;
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr("192.168.100.190");
+    clientaddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(clientaddr);
+
+    if (connect(client_sockfd, (struct sockaddr *)&#38;clientaddr, client_len) &#60; 0)
+    {
+        perror("Connect error : ");
+        exit(0);
+    }
+
+    write(client_sockfd, (void *)&#38;data, sizeof(int));
+    close(client_sockfd);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			클라이언트는 123456789 를 보내고 서버는 이값을 받아서 출력하는 
+			단순한 일을한다. 그럼 각각의 쏘쓰를 솔라리스와 리눅스로 옮겨서 
+			컴파일후 작동시켜보도록 하자. 서버측에서는 다음과 같은 
+			결과를 보여줄것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@solaris test]# ./server 12345
+365779719
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			분명 클라이언트는 123456789 를 보냈는데, 서버측에서는 전혀 다른 값을 
+			출력시킨다. 이유는 간단한다 Endian 이 달라서 데이타의 byte 가 역전되어 
+			있기 때문이다.   
+		</P
+><P
+>			그럼 이문제를 어떻게 해결해야 할까. 인테넷 상에는 그야말로 다양한 시스템이 
+			존재하고 시스템마다 Endian 차이가 존재할건데, 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.2&#51208;. 그럼 Endian 문제의 해결방법은 ?</A
+></H2
+><P
+>			가장 간단한 해결방법은 Endian 이 Big 이든 Little 이든 하나로 통일시키는  
+			거겠지만 이건 사실 불가능하다. 그럼 생각할수 있는 방법이 
+			공통되는 Endian 으로 변환 시킨다음에 
+			자신의 데이타를 전송하는 방법이 될것이다. 그러면 전송하는 측이나 전송받는 측이나 
+			이 공통되는 Endian 을 알고 있을 것임으로 byte order 를 시킬수 있을것이다. 	 
+		</P
+><P
+>			그래서 network byte order 이란것이 존재한다. 즉 network 로 데이타를 보낼때는 
+			무조건 하나의 Endian 으로 통일을 시키는 것이다. network byte order 는 
+			Big Endian 을 따른다. 그러므로 우리는 시스템에 관계없이 무조건 byte 를 
+			Big Endian 에 맞도록 byte order 를 시킨다음에 네트웍을 통해서 외부로 보내면 
+			된다. 받는 측에서는 자기에게 들어오는 Endian 이 Big 으로 통일되어 있음으로 
+			Big Endian 을 자신의 Endian 에 맞도록 byte order 시켜주면 될것이다.  
+		</P
+><P
+>			C 는 이러한 byte order 를 위한 함수를 제공한다. 
+			함수가 하는 일은 자신의 host byte order 을 network byte order 에 맞게 
+			변경시켜주는 것과, network byte order 을 자신의 host byte order 에 맞게 
+			변경시켜주는 2가지 군의 함수를 제공한다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;netinet/in.h&#62;
+
+unsigned long int htonl(unsigned long int hostlong);
+unsigned short int htons(unsigned short int hostshort);
+
+unsigned long int ntohl(unsigned long int netlong);
+unsigned short int ntohs(unsigned short int netshort);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			htonl 과 htons 는 host to network 즉 host byte order 를 network byte order 로 
+			변경시켜주며, ntohs 는 network to host 로 그 반대로 변경 작업을 한다.  
+		</P
+><P
+>			그렇다면 위의 쏘스들에서 port 지정을 위해서 왜 htons 를 
+			사용하는지를 알수 있을것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>serveraddr.sin_port = htons(atoi(argv[1]));
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			자신의 host byte order 를 network byte order 로 변경 시키는 
+			작업이다. linux 의 경우 little endian 을 따르는 byte order 를 
+			하는데 만약 nework byte order 로 변경시키지 않는다면, 
+			자기가 입력한것과 전혀 다른 port 가 전달될것이다. 
+			예를 들어 349 번 포트를 htons 없이 지정했다면 34049 가 
+			지정된것으로 전달될것이다. 결국 원하는 포트를 찾지 못하는 
+			결과를 가져올 것이다. 
+		</P
+><P
+>			이제 위의 코드를 어떻게 변경시켜야 할지 감을 잡았을 것이다. 
+			data 를 보내는 측에서는 htonl 을 이용해서 host byte order 로 
+			변경시켜주고, 받는 측(서버) 에서는 ntohl 을 이용해서 
+			network byte order 를 자신에게 맞도록 변경시켜주면 된다.  
+			다음과 같이 코드를 각각 변경시키면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>client.c
+========
+data = htonl(data);
+write(client_sockfd, (void *)&#38;data, sizeof(int));
+
+server.c
+========
+printf("%d&#92;n", ntohl(data));
+close(client_sockfd);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>2.3&#51208;. 또 다른 해결책은 없나요</A
+></H2
+><P
+>			byte order 함수를 사용해서 Little/Big Endian 문제의 해결은 
+			했지만, 조금만 생각해보면 이 방법이 꽤 불편할수 있다는걸 
+			알수 있다. 데이타를 보낼적엔 반드시 Endian 변환을 해줘야 
+			한다. 꽤 귀찮은 작업이 될수 있다. 혹시라도 실수로 변환을 
+			하지 않을경우에는 어떻게 될지 알수 없다. 
+		</P
+><P
+>			그렇다면 byte order 에 신경쓸필요 없이 byte 단위로 데이타를 
+			보내면 될것이다. char 를 사용하는 것이다.  
+			char 은 1byte 의 크기를 가짐으로 byte order 에 신경쓸 
+			필요가 없이 사용가능하다. 그래서 많은 경우 네트웍 통신 
+			프로그래밍을 할경우 char 만을 이용해서 통신을 하도록 
+			하는 경우도 있다. 예를 들어 위의 12345678 을 int 형으로 보내는 
+			대신 문자열로 변환시켜서 전송하는 것이다. 이럴경우에는 
+			Endian 문제에 신경쓸필요가 없을것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN57"
+>2.4&#51208;. Endian 체크하기</A
+></H2
+><P
+>			다음과 같은 간단한 코드를 이용해서 시스템의 Endian 을 체크할수 있다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : endian_check.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int main()
+{
+    int i = 0x00000001;
+    if( ((char *)&#38;i)[0] )
+        printf( "Littile Endian&#92;n" );
+    else
+        printf( "Big Endian&#92;n" );
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 Endian 에 대해서 간단하게 알아보았다. 보통 int 형과 같이 
+		byte order 가 필요한 데이타 통신을 "binary 통신을 한다" 라고 
+		말한다. 최근에는 binary 통신을 사용하지 않고 단지 text(char) 만을 
+		이용해서 통신을 하는게 좀더 일반적인 추세이다. 그러나 어느 방식을 채택하든지 
+		사용하기에 간편한 방식을 택하면 될것이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+== 참고문헌 ==
+ * [wiki:article/endian mwyun님의 endian]
+ * [wiki:Code/C/endian endian 체크 프로그램]

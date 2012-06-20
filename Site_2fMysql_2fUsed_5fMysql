@@ -1,0 +1,76 @@
+#title Mysql 사용하기 
+
+''MySQL DB의 사용에 관한 위키''' 
+
+|| 만든날 	|| 2004/05/08 				||
+|| 관리자 	|| gururang				||
+|| 홈페이지	|| http://synova.zetyx.net  		||
+|| 이메일	|| [mailto:synova@empal.com]	||
+
+'''목차'''
+[[TableOfContents]]
+
+== SQL 기본 사용(1) ==
+{{{#!plain
+-Database 생성
+ create database [데이타베이스명];
+-Table 생성
+ create table [테이블명](
+   [필드 Type] [필드명] [옵션],
+              .
+              .
+   primary key([필드명])
+  );
+
+-Record 추가
+ insert into [table명] values ('..',.....);
+
+}}}
+
+
+== MySQL에서 계정추가+DB권한주기 ==
+{{{#!plain
+mysql> insert into user (host,user,password) values('localhost','사용자ID',password('비밀번호')); 
+mysql> insert into db values('localhost','DB명','사용자ID','y','y','y','y','y','y','y','y','y','y','y','y'); 
+mysql> flush privileges; 
+}}}
+
+== mysql 데몬이 뜨자마자 죽을때 ==
+ # bin/mysqld_safe &  하면 바로 
+ starting mysqld daemon with databases from /usr/local/mysql/var 
+ mysqld ended 
+
+라고 뜨는 에러는 접근권한을 주지않은 문제이다. 
+우선 mysql 유저와 mysql 그룹이 있는지 본후 없다면, 
+{{{#!plain
+ shelll> groupadd mysql               <======  mysql 계정을 추가
+ shell> useradd -g mysql mysql 
+ shell> cd /usr/local/mysql 
+ shell> bin/mysql_install_db          <====== DB설치
+ shell> chown -R root .                  <====== 디렉토리 권한 설정
+ shell> chown -R mysql data 
+ shell> chgrp -R mysql . 
+ shell> bin/mysqld_safe --user=mysql & 
+}}}
+이렇게 실행 시켜 주자. 
+
+== Mysql C API를 이용해서 프로그래밍 할시 동적 로딩파일 에러 ==
+{{{#!plain
+Mysql C API로 플밍을 한후 컴파일 과정까지 제대로 됐지만,
+
+error while loading shared libraries: libmysqlclient.so.12: cannot open shared object file: No such file or directory
+
+이라는 에러가 떳을경우..
+우선 저 libmysqlclient.so.xx (뒤에 xx는 버전..) 파일을 찾는다.
+find 를 사용해도 되지만, 보통 mysql이 설치된 디렉토리의 lib폴더 안에 있다.
+만약 /usr/local/mysql/lib 디렉토리에 libmysqlclient.so.xx 파일이 있다면
+/etc/ld.so.conf 파일에 저 경로 (/usr/local/mysql/lib) 를 추가해준후
+ shell> ldconfig  를 실행시켜준다.
+
+}}}
+
+== Mysql Error Code 정리 ==
+ [http://blog.naver.com/marine6309.do?Redirect=Log&logNo=100001965751] 
+
+== 관련 문헌 ==
+  1. [wiki:APM 윤드림의 APM 설치기]

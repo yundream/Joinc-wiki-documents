@@ -1,0 +1,45 @@
+#title joinc wiki comment 프로젝트
+
+=== 시작하기에 앞서 ===
+얼마전에 joinc(:12)의 wiki(:12)페이지에서 다른 blog(:12) 페이지로 trackback(:12)을 전송하기 위한 간단한 모듈을 개발했다. wiki에서 blog의 trackback라면 좀 생뚱맞은 감이 있긴 하지만 trackback를 '''편리한 링크'''의 관점에서 본다면 뭐, 그리 생뚱맞은 것은 아니라는 생각이 들기도 한다. 그래도 trackback이 단순한 link(:12)의 개념을 넘어선 상호 소통을 위한 툴의 개념으로 본다면 역시 덧글 시스템도 구현해야 되지 싶다는 생각이 들게 되었다. 
+
+joinc에서 사용하는 moniwiki는 자체적으로 comment module을 제공하긴 하는데, 여엉 마음에 들지를 않는다. 해서 sqlite(:12)기반으로 새로 만들기로 했다.
+
+귀차니즘을 극복할 수 있다면, 하루면 만들겠지 ?
+=== 주요 기능 ===
+댓글작성기가 가질 수 있는 최소한의 기능만을 포함하기로 했다. 아뭏든 복잡한건 싫다. 
+  1. UI
+    * 타이틀 : 제목은 적아야 하지 싶다. 
+    * 본문 : 본문도 있어야지
+    * 홈페이지 : 댓글남긴이의 홈페이지 주소 
+    * 패스워드 : 삭제/수정을 위해서 필요하겠다.
+  1. 스팸관리 : 스팸 이거 왕짜증이다. 우선 한글이 단 한자도 들어가 있지 않는 댓글은 필터링 시킬 생각이다. 그다음에는 주요 스팸패턴을 찾아서 필터링하는 방법을 사용할 생각이다. 그림문자등을 이용하는 방법도 있겠지만 귀찮다.  
+  1. 댓글의 댓글 : 깊이 1까지만의 댓글을 허용한다. 댓글의 댓글의 댓글의 댓글 이런거 귀찮다. 
+
+=== Table 구조 ===
+이 정도면 충분하겠지 ?
+ || Comment_ID      || int           || 일련번호                    ||
+ || Comment_PID     || int           || 댓글의 댓글을 남길때 사용   ||
+ || Comment_PAGE    || varchar(160)  || comment 남긴 페이지         ||
+ || Comment_TITLE   || varchar(160)  || 댓글 제목                   ||
+ || Comment_CONTENT || text          || 댓글 내용                   ||
+ || Comment_URL     || varchar(80)   || 댓글러 홈페지 주소          ||
+ || Comment_PASS    || varchar(80)   || 패스워드 그냥 crypt(:12)나 md5(:12) 이용해야지 ||
+ || Comment_DATE    || datetime      || comment 남긴 날             ||
+
+{{{#!plain
+create table comment 
+(
+	Comment_ID        int NOT NULL,
+	Comment_PID       int,
+	Comment_PAGE      varchar(160),
+	Comment_TITLE     varchar(160),
+	Comment_CONTENT   text,
+	Comment_URL       varchar(80), 
+	Comment_PASS      varchar(80),
+	Comment_DATE      datetime,
+	PRIMARY KEY (Comment_ID)
+);
+}}}
+
+

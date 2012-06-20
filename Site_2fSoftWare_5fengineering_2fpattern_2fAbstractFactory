@@ -1,0 +1,153 @@
+#title Abstract Factory pattern
+
+=== Abstract Factory pattern ===
+Abstract Factory pattern 은 Factory:::pattern(:12)를 추상화 시킨 패턴이다. 즉 구체적인 클래스의 정의를 하지 않고, 인터페이스만 제공하게 함으로써 실제 구현은 상속된 클래스를 통해서 이루어지게 한다. 
+
+추상화 시키는 이유는 concrete Create의 종류가 많아지게 될 경우 애플리케이션의 코드 수정이 불가피해 질 수 있다는 Factory pattern의 단점을 보완하기 위함이다.
+
+=== 구조 ===
+attachment:Abstract_factory.png
+
+=== 예제 1 ===
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+#define DEFAULT 0
+#define GET 1 
+#define PUT 2
+
+/* Interface */
+class Handler
+{
+	public:
+		virtual void execute(char *instr)=0;
+		virtual int getID()=0;
+};
+
+/* Factory Class */
+class HandlerFactory 
+{
+	public:
+		Handler *instance(){}
+};
+
+class GetHandler : public Handler
+{
+	public :
+		void execute(char *str)
+		{
+			cout << "Get Handler : " << str << endl;
+		}
+		int getID(){return GET;}
+};
+class PutHandler : public Handler
+{
+	public :
+		void execute(char *str)
+		{
+			cout << "Put Handler : " << str << endl;
+		}
+		int getID(){return PUT;}
+};
+
+class DefaultHandler : public Handler
+{
+	public :
+		void execute(char *str)
+		{
+			cout << "DefaultHandler : " << str << endl;
+		}
+		int getID(){return DEFAULT;}
+};
+
+class GetDataHandler : public HandlerFactory
+{
+	public :  
+		Handler * instance(int type)
+		{
+			if (type == GET)
+				return new GetHandler;
+			if (type == PUT)
+				return new PutHandler;
+			return new DefaultHandler;
+		}
+};
+
+int main()
+{
+	GetDataHandler *dh = new GetDataHandler; 
+	Handler *mh = dh->instance(PUT);
+
+	mh->execute((char *)"ok");
+	cout << "ID : " << mh->getID() << endl;
+}
+}}}
+
+=== 예제 2 ===
+{{{#!plain
+#include <iostream>
+using namespace std;
+
+class Lock
+{
+	public:
+		virtual void lock()=0;
+		virtual void unlock()=0;
+};
+
+class LockFactory
+{
+	public:
+		Lock *getInstance(int type);
+};
+
+class FileLock : public Lock
+{
+	public:
+		void lock(){cout << "File Record LOCK " << endl;}
+		void unlock(){cout << "File Record UN Lock " << endl;}
+};
+
+class MutexLock : public Lock
+{
+	public:
+		void lock(){cout << "Mutex LOCK " << endl;}
+		void unlock(){cout << "Mutex UN Lock " << endl;}
+};
+
+class DefaultLock : public Lock
+{
+	public:
+		void lock(){cout << "LOCK " << endl;}
+		void unlock(){cout << "UN Lock " << endl;}
+};
+
+
+class GetLockHandler : public LockFactory
+{
+	public:
+		Lock *gethandler(int type)	
+		{
+			if (type == 1)
+			{
+				return new MutexLock;
+			}
+			if (type == 2)
+			{
+				return new FileLock;
+			}
+			return new DefaultLock; 
+		}
+};
+
+int main(int argc, char ** argv)
+{
+	GetLockHandler *LockHandler = new GetLockHandler; 
+	Lock *myLock = LockHandler->gethandler(2);
+	myLock->lock();
+	myLock->unlock();
+	return 0;
+}
+}}}

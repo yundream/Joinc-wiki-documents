@@ -1,0 +1,1133 @@
+#title IPC 성능테스트
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>IPC 성능테스트</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>IPC 성능테스트</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN12"
+>IPC 테스트</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN14"
+>테스트할 IPC 설비의 종류</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN19"
+>테스트할 내용</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN22"
+>테스트 방법</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN32"
+>테스트 시스템 환경</A
+></DT
+><DT
+>2.5&#51208;. <A
+HREF="#AEN48"
+>IPC 별 테스트</A
+></DT
+><DD
+><DL
+><DT
+>2.5.1&#51208;. <A
+HREF="#AEN51"
+>Unix Domain Socket</A
+></DT
+><DT
+>2.5.2&#51208;. <A
+HREF="#AEN62"
+>FIFO</A
+></DT
+><DT
+>2.5.3&#51208;. <A
+HREF="#AEN72"
+>Message Queue</A
+></DT
+></DL
+></DD
+><DT
+>2.6&#51208;. <A
+HREF="#AEN81"
+>테스트 결과</A
+></DT
+><DD
+><DL
+><DT
+>2.6.1&#51208;. <A
+HREF="#AEN84"
+>테스트 결과 1 (71 바이트)</A
+></DT
+><DT
+>2.6.2&#51208;. <A
+HREF="#AEN100"
+>테스트 결과 2 (512 바이트)</A
+></DT
+></DL
+></DD
+><DT
+>2.7&#51208;. <A
+HREF="#AEN116"
+>IPC 성능 테스트결과에 대한 분석</A
+></DT
+><DT
+>2.8&#51208;. <A
+HREF="#AEN119"
+>무엇을 선택하는게 좋을까?</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		IPC 는 매우 다양한 종류가 존재하며, 각 IPC 설비 종류마다 장/단점을 가지고 있다. 
+		그러므로 어떤 일을 하는 프로그램들이냐에 따라서 거기에 적당한 장점을 가지고 
+		적당한 성능을 보여주는 IPC 설비를 선택해주어야 한다. 
+		이 글은 이러한 IPC 설비에 대한 간단한 성능 테스트에 관한 글이다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN12"
+>2&#51208;. IPC 테스트</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>2.1&#51208;. 테스트할 IPC 설비의 종류</A
+></H2
+><P
+>			모든 IPC 에 대해서 테스트를 하지는 않을것이다. 여러가지 IPC 설비중에서, 
+			서버/클라이언트 모델구성이 가능한 IPC 설비를 선택해서 테스트 할것이다. 
+		</P
+><P
+>			이번 테스트에서는 위의 서버/클라이언트 모델의 구성이 비교적 용이한, 
+			<B
+CLASS="EMPHASIS"
+>message queue, Unix Domain Socket, FIFO</B
+> 3가지 IPC 에 대한 테스트를 
+			실시하기로 결정했다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.2&#51208;. 테스트할 내용</A
+></H2
+><P
+>			테스트할 내용은 process 의 실행시간이며, real time, user time, sys time 3가지 
+			부분에서 테스트가 진행될것이다. 그렇긴 하지만 우리가 가장 관심있어 할 부분은 
+			real time 관련된 부분이 될것이다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.3&#51208;. 테스트 방법</A
+></H2
+><P
+>			우선 3가지 테스트할 IPC 에 대한 서버/클라이언트 프로그램을 작성할것이다. 
+			서버측은 각각의 IPC 선로를 만들고, 클라이언트측에서 데이타를 만들어서 
+			IPC 선로를 통해서 서버측으로 전송한다. 우리는 데이타를 모두 전송하는데 
+			걸리는 시간을 테스트 하게 될것이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> +--------+ packet                          +--------+
+ | Client | ------------------------------&#62; | Server | 
+ +--------+                                 +--------+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			패킷는 일반적인 연속된 문자열이며, 약 100M 정도의 데이타를 발송하게 될것이다. 
+			패킷의 크기에 따라서 속도가 어떻게 달라지는지 확인하기 위해서, 한번에 발송할 
+			패킷의 크기를 다르게 해서 테스트를 하게 될것이다. 
+		</P
+><P
+>			Process 시간을 체크하기 위해서 time(1) 명령어를 사용할것이다. 
+		</P
+><P
+>			사실 time 명령어를 사용할경우 정확한 process 시간을 체크할수는 없을것이다. 	
+			실제 처리하고자 하는 데이타 전송 루틴외의 다른 부분들 예를들어 
+			프로세스를 시작하고 종료하는데 드는 시간, 각종 IPC 설비 초기화와 관련된 
+			시간들, 그밖의 자잘한 부분들에서 드는 시간들이 덤으로 추가되기 때문이다. 
+		</P
+><P
+>			어쨋든 그러한 어느정도의 추가적인 시간들은 무시하기로 했다. 
+			실제 체크하고자할 전송영역의 실행시간을 크게 만들면(보내고자 하는 메시지의 양을 
+			크게) 하면, 상대적으로 그러한 추가적인 시간들은 무시할수 있을거라고 생각했기 
+			때문이다. 그리고 그렇게 아주 세밀한 성능측정까지는 필요 하지 않았기 
+			때문이다. 
+		</P
+><P
+>			만들어진 데이타를 시각적으로 그럴듯하게 보여주기 위해서 그래프를 그리기로 했으며, 
+			그래프를 그리는데는 gnuplot 를 사용했다. gnuplot 에 대한 내용은 <A
+HREF="http://kldp.org/KoreanDoc/html/GnuPlot-KLDP"
+TARGET="_top"
+>GnuPlot</A
+> 문서를 참고하기 바란다. 
+		</P
+><P
+>			테스트는 각 IPC 설비들에 대해서 71 바이트씩 보내는 테스트로 5번씩, 
+			512 바이트씩 보내는 테스트로 5번씩 실시했다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN32"
+>2.4&#51208;. 테스트 시스템 환경</A
+></H2
+><P
+>			이러한 테스트는 시스템 환경의 영향을 크게 받으므로 테스트를 실시하기 전에 
+			테스트 시스템의 환경에 대해 정리해 보았다.
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN35"
+></A
+><P
+><B
+>&#54364; 1. 테스트 환경</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>운영체제</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Linux(kernel 2.4.13)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CPU</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Intel PIII 700</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>RAM</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>256M</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.5&#51208;. IPC 별 테스트</A
+></H2
+><P
+>			이번장에서는 각 IPC 테스트를 위한 서버/클라이언트 프로그램의 코드와 
+			실제 테스트 방법에 대해서 설명하도록 하겠다.
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN51"
+>2.5.1&#51208;. Unix Domain Socket</A
+></H3
+><P
+>				<B
+CLASS="EMPHASIS"
+>unix_domain_server.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/un.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int state, client_len;
+
+    FILE *fp;
+    struct sockaddr_un clientaddr, serveraddr;
+    int packet_size;
+
+    char *buf;
+
+    if (argc != 3)
+    {
+        printf("Usage : ./unix_domain_server [filename] [packet size]&#92;n");
+        exit(0);
+    }
+
+    packet_size = atoi(argv[2]);
+    buf = (char *)malloc(packet_size);
+    if ((server_sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) &#60; 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+
+
+    unlink(argv[1]);
+    bzero(&#38;serveraddr, sizeof(serveraddr));
+    serveraddr.sun_family = AF_UNIX;
+    strcpy(serveraddr.sun_path, argv[1]);
+
+    state = bind (server_sockfd, (struct sockaddr *)&#38;serveraddr, 
+                    sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+
+    state = listen(server_sockfd, 5);
+    if (state == -1)
+    {
+        perror("listen error : ");
+        exit(0);
+    }    
+
+    printf("accept :&#92;n");
+
+    client_sockfd =accept(server_sockfd, (struct sockaddr *)&#38;clientaddr, 
+                &#38;client_len);
+    while(1)
+    {
+        read(client_sockfd, buf, packet_size);
+    }
+    close(client_sockfd);
+    exit(0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				서버는 아규먼트로 "socket 파일이름" 과 "한번에 받아들일 패킷의 크기" 를 
+				받아들인다. 그후 클라이언트의 연결을 기다리고, 클라이언트로 부터 한번에 
+				받아들일 패킷의 크기만큼 패킷을 읽어들인다.
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>unix_domain_client.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/un.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main(int argc, char **argv)
+{
+	int server_sockfd, client_sockfd;
+	int state, client_len;
+	int fd_r;
+	int n;
+	pid_t pid;
+
+	FILE *fp;
+	struct sockaddr_un clientaddr, serveraddr;
+
+	int  packet_size;
+	char *packet;
+	int  total_size = 100000000;
+	int  loop_size; 
+	int  i;	 
+
+	packet_size = atoi(argv[2]);
+	printf("packet size %d&#92;n", packet_size);
+	loop_size = total_size / packet_size;
+
+	packet = (char *)malloc(packet_size);
+
+	memset(packet, 0x00, packet_size);
+	memset(packet, '0', packet_size);
+	packet[packet_size-1] = '&#92;n'; 
+
+	if (argc != 3)
+	{
+		printf("Usage : ./unix_domain_server [filename] [packet size]&#92;n");
+		exit(0);
+	}
+
+	if ((client_sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) &#60; 0)
+	{
+		perror("socket error : ");
+		exit(0);
+	}
+
+	bzero(&#38;clientaddr, sizeof(serveraddr));
+	clientaddr.sun_family = AF_UNIX;
+	strcpy(clientaddr.sun_path, argv[1]);
+	client_len = sizeof(clientaddr);
+	if (connect(client_sockfd, (struct sockaddr *)&#38;clientaddr, client_len) &#60; 0)
+	{
+		perror("connect error : ");
+		exit(0);
+	}
+	for (i = 0; i &#60; loop_size; i++)
+	{
+		write(client_sockfd, packet, packet_size);
+	}
+	close(client_sockfd);
+	exit(0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				클라이언트는 아규먼트로 "socket 파일이름" 과 "한번에 보낼 패킷의 크기" 를 
+				받아들인다. 그후 서버로 연결을 하고, 서버측으로 한번에 보낼 패킷의 크기 만큼 
+				패킷을 만들어서 전송하며, 우리는 프로그램의 시작과 종료에 걸리는 시간을 time 명령어를 
+				통해서 테스트 하게 될것이다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./unix_domain_server
+...
+[root@localhost test]# time ./unix_domain_client
+packet size 512
+
+real    0m2.958s
+user    0m0.120s
+sys     0m1.840s
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				위와 같은 테스트는 5번에 걸쳐서 이루어 지게 되며, 그 결과를 기록한다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN62"
+>2.5.2&#51208;. FIFO</A
+></H3
+><P
+>				<B
+CLASS="EMPHASIS"
+>fifo_server.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+
+int main(int argc, char **argv)
+{
+	int fd_w, fd_r;
+	int n;
+	int packet_size;
+	char *buf_r; 
+
+	packet_size = atoi(argv[2]);
+
+	buf_r = (char *)malloc(packet_size);
+
+	if ((fd_r = open(argv[1], O_RDONLY)) &#60; 0)
+	{
+		perror("open error : ");
+		exit(0);
+	}
+	while(1)
+	{
+		while((n = read(fd_r, buf_r, packet_size)) &#62; 0)
+		{
+		}
+	}
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				서버는 아규먼트로 "FIFO 파일이름" 과 한번에 받아들일 패킷의 크기를 받는다. 
+				그후 클라이언트의 연결을 기다리고, 클라이언트로 부터 패킷을 읽어들인다.
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>fifo_client.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+
+int main(int argc, char **argv)
+{
+	int fd_w, fd_r;
+	char buf_r[71]; 
+	int n, i;
+
+	int  packet_size;
+	char *packet;
+
+	int  total_size = 100000000;
+	int  loop_size;
+
+
+	packet_size = atoi(argv[2]);
+	loop_size = total_size / packet_size;
+	packet = (char *)malloc(packet_size);
+
+	if ((fd_w = open(argv[1], O_WRONLY)) &#60; 0)
+	{
+		perror("open error : ");
+		exit(0);
+	}
+
+	memset(packet, '0', packet_size);
+	packet[packet_size-1] = '&#92;n'; 
+
+	loop_size = total_size / packet_size;
+
+	for(i = 0; i &#60; loop_size; i++)
+	{
+		write(fd_w, packet, packet_size); 
+	}
+	printf("size %d %d&#92;n", loop_size, loop_size * packet_size);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				클라이언트는 아규먼트로 "FIFO 파일이름" 과 "한번에 보낼 피킷의크기"를 받는다. 
+				그후 서버로 연결하고 서버측으로 패킷을 만들어 전송한다. 
+				마찬가지로 time 명령어를 통해서 시간 측정을 한다. 
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost src]# ./fifo_server /tmp/fifo_server 512
+...
+[root@localhost src]# time ./fifo_client_mem /tmp/fifo_server 512
+size 195312 99999744
+
+real    0m1.433s
+user    0m0.060s
+sys     0m0.960s
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN72"
+>2.5.3&#51208;. Message Queue</A
+></H3
+><P
+>				<B
+CLASS="EMPHASIS"
+>message_queue_server.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/ipc.h&#62;
+#include &#60;sys/msg.h&#62;
+#include &#60;sys/stat.h&#62;
+struct msgbuf
+{
+    long msgtype;
+    char buf[512];
+};
+
+int main(int argc, char **argv)
+{
+    key_t key_id;
+    int i;
+    struct msgbuf mybuf;
+    int msgtype;
+
+    key_id = msgget((key_t)1234, IPC_CREAT|0666);
+    if(key_id == -1)
+    {
+        perror("msgget error : ");
+        exit(0);
+    }
+
+    while(1)
+    {
+        if (msgrcv(key_id, (void *)&#38;mybuf, sizeof(struct msgbuf), 1, 0) == -1)
+        {
+            perror("quit : ");
+            exit(0);
+        }
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				서버는 메시지큐로부터 데이타를 기다린다. 읽어들인 패키지는 msgbuf.buf 로 
+				저장되며 크기는 하드코딩했다.
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>message_queue_client.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/ipc.h&#62;
+#include &#60;sys/msg.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;sys/stat.h&#62;
+
+struct msgbuf
+{
+    long msgtype;
+    char buf[512];
+};
+
+int main(int argc, char **argv)
+{
+    key_t key_id;
+    int i, n;
+    struct msgbuf mybuf;
+    int fd_r;
+
+    int  packet_size;
+
+    int  total_size = 100000000;
+    int  loop_size;
+
+    packet_size = 512;
+    loop_size = total_size / packet_size;
+    key_id = msgget((key_t)1234, IPC_CREAT|0666);
+    if(key_id == -1)
+    {
+        perror("msgget error : ");
+        exit(0);
+    }
+
+    mybuf.msgtype = 1;
+
+    memset(mybuf.buf, '1', 511);
+    mybuf.buf[511] = 0x00;
+    for(i = 0; i &#60; loop_size; i++)
+    {
+        if (msgsnd(key_id, (void *)&#38;mybuf, sizeof(struct msgbuf), 0) == -1)
+        {
+            perror("msgsnd error : ");
+            exit(0);
+        }
+    }
+    exit(0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			클라이언트는 일정한데이타를 메시지큐로 보낸다.
+			</P
+><P
+>			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN81"
+>2.6&#51208;. 테스트 결과</A
+></H2
+><P
+>			다음은 테스트 결과 이다. 테스트횟수는 위에서 언급했듯이 5번씩 이루어졌으며, 
+			패킷 사이즈에 따라서(71 바이트, 512 바이트) 2번에 걸쳐 테스트를 했다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN84"
+>2.6.1&#51208;. 테스트 결과 1 (71 바이트)</A
+></H3
+><P
+>				다음은 테스트 결과를 정리한 데이타 파일이다. 파일이름은 data_71.dat 로 
+				정했다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#      real time             user time            sys time
+#domain queue shared   domain queue shared   domain queue shared
+#==============================================================
+1 4.603 2.929 2.675    0.350 0.350 0.250     2.240 1.070 1.110
+2 4.782 2.863 2.712    0.450 0.430 0.330     2.350 0.970 1.070
+3 4.859 2.956 2.734    0.400 0.390 0.270     2.450 1.010 1.080
+4 4.516 3.069 2.757    0.390 0.480 0.280     1.980 0.980 1.150
+5 4.544 2.935 2.818    2.120 0.390 0.290     2.120 1.080 1.260    
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				가장오른쪽에 있는 일련번호(1,2,3...)은 테스트 횟수를 나타내며, gnuplot 를 
+				이용해서 그래프를 그릴때 x축 눈금기준이 될것이다.
+			</P
+><P
+>				위의 data 파일을 gnuplot 으로 보기 위해서 다음과 같은 gnuplot 작업파일을 만들었다. 
+				파일이름은 real_71.dem 으로 했다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>set yrange[2.5:5]
+set xrange [1:5]
+set xtics 0,1,5
+set title "real time"
+plot 'data_71.dat' using 1:2 t "queue" with l, 'data_71.dat' using 1:3 t "fifo" 
+with l, 'data_71.dat' using 1:4 t "domain socket" with l
+
+pause -1 "Hit return to continue"
+set title "user time"
+set yrange[0.2:0.5]
+plot 'data_71.dat' using 1:5 t "queue" with l, 'data_71.dat' using 1:6 t "fifo" 
+with l, 'data_71.dat' using 1:7 t "domain socket" with l
+    
+pause -1 "Hit return to continue"
+set title "sys time"
+set yrange[1:3]
+plot 'data_71.dat' using 1:8 t "queue" with l, 'data_71.dat' using 1:9 t "fifo" 
+with l, 'data_71.dat' using 1:10 t "domain socket" with l
+pause -1 "Hit return to continue"
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위와 같은 내용으로 real_71.dem 을 작성한다음 gnuplot 를 이용해서 
+				데이타 내용을 그래프로 만들고 이것을 gimp 를 이용해서 캡쳐하였다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@loalhost src]# gnuplot real_71.dem 
+Hit return to continue
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN91"
+></A
+><P
+><B
+>&#44536;&#47548; 1. real_time_71</B
+></P
+><P
+><IMG
+SRC="/images/articles/real_time_71.gif"></P
+></DIV
+>
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN94"
+></A
+><P
+><B
+>&#44536;&#47548; 2. user_time_71</B
+></P
+><P
+><IMG
+SRC="/images/articles/user_time_71.gif"></P
+></DIV
+>
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN97"
+></A
+><P
+><B
+>&#44536;&#47548; 3. sys_time_71</B
+></P
+><P
+><IMG
+SRC="/images/articles/sys_time_71.gif"></P
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN100"
+>2.6.2&#51208;. 테스트 결과 2 (512 바이트)</A
+></H3
+><P
+>				다음은 테스트 결과를 정리한 파일이다. 파일이름은 data_512.dat 로 했다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#      real time             user time            sys time
+#domain queue shared   domain queue shared   domain queue shared
+#==============================================================
+1 0.739 0.509 0.547    0.030 0.030 0.070     0.320 0.170 0.180
+2 0.790 0.414 0.486    0.040 0.050 0.050     0.390 0.150 0.190
+3 0.744 0.442 0.545    0.020 0.070 0.010     0.280 0.160 0.330
+4 0.753 0.454 0.521    0.040 0.030 0.040     0.300 0.190 0.220
+5 0.757 0.405 0.485    0.050 0.070 0.030     0.310 0.150 0.240
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				위의 data 파일을 gnuplot 으로 보기 위해서 다음과 같은 gnuplot 작업파일을 만들었다. 
+				파일이름은 real_512.dem 으로 했다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>set yrange[0.4:0.9]
+set xrange [1:5]
+set xtics 0,1,5
+set title "real time"
+plot 'data_512.dat' using 1:2 t "queue" with l, 'data_512.dat' using 1:3 t "fifo
+" with l, 'data_512.dat' using 1:4 t "domain socket" with l
+
+pause -1 "Hit return to continue"
+set title "user time"
+set yrange[0:0.10]
+plot 'data_512.dat' using 1:5 t "queue" with l, 'data_512.dat' using 1:6 t "fifo
+" with l, 'data_512.dat' using 1:7 t "domain socket" with l
+
+pause -1 "Hit return to continue"
+set title "sys time"
+set yrange[0.1:0.4]
+plot 'data_512.dat' using 1:8 t "queue" with l, 'data_512.dat' using 1:9 t "fifo
+" with l, 'data_512.dat' using 1:10 t "domain socket" with l
+pause -1 "Hit return to continue"
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위와 같은 내용으로 real_512.dem 을 작성한다음 gnuplot 를 이용해서 
+				데이타 내용을 그래프로 만들고 이것을 gimp 를 이용해서 캡쳐하였다.
+			</P
+><P
+>				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN107"
+></A
+><P
+><B
+>&#44536;&#47548; 4. real_time_512</B
+></P
+><P
+><IMG
+SRC="/images/articles/real_time_512.gif"></P
+></DIV
+>
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN110"
+></A
+><P
+><B
+>&#44536;&#47548; 5. user_time_512</B
+></P
+><P
+><IMG
+SRC="/images/articles/user_time_512.gif"></P
+></DIV
+>
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN113"
+></A
+><P
+><B
+>&#44536;&#47548; 6. sys_time_512</B
+></P
+><P
+><IMG
+SRC="/images/articles/sys_time_512.gif"></P
+></DIV
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN116"
+>2.7&#51208;. IPC 성능 테스트결과에 대한 분석</A
+></H2
+><P
+>			테스트결과는 real time 을 가지고 분석하도록 하겠다. 그래프를 보면 알겠지만 
+			모든 경우에 있어서 Unix Domain Socket 가 확실히 다른 것들보다 느림을 알수 있다.  
+			fifo 와 message queue 의 경우에는 비슷하게 빠른 속도를 보여주고 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN119"
+>2.8&#51208;. 무엇을 선택하는게 좋을까?</A
+></H2
+><P
+>			확실히 Unix Domain Socket 가 다른것들 보다 느리긴 하지만, 느림이 문제가 되는경우는 
+			없을것 같다. 계산을 해보면 알겠지만.. 71 바이트씩 메시지를 전송 했을경우 초당 
+			28만건의 메시지 전송이 가능하며 512 바이트식 메시지를 전송했을경우 초당  
+			약 24만건의 메시지 전송이 가능하다라는 계산이 나온다. 즉 어떤 IPC 를 사용하더라도 
+			속도때문에 문제가 되는경우는 거의 없다고 봐도 무관하다라고 볼수 있다.   
+		</P
+><P
+>			그렇다면 좀더 프로그래밍 하기 쉽고, 안정적이고 확장성이 용이한 쪽에 중심을 두고 IPC 설비를 
+			선택해야 할것이다. 	
+		</P
+><P
+>			그런측면에서 본다면 FIFO 와 message queue 는 제어하기가 까다롭다는 문제점을 가지며, 확장이 
+			용이하지 않다는 단점을 가진다. 에러처리도 그리 수월하지 않다. 반면 Unix 도메인 소켓은 
+			확장이 용이하며 제어하기가 비교적 쉬우며, 에러처리 역시 수월하다는 장점을 가진다. 
+		</P
+><P
+>			결론은 아주 간단한 경우가 아니면 Unix Domain Socket 를 사용하는게 유리할거라는게 필자의 
+			견해이다.
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

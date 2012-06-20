@@ -1,0 +1,89 @@
+#title 동적 메모리 할당
+
+[[include(article/동적_메모리할당)]]
+
+== '''linked list 예제소스에 warning 이 있어 수정하여 보았습니당''' ==
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+typedef struct _list_item
+{
+    char name[12];
+    struct _list_item *next_link;
+} list_item;
+
+list_item * add_item(list_item *, char *);
+list_item * remove_item(list_item *);
+void print_list(list_item *item);
+
+int main()
+{
+    list_item *list;
+
+    list = NULL;
+
+    list = add_item(list, "yundream");
+    list = add_item(list, "kknd2");
+    list = add_item(list, "hohoho");
+    list = add_item(list, "loveisall");
+    print_list(list);
+
+    printf("\n");
+    list = remove_item(list);
+    print_list(list);
+
+    return 0;
+}
+
+list_item * add_item(list_item *item, char *name)
+{
+    list_item *lp = item;
+
+    if (item != NULL)
+    {
+        while(item->next_link != NULL)
+            item = item->next_link;
+
+        item->next_link = (list_item *)malloc(sizeof(list_item));
+        item = item->next_link;
+        strcpy(item->name, name);
+        return lp;
+    }
+    else
+    {
+        item = (list_item *)malloc(sizeof(list_item));
+        item->next_link = NULL;
+        strcpy(item->name, name);
+        return item;
+    }
+}
+
+list_item * remove_item(list_item *item)
+{
+    list_item *tmp;
+    printf("Element remove is %s\n", item->name);
+    tmp = item->next_link;
+    free(item);
+    return tmp;
+}
+
+void print_list(list_item *item)
+{
+    if (item == NULL)
+        printf("NONE LIST\n");
+    else
+        while(item != NULL)
+        {
+            printf("%10s : %p %p\n",
+                    item->name,
+                    item,
+                    item->next_link);
+            item = item->next_link;
+        }
+}
+
+[[Category(1)]]
+

@@ -1,0 +1,37 @@
+#title 윈도 사이즈와 소켓 버퍼
+
+=== sliding window ===
+TCP는 데이터의 신뢰성을 보장한다. 신뢰성 보장의 핵심은 전송 패킷에 대한 ACK 응답이다. 내가 보낸 데이터에 대해서 일정 시간동안 응답이 없다면, 상대측이 데이터를 받지 못한 것으로 간주 하고 재 전송하는 식이다.
+
+TCP의 '전송 <-> 응답'시스템은 신뢰성을 보장해주는 매우 좋은 방식이긴 하지만, 비 효율적일 수 있다는 문제가 발생한다. TCP Maximum Segment Size - MSS - 가 1k라고 가정하자. 이 환경에서 보내야할 데이터가 10k라면 10번의 전송이 필요할 것이며, 총 10번의 ACK 데이터가 발생할 것이다. ACK 데이터의 전송과 수신에는 어느 정도의 시간이 걸리므로, 그 시간만큼의 시간 지연이 발생한다. 데이터가 커질 수록 이러한 시간 지연은 점점 더 커질 것이다.   
+
+http://lh6.ggpht.com/_Os5qf5urx_A/S8x3Tx-SOTI/AAAAAAAABc0/aw0LDQOB2iI/s-kW5xBTQabjnXxg71jH3gA.png
+
+sliding window는 이러한 TCP의 문제를 해결하기 위한 방법이다. 이 방식은 여러 개의 패킷을 논리적인 하나의 창으로 묶어서 흐름을 관리한다. 예컨데 위의 경우 1k의 패킷을 5개로 묶어서 데이터에 대한 ACK를 보내는 방식이다. 만약 패킷을 5개로 묶는다면 즉 5k를 하나의 데이터 흐름 단위로 하면 단지 2번의 ACK 교환으로 데이터를 전송할 수 있을 것이다. 그만큼 효율적으로 데이터를 전송할 수 있다. 
+
+http://lh6.ggpht.com/_Os5qf5urx_A/S8x3UF69siI/AAAAAAAABc4/5KjjJMzSD4A/sr1yGMYGS-9gB9nZGVVUaag.png
+
+sliding라는 이름이 붙은 이유에 대해서 알아보자. 
+
+내가 보내고자 하는 데이터가 20k라고 가정해 보자. 그리고 10k 만큼씩 보내도록 설정을 했다. 이중 2개의 패킷을 전송하면, 윈도를 오른쪽으로 2만큼 이동시켜서 11과 12 데이터를 전송한다. 그러면 ACK를 기다리는 시간을 최소화 하도록 데이터 흐름을 제어할 수 있을 것이다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1pHAkiuM9o4xupzpUnj2dGaeZ5CTjasjS4ZyU52RkvDM&w=442&h=118">
+}}}
+
+=== window size ===
+sliding할 윈도의 크기를 window size라고 한다. window size의 크기로 논리적으로 다룰 패킷의 개수를 지정할 수 있다. window size를 크게 하면 ACK 를 그만큼 덜 기다리게 되므로써 빠른 데이터 통신이 가능하다.
+
+그러나 무작정 크게 한다고 좋은 건 아니다. MTU(:12)와 마찬가지로 네트워크 환경에 따라 달라질 수 있다. 모뎀과 같이 매우 느린 매체를 사용하거나 혹은 트래픽이 높은 네트워크 환경이라면 오히려 성능을 떨어트리는 원인이 될 수 있다. 이러한 환경에서는 데이터를 전송하는데 시간이 오래 걸리므로 window size를 지나치게 크게 하면 ACK가 최대 전송 시간을 초과해서 도착하지 않을 수도 있다. 이 경우 재 전송을 요청하게 되므로 당연히 성능이 떨어질 것이다. 
+
+그러므로 네트워크 환경에 적당한 window size가 필요하다.
+
+=== 소켓 버퍼 ===
+window size는 소켓 버퍼의 크기로 조정할 수 있다. setsockopt(:2) 함수의 SO_SNDBUF, SO_RCVBUF의 값을 조절하면 된다.
+{{{#!plain
+int sndsize = 2048; 
+setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(sndsize)); 
+}}}
+
+=== 관련 글 ===
+  * [wiki:man/2/setsockopt 소켓 옵션]

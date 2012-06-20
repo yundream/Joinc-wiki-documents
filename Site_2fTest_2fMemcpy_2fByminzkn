@@ -1,0 +1,156 @@
+#title memcpy:minzkn의 답
+
+저 역시 4 - 2 - 1 alignment 순으로 복사를 하도록 구현하였습니다. 1 - 2 - 4 순으로 구현할수도 있지만 대부분 가르키는 포인터 대상은 컴파일러에 의해서 4byte alignment 된 시작위치를 갖기 때문에 4 - 2 - 1 순의 구조가 보다 유리합니다.
+
+그리고 실제로 대부분의 개발환경에서 memcpy 는 inline 으로 구현됩니다. 또한 상수인자조건에 대해서 간략화한 또 다른 inline 처리를 하는것이 보통입니다.
+예를 들어서 memcpy 의 크기인자가 상수조건이라면(변수조건이 아닌) 이것은 루프없이 별로도 구현할수 있는 조건이 됩니다.
+즉, "memcpy(to, from, 4)" 의 경우는 "*((dword *)to) = *((dword *)from)" 으로 구현될수 있습니다.
+저는 그러한 상수식에 대한 컴파일 최적화를 고려하여 작성하였습니다.
+
+즉, 아래의 mzmemcpy 함수는 macro와 inline 의 조합이고 Header 에 명시하여 사용할 의도를 갖고 있습니다.
+
+{{{#!plain
+/*
+ Copyright (C) Information Equipment co.,LTD.
+ All rights reserved.
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+
+ ID="$Id: Site_2fTest_2fMemcpy_2fByminzkn,v 1.1 2007/01/09 02:46:19 root Exp root $"
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#if defined(__GNUC__)
+# define mzmemcpy(m_to,m_from,m_size) (\
+ __extension__(\
+  __builtin_constant_p(m_size) ? \
+   (\
+    ((m_size) == 1) ? \
+     (\
+      mzmemcpy_1(m_to,m_from)\
+     ) : \
+     (\
+      ((m_size) == 2) ? \
+       (\
+        mzmemcpy_2(m_to,m_from)\
+       ) : \
+       (\
+        ((m_size) == 4) ? \
+         (\
+          mzmemcpy_4(m_to,m_from)\
+         ) : \
+         (\
+          mzmemcpy_generic(m_to,m_from,m_size)\
+         )\
+       )\
+     )\
+   ) : \
+   mzmemcpy_generic(m_to,m_from,m_size)\
+ )\
+)
+#else
+# define mzmemcpy(m_to,m_from,m_size) mzmemcpy_generic(m_to,m_from,m_size)
+#endif
+
+static __inline void *mzmemcpy_1(void *s_to,const void *s_from)
+{
+ *((unsigned char *)s_to) = *((unsigned char *)s_from);
+ return(s_to);
+}
+
+static __inline void *mzmemcpy_2(void *s_to, const void *s_from)
+{
+ *((unsigned short int *)s_to) = *((unsigned short int *)s_from);
+ return(s_to);
+}
+
+static __inline void *mzmemcpy_4(void *s_to, const void *s_from)
+{
+ *((unsigned int *)s_to) = *((unsigned int *)s_from);
+ return(s_to);
+}
+
+static __inline void *mzmemcpy_generic(void *s_to, const void *s_from, size_t s_size)
+{
+ void *s_temp_to = s_to;
+ size_t s_count = s_size & (~3);
+ while((s_temp_to - s_to) < s_count)
+ {
+  *((unsigned int *)s_temp_to) = *((unsigned int *)s_from);
+  s_temp_to += 4, s_from += 4;
+ }
+ s_size &= (size_t)3;
+ while(s_size > ((size_t)0))
+ { /* byte */
+  *((unsigned char *)s_temp_to) = *((unsigned char *)s_from);
+  s_temp_to += 1, s_from += 1;
+ }
+ return(s_to);
+}
+
+/* ------------------------------------------------------ */
+
+struct ts_test_data
+{
+ int age;
+ char name[24];
+ char flags;
+};
+
+int main(int s_argc, char *s_argv[])
+{
+ int s_count;
+ struct ts_test_data s_to, s_from;
+ clock_t s_begin, s_end, s_tick;
+
+ s_from.age = 29;
+ s_from.flags = 0xc7;
+ (void)strcpy((char *)(&s_from.name[0]), "minzkn");
+
+ s_begin = clock();
+ for(s_count = 0;s_count < 10000000;s_count++)
+ {
+ #if 0 /* standard */
+  (void)memcpy((void *)(&s_to), (void *)(&s_from), (size_t)sizeof(s_from));
+ #else /* minzkn */
+  (void)mzmemcpy((void *)(&s_to), (void *)(&s_from), (size_t)sizeof(s_from));
+ #endif
+ }
+ s_end = clock();
+
+ s_tick = ((s_end - s_begin) * ((clock_t)1000)) / CLOCKS_PER_SEC;
+ (void)fprintf(stdout,
+  "time: %u.%03ums\n"
+  "age: %d\n"
+  "name: %s\n"
+  "flags: %02XH\n",
+  ((unsigned int)s_tick) / 1000u, ((unsigned int)s_tick) % 1000u,
+  s_to.age,
+  (char *)(&s_to.name[0]),
+  ((unsigned int)s_to.flags) & 0xffu
+ );
+ return(0);
+}
+
+/* End of source */
+}}}
+
+다음은 테스트 결과 입니다.
+{{{#!plain
+bash# ./test
+time: 0.100ms
+age: 29
+name: minzkn
+flags: C7H
+}}}
+
+다음은 glibc 의 memcpy 로 테스트를 수행한 결과입니다.
+{{{#!plain
+time: 0.050ms
+age: 29
+name: minzkn
+flags: C7H
+}}}

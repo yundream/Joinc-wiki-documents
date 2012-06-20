@@ -1,0 +1,47 @@
+#title oriented DBMS
+
+== Column-Oriented DBMS ==
+column-oriented DBMS는 row가 아닌 column에 중점을 둔 데이터베이스 시스템이다. 컬럼지향 형태의 데이터베이스는 '''column'''으로 고속의 검색이 가능한데, 이러한 성능은 대량의 비슷한 특성을 가진 데이터를 계산하는 '''data warehouse'''등에 강력한 면모를 보여준다. 
+
+== 설명 ==
+재현되는 구조는 DBMS와 비슷해 보인다. 그러나 컬럼방향으로 빠른 탐색이 가능하도록 구성이 된다. 예를 들어 다음과 같은 데이터가 저장된 테이블이 있다고 가정해 보자. 
+
+|| EmpID || Lastname || Firstname || Salary ||
+|| 1     || Smith    || Joe       || 40000  ||
+|| 2     || Jones    || Mary      || 50000  ||
+|| 3     || Johson   || Cathy     || 44000  ||
+
+이 테이블은 고용번호 성과 이름 그리고 연봉정보를 포함하고 있다.
+
+row-oriented DBMS는 다음과 같이 모든 attribute의 값을 읽어오는데, 특화되어 있다.   
+{{{#!plain
+   1, Smith, Joe, 40000; 2, Jones, Mary, 50000;
+}}}
+그러나 Column-oorinted DBMS는 특정 컬럼의 정보를 읽어오는 방식으로 특화되어 있다. 
+{{{#!plain
+   1, 2, 3;Smith, Jones, Johson;Joe, Mary, Cathy;...
+}}}
+
+row-oriented DBMS로 위의 데이터를 읽어온다면, 고용번호가 1번인 직원의 정보를 얻어와라 하는 식으로 요청을 할 것이다. 반면 column-oriented DBMS라면, 전체연봉의 총합과 평균치를 구하라 하는 식으로 요청을 하게 될 것이다.
+
+== 장점 ==
+=== 높은 압축가능 ===
+컬럼은 비슷한 데이터 타입을 가진다. 데이터 압축을 위해서 일반적으로 사용하는 '''lzw'''의 경우 데이터 타입이 비슷할 경우 높은 압축률을 자랑한다. 그러므로 컬럼단위로 데이터를 압축할 경우 '''압축''' 효율이 크게 높아진다.
+
+== 활용 ==
+=== 로그분석 시스템 ===
+로그는 row 데이터를 가져오는게 목적이 아니다. 특정 컬럼 정보를 가져와서 분석하는게 목적이다. DBMS 보다는 컬럼지향 DBMS가 더 효율적이다. 물론 DBMS로도 분석할 수 있고, 그렇게 해왔었다. 어디까지나 '''더 효율'''적이다라는 얘기다. 
+  * 로그 기반 사용자 패턴 분석
+  * 태그 분석 
+  * link 분석 
+
+crawl한 블로그 컨텐츠를 컬럼지향 DBMS형태로 저장한 모습이다. 이렇게 저장된 데이터는 (pagerank등을 위한)link분석, Time Stamp을 이용한 Posting 패턴분석에 사용할 수 있을 것이다. Posting 패턴분석은 Author의 랭킹을 부여하기 위한 목적등에 사용할 수 있을 것이다.
+|| Row Key  || Time Stamp || Column "contents:" || Column "anchor:"   || Column "mine:" || Column "tag:"   ||
+||<|5> "www.blog.yundram" || t9    ||                    || "anchor:cnnsi.com" ||       || linux           || 
+                 || t10   ||                    || "anchor:my.lo.ca"  ||                || C,Perl          ||
+                 || t11   || "<HTML>..."        ||                    || "text/html     || KDE             ||
+                 || t12   || "<HTML>..."        ||                    ||                || System Programing ||
+                 || t13   || "<HTML>..."        ||                    ||                ||                 ||
+== 구현툴 ==
+ * [http://hypertable.org hypertable] : C++ 기반의 오픈소스 BigTable 구현, 이건 한번 사용해 보고 싶다. 
+ * [http://wiki.apache.org/hadoop/Hbase Hbase] : hadoop(:12)기반의 BigTable 구현

@@ -1,0 +1,733 @@
+#title libcurl을 이용한 간단한 Web 프로그래밍 
+
+원문 : http://www.linuxdevcenter.com/pub/a/linux/2005/05/05/libcurl.html?page=1
+[[TableOfContents]]
+== Curl에 대해서 ==
+curl은 데이터 전송과 관련된 프로그램의 빠른 작성을 위해서 사용하는 '''command line tool'''이다. HTTP(:12), FTP(:12), LDAP(:12), TELNET(:12), HTTPS(:12), DICT(:12)와 같은 프로토콜을 지원하며, SSL(:12)을 가지는 각각의 프로토콜 역시 지원한다. 또한 HTTP기반의 upload, proxies, cookies, user+password 인증을 사용할 수도 있다.
+
+이러한 툴의 제공과는 별도로 위의 프로토콜들을 지원하는 클라이언트의 제작을 도와주기 위한 '''libCURL'''을 제공한다.  libCURL을 이용하면 데이터 전송과 관련된 프로그램을 빠르게 작성할 수 있다.
+
+이 문서는 '''libCURL'''의  API(:12)를 이용해서 필요한 데이터전송 프로그램을 만드는 법에 대해서 설명을 할 것이다. 쉬운 설명을 위해서 다음과 같은 예제를 작성하게 될 것이다.
+ * HTTP GET : URL(:12)로 부터 내용을 가져온다.
+ * Anonymous FTP 다운로드  : FTP서버에 접속해서 파일을 가져온다.
+ * HTTP POST: Web Form을 흉내내어서 데이터를 전송한다.
+ * Authenticated FTP Upload : ID+Password로 접속해서 파일을 Upload한다. 
+
+libCURL은 C 라이브러리(:12)이다. 몇몇 예제는 빠른작성을 위해서 C++을 이용할것이긴 하지만, 이해하고 사용하는데 무리는 없을 것이다 - C++의 템플릿은 프로그램 작성에 걸리는 시간을 대폭 줄요준다. 테스트 프로그램을 만들고자 할때 시간을 절약하도록 해 준다 -.
+
+예제는 Ubuntu(:12) 환경에서 테스트되었다. libCURL의 버젼은 7.12.3을 사용할 것이다. 버젼이 달라도 큰 문제는 없을 것이라 생각된다.
+
+== Curl 사용 기초 ==
+Curl을 사용하기 전에 client/server 에서의 요청과 응답과정이 어떻게 이루어지는지 알아보도록 하자. HTTP(:12) 프로토콜을 이용해서 설명하도록 하겠다. 
+ 1. clinet는 server로 연결을 시도한다.
+ 1. 연결이 되었다면 client는 '''GET''', '''POST'''를 이용해서 데이터를 보낼 것이다.
+ 1. server는 요청을 받고 요청에 대한 응답을 보낸다.(HTML페이지 혹은 에러 메시지)
+ 1. client는 server로의 연결을 종료한다.
+  <!> 좀더 자세한 내용은 [wiki:Site/TCP_IP TCP/IP]문서를 참고하기 바란다.
+
+libCURL은 이러한 프로세스의 중간에서 중계역할을 한다. 사용은 context 객체와 요청데이터 (URL, 인자)와 콜백(callback functions)형식의 response handler를 정의해 주면된다. 이 객채를 라이브러리에 넘기게 되면, 라이브러리는 저수준에서 일어나는 네트워크 통신을 알아서 핸들하고 그 결과 값을 response handler를 통해서 넘겨주게 된다.
+
+libCURL은 고수준의 라이브러리로 프로그래머는 프로토콜이 어떻게 생겨먹었는지에 대해서 신경쓸 필요 없이, 데이터만 넘겨주는 정도로 필요한 프로그램을 작성할수 있다. libCURL이 Application 계층아래를 완전히 추상화 시켜주기 때문이다. 
+
+libCURL은 아래와 같은 '''easy'''라는 이름을 가지는 인터페이스를 제공한다.
+ 1. curl_blogal_init : curl 라이브러리(:12)를 초기화 한다.
+ 1. curl_easy_init : context를 생성한다.
+ 1. curl_easy_setopt : context 설정
+ 1. curl_easy_perform : 요청을 초기화 하고 callback함수를 대기시킨다.
+ 1. curl_easy_cleanup : context를 없앤다.
+ 1. curl_global_cleanup : curl 라이브러리를 없앤다.
+
+curl_easy_setopt 함수는 다음과 같이 선언되어 있다.
+{{{#!plain
+curl_easy_setopt(CURL *ctx, CURLoption key, value)
+}}}
+
+== HTTP GET: 웹 페이지 긁어오기 ==
+이제 프로그램을 만들어보도록 하자. 이 프로그램은 HTTP GET을 이용해서 웹페이지를 긁어오는 일을 한다. 헤더는 표준에러(:12)로 body 부분은 표준출력(:12)형식으로 가져오도록 하겠다.
+
+curl_easy_init 함수를 호출해서 context 객체를 생성한다.
+{{{#!plain
+CURL *ctx = curl_easy_init ();
+}}}
+curl_easy_setopt 를 이용해서 context객체를 설정한다. CURLOPT_URL은 목표 URL이다. 
+{{{#!plain
+curl_easy_setopt(ctx, CURLOPT_URL, argv[1]);
+}}}
+curl_easy_setopt를 이용하면 이외에도 몇 가지 설정을 더 해줄 수 있다.
+{{{#!plain
+curl_easy_setiopt(ctx, CURLOPT_WRITEHEADER, stderr);
+curl_easy_setiopt(ctx, CURLOPT_WRITEDATA, stdout);
+}}}
+header 정보는 표준에러로, body정보는 표준출력으로 가져오도록 설정을 했다.
+
+이제 curl_easy_perform함수를 이용해서 실제 페이지를 긁어오는 일을 하도록 하자.
+{{{#!plain
+const CURLcode rc = curl_easy_perform(ctx);
+if (CURLE_OK != rc)
+{
+    std::cerr << "Error from cURL: " << curl_easy_strerror(rc) std::endl;
+}
+else
+{
+    // 데이터 처리
+}
+}}}
+
+이후 데이터는 아래와 같이 '''curl_easy_getinfo'''를 통해서 얻어와서 처리하면 된다.
+{{{#!plain
+long statLong;
+curl_easy_getinfo(ctx, CURLINFO_HTTP_CODE, &statLong);
+std::cout << "HTTP response code: " << statLong << std::endl;
+}}}
+원하는 값을 가져오기 위해서는 데이터의 타입에 맞는 인자를 써야 한다. '''200'''이나 '''404'''와 같은 HTTP 응답코드를 가져오길 원한다면 '''CURLINFO_HTTP_CODE'''를 전송받은 문서의 크기를 알아내길 원한다면 '''CURLINFO_SIZE_DOWNLOAD'''를 사용하는 식이다. 
+
+모든 작업이 다 끝났다면, '''curl_easy_cleanup'''을 호출해서 curl_easy_setopt 객체를 소멸시켜야 한다. 그렇지 않을경우 메모리누수 현상을 겪게 될 것이다.
+{{{#!plain down:httpget.cc
+/*
+sample for O'ReillyNet article on libcURL:
+	{TITLE}
+	{URL}
+	AUTHOR: Ethan McCallum
+
+Scenario: use http/GET to fetch a webpage
+
+이 코드는 Ubuntu 리눅스 Kernel 2.6.15에서 
+libcURL 버젼 7.15.1로 테스트 되었다.
+2006년 8월 3일
+*/
+
+#include<iostream>
+
+extern "C" {
+	#include<curl/curl.h>
+}
+
+// - - - - - - - - - - - - - - - - - - - -
+
+enum {
+	ERROR_ARGS = 1 ,
+	ERROR_CURL_INIT = 2
+} ;
+
+enum {
+	OPTION_FALSE = 0 ,
+	OPTION_TRUE = 1
+} ;
+
+enum {
+	FLAG_DEFAULT = 0 
+} ;
+
+// - - - - - - - - - - - - - - - - - - - -
+
+int main( const int argc , const char** argv ){
+
+	if( argc != 2 ){
+		std::cerr << " Usage: ./" << argv[0] << " {url} [debug]" << std::endl ;
+		return( ERROR_ARGS ) ;
+	}
+
+	const char* url = argv[1] ;
+
+	// lubcURL 초기화 
+	curl_global_init( CURL_GLOBAL_ALL ) ;
+
+	// context객체의 생성
+	CURL* ctx = curl_easy_init() ;
+
+	if( NULL == ctx ){
+		std::cerr << "Unable to initialize cURL interface" << std::endl ;
+		return( ERROR_CURL_INIT ) ;
+	}
+
+	// context 객체를 설정한다.	
+	// 긁어올 url을 명시하고, url이 URL정보임을 알려준다.
+	curl_easy_setopt( ctx , CURLOPT_URL,  url ) ;
+
+	// no progress bar:
+	curl_easy_setopt( ctx , CURLOPT_NOPROGRESS , OPTION_TRUE ) ;
+
+	/*
+	By default, headers are stripped from the output.
+	They can be:
+
+	- passed through a separate FILE* (CURLOPT_WRITEHEADER)
+
+	- included in the body's output (CURLOPT_HEADER -> nonzero value)
+		(here, the headers will be passed to whatever function
+		 processes the body, along w/ the body)
+
+	- handled with separate callbacks (CURLOPT_HEADERFUNCTION)
+		(in this case, set CURLOPT_WRITEHEADER to a
+		 matching struct for the function)
+
+	*/
+	
+	// 헤더는 표준에러로 출력하도록 하다. 
+	curl_easy_setopt( ctx , CURLOPT_WRITEHEADER , stderr ) ;
+
+
+	// body 데이터는 표준출력 하도록 한다.
+	curl_easy_setopt( ctx , CURLOPT_WRITEDATA , stdout ) ;
+
+	// context 객체의 설정 종료 
+
+
+	// 웹페이지를 긁어온다. 
+
+	const CURLcode rc = curl_easy_perform( ctx ) ;
+
+	if( CURLE_OK != rc ){
+
+		std::cerr << "Error from cURL: " << curl_easy_strerror( rc ) << std::endl ;
+
+	}else{
+
+		// get some info about the xfer:
+		double statDouble ;
+		long statLong ;
+		char* statString = NULL ;
+
+		// HTTP 응답코드를 얻어온다. 
+		if( CURLE_OK == curl_easy_getinfo( ctx , CURLINFO_HTTP_CODE , &statLong ) ){
+			std::cout << "Response code:  " << statLong << std::endl ;
+		}
+
+		// Content-Type 를 얻어온다.
+		if( CURLE_OK == curl_easy_getinfo( ctx , CURLINFO_CONTENT_TYPE , &statString ) ){
+			std::cout << "Content type:   " << statString << std::endl ;
+		}
+
+		// 다운로드한 문서의 크기를 얻어온다.
+		if( CURLE_OK == curl_easy_getinfo( ctx , CURLINFO_SIZE_DOWNLOAD , &statDouble ) ){
+			std::cout << "Download size:  " << statDouble << "bytes" << std::endl ;
+		}
+
+		// 
+		if( CURLE_OK == curl_easy_getinfo( ctx , CURLINFO_SPEED_DOWNLOAD , &statDouble ) ){
+			std::cout << "Download speed: " << statDouble << "bytes/sec" << std::endl ;
+		}
+
+	}
+
+	// cleanup
+	curl_easy_cleanup( ctx ) ;
+	curl_global_cleanup() ;
+
+	return( 0 ) ;
+
+} // main()
+}}}
+
+== FTP Download: FTP 데이터 다운로드 ==
+현재는 웹서비스를 통해서 데이터를 얻는 경우가 압도적이지만, 여전히 FTP는 데이터의 전송을 위한 용도로 널리 사용되고 있다.
+
+FTP는 script의 작성을 통해서 일괄작업 형식으로 파일을 업/다운로드 하는 형태로 사용될 수 있다. 이러한 일을 하는 스크립트를 작성하기 위해서는 expect(:12)와 같은 툴을 이용해야 하는데, 제대로 작동하는 프로그램을 짜기란 여간 어려운게 아니다. 서버의 특성에 따라서 프로그래밍 기법이 달라져야 하며, 특히 에러처리가 매우 힘들기 때문이다. (ncftp와 같은 프로그램은 스크립트 형태로 사용가능한 '''ncftpput''', ''ncftpget'''과 같은 툴을 제공한다.) 
+
+httpget.cc와 중복되는 내용들은 빼고 설명하도록 하겠다. 이 프로그램은 원격지의 파일을 로컬에 저장하지는 않는다. 파일을 읽어들이고, 그 크기만 출력을 한다. 
+{{{#!plain
+size_t showSize(...);
+curl_esay_setopt(ctx, CURLOPT_WRITEFUNCTION, showSize);
+}}}
+'''CURLOPT_WRITEFUNCTION'''은 원격지 파일을 다운로드 할께 호출할 함수를 정의하기 위해서 사용한다. 
+
+이제 다운로드할 파일갯수만큼 for루프를 돌면서 파일을 다운받는다. 우선 CURLOPT_URL을 이용해서 연결을 시도할 서버이름을 정해준다. CURLOPT_WRIDATE 는 CURLOPT_WRITEFUNCTION를 이용해서 정의된 콜백함수 - showSize() -를 할당해서 인자로 주어진 XferInfo객체에 데이터를 쓴다.
+{{{#!plain
+class XferInfo
+{
+	void add(int more);
+	int getBytesTransferred();
+	int getTimesCalled();
+};
+...
+
+XferInfo info;
+curl_easy_setopt(ctx, CURLOPT_WRITEDATA, &info);
+}}}
+
+그럼 실질적으로 데이터를 받아서 처리하는 showSize 콜백함수에 대해서 알아보도록 하자. 
+{{{#!plain
+extern "C"
+size_t showSize
+{
+	void *source,
+	size_t size,
+	size_t nmemb,
+	void *userData
+}
+}}}
+
+'''source'''는 읽어들인 실제 데이터다. 읽어들인 데이터는 '''NULL'''을 포함하는 이진데이터가 될 수 있으므로, char *형 대신 void * 형을 사용했다. 읽어들일 데이터의 크기는 '''size*nmemb'''를 통해 계산한다.
+
+'''userData'''는 CURLOPT_WRITEDATA 에 의해서 할당된, 자료구조로 우리는 여기에 필요한 정보 - 읽어들인 파일의 크기 - 를 적을 것이다. '''userData'''자료구조 대신에 파일에 쓰길 원한다면 FILE *을 넘기면 된다. '''usrData'''는 '''void *'''형이므로 반드시 캐스트 해주어야 한다.  
+{{{#!plain
+extern "C"
+size_t showSize(...)
+{
+	XferInfo *info = static_cast<XferInfo *>(userData);
+	const int bufferSize = size * nmemb;
+	info->add(bufferSize);
+}
+}}}
+이제 우리가 만든 콜백함수는 읽어들인 파일의 크기를 (size*nmemb)로 계산해서 되돌려줄 것이다. 또한 이 함수는 bufferSize를 되돌려주게 되는데, libCURL은 콜백함수의 리턴값과 전송받은 실제 데이터의 크기를 비교해서 틀릴경우 0을 리턴해주게 된다. 이런식으로 데이터를 정상적으로 받았는지를 체크할 수 있다.  
+
+이제 curl_easy_perform을 이용해서 URL에 연결해서 데이터를 받아오고 콜백함수를 실행시키면 된다. 
+{{{#!plain down:ftpget.cc
+/*
+
+sample for O'ReillyNet article on libcURL:
+	{TITLE}
+	{URL}
+	AUTHOR: Ethan McCallum
+
+
+anon ftp/download (scenario: fetch remote file)
+
+이 코드는 Ubuntu 리눅스 Kernel 2.6.15에서
+libcURL 버젼 7.15.1로 테스트 되었다.
+2006년 8월 3일
+
+*/
+
+#include<iostream>
+#include<string>
+#include<sstream>
+#include<list>
+
+extern "C" {
+	#include<curl/curl.h>
+}
+
+// - - - - - - - - - - - - - - - - - - - -
+
+typedef std::list< std::string > FileList ;
+
+enum {
+	ERROR_ARGS = 1 ,
+	ERROR_CURL_INIT = 2
+} ;
+
+enum {
+	OPTION_FALSE = 0 ,
+	OPTION_TRUE = 1
+} ;
+
+// - - - - - - - - - - - - - - - - - - - -
+
+// 콜백함수에서 사용할 사용자 정의 객체 
+class XferInfo {
+
+	private:
+	int bytesTransferred_ ;
+	int invocations_ ;
+
+	protected:
+	// empty
+
+	public:
+	XferInfo(){
+
+		reset() ;
+
+	} // ctor
+
+	/// reset counters
+	void reset(){
+
+		bytesTransferred_ = 0 ;
+		invocations_ = 0 ;
+
+		return ;
+
+	} // reset()
+
+	/// add the number of bytes transferred in this call
+	void add( int more ){
+
+		bytesTransferred_ += more ;
+		++invocations_ ;
+
+		return ;
+
+	} // add()	
+
+	/// get the amount of data transferred, in bytes
+	int getBytesTransferred() const {
+		return( bytesTransferred_ ) ;
+	} // getBytesTransferred()
+
+	/// get the number of times add() has been called
+	int getTimesCalled(){
+		return( invocations_ ) ;
+	} // getTimesCalled()
+} ;
+
+// - - - - - - - - - - - - - - - - - - - -
+
+
+// C++ 에서 C함수를 링크시키기 위해서는, "extern C"를 이용해야 한다.
+extern "C"
+size_t showSize( void *source , size_t size , size_t nmemb , void *userData ){
+
+	// this function may be called any number of times for even a single
+	// transfer; be sure to write it accordingly.
+
+	// source is the actual data fetched by libcURL; cast it to whatever
+	// type you need (usually char*).  It has NO terminating NULL byte.
+
+	// we don't touch the data here, so the cast is commented out
+	// const char* data = static_cast< const char* >( source ) ;
+
+	// userData is called "stream" in the docs, which is misleading:
+	// that parameter can be _any_ data type, not necessarily a FILE*
+	// Here, we use it to save state between calls to this function
+	// and track number of times this callback is invoked.
+	XferInfo* info = static_cast< XferInfo* >( userData ) ;
+
+	const int bufferSize = size * nmemb ;
+
+	std::cout << '\t' << "showSize() called: " << bufferSize << " bytes passed" << std::endl ;
+
+	// ... pretend real data processing on *source happens here ...
+
+	info->add( bufferSize ) ;
+
+        
+	/*
+	return some number less than bufferSize to indicate an
+	error (xfer abort)
+	
+	nicer code would also set a status var (in userData) for the
+	calling function
+	*/
+
+	return( bufferSize ) ;
+
+} // showSize()
+
+
+// - - - - - - - - - - - - - - - - - - - -
+
+
+int main( const int argc , const char** argv ){
+
+	if( argc < 3 ){
+		std::cerr << "test of libcURL: anonymous FTP" << std::endl ;
+		std::cerr << " Usage: " << argv[0] << " {server} {file1} [{file2} ...]" << std::endl ;
+		return( ERROR_ARGS ) ;
+	}
+
+	// remote FTP server
+	const char* server = argv[1] ;
+
+	const int totalTargets = argc - 2 ;
+
+	std::cout << "Attempting to download " << totalTargets
+		<< " files from " << server << std::endl
+	;
+
+
+	curl_global_init( CURL_GLOBAL_ALL ) ;
+
+
+	CURL* ctx = curl_easy_init() ;
+
+	if( NULL == ctx ){
+		std::cerr << "Unable to initialize cURL interface" << std::endl ;
+		return( ERROR_CURL_INIT ) ;
+	}
+
+	/* BEGIN: global handle options */
+
+	// handy for debugging: see *everything* that goes on
+	// curl_easy_setopt( ctx , CURLOPT_VERBOSE, OPTION_TRUE ) ;
+
+	// no progress bar:
+	curl_easy_setopt( ctx , CURLOPT_NOPROGRESS , OPTION_TRUE ) ;
+
+	// what to do with returned data
+	curl_easy_setopt( ctx , CURLOPT_WRITEFUNCTION , showSize ) ;
+
+	XferInfo info ;
+
+	for(
+		int ix = 2 ;
+		ix < argc ;
+		++ix
+	){
+
+		const char* item = argv[ ix ] ;
+
+		// zero counters for each file
+		info.reset() ;
+
+
+		// target url: concatenate the server and target file name
+		urlBuffer.str( "" ) ;
+		urlBuffer << "ftp://" << server << "/" << item << std::flush ;
+
+		std::cout << "Trying " << urlBuffer.str() << std::endl ;
+
+		const std::string url = urlBuffer.str() ;
+
+		curl_easy_setopt( ctx , CURLOPT_URL,  url.c_str() ) ;
+
+		// set the write function's user-data (state data)
+		curl_easy_setopt( ctx , CURLOPT_WRITEDATA , &info ) ;
+
+
+		// action!
+
+		const CURLcode rc = curl_easy_perform( ctx ) ;
+
+		// for curl v7.11.x and earlier, look into
+		// curl_easy_setopt( ctx , CURLOPT_ERRORBUFFER , /* char array */ ) ;
+		if( CURLE_OK == rc ){
+			std::cout << '\t' << "xfer size: " << info.getBytesTransferred() << " bytes" << std::endl ;
+			std::cout << '\t' << "Callback was invoked " << info.getTimesCalled() << " times for this file" << std::endl ;
+		} else {
+			std::cerr << "Error from cURL: " << curl_easy_strerror( rc ) << std::endl ;
+		}
+
+		std::cout << std::endl ;
+
+	}
+
+
+	// cleanup
+	curl_easy_cleanup( ctx ) ;
+	curl_global_cleanup() ;
+
+	return( 0 ) ;
+
+} // main()
+
+}}}
+
+== FTP 업로드 ==
+이번에 만들 프로그램은 FTP 호스트에 연결해서 파일을 Upload 하는 일을 한다. FTP호스트에 접근하기 위해서는 host의 도메인 이름과 로그인을 위한 아이디와 패스워드가 필요하다. 제대로된 프로그램이라면 설정파일등을 통해서 이들 정보를 입력받아야 겠지만, 여기에서는 편의상 소스내에 하드코딩하도록 하겠다. 타겟 URL에 file을 업로드하는 것은 다음과 같이 기술된다.
+{{{#!plain
+ftp://host/file
+}}}
+
+로그인을 위한 아이디와 패스워드는 '''CURLOPT_USERPWD'''를 이용해서 설정할 수 있다. 이들 정보는 다음과 같이 기술될 것이다. 
+{{{#!plain
+login:password
+}}}
+
+최종적으로 다음과 같은 URL정보를 가지게 된다. 
+{{{#!plain
+ftp://login:password@host/file
+}}}
+
+libCURL은 파일을 전송하는 것 뿐만 아니라. ftp서버에서 사용할 수 있는 '''mkdir'''과 같은 명령도 문제없이 사용할 수 있다. 사용할 명령은 curl_slist 에 링크드리스트(:12) 형태로 저장한다. 
+{{{#!plain
+struct curl_slist *command=NULL;
+command = curl_slist_append( commands, "mkdir /some/path");
+command = curl_slist_append( commands, "mkdir /another/path");
+}}}
+물론 이들 명령이 실행하기 위해서는 로그인 과정을 우선 거쳐야 할 것이다. 이제 CURLOPT_QUOTE를 이용해서 명령을 등록시키면 된다. 
+{{{#!plain
+curl_easy_setopt(ctx, CURLPOST_QUOTE, commands);
+// curl_easy_perform을 이용해서 ftp 세션을 시작하고
+// 명령을 실행한다.
+curl_slist_free_all(command);
+}}}
+
+
+== HTTP POST ==
+HTTP(:12) POST(:12)는 웹을 통해서 폼데이터를 주고받기 위한 데이터 전송방법의 하나다. 이 문서의 마지막 예제로 libCURL을 이용해서 HTTP POST 형식의 데이터를 전송하는 방법에 대해서 알아보도록 하겠다. 또한 사용자정의된 HTTP header도 테스트하도록 하겠다. 완전한 테스트를 위해서는 웹서버가 구축되어 있어야 할 것이다.    
+
+POST로 보내는 데이터는 '''key=value'''형태로 되어 있으며, 각각의 '''key=value''' 는 '''&'''를 통해서 구분된다.  
+{{{#!plain
+const char* postData="param1=value1&param2=value2&...";
+}}}
+POST 데이터 전송을 위해서 '''CURLOPT_POSTFIELDS'''옵션을 설정하면 된다.
+{{{#!plain
+curl_easy_setopt(ctx, CURLOPT_POSTFIELDS, postData);
+}}}
+
+이제 '''CURLOPT_HTTPHEADER'''를 이용해서 사용자정의 HTTP 헤더를 만들도록 한다.
+{{{#!plain
+curl_sist * responseHeaders=NULL;
+
+responseHeaders = curl_slist_append(
+	responseHeaders,
+	"Expect: 100-continue"
+);
+
+curl_easy_setopt(ctx, CURLOPT_HTTPHEADER, responseHeaders);
+}}}
+주의 할것은 libCURL은 hidden 필드나 JavaScript(:12)와 같은 클라이언트측의 기술들을 사용하지 못한다는 점이다. 예를들어 폼입력을 하고나서 '''submit'''버튼을 클릭하면 폼의 각 필드를 검사하는 등의 자바스크립트등은 처리할 수 없다.
+
+{{{#!plain down:httppost.cc
+/*
+
+sample for O'ReillyNet article on libcURL:
+	{TITLE}
+	{URL}
+	AUTHOR: Ethan McCallum
+
+HTTP POST (e.g. form processing or REST web services)
+
+이 코드는 Ubuntu 6.06 Dapper Drake,  
+libcURL
+This code was built/tested under Fedora Core 3,
+libcURL version 7.12.3 환경에서 테스트 되었다.
+*/
+
+#include<cstdio>
+#include<iostream>
+#include<string>
+#include<sstream>
+
+extern "C" {
+	#include<curl/curl.h>
+}
+
+// - - - - - - - - - - - - - - - - - - - -
+
+enum {
+	ERROR_ARGS = 1 ,
+	ERROR_CURL_INIT = 2
+} ;
+
+enum {
+	OPTION_FALSE = 0 ,
+	OPTION_TRUE = 1
+} ;
+
+enum {
+	FLAG_DEFAULT = 0 
+} ;
+
+const char* targetUrl ;
+
+// - - - - - - - - - - - - - - - - - - - -
+
+int main( int argc , char** argv ){
+
+	if( argc != 2 ){
+		std::cerr << "test of libcURL: test an HTTP post" << std::endl ;
+		std::cerr << "(post data is canned)" << std::endl ;
+		std::cerr << " Usage: " << argv[0] << " {post url}" << std::endl ;
+		std::exit( ERROR_ARGS ) ;
+	}
+
+	targetUrl = argv[1] ;
+
+	curl_global_init( CURL_GLOBAL_ALL ) ;
+
+
+	CURL* ctx = curl_easy_init() ;
+
+	if( NULL == ctx ){
+		std::cerr << "Unable to initialize cURL interface" << std::endl ;
+		return( ERROR_CURL_INIT ) ;
+	}
+
+	/* BEGIN: configure the handle: */
+
+	// Target URL: 
+	curl_easy_setopt( ctx , CURLOPT_URL,  targetUrl ) ;
+	// no progress bar:
+	curl_easy_setopt( ctx , CURLOPT_NOPROGRESS , OPTION_TRUE ) ;
+
+	// 응답데이터를 표준출력으로 보낸다. 
+	curl_easy_setopt( ctx , CURLOPT_WRITEDATA , stdout ) ;
+
+	// 사용자 정의 HTTP 헤더: create a linked list and assign
+	curl_slist* responseHeaders = NULL ;
+	responseHeaders = curl_slist_append( responseHeaders , "Expect: 100-continue" ) ;
+	responseHeaders = curl_slist_append( responseHeaders , "User-Agent: Some Custom App" ) ;
+	curl_easy_setopt( ctx , CURLOPT_HTTPHEADER , responseHeaders ) ;
+
+	// POST Data 설정 
+	// notice the URL-unfriendly characters (such as "%" and "&")
+	// URL에서는 '%', '&', ' '와 같은 문자를 URL encoding 시켜줘야 한다.
+	// curl_escape 함수를 이용해서 인코딩할 수 있다. 
+	const char* postParams[] = {
+		"One"      , "this has % and & symbols" ,
+		"Dos"      , "value with spaces" ,
+		"Trois"    , "plus+signs+will+be+escaped" ,
+		"Chetirye" , "fourth param..." ,
+		NULL
+	} ; 
+
+	// buffer for the POST params
+	std::ostringstream postBuf ;
+
+	const char** postParamsPtr = postParams ;
+
+	while( NULL != *postParamsPtr )
+	{
+		// curl_escape( {string} , 0 ): replace special characters
+		// (such as space, "&", "+", "%") with HTML entities.
+		// ( 0 => "use strlen to find string length" )
+		// remember to call curl_free() on the strings on the way out
+		char* key = curl_escape( postParamsPtr[0] , FLAG_DEFAULT ) ;
+		char* val = curl_escape( postParamsPtr[1] , FLAG_DEFAULT )  ;
+
+		std::cout << "Setting POST param: \"" << key << "\" => \"" << val << "\"" << std::endl ;
+		postBuf << key << "=" << val << "&" ;
+
+		postParamsPtr += 2 ;
+
+		// the cURL lib allocated the escaped versions of the
+		// param strings; we must free them here
+		curl_free( key ) ;
+		curl_free( val ) ;
+
+	}
+	postBuf << std::flush ;
+
+	// We can't really call "postBuf.str().c_str()" here, because
+	// the std::string created in the middle is a temporary.  In turn,
+	// the char* buf from its c_str() operation isn't guaranteed to
+	// be around after the function call.
+	// The solution: explicitly create the string.
+
+	// Larger (and/or better) code would use std::string::copy() to create
+	// a const char* pointer to pass to cURL, then clean it up later.
+	// e.g.:
+	//	const char* postData = new char*[ 1 + postBuf.tellg() ] ;
+	// 	postBuf.str().copy( postData , std::string::npos ) ;
+	//  postData[ postBuf.tellg() ] == '\0' ;
+	const std::string postData = postBuf.str() ;
+
+	std::cout << "post data: " << postData << std::endl ;
+	curl_easy_setopt( ctx , CURLOPT_POSTFIELDS , postData.c_str() ) ;
+
+	// do a standard HTTP POST op
+	// in theory, this is automatically set for us by setting
+	// CURLOPT_POSTFIELDS...
+	curl_easy_setopt( ctx , CURLOPT_POST , OPTION_TRUE ) ;
+
+	/* END: configure the handle */
+	// action!
+	std::cout << "- - - BEGIN: response - - -" << std::endl ;
+	CURLcode rc = curl_easy_perform( ctx ) ;
+	std::cout << "- - - END: response - - -" << std::endl ;
+
+	// "curl_easy_strerror()" available in curl v7.12.x and later
+	if( CURLE_OK != rc ){
+		std::cerr << '\t' << "Error from cURL: " << curl_easy_strerror( rc ) << std::endl ;
+	}
+
+	// cleanup
+	curl_slist_free_all( responseHeaders ) ;
+	curl_easy_cleanup( ctx ) ;
+	curl_global_cleanup() ;
+	std::exit( 0 ) ;
+} // main()
+}}}
+
+위 프로그램의 테스트를 위해서 다음과 같은 php페이지를 만들었다.
+{{{#!plain
+<?
+    echo "SERVER Ons      : $One<br>\n";
+    echo "SERVER Dos      : $Dos<br>\n";
+    echo "SERVER Trois    : $Trois<br>\n";
+    echo "SERVER Chetirye : $Chetirye<br>\n";
+?>
+}}}

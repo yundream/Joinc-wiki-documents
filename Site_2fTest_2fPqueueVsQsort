@@ -1,0 +1,219 @@
+#title 퀵 소트와 Priority Queue와의 속도 비교 테스트
+
+심심해서 QuickSort(:12)와 PriorityQueue(:12)와의 속도를 비교해보았다. 테스트 제한조건은 다음과 같다.
+ * 1,000,000건의 Int형의 데이터 준비
+ * 데이터는 random()함수를 사용해서 랜덤(:12)하게 발생시킨다.
+ * priority Queue의 Queue(:12)사이즈는 20,000으로 한다.
+ * 퀵소트는 C의 표준라이브러리 함수에서 제공하는 qsort(:3)함수를 사용한다.
+여기에서 조건이 Top 20,000인 것에 주목해야 한다. 모든 목록을 정렬하는게 아니다.
+
+== 퀵소트 ==
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX 1000000
+
+int fn_qsort_intcmp( const void *a, const void *b )
+{
+  return( *(int *)a - *(int *)b);
+}
+
+int main()
+{
+  int a[MAX];
+  int i;
+  int *c;
+  clock_t stime, etime;
+
+  for (i = 0; i < MAX; i++)
+  {
+    a[i] = random()%MAX;
+  }
+
+  stime = clock();
+  qsort( a, MAX, sizeof(int), fn_qsort_intcmp );
+  etime = clock();
+  printf("Time : %.3fs\n",(double)(etime - stime)/CLOCKS_PER_SEC);
+  return 0;
+}
+}}}
+
+[[sadsense(click)]]
+=== Priority Queue ===
+{{{#!plain
+#include <stdio.h>
+#include <vector>
+#include <list>
+#include <iostream>
+#include <set>
+#include <time.h>
+#include <unistd.h>
+#include <sys/time.h>
+
+#include <time.h>
+
+using namespace std;
+
+const int FAULT = 1<<31;
+#define MAX 1000000
+
+class PriorityQueue
+{
+    private:
+        int maxsize;
+        int size;
+        int max;
+        int *heap;
+        int faluse;
+    public:
+        PriorityQueue(int csize)
+        {
+            maxsize = csize;
+            size = 0;
+            heap = (int *)malloc(sizeof(int) * (maxsize+4));
+        }
+        void Print()
+        {
+            printf("Show =========\n");
+            for (int i = 0; i < size; i++)
+            {
+                printf("%d\n", heap[i+1]);
+            }
+        }
+        int top()
+        {
+            if (size > 0)
+                return heap[1];
+            else
+                return FAULT;
+        }
+        void Insert(int a)
+        {
+            if (size < maxsize)
+            {
+                put(a);
+            }
+            else if (size > 0 && !(a < top()))
+            {
+                heap[1] = a;
+                downHeap();
+            }
+        }
+
+        void put(int a)
+        {
+            size++;
+            heap[size] = a;
+            upHeap();
+        }
+
+        void upHeap()
+        {
+            int i = size;
+            int node = heap[i];
+            int j = i >> 1;
+            j = j & ~(1 << 31) ;
+            while((j > 0) && (node < heap[j]))
+            {
+                heap[i] = heap[j];
+                i = j;
+                j = j >> 1;
+                j = j & ~(1 << 31);
+            }
+            heap[i] = node;
+        }
+
+        int pop()
+        {
+            if (size > 0)
+            {
+                int result = heap[1];
+                heap[1] = heap[size];
+                heap[size] = FAULT;
+                size --;
+                downHeap();
+                return result;
+            }
+            else
+            {
+                return FAULT;
+            }
+        }
+
+        int Size()
+        {
+            return size;
+        }
+
+        void downHeap()
+        {
+            int i = 1;
+            int node = heap[i];
+            int j = i << 1;
+            int k = j + 1;
+            if ( k <= size && (heap[k] < heap[j]))
+            {
+                j = k;
+            }
+            while((j <= size) && (heap[j] < node))
+            {
+                heap[i] = heap[j];
+                i = j;
+                j = i << 1;
+                k = j + 1;
+                if ((k <= size) && (heap[k] < heap[j]) )
+                {
+                    j = k;
+                }
+            }
+            heap[i] = node;
+        }
+};
+
+int main(int argc, char **argv)
+{
+    int i;
+    vector<int> value;
+    vector<int> pqueue(20);
+    clock_t stime, etime;
+
+    for (i = 0; i < MAX; i++)
+    {
+      value.push_back(random()%MAX);
+    }
+
+
+    PriorityQueue PQueue(20000);
+    stime = clock();
+    for (i = 0; i < value.size(); i++)
+    {
+        PQueue.Insert(value[i]);
+    }
+    etime = clock();
+    printf("Time : %.3fs\n",(double)(etime - stime)/CLOCKS_PER_SEC);
+
+    //PQueue.Print();
+
+    return 0;
+}
+}}}
+
+=== 테스트 결과 ===
+==== 평균시간 ====
+일단 평균시간을 가지고 테스트를 했다. 
+
+1,000,000 건
+|| Quick Sort || 0.43   ||
+|| Priority Queue || 0.1  ||
+
+100,000 건
+|| Quick Sort || 0.04    ||
+|| Priority Queue || 0.02  ||
+
+예상외로 Priority Queue가 더 빠른 결과를 보여주고 있는데, Priority Queue의 경우 Queue에 입력하기 전에 Queue의 가장 작은 값과 비교를 하는 루틴때문으로 생각된다. 또한 Priority Queue는 TopN을 유지하지만, TopN에서 완전한 Sort가 이루어지지 않는 다는 점을 염두에 두어야 한다.
+
+ <!> 데이터가 10,000,000개까지 늘어날 경우의 속도 증가치를 비교해본다.
+ <!> Priority Queue와 Quick Sort의 장단점과 활용방안을 비교한다.

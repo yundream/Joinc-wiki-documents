@@ -1,0 +1,139 @@
+----
+ 1. dfget 
+ 1. 디스크 사용 정보체크(리눅스)
+ 1. [yundream]
+ 1. Version 0.2
+ 1. 2004/02/06
+----
+
+=== 설명 ===
+디스크 정보를 읽어옵니다. 파티션, 마운트 파일, 할당된 블럭과 사용중인 블럭의 크기를 얻어옵니다. 실제 '''df'''을 통해서 얻을 수 있는 정보들을 가져옵니다.
+
+/dev/mounts정보와 statfs()함수를 이용해서 위의 정보들을 얻어옵니다. 
+=== 사용방법 ===
+{{{#!plain
+MOUNTP *dfopen();
+MOUNTP *dfget(MOUNTP *MP);
+int dfclose(MOUNTP *);
+}}}
+ * dfopen : 초기화 함수, 초기화에 성공하면 파티션 정보를 가르키는 '''MOUNTP'''를 리턴한다.  
+ * dfget : 파티션 정보를 가져오며 더이상 정보가 없을 경우 NULL을 리턴한다. 정보가 있을 경우 MOUNTP 구조체를 리턴한다.  
+ * dfclose : 자원을 해제한다. 
+
+MOUNTP 구조체는 다음과 같이 정의되어 있다.
+{{{#!plain
+struct f_size
+{
+    long blocks;  // 할당된 블럭
+    long avail;   // 사용가능한 블럭 
+};
+
+typedef struct _mountinfo
+{
+    FILE *fp;            // /proc/mounts에 대한 파일 포인터
+    char devname[80];    // 장치이름
+    char mountdir[80];   // 마운트 경로
+    char fstype[12];     // 파일시스템 종류
+    struct f_size size;  
+} MOUNTP;
+}}}
+
+{{{#!plain
+#include "dfget.h"
+
+int main()
+{   
+    MOUNTP *MP;
+    if ((MP=dfopen()) == NULL)
+    {
+        perror("error");
+        return 1;
+    }
+    
+    while(1)
+    {
+        while(dfget(MP))
+        {
+            printf("%-14s%-20s%10lu%10lu\n", MP->mountdir, MP->devname,
+                                MP->size.blocks,
+                                MP->size.avail);
+        }
+        printf("=========================\n\n");
+        sleep(1);
+    }
+}   
+}}}
+
+=== 코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <libgen.h>
+#include <sys/vfs.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+const char *MMOUNT = "/proc/mounts";
+
+struct f_size
+{
+    long blocks;
+    long avail;
+};
+
+typedef struct _mountinfo
+{
+    FILE *fp;
+    char devname[80];
+    char mountdir[80];
+    char fstype[12];
+    struct f_size size;
+} MOUNTP;
+
+MOUNTP *dfopen()
+{
+    MOUNTP *MP;
+    MP = (MOUNTP *)malloc(sizeof(MOUNTP));
+    if(!(MP->fp = fopen(MMOUNT, "r")))
+    {
+        return NULL;
+    }
+    else
+        return MP;
+}
+MOUNTP *dfget(MOUNTP *MP)
+{
+    char buf[256];
+    char *bname;
+    char null[16];
+    struct statfs lstatfs;
+    struct stat lstat;
+    int is_root = 0;
+    while(fgets(buf, 255, MP->fp))
+    {
+        is_root = 0;
+        sscanf(buf, "%s%s%s",MP->devname, MP->mountdir, MP->fstype);
+        if (strcmp(MP->mountdir,"/") == 0) is_root=1;
+        if (stat(MP->devname, &lstat) == 0 || is_root)
+        {
+            if (strstr(buf, MP->mountdir) && S_ISBLK(lstat.st_mode) || is_root)
+            {
+                statfs(MP->mountdir, &lstatfs);
+                MP->size.blocks = lstatfs.f_blocks * (lstatfs.f_bsize/1024);
+                MP->size.avail  = lstatfs.f_bavail * (lstatfs.f_bsize/1024);
+                return MP;
+            }
+        }
+    }
+    rewind(MP->fp);
+    return NULL;
+}
+
+int dfclose(MOUNTP *MP)
+{
+    fclose(MP->fp);
+}
+}}}
+
+
+=== 변경사항 ===

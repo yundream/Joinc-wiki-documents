@@ -1,0 +1,164 @@
+#title linux man page : msgget - 메시지큐의 식별번호를 반환한다.
+
+=== 사용법 ===
+{{{#!plain
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+int msgget(key_t key, int msgflg);
+}}}
+
+=== 설명 ===
+이 함수는 '''key'''를 번호로 가지는 메시지큐(:12)에 대한 '''식별번호'''를 리턴한다. '''msgflg'''로 IPC_CREAT를 사용하면 새로운 메시지큐를 생성하게 된다. IPC_CREATE와 IPC_EXCL을 함께 사용할경우 만약 '''key'''를 가지는 메시지큐가 이미 존재하면 -1 을 리턴하게 된다. open(2) 시스템콜(:12)의 '''O_CREAT'''와 '''O_EXCL'''을 함께 사용할때와 동일한 효과를 보여준다.
+
+msgflg의 하위 9비트는 메시지큐에 대한 접근권한을 정의하기 위해 사용된다. chmod(2)에 사용되는 것과 같은 형태를 사용한다. 단 실행허가는 사용되지 않는다. (메시지큐는 실행되기 위한게 아니므로 필요가 없기도 하다)
+
+이 함수(:12)를 이용해서 메시지큐를 생성하게 되면, 메시지큐 데이터 구조체인 '''msqid_ds'''를 다음과 같이 추기화 한다.
+   * msg_perm.cuid와 msg_perm.uid는 호출 프로세스의 유효 사용자-ID로 설정된다. 
+   * msg_perm.cgid와 msg_perm.gid는 호출 프로세스의 유효 그룹-ID로 설정된다. 
+   * msg_perm.mode의 하위 9비트는 msgflg의 하위 9비트로 설정된다. 
+   * msg_qnum, msg_lspid, msg_lrpid, msg_stime 그리고 msg_rtime는 0으로 설정된다. 
+   * msg_ctime은 현재 시간으로 설정된다. 
+   * msg_qbytes는 시스템 제한값 MSGMNB으로 설정된다. 
+'''msquid_ds'''는 다음과 같이 선언되어 있다.
+{{{#!plain
+struct msqid_ds 
+{ 
+    struct ipc_perm msg_perm; /* 권한 */ 
+    __time_t msg_stime;       /* 마지막으로 msgsnd(2)를 호출한 시간 */ 
+    unsigned long int __unused1; 
+    __time_t msg_rtime;       /* 마지막으로 msgrcv(2)를 호출한 시간 */ 
+    unsigned long int __unused2; 
+    __time_t msg_ctime;       /* 마지막으로 변경된 시간 */ 
+    unsigned long int __unused3; 
+    unsigned long int __msg_cbytes; /* current number of bytes on queue */ 
+    msgqnum_t msg_qnum;       /* 큐에 있는 메시지의 갯수 */ 
+    msglen_t msg_qbytes;      /* 큐의 최대 허용 크기 - byte(:12) */ 
+    __pid_t msg_lspid;        /* 마지막으로 msgsnd()를 호출한 프로세스(:12)의 PID */ 
+    __pid_t msg_lrpid;        /* 마지막으로 msgrcv()를 호출한 프로세스의 PID */ 
+    unsigned long int __unused4; 
+    unsigned long int __unused5; 
+}; 
+}}}
+
+=== 리턴값 ===
+성공하면 메시지큐를 지시하는 '''식별번호'''를 리턴한다. 실패하면 '''-1'''을 리턴하고 errno(:12)를 설정한다.
+
+=== ERRORS ===
+실패할 경우 '''errno'''에 다음과 같은 값들이 설정된다.
+   * '''EACCES''' : '''key'''를 번호로 하는 메시지큐가 존재한다. 그러나 큐에 대한 접근권한이 없다. 
+   * '''EEXIST''' : '''IPC_CREAT'''와 '''IPC_EXCL'''을 함께 사용했을때, '''key'''를 번호로 하는 메시지큐가 이미 존재할 경우
+   * '''ENOENT''' : '''IPC_CREAT'''를 설정하지 않았을때, '''key'''를 번호로 하는 메시지큐가 존재하지 않을 경우
+
+=== 예제 ===
+메시지큐를 생성하고, 데이터를 큐에 쓰는 프로그램
+{{{#!plain
+#include <sys/types.h>  
+#include <sys/ipc.h>  
+#include <sys/msg.h>  
+#include <sys/stat.h>  
+ 
+struct msgbuf 
+{ 
+    long msgtype; 
+    char mtext[256]; 
+    char myname[16]; 
+    int  seq; 
+}; 
+ 
+int main() 
+{ 
+    key_t key_id; 
+    int i; 
+    struct msgbuf mybuf, rcvbuf; 
+ 
+    key_id = msgget((key_t)1234, IPC_CREAT|0666); 
+    if (key_id == -1) 
+    { 
+        perror("msgget error : "); 
+        exit(0); 
+    } 
+ 
+    printf("Key is %d\n", key_id); 
+ 
+    memset(mybuf.mtext, 0x00, 256);  
+    memset(mybuf.myname, 0x00, 16);  
+    memcpy(mybuf.mtext, "hello world 4", 13); 
+    memcpy(mybuf.myname, "yundream", 8); 
+    mybuf.seq = 0; 
+    i = 0; 
+ 
+    while(1) 
+    { 
+        // 짝수일경우 메시지 타입이 4 
+        // 홀수일경우에는 메시지 타입이 3 
+        if (i % 2 == 0) 
+            mybuf.msgtype = 4; 
+        else  
+            mybuf.msgtype = 3; 
+        mybuf.seq = i; 
+ 
+        // 메시지를 전송한다.  
+        if (msgsnd( key_id, (void *)&mybuf, sizeof(struct msgbuf), IPC_NOWAIT) == -1) 
+        { 
+            perror("msgsnd error : "); 
+            exit(0); 
+        }  
+        printf("send %d\n", i); 
+        i++; 
+        sleep(1); 
+    } 
+ 
+    printf("%d \n", rcvbuf.msgtype); 
+    printf("%s \n", rcvbuf.mtext); 
+    printf("%s \n", rcvbuf.myname); 
+    exit(0); 
+} 
+}}}
+
+위의 예제 프로그램이 메시지큐에 쓴 데이터를 읽어들이는 프로그램 
+{{{#!plain
+#include <sys/types.h>  
+#include <sys/ipc.h>  
+#include <sys/msg.h>  
+#include <sys/stat.h>  
+struct msgbuf  //구조체도 헤더파일에서 선언된 것과 겹치는 현상이 일어나서 컴파일이 되질 않습니다. 구조체 이름도 바꾸어야합니다. 
+{ 
+    long msgtype; 
+    char mtext[256]; 
+    char myname[16]; 
+    int  seq; 
+}; 
+ 
+int main(int argc, char **argv) 
+{ 
+    key_t key_id; 
+    struct msgbuf mybuf; 
+    int msgtype;//전역변수로 빼야 됩니다. 
+ 
+    // 아규먼트가 있을경우 msgtype 가 3인 메시지를 받아오고(홀수)  
+    // 아규먼트가 없을경우 msgtype 가 4인 메시지를 받아온다(짝수)   
+    if (argc == 2) 
+        msgtype = 3; 
+    else  
+        msgtype = 4; 
+ 
+    key_id = msgget(1234, IPC_CREAT|0666); 
+    if (key_id < 0) 
+    { 
+        perror("msgget error : "); 
+        exit(0); 
+    } 
+    while(1) 
+    { 
+        if (msgrcv( key_id, (void *)&mybuf, sizeof(struct msgbuf), msgtype, 0) == -1) 
+        { 
+            perror("msgrcv error : "); 
+            exit(0);     
+        } 
+        printf("%d\n", mybuf.seq); 
+    } 
+    exit(0); 
+} 
+}}}

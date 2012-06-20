@@ -1,0 +1,79 @@
+#title winapi : WSAGetLastError - 가장 최근 발생한 소켓에러의 정보 값을 반환한다.
+
+== WSAGetLastError함수 ==
+{{{#!plain
+int WSAGetLastError(void);
+}}}
+
+=== 매개변수 ===
+이 함수는 매개변수가 없다.
+
+=== 반환 값 ===
+가장 최근 발생한 소켓에러에 대응되는 에러코드를 반환한다.
+
+=== 설명 ===
+다중 쓰레드 프로그램일 경우 모든 쓰레드의 소켓에 대해 에러값을 측정한다. 이 경우 어느 쓰레드의 소켓함수 호출에서 에러가 발생한 건지 명확하지 않을 수 있다.  특정한 윈도 소켓에 에러가 발생하면, 그에 적절한 에러코드를 확인해서 반환한다. getsockopt()함수를 SO_ERROR 매개변수로 호출한 에러코드와는 다를 수 있다.  
+
+특정 소켓함수가 성공했다고 해서, 가장 최근의 소켓에러값이 리셋되지 않는다. 에러코드를 리셋하려면 WSAGetLastError 함수의 ''iError''매개변수를 0으로 호출 해야 한다.   
+
+비동기 네트워크로 메시지로에서 ''IParam'''매게변수로 전달되는 에러 값은 WSAGetLastError과 다를 수 있다. 
+
+=== 에러코드 종류 ===
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSA_INVALID_HANDLE || 6 ||  지정된 이벤트 객체 핸들이 잘못 되었다. ||
+|| WSA_NOT_ENOUGH_MEMORY  || 8  || 메모리가 충분하지 않다.           ||
+|| WSA_INVALID_PARAMETER       || 87  || 하나 이상의 잘못된 인자가 사용됐다.  ||
+|| WSA_OPERATION_ABORTED     || 995  || overlapped(:12) 연산이 중단 되었다.  ||
+|| WSA_IO_INCOMPLETE              || 996   || Overlapped 입출력 이벤트가 신호 상태가 아니다.    ||
+|| WSA_IO_PENDING                    || 997  || Overlapped 연산은 나중에 완료될 것이다. 중첩 연산을 위한 준비가 되었으나, 즉시 완료되지 않았을 경우발생  ||
+|| WSAEINTR   || 10004     || WSACancelBlockingCall()에 의해 블록화 호출이 취소: Interrupted system call ||
+|| WSAEBADF   || 10009     || 잘못된 파일 기술자가 사용되었음        ||
+|| WSAEACCES  || 10013     || 요청한 주소가 브로드캐스트 주소인데 setsockopt()로 SO_BROADCAST 가 설정되지 않았다.      ||
+|| WSAEFAULT  || 10014     || 잘못된 주소를 사용했음                 ||
+|| WSAEINVAL  || 10022     || 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때  ||
+|| WSAEMFILE  || 10024     || 너무 많은 파일이 열려있음              ||
+|| WSAEWOULDBLOCK || 10035 || non overlapped 소켓 : 비 봉쇄 소켓에 아직 읽을 데이터가 없음, overlapped(:12) 소켓 : 너무 많은 중첩 입출력 요구가 있음 ||
+|| WSAEINPROGRESS || 10036 || 블록화 함수가 진행되는 동안 부적절한 윈속 API함수가 호출.  ||
+|| WSAEALREADY    || 10037 || 비봉쇄모드 소켓에서 아직 진행중인 작업임. (connect가 완료되지 않은 상태에서 connect 함수의 호출등..) ||
+|| WSAENOTSOCK   || 10038 || 잘못된 소켓기술자를 사용했음  ||
+|| WSAEDESTADDRREQ || 10039  || 목적지 주소를 명시하지 않았음   ||
+|| WSAEMSGSIZE   || 10040 || 송수신에 사용된 데이터가 버퍼의 크기를 초과해서 크기에 맞게 잘렸음 ||
+|| WSAEPROTOTYPE || 10041 || 소켓에 맞지 않는 프로토콜을 사용했음  ||
+|| WSAENOPROTOOPT || 10042   || 잘못된 옵션을 사용했음. 지원되지 않는 옵션으로 getsockopt함수를 호출하는 등. ||
+|| WSAEPROTONOSUPPORT || 10043  || 윈속에서 지원하지 않는 주소체계를 사용했음 ||
+|| WSAESOCKTNOSUPPORT || 10044  || 소켓타입이 지원하지 않는 주소체계를 사용했음        ||
+|| WSAEOPNOTSUPP  || 10045 || 소켓이 지원하지 않는 명령을 사용했음. listen()함수를 데이터그램 통신 (SO_DGRAM)에서 호출  ||
+|| WSAEPFNOSUPPORT || 10046  || 지원하지 않는 프로토콜을 사용했음  ||
+|| WSAEAFNOSUPPORT || 10047 || 윈속에서 지원하지 않는 주소체계를 사용했음       ||
+|| WSAEADDRINUSE || 10048 || 지정된 주소가 이미 사용 중임     ||
+|| WSAEADDRNOTAVAIL || 10049 || 사용할 수 없는 주소임                           ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+|| WSAENETUNREACH  || 10051 || 네크워크에 접근할 수 없음                         ||
+|| WSAENETRESET   || 10052 || 네트워크 재설정으로 연결이 끊어졌음.               ||
+|| WSAECONNABORTED || 10053  || 타임아웃 혹은 상대방의 접속종료들과 같은 소프트웨어적인 문제로 연결이 끊겼음.      ||
+|| WSAECONNRESET || 10054 || 연결이 원격 호스트에 의해 재설정되었음.             ||
+|| WSAENOBUFS    || 10055 || 남아있는 버퍼공간이 없어서 소켓을 사용할 수 없음 ||
+|| WSAEISCONN    || 10056 || 이미 연결이 완료된 소켓임. connect로 연결이 완료된 소켓에 다시 connect를 시도할 경우 ||
+|| WSAENOTCONN  || 10057 || 연결되지 않은 소켓임. 연결되지 않은 소켓에 읽고 쓰는 경우 ||
+|| WSAESHUTDOWN || 10058 || 소켓이 종료되었음. 종료된 소켓에 데이터를 읽고 쓰려 경우  ||
+|| WSAETOOMANYREFS || 10059 || Too many references                    ||
+|| WSAETIMEDOUT  || 10060 || 접속시도 제한 시간 초과         ||
+|| WSAECONNREFUSED || 10061 || 서버가 연결시도를 거절함. 수신 대기열이 가득찬 상태에서 클라이언트의 connect 호출이 있을 경우 ||
+|| WSAELOOP        || 10062 || 너무 많은 심볼릭링크가 사용되었음      ||
+|| WSAENAMETOOLONG  || 10063  || 파일이름이 너무 김                   ||
+|| WSAEHOSTDOWN  ||10064 || 호스트 다운                               ||
+|| WSAEHOSTUNREACH  || 10065 || 호스트로의 경로를 설정할 수 없음      ||
+|| WSAENOTEMPTY  || 10066 ||  네트워크 서브시스템이 아직 통신할 준비가 되어 있지 않음. WSAStartup에 의해 반환   ||
+|| WSAEPROCLIM   || 10067 || 너무 많은 프로세스가 생성되었음       ||
+|| WSAEUSERS     || 10068 || 사용자가 너무 많음                    ||
+|| WSAEDQUOT     || 10069 || 디스크 허용 할당량 초과               ||
+|| WSAESTALE     || 10070 || Stale NFS file handle                 ||
+|| WSAEREMOTE    || 10071 || Too many levels of remote in path     ||
+|| WSAEDISCON    || 10101 || 종료가 진행중임                       ||
+|| WSASYSNOTREADY || 10091 || 네트워크 서브시스템이 아직 통신할 준비가 되어 있지 않았음  ||
+|| WSAVERNOTSUPPORTED || 10092 || 윈속이 지원하지 않는 프로토콜 버전을 사용했음. WSAStartUp()에서 반환  ||
+|| WSANOTINITIALISED || 10093 || WSAStartup() 함수가 성공적으로 실행되지 않은 상황에서 윈속 함수를 호출했을 때  ||
+|| WSAHOST_NOT_FOUND || 11001 || 요청된 호스트를 찾을 수 없음      ||
+|| WSATRY_AGAIN     || 11002  || 요청된 호스트를 찾을 수 없음      ||
+|| WSANO_RECOVERY  || 11003  || 복구할 수 없는 에러가 발생하였음   ||
+|| WSANO_DATA      || 11004 || 요청한 이름이 유효하지만 정보를 찾지 못했음. gethostbyaddr()등에서 발생  ||

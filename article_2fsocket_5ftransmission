@@ -1,0 +1,97 @@
+#title pre fork 서버에서의 소켓 전달. 
+
+== 소개 ==
+fork()는 새로운 프로세스를 생성시키기 위해서 사용하는 [wiki:article_linux_systemcall_quick_reference 시스템콜]로 특히 다중의 클라이언트와 통신을 해야 하는 서버프로그램의 작성을 위해서 [wiki:article_pthread_1 쓰레드]와 함께 일반적으로 사용된다. 
+
+인터넷 환경의 발달로 인해서 최근의 서버 프로그램들은 가능한한 효율적으로 최소의 비용만을 소비하면서 특정한 일을 처리해야할 필요가 있다. 일반적으로 fork()를 호출해서 새로운 프로세스를 생성시키거나 pthread_create()등을 이용해서 새로운 쓰레드를 생성시키는 건 매우 많은 자원과 시간을 소모한다. 그러므로 가능하면 이들 시간을 줄여야할 필요가 있다.  
+
+이런 이유로 쓰레드 혹은 프로세스를 미리 생성시켜서 필요할 때 작업을 할당 시키는 방법을 사용하게 된다. 쓰레드를 미리 생성시켜서 효율을 높이는 방법은 이미 [wiki:thread_poll 쓰레드 풀]작성에서 다룬적이 있다. 
+
+여기에서는 프로세스 풀을 만들어서 효율성을 높인 서버프로그램의 작성 기법에 대해서 알아보도록 하겠다. 
+
+== 프로세스 풀의 작성 == 
+기본적인 개념은 쓰레드 풀과 같다. 부모 쓰레드는 우선 필요한 만큼의 자식 프로세스를 미리 할당 시켜 놓는다. 부모 쓰레드는 socket()->bind()->listen() 으로 생성된 듣기 소켓을 통하여 클라이언트의 연결을 기다린다. 만약 클라이언트의 연결이 발생한다면 부모 소켓은 놀고 있는 자식 프로세스가 클라이언트를 처리하도록 처리한다.
+
+그런데 프로세스 풀의 경우 쓰레드 풀에서는 겪을 수 없었던 "소켓 전달"과 관련된 문제에 직면하게 된다. 쓰레드의 경우라면 부모 프로세스와 자식 프로세스간의 파일이 공유 되므로 프로그래머는 단지 놀고 있는 쓰레드를 깨우고 "어떤 연결 소켓"을 통해서 통신하면 될지를 자식 쓰레드에게 알려주기만 하면된다. 
+
+그러나 전혀 별개의 프로세스로 구성되는 프로세스 풀에서는 이러한 방법을 사용할 수 없다. 일단 fork()를 통해서 새로운 프로세스가 만들어 졌다면 이들은 서로 전혀 벌개의 독립된 파일을 가지고 작업하기 때문이다. 부모 프로세스는 어떡해서든지 새로 생성된 소켓을 자식에게 전달해 주어야 하는 문제를 해결해야 한다.  
+
+=== 소켓 전달 ===
+소켓 전달을 위해서 사용할 기본 테스트 서버 코드 
+{{{#!plain
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <signal.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int state, client_len;
+	int pid;
+
+    struct sockaddr_in clientaddr, serveraddr, myaddr;
+	char buf[256] = {0x00,};
+
+
+    // internet 기반의 스트림 소켓을 만들도록 한다. 
+    // server_sockfd 는 endpoint 소켓(듣기 소켓) 으로 사용된다. 
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(12345);
+
+    // 듣기 소켓에 소켓특성(주소, 포트)를 묶어준다. 
+    state = bind(server_sockfd , (struct sockaddr *)&serveraddr, 
+            sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+
+    state = listen(server_sockfd, 5);
+    if (state == -1)
+    {
+        perror("listen error : ");
+        exit(0);
+    }
+
+    // 만약 듣기 소켓으로 클라이언트 연결이 들어왔다면, 
+    // 새로운 클라이언트와의 통신을 위한 소켓 지정번호를 할당한다. 
+	signal(SIGCHLD, SIG_IGN);
+	while(1)
+	{
+    	client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, 
+                           &client_len);
+    	if (client_sockfd == -1)
+    	{
+			perror("Accept error : ");
+			exit(0);
+    	}
+		pid = fork();
+		if (pid == 0)
+		{
+			read(client_sockfd, buf, 256);
+			printf("%s\n", buf);
+
+			sleep(1);
+			printf("Child Close\n");
+			close(client_sockfd);
+			exit(0);
+		}
+	}
+    close(client_sockfd);
+    return 1;
+}
+}}}

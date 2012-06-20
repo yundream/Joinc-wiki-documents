@@ -1,0 +1,46 @@
+#title Tcpdump와 WireShark를 이용한 패킷 분석
+
+== 왜 리눅스에는 wireshark 같은 물건이 없을까 ? ==
+네트워크 관리자는 아니라서 tcpdump를 달고사는 건 아니지만 간혹 네트워크 프로그램 디버깅 목적으로 사용하곤 합니다. 그 때마다 드는 생각이 있죠. "왜 리눅스에는 윈도우의 wireshark와 같은 GUI 기반의 분석툴이 없을까. ?".
+
+클라우드 관련일을 하다보니, 패킷을 분석해야할 일이 많아진 요즘에는 그런 생각이 좀 더 간절해 집니다. tcpdump로 분석하는 건 인간적으로 너무 짜증나고. windows vm에서 wireshark를 실행해야 하나 ? 라는 생각도 하게 됐구요. 그거 분석하자고 vm 띄우는건 짜증이야 라는 생각에 wine으로 실행해 볼까라는 생각도 하게 됐죠. wine으로 wireshark를 실행하는건 실제 시도했습니다. 잘 돼더군요. 아 됐다. 라고 생각을 했는데, 느리더군요.!!
+
+결국 windows vm을 띄워야 하나 그렇게 생각하고 있는데, 우연찮게 wireshark의 리눅스 버전이 이미 개발됐다는 텍스트를 보게 됐습니다. 그래 [http://www.wireshark.org/download.html wireshark 홈피]에 들렀더니 정말 있더군요. 나만 모르고 있었나.... 그런데 이건 제 잘못이 아닙니다. wireshark 홈피에 들러보세요. Stable Release를 보면 windows와 OSX만 있어요. 오른쪽 구석까지 살펴보지 않으면, 리눅스용이 있다는걸 모른단 말입니다.  
+
+아 그래서 제 우분투 리눅스의 패키지 관리자에서 wireshark를 찾았더니.. 젠장 패키지가 존재하네요. install 했더니.. 젠장 설치 완전 잘되는데다가 깔끔하게 작동하네요.
+
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/t24wNPfYNF3W-Wb3twlmUw?feat=embedwebsite"><img src="https://lh5.googleusercontent.com/-lIlfLlaL2kc/TpzV3abX7tI/AAAAAAAAB1s/XT9LkZ_sh0s/s640/wireshark1.png" height="463" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+== wireshark를 이용한 packet 분석 ==
+wireshark는 integrated sorting, 필터 등 몇가지 기능을 더 가지고 있기는 하지만 기본적으로 tcpdump의 frontend라고 봐도 무방합니다. 만약 tcpdump를 조금이라도 사용할 줄 안다면, wireshark는 편리한 툴로 재미있게 활용할 수 있을 겁니다. 
+
+실제 분석 방법을 예를 들어서 설명했습니다. 네트워크 프로그램을 개발하지만 네트워크 관리자는 아닌 관계로 높은 수준의 분석을 할 수는 없을 겁니다. 이런 식으로 분석을 진행하는 구나 느낌으로 보셨으면 합니다.
+=== 분석 방법 ===
+패킷 분석 방법은 두 가지로 나눌 수 있겠습니다.
+  1. tcpdump로 패킷 캡춰한 내용을 파일로 저장한 다음 wireshark로 읽어서 분석하는 방법과
+  1. wireshark로 인터페이스로 부터 직접 패킷을 캡춰하고 분석하는 겁니다. 다이나믹한 분석이 가능하겠죠. 
+상황에 따라 적당한 방법을 사용하면 되겠고요. 전 첫번째 방법을 이용하기로 했습니다.
+
+eth0 인터페이스에 대해서 80번 포트로 이동하는 패킷을 캡춰하고, 캡춰한 정보를 파일로 저장하는 예입니다.
+{{{#!plain
+# tcpdump -i eth0 port 80 -w tcp_80_eth0.dmp
+}}}
+
+wireshark로 이 파일을 읽어서 분석하는 거죠. wireshark로 읽은 결과입니다. 분석을 위해서는 TCP/IP에 대한 이해가 있어야 겠습니다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/OvUdy8u-OTlGj9VXt9Yg_A?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-n-1H-caNli4/Tp5y2fzI6tI/AAAAAAAAB14/xz9L32QAciQ/s640/wireshark2.png" height="290" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+wireshark를 실행한 다음 패킵캡춰 룰을 만들어서 실시간으로 패킷을 분석하는 방법을 사용할 수도 있습니다. 이 경우 wireshark는 raw 소켓에 접근을 하는데, 그러기 위해서는 루트권한이 필요합니다. sudo로 실행하는게 제일 편할 듯.
+=== 분석 예제 ===
+스크린샷 찍어가면서 할 필요는 없겠다는 생각이 듭니다. 관심있는 프로토콜 사양을 살펴보는게 가장 빠른 방법이겠네요. HTTP over TCP를 분석하겠다면 먼저, TCP(:12)와 IP(:12) 그리고 필요에 따라서 HTTP(:12)를 공부해야 겠죠. wireshark로 패킷 분석하는 영상자료를 만들고 싶긴한데, 완전 귀찮을 것 같아서 어떻게 할까 고민 중입니다.
+  * [wiki:Site/TCP_IP/TCP_Header TCP 자세히 보기]
+  * [wiki:Site/TCP_IP/IP_Header IP 자세히 보기]
+  * [wiki:Site/Network_Programing/AdvancedComm/pcap_capture pcap을 이용한 패킷 캡춰 프로그램 개발]
+
+== history ==
+  * 2011년 10월 18일
+[[tag(tcpdump,wireshark,tcp,ip,pcap)]]
+[[Category(15)]]

@@ -1,0 +1,119 @@
+#title winsock : bind - 소켓에 주소를 할당한다.
+
+== bind ==
+소켓에 주소, 프로토콜, 포트를 할당한다. file descriptor 대신에 '''SOCKET'''객체를 사용한다는 것을 제외하고 BSD:::socket(:12)와 동일하다.
+
+== syntax ==
+{{{#!plain
+int bind(
+    SOCKET s,
+    const struct sockaddr *name,
+    int namelen
+);
+}}}
+
+== 인자 ==
+  * s : socket()으로 생성된 소켓객체
+  * name : 소켓객체에 부여할 주소정보를 포함한 구조체 
+  * namelen : name의 데이터 길이. byte(:12)단위
+
+== 리턴값 ==
+성공했을 경우 0을 리턴한다. 실패했을 경우 SOCKET_ERROR을 리턴하고 error code를 설정한다. WSAGetLastError 함수를 호출해서 error code 값을 가져올 수 있다.
+
+|| error code  || 설명                                    ||
+|| WSANOTINITIALISED     || WSAStartup 이 성공적으로 호출된 적이 없다.        ||
+|| WSAENETDOWN           || 네트워크 서브시스템에서 실패                      ||
+|| WSAEACCES             || 요청한 주소가 브로드캐스트 주소인데 setsockopt()로 SO_BROADCAST 가 설정되지 않았다. ||
+|| WSAEADDRINUSE            || 동일한 주소/포트를 다른 프로세스에서 사용하고 있다. SO_REUSEADDR(:12)을 이용해서 주소를 재사용할 것을 명시함으로 해결할 수 있다. ||
+|| WSAEADDRNOTAVAIL         || 지정된 주소가 올바른 주소가 아님  ||
+|| WSAEFAULT                || name 혹은 namelen 인자가 잘못되었을 경우. namelen이 너무 작거나, name이 잘못된 주소형태를 포함하고 있을 경우 ||
+|| WSAEINVAL                || 이미 bind된 소켓임    ||
+|| WSAENOBUFS               || 너무 많은 연결로 남아있는 버퍼가 없음    ||
+|| WSAENOTSOCK              || '''s'''가 소켓이 아님    ||
+
+== 설명 ==
+bind 함수는 listen(),connect() 호출전에 사용되며, '''연결되지 않은 소켓'''을 필요로 한다. bind는 일반적으로 연결지향(stream) 혹은 비연결지향(connectless) datagram 소켓을 위해서 사용된다. 이외에도 raw:::socket(:12)에도 사용된다.
+
+대게의 경우 서버프로그램에서 사용되는데, 클라이언트 프로그램에서 사용되는 경우도 있다. 클라이언트에서는 주로, port를 명시적으로 할당해주기 위한 목적으로 사용한다.
+
+소켓에 할당되는 이름 - name -은 크게 세가지로 구분이 된다. '''주소체계''', '''호스트주소''' 그리고 '''포트번호'''이다. sockaddr(:12) 구조체에서 처음 2byte인 sa_family가 주소체계를 가리키게 되는데, 소켓을 생성할 때 사용했던 주소체계와 일치해야 한다. 그렇지 않을 경우 '''WSAEFAULT''' 에러가 발생한다. 
+
+만약 PORT(:12) 번호를 0으로 할당하면, 서비스 프로바이더는 (리눅스의 경우에는 커널이) 1024 ~ 5000 사이의 값을 임의로 할당한다. 보통 클라이언트는 PORT를 0으로 해서 임의로 포트를 할당받아서 사용하며, 서버 프로그램을 PORT를 명시해서 사용한다. 서버의 경우에는 연결요청을 하는 클라이언트가 포트번호를 알고 있어야 하기 때문이다. 클라이언트의 경우 명시해서 사용하기가 어렵다. 왜냐하면 명시하려는 포트가 이미 다른 클라이언트에 의해서 사용될 수 있기 때문이다. 
+== 예제 ==
+{{{#!plain
+#include <winsock.h> 
+#include <stdio.h> 
+ 
+#define MAX_PACKETLEN 512 
+#define PORT 5552 
+ 
+int main() 
+{ 
+    WSADATA wsaData; 
+    int status; 
+    int SockLen; 
+    int Readn,Writen; 
+    SOCKET EndpointSocket, ClientSocket; 
+    struct sockaddr_in SockInfo, ClientSockInfo; 
+    char ReadBuffer[MAX_PACKETLEN]; 
+ 
+ 
+    if(WSAStartup(MAKEWORD(2,2),&wsaData)!= 0) 
+    { 
+        printf("error\r\n"); 
+        return 0; 
+    } 
+ 
+    EndpointSocket = socket( AF_INET, SOCK_STREAM, 0 ); 
+    if( EndpointSocket == INVALID_SOCKET ) 
+        return 1; 
+ 
+    printf("Success socket create\r\n"); 
+    ZeroMemory(&SockInfo, sizeof( struct sockaddr_in )); 
+ 
+    SockInfo.sin_family = AF_INET; 
+    SockInfo.sin_port = htons( PORT ); 
+    SockInfo.sin_addr.S_un.S_addr = htonl(INADDR_ANY); 
+ 
+    status = bind( EndpointSocket, (struct sockaddr*)&SockInfo, sizeof( struct sockaddr_in) ); 
+    if( status == SOCKET_ERROR)  
+    { 
+        printf("Bind Error\n"); 
+        return 0; 
+    } 
+    if( SOCKET_ERROR == listen( EndpointSocket, 5 )) 
+    { 
+        printf("listen Error\n"); 
+        return 0; 
+    } 
+ 
+    while(1) 
+    { 
+        ZeroMemory( &ClientSockInfo, sizeof( struct sockaddr_in ) ); 
+        SockLen = sizeof(struct sockaddr_in); 
+        ClientSocket = accept( EndpointSocket, (struct sockaddr*)&ClientSockInfo, &SockLen ); 
+        if(ClientSocket == INVALID_SOCKET) 
+        { 
+            printf("Accept Error\n"); 
+            closesocket(EndpointSocket); 
+            WSACleanup(); 
+            return 1; 
+        } 
+        printf("Accept Client\n"); 
+        Readn = recv( ClientSocket, ReadBuffer, MAX_PACKETLEN,0 ); 
+        if( Readn > 0 ) 
+        { 
+            Writen = send( ClientSocket, ReadBuffer, Readn, 0 ); 
+        } 
+        else 
+        { 
+            printf("read Error\n"); 
+        } 
+        closesocket(ClientSocket);  
+    } 
+    closesocket( EndpointSocket );  
+    WSACleanup(); 
+    return 0; 
+ 
+} 
+}}}

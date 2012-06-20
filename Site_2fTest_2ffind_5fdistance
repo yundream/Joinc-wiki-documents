@@ -1,0 +1,137 @@
+#title Lv.2 가장 짧은 거리 찾기
+
+== 소개 ==
+검색엔진에서 "A B C"의 3개의 Term으로 검색을 하면, 검색결과와 함께 문서의 요약을 함께 출력한다. 이 문서의 요약은 검색어에 대한 highliting을 적용한다. 이 요약문은 다음과 같은 조건을 가져야 할 것이다.
+   1. 약 200byte 정도의 크기를 가진다.
+   1. Term 밀도를 계산한다. 즉 문서에서 3개의 Term이 가장 근접한 영역을 추출해내야 할 것이다.
+
+"리눅스 명령어 cp"로 계산했을 때다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="http://picasaweb.google.com/lh/photo/e6Gr2fKzDYtFBEUeWo_yew?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/TOtZF4zjvJI/AAAAAAAABno/gIvOhFP4SAo/s640/linux_cp.png" height="302" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="http://picasaweb.google.com/yundream/Linux?feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+== 문제 ==
+다음의 문자열에서 "A B C"가 가장 가까운 거리에서 출현하는 지점을 찾아라.
+{{{#!plain
+AxxxxxxxxxxxxxxxxxxxxAxxxxxxxxBxxxxxxxxCxxxxCxxxxAxxBxxxxAxCxB
+}}}
+  * 우리는 직관적으로 가장 마지막의 AxCxB가 가장 가까운 거리에 있음을 알 수 있다.
+
+출력결과는 다음과 같다.
+{{{#!plain
+56, 60 지역에서 발생. 거리는 4
+}}}
+
+
+== 문제 풀이 ==
+=== yundream의 풀이 ===
+최적화하지 않은 코드임. O(n)
+{{{#!plain
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#include <vector>
+
+using namespace std;
+
+struct term {
+    int  term;
+    int  proxy;
+
+};
+int distance(int a, int b, int c, int *amax, int *amin);
+
+int main(int argc, char **argv)
+{
+    char str[]="AxxxxxxxxxxxxxxxxxxxxxxAxxxBxxxxxAxxxxCxxxxxxCxAxxxxBxxxCxxxAxBxCx";
+    int i = 0;
+    vector<struct term> post;
+    vector<struct term>::iterator mi; 
+
+    int min_dist = 10000;
+    int dist = 0;
+    int max, min;
+    int upper, lower;
+
+    struct term termp;
+    for(i = 0; i < strlen(str); i++)
+    {   
+
+        switch(str[i])
+        {       
+            case 'A':   
+                termp.term = 'A';   
+                termp.proxy = i+1;
+                post.push_back(termp);
+                break;          
+            case 'B':   
+                termp.term = 'B';   
+                termp.proxy = i+1;
+                post.push_back(termp);
+                break;          
+            case 'C':   
+                termp.term = 'C';   
+                termp.proxy = i+1;
+                post.push_back(termp);
+                break;          
+        }       
+    }   
+    printf("         1         2         3         4         5         6         7         8         9\n");
+    printf("123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890\n");
+    printf("%s\n", str);
+
+    mi = post.begin();
+    struct term mask[3];
+    memset(mask, 0x00, sizeof(term)*3);
+
+    while(mi != post.end())
+    {
+        mask[mi->term-65] = *mi;
+        if(mask[0].proxy && mask[1].proxy && mask[2].proxy)
+        {
+            dist = distance(mask[0].proxy, mask[1].proxy, mask[2].proxy, &upper, &lower);
+            if(dist < min_dist)
+            {
+                min_dist = dist;
+                max = upper;
+                min = lower;
+            }
+        }
+        mi++;
+    }
+    printf("%d,%d에 있고 거리는 %d이다.\n", min, max, min_dist);
+
+    return 1;
+}
+
+int distance(int a, int b, int c, int *amax, int *amin)
+{
+    int min=0;
+    int max=0;
+    if(a > b)
+    {
+        max = a;
+        min = b;
+    }
+    else
+    {
+        max = b;
+        min = a;
+    }
+
+    if(max < c)
+    {
+        max = c;
+    }
+    if(min > c)
+    {
+        min = c;
+    }
+    *amax = max;
+    *amin = min;
+    return max-min;
+}
+}}}
+
+[[Category(3)]]

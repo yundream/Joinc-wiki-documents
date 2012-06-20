@@ -1,0 +1,165 @@
+#title 팀블로그를 위한 코딩
+
+제 코딩스타일은 .. 주변에 있는거 잘 가져다가 덕지 덕지 만들어서 돌아가게 만드는것 입니다. -.-;; 우선은 원하고자 하는게 잘 되는지를 빠르게 확인하는걸 목적으로 합니다. 그래서 초기 코드는 거의 뼈대코드정도로 대충? 돌아가게 만들고, 그 후에 에러/예외처리 기능추가와 코드다듬기 등을 합니다.
+
+딱 이런 스타일이죠.
+
+http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Development/Forum/manager/Brain?action=download&value=6477503482.jpg
+
+이번 팀블을 위해서 가져다 쓴건 planet(:12) 입니다. 그러나 planet이 RSS의 목록을 저장하지 못하는 관계로, RSS(:12)목록을 저장하기 위한 별도의 php(:12)스크립트와 C(:12) 프로그램을 작성했습니다.
+
+planet는 다행히도 수집한 RSS 정보를 DB(:12) 형태로 저장을 하고, 저장된 정보를 얻어오기 위한 python 프로그램을 제공합니다. C 프로그램은 popen(3)을 이용해서 python 프로그램을 호출하고 그 결과값을 시간순으로 정렬해서 파일로 저장합니다. 파일로 저장된건 php스크립트를 이용해서 mysql(:12) DB에 집어 넣도록 했습니다. C프로그램에서 Mysql API를 직접 호출해서 한번에 끝낼 수도 있겠으나 저의 '''가능한 편한 방법으로 조합해서 문제를 해결하자'''라는 철학에 맞추어서, DB처리가 비교적 쉬운 PHP를 이용했습니다.
+
+다음은 C 프로그램 코드 입니다. 에러 처리? 예외 처리? 아무 것도 없이 돌아가는게 확인되는 수준의 프로그램입니다. STL(:12)을 비롯해서 온갖 잡다한걸 가져다 붙였군요.
+{{{#!plain
+#include <stdio.h>
+#include <map>
+#include <vector>
+#include <string>
+#include <string.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <libgen.h>
+
+using namespace std;
+
+// RSS 캐쉬파일의 목록을 얻어온다.
+vector<string> getCache()
+{
+    struct dirent *item;
+    DIR *dp;
+    vector<string> rtv;
+
+    dp = opendir("/usr/planet/cache");
+    if (dp != NULL)
+    {
+        for(;;)
+        {
+            item = readdir(dp);
+            if (item == NULL)
+                break;
+            // 우선은 joinc 팀블로그에서 발행된, RSS 캐쉬만 읽도록 했습니다.
+            if(strstr(item->d_name, "teamblog.joinc.co.kr") != NULL)
+              rtv.push_back(item->d_name);
+        }
+        closedir(dp);
+    }
+  return rtv;
+}
+
+// 시간순으로 정렬해서 DB에 저장하기 위함으로, map 에서 호출될 겁니다.
+// 사실 Mysql에 저장될테니 굳이 시간순으로 정렬할 필요도 없겠지만요.
+struct ltstr
+{
+   bool operator()(const int s1, const int s2) const
+   {
+      return s1 > s2;
+   }
+};
+
+struct Item
+{
+  char id[80];
+  char channel[80];
+};
+
+int main(int argc, char **argv)
+{
+  map<int, Item, ltstr> keymap;
+  map<int, Item, ltstr>::iterator mi;
+  vector<string> cache;
+  FILE *fp;
+  char buf[1024];
+  char key[80], value[80];
+  char command[256];
+  Item lItem;
+
+  cache = getCache();
+  // Cache 파일의 목록만큼 루프를 돌면서,
+  // 제공된 python 스크립트를 이용해서 RSS 채널 정보를 얻어옵니다.
+  for (int i = 0; i < cache.size(); i++)
+  {
+    int first = 0;
+    sprintf(command,"/usr/bin/planet-cache.py -L /usr/planet/cache/%s", cache[i].c_str());
+    fp = popen(command, "r");
+    if (fp == NULL)
+    {
+      perror("Error");
+    }
+    while(fgets(buf, 1024, fp) != NULL)
+    {
+      if (first != 0)
+      {
+        sscanf(buf, "%s%s", value, key);
+        memset((void *)&lItem, 0x00, sizeof(Item));
+        sprintf(lItem.id, "%s", value);
+        sprintf(lItem.channel, "%s", cache[i].c_str());
+        keymap[atoi(key)] = lItem;
+      }
+      first = 1;
+    }
+    pclose(fp);
+  }
+  mi = keymap.begin();
+  string channel;
+  char *dftdir = "/usr/planet/cache";
+
+  // 얻어온 채널정보를 이용해서
+  // 각 채널의 포스트의 세부정보를 얻어옵니다.
+  // popen으로 호출했는데, playnet-cache.py 를 약간 수정해서, 해석하기 좋은 결과물을 출력하도록 했습니다.
+  while(mi != keymap.end())
+  {
+    channel = mi->second.channel;
+
+    sprintf(command,"/usr/local/bin/planet-cache.py -I %s/%s %s", dftdir, mi->second.channel, mi->second.id);
+    fp = popen(command, "r");
+    if (fp == NULL)
+    {
+      perror("Error");
+    }
+    memset(buf, 0x00, 1024);
+    while(fgets(buf, 1023, fp) != NULL)
+    {
+      printf("%s", buf);
+      memset(buf, 0x00, 1024);
+    }
+    printf("\tchannel\t%s\n", mi->second.channel);
+
+    // 짠.. php로 포스트간 구별을 쉽게하도록 하기 위한 구분문자열 입니다.
+    // 아주 무식한 방법이죠.
+    printf("-------------------------------------::\n\n");
+    pclose(fp);
+    *mi++;
+  }
+}
+}}}
+
+이렇게 해서, 파일로 저장되면 php 스크립트를 이용해서 DB에 넣고 사용자가 방문하면 읽어들입니다. DB는 다음과 같습니다.
+{{{#!plain
++----------+--------------+------+-----+---------+-------+
+| Field    | Type         | Null | Key | Default | Extra |
++----------+--------------+------+-----+---------+-------+
+| id       | varchar(80)  |      | PRI |         |       |
+| channel  | varchar(255) | YES  |     | NULL    |       |
+| date     | int(11)      | YES  |     | NULL    |       |
+| author   | varchar(24)  | YES  |     | NULL    |       |
+| comments | text         | YES  |     | NULL    |       |
+| content  | text         | YES  |     | NULL    |       |
+| link     | varchar(255) | YES  |     | NULL    |       |
+| summary  | text         | YES  |     | NULL    |       |
+| title    | varchar(255) | YES  |     | NULL    |       |
+| udate    | int(11)      | YES  |     | NULL    |       |
++----------+--------------+------+-----+---------+-------+
+}}}
+  * id : Post 주소로 Key 로 사용된다.
+  * channel : 채널 주소
+  * date : 포스팅 날짜
+  * author : 저자
+  * comments : 예비
+  * content : 본문내용
+  * link : 링크주소
+  * summary : 본문내용의 요약본
+  * title : 포스트 제목
+  * udate : 업데이트 날짜.
+
+이제 이걸, key인 id로 trackback DB와 join 하면, 각 포스트의 [wiki:Site/Team_Blog/Category 카테고리]를 지정할 수 있습니다.

@@ -1,0 +1,322 @@
+#title 함수호출 모니터링
+
+Overview
+
+There are tools to monitor the system calls an application makes, but how about monitoring your own written functions - inside the program itself? What if we want to check when a function is entered, which arguments is the function called with, when the function exits, and what the returned value is? This article presents a proof-of-concept tool to achieve this without modifying the application's code.
+
+While the gcc compiler will instrument the code for us, some of the details left to the programmer are both compiler-version dependent and CPU-dependent - namely retrieving the function arguments and return values. Thus, the discussion here is based on experiments with gcc compiler suites 4.1 and 4.2, Intel processors, and binutils 2.18.
+Code instrumentation
+
+We want to address the following points:
+
+    * when a function/method is entered and exited
+    * what the call arguments were when the function is entered
+    * what the return code was when the function is exited
+    * optionally, where the function was called from
+
+The first one is easy: if requested, the compiler will instrument functions and methods, so that when a function/method is entered, a call to an instrumentation function is made, and when the function is exited, a similar instrumentation call is made:
+{{{#!plain
+    void __cyg_profile_func_enter(void *func, void *callsite); 
+    void __cyg_profile_func_exit(void *func, void *callsite); 
+}}}
+This is achieved by compiling the code with the -finstrument-functions flag. The above two functions can be used, for instance, to collect data for coverage or for profiling. We will use them to print a trace of function calls. Furthermore, we can isolate these two functions and the supporting code in an interposition library of our own. This library can be loaded when and if needed, thus leaving the application code basically unchanged.
+
+Now when the function is entered, we get the arguments of the call:
+{{{#!plain
+    void __cyg_profile_func_enter( void *func, void *callsite )
+    {
+        char buf_func[CTRACE_BUF_LEN+1] = {0};
+        char buf_file[CTRACE_BUF_LEN+1] = {0}; 
+        char buf_args[ARG_BUF_LEN + 1] = {0}; 
+        pthread_t self = (pthread_t)0;
+        int *frame = NULL;
+        int nargs = 0;
+    
+        self = pthread_self(); 
+        frame = (int *)__builtin_frame_address(1); /*of the 'func'*/
+
+        /*Which function*/
+        libtrace_resolve (func, buf_func, CTRACE_BUF_LEN, NULL, 0);
+        
+        /*From where.  KO with optimizations. */
+        libtrace_resolve (callsite, NULL, 0, buf_file, CTRACE_BUF_LEN);
+        
+        nargs = nchr(buf_func, ',') + 1; /*Last arg has no comma after*/ 
+        nargs += is_cpp(buf_func);       /*'this'*/
+        if (nargs > MAX_ARG_SHOW)
+            nargs = MAX_ARG_SHOW;
+
+        printf("T%p: %p %s %s [from %s]\n", 
+               self, (int*)func, buf_func, 
+               args(buf_args, ARG_BUF_LEN, nargs, frame), 
+               buf_file);
+    }
+}}}
+
+And when the function is is exited, we get the return value:
+{{{#!plain
+    void __cyg_profile_func_exit( void *func, void *callsite )
+    {
+        long ret = 0L; 
+        char buf_func[CTRACE_BUF_LEN+1] = {0};
+        char buf_file[CTRACE_BUF_LEN+1] = {0}; 
+        pthread_t self = (pthread_t)0;
+
+        GET_EBX(ret); 
+        self = pthread_self(); 
+
+        /*Which function*/
+        libtrace_resolve (func, buf_func, CTRACE_BUF_LEN, NULL, 0);
+        
+        printf("T%p: %p %s => %d\n", 
+               self, (int*)func, buf_func, 
+               ret);
+
+        SET_EBX(ret); 
+    }
+}}}
+Since these two instrumentation functions are aware of addresses, and we actually want the trace to be readable by humans, we need also a way to resolve symbol addresses to symbol names: this is what libtrace_resolve() does.
+Binutils and libbfd
+
+First, we have to have the symbol information handy. To achieve this, we compile our application with the '-g' flag. Then, we can map addresses to symbol names. This would normally require writing some code that is aware of the ELF format.
+
+Luckily, there is the binutils package, which comes with a library that does just that - libbfd - and with a tool - addr2line. addr2line is a good example of how to use libbfd, and I have simply used it to wrap around libbfd. The result is the libtrace_resolve() function. For details, please refer to the README in the code accompanying this article.
+
+Since the instrumentation functions are isolated in a stand-alone module, we tell this module the name of the instrumented executable through an environment variable (CTRACE_PROGRAM) that we set before running the program. This is needed to properly init libbfd to search for symbols.
+
+Note: binutils is a work in progress. I have used version 2.18. It does an amazingly good job, although function inlining affects its precision.
+Stack Layout
+
+To address the first point, the work has been architecture-agnostic. (Actually, libbfd is aware of the architecture, but things are hidden behind its API.) However, to retrieve function arguments and return values, we have to look at the stack, write a bit of architecture-specific code, and exploit some gcc quirks. Again, the compilers I have used were gcc 4.1 and 4.2; later or previous versions might work differently. In short:
+
+    * x86 dictates that the stack grows down
+    * GCC dictates how the stack is used - a "typical" stack is depicted below.
+    * each function has a stack frame marked by the ebp (base pointer) and esp (stack pointer) registers.
+    * normally, we expect the eax register to contain the return code
+{{{#!plain
+                                \
+               +------------+   |
+               | arg 2      |   \
+               +------------+    >- previous function's stack frame
+               | arg 1      |   /
+               +------------+   |
+               | ret %eip   |   /
+               +============+   
+               | saved %ebp |   \
+        %ebp-> +------------+   |
+               |            |   |
+               |   local    |   \
+               | variables, |    >- current function's stack frame
+               |    etc.    |   /
+               |            |   |
+               |            |   |
+        %esp-> +------------+   /
+}}}
+In an ideal world, the code the compiler generates would make sure that upon instrumenting the exit of a function the return value was set and the CPU registers were pushed on the stack (to ensure the instrumentation function does not affects them). Then, it would call the instrumentation function, and finally pop the registers. This sequence of code would ensure we always get access to the return value in the instrumentation function. The code generated by the compiler is a bit different...
+
+Also, in practice, many of gcc's flags affect the stack layout and registers usage. The most obvious ones are:
+
+    * -fomit-frame-pointer. This flag affects the stack offset where the arguments are to be found.
+    * The optimization flags (e.g., '-Ox'); each of these flags aggregates a number of optimizations. These flags did not affect the stack, and, quite amazingly, arguments were always passed to functions through the stack regardless of the optimization level. One would have expected that some arguments would be passed through registers - in which case getting these arguments would have proven difficult or even impossible. However, these flags did complicate recovering the return code. Note that on some architectures, these flags will "suck in" the -fomit-frame-pointer optimization.
+
+In any case, be wary: the flags you use to compile your application may hold hidden surprises.
+Function arguments
+
+In my tests with the compilers, all arguments were invariably passed through the stack. Hence, this is trivial business, affected to a small extent by the -fomit-frame-pointer flag - this flag will change the offset at which arguments start.
+
+How many arguments does a function have; how many arguments are on the stack? One way to infer the number of arguments is based on its signature (for C++, beware of the "this" hidden argument), and this is the technique used in __cyg_profile_func_enter().
+
+Once we know the offset where the arguments start on the stack and how many of them there are, we just walk the stack to retrieve their values:
+{{{#!plain
+    char *args(char *buf, int len, int nargs, int *frame)
+    {
+        int i; 
+        int offset;
+
+        memset(buf, 0, len); 
+
+        snprintf(buf, len, "("); 
+        offset = 1; 
+        for (i=0; i<nargs && offset<len; i++) {
+            offset += snprintf(buf+offset, len-offset, "%d%s", 
+                             *(frame+ARG_OFFET+i), 
+                             i==nargs-1 ? " ...)" : ", ");
+        }
+
+        return buf; 
+    }
+}}}
+Function return values
+
+Obtaining the return value proved to be possible only when using the -O0 flag.
+
+Let's look what happens when using this method:
+{{{#!plain
+    class B {
+        ...
+        virtual int m1(int i, int j) {printf("B::m1()\n"); f1(i); return 20;}
+        ...
+    }; 
+}}}
+
+is instrumented with -O0:
+{{{#!plain
+    080496a2 <_ZN1B2m1Eii>:
+     80496a2:    55                       push   %ebp
+     80496a3:    89 e5                    mov    %esp,%ebp
+     80496a5:    53                       push   %ebx
+     80496a6:    83 ec 24                 sub    $0x24,%esp
+     80496a9:    8b 45 04                 mov    0x4(%ebp),%eax
+     80496ac:    89 44 24 04              mov    %eax,0x4(%esp)
+     80496b0:    c7 04 24 a2 96 04 08     movl   $0x80496a2,(%esp)
+     80496b7:    e8 b0 f4 ff ff           call   8048b6c <__cyg_profile_func_enter@plt>
+     80496bc:    c7 04 24 35 9c 04 08     movl   $0x8049c35,(%esp)
+     80496c3:    e8 b4 f4 ff ff           call   8048b7c <puts@plt>
+     80496c8:    8b 45 0c                 mov    0xc(%ebp),%eax
+     80496cb:    89 04 24                 mov    %eax,(%esp)
+     80496ce:    e8 9d f8 ff ff           call   8048f70 <_Z2f1i>
+     80496d3:    bb 14 00 00 00           mov    $0x14,%ebx
+     80496d8:    8b 45 04                 mov    0x4(%ebp),%eax
+     80496db:    89 44 24 04              mov    %eax,0x4(%esp)
+     80496df:    c7 04 24 a2 96 04 08     movl   $0x80496a2,(%esp)
+     80496e6:    e8 81 f5 ff ff           call   8048c6c <__cyg_profile_func_exit@plt>
+     80496eb:    89 5d f8                 mov    %ebx,0xfffffff8(%ebp)
+     80496ee:    eb 27                    jmp    8049717 <_ZN1B2m1Eii+0x75>
+     80496f0:    89 45 f4                 mov    %eax,0xfffffff4(%ebp)
+     80496f3:    8b 5d f4                 mov    0xfffffff4(%ebp),%ebx
+     80496f6:    8b 45 04                 mov    0x4(%ebp),%eax
+     80496f9:    89 44 24 04              mov    %eax,0x4(%esp)
+     80496fd:    c7 04 24 a2 96 04 08     movl   $0x80496a2,(%esp)
+     8049704:    e8 63 f5 ff ff           call   8048c6c <__cyg_profile_func_exit@plt>
+     8049709:    89 5d f4                 mov    %ebx,0xfffffff4(%ebp)
+     804970c:    8b 45 f4                 mov    0xfffffff4(%ebp),%eax
+     804970f:    89 04 24                 mov    %eax,(%esp)
+     8049712:    e8 15 f5 ff ff           call   8048c2c <_Unwind_Resume@plt>
+     8049717:    8b 45 f8                 mov    0xfffffff8(%ebp),%eax
+     804971a:    83 c4 24                 add    $0x24,%esp
+     804971d:    5b                       pop    %ebx
+     804971e:    5d                       pop    %ebp
+     804971f:    c3                       ret    
+}}}
+Note how the return code is moved into the ebx register - a bit unexpected since, traditionally, the eax register is used for return codes - and then the instrumentation function is called. Good to retrieve the return value, but to avoid the ebx register getting clobbered in the instrumentation function, we'll save it upon entering the function, and restore it when we exit.
+
+When the compilation is done with some degree of optimization (-O1...3; shown here is -O2), the code changes:
+{{{#!plain
+    080498c0 <_ZN1B2m1Eii>:
+     80498c0:    55                       push   %ebp
+     80498c1:    89 e5                    mov    %esp,%ebp
+     80498c3:    53                       push   %ebx
+     80498c4:    83 ec 14                 sub    $0x14,%esp
+     80498c7:    8b 45 04                 mov    0x4(%ebp),%eax
+     80498ca:    c7 04 24 c0 98 04 08     movl   $0x80498c0,(%esp)
+     80498d1:    89 44 24 04              mov    %eax,0x4(%esp)
+     80498d5:    e8 12 f4 ff ff           call   8048cec <__cyg_profile_func_enter@plt>
+     80498da:    c7 04 24 2d 9c 04 08     movl   $0x8049c2d,(%esp)
+     80498e1:    e8 16 f4 ff ff           call   8048cfc <puts@plt>
+     80498e6:    8b 45 0c                 mov    0xc(%ebp),%eax
+     80498e9:    89 04 24                 mov    %eax,(%esp)
+     80498ec:    e8 af f7 ff ff           call   80490a0 <_Z2f1i>
+     80498f1:    8b 45 04                 mov    0x4(%ebp),%eax
+     80498f4:    c7 04 24 c0 98 04 08     movl   $0x80498c0,(%esp)
+     80498fb:    89 44 24 04              mov    %eax,0x4(%esp)
+     80498ff:    e8 88 f3 ff ff           call   8048c8c <__cyg_profile_func_exit@plt>
+     8049904:    83 c4 14                 add    $0x14,%esp
+     8049907:    b8 14 00 00 00           mov    $0x14,%eax
+     804990c:    5b                       pop    %ebx
+     804990d:    5d                       pop    %ebp
+     804990e:    c3                       ret    
+     804990f:    89 c3                    mov    %eax,%ebx
+     8049911:    8b 45 04                 mov    0x4(%ebp),%eax
+     8049914:    c7 04 24 c0 98 04 08     movl   $0x80498c0,(%esp)
+     804991b:    89 44 24 04              mov    %eax,0x4(%esp)
+     804991f:    e8 68 f3 ff ff           call   8048c8c <__cyg_profile_func_exit@plt>
+     8049924:    89 1c 24                 mov    %ebx,(%esp)
+     8049927:    e8 f0 f3 ff ff           call   8048d1c <_Unwind_Resume@plt>
+     804992c:    90                       nop    
+     804992d:    90                       nop    
+     804992e:    90                       nop    
+     804992f:    90                       nop    
+}}}
+Note how the instrumentation function gets called first, and only then the eax register is set with the return value. Thus, if we absolutely want the return code, we are forced to compile with -O0.
+Sample output
+
+Finally, below are the results. At the shell prompt type:
+{{{#!plain
+$ export CTRACE_PROGRAM=./cpptraced
+$ LD_PRELOAD=./libctrace.so ./cpptraced
+
+T0xb7c0f6c0: 0x8048d34 main (0 ...) [from ]
+./cpptraced: main(argc=1)
+T0xb7c0ebb0: 0x80492d8 thread1(void*) (1 ...) [from ]
+T0xb7c0ebb0: 0x80498b2 D (134605416 ...) [from cpptraced.cpp:91]
+T0xb7c0ebb0: 0x8049630 B (134605416 ...) [from cpptraced.cpp:66]
+B::B()
+T0xb7c0ebb0: 0x8049630 B => -1209622540 [from ]
+D::D(int=-1210829552)
+T0xb7c0ebb0: 0x80498b2 D => -1209622540 [from ]
+Hello World! It's me, thread #1!
+./cpptraced: done.
+T0xb7c0f6c0: 0x8048d34 main => -1212090144 [from ]
+T0xb740dbb0: 0x8049000 thread2(void*) (2 ...) [from ]
+T0xb740dbb0: 0x80498b2 D (134605432 ...) [from cpptraced.cpp:137]
+T0xb740dbb0: 0x8049630 B (134605432 ...) [from cpptraced.cpp:66]
+B::B()
+T0xb740dbb0: 0x8049630 B => -1209622540 [from ]
+D::D(int=-1210829568)
+T0xb740dbb0: 0x80498b2 D => -1209622540 [from ]
+Hello World! It's me, thread #2!
+T#2!
+T0xb6c0cbb0: 0x8049166 thread3(void*) (3 ...) [from ]
+T0xb6c0cbb0: 0x80498b2 D (134613288 ...) [from cpptraced.cpp:157]
+T0xb6c0cbb0: 0x8049630 B (134613288 ...) [from cpptraced.cpp:66]
+B::B()
+T0xb6c0cbb0: 0x8049630 B => -1209622540 [from ]
+D::D(int=0)
+T0xb6c0cbb0: 0x80498b2 D => -1209622540 [from ]
+Hello World! It's me, thread #3!
+T#1!
+T0xb7c0ebb0: 0x80490dc wrap_strerror_r (134525680 ...) [from cpptraced.cpp:105]
+T0xb7c0ebb0: 0x80490dc wrap_strerror_r => -1210887643 [from ]
+T#1+M2 (Success)
+T0xb740dbb0: 0x80495a0 D::m1(int, int) (134605432, 3, 4 ...) [from cpptraced.cpp:141]
+D::m1()
+T0xb740dbb0: 0x8049522 B::m2(int) (134605432, 14 ...) [from cpptraced.cpp:69]
+B::m2()
+T0xb740dbb0: 0x8048f70 f1 (14 ...) [from cpptraced.cpp:55]
+f1 14
+T0xb740dbb0: 0x8048ee0 f2(int) (74 ...) [from cpptraced.cpp:44]
+f2 74
+T0xb740dbb0: 0x8048e5e f3 (144 ...) [from cpptraced.cpp:36]
+f3 144
+T0xb740dbb0: 0x8048e5e f3 => 80 [from ]
+T0xb740dbb0: 0x8048ee0 f2(int) => 70 [from ]
+T0xb740dbb0: 0x8048f70 f1 => 60 [from ]
+T0xb740dbb0: 0x8049522 B::m2(int) => 21 [from ]
+T0xb740dbb0: 0x80495a0 D::m1(int, int) => 30 [from ]
+T#2!
+T#3!
+}}}
+Note how libbfd fails to resolve some addresses when the function gets inlined.
+
+[ The example code in this article is available here:
+
+    * addr2line.c
+    * cpptraced.cpp
+    * ctraced.c
+    * ctrace.sh
+    * libctrace.c
+    * libctrace.exp
+    * Makefile
+    * README
+    * trace-O2.txt
+    * trace-plain.txt
+
+or here as a single tarball containing all of the above.
+
+Make sure you use binutils 2.18 or you miss some important header files (Debian Etch currently only has binutils 2.17). You can try the code without installing binutils 2.18, the Makefile already accesses the binutils build directory (just change the path to wherever you unpacked the sources).
+Please note that the code was intended to be used on the IA32 32-bit Intel platform. We tried to run it on a x86_64 system with some modifications but decided to leave it that way. If you port the examples to the AMD x86_64 platform, please send patches to the author. -- Ren&#233; ]
+Resources
+
+    * Overview of GCC on x86 platforms
+    * The Intel stack
+

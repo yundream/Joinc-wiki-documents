@@ -1,0 +1,119 @@
+#title syscall(2)
+[wiki:function_syscall(2) HTML 변환문서]
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/06/02           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>syscall(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	현재 시간을 가져오고 시스템의 시간값을 설정한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/syscall.h&gt;
+#include &lt;unistd.h&gt;
+
+int syscall(int number, ...); 
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		syscall()은 시스템 호출의 어셈블리 인터페이스이다. 첫번째 인자는 
+		시스템 콜 번호이며, 그 다음으로 각 시스템콜의 인자가 입력된다.
+		시스템 콜 번호는 <ulink ulink="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_linux_systemcall_quick_reference">
+		Linux 시스템콜 레퍼런스</ulink>를 참고하기 바란다. 
+		syscall()을 사용할때 시스템 콜 번호를 직접입력하는 것은 귀찮은 
+		작업인데, 각 시스템 콜에 대해서 sys/syscall.h 에 정의되어 있으니 
+		참고하기 바란다. <emphasis>SYS_systemcall</emphasis>식으로 정의되어 
+		있다. 예를들어 open()시스템 호출을 사용하기 원한다면 
+		syscall(SYS_open,...)식으로 사용하면 된다.  
+	</para>
+	<para>
+		역사적으로 syscall()은 BSD4.0에 의해서 사용되어졌다.
+	</para>
+</section>
+
+<section>
+	<title>반환값</title>
+	<para>
+		반환값은 시스템 콜의 리턴 정책에 따라서 달라진다. 일반적으로 
+		성공했다면 0, 에러가 발생했다면 -1이 리턴된다. 에러 코드는 
+		<emphasis>errno</emphasis>에 저장된다.
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;syscall.h&gt; 
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;string.h&gt;
+
+#define BUF_SIZE 256
+int main()
+{
+	int fd;
+	int n;
+	char buf[BUF_SIZE];
+	// 시스템콜의 직접 사용  
+	// 시스템콜 번호 : 20
+	fd = syscall(SYS_open, "syscall.c", O_RDONLY);
+	if (fd &lt; 0)
+	{
+		perror("Open Syscall Error ");
+		exit(0);
+	}
+	while((n = syscall(SYS_read, fd, buf,BUF_SIZE - 1)) &gt; 0)
+	{
+		syscall(SYS_write, 1, buf, n);
+		memset(buf, 0x00, BUF_SIZE);
+	}
+
+	syscall(SYS_close);
+	return (0);
+}
+		</screen>
+		위 프로그램은 파일의 내용을 읽어서 출력하는 일을한다. open(), read(), 
+		write(), close()와 같은 주요 시스템 호출을 syscall()을 통해서 구현했다. 
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink ulink="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_linux_systemcall_quick_reference">
+			Linux 시스템콜 레퍼런스</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

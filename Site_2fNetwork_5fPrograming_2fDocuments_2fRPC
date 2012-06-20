@@ -1,0 +1,269 @@
+#title RPC - Remote procedure call
+
+[[TableOfContents]]
+== 소개 ==
+'''Remote prodecure call (이하 RPC)'''는 다른 주소공간에서 서브루틴이나 프로시져를 실행시키기위한 컴퓨터 프로그래밍 기술이다. 이 기술을 이용하면 프로그래머는 마치 로컬에서 프로그램을 돌리는 것과 같은 결과를 얻어올 수 있다. 
+
+이렇게 여러대의 컴퓨터에 프로시져를 분산하고, 결과를 취합하는 모델은 분산시스템을 위한 훌륭한 대안이 될 수 있다.
+
+여기에서는 RPC 프로그래밍과 관련된 내용을 다룰 것이다. 
+
+== 클라이언트/서버 모델 ==
+RPC는 전형적인 클라이언트 모델을 따른다. 서비스를 요청하는 쪽이 클라이언트가 되고, 서비스를 받아서 프로시저가 된다. RPC 클라이언트/서버 모델을 이해하기 위해서는 다음 용어들을 숙지해둘 필요가 있다. 
+
+  * caller : 서브루틴을 호출하는 프로그램 
+  * callee : caller에 의해서 호출되는 서브루틴 혹은 프로시져 
+  * client : 네트워크 서버로 연결해서 요청을 날리는 프로그램 
+  * Server : Client의 연결을 기다리다가 요청이 들어오면 서비스를 제공하는 프로그램 
+
+== RPC 메커니즘 ==
+서브/클라이언트 모델을 따르기 때문에, 데이터 통신을 위한 메커니즘은 단순하다고 할 수 있다. 클라이언트에서 서비스를 요청하면 서버에서 프로시져를 호출해서 처리하고 리턴값을 되돌려주는 방식이다.
+
+그러나 여기에는 몇가지 고려해야할 사항이 있다.
+  * caller과 callee는 서로 다른 시스템일 수 있다. 이 경우 데이터 타입의 처리등에 신경을 써주어야 한다. intel 머신에서 int '''1'''이, sparc 머신에서는 전혀 다르게 해석된다. 이와 관련된 내용은 endian(:12) 문서를 읽어보기 바란다.
+  * 일반적인 서버/클라이언트 프로그램의 경우 프로시져 기반이 아닌 데이터 기반이다. 서로 약속된 데이터를 주고 받는 것이다. RPC는 프로시져 기반이므로, 주고 받는 인자와 인자의 데이터타입을 명확히 명시해줘야할 필요가 있다.
+
+이는 서버와 클라이언트 사이에서 전송되는 데이터들에 대해서 타입에 맞게 재해석하고 변환해주는 장치가 필요함을 의미한다. 이러한 장치는 표준적으로 제공하는 것이 있는데, 그 중 하나가 ONC RPC에서 이용하는 e'''X'''ternal '''D'''ata '''R'''epresentaion, '''XDR'''이다. XDR은 C함수와 매크로의 모음으로 구성되어 있는데, 주고 받을 데이터를 각 머신에 맞도록 표준적인 방법으로 재해석하는 일을 한다. XDR은 데이터를 재해석하기 위한 int, float, string과 같은 원시 데이터 타입과, 몇개의 레코드로 이루어진 복잡한 데이터들 - 리스트, 구조체 같은 - 들을 재해석하기 위한 자료타입을 가지고 있다.
+
+== RPC 데이터 흐름 ==
+attachment:RPC.png
+ 1. Client 데이터는 XDR 필터를 통과해서 인코딩된 후 전달된다.
+ 1. XDR 인코딩된 데이터는 네트워크를 가로질러서 원격지 호스트로 전달된다.
+ 1. 데이터를 받은 서버는 XDR 필터를 통해서 디코딩한다.
+ 1. 디코딩된 데이터를 처리하고 결과 데이터를 XDR 필터를 통해서 인코딩한다.
+ 1. 인코딩된 XDR 데이터가 네트워크를 가로질러서 클라이언트에 전달된다. 
+ 1. 클라이언트는 XDR 디코딩을하고 결과를 처리한다.
+ 
+== RPC 네트워크 프로그래밍 개론 ==
+RPC를 통해서 어떻게 데이터가 흐르는지 알아보았다. 이제 네트워크 프로그래밍 관점에서 이 과정을 살펴보기로 하자.
+
+네트워크 상에서 데이터가 전송되기 위해서는 다음과 같은 5개의 요소들이 필요하다.
+ * protocol
+ * local-address
+ * local-process
+ * foreign-address
+ * foregn-process
+
+'''protocol'''은 두개의 호스트 사이의 데이터 전송 매커니즘으로, 보통 TCP(:12)와 UDP(:12)를 사용한다. 한쪽 호스트는 다른쪽 호스트에 데이터를 전송하기 위해서 네트워크 상에서의 호스트의 위치를 알고 있어야 한다. 이를 위해서 '''local-address/process, foregn-addresss/process'''가 필요하다. 
+
+address로 IP주소가 사용되며, 이를 통해서 컴퓨터의 위치를 식별한다는 것은 쉽게 이해할 수 있을 것이다. 남은 문제는 '''process'''를 어떻게 식별할 수 있느냐 하는 것이다. 컴퓨터에는 보통 수십개에서 수백개의 process가 떠 있는데, 이중 작업을 처리할 process로 데이터를 보낼 수 있어야 하기 때문이다. 이러한 프로세스의 식별은 '''port'''를 통해서 이루어진다. 네트워크 프로그램은 실행될때, 자신이 사용할 PORT 번호를 요청할 수 있으며, 이 Port번호를 통해서 어떤 프로세스로 데이터가 전달될지를 명확히 할 수 있다. 예를 들면 FTP 서비스를 위한 포트는 21번이고, 어떤 프로세스가 실행되어서 21번 포트를 할당 받았다면, FTP와 관련된 데이터는 이 프로세스에게 전달이 된다. 
+
+=== RPC Call Binding ===
+이상에서 PRC를 이용한 프로시져 기반의 프로그램도 네트워크를 거쳐야 함으로 '''PORT''' 번호가 필요함을 알 수 있을 것이다. 이러한 대표적인 Port binding 프로그램이 ONC RPC에서 사용하는 '''portmap'''이다. 이 프로그램은 RPC 프로그램에 포트번호를 할당해 준다. 최종적으로 RPC 프로그램은 다음과 같은 방식으로 네트워크를 가로지르게 된다.  
+
+attachment:flow.png
+
+== 프로토콜 컴파일러 ==
+이상 RPC에 대해서 간단히 알아보았는데, 예상과는 달리 꽤나 복잡해 보인다는 느낌을 받았을 것이다. 주고 받을 데이터의 타입을 명시를 해주어야하고, 포트를 bind시켜주기 위해서 portmap을 실행시켜줘야 한다. 특히 프로토콜이라고 할 수 있는 데이터와 데이터 타입을 XDR 형식에 맞도록 만들어야 하는데 부담이 될 것이다.
+
+그러나 걱정할 것 없다. 이러한 프로토콜을 자동으로 만들어주는 RPC 개발 프로그램이 있기 때문이다. '''rpcgen''이라고 불리우는 프로토콜 컴파일러를 이용하면, 프로시저에 전달할 데이터 인자의 갯수와 각각의 타입을 정하는 정도로 간단하게 서버/클라이언트 그리고 XDR 필터를 생성할 수 있다. 개발자는 프로시저만 만들어주면 된다.  
+
+주어진 숫자들에 대해서 평균값을 구해주는 rpc 서비스를 구현해 보도록 하자. 우선 데이터와 데이터의 타입을 정의한 파일을 만들고 이것을 rpcgen으로 컴파일 시킨다. 이 파일의 이름은 avg.x라고 하자. avg.x 는 다음과 같은 내용을 담고 있다.
+{{{#!plain
+/*
+ * 프로시져는 double형의 배열데이터를 받는데, 받을 수 있는 최대 배열의 크기는
+ * 200으로 제한한다.
+ * 리턴값은 double 형이다.
+ */
+const MAXAVGSIZE  = 200;
+
+// 입력데이터의 타입과 크기를 정의 한다.
+struct input_data {
+  double input_data<200>;
+};
+
+typedef struct input_data input_data;
+
+// 프로그램의 이름과 버전을 정의 한다.
+program AVERAGEPROG {
+    version AVERAGEVERS {
+        double AVERAGE(input_data) = 1;
+    } = 1;
+} = 22855;
+}}}
+ * 프로그램 이름은 번호로 정의된다. 여기에서는 22855로 정의했다.
+ * 프로그램의 버전은 1이다.
+
+이제 컴파일 하자.
+{{{#!plain
+# rpcgen avg.x
+}}}
+
+rpcgen을 수행하면 아래와 같은 3개의 파일을 생성한다.
+  1. '''avg_clnt.c''' : 클라이언트 caller 프로세스를 위한 stud 프로그램
+  1. '''avg_svc.c''' : 서버 callee 프로세스를 위한 main 프로그램
+  1. '''avg_xdr.c''' : 서버와 클라이언트 양쪽에서 사용될 XDR 루틴이 들어있다. 
+  1. '''avg.h''' : XDR과 각종 함수들이 선언되어 있다. 
+
+이제 서버 소스코드를 담고 있는 '''avg_svc.c'''를 수정해야 한다. '''average_1'''과 '''average_1_svc'''함수를 정의해 주면 된다. 인자로 넘어온 데이터는 XDR 필터에 의해서 리스트형태로 넘어온다. 이 리스트의 값을 모두 더한다음에, 리스트의 길이 만큼 나눠준 결과 값을 리턴하면 된다.
+{{{#!plain
+static double sum_avg;
+
+double * average_1(input_data *input, 
+  CLIENT *client) {
+
+  double *dp = input->input_data.input_data_val;
+  u_int i;
+  sum_avg = 0;
+  for(i=1;i<=input->input_data.input_data_len;i++) {
+    sum_avg = sum_avg + *dp; dp++;
+  }
+  sum_avg = sum_avg /
+    input->input_data.input_data_len;
+  return(& sum_avg);
+}
+
+double * average_1_svc(input_data *input, 
+    struct svc_req *svc) {
+  CLIENT *client;
+  return(average_1(input,client));
+}
+}}}
+
+이제 클라이언트 코드인 '''avg_clnt.c'''에 코드를 추가한다.
+{{{#!plain
+void
+averageprog_1( char* host, int argc, char *argv[])
+{
+   CLIENT *clnt;
+   double  *result_1, *dp, f;
+      char *endptr;
+      int i;
+   input_data  average_1_arg;
+   average_1_arg.input_data.input_data_val = 
+     (double*) malloc(MAXAVGSIZE*sizeof(double));
+
+   dp = average_1_arg.input_data.input_data_val;
+   average_1_arg.input_data.input_data_len = argc - 2;
+   for (i=1;i<=(argc - 2);i++) 
+   {
+        f = strtod(argv[i+1],&endptr);
+        printf("value   = %e\n",f);
+        *dp = f;
+        dp++;
+    }
+   clnt = clnt_create(host, AVERAGEPROG, AVERAGEVERS, "udp");
+   if (clnt == NULL) 
+   {
+      clnt_pcreateerror(host);
+      exit(1);
+   }
+   result_1 = average_1(&average_1_arg, clnt);
+   if (result_1 == NULL) 
+   {
+      clnt_perror(clnt, "call failed:");
+   }
+   clnt_destroy( clnt );
+      printf("average = %e\n",*result_1);
+}
+
+main( int argc, char* argv[] )
+{
+   char *host;
+
+   if(argc < 3) 
+   {
+     printf(
+      "usage: %s server_host value ...\n",
+      argv[0]);
+      exit(1);
+   }
+   if(argc > MAXAVGSIZE + 2) 
+   {
+      printf("Two many input values\n");
+      exit(2);
+   }
+   host = argv[1];
+   averageprog_1( host, argc, argv);
+}
+}}}
+
+좀더 확장성있는 코드를 원한다면, progen 으로 만들어진 코드들을 변경하지 말고 추가되는 함수들을 별도에 코드로 분리하는게 좋을 것이다. 
+
+다음은 makefile이다.
+{{{#!plain
+BIN =  avg_clnt avg_svc
+GEN = avg_clnt.c avg_svc.c avg_xdr.c avg.h
+RPCCOM = rpcgen
+CC = gcc
+
+all: $(BIN)
+
+avg_clnt: avg_clnt.o avg_xdr.o
+	$(CC) -o $@ avg_clnt.o avg_xdr.o
+
+avg_clnt.o: avg_clnt.c avg.h
+	$(CC) -g avg_clnt.c -c
+
+avg_svc: avg_svc.o avg_xdr.o
+	$(CC) -o $@ avg_svc.o avg_xdr.o
+
+avg_proc.o: avg_proc.c avg.h
+}}}
+
+== portmapper ==
+이제 만들어진 rpc 응용 프로그램을 테스트 해보기로 하자. 쉽게 테스트 하기 위해서 로컬컴퓨터에서 클라이언트/서버 환경을 구축하는 걸로 하겠다. 
+
+위에서 언급했듯이, rpc 응용을 이용하기 위해서는 프로그램과 포트를 연결시켜주는 '''portmapper''' 프로그램이 우선실행되어 있어야 한다. '''rpcinfo'''를 이용하면 portmapper이 실행되어 있는지를 확인할 수 있다. portmaper이 설치되어 있지 않다면, portmap 패키지를 설치하도록 한다. 
+{{{#!plain
+$ rpcinfo -p localhost
+program    vers   proto    port
+100000        2     tcp     111   portmapper
+100000        2     udp     111   portmapper
+}}}
+만약 에러가 떨어진다면 portmap(8) 프로그램이 떠있는지 확인하고, 띄워주도록 한다. portmap를 루트권한으로 실행시켜야 한다. 이제 '''avg_svc'''를 실행시키고 rpcinfo 로 다시 확인해 보도록 하자.
+{{{#!plain
+$ rpcinfo -p localhost
+program    vers   proto    port
+100000        2     tcp     111   portmapper
+100000        2     udp     111   portmapper
+ 22855        1     udp   35621   
+ 22855        1     tcp   56094   
+}}}
+'''22855'''를 눈여겨 보기 바란다. 이 값은 '''avg.x'''에 정의된 값으로 프로그램의 이름을 가리키는 프로그램 번호다. '''1'''은 프로그램의 버전번호다. 100000 번 프로그램의 경우 '''portmapper'''이라고 이름이 나오는데, 우리가 실행시킨 rpc 프로그램은 프로그램이름이 나오지 않음을 알 수 있다. 이는 22855 번호에 대한 프로그램이름이 RPC 서비스명에 등록되어 있지 않기 때문이다. 이름 대신 번호로 되어 있으면 관리하기가 쉽지 않으므로, 번호를 이름으로 맵핑시키도록 하자. RPC 서비스명은 '''/etc/rpc'''에 등록되어 있다. 아래와 같이 22855 프로그램을 RPC 서비스에 등록하도록 하자. 
+{{{#!plain
+...
+avg             22855
+portmapper      100000  portmap sunrpc
+rstatd          100001  rstat rstat_svc rup perfmeter
+rusersd         100002  rusers
+nfs             100003  nfsprog
+ypserv          100004  ypprog
+...
+}}}
+다시 rpcinfo로 확인해 보면 이름이 프로그램 번호에 대응되는 이름이 출력되는걸 볼 수 있다.
+{{{#!plain
+$ rpcinfo -p localhost
+program    vers   proto    port
+100000        2     tcp     111   portmapper
+100000        2     udp     111   portmapper
+ 22855        1     udp   35621   avg 
+ 22855        1     tcp   56094   avg
+}}}
+
+이제 RPC 클라이언트를 이용해서 avg 서비스를 테스트해보도록 하자. 우리가 실행시킨 RPC 클라이언트는 111번에 연결해서 portmapper로 부터 22855 프로그램을 위한 포트번호를 얻어오고 여기에 연결해서 서비스를 요청하게 된다.
+{{{#!plain
+$ ./avg_clnt localhost $RANDOM $RANDOM $RANDOM
+value   = 2.716100e+04
+value   = 2.341800e+04
+value   = 1.599100e+04
+average = 2.219000e+04
+}}}
+
+== RPC의 활용 용도 ==
+최근에는 RPC를 그다지 사용하지 않는 것 같다. 하지만 RPC의 작동방식은 여러 방식으로 응용되어서 활용하고 있다. XML-RPC, 자바의 RMI가 대표적인 RPC응용 소프트웨어다.
+
+RPC가 지금도 응용되는 이유는, RPC의 작동방식이 '''분산 데이터'''를 처리하는데 좋은 방안을 제시해 주기 때문이다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1blj7J_JOtuS8rXdPjW24raCSLR4RiiBN25AhJPKUyk0&amp;w=556&amp;h=397">
+}}}
+
+예를들어 10000000개의 데이터의 연산을 해야 한다고 가정해보자. 하나의 컴퓨터로는 매우 많은 시간이 걸릴 것이다. 이것을 RPC로 구현하면, 10대의 RPC서버에서 데이터를 나누어서 처리하고 그 결과를 RPC클라이언트에서 취합해서 처리하도록 할 수 있다. 이렇게 하면 (산술적으로)데이터 처리 시간을 10배가량 줄일 수 있을 것이다.
+
+이러한 RPC의 분산 데이터 처리 방식은 구글의 MapReduce(:12)나 hadoop(:12)에도 그대로 응용되고 있다. 
+== 참고문헌 ==
+ * http://www.linuxjournal.com/article/2204
+ * http://en.wikipedia.org/wiki/Remote_procedure_call
+
+[[Category(5)]]

@@ -1,0 +1,164 @@
+#title winapi : CreateNamedPipe - 네임드 파이프 생성
+
+== CreateNamedPipe ==
+네임드 파이프의 인스턴스를 생성하고 파이프를 제어하기 위한 핸들러를 반환한다. 
+
+=== 사용법 ===
+{{{#!plain
+HANDLE WINAPI CreateNamedPipe(
+  __in      LPCTSTR lpName,
+  __in      DWORD dwOpenMode,
+  __in      DWORD dwPipeMode,
+  __in      DWORD nMaxInstances,
+  __in      DWORD nOutBufferSize,
+  __in      DWORD nInBufferSize,
+  __in      DWORD nDefaultTimeOut,
+  __in_opt  LPSECURITY_ATTRIBUTES lpSecurityAttributes
+);
+}}}
+  * lpName
+    유일한 파이프의 이름으로 아래의 포맷을 따른다. 
+    {{{#!plain
+\\.\pipe\pipename
+}}}
+    파이프이름은 백슬래쉬를 제외한 모든 문자와 숫자 특수문자를 사용할 수 있다. 파이프이름은 256자를 초과할 수 있다. 파이프 이름은 대소문자를 구분하지 않는다.
+
+=== 매개 변수 ===
+  * dwOenMode
+    파이프의 접근방식과 권한을 설정한다.
+    || Mode                 || 설명                                                                      ||
+    || PIPE_ACCESS_DUPLEX   || 읽기&쓰기 모드로 서버와 클라이언트는 양방향으로 읽고 쓸 수 있다. 서버는 GENERIC_READ, GENERIC_WRITE 파일 접근권한과 동일한 효과를 가진다. 클라이언트는 CreateFile(:12) 함수로 파이프를 이용할 수 있는데, GENERIC_READ, GENERIC_WRITE 혹은 모두를 사용할 수 있다. ||
+    || PIPE_ACCESS_INBOUD   || 서버는 클라이언트로 부터 읽을 수만 있다. 서버는 GENERIC_READ 효과를 가진다. 클라이언트는 GENERIC_WRITE로 쓰기로 파이프에 연결할 수 있다. ||
+    || PIPE_ACCESS_OUTBOUND || 서버는 클라이언트로 쓸수만 있다. 서버는 GENERIC_WRITE 효과를 가진다. 클라이언트는 GENERIC_READ로 읽기로 파이프에 연결할 수 있다. ||
+  * dwPipeMode 
+    파이프의 데이터 통신 방식을 설정한다.
+    || PIPE_TYPE_BYTE      || 바이너리 전송 모드            ||
+    || PIPE_TYPE_MESSAGE   || 메시지 전송 모드              ||
+    || PIPE_READMODE_BYTE  || 바이너리 수신 모드            ||
+    || PIPE_READMODE_MESSAGE || 메시지 수신 모드            ||
+    || PIPE_WAIT           || 봉쇄 모드                     ||
+    || PIPE_NOWAIT         || 비봉쇄 모드                   ||
+  * nMaxInstances
+    생성할 수 있는 최대 파이프 갯수 255까지 허용
+  * nOutBufferSize
+    출력 버퍼 사이즈. 0이면 기본 값 사용
+  * nInBufferSize
+    입력 버퍼 사이즈. 0이면 기본 값 사용
+  * nDefaultTimeout  
+    WaitNamePipe(:12)함수에 적용할 시간. 1/1000초 단위 
+  * lpSecurityAttributes
+    보안속성 구조체
+
+=== 설명 ===
+리눅스와 마찬가지로 파일처럼 다룰 수 있다. CreateFile(:4300)으로 파이프에 연결하고 ReadFile(:4300), WriteFile(:4300)로 데이터를 읽을 수 있다.
+
+단지 지역 컴퓨터에 있는 프로세스(:12)사이의 통신이 가능한 리눅스(:12)의 네인드 파이프와 달리, 윈도는 LAN 혹은 인터넷(:12)에서의 통신도 지원한다. 지역 컴퓨터와 LAN 영역에서의 통신은 충분한 성능을 보여주지만 인터넷 영역으로 넘어갈 경우 TCP(:12) 소켓(:12) 통신에 비해 매우 느린 성능을 보여준다.
+
+=== 예제 ===
+네임드 파이프로 echo 서버 클라이언트를 구현해 보기로 했다. 서버 프로그램의 이름은 echo_server_np.c, 클라이언트 프로그램의 이름은 echo_client_np.c로 했다.
+
+'''컴파일은 테스트되었음. 작동 테스트하지 않았음 '''
+
+예제 : echo_server_np.c
+{{{#!plain
+#include <stdio.h>
+#include <time.h>
+#include <windows.h>
+
+#define PIPE_NAME "\\\\.\\pipe\\echo"
+#define BUF_SIZE  1024     // IN, OUT
+
+int main(int argc, char **argv)
+{
+	HANDLE ph = NULL;
+	time_t ctime = 0;
+	struct tm *ltm=NULL;
+	char buf[256];
+	DWORD nread =0, nwrite=0;
+	BOOL brtv = FALSE;
+
+
+	ph = CreateNamedPipe(
+		PIPE_NAME,
+		PIPE_ACCESS_DUPLEX,
+		PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+		PIPE_UNLIMITED_INSTANCES,
+		BUF_SIZE,
+		BUF_SIZE,
+		NMPWAIT_USE_DEFAULT_WAIT,
+		NULL);
+	if (ph == INVALID_HANDLE_VALUE)
+	{
+		printf("Pipe create failure!!\n");
+		return 1;
+	}
+
+	while(1)
+	{
+		if(ConnectNamedPipe(ph, NULL))
+		{
+			brtv = ReadFile(ph, buf, 256, &nread, NULL);
+			if(!brtv || (nread == 0))
+			{
+				printf("Read Pipe Error\n");
+				return 1;
+			}
+			brtv = WriteFile(ph, buf, nread, &nwrite, NULL);
+			if(!brtv || (nwrite != nread))
+			{
+				printf("Write Error\n");
+			}
+		}
+	}
+}
+}}}
+
+예제 : echo_client_np.c
+{{{#!plain
+#include <stdio.h> 
+#include <time.h> 
+#include <windows.h> 
+ 
+#define PIPE_NAME "\\\\.\\pipe\\echo" 
+#define BUF_SIZE  1024     // IN, OUT 
+ 
+int main(int argc, char **argv) 
+{ 
+    HANDLE ph = NULL; 
+    time_t ctime = 0; 
+    struct tm *ltm=NULL; 
+    char buf[BUF_SIZE]; 
+    LPDWORD nread =0, nwrite=0; 
+    BOOL brtv = FALSE; 
+ 
+
+	ph = CreateFile((LPCWSTR)PIPE_NAME, GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+    if (ph == INVALID_HANDLE_VALUE) 
+    { 
+        printf("Pipe open failure!!\n"); 
+        return 1; 
+    } 
+ 
+    while(1) 
+    {
+		printf("> ");
+		fgets(buf, BUF_SIZE, stdin);
+		if(strncmp(buf, "quit\n",5) == 0)
+		{
+			break;
+		}
+		WriteFile(ph, buf, strlen(buf), nwrite, NULL);
+		memset(buf, 0x00, BUF_SIZE);
+		ReadFile(ph, buf, BUF_SIZE, nread, NULL);
+		printf("Server -> %s", buf);
+    } 
+	return 0;
+}
+}}}
+[[tag(윈도 시스템 프로그래밍, IPC, PIPE)]]
+

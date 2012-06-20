@@ -1,0 +1,65 @@
+#title redirect - 재지향
+
+== 재지향 ==
+프로그램은 연산 결과를 파일, 프린터, 모니터 등에 출력한다. 이때 특정 장치로 출력된 데이터를 다른 장치로 다시 보낼 수 있는데 이를 '''재지향'''이라고 한다. 예컨데, 모니터로 출력되는 데이터를 파일로 보내거나 프린터로 보내는 것을 의미한다. 재지향은 장치 뿐만 아니라 프로그램으로도 향할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1IeqTXMa87ZUCjWXsDJBYDb9-ekQ7-ZVOPY3SuPiI0wQ&amp;w=344&amp;h=218">
+}}}
+
+재지향은 특시 shell(:12)에서 모니터에 출력된 내용을 파일로 저장하기 위한 목적으로 널리 사용된다. 아래의 문자들을 이용해서 재지향을 할 수 있다. 
+  || command > file  || command 실행 출력물을 file 로 저장한다. 기존 file의 내용은 지워진다.         ||
+  || command >> file || command 실행 출력물을 file 로 저장한다. 기존 file의 내용마지막에 덧붙여 진다 ||
+  || command < file  || file의 내용을 표준입력(:12) 형태로 command 로 전달한다.                      ||
+
+다음과 같이 지향할 출력 file descriptor를 명시할 수 있다.
+{{{#!plain
+command [file descriptor number]> file
+}}}
+
+== 사용예 ==
+  * 표준출력을 파일로 재지향
+    {{{#!plain
+# echo "hello world" > file
+# echo "hello world" >> file
+# cat test.txt > text.txt.bak
+}}}
+  * 파일을 프로그램으로 재지향 
+    {{{#!plain
+# cat < test.txt
+}}}
+  * 파일을 프린터로 재지향
+    {{{#!plain
+# cat test.txt > lp0
+}}}
+  * 표준에러를 /dev/null 로 재지향
+    {{{#!plain
+# which emacs 2> /dev/null
+}}}
+  * 표준에러와 표준출력 모두를 /dev/null 로 재지향
+    {{{#!plain
+# which emacs > /dev/null 2> /dev/null
+}}}
+
+== 프로그램으로 재지향 ==
+프로그램이 실행되면 표준입력(:12),표준출력,표준에러 3개의 장치파일을 만든다. 프로그램으로 데이터를 재지향 하게 되면, 이 데이터는 프로그램의 표준입력으로 향하게 된다. 아래 프로그램을 stdin.c로 저장하자.
+{{{#!plain
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+    char buf[1024];
+    while(fgets(buf, 1023, stdin) != NULL)
+    {
+        printf("%s", buf);
+    }
+}
+
+}}}
+이제 파일을 프로그램으로 재지향 하면, 표준입력으로 읽어서 출력하는 것을 확인할 수 있을 것이다.
+{{{#!plain
+# ./stdin < my.txt
+}}}
+
+== 참고문서 ==
+  1. [wiki:Site/C/Documents/CprogramingForLinuxEnv/Ch13_Input_Output 리눅스환경에서의 C 프로그래밍 3장 입력/출력]

@@ -1,0 +1,182 @@
+#title malloc(3)
+[wiki:function_malloc(3) HTML 변환문서]
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/02/04           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>malloc(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	동적 메모리 할당 및 해제
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;stdlib.h&gt;
+
+int malloc(size_t size);
+int calloc(size_t size);
+int free(void *ptr); 
+void *realloc(void *ptr, size_t size);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		malloc() 는 size 크기만큼의 메모리를 (동적으로)할당하기 위해서 
+		사용한다. malloc()은 호출에 성공한뒤 할당된 메모리영역을 가르키는 
+		포인터를 반환한다. malloc()을 이용해서 할당된 메모리 영역은 자동으로 
+		clear 되지 않는다. 더이상 사용하지 않는 메모리영역은 반드시 
+		free() 를 이용해서 clear 해주도록한다. 그렇지 않을경우 메모리
+		누수가 일어날수 있다.
+	</para>
+	<para>
+		calloc()는 <emphasis>size</emphasis>크기를 가지는 
+		<emphasis>nmemb</emphasis>요소 만큼의 공간을 할당한다. 메모리는 
+		0으로 설정된다. 
+	</para>
+	<para>
+		realloc()는 <emphasis>ptr</emphasis>가 가르키는 메모리영역의 크기를 
+		<emphasis>size</emphasis>만큼 조절한다. 메모리 영역에 있던 데이터는 
+		그대로 남아 있게 된다. 만약 <emphasis>ptr</emphasis>가 
+		<emphasis>NULL</emphasis>을 가리키고 있었다면 malloc(size)와 동일한 
+		수행을 보여준다. <emphasis>size</emphasis>가 0이라면 free(ptr)과 
+		동일한 수행을 보여준다.
+	</para>
+	<para>
+		free()는 <emphasis>ptr</emphasis>가 가르키는 메모리 영역을 해제한다. 
+		malloc(), calloc(), realloc()를 사용한 메모리영역을 더이상 사용하지 
+		않는다면 free()를 호출해서 자원의 낭비를 막도록 한다. 
+		<emphasis>ptr</emphasis>가 <emphasis>NULL</emphasis>이라면 아무런 
+		일도 수행하지 않은 경우가 된다. 
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		calloc(), malloc()는 할당된 메모리를 가리키는 포인터를 리턴한다. 
+		실패했다면 <emphasis>NULL</emphasis>을 리턴한다. 
+	</para>
+	<para>
+		free()는 값을 리턴하지 않는다.
+	</para>
+	<para>
+		realloc()는 새로할당된 메모리를 가리키는 포인터를 리턴한다. 
+		실패할 경우 <emphasis>NULL</emphasis>을 리턴한다. 
+		realloc()가 실패하더라도 이전 메모리가 해제되거나 이동하는 일은 
+		발생하지 않는다. 만약 realloc()요청한 메모리의 크기가 충분히 커서 
+		이전 포인터 영역에서 연속된 메모리 공간을 할당할 수 없게 된다면 
+		공간확보가 가능한 다른 영역으로 복사된다.	
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+
+struct name
+{
+    int     age;
+    char    name[25];
+};
+int main()
+{           
+    char *org_name;
+    struct name *myname;
+    int i;
+                       
+    // org_name 에 char 이 25만큼 들어갈수 있는
+    // 메모리 공간을 할당한다.                                                
+    // malloc 는 할당된 메모리 영역의 포인터를 리턴해주므로
+    // org_name 은 malloc 를 이용해 할당된 영역의 포인터를 가르키게 된다.
+    org_name = (char *)malloc(sizeof(char)*25);
+                                                                               
+    // myname 역시 마찬가지로 struct name 이 2개 만큼 들어갈수
+    // 있는 메모리 공간을 할당한다.
+    myname = (struct name *)malloc(sizeof(myname)*2);                         
+
+    strcpy(org_name, "yundream");
+                                                                              
+    myname[0].age = 25;
+    strcpy(myname[0].name, org_name);
+
+                                                                               
+    strcpy(org_name, "testname");                                             
+    myname[1].age = 28;                                                       
+    strcpy(myname[1].name, org_name);                                          
+                     
+    for(i = 0; i < 2; i++)
+    {                           
+        printf("%d : %s\n", myname[i].age, myname[i].name);
+    }                                                                         
+}
+		</screen>
+	</para>
+	<para>
+		위의 코드를 보면 org_name 라는 char 형 포인터가 선언되어 있다. 
+		처음 선어시에 이 포인터는 아무것도 가르키지 않고 있음으로, 이 
+		포인터를 사용하기 위해서는 메모리를 할당하고 할당된 메모리의 주소를 
+		가르키도록 만들어 줘야 한다.
+	</para>
+	<para>
+		<screen>
+ malloc 사용전
+              
+ +-- 4byte -+ 
+              
+ +----------+ 
+ | org_name | 
+ +----------+          ?
+     |                 |
+     +-----------------+
+                        
+ malloc 사용후          
+                      +- 25 byte -+
+                                   
+ +----------+         +------------+
+ | org_name |         |MEMORY      |
+ +----------+         +------------+
+     |                 |            
+     +-----------------+            
+		</screen>
+	</para>
+</section>
+
+<section>
+	<title>참고문헌</title>	
+	<para>
+		<orderedlist>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=89">동적메모리 할당</ulink>
+				</para>
+			</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

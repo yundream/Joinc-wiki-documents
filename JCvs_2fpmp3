@@ -1,0 +1,136 @@
+= "pmp3" project wiki page =
+ || [http://www.joinc.co.kr/modules.php?name=JCvs JCvs tree로 가기] ||
+ || [http://www.joinc.co.kr/modules.php?name=JCvs&cwd=pmp3&type=showfile pmp3의 CVS tree로 가기] ||
+ || [http://www.joinc.co.kr/modules.php?name=JCvs&cwd=pmp3%2Fpmp3&type=showfile pmp3 repository] ||
+ == 차례 ==
+ [[TableOfContents]]
+ == 개요 ==
+ * {{{MP3}}}형식이 잘못된 파일의 입력에서 거뜬하게 살아있는 '''버그 없는''' MP3 library를 지향합니다.
+ * 크기가 작고 CPU점유가 적은 '''Embedded에 적합한''' library를 지향합니다.
+ * UI의 분리를 위해 '''외부 제어 모듈'''을 통한 접근 방식을 지향합니다. (Server to clent)
+ * C를 주 개발언어로 채택하고 있으나 CPU점유를 내리기 위해서 Assembly를 아키텍쳐별로 최적화하는것을 지향합니다.
+ == 저작권 ==
+ * [pmp3]는 libmpg123의 decoder부분으로부터 파생되었으므로 그 어떠한 상업적인 용도로 변경할수 없으며 libmpg123의 라이센스 정책을 상속받습니다. 단, mp3_ext.c와 mp3_ext.h 는 단독으로 분리된 것으로 차후에 decoder부분이 독립되어 전혀 다른 기반의 알고리즘을 적용해 나갈것이고 이것이 완성되는 순간 순수 독립적인 GPL을 유지할수 있을거라 생각됩니다.
+ * 현시점에서 공개한 이유는 오로지 개인적인 취미를 가진분들에게 보다 좋은 알고리즘의 고안을 유출해보자는 이유로 시작되었으며 차후 자체 알고리즘으로 전환해 나갈것입니다. 그 전까지는 모든 저작권은 libmpg123의 라이센스 정책이 우선합니다.
+ * MP3 decode자체의 라이센스 문제는 아직 제가 자세히 조사하지 못했습니다. 이점에 대해서 사용하시는 모든 분들은 충분한 조사를 하십시요!
+ == 개발계획 ==
+ * 2001년 말부터 프로젝트를 시작하여 2002년 초부터 개발중지
+ * 2003년 11월 7일부로 joinc에서 pmp3 project를 시작
+ * 2004년 3월 : Full/Block buffer mode지원, ogg지원 일부 시도
+ * 2004년 6월 : UI작업
+ * 2004년 12월 : 다양한 아키텍쳐로 포팅, ogg 호환완료
+ == 변경사항 ==
+ * 2002년 초까지 : libmpg123의 decode부분을 근간으로 시작하여 버그 일부분 수정 및 버퍼관리 교체와 불필요한 요소 제거 그리고 PPC로 포팅
+ * 2003년 11월 10일 : pmp3.c에서 buffering부분을 thread로 바꾸고 ID3 header를 선검출하여 보여주도록 추가하고 진행률 표시를 당분간 삭제하였음.
+ * 2003년 11월 11일 : pmp3.c에서 지정된 인자가 파일인경우 그대로 list에 추가하며 속성이 directory인경우 자동으로 하위 directory구조를 scanning하여 파일들을 list에 추가하도록 함.
+ * 2003년 11월 13일 : 진행률 표시 다시 넣음. (압축비율표시 추가)
+ * 2003년 11월 17일 : autoconf 적용.
+ * 2003년 11월 18일 : mixer library 개선 (mixer.c, dsp.c)
+ * 2003년 12월 16일 : interface.c 에서 c_Tag 검출부분 (ID3 tag 검색을 하여 struct mpstr.TAG 에 밀어 넣는 부분)이 정상적인 동작을 하지 않는것으로 버그로 발견되었고 이를 L_TAG_ADD 라벨로 분기토록 수정. 참고로 현재 ID3 검출 방법은 2가지가 존재하며 pmp3 자체에는 이 방법을 사용치 않으며 mp3_ext 에서 따로 작성된 검색 루틴을 사용하고 있습니다.
+ * 2003년 12월 30일 : 재생목록을 임의로 섞는 기능 추가.
+ * 2004년 3월 25일 : 에러메세지 몇개 추가 (/dev/dsp open 실패, Thread 생성 실패)
+ * 2004년 12월 16일 : pmp3 0.0.9 binary RPM 배포
+ * 2005년 8월 10일 : pmp3 0.0.9 source 를 매우 간략화하여 만든 소스 제공 (CVS에는 등록안함 - 밑에 다운로드 부분참고)
+ == 알려진 문제점 / 검증요소 ==
+ 
+ * 검증요소 : 메모리 누수가 약간(단기 200byte) 발생하는것으로 보임. (지속형 Leak이 아니며 1회 free가 안되는 것으로 valgrind 로 검증결과 확인)
+  * 조치 : 진행중 (MP3 decoder쪽은 아닌것으로 보임. mp3_ext.c 의 어딘가로 짐작하고 있음.)
+  * 확인완료 : 원인은 pthread와 valgrind가 문제였음이 확인됨. 실제로 큰 문제는 아니며 단지 valgrind가 pthread의 특수한 상황을 정확히 추적하지 못함. 즉, 메모리 누수 없음.
+ * 8K Audio buffer: 일부 사운드칩셋 또는 드라이버에서 8K이하로 push 하는 경우 문제가 있음을 확인하였습니다. 대부분 8K alignment 하여 push 하면 문제가 없군요. 8K이하로 push 할경우 다음과 같은 문제점들이 나타났습니다. 항상 현상이 발생되는 것은 아니며 대부분 SampleRate 에 해당하는 만큼의 PCM data 를 밀어넣어주지 못할때 잘 발생합니다. pmp3 에서 이 부분을 조망간 수정해놔야 되겠습니다. (사운드 칩셋에서 제품명은 밝히지 않겠습니다.)
+  1. close 함수에서 block 되버리는 현상
+  1. 음질의 왜곡이 심한 현상
+  1. 음이 끊기는 현상
+  1. write 함수에서 이상시점에 반환되는 현상
+ == 문서 ==
+ * MP3 / ID3 format: http://minzkn.wowdns.com:2745/screenshot/MPEG_AudioFrame.html
+ * 샘플링 기술: '''TODO'''
+ * 사운드 드라이버별 특징: '''TODO'''
+ * mpg123 홈페이지: http://www.mpg123.de
+ == 다운로드 ==
+ * CVS checkout '''pmp3''' : 주 프로젝트
+  {{{
+bash# cvs -d :pserver:anonymous@cvs.joinc.co.kr:/home/jcvs/pmp3 login
+      <암호를 입력하라고 나오면 Enter(!) 입력>
+bash# cvs -d :pserver:anonymous@cvs.joinc.co.kr:/home/jcvs/pmp3 co pmp3
+}}}
+ * CVS checkout "pmp3 tiny" : 부 프로젝트
+  {{{
+bash# cvs -d :pserver:anonymous@cvs.joinc.co.kr:/home/jcvs/pmp3 login
+      <암호를 입력하라고 나오면 Enter(!) 입력>
+bash# cvs -d :pserver:anonymous@cvs.joinc.co.kr:/home/jcvs/pmp3 co pmp3_tiny
+}}}
+ * 그밖에 부 프로젝트를 받으시려면 [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/pmp3/ 여기]를 눌러서 보다 많은 module을 확인하시고 필요한부분을 받으세요.
+
+ * Release download [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/pmp3/ ViewCVS]
+  || '''Release date''' || '''Version''' || '''Download link''' || '''md5sum''' || '''설명''' ||
+  || 2004.3.25 || 0.0.9 || [[Attachment(pmp3-0.0.9.tar.gz)]] || 79beffe401d78bb736b9e6caab0c4238 || 소스 tarball ||
+  || 2004.12.16 || 0.0.9 build 1 || [[Attachment(pmp3-0.0.9-1.i386.rpm)]] || d25f2f2cbfb05622dcfe89fb5a3839f9 || Binary package (RPM) ||
+  || 2005.8.10 || 0.0.9 || [[Attachment(pmp3_decode.tar.gz)]] || 5dcdc9b42582d4bdd8863813bf37cc04 || 간략화한 소스 ||
+ * RPM 설치법
+  1. 설치
+  {{{#!vim sh
+rpm -i pmp3-0.0.9-1.i386.rpm
+}}}
+  1. 제거
+  {{{#!vim sh
+rpm -e pmp3
+}}}
+ * RPM spec
+ {{{#!vim spec
+%define buildroot /var/tmp/pmp3-buildroot
+
+Summary: pmp3 MP3 player
+Name: pmp3
+Version: 0.0.9
+Release: 1
+Copyright: MPG123
+Group: Applications/Player
+
+%description
+This package contains pmp3 player
+
+%prep
+install -m 0755 -d %{buildroot}
+cd %{buildroot}
+rm -rf pmp3
+cvs -d:pserver:anonymous:@cvs.joinc.co.kr:/home/jcvs/pmp3 co pmp3
+
+%build
+cd %{buildroot}/pmp3
+./configure --prefix=/usr
+make
+
+%install
+cd %{buildroot}/pmp3
+make install
+
+%post
+echo "* Install pmp3 player"
+echo "  - Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>"
+echo "  - See also : http://www.joinc.co.kr/modules/moniwiki/wiki.php/pmp3"
+
+%postun
+echo "Uninstall pmp3 player"
+
+%clean
+rm -rf %{buildroot}
+
+%files
+/usr/bin/pmp3
+/usr/bin/mixer
+
+%changelog
+}}}
+ == 건의사항 및 사용소감 ==
+ * 코드만 보고 아직 사용은 안해봤습니다. 조만간 사용해 볼께요.. 음 그런데.. 주석처리좀 :-) yundream
+  * 큰일이예요. 제 습관이 점점 시간이 갈수록 주석 안다는것. - [minzkn]
+ * 음.. configure스크립트가 들어 있더군요... 이거 작성하는 법좀 알려주세요. 혹은 관련자료 :-) yundream
+  * [http://www.gnu.org/software/autoconf/manual/autoconf-2.57/autoconf.html 여기]를 한번 보세요.- [minzkn]
+ * 포함되어 있는 프로그램이용해서 테스트 해봤습니다. 디코딩 잘되구요. 간단하게 time으로 cpu점유율이랑 메모리 사용율 체크했는데 mpg123과 비슷하게 나오는 군요. 오늘부터라도 코드 훑어 봐야죠라고 마음을(만?) 먹고 있습니다.  
+
+ == 스크린샷 ==
+ [[Attachment(pmp3.png)]]
+ == 참여자 정보 ==
+ || '''사용자ID''' || '''홈페이지''' || '''전자우편''' ||
+ || [minzkn] || http://minzkn.pe.ky || [mailto:minzkn@infoeq.com] ||
+ || yundream || http://www.joinc.co.kr || [mailto:yundream@joinc.co.kr] ||

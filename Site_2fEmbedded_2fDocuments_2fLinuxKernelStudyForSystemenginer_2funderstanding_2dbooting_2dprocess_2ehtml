@@ -1,0 +1,303 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>부팅 과정의 이해부팅에 관한 좀더 자세한 정보는 LILO의 README를
+		참조하기 바란다.</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Makefile 분석"
+HREF="chap02.html"><LINK
+REL="PREVIOUS"
+TITLE="Makefile 분석"
+HREF="chap02.html"><LINK
+REL="NEXT"
+TITLE="커널 이미지 파일의 구조"
+HREF="kernel-image-file-structure.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="chap02.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>2장. Makefile 분석</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="kernel-image-file-structure.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="UNDERSTANDING-BOOTING-PROCESS"
+>2.1. 부팅 과정의 이해<A
+NAME="AEN455"
+HREF="#FTN.AEN455"
+>[1]</A
+></A
+></H1
+><P
+>			i386 계열의 pc를 중심으로 부팅 과정을 알아본다. 임베디드 시스템에선 PC와는 다른 부팅 과정이
+			필요할 것이지만 pc에서의 부팅 과정을 이해한 후엔 훨씬 접근이 쉬울 것이다. 또 대체적인 큰 
+			항목들은 pc든 임베디드 시스템이든 같기 때문에 좋은 예가 될 것이다.
+		</P
+><P
+>			pc의 전원을 처음 넣으면 CPU는 ROM에서 BIOS 코드를 읽어 실행하기 시작한다. 처음 코드는 PC의
+			기본 적인 초기화를 할 것이고 이어 각종 HW의 초기화를 실행할 것이다.
+		</P
+><P
+>			기본 초기화가 끝나면 VGA를 통해 화면이 보이기 시작할 것이고 RAM 체크, HDD 인식, PnP 세팅
+			등을 실행한다. 여기 까지가 넓은 의미에서의 HW 초기화라고 봐야할 것이다.
+		</P
+><P
+>			모든 초기화와 세팅이 끝난 후는 기본적인 HW인 플로피나 하드디스크가 사용 가능한 상태가 된다.
+			이제 bios는 부팅 가능한 순서가 지정된 디바이스를 찾아 부팅을 시도한다. 부팅 가능하면그
+			디바이스의 첫 512 bytes를 읽어 실행한다. 
+		</P
+><P
+>			하드 디스크의 첫 섹터를 MBR<A
+NAME="AEN462"
+HREF="#FTN.AEN462"
+>[2]</A
+>이라 부르고
+			이 섹터만이 부팅에 사용된다. 하드 디스크가 여러 개 있더라도 정해진 첫 드라이브의 MBR만이
+			사용된다. 이 섹터는 로더 프로그램과 파티션 테이블 정보를 담고 있다. 로더는 일반적으로 부트
+			섹터를 읽어 부트한다. 실제로 MBR과 부트 섹터는 MBR이 파티션 정보를 담고 있다는 것을 제외하고는
+			기능적인 차이가 없다.
+		</P
+><P
+>			mbr의 첫 446 바이트(0x1BE)는 로더 프로그램이고 그 뒤 64 바이트는 파티션 테일블 정보를 담고 있다.
+			마지만 두 바이트는 매직 넘버를 갖고 있고 이 숫자는 이 섹터가 진짜 부트 섹터인지 판별할 때
+			사용된다.
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN465"
+></A
+><P
+><B
+>그림 2-1. mbr의 구조</B
+></P
+><P
+>
+}}}
+attachment:structure-of-mbr.png
+{{{#!html
+</P
+></DIV
+>
+		</P
+><P
+>			위 그림에서 보듯이 처음 읽혀지는 코드의 크기는 512 bytes 이므로 충분하다고는 볼수 없을
+			것이다. 그러므로 이 작은 용량엔 실제 코드를 읽어 실행하도록 하는 기능만을 넣는 것이
+			보통이다. 나머지는 해당 OS 파티션의 부트 섹터에 기록된다.
+		</P
+><P
+>			여기 까지가 일반적인 PC의 부팅과정이다. 이제 부터는 어떤 OS가 깔렸는지에 따라 부팅이 달라지게
+			된다. lilo와 같은 부트 로더가 실행되 원하는 OS를 부트한다.
+		</P
+><P
+>			이 책에서는 리눅스에 대해 다루므로 BIOS에 의해 처음 읽혀 실행되는 것이 LILO(혹은 GRUB)가
+			될 것이다. lilo를 설치할 때 LILO는 MBR에 자신을 위한 로더를 기록해 부팅할 때 LILO가 실행
+			되도록 할 것이다. lILO의 첫 스테이지 부트 섹터는 여러 다른 곳에서 LILO의 나머지 부분을 읽어
+			들인다.
+		</P
+><P
+>			다음은 필자의 lilo.conf로 lilo를 실행하면 install에 지정된 /boot/boot.b가 MBR에 써진다.
+			boot.b는 lilo의 첫 스테이지와 두번째 스테이지가 묶여진 file로 첫 스테이지는 부트 섹터에 기록
+			되도록 512 바이트이고 두번째 스테이지는 그 나머지 부분이다. 실제로 필자의 컴퓨터 boot.b는 4566
+			바이트로 앞 512 바이트가 첫번째 스테이지, 나머지 부분인 4054 바이트가 두번째 스테이지가된다. 
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>prompt
+timeout=50
+default=linux
+boot=/dev/hda
+map=/boot/map
+install=/boot/boot.b
+lba32
+vga=0x030a
+
+image=/boot/bzImage-2.4.16
+	label=linux
+	initrd=/boot/initrd-2.4.16.img
+	read-only
+	root=/dev/hda1
+	append="mem=nopentium hdd=ide-scsi"</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			그러나 /boot/boot.b를 hexedit와 같은 것으로 보면 앞부분에 있어야할 중요한 정보들이 비어 있는
+			것을 알 수 있다. 이 것은 lilo를 실행해 MBR에 boot.b를 등록할 때 정보가 채워지게 된다.
+		</P
+><P
+>			일단 bios가 mbr을 읽어 LILO를 기동하면 LILO는 lilo.conf를 사용해 등록된 메뉴를 갖고 사용자의
+			입력에 따라 해당 os를 시작하게 된다. 필자의 lilo.conf에 의하면 선택 가능한 OS는 "linux"로
+			커널 이미지는 /boot/bzImage-2.4.16임을 알수 있다. 즉 LILO는 사용자가 "linux"를 선택했을 때
+			/boot/bzImage-2.4.16를 읽어들이고 실행해 주는 역할을 한다.
+		</P
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>주석</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN455"
+HREF="understanding-booting-process.html#AEN455"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>부팅에 관한 좀더 자세한 정보는 LILO의 README를
+		참조하기 바란다.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN462"
+HREF="understanding-booting-process.html#AEN462"
+>[2]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>Master Boot Record</P
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="kernel-image-file-structure.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>Makefile 분석</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>커널 이미지 파일의 구조</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

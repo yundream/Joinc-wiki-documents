@@ -1,0 +1,330 @@
+'''네트워크 관련 정보 연구 위키'''
+
+pcap관련코딩 하면서 새로 발견되는 내용들에 대한 정리/스터디 위키 
+
+|| 만든날 	|| 2003/11/18 				||<|4> http://www.joinc.co.kr/images/myavata/2.gif	||
+|| 관리자 	|| yundream							||
+|| 홈페이지	|| http://www.joinc.co.kr			||
+|| 이메일	|| [mailto:yundream@joinc.co.kr]	||
+
+ 1. [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=148 네트워크 관련 정보 얻기] 로 이동 2003/11/24 - yundream
+
+
+''' 목차 '''
+[[TableOfContents]]
+
+=== 목적 및 계획 ===
+ 1. 범용적으로 사용가능한 네트워크 통계 프로그램의 작성 
+ 1. 네트워크 통계는 pcap를 이용한다. 
+ 1. 리눅스의 경우 네트워크 통계는 /proc를 통해서도 가능하지만 이럴경우 범용적이지 못하기 때문에 pcap을 이용한다.  
+ 1. 우선은 네트워크 장치에대한 정보를 얻는 것에 대해서 알아본다.  
+ 1. 운영체제에 따라 다르긴 하지만 일반적으로 pcap는 네트워크 장치등에 대한 상세한 정보를 얻긴 힘들다. 이럴경우 ioctl(2)등과 같은 입출력제어함수를 사용해야 한다. 그래서 종종 ioctl()에 대해서 다루게 될 것이다.   
+ 1. 그후에는 네트워크 통계를 내고 이것을 이용할 수 있도록 기능을 확장한다. 
+ 1. libpcap 버젼은 libpcap-0.7.x를 기준으로 한다. 이하의 버젼의 경우 몇몇지원되지 않는 함수가 있을 수도 있다. pcap_findalldevs()가 대표적인 함수로 이럴 경우 직접 함수를 만들어야 할것이다. 이 방법에 대해서는 언급하지 않을 것이다.  
+
+=== Pcap Lib를 이용한 네트워크 정보및 트래픽 검사 ===
+pcap lib를 이용할 경우 운영체제에 관계없이 동일한 코드를 유지할 수 있다는 장점을 가진다. 만약 '''raw socket'''이나 '''ioctl''', '''커널데이터 요청'''등을 이용하게 된다면 거기에 각각의 서로 다른 유닉스 운영체제로의 포팅까지를 생각하고 있다면 상당한 두통을 각오해야 할 것이다.
+
+물론 단점도 있다. ioctl과 '''커널데이터 요청'''을 이용 하는것에 비해서 상당한 비용을 지불해야 한다는 점이다. 네트워크 트래픽이 심하지 않은 경우는 문제 없지만 router등과 같은 다량의 패킷을 발생시키는 시스템에서라면 문제가 될 소지가 있다. 
+
+그러므로 pcap을 이용한 네트워크 트래픽 검사는 내부네트워크에 있는 각 호스트의 트래픽을 체크하는데 사용하는게 무난하다.
+
+이외에도 snmp를 통해서 얻어오는 방법등 여러가지가 있겠지만 이건 나중에 다루기로 하겠다.  
+==== 모든 Network device 이름 얻어오기 ==== 
+pcap_findalldevs()함수를 이용하면 된다. 이 함수는 '''libpcap-0.7.x'''이상에서 지원된다. 
+{{{#!plain
+int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf);
+}}}
+디바이스 정보는 alldevsp를 통해서 얻어올수 있다. alldevsp는 링크드리스트이다. pcap_if_t는 다음과 같은 멤버들을 가진다.
+{{{#!plain
+next        만약 NULL이 아니라면 다음요소가 있음을 의미한다.
+name        디바이스 이름 
+description 디바이스에 대한 설명 
+addresses   디바이스 주소의 리스트
+flags       인터페이스 플래그 만약 PCAP_IF_LOOPBACK이라면 루프백 인터페이스다.
+}}}
+
+pcap_findalldevs()를 통해서 alldevsp정보를 얻어왔다면 유효한 인터페이스에 대한 정보인지 확인하기 위해서 loopback인지(PCAP_IF_LOOPBACK) addresses가 0인지를 검사해 주어야 한다.  
+{{{#!plain
+if ((alldevps->flags != PCAP_IF_LOOPBACK) && (alldevps->addresses !=0 ))
+{
+   // 유효한 인터페이스  
+}
+}}}
+
+==== 동시에 2개 이상의 device에서 데이터 얻어오기 ==== 
+현재는 thread를 이용한 방법을 고려하고 있다. 
+
+pcap_findalldevs()를 이용해서 이더넷 장치의 이름목록을 얻어오고 각각의 이더넷 장치이름에 대해서 pcap_open_live를 통해서 pcd(패킷챕쳐디스크립션)을 얻어온다. 그래고 생성된 pcd만큼 쓰레드를 만든다. 
+
+쓰레드 생성시 pcd를 인자로 넘기고 쓰레드는 pcap_next()를 이용해서 패킷을 가져온다.    
+
+==== 예제 코드 ====
+{{{#!plain
+#include <pcap.h>
+#include <net/bpf.h>
+#include <net/ethernet.h>
+
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
+#define PROMISCUOUS     1
+#define NONPROMISCUOUS  0
+#define DEV_MAX         32
+
+typedef struct _pcd_info_t
+{
+    int     num;
+    char    name[DEV_MAX][16];
+    pcap_t  *pcd;
+    u_long  out_size[DEV_MAX];
+    u_long  out_pkts[DEV_MAX];
+    u_long  in_size[DEV_MAX];
+    u_long  in_pkts[DEV_MAX];
+} pcd_info_t;
+
+int main()
+{
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcd_info_t lpcd_info;
+    pcap_if_t *alldevps;
+	struct sockaddr_in *si;
+	int i;
+
+    memset((void *)&lpcd_info, 0x00, sizeof(lpcd_info));
+    pcap_findalldevs(&alldevps, errbuf);
+    while(1)
+    {
+        if((alldevps->flags != PCAP_IF_LOOPBACK))
+        {
+			si = (struct sockaddr_in *)alldevps->addresses->addr;
+            printf("%d %s %s\n", alldevps->flags, alldevps->name, inet_ntoa(si->sin_addr));
+        }
+        if (alldevps->next == NULL)
+        {
+            break;
+        }
+        alldevps = alldevps->next;
+    }
+}
+
+}}}
+'''inet_ntoa'''대신 [http://www.joinc.co.kr/modules.php?name=Encyclopedia&op=content&tid=132 inet_ptoa(3)]를 사용하는 것도 좋은 방법이 될것이다.  
+
+=== 시스템 함수(ioctl)를 이용해서 얻어오기 ===
+ * pcap는 꽤 편하긴 하지만 몇몇 정보는 ioctl()과 같은 시스템 함수를 이용해서 얻어오거나, 리눅스의 경우 /proc 파일시스템의 값을 얻어오는게 더편한경우가 많다. 여기에서는 이러한 몇가지 방법들에 대해서 알아보도록 하겠다. 
+ * 여기에서는 linux에서의 경우에 대해서만 신경 쓰도록 하겠다. 몇몇 데이터의 경우 다른 유닉스와 호환되지 않는 경우도 있기 때문이다. 바로 이 코드 호환성 문제가 pcap과 같은 범용라이브러리를 사용하지 않을 때 발생하는 문제점이다. 이문제를 해결하기 위해서는 #ifdef 신공을 구사해야 할 것이다.   
+{{{#!plain
+int ioctl(int d, int request, ...);
+}}}
+첫번째 아규먼트 d는 입출력 지정자이다. 이 문서는 네트워크 정보관련된 내용에 대해서 다루고 있으므로 당연히 d는 소켓지정자가 될 것이다. request는 ioctl()명령(command)로 어떤 정보를 요청할 것인지를 지정하기 위해서 사용한다.     
+
+... 부분은 어떤 입출력장치에 대한 제어를 하느냐에 따라 달라지는데 만약 이더넷과 관련된 정보를 필요로 한다면 struct ifr를 사용하게 될것이다. ioctl()를 이용할때 request를 어떤 값으로 사용하느냐에 따라서 ioctl()은 거기에 적당한 구조체를 넘겨주게 된다. 그러므로 ioctl()을 제대로 다루기 위해서는 request의 값과 거기에 따른 데이터 타입을 숙지하고 있어야 한다.(혹은 그때 그때 필요에 따라 찾아낼 수 있어야 한다.  
+
+==== ioctl() 명령 인자 ====
+ioctl의 두번째 인자인 명령 목록에 대해서 알아보도록 하겠다. 이들 값을 사용하려면 /usr/include/sys/ioctl.h를 인클루드 시켜야 한다. 명령에 대한 실제 정의된 내용은 /usr/include/bits/ioctls.h을 찾아보면 된다. 지면상의 이유로 일부만 다루도록 하겠다.   
+{{{#!plain
+#define SIOCADDRT   0x890B      /* add routing table entry  */
+#define SIOCDELRT   0x890C      /* delete routing table entry   */
+#define SIOCRTMSG   0x890D      /* call to routing system   */
+
+/* Socket configuration controls. */
+#define SIOCGIFNAME 0x8910      /* get iface name       */
+#define SIOCSIFLINK 0x8911      /* set iface channel        */
+#define SIOCGIFCONF 0x8912      /* get iface list       */
+#define SIOCGIFFLAGS    0x8913      /* get flags            */
+#define SIOCSIFFLAGS    0x8914      /* set flags            */
+#define SIOCGIFADDR 0x8915      /* get PA address       */
+#define SIOCSIFADDR 0x8916      /* set PA address       */
+#define SIOCGIFDSTADDR  0x8917      /* get remote PA address    */
+#define SIOCSIFDSTADDR  0x8918      /* set remote PA address    */
+#define SIOCGIFBRDADDR  0x8919      /* get broadcast PA address */
+#define SIOCSIFBRDADDR  0x891a      /* set broadcast PA address */
+#define SIOCGIFNETMASK  0x891b      /* get network PA mask      */
+#define SIOCSIFNETMASK  0x891c      /* set network PA mask      */
+#define SIOCGIFMETRIC   0x891d      /* get metric           */
+....
+}}}
+
+==== ioctl()명령에 따른 주요 네트워크 관련 구조체들 ====
+===== struct ifconf =====
+{{{#!plain
+struct ifconf
+{
+    int ifc_len;            /* Size of buffer.  */
+    union
+      {
+    __caddr_t ifcu_buf;
+    struct ifreq *ifcu_req;
+      } ifc_ifcu;
+};
+# define ifc_buf    ifc_ifcu.ifcu_buf   /* Buffer address.  */
+# define ifc_req    ifc_ifcu.ifcu_req   /* Array of structures.  */
+# define _IOT_ifconf _IOT(_IOTS(struct ifconf),1,0,0,0,0) /* not right */
+}}}
+네트워크 인터페이스와 관련된 가장 기본이 되는 구조체로, 인터페이스 정보를 얻기 원한다면 ioctl을 이용해서 위 구조체의 값을 얻어오는 것부터 시작한다. 
+
+이 구조체의 핵심멤버는 바로 아래에서 설명할 struct ifreq 구조체이다. 이 구조체를 보면 네트워크 인터페이스가 가져야할 중요한 핵심정보들을 가지고 있다. ifcu_buf는 ioctl()을 통해서 가져온 ifreq 구조체 정보를 저장하기 위한 버퍼이며, ifc_len은 버퍼에 저장된 데이터의 크기를 나타낸다. 
+
+이 구조체(ifconf)를 얻어오기 위해서 사용하는 ioctl()명령은 SIOCGIFCONF이다.  
+{{{#!vim c 
+ioctl(fd, SIOCGIFCONF, (char *)&ifcfg);
+}}}
+
+===== struct ifreq =====
+다음은 ifr구조체의 멤버들이다. 이름에서 알수 있듯이 이더넷 장치에 대한 여러가지 중요 정보를 얻어 올수 있다.  
+{{{#!plain
+struct ifreq
+  {
+# define IFHWADDRLEN    6
+# define IFNAMSIZ   IF_NAMESIZE
+    union
+      {
+    char ifrn_name[IFNAMSIZ];   /* Interface name, e.g. "en0".  */
+      } ifr_ifrn;
+
+    union
+      {
+    struct sockaddr ifru_addr;
+    struct sockaddr ifru_dstaddr;
+    struct sockaddr ifru_broadaddr;
+    struct sockaddr ifru_netmask;
+    struct sockaddr ifru_hwaddr;
+    short int ifru_flags;
+    int ifru_ivalue;
+    int ifru_mtu;
+    struct ifmap ifru_map;
+    char ifru_slave[IFNAMSIZ];  /* Just fits the size */
+    char ifru_newname[IFNAMSIZ];
+    __caddr_t ifru_data;
+      } ifr_ifru;
+  };
+}}}
+멤버들은 이름만 봐도알수 있을 것이다. ifru_addr, ifru_boradaddr,ifru_netmask등은 인터페이스 주소, 브로드케시팅 주소, 네트마스크 주소를 나타낸다. ifru_mut는 MTU(Maximum Transmission Unit)값을 가져오기 위해서 사용된다. MTU는 TCP/IP 네트워크 상에서 한번에 전송할 수 있는 패킷의 최대크기를 나타낸다. 이보다 큰 데이터를 보내고자 할때는 MTU사이즈에 맞도록 여러개로 나뉘어서 보내게 된다. 하나의 큰데이터를 보내는 것보다는 적당한 크기로 나누어서 보내는게 네트워크 환경의 효율을 높일 수 있기 때문이다. MTU사이즈는 네트워크 환경에 따라 달라 질수 있다. 일반적으로 ethernet은 1500의 크기를 가진다.      
+
+==== 예제 ====
+운영체제 의존적인 대다가 표준이 정해지지 않은 ioctl의 특성상 예제 코드는 단지 리눅스에서만 실행된다. 
+{{{#!plain
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+
+int main()
+{
+    // 이더넷 데이터 구조체 
+    struct ifreq *ifr;
+    struct sockaddr_in *sin;
+    struct sockaddr *sa;
+
+    // 이더넷 설정 구조체
+    struct ifconf ifcfg;
+    int fd;
+    int n;
+    int numreqs = 30;
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    // 이더넷 설정정보를 가지고오기 위해서 
+    // 설정 구조체를 초기화하고  
+    // ifreq데이터는 ifc_buf에 저장되며, 
+    // 네트워크 장치가 여러개 있을 수 있으므로 크기를 충분히 잡아주어야 한다.  
+    // 보통은 루프백주소와 하나의 이더넷카드, 2개의 장치를 가진다.
+    memset(&ifcfg, 0, sizeof(ifcfg));
+    ifcfg.ifc_buf = NULL;
+    ifcfg.ifc_len = sizeof(struct ifreq) * numreqs;
+    ifcfg.ifc_buf = malloc(ifcfg.ifc_len);
+
+    for(;;)
+    {
+        ifcfg.ifc_len = sizeof(struct ifreq) * numreqs;
+        ifcfg.ifc_buf = realloc(ifcfg.ifc_buf, ifcfg.ifc_len);
+        if (ioctl(fd, SIOCGIFCONF, (char *)&ifcfg) < 0)
+        {
+            perror("SIOCGIFCONF ");
+            exit;
+        }
+        // 디버깅 메시지 ifcfg.ifc_len/sizeof(struct ifreq)로 네트워크 
+        // 장치의 수를 계산할 수 있다.  
+        // 물론 ioctl을 통해서도 구할 수 있는데 그건 각자 해보기 바란다.
+        printf("%d : %d \n", ifcfg.ifc_len, sizeof(struct ifreq));
+        break;
+    }
+
+    // 주소를 비교해 보자.. ifcfg.ifc_req는 ifcfg.ifc_buf를 가리키고 있음을 
+    // 알 수 있다. 
+    printf("address %d\n", &ifcfg.ifc_req);
+    printf("address %d\n", &ifcfg.ifc_buf);
+
+    // 네트워크 장치의 정보를 얻어온다.  
+    // 보통 루프백과 하나의 이더넷 카드를 가지고 있을 것이므로 
+    // 2개의 정보를 출력할 것이다. 
+    ifr = ifcfg.ifc_req;
+    for (n = 0; n < ifcfg.ifc_len; n+= sizeof(struct ifreq))
+    {
+        // 주소값을 출력하고 루프백 주소인지 확인한다.
+        printf("[%s]\n", ifr->ifr_name);
+        sin = (struct sockaddr_in *)&ifr->ifr_addr;
+        printf("IP    %s\n", inet_ntoa(sin->sin_addr) );
+		if ( (sin->sin_addr.s_addr) == INADDR_LOOPBACK)
+		{
+			printf("Loop Back\n");
+		}
+		else
+		{
+            // 루프백장치가 아니라면 MAC을 출력한다.
+            ioctl(fd, SIOCGIFHWADDR, (char *)ifr);
+            sa = &ifr->ifr_hwaddr;
+            printf("%s\n", ether_ntoa((struct ether_addr *)sa->sa_data));
+        }
+        // 브로드 캐스팅 주소 
+        ioctl(fd,  SIOCGIFBRDADDR, (char *)ifr);
+        sin = (struct sockaddr_in *)&ifr->ifr_broadaddr;
+        printf("BROD  %s\n", inet_ntoa(sin->sin_addr));
+        // 네트워크 마스팅 주소
+        ioctl(fd, SIOCGIFNETMASK, (char *)ifr);
+        sin = (struct sockaddr_in *)&ifr->ifr_addr;
+        printf("MASK  %s\n", inet_ntoa(sin->sin_addr));
+        // MTU값
+        ioctl(fd, SIOCGIFMTU, (char *)ifr);
+        printf("MTU   %d\n", ifr->ifr_mtu);
+        printf("\n");
+        ifr++;
+    }
+}
+}}}
+다음은 필자의 컴퓨터에서 테스트한 결과이다.
+{{{#!plain
+64 : 32 
+address -1073743948
+address -1073743948
+[lo]
+IP    127.0.0.1
+BROD  127.255.255.255
+MASK  255.0.0.0
+MTU   16436
+
+[eth0]
+IP    61.254.131.50
+52:54:5:ff:0:73
+BROD  255.255.255.255
+MASK  255.255.255.0
+MTU   1500
+}}}
+
+=== 참고 문헌 ===
+ 1. [http://winpcap.mirror.ethereal.com/301a/docs/funcs_2pcap_8h.html libpcap 레퍼런스]
+ 1. [http://lists.community.tummy.com/pipermail/linux-ha-dev/2000-October/000917.html ioctl을 이용한 네트워크 인터페이스 정보 얻어오기]
+ 1. [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=112 libpcap 프로그래밍] 
+ 1. [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=114 pcap을 이용한 id,password 정보 가져오기]
+ 1. [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=136 libpcap을 이용한 포트스캐닝 검사]

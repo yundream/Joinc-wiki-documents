@@ -1,0 +1,1523 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>proc 프로그래밍(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>proc 프로그래밍(2)</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN16"
+>proc 프로그래밍의 기본</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN18"
+>proc 문의 구조</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1&#51208;. <A
+HREF="#AEN22"
+>Executable 영역</A
+></DT
+><DT
+>2.1.2&#51208;. <A
+HREF="#AEN30"
+>DECLARATIVE 지원</A
+></DT
+><DT
+>2.1.3&#51208;. <A
+HREF="#AEN34"
+>Embedded PL/SQL Blocks</A
+></DT
+><DT
+>2.1.4&#51208;. <A
+HREF="#AEN38"
+>host 변수와 indicator 변수</A
+></DT
+><DT
+>2.1.5&#51208;. <A
+HREF="#AEN43"
+>Cursor 과 Fetch 의 지원</A
+></DT
+></DL
+></DD
+><DT
+>2.2&#51208;. <A
+HREF="#AEN46"
+>오라클의 데이타 타입</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN52"
+>Transaction</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN57"
+>Error 제어</A
+></DT
+><DT
+>2.5&#51208;. <A
+HREF="#AEN62"
+>Proc를 이용한 어플리케이션 개발방법</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN68"
+>셈플작성</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN76"
+>Makefile</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN80"
+>main.pc</A
+></DT
+><DT
+>3.3&#51208;. <A
+HREF="#AEN84"
+>myterm.pc</A
+></DT
+><DT
+>3.4&#51208;. <A
+HREF="#AEN88"
+>zipcode.pc</A
+></DT
+><DT
+>3.5&#51208;. <A
+HREF="#AEN92"
+>include/menu.h</A
+></DT
+><DT
+>3.6&#51208;. <A
+HREF="#AEN96"
+>myterm.h</A
+></DT
+><DT
+>3.7&#51208;. <A
+HREF="#AEN100"
+>zipcode.h</A
+></DT
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN104"
+>테스트</A
+></DT
+><DT
+>5&#51208;. <A
+HREF="#AEN113"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번장에서는 Proc 프로그래밍을 좀더 깊이 있게 다루어 보도록 하겠다. 
+		Proc 프로그래밍 환경은 이미 다 갖추어져 있으며, proc 가 무엇인지도 
+		개념을 잡고 있다고 가정하고 강좌를 진행할 것이다. sql 역시 
+		기본적으로 사용할줄 아는걸로 가정하겠다.  
+	</P
+><P
+>		만약 위의 내용들이 준비되어 있지 못하다면 
+		<A
+HREF="/modules.php?name=News&file=article&sid=94&mode=nested&order=0&thold=0"
+TARGET="_top"
+>proc 프로그래밍(1)</A
+> 과 <A
+HREF="/modules.php?name=News&file=article&sid=92&mode=nested&order=0&thold=0"
+TARGET="_top"
+>오라클 817 설치하기</A
+> 문서를 
+		먼저 읽어 보기 바란다.  
+	</P
+><P
+>		이외에도 Proc 와 직접적인 관련은 없지만 termios 를 이용한 터미널 제어와 
+		ANSI 를 이용한 화면조정에 대한 내용도 코드를 통해서 약간 다루게 될것이다. 
+		termios 는 조만간 자료를 만들어서 올릴 생각이니, 이 문서에서는 
+		그냥 이러한 도구를 이용해서 터미널 제어가 가능하구나.. 하는 정도로만 
+		알아두길 바란다. 	 	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>2&#51208;. proc 프로그래밍의 기본</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2.1&#51208;. proc 문의 구조</A
+></H2
+><P
+>			기본적으로 proc 는 C 코드와 함께 쓰이도록 되어 있다. 
+			이를테면 C 코드안에 SQL 문을 포함(embedded) 시키는 일을 한다.  
+			그럼으로 proc 가 구조적으로 가져야될 가장 중요한 특징은 
+			바로 (oracle)sql 과 C 프로그램과의 데이타 교환이 될것이다.   
+		</P
+><P
+>			proc 는 C 와의 데이타 교환을 지원하기 위해서 4가지 큰 구조로 
+			나뉜다. 하나는 Executable 영역이며, 다른 하나는 Declarative 
+			영역이다. 또한 PL/SQL 블럭을 추가 시킬수 있으며, 
+			SQL 명령의 실행 상태를 측정하기 위함 Indicator Variables 등을 
+			사용할수 있다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1.1&#51208;. Executable 영역</A
+></H3
+><P
+>				Executable 이라는 어감에서 알수 있듯이, Executable 은 
+				SQLLIB 를 실행시간에 호출하기 위해서 사용되는 영역이다. 
+				SQLLIB 를 호출함으로써 C(혹은 C++)로 된 코드에서 오라클 
+				SQL 을 실행하고 때에 따라서는 SQL 문에 C 에서 선언한 값을 
+				입력하거나 혹은 SQL 쿼리 결과를 C 에서 선언한 변수에 
+				출력할수 있게 된다.  
+			</P
+><P
+>				Executable 영역은 오라클 에서 데이타베이스 관리를 위해서 
+				사용하는 표준 SQL 과 확장(오라클에서 추가한) SQL 문을 
+				실행한다. 즉 테이블을 생성하거나 CREATE, 지우고 DROP, 
+				권한 설정을 하고 GRANT, 값을 가져오거나 SELECT, 값을 지우는 
+				DELETE 등의 일을 처리하게 된다. SQL 문을 C 코드에 
+				embeded 시키기 위한 영역이라고 생각하면 된다.   
+			</P
+><P
+>				다음은 Executable 영역에서 다룰수 있는 SQL 관련 실행문이다. 
+				이 문서는 ORACLE SQL 자체에 대한 강의문서는 아님으로 
+				이러한 일들을 할수 있다라는 정도로 열거만 하도록 하겠다. 
+				조금이라도 SQL 을 다루어 보았다면 대부분 무슨일을 하는 
+				명령어인지 이해될것이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>CLOSE, CONNECT, CREATE, DROP, FREE, GRANT, AOAUDIT, RENAME, TRUNCATE, 
+DELETE, EXPLAIN PLAN, FETCH, INSERT, LOCK TABLE, OPEN, SELECT, UPDATE, 
+COMMIT(트랜잭션관리), ROLLBACK, SAVEPOINT, SET TRANSACTION, 
+DESCRIBE(dynamic sql 용), EXECUTE, PREPARE, ALTER SESSION(세션 제어용)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 명령어들은 다시 Interactive 한것과 그렇지 않은 것
+				(no Interactive)으로 나뉜다. 
+				인터엑티브란 SQL문 실행결과와 C프로그램간의 데이타 교환이 
+				있는 것을 말하며, no 인터엑티브란 SQL 문만 단독으로 
+				실행되며 C 프로그램과의 데이타 교환이 없는걸 말한다. 
+				no Interactive 한 문으로는 CONNECT, FETCH, OPEN, DESCRIBE, 
+				EXECUTE, PREPARE 가 있다. - 나머지는 모두 C코드와 
+				인터엑티브 하게 작용(상호작용)한다 - 
+				복잡하게 생각할 필요 없이 그냥 상식적으로 생각하면 된다. 
+				오라클과 연결하고, DB 를 OPEN 하는데는 C코드와 얘기할 필요가 
+				전혀 없을 것이다. 그냥 연결하고 오픈하면 되기 때문이다. 
+				반면 SELECT 의 경우 오라클에서 SELECT 한 결과를 C 프로그램에 
+				되돌려주어야 함으로 interactive 하게 작용할 
+				필요가 있다.  
+			</P
+><P
+>				interactive 하게 사용하기 위해서보통 ":" 을 사용하게 된다. 
+				예를들어서 오라클 DB 에서 셀렉트한 결과를 C 프로그램의 변수에 
+				저장하길 원한다면 아래와 같은 방법으로 사용하면 된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char zipcode[12];
+EXEC SQL SELECT zipcode 
+         INTO : zipcode[12] 
+         FROM zipcode where zipcode_no = "500-180";
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				C 프로그램에서 알아와야 될 값은 SELECT 로 가져오게 되는 zipcode 
+				값이다. 이것을 C 프로그램에서 선언한 zipcode 로 넘겨주기 위해서(INTO) 
+				":" 를 사용하고 있음을 알수 있다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN30"
+>2.1.2&#51208;. DECLARATIVE 지원</A
+></H3
+><P
+>				기본적으로 C 의 자료형과 SQL 에서 다루는 자료형은 서로 
+				호환되지 않는다. 
+			</P
+><P
+>				그럼으로 이들의 호환을 보장해줄수 있어야 한다. 해서 
+				proc 는 별도의 선언(Declarative) 영역을 두어서, 선언을 
+				하게 하고 proc 프리컴파일러를 돌려서 나중에 C 코드와 호환가능 
+				하도록 변환하는 정책을 사용하고 있다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN34"
+>2.1.3&#51208;. Embedded PL/SQL Blocks</A
+></H3
+><P
+>				proc 는 PL/SQL 블럭을 C 코드상에서 사용할수 있도록 도와준다. 
+				PL/SQL 블럭을 추가하기 위해서 단지 EXEC SQL EXECUTE 와 END-EXEC 
+				만을 사용하면 된다. 		   
+			</P
+><P
+>				PL/SQL 은 기본적으로 모든 SQL 데이타를 제어할수 있도록 지원하며, 
+				아울러 트랜잭션까지도 해결해준다. 그럼으로 훨씬 안정성있고, 유지 
+				관리 편한 코드를 만들수 있도록 도와 준다.    
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN38"
+>2.1.4&#51208;. host 변수와 indicator 변수</A
+></H3
+><P
+>				Host 변수는 오라클과 어플리케이션(C/C++ 로된) 사이의 통신(데이타 교환)을 
+				위해서 사용된다. 이들 변수는 C 코드 상에서 생성되며, 선언된 변수는 
+				C 와 공유할수 있게 된다.   	 	
+			</P
+><P
+>				host 변수는 크게 input host 변수와 output host 변수가 있는데, input host 변수는 
+				프로그램 데이타를 Oracle 에 넘겨주기 위해서 사용되며, output host 변수는 
+				오라클의 데이타(쿼리 결과등)을 프로그램에게 넘겨주기 위해서 사용한다. 
+				이러한 호스트변수의 사용은 오라클문장에 ":" 를 이용함으로써 사용가능하게 된다. 
+			</P
+><P
+>				또한 indicator 변수를 사용할수도 있는데, indicator 란 뜻에서 생각할수 있듯이 
+				오라클문의 실행결과를 측정하기 위한 용도로 사용한다. 
+				이를테면 CONNECT 를 통해서 ORACLE DB 서버로 연결을 시도했을때의 성공혹은 실패에 
+				대한 리턴값이라고 보면 될것이다. 좀더 기술적으로 말하자면 indicator 변수는 
+				host 변수의 상태를 측정하기 위한 용도로 상요된다.    	 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.1.5&#51208;. Cursor 과 Fetch 의 지원</A
+></H3
+><P
+>				fetch 라면 특히 php+mysql 을 이용한 웹플밍 작업을 하면서 
+				많이 다루어 보았을것이다. proc 에서는 쿼리결과물(리스트) 
+				의 관리를 위해서 Cursor 과 Fetch 를 지원한다.   
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN46"
+>2.2&#51208;. 오라클의 데이타 타입</A
+></H2
+><P
+>			proc 프로그래밍의 일반적인 방법은 
+			C 프로그램에서 input host 변수를 통해서 ORACLE 측에 데이타를 요청하면,  
+			ORACLE 데이타베이스는 output host 변수를 통해서 C 프로그램에 데이타를 되돌려 
+			주는 방식을 사용한다. 그러므로 오라클은 반드시 C 프로그램과의 통신에 
+			사용되는 데이타의 타입에 대해서 알고 있어야만 한다.   	 
+		</P
+><P
+>			오라클은 interanl 과 external 2가지의 데이타 타입을 인식한다. 
+			interanl 데이타 타입은 오라클 데이타베이스에서 각각의 칼럼의 데이타 타입을 
+			지정하기 위해서 사용하는 데이타 타입이다. 
+		</P
+><P
+>			external 데이타 타입은 host 변수를 통해서 저장될 데이타의 타입을 말한다. 
+			만약 C 프로그램에서 input host 변수를 통해서 오라클에 데이타를 전달했다면, 
+			오라클은 이 변수를 external 데이타로 간주하고 이것을 오라클자신이 사용하는 internal 
+			데이타 타입과 일치시켜서 작업을 하게 된다. 마찬가지로 작어을 마치고 데이타를 되돌려 
+			줄때도 internal 데이타 타입을 external 데이타 타입으로 변경시킨후 output host 변수에 
+			저장해서 되돌려 주게 된다. 이러한 복잡한 데이타 변환작업이 일어나는 이유는 
+			C 프로그램에서 사용하는 데이타 타입과 오라클에서 사용하는 데이타 타입이 근본적으로 
+			서로 다르기 때문이다. 내부적으로 보자면 proc 는 이러한 데이타 타입의 
+			일치를 위해서 void * 형변환을 이용한다.     	
+		</P
+><P
+>			proc 는 호스트 변수로 배열을 사용할수 있도록 지원하며, 마찬가지로 구조체도 지원한다. 
+			이러한 배열/구조체 가 사용될수 있는 곳은 SQL 문을 사용할경우이다. 
+			즉 SELECT, FETCH, DELETE, INSERT, UPDATE 등에 사용할수 있다.    
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN52"
+>2.3&#51208;. Transaction</A
+></H2
+><P
+>			오라클에서 Transaction 은 매우 중요한 요소이다. 
+			Transaction 은 이를테면 데이타의 무결성을 검증시켜주기 위해서 
+			SQL 상태를 논리적인 하나의 상태로 관리하는 것이라고 볼수 있다. 
+		</P
+><P
+>			oracle 은 transaction 을 유지하기 위해서 COMMIT 
+			와 ROLLBACK 를 이용하는데, 
+			proc 에서도 마찬가지로 COMMIT, ROLLBACK 를 그대로 이용해서 트랜잭션을 
+			처리할수 있도록 도와준다. 이러한 작업은 특히 PL/SQL 구문을 이용함으로써 
+			C 코드상에 쉽게 임베디드 시킬수 있다. 
+			아래는 Executable SQL문을 이용해서 어떻게 트랜잭션처리를 할수 있는지를 
+			벼여준다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>...
+EXEC SQL
+   UPDATE zipcode 
+   SET dong =: mdong
+   WHERE bunji =: mbungi
+
+if (sqlca.sqlcode == 0)
+    EXEC SQL COMMIT WORK
+else 
+    EXEC SQL ROLLBACK WORK;
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN57"
+>2.4&#51208;. Error 제어</A
+></H2
+><P
+>			제대로된 프로그램은 제대로된 에러처리 루틴을 가진다. 
+			proc 는 WHENEVER 문을 통해서 ORACLE 에서의 작업중 발생한 
+			문제를 C 어플리케이션에서 알수 있도록 도와준다.  
+		</P
+><P
+>			이것은 단지 SQLCA 를 include 시키는 것으로 가능하며, 
+			에러를 체크해야될 부분에서 간단하게 사용할수 있다. 
+			예를들어 오라클 서버에 연결을 시도하고 연결 시도 결과를 체크하고 싶다면, 
+			아래와 같은 간단한 방법으로 에러를 제어할수 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>EXEC SQL INCLUDE SQLCA;
+
+....
+int main()
+{
+    ....
+    EXEC SQL CONNECT :userid;
+
+    // 에러 검사
+    if (sqlca.sqlcode &#60; 0)
+    {
+        // 자세한 에러메시지 출력
+        printf("%s&#92;n", sqlca.sqlerrm.sqlerrmc);
+        exit(0);
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN62"
+>2.5&#51208;. Proc를 이용한 어플리케이션 개발방법</A
+></H2
+><P
+>			전체적으로 보자면 다음과 같은 방법을 통해서 Proc 개발이 이루어진다. 
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN65"
+></A
+><P
+><B
+>&#44536;&#47548; 1. Proc를 이용 오라클 DB프로그래밍 과정</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/acn.gif"></P
+></DIV
+>
+			보면 알겠지만 일반적인 C 어플리케이션 개발방법과 비교해서 
+			"Proc 코드작성", "Precomplie" 가 들어간것만 빼고는 동일하다는걸 
+			알수 있을 것이다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN68"
+>3&#51208;. 셈플작성</A
+></H1
+><P
+>		가장 빠른 이해를 위해서는 역시 셈플 작성만한게 없다. 
+		이미 모든 테스트 환경은 가추어져 있다고 가정을 하고 셈플을 작성할 
+		것이다. 셈플 프로그램은 "우편주소 검색" 프로그램이다. 
+	</P
+><P
+>		셈플프로그램은 모듈별로 분할되어서 Makefile 로 관리 될것이며, 
+		헤더 파일은 include 라는 서브디렉토리를 만들것어서 관리하게 된다. 
+		다음은 이번 예제의 쏘쓰 트리구성도이다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> +--/---+--- Makefile      make 파일
+        |
+        +--- main.pc       main 함수를 포함
+        |
+        +--- myterm.pc     teminal 제어 관련 함수
+        |
+        +--- zipcode.pc    DB연결및 쿼리 관련
+        |
+        +--- include ----+-- menu.h     메뉴들 
+                         |
+                         +-- myterm.h  
+                         |
+                         +-- zipcode.h
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		셈플 어플리케이션은 사용자와의 인터페이스를 위해서 
+		ANSI 와 termios 를 조합해서 사용할것이다. 
+		ANSI 는 출력의 모양 - 커서이동, 화면 정리 - 을 조정하기 
+		위해서 사용되며, termios 는 터미널 특성(입출력) 을 제어하기 
+		위해서 사용될것이다.  
+	</P
+><P
+>		예를들어서 보통 패스워드 입력을 위해서는 패스워드를 화면에 
+		출력하지 않고 "*" 로 대치시켜서 출력하게 된다. 이러한 기능은 
+		termios 의 터미널특성 제어를 통해서 구현하게 된다.  
+		termios 는 별도의 문서를 이용해서 자세히 설명하도록 할것이다.   
+	</P
+><P
+>		ANSI 는 커서의 움직임과 화면지우기, 라인지우기 등의 구현을 
+		위해서 사용한다.   
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN76"
+>3.1&#51208;. Makefile</A
+></H2
+><P
+>			아주 간단하다. 분석하는데 어려움이 없을것이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>TARGET          = zipcode
+
+CC              = gcc
+PROC            = proc
+LIB             = -L$(ORACLE_HOME)/lib -lclntsh
+MYINC           = include/
+PROCINC         = include=$(ORACLE_HOME)/precomp/public/ include=$(ORACLE_HOME)/rdbms/demo/ &#92;
+    include=$(ORACLE_HOME)/rdbms/public/ &#92;
+    include=$(ORACLE_HOME)/network/public/ 
+CINC            = -I$(ORACLE_HOME)/precomp/public/ -I$(ORACLE_HOME)/rdbms/demo/ &#92;
+    -I$(ORACLE_HOME)/rdbms/public/ -I$(ORACLE_HOME)/network/public/ 
+
+ORA_OPT         = PARSE=NONE RELEASE_CURSOR=YES MODE=ANSI
+CC_OPT          =
+
+OBJECT          = main.o &#92;
+                zipcode.o &#92;
+                myterm.o
+ORA_GARBAGE     = *.dcl *.cod *.cud *.lis
+
+######## implicit rules
+.SUFFIXES: .pc .c
+
+.pc.c:
+    $(PROC) $* INCLUDE=$(MYINC) $(PROCINC) $(ORA_OPT)
+.c.o:
+    $(CC) -c -o $*.o $*.c -I $(MYINC) $(CINC)
+
+####### build rules
+
+all:            $(TARGET)
+
+$(TARGET):      $(OBJECT)
+    $(CC) -o $(TARGET) $(OBJECT) $(LIB)
+
+main.c: main.pc
+main.o: main.c zipcode.c myterm.c
+zipcode.c : zipcode.pc
+zipcode.o : zipcode.c
+myterm.c : myterm.pc
+myterm.o : myterm.c
+
+clean:
+    rm -f $(TARGET) $(OBJECT) $(ORA_GARBAGE) *.c 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN80"
+>3.2&#51208;. main.pc</A
+></H2
+><P
+>			
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;zipcode.h&#62;
+#include &#60;myterm.h&#62;
+#include &#60;termios.h&#62;
+
+
+int main()
+{
+    /* 터미널 초기화 */  
+    termio_init();
+
+    /* 로그인 */  
+    if (login(3) &#60; 0)
+    {
+        login_error();
+        exit(0);
+    }    
+
+    /* 로그인에 성공했다면
+     * 실제 작업에 들어간다. 
+     */
+    search_zipcode();
+
+    /* 최초 터미널 상태로 복원시킨다 */  
+    termio_default();
+    return 1;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN84"
+>3.3&#51208;. myterm.pc</A
+></H2
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+
+#include &#60;zipcode.h&#62;
+#include &#60;myterm.h&#62;
+/*
+ * 터미널 초기화
+ */
+void termio_init()
+{
+    tcgetattr(0, &#38;stored_settings);
+
+    default_settings = stored_settings;
+    tcsetattr(0, TCSANOW, &#38;default_settings);
+
+    stored_settings.c_lflag &#38;= (~ICANON);
+    tcsetattr(0, TCSANOW, &#38;stored_settings);
+}
+
+void termio_default()
+{
+    tcsetattr(0, TCSANOW, &#38;default_settings);
+}
+
+/* 패스워드를 화면에 보이지 않기 위해서
+ * 입력을 화면에 반향(echo) 하지 않도록 설정한다.
+ */
+void echo_off()
+{
+    struct termios new_settings;
+    tcgetattr(0, &#38;stored_settings);
+    new_settings = stored_settings;
+    new_settings.c_lflag &#38;= (~ECHO);
+    tcsetattr(0, TCSANOW, &#38;new_settings);
+
+    return;
+}
+
+/*
+ * 기본 터미널 상태로 되돌린다.
+ */
+void echo_on()
+{
+    tcsetattr(0, TCSANOW, &#38;stored_settings);
+    return ;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN88"
+>3.4&#51208;. zipcode.pc</A
+></H2
+><P
+>			실질적으로 오라클데이타 베이스와 관련된 작업을 하는 
+			함수들은 여기에 정의되어 있다. 
+			그리 복잡하지 않으니 대충 훑어봐도 이해 가능할것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+#include &#60;zipcode.h&#62;
+#include &#60;myterm.h&#62;
+#include &#60;menu.h&#62;
+
+EXEC SQL INCLUDE SQLCA;
+/*
+ * 패스워드를 받아들인다.
+ * echo_off 함수를 호출해서
+ * 키보드입력이 반향되지 않도록한후
+ * 키입력을 "*" 로 대체한다.
+ * 입력을 마친후에는 echo_on 함수를 호출하여
+ * 입력을 반향한다.
+ */
+void get_pass(char *pass)
+{
+    char buf;
+    int i = 0;
+    echo_off();
+    while ((buf=getc(stdin)) != '&#92;n')
+    {
+        pass[i] = buf;
+        printf("%c", '*');
+        i++;
+    }
+    echo_on();
+    return ;
+}
+
+/*
+ * 단일 문자를 입력받기 위해서 사용한다.
+ * getc 를 이용한 단일 문자 입력시
+ * 개행문자가 반향되지
+ * 않도록 echo_off 함수를 호출한다.
+ */
+int ngetc()
+{
+    char buf;
+    echo_off();
+    buf = getc(stdin);
+    if (buf != '&#92;n')
+        printf("%c", buf);
+    echo_on();
+    return buf;
+}
+
+/*
+ * 여러줄의 입력을 받기 위해서 사용한다.
+ * 개행문자는 제거한후 되돌려준다.
+ */
+void get_input(char *str)
+{
+    char buf;
+    int i = 0;
+    while ((buf=getc(stdin)) != '&#92;n')
+    {
+        str[i] = buf;
+        i++;
+    }
+    return ;
+}
+/*
+ * 우편번호를 출력한다.
+ * 실제 검색은 dong 만을 가지고 한다.
+ */
+int print_zipcode(char *city, char *dong)
+{
+    int state;
+    int i;
+    int running = 1;
+
+    /*
+     * DECLARE 영역
+     */
+    EXEC SQL BEGIN DECLARE SECTION;
+        /*
+         * Select 한 데이타가 들어갈 구조체이다. 
+         * 주의해야 할점은 각 멤버변수의 크기를 
+         * 잡을때 실제 필드의 크기보다 +1 만큼 더크게 
+         * 배열 공간을 잡아야 한다는 것이다. 
+         * 실제 zipcode table 의 zipcode 필드는 7의 크기이다.
+         * +1 만큼 더 크게 잡는 이유는 널값을 저장하기 위함이다.   
+         */
+        struct testdata
+        {
+            char zipcode[8];
+            char sido[11];
+            char gugun[15];
+            char bunji[19];
+            char dong[45];
+            char numb[3];
+        } mydata;
+        char mdong[16];
+        int page = 1;
+        int page_per_list = 17;
+        int start_listnum, end_listnum;
+    EXEC SQL END DECLARE SECTION;
+
+    /*
+     * 문자열 copy 를 통해서 dong 변수를
+     * declare 영역에서 선언된 오라클 변수로 복사한다.
+     */
+    strcpy(mdong, dong);
+    strcat(mdong,"%");
+
+    while(running)
+    {
+        int i;
+        /* 주소리스트 영역 (5-17 라인)을 지운다 */
+        SCR_CLEAR2(5,17);
+        MOVE_CURSOR(5, 1);
+
+        /* 출력하고자 하는 주소리스트 영역을 계산한다
+         * page          : 보고자 하는 페이지
+         * end_listnum   : 현재 페이지에서 가장큰 리스트번호
+         * start_listnum : 현재 페이지의 시작 리스트 번호
+         * page_per_list : 한페이지에 보여줘야할 리스트 수 (17)
+         */
+        end_listnum = page_per_list * page;
+        start_listnum = end_listnum - page_per_list;
+
+        /*
+         * CURSOR 을 만든다.
+         * mysql 에서 범위지정을 위해사용하는 limit 를 오라클에서는
+         * 제공하지 않음으로, rownum 을 이용한 in-line view 를 사용한다.
+         */
+        EXEC SQL DECLARE zip_cursor CURSOR FOR
+            SELECT * FROM
+            (
+                SELECT ZIPCODE, SIDO, GUGUN, BUNJI, DONG, ROWNUM NUMB
+                FROM ZIPCODE WHERE DONG like : mdong
+            ) 
+            WHERE NUMB &#62; : start_listnum
+            AND NUMB &#60; : end_listnum;
+
+        printf("dong : (%s)&#92;n", mdong);
+        if (sqlca.sqlcode !=0 )
+        {
+            printf("ERROR&#92;n");
+            return -1;
+        }
+
+        /*
+         * 커서를 사용하기 위해서 연다.
+         */
+        EXEC SQL OPEN zip_cursor ;
+
+        /*
+         * 열린 커서에서 FETCH 작업중 더이상 FETCH 할
+         * 데이타가 없으면 DO 이후의 문인 break 를 실행한다.
+         */
+        EXEC SQL WHENEVER NOT FOUND DO break;
+        for (i=0; ;i++)
+        {
+            /*
+             * FETCH 한 데이타는 mydata 구조체에 입력한다.
+             */
+            EXEC SQL FETCH zip_cursor INTO: mydata;
+
+            /*
+             * proc 에서는 FETCH 한 레코드의 특정필드에 데이타가
+             * 없을경우 에러(-1405) 처리를 한다. 
+             * 그러나 필드의 특성에 따라서 NULL 이 될수도 있음으로
+             * 이 에러는 무시하고 넘어가도록 한다.
+             */
+            if (sqlca.sqlcode &#60; 0)
+            {
+                if (sqlca.sqlcode != -1405)
+                {
+                    break; 
+                }
+            }
+
+            /* 
+             * 우편번호 데이타 출력 
+             */
+            printf("%s %s %s %s&#92;n", 
+                    mydata.zipcode,   
+                    mydata.sido, mydata.gugun,
+                    mydata.dong, mydata.bunji);
+        }
+
+        /* 페이지 출력 */
+        MOVE_CURSOR(22, 1);
+        LINE_CLEAR;
+        printf("page : %d", page);
+
+        /* 
+         * 열린 커서는 더이상 사용하지 않을경우
+         * 닫아주어야 한다.
+         * 그렇지 않을경우 메모리 누수가 생길수 있다. 
+         */
+        EXEC SQL CLOSE zip_cursor;
+
+        /*
+         * move_page 함수를 호출하여 키입력을
+         * 받아들여서 페이지 이동을 한다.
+         */
+        if (i == 16 || page &#62; 1)
+        {
+            int ans;
+            while(1)
+            {
+                ans = move_page();
+                if (ans == NEXT)
+                {
+                    if (i == 16)
+                    {
+                        page++;
+                        break;
+                    }
+                }
+                else if (ans == PREV)
+                {
+                    if (page &#62; 1)
+                    {
+                        page--;
+                        break;
+                    }
+                }
+                else
+                    return 1;
+            }
+        }
+        else
+        {
+            return 1;
+        }
+    }
+}
+
+/*
+ * 로그인
+ * check_num 만큼 아이디와 패스워드를 묻는다.
+ */
+int login(int check_num)
+{
+    int loop = 1;
+    char id[16];
+    char pass[16];
+    SCR_CLEAR;
+
+    while(1)
+    {
+        memset(pass, 0x00, 16);
+        memset(id, 0x00, 16);
+        MOVE_CURSOR(10,5);
+        printf("%s&#92;n", login_prompt);
+        if (loop &#62; 1)
+        {
+            MOVE_CURSOR(15, 23);
+            printf("Login Failure !! %s", pass);
+        }
+        MOVE_CURSOR(12, 34);
+        get_input(id);
+
+        MOVE_CURSOR(13, 34);
+        get_pass(pass); 
+
+        if ((dbconnect(id, pass) &#60; 0))
+        {
+            if (loop == check_num)
+            {
+                return -1;
+            }
+            #ifdef __DEBUG 
+            MOVE_CURSOR(22, 1);
+            printf("%s", sqlca.sqlerrm.sqlerrmc);
+            #endif
+        }
+        else
+        {
+            MOVE_CURSOR(22, 1);
+            printf("Connection Success !!");
+            return 1;
+        }
+        loop++;
+    }
+}
+
+/*
+ * 아이디와, 패스워드를 이용해서
+ * 로그인을 실시한다.  
+ */
+int dbconnect(char *id, char *pass)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+        char loginid_pass[40];
+    EXEC SQL END DECLARE SECTION;
+    
+    sprintf(loginid_pass, "%s/%s@oracle", id, pass);
+    EXEC SQL CONNECT: loginid_pass;
+
+    return sqlca.sqlcode;
+}
+ 
+/*
+ * 동이름을 이용해서 우폄번호 검색을 한다.
+ */ 
+int search_zipcode()
+{   
+    char city[16];
+    char dong[16];
+    int running = 1;
+    SCR_CLEAR;
+
+    MOVE_CURSOR(4,2);
+    printf("%s", hr);
+
+    MOVE_CURSOR(23,2);
+    printf("%s", hr);
+
+    while(running)
+    {
+        MOVE_CURSOR(1,1);
+        printf("%s&#92;n", query_prompt);
+        memset(city, 0x00, 16);
+        memset(dong, 0x00, 16);
+        MOVE_CURSOR(2, 13);
+        get_input(city);
+
+        MOVE_CURSOR(3, 13);
+        get_input(dong);
+
+        if (strlen(city) == 0 &#38;&#38; strlen(dong) == 0)
+        {
+            if (question_end() == YES)
+                running = 0;
+        }
+        else
+        {
+            MOVE_CURSOR(5, 1);
+            print_zipcode(city, dong);
+        }
+    }
+
+    /*
+     * 오라클서버와의 연결을 끊는다.
+     */
+    EXEC SQL COMMIT WORK RELEASE;
+
+    /*
+     * 화면을 클리어 하고 커서를
+     * 처음화면으로 되돌린다.
+     */
+    SCR_CLEAR;
+    MOVE_CURSOR(1, 1);
+}
+
+/* 페이지 이동 관련 */
+int move_page()
+{
+    char ans;
+    while(1)
+    {
+        MOVE_CURSOR(24, 2);
+        LINE_CLEAR;
+        printf("%s", "페이지 이동 (P:이전 N:다음 Q:종료)");
+        ans = ngetc();
+        switch(ans)
+        {
+            case('N'):
+            case('n'):
+                return NEXT;
+                break;
+            case('P'):
+            case('p'):
+                return PREV;
+                break;
+            case('q'):
+            case('Q'):
+                return QUIT;
+                break;
+        }
+    }
+}
+
+/* 종료할것인지를 묻는다 */
+int question_end()
+{
+    char ans;
+    while(1)
+    {
+        MOVE_CURSOR(24, 2);
+        LINE_CLEAR;
+        printf("%s", ques_end);  
+        ans = ngetc();
+        switch(ans)
+        {
+            case('y'):
+            case('Y'):
+                return YES;
+                break;
+            case('n'):
+            case('N'):
+                return NO;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+int login_error() 
+{
+    MOVE_CURSOR(23, 1);
+    printf("Login failure!!&#92;n");
+    return -1;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN92"
+>3.5&#51208;. include/menu.h</A
+></H2
+><P
+>			메뉴와 관련된 변수들이 선언되어 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _MENU_H_
+#define _MENU_H_
+
+#define SCR_CLEAR printf("^[[2J")
+#define MOVE_CURSOR(x,y) printf("^[[%d;%dH", x,y)
+#define WAIT_INPUT(x) printf("%s", x); getchar()
+#define chop(str) str[strlen(str)-1] = '&#92;0'
+#define LINE_CLEAR printf("^[[K")
+
+#define SCR_CLEAR2(x, y) for (i=0; i &#60; y; i++) &#92;
+{ &#92;
+    MOVE_CURSOR(x+i, 1);&#92;
+    printf("^[[2K");&#92;
+}&#92;
+MOVE_CURSOR(x, 1);
+
+#define STDIN 0
+#define YES 1
+#define NO  0 
+#define UNKNOWN 2 
+
+#define NEXT 1
+#define PREV 0
+#define QUIT 2
+char *login_prompt =
+"
+                    +----------+-----------------+
+                    | 아 이 디 | ____________    |
+                    | 패스워드 | ____________    |
+                    +----------+-----------------+
+                    |                            |
+                    +----------+-----------------+
+";
+
+char *query_prompt =
+"
+ 도시이름 : __________
+ 동 이 름 : __________
+";
+
+char *hr =
+"=============================================================================";
+
+char *question = "선택 (Y,N,X) : ";
+char *ques_end = "종료하시겠습니까 (Y/N) ? ";
+
+#endif
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN96"
+>3.6&#51208;. myterm.h</A
+></H2
+><P
+>			myterm.pc 함수에 대한 선언
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _MYTERM_H_ 
+#define _MYTERM_H_
+#include &#60;termios.h&#62;
+static struct termios stored_settings;
+static struct termios default_settings;
+void termio_init();
+void termio_default();
+void echo_off();
+void echo_on();
+
+#endif
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN100"
+>3.7&#51208;. zipcode.h</A
+></H2
+><P
+>			zipcode.pc 함수에 대한 선언
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _ZIPCODE_H_
+#define _ZIPCODE_H_
+
+void get_pass(char *pass);
+int ngetc();
+int login(int);
+int dbconnect();
+int search_zipcode();
+int question_end();
+
+void get_input(char *str);
+print_zipcode(char *city, char *dong);
+int login_error();
+
+#endif
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN104"
+>4&#51208;. 테스트</A
+></H1
+><P
+>	
+		위의 어플리케이션을 실행하면 다음과 같은 
+		화면들을 보여줄것이다. 참고로 도시이름검색은 하지 않고 
+		단지 "동이름" 으로만 검색한다. 
+	</P
+><P
+>	
+		<B
+CLASS="EMPHASIS"
+>로그인</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>&#13;                    +----------+-----------------+
+                    | 아 이 디 | system______    |
+                    | 패스워드 | *******_____    | 
+                    +----------+-----------------+
+                    |                            |
+                    +----------+-----------------+
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>	
+		<B
+CLASS="EMPHASIS"
+>검색</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 도시이름 : __________
+ 동 이 름 : 역삼______
+ =============================================================================
+dong : (역삼%)
+135-706 서울       강남구         역삼1동 공무원연금관리공단                  
+135-703 서울       강남구         역삼1동 과학기술회관                        
+135-707 서울       강남구         역삼1동 남영빌딩                            
+135-977 서울       강남구         역삼1동 로담코빌딩                          
+135-709 서울       강남구         역삼1동 빅토리아빌딩                        
+135-979 서울       강남구         역삼1동 삼부빌딩                            
+135-980 서울       강남구         역삼1동 삼성역삼빌딩                        
+135-751 서울       강남구         역삼1동 삼성제일빌딩                        
+135-768 서울       강남구         역삼1동 삼일프라자오피스텔                  
+135-711 서울       강남구         역삼1동 삼흥빌딩                            
+135-917 서울       강남구         역삼1동 성지하이츠1차빌딩                   
+135-717 서울       강남구         역삼1동 성지하이츠3차빌딩                   
+135-984 서울       강남구         역삼1동 스타타워                            
+135-718 서울       강남구         역삼1동 아가방빌딩                          
+135-978 서울       강남구         역삼1동 아주빌딩                            
+135-748 서울       강남구         역삼1동 여삼빌딩                            
+page : 1
+ =============================================================================
+ 페이지 이동 (P:이전 N:다음 Q:종료)
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		N/n, P/p 를 이용해서 페이지 이동이 가능하다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN113"
+>5&#51208;. 결론</A
+></H1
+><P
+>		이상 proc 플밍에 대한 좀더 깊이 있는 내용을 다루어 보았다. 
+		그러나 여기에서 다룬 내용은 전체 proc 내용에 비하면 정말 맛보기정도 
+		이다. 말했듯이 proc 는 그 자체만으로도 책몇권분량이 쉽게 나오는 
+		방대한 분량이다. 또한 PL/SQL 에 대한 내용도 어느정도 알고 있어야 한다.  
+	</P
+><P
+>		이문서는 어디까지나 부담없이 proc 플밍을 접할수 있도록 하기 위한 지침서 이다. 
+		(일단 컴파일 할줄은 알아야 깊이 들어가든지 말든지 할테니까) 	
+	</P
+><P
+>		proc 플밍에 대한 더욱 깊은 내용은 각자의 몫이 될것이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+
+}}}

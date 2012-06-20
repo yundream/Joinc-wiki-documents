@@ -1,0 +1,268 @@
+#title epoll - 커널 2.4 기준
+
+[[tag(네트워크프로그래밍,select,socket,poll,c,리얼타임시그널)]]
+이 문서는 kernel2.4를 기반으로한 오래된 문서입니다. 기술적인 내용만 참고하고 [wiki:Site/Network_Programing/Documents/epoll26 kernel 2.6 버전용]으로 변경사항을 확인하면 될 것 같습니다. 일단 2.6은 커널패치나 라이브러리 없이 epoll을 지원하기 때문에, 2.6을 사용하는 지금은 라이브러리와 커널 설정 부분은 읽을 필요가 없습니다. 
+
+  * 작성일 : 최초 아마 2004 년쯤 ??
+  * 수정일 : 2011년 4월 13일
+  * 언제 날 잡아서 2.6에 맞게 전체 문서를 재작성 해야겠습니다.
+[[TableOfContents]]
+
+=== 소개 ===
+epoll 사용에 대한 문서입니다. 예전 2.4.x 기준으로 작성한 문서를 계속 유지했었는데요. 2011년인 지금까지 2.4.x를 기준으로 한 문서를 유지할 필요는 없을 것 같아서 2.6.x 버전으로 다시 만들었습니다. 쓰지도 않는 2.4에 대한 내용이 있으니 오히려 헛갈리더라구요.
+
+현재 epoll은 realtime signal과 함께 가장 빠른 입출력 처리 방식 중 하나로 알려져 있습니다. realtime signal보다 더 빠르던가.. 그럴겁니다. 벤치마크 결과가 있는지 찾아봐야 겠군요.
+
+=== epoll ===
+==== epoll에 대해서 ====
+리눅스의 이벤트 통지 입출력 처리는 주로 select(:2)와 poll(:2)을 이용한 입출력:::다중화(:12)모델을 따르고 있습니다. 입출력 다중화를 이용하는 이유는 다수의 프로세스 혹은 스레드를 만들지 않고도 여러 파일(:12)을 처리할 수 있기 때문인데요. 프로세스와 스레드의 생성시간이 없으니 그만큼 빠르게 작동할 수 있다는 이점을 누릴 수 있죠. 게다가 IPC(:12)를 사용할 필요도 없구요. 멀티:::프로세스(:12), 멀티:::스레드(:12) 환경에서 IPC를 사용해 본 경험이 있다면, 얼마나 까다로운지 아마 이해하실 겁니다.
+
+하지만 select를 이용한 방법은 문제가 좀 있습니다. 아이디어는 훌륭한데, 구현이 그다지 효율적이지 않다는 문제입니다. 
+  1. 비트 테이블을 하나하나 검사해야 한다. 
+    select는 고정 비트 테이블인 fd_set을 이용해서 입출력 데이터를 확인하는데요. 고정 비트 테이블이기 때문에 최대 파일 지정번호 + 1만큼의 테이블을 검사해야 한다는 문제가 있습니다. 데이터가 있는 파일의 목록을 돌려주면 참 좋을 건데 말이죠.
+  1. 데이터 복사.  
+    select는 fd_set을 이용해서 데이터를 기다리고, 데이터가 오면 fd_set을 갱신해 버립니다. 이전 fd_set정보를 잃어버리는 거죠. 결국 매번 fd_set을 복사해야 되는데요. 역시 비용이 소비되죠. 
+
+epoll은 이름에서 알 수 있듯이 select와 poll로 대표되는 입출력 다중화를 개선한 기술입니다. 즉 아래의 사항에서 기술개선이 이루어졌습니다.
+  1. 이벤트가 발생한 파일의 목록을 반환한다.
+     파일 목록을 순환하면서 데이터를 처리하면 됩니다. 효율적이죠 ?
+  1. 데이터 복사
+     fd_set등을 유지할 필요가 없습니다. 효율적이기도 하지만 사용하기도 편하죠.
+
+==== Edge Trigger 과 Level Trigger ====
+epoll을 다루다보면 Edge Trigger과 level Trigger 둘 중 하나를 선택해야 하는데요. 간단하지만, 헛갈릴 수 있는 용어라서 설명을 하고 넘어갈까 합니다. 
+
+ * Level-triggered는 특정 준위 (상태)가 유지되는 동안 감지.
+ * Edge-triggered는 특정 준위가 변화하는 시점에서만 감지.
+예를 들어 디지털 신호 0000111000111000111 에서 1에 대한 Trigger이라면 LT는 1이 유지되는 시간동안 횟수에 상관없이 발생하고, Edge-triggered는 0에서 1로 변하는 시점에서만 발생합니다. 즉 이 경우 ET는 3회 발생합니다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1SkWFr60m7gjA04_o045D-rFdTtaH5YliRiOnINK5aJo&amp;w=522&amp;h=248">
+}}}
+
+LT 방식은 select나 poll처럼 작동을 하기 때문에 쉽게 이해할 수 있습니다. select(:2), poll은 LT로 작동하는데, 소켓 버퍼가 비기전까지 1로 설정하기 때문에, 소켓에 버퍼가 있는 동안에는 계속 반환합니다. 
+
+반면 ET는 처음 이벤트가 발생해서 1이되었을 때만 발생합니다. 만약 이벤트가 발생해서 데이터를 읽었는데, 버퍼의 데이터를 모두 읽지 않고 다음 wait 함수를 호출할 경우, wait 함수에서 봉쇄되는 문제가 생길 수 있습니다. 자칫하면 영원히 봉쇄될 수도 있죠. 다음의 시나리오를 가정해보죠.
+
+ 1. read sid of pipe(RFD)에 있는 파일 지정자가 epoll 장치에 ET 상태로 추가된다.  
+ 1. Pipe write가 2Kb의 데이터를 쓴다.
+ 1. epoll_wait(2)가 호출되고 RFD는 이벤트가 발생한 파일 지정자를 리턴한다.    
+ 1. Pipe reader은 RFD로 부터 1Kb데이터를 읽어들인다.  
+ 1. epoll_wait(2)가 호출된다. 
+ 1. ET 방식이기 때문에 epoll_wait에서 봉쇄된다.
+
+ET일 경우 생기는 문제를 알 수 있겠죠. 따라서 ET로 작동하게 하려면 non-blocking 소켓에 사용해야만 합니다.
+ 1. non-block 파일디스크립터를 사용한다.
+ 1. read(2) 나 write(2) 가 errno로 EGAIN을 반환할때만 wait 을 하도록 하자 (epoll_wait)
+
+ET가 좋은 방법인지는 잘 모르겠습니다. 성능상의 이점이 있다고 하는데, 프로그램이 좀 지나치게 복잡해 질 수 있기 때문입니다. EGAIN일 때까지 루프를 돌면서 데이터를 처리해야 하는데, 이 경우 데이터 버퍼를 관리해야 하기도 하고 여러모로 신경쓸게 많아지거든요. 
+
+LT 방식으로 epoll을 사용할 경우, select(:2)와 동일한 방식으로 사용할 수 있습니다. 물론 더 빠르겠죠. 
+
+epoll은 LT 방식을 기본으로 실행됩니다. 만약 ET방식으로 지정하고 싶다면, 다음과 같이 하면 됩니다.
+{{{#!plain
+mev.events = EPOLLIN | EPOLLET ....;
+epoll_ctl(mepollfd, EPOLL_CTL_ADD, afd, &mev);
+}}}
+==== 최대 등록 파일 개수 ====
+/proc/sys/fs/epoll/max_user_watches 에서 확인할 수 있습니다. 여기에는 유저가 등록할 수 있는 파일의 최대 개수가 명시되어 있는데요. User ID당 제한이 설정됩니다. 32bit 커널에서는 파일 하나당 약 90byte의 메모리가 64bit에서는 160바이트가 필요하다고 합니다. 
+
+=== epoll API ===
+epoll를 사용하기 위한 함수들을 설명합니다. select의 확장한 기술이기 때문에, 입출력 다중화에 대한 경험이 있다면 쉽게 이해하고 응용할 수 있을 겁니다.
+
+==== epoll_create ====
+{{{#!plain
+epoll_create(int size)
+}}}
+epoll_create()는 이벤트를 저장하기 위한 '''size'''만큼의 공간을 커널에 요청합니다. 커널에 요청한다고 해서 반드시 size만큼의 공간이 확보되는 건 아니지만 커널이 대략 어느 정도의 공간을 만들어야 할지는 정해줄 수 있습니다. 수행된 후 파일 지정자를 되돌려 주는데, 더 이상 사용하지 않을 거라면 close(:2) 함수로 닫아주면 됩니다.
+
+크기는 서비스 마다 다른데요. 일반적으로 예상 최대 동접 x 1.5 정도면 된다고 합니다.
+
+==== epoll_wait ====
+{{{#!plain
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
+}}}
+실제 이벤트가 발생하는걸 기다리고 있다가, 이벤트가 발생하면 이벤트 관련 정보를 넘겨주는 일을 합니다. 
+
+'''epfd'''는 epoll_create(2)를 이용해서 생성된 epoll 지정번호구요. 만약 이벤트가 발생하면 반환하는데, 이벤트에 관한 정보는 '''events'''에 기록됩니다 . '''maxevents'''는 epoll이벤트 풀의 크기고요. '''timeout'''는 기다리는 시간입니다. 0보다 작다면 이벤트가 발생할 때까지 기다리고, 0이면 바로 리턴, 0보다 크면 '''timeout''' 밀리세컨드 만큼 기다린다. 만약 timeout시간에 이벤트가 발생하지 않는다면 0을 반환합니다. 
+
+이벤트가 발생했다면 발생한 이벤트의 갯수를 반환합니다. 
+
+==== epoll_ctl ====
+{{{#!plain
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+}}}
+이벤트풀을 제어하기 위해서 사용한다. poll(2)와 매우 비슷하게 작동한다. '''op'''는 '''fd'''에 대해서 어떤 작업을 할것인지를 정의하기 위해서 사용된다. '''op'''가 실행된 결과는 '''event'''구조체에 적용된다. 
+
+다음은 '''epoll_event'''구조체의 모습이다.
+{{{#!plain
+typedef union epoll_data {
+     void *ptr;
+     int fd;
+     __uint32_t u32;
+     __uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+     __uint32_t events;  /* 발생된 이벤트 */
+     epoll_data_t data;  /* 유저 데이터로 직접 설정가능하다 */ 
+};
+}}}
+'''epoll_data_t'''를 유심히 볼필요가 있다. union이라서 사용자 정의 데이터에 대한 포인터를 넘길 수가 있습니다. 예를들어 여기에 pid값이라든지 소켓지정번호 혹은 메시지를 포함한 정보를 구조체로 넘겨줄 수 있는 거죠. 
+
+'''op'''는 다음과 같은 종류의 작업명령들을 가지고 있습니다. poll(2)와 비교해보면 매우 유사함을 알 수 있을 것이다.    
+ * EPOLL_CTL_ADD
+   '''fd'''를 epoll 이벤트 풀에 추가하기위해서 사용한다. 
+ * EPOLL_CTL_DEL
+   '''fd'''를 epoll 이벤트 풀에서 제거하기 위해서 사용한다.
+ * EPOLL_CTL_MOD
+   이미 이벤트 풀에 들어 있는 '''fd'''에 대해서 '''event'''의 멤버값을 변경하기 위해서 사용한다.
+ * EPOLLIN
+   입력(read)이벤트에 대해서 검사한다. 
+ * EPOLLOUT
+   출력(write)이벤트에 대해서 검사한다.
+ * EPOLLERR
+   파일지정자에 에러가 발생했는지를 검사한다. 
+ * EPOLLHUP
+   Hang up이 발생했는지 검사한다.
+ * EPOLLPRI
+   파일지정자에 중요한 데이터가 발생했는지 검사한다.
+ * EPOLLET
+   파일지정자에 대해서 ET 행동을 설정한다. 기본 값은 LT.
+   
+
+=== epoll의 장점/단점/해결방법 ===
+==== 장점 ====
+ 1. 좀더 적은 자원을 차지하면서 효율은 기존의 기술보다 좋다.
+ 1. select, poll등에 비해 충분히 효율적이면서도 RealTime Signal에 비해서 사용하기 쉽다. 
+
+==== 단점 ====
+ 1. 표준 지원사항이 아니라서 다른 유닉스에서는 사용할 수 없다.
+
+=== 예제 프로그램 ===
+epoll시스템 구축을 기념삼아서 간단한 예제프로그램을 만들어 보았다. 아래 프로그램은 echo서버의 epoll버젼으로 LT모드다.
+{{{#!plain down:epoll.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+
+#define SA  struct sockaddr
+#define EPOLL_SIZE		20
+
+int main(int argc, char **argv)
+{
+	struct sockaddr_in addr, clientaddr;
+	struct eph_comm *conn;
+	int sfd;
+	int cfd;
+	int clilen;
+	int flags = 1;
+	int n, i;
+	int readn;
+	struct epoll_event ev,*events;
+
+	int efd;
+	char buf_in[256];
+
+	// 이벤트 풀의 크기만큼 events구조체를 생성한다.
+	events = (struct epoll_event *)malloc(sizeof(*events) * EPOLL_SIZE);
+
+	// epoll_create를 이용해서 epoll 지정자를 생성한다.	
+	if ((efd = epoll_create(100)) < 0)
+	{
+		perror("epoll_create error");
+		return 1;
+	}
+
+
+	// --------------------------------------
+	// 듣기 소켓 생성을 위한 일반적인 코드
+	clilen = sizeof(clientaddr);
+	sfd = socket(AF_INET, SOCK_STREAM, 0);	
+	if (sfd == -1)
+	{
+		perror("socket error :");
+		close(sfd);
+		return 1;
+	}
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(atoi(argv[1]));
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	if (bind (sfd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
+	{
+		close(sfd);
+		return 1;
+	}
+	listen(sfd, 5);
+	// --------------------------------------
+
+	// 만들어진 듣기 소켓을 epoll이벤트 풀에 추가한다.
+	// EPOLLIN(read) 이벤트의 발생을 탐지한다.
+	ev.events = EPOLLIN;
+	ev.data.fd = sfd;
+	epoll_ctl(efd, EPOLL_CTL_ADD, sfd, &ev);
+	while(1)
+	{
+		// epoll이벤트 풀에서 이벤트가 발생했는지를 검사한다.
+		n = epoll_wait(efd, events, EPOLL_SIZE, -1);
+		if (n == -1 )
+		{
+			perror("epoll wait error");
+		}
+
+		// 만약 이벤트가 발생했다면 발생한 이벤트의 수만큼
+		// 돌면서 데이터를 읽어 옵니다. 
+		for (i = 0;	i < n; i++)
+		{
+			// 만약 이벤트가 듣기 소켓에서 발생한 거라면
+			// accept를 이용해서 연결 소켓을 생성한다. 
+			if (events[i].data.fd == sfd)
+			{
+				printf("Accept\n");
+				cfd = accept(sfd, (SA *)&clientaddr, &clilen);
+				ev.events = EPOLLIN;
+				ev.data.fd = cfd;
+				epoll_ctl(efd, EPOLL_CTL_ADD, cfd, &ev);
+			}
+			// 연결소켓에서 이벤트가 발생했다면
+			// 데이터를 읽는다.
+			else
+			{
+				memset(buf_in, 0x00, 256);
+				readn = read(events[i].data.fd, buf_in, 255);
+				if (readn <= 0)
+				{
+					epoll_ctl(efd, EPOLL_CTL_DEL, events[i].data.fd, events);
+					close(events[i].data.fd);
+					printf("Close fd\n", cfd);
+				}
+				else
+                {
+					printf("read data %s\n", buf_in);
+                    write(events[i].data.fd, buf_in, readn);
+                }
+			}
+		}
+	}
+}
+}}}
+
+=== 프로젝트 진행 ===
+ 1. epoll로 echo 서버를 만든뒤 다른 기술과 비교해 성능비교를 하도록 하겠다.
+
+=== 참고 문서 ===
+ 1. [http://www.xmailserver.org/linux-patches/nio-improve.html epoll과 다른 소켓연결방식 비교]
+ 1. yundream [RTS] 연구 위키 
+ 1. [http://sourceforge.net/projects/undernet-ircu ircu irc서버] epoll, kqueue, poll 범용 코드 
+
+{{{#!comment
+최초 작성일 : 2004년 쯤
+마지막 수정일 : 2011년 6월 10일
+}}}

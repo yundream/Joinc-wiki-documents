@@ -1,0 +1,60 @@
+#title winapi : CreateThread - 쓰레드 생성
+
+== CreateThread ==
+호출한 프로세스의 가상 주소 공간에 쓰레드를 생성해서 실행한다. '''CreateRemoteThread'''함수를 이용하면 다른 프로세스의 가상 주소 공간에서 쓰레드를 실행할 수 있다. (다른 프로세스의 주소 공간에 쓰레드를 실행시킨 다는 것의 의미를 확인해 봐야 겠다.)
+
+=== 사용 방법 ===
+{{{#!plain
+HANDLE WINAPI CreateThread(
+  __in_opt   LPSECURITY_ATTRIBUTES lpThreadAttributes,
+  __in       SIZE_T dwStackSize,
+  __in       LPTHREAD_START_ROUTINE lpStartAddress,
+  __in_opt   LPVOID lpParameter,
+  __in       DWORD dwCreationFlags,
+  __out_opt  LPDWORD lpThreadId
+);
+}}}
+
+=== 매개변수 ===
+lpThreadAttributes [in, optional]
+    '''SECURITY_ATTRIBUTES''' 구조체 포인터(:12). NULL 을 사용하면 기본 보안특성을 사용한다. 
+    {{{#!plain
+typedef struct _SECURITY_ATTRIBUTES 
+{
+    DWORD nLength;    // 이 구조체의 크기
+    LPVOID lpSecurityDescriptor;    // 공유 제어에 대한 보안 descriptor 포인터.
+    BOOL bInheritHandle;   // Child Process 로 Kernel Object Handle를 넘겨줄 것인지.
+}
+}}}
+
+dwStackSize [in]
+    스캑의 크기를 초기화 한다. 단위는 byte(:12)다. 만약 '''0'''이면 기본 크기가 사용된다. 자세한 내용은 '''Thread Stack Size''' 문서를 참고한다.
+
+lpStartAddress [in]
+     실행할 쓰레드 함수의 포인터이다.
+
+lpParameter [in, optional]
+    쓰레드에 넘겨줄 변수의 포인터.
+
+dwCreationFlags [in] 
+     쓰레드가 생성될 때 사용할 추가적인 프랠그 값이다. 이 값이 0이면 쓰레드는 생성 즉시 CPU에 의해 스케줄링 된다. '''CREATE_SUSPENDED''' 플래그를 설정하면 ResumeThread(:4200)함수 호출전까지 대기한다.
+     
+lpThreadId [out, optional]
+    쓰레드 식별번호다. 매개변수 값이 '''NULL'''이면, 쓰레드 식별번호를 반환하지 않는다.
+
+=== 반환 값 ===
+함수가 성공적으로 실행되면, 생성된 쓰레드의 '''handle'''이 반환 된다. 함수가 실패하면 NULL을 반환한다. GetLastError() 함수를 호출하면 자세한 에러내용을 확인 할 수 있다.
+
+=== 참고 내용 ===
+프로세스가 생성할 수 있는 쓰레드의 갯수는 가상 메모리의 크기에따라 제한된다. 기본적으로 쓰레드는 1메가 바이트의 스택크기를 가진다. 그러므로 최대 2048개의 쓰레드를 생성할 수 있다. 더 많은 쓰레드를 생성하려면 스택크기를 줄여야 한다.
+
+쓰레드들은 동시에 수행될 수 있으며, 어떠한 순서로 실행될 것인지를 예측할 수 없다. 
+
+=== 과제 ===
+  * 1000 만개의 소수를 찾아내는 멀티쓰레드 프로그램을 만들어 보자.
+  * 쓰레드를 늘려가면서 성능 향상이 있는지 확인해 보자.
+  * pthread 로도 테스트 해보자.
+  * _beginthread, _beginthreadex 와의 차이점에 대해서 알아보자.
+
+=== 관련 글 ===
+  * [wiki:Site/Win_Thread/Create_Threads Windows Thread - 예제 포함]

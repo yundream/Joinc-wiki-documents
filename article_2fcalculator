@@ -1,0 +1,2383 @@
+[[TableOfContents]]
+
+== 계산기 예제 ==
+
+'''작성자:''' mwyun([멍])
+
+각종 계산기 프로그램을 보고 스택과 배열등을 어떻게 이용하여 어떻게 계산기를 구현하였는지 알아본다.
+또한 자료구조 강좌의 list와 stack 소스와 본 강좌의 계산기 알고리즘을 이용하여 계산기 프로그램을 직접 만들어 본다.
+본 강좌는 필자가 대학 때 도스기반의 TC++ 3.0에서 작성하였던 소스들을 다시 리눅스용으로 포팅한 것이다.
+
+=== 알고리즘 ===
+
+=== stack.h ===
+
+{{{#!plain
+// 간단한 스택 템플릿 클래스
+
+#include <iostream.h>
+
+const int DefaultSize = 80;
+enum Boolean
+{ FALSE = 0, TRUE = 1 };
+
+template < class KeyType > class Stack {
+  private:
+    int top;			// 스택의 top
+    KeyType *stack;		// 실제 데이터가 저장되는 스택 포인터
+    int MaxSize;		// 스택의 최대크기
+  public:
+    Stack (int MaxStackSize = DefaultSize);	// 객체 생성자
+    ~Stack ();			// 객체 파괴자
+    void Add (const KeyType & x);	// 스택의 top에 해당 값을 추가
+    KeyType *Delete (KeyType & x);	// 스택의 top의 해당 값을 삭제
+    Boolean IsFull ();		// 스택이 가득찼는가 체크
+    Boolean IsEmpty ();		// 스택이 비었는가 체크
+    KeyType *GetStackTop (KeyType & x);	// 스택의 top값을 리턴
+    int GetTop ()
+    {
+	return top;
+    }				// 스택의 top index를 리턴, 스택의 크기
+};
+
+template < class KeyType > Stack < KeyType >::Stack (int MaxStackSize):MaxSize
+    (MaxStackSize)
+{
+    stack = new KeyType[MaxSize];
+    top = -1;
+}
+
+template < class KeyType > Stack < KeyType >::~Stack ()
+{
+    delete stack;
+}
+
+template < class KeyType > Boolean Stack < KeyType >::IsFull ()
+{
+    if (top == MaxSize - 1)
+	return TRUE;
+    else
+	return FALSE;
+}
+
+template < class KeyType > Boolean Stack < KeyType >::IsEmpty ()
+{
+    if (top == -1)
+	return TRUE;
+    else
+	return FALSE;
+}
+
+template < class KeyType > void Stack < KeyType >::Add (const KeyType & x)
+{
+    if (IsFull ())
+	return;
+    else
+	stack[++top] = x;
+}
+
+template < class KeyType > KeyType * Stack < KeyType >::Delete (KeyType & x)
+{
+    if (IsEmpty ())
+	return 0;
+    x = stack[top--];
+    return &x;
+}
+
+template < class KeyType >
+    KeyType * Stack < KeyType >::GetStackTop (KeyType & x)
+{
+    if (IsEmpty ())
+	return 0;
+    x = stack[top];
+    return &x;
+}
+}}}
+
+=== 계산기 프로그램 1 ===
+
+==== calc1.cpp ====
+
+{{{#!plain
+// 수식을 입력받아 postfix로 바꾼 다음 계산하는 프로그램
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include "stack.h"		// 스택 클래스를 include
+
+// 수식을 계산하는 클래스 Calc의 정의
+class Calc
+{
+  private:
+    int Position;		// NewToken함수에서 현재의 배열인덱스를 나타내는 변수
+    double Result;		// 최종결과를 저장하기 위한 변수
+    char *CurrentString;	// 현재 작업할 배열을 가리키는 포인터
+    char *PostfixString;	// 수식을 posifix 형태로 바꿔 저장하기 위한 배열
+    char *InfixString;		// 수식을 infix 형태로 입력받아 저장하기 위한 배열
+  public:
+      Calc ();			// 객체생성자
+     ~Calc ();			// 객체파괴자
+    void InitValue ();		// 계속적인 실행을 위해 변수들의 초기값을 주는 함수
+    int Isp (char op);		// 연산자에 대한 isp값을 넘겨주는 함수
+    int Icp (char op);		// 연산자에 대한 icp값을 넘겨주는 함수
+    char *NewToken ();		// 토큰을 넘겨주는 함수
+    void Infix ();		// 수식을 infix 형태로 읽어들이는 함수
+    void Postfix ();		// 수식을 postfix 형태로 바꾸는 함수
+    void Eval ();		// postfix 형태의 수식을 계산하는 함수
+};
+
+// 객체생성자
+Calc::Calc ()
+{
+    InfixString = new char[DefaultSize];	// 동적으로 메모리를 할당
+    PostfixString = new char[DefaultSize];
+    InitValue ();		// 변수들을 초기값하기 위해 함수 호출
+}
+
+// 객체파괴자
+Calc::~Calc ()
+{
+    delete InfixString;		// 동적으로 할당했던 메로리를 해제
+    delete PostfixString;
+}
+
+// 변수 초기화 함수
+void
+Calc::InitValue ()
+{
+    Position = 0;
+    Result = 0.0;
+    CurrentString = InfixString;
+    for (int i = 0; i < DefaultSize; i++)
+	PostfixString[i] = InfixString[i] = ' ';
+}
+
+// 연산자에 대한 isp값을 넘겨주는 함수
+int
+Calc::Isp (char op)
+{
+    switch (op) {
+    case '#':
+	return 0;
+    case '(':
+	return 0;
+    case ')':
+	return 19;
+    case '+':
+	return 12;
+    case '-':
+	return 12;
+    case '*':
+	return 13;
+    case '/':
+	return 13;
+    }
+}
+
+// 연산자에 대한 icp값을 넘겨주는 함수
+int
+Calc::Icp (char op)
+{
+    switch (op) {
+    case '#':
+	return 0;
+    case '(':
+	return 20;
+    case ')':
+	return 19;
+    case '+':
+	return 12;
+    case '-':
+	return 12;
+    case '*':
+	return 13;
+    case '/':
+	return 13;
+    }
+}
+
+// 토큰을 넘겨주는 함수
+char *
+Calc::NewToken ()
+{
+    int i;
+    int j;
+    char temp[DefaultSize];
+
+    for (i = 0; i < DefaultSize; i++)
+	temp[i] = ' ';
+    while ((CurrentString[Position] == ' ') ||	// 공백이나 탭은 무시하고 넘어감
+	   (CurrentString[Position] == '\t'))
+	Position++;
+    i = Position;		// 공백이나 탭이 아닌 새로운 위치에서 작업 시작
+    switch ((CurrentString[i])) {	// 하나의 문자에 대하여 비교한 후 해당 작업 처리
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+	while (isdigit (CurrentString[i]))
+	    i++;		// 피연산자를 저장
+	if (CurrentString[i] == '.')
+	    i++;		// 소수점이하도 체크하여 저장
+	while (isdigit (CurrentString[i]))
+	    i++;
+	for (j = 0; j <= i - Position - 1; j++)
+	    temp[j] = CurrentString[Position + j];
+	temp[j] = '\0';
+	Position = i;
+	break;
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '(':
+    case ')':
+    case '#':
+	temp[0] = CurrentString[Position];	// 해당 연산자를 저장
+	temp[1] = '\0';
+	Position++;
+	break;
+    }
+    return strdup (temp);	// 피연산자 또는 연산자를 리턴
+}
+
+// 수식을 infix 형태로 읽어들이는 함수
+void
+Calc::Infix ()
+{
+    cout << "\n\nEnter the INFIX expression: ";
+    cin.getline (CurrentString, 80, '\n');
+    strcat (CurrentString, "#");	// 수식의 끝을 나타내는 '#'를 수식의 마지막에 저장
+}
+
+// 수식을 postfix 형태로 바꾸는 함수
+void
+Calc::Postfix ()
+{
+    Stack < char >stack;	// 연산자를 저장하기 위한 클래스 Stack형의 객체 stack의 정의
+    char temp[DefaultSize], y, *x;
+    double value;
+    int j, k = 0;
+
+    stack.Add ('#');		// 수식의 끝을 나타내는 '#'을 스택에 저장
+    while (1) {
+	for (int i = 0; i < DefaultSize; i++)
+	    temp[i] = ' ';
+	x = NewToken ();
+	strcpy (temp, x);
+	if (temp[0] == '#')
+	    break;
+
+	value = atof (temp);	// double형의 값으로 변환
+	if (value != 0) {	// double형의 값이면 0이 아닌 값을 반환, 0이면 연산자
+//           cout << z << ' '; // 피연산자이면 PostfixStirng에 저장
+	    for (j = 0; j < strlen (temp); j++)
+		PostfixString[k++] = temp[j];
+	    PostfixString[k++] = ' ';
+	}
+	// ')'이 나오면 '('가 나올때 까지 스택에서 연산자를 pop한다.
+	else if (temp[0] == ')')
+	    while (1) {
+		y = *stack.Delete (y);
+//                  cout << y << ' ';
+		if (y == '(')
+		    break;
+		// pop한 연산자를 차례로 PostfixStirng에 저장
+		PostfixString[k++] = y;
+		PostfixString[k++] = ' ';
+	    }
+	else {
+	    while (1) {
+		y = *stack.Delete (y);
+		// isp >= icp : push,   isp < icp : pop
+		if (Isp (y) < Icp (temp[0]))
+		    break;
+//                  cout << y << ' ';
+		PostfixString[k++] = y;
+		PostfixString[k++] = ' ';
+	    }
+	    stack.Add (y);
+	    stack.Add (temp[0]);
+	}
+    }
+
+    while (!stack.IsEmpty ()) {
+	y = *stack.Delete (y);
+//         cout << y << ' ';
+	PostfixString[k++] = y;
+	PostfixString[k++] = ' ';
+    }
+    PostfixString[--k] = '\0';	// 마지막에 꼭 문자열의 끝을 나타내는 널문자를 넣어야한다.
+    cout << "Postfix : " << PostfixString << endl;	// postfix형태의 수식을 출력
+}
+
+// postfix 형태의 수식을 계산하는 함수
+void
+Calc::Eval ()
+{
+    Stack < double >stack;	// double 형의 값을 저장할 수 있는 Stack형의 객체 stack의 정의
+    char temp[DefaultSize], *x;
+    double value, operand1, operand2, result;
+
+    Position = 0;		// NextToken함수에서는 인덱스 Position과 포인터 CurrentString를 
+    CurrentString = PostfixString;	// 사용하므로 수식을 계산할 때 올바르게 지정해야 한다.
+//  cout << endl << CurrentString << endl;
+
+    while (1) {
+	for (int i = 0; i < DefaultSize; i++)
+	    temp[i] = ' ';	// temp 배열의 초기화
+	x = NewToken ();	// 다음 토큰을 읽어들인다.
+	strcpy (temp, x);
+	if (temp[0] == '#')
+	    break;		// 읽어들인 토큰이 '#'이면 연산을 종료
+
+	value = atof (temp);
+	if (value != 0)
+	    stack.Add (value);	// 피연산자를 스택에 저장
+	else {
+	    stack.Delete (operand2);	// 피연산자 1를 스택에서 꺼냄
+	    stack.Delete (operand1);	// 피연산자 2를 스택에서 꺼냄
+	    switch (temp[0])	// 해당하는 연산을 수행
+	    {
+	    case '+':
+		result = operand1 + operand2;
+		break;
+	    case '-':
+		result = operand1 - operand2;
+		break;
+	    case '*':
+		result = operand1 * operand2;
+		break;
+	    case '/':
+		result = operand1 / operand2;
+		break;
+	    }
+//             cout << operand1 << '+' << operand2 << '=' << result << endl;
+	    stack.Add (result);	// 계산한 결과를 다시 저장
+	}
+    }
+    stack.Delete (Result);	// 최종결과를 Result에 저장
+    cout << "= " << Result;	// 최종결과를 출력
+}
+
+// 메인함수
+int
+main (int argc, char *argv[])
+{
+    Calc c;			// 클래스 Calc의 객체 c의 정의
+
+    do {			// do-while문을 이용하여 계속 반복한다.
+	c.InitValue ();		// 계속적인 수식 계산을 위해 변수값을 초기화 한다.
+	c.Infix ();		// 수식을 읽어들인다.
+	c.Postfix ();		// 읽어들인 수식을 postfix 형태로 바꾼다.
+	c.Eval ();		// postfix 형태로 바꾼 수식을 계산한다.
+	cout << "\n(C)ontinue, (E)nd?";	// 계속할 것인가를 묻는 메시지를 출력
+    } while (toupper (getchar ()) != 'E' && getchar () == 10);	// 누른 키가 E, e이면 프로그램 종료
+
+    return 0;
+}
+}}}
+
+==== 컴파일 ==== 
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc1
+g++ -c -g -Wno-deprecated calc1.cpp
+g++ -o calc1 calc1.o -lstdc++
+[mwyun@iokorea calc]$
+}}}
+
+==== calc1 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ ./calc1
+
+
+Enter the INFIX expression: 10-(4/2)+3
+Postfix : 10 4 2 / - 3 + #
+= 11
+(C)ontinue, (E)nd?c
+
+
+Enter the INFIX expression: 10/(4-2)+3
+Postfix : 10 4 2 - / 3 + #
+= 8
+(C)ontinue, (E)nd?c
+
+
+Enter the INFIX expression: 10-4
+Postfix : 10 4 - #
+= 6
+(C)ontinue, (E)nd?e
+[mwyun@iokorea calc]$
+}}}
+
+=== 계산기 프로그램 2 ===
+
+==== calc2.cpp ==== 
+
+{{{#!plain
+#include <iostream.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#define  max  100
+#define  null  0
+#define  underflow -1
+
+int top = -1;
+
+template < class T > void
+push (T * stack, T item)
+{
+    top++;
+    if (top > max) {
+	cout << "\nStack overflow\n";
+	exit (-1);
+    }
+    stack[top] = item;
+}
+
+template < class T > T pop (T * stack)
+{
+    if (top < 0)
+	return underflow;
+    return stack[top--];
+}
+
+int
+sunwi (int yunsanja)
+{
+    switch (yunsanja) {
+    case '(':
+	return 0;
+    case ')':
+	return 0;
+    case '+':
+	return 1;
+    case '-':
+	return 1;
+    case '*':
+	return 2;
+    case '/':
+	return 2;
+    case '%':
+	return 2;
+    default:
+	return 3;
+    }
+}
+
+void
+postfix (char *postsusik, char *susik)
+{
+    char stack[max] = { ' ', };
+
+    while (*susik != '\0') {
+	if (*susik == '(')
+	    push (stack, *susik++);
+	else if (*susik == ')') {
+	    while (stack[top] != '(') {
+		*postsusik++ = pop (stack);
+		*postsusik++ = ' ';
+	    }
+	    pop (stack);
+	    susik++;
+	}
+	else if (strchr ("+ - * / %", *susik) != NULL) {
+	    while (top >= 0 && sunwi (stack[top]) >= sunwi (*susik)) {
+		*postsusik++ = pop (stack);
+		*postsusik++ = ' ';
+	    }
+	    push (stack, *susik++);
+	}
+	else if (isalnum (*susik)) {
+	    do {
+
+		*postsusik++ = *susik++;
+	    }
+	    while (isalnum (*susik));
+	    *postsusik++ = ' ';
+	}
+	else
+	    susik++;
+    }
+    while (top >= 0) {
+	*postsusik++ = pop (stack);
+	*postsusik++ = ' ';
+    }
+    postsusik--;
+    *postsusik = null;
+}
+
+int
+eval (char *postfix)
+{
+    int integer[max] = { 0, }, v, op1, op2, r;
+    char string[max];
+    top = -1;
+
+    while (*postfix != '\0') {
+	if (*postfix == ' ') {
+	    *postfix++;
+	    continue;
+	}
+	else if (isdigit (*postfix)) {
+	    int j = 0;
+	    while (isdigit (*postfix))
+		string[j++] = *postfix++;
+	    string[j] = '\0';
+	    v = atoi (string);
+	    push (integer, v);
+	}
+	else {
+	    op2 = pop (integer);
+	    op1 = pop (integer);
+	    switch (*postfix) {
+	    case '+':
+		r = op1 + op2;
+		break;
+	    case '-':
+		r = op1 - op2;
+		break;
+	    case '*':
+		r = op1 * op2;
+		break;
+	    case '/':
+		r = op1 / op2;
+		break;
+	    case '%':
+		r = op1 % op2;
+		break;
+	    }
+	    push (integer, r);
+	}
+	*postfix++;
+    }
+    r = pop (integer);
+    return r;
+}
+
+int
+main (int argc, char *argv[])
+{
+    int i;
+    char postsusik[max];
+    char susik[max];
+
+    cout << "Infix => ";
+    cin >> susik;
+    postfix (postsusik, susik);
+
+    cout << "Postfix => ";
+    for (i = 0; i < strlen (postsusik); i++)
+	cout << postsusik[i];
+    cout << endl << "= " << eval (postsusik) << endl;
+
+    return 0;
+}
+}}}
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc2
+g++ -c -g -Wno-deprecated calc2.cpp
+g++ -o calc2 calc2.o -lstdc++
+[mwyun@iokorea calc]$
+}}}
+
+==== calc2 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ ./calc2
+Infix => 10-(4/2)+3
+Postfix => 10 4 2 / - 3 +
+= 11
+[mwyun@iokorea calc]$ ./calc2
+Infix => 10/(4-2)+3
+Postfix => 10 4 2 - / 3 +
+= 8
+[mwyun@iokorea calc]$ ./calc2
+Infix => 10-4
+Postfix => 10 4 -
+= 6
+[mwyun@iokorea calc]$
+}}}
+
+=== 계산기 프로그램 3 ===
+
+한자리 숫자만 사칙 연산이 가능한 계산기 프로그램이다.
+  예) 8-(4/2)+3
+
+==== calc3.cpp ==== 
+
+{{{#!plain
+#include <iostream.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "stack.h"
+
+const int MAX_STACK_SIZE = 100;
+const int MAX_EXPR_SIZE = 100;
+//                   (   )   +   -   *   /   %  #
+//static int isp[] = { 0, 19, 12, 12, 13, 13, 13, 0};
+//static int icp[] = {20, 19, 12, 12, 13, 13, 13, 0};
+typedef enum
+{ lparen, rparen, plus, minus, times, divide,
+    mod, eos, operand
+} precedence;
+
+class calc
+{
+  private:
+    char expr[MAX_EXPR_SIZE];
+    char postfix_expr[MAX_EXPR_SIZE];
+    char *pointer;
+  public:
+      calc ();
+    int Isp (precedence token);
+    int Icp (precedence token);
+    void expression_input (void);
+    char print_token (precedence token);
+    precedence get_token (char &symbol, int &n);
+    void postfix (void);
+    int eval (void);
+};
+
+calc::calc ()
+{
+    pointer = expr;
+    for (int i = 0; i < MAX_EXPR_SIZE; i++)
+	expr[i] = postfix_expr[i] = ' ';
+}
+
+int
+calc::Isp (precedence token)
+{
+    switch (token) {
+    case lparen:
+	return 0;
+    case rparen:
+	return 19;
+    case plus:
+	return 12;
+    case minus:
+	return 12;
+    case times:
+	return 13;
+    case divide:
+	return 13;
+    case mod:
+	return 13;
+    case eos:
+	return 0;
+    }
+}
+
+int
+calc::Icp (precedence token)
+{
+    switch (token) {
+    case lparen:
+	return 20;
+    case rparen:
+	return 19;
+    case plus:
+	return 12;
+    case minus:
+	return 12;
+    case times:
+	return 13;
+    case divide:
+	return 13;
+    case mod:
+	return 13;
+    case eos:
+	return 0;
+    }
+}
+
+void
+calc::expression_input (void)
+{
+/*
+  int i = 0, x;
+  while (i < MAX_EXPR_SIZE) {
+	x = cin.get();
+	if (x != ' ' || x != '\t') expr[i++] = x;
+  }
+  expr[i] = '\0';
+*/
+    cin >> expr;
+    strcat (expr, "#");
+   // cout << expr << endl;
+}
+
+precedence calc::get_token (char &symbol, int &n)
+{
+    symbol = pointer[n++];
+    switch (symbol) {
+    case '(':
+	return lparen;
+    case ')':
+	return rparen;
+    case '+':
+	return plus;
+    case '-':
+	return minus;
+    case '*':
+	return times;
+    case '/':
+	return divide;
+    case '%':
+	return mod;
+    case '#':
+	return eos;
+    default:
+	return operand;
+    }
+}
+
+char
+calc::print_token (precedence token)
+{
+    char c;
+
+    switch (token) {
+    case lparen:
+	c = '(';
+	break;
+    case rparen:
+	c = ')';
+	break;
+    case plus:
+	c = '+';
+	break;
+    case minus:
+	c = '-';
+	break;
+    case times:
+	c = '*';
+	break;
+    case divide:
+	c = '/';
+	break;
+    case mod:
+	c = '%';
+	break;
+    case eos:
+	c = '#';
+	break;
+    }
+   // cout << c << ' ';
+    return c;
+}
+
+void
+calc::postfix (void)
+{
+    Stack < precedence > stack;
+    precedence token, y;
+    char symbol = ' ';
+    int i = 0, n = 0;
+
+    stack.Add (eos);
+    for (token = get_token (symbol, n); token != eos;
+	 token = get_token (symbol, n)) {
+	if (token == operand) {
+	    postfix_expr[i++] = symbol;
+	}
+	else if (token == rparen)
+	    for (y = *stack.Delete (y); y != lparen; y = *stack.Delete (y))
+		postfix_expr[i++] = print_token (y);
+	else {
+	    for (y = *stack.Delete (y); Isp (y) >= Icp (token);
+		 y = *stack.Delete (y))
+		postfix_expr[i++] = print_token (y);
+	    stack.Add (y);
+	    stack.Add (token);
+	}
+    }
+    while (!stack.IsEmpty ())
+	postfix_expr[i++] = print_token (*stack.Delete (y));
+    postfix_expr[i] = '\0';
+    cout << "Postfix : " << postfix_expr << endl;
+}
+
+int
+calc::eval (void)
+{
+    Stack < int >stack;
+    precedence token;
+    char symbol = ' ';
+    int op1, op2;
+    int n = 0;
+
+    pointer = postfix_expr;
+    token = get_token (symbol, n);
+    while (token != eos) {
+               if (token == operand)
+	    stack.Add (symbol - '0');
+	else {
+	    stack.Delete (op2);
+	    stack.Delete (op1);
+
+	    switch (token) {
+	    case plus:
+		stack.Add (op1 + op2);
+		break;
+	    case minus:
+		stack.Add (op1 - op2);
+		break;
+	    case times:
+		stack.Add (op1 * op2);
+		break;
+	    case divide:
+		stack.Add (op1 / op2);
+		break;
+	    case mod:
+		stack.Add (op1 % op2);
+		break;
+	    }			// end of switch
+	}			// end of if-else
+	token = get_token (symbol, n);
+    }				// end of while
+    return *stack.Delete (op1);
+}
+
+int
+main (int argc, char *argv[])
+{
+    calc a;
+
+    a.expression_input ();
+    a.postfix ();
+    cout << "= " << a.eval () << endl;
+
+    return 0;
+}
+}}}
+
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc3
+g++ -c -g -Wno-deprecated calc3.cpp
+g++ -o calc3 calc3.o -lstdc++
+[mwyun@iokorea calc]$
+}}}
+
+==== calc3 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ ./calc3
+8-(4/2)+3
+Postfix : 842/-3+#
+= 9
+[mwyun@iokorea calc]$
+}}}
+
+=== 계산기 프로그램 4 ===
+
+==== calc4.cpp ==== 
+
+{{{#!plain
+#include<iostream.h>
+#include<stdlib.h>
+#include<string.h>
+#include<ctype.h>
+#include"stack.h"
+#define  max  100
+#define  null  0
+#define  underflow -1
+
+char
+order (int Operator)
+{
+    switch (Operator) {
+    case '(':
+	return 0;
+    case ')':
+	return 0;
+    case '+':
+	return 1;
+    case '-':
+	return 1;
+    case '*':
+	return 2;
+    case '/':
+	return 2;
+    default:
+	return 3;
+    }
+}
+
+void
+Postfix (char postfix[], char *infix)
+{
+    Stack < char >stack;
+    char x, y;
+    int i = 0;
+
+    while (*infix != '\0') {
+	if (*infix == '(')
+	    stack.Add (*infix++);
+	else if (*infix == ')') {
+	    while ((y = *stack.GetStackTop (y)) != '(') {
+		stack.Delete (x);
+		postfix[i++] = x;
+		postfix[i++] = ' ';
+	    }
+	    stack.Delete (x);
+	    infix++;
+	}
+	else if (strchr ("+ - * /", *infix) != NULL) {
+	    while (stack.GetTop () >= 0 &&
+		   order ((y = *stack.GetStackTop (y))) >= order (*infix)) {
+		stack.Delete (x);
+		postfix[i++] = x;
+		postfix[i++] = ' ';
+	    }
+	    stack.Add (*infix++);
+	}
+	else if (isalnum (*infix)) {
+	    while (isalnum (*infix))
+		postfix[i++] = *infix++;
+	    if (*infix == '.')
+		postfix[i++] = *infix++;
+	    while (isalnum (*infix))
+		postfix[i++] = *infix++;
+	    postfix[i++] = ' ';
+	}
+	else
+	    infix++;
+    }
+    while (stack.GetTop () >= 0) {
+	stack.Delete (x);
+	postfix[i++] = x;
+	postfix[i++] = ' ';
+    }
+    postfix[i--] = '\0';
+}
+
+float
+eval (char *postfix)
+{
+    Stack < float >stack;
+    char string[max];
+    float integer, result, op1, op2;
+    int i;
+
+    for (i = 0; i <= strlen (postfix); i++) {
+	int j = 0;
+	if (isdigit (postfix[i]))	// 0 to 9
+	{
+	    while (isdigit (postfix[i]) || postfix[i] == '.')
+		string[j++] = postfix[i++];
+	    string[j] = '\0';
+	    integer = atof (string);
+	    stack.Add (integer);
+	}
+	else if (postfix[i] == ' ')
+	    continue;
+	else {
+	    stack.Delete (op2);
+	    stack.Delete (op1);
+	    switch (postfix[i]) {
+	    case '+':
+		result = op1 + op2;
+		break;
+	    case '-':
+		result = op1 - op2;
+		break;
+	    case '*':
+		result = op1 * op2;
+		break;
+	    case '/':
+		result = op1 / op2;
+		break;
+	    }
+	    stack.Add (result);
+//      cout << endl << op1 << postfix[i] << op2 << '=' << result << endl;
+	}
+    }
+    result = *stack.Delete (result);
+    return result;
+}
+
+int
+main (int argc, char *argv[])
+{
+    int i;
+    char postfix[max];
+    char infix[max];
+
+    cout << "\n *** Infix to Postfix ***\n";
+    cout << "\n # Infix : ";
+    cin >> infix;
+    Postfix (postfix, infix);
+
+    cout << " # Postfix : ";
+    for (i = 0; i < strlen (postfix); i++)
+	cout << postfix[i];
+
+    cout << "\n\n # Result :";
+    for (i = 0; i < strlen (infix); i++)
+	cout << infix[i];
+    cout << endl << "= " << eval (postfix) << endl;
+}
+}}}
+
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc4
+g++ -c -g -Wno-deprecated calc4.cpp
+g++ -o calc4 calc4.o -lstdc++
+}}}
+
+==== calc4 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ ./calc4
+
+ *** Infix to Postfix ***
+
+ # Infix : 10-(4/2)+3
+ # Postfix : 10 4 2 / - 3 +
+
+ # Result :10-(4/2)+3
+= 11
+[mwyun@iokorea calc]$ ./calc4
+
+ *** Infix to Postfix ***
+
+ # Infix : 10/(4-2)+3
+ # Postfix : 10 4 2 - / 3 +
+
+ # Result :10/(4-2)+3
+= 8
+[mwyun@iokorea calc]$ ./calc4
+
+ *** Infix to Postfix ***
+
+ # Infix : 10-4
+ # Postfix : 10 4 -
+
+ # Result :10-4
+= 6
+[mwyun@iokorea calc]$
+}}}
+
+
+=== 계산기 프로그램 5 ===
+
+calc1.cpp의 계산기 알고리즘 소스를 참조하고 list와 statck 자료구조를 이용하여  좀더 복잡한 형태의 계산기를 만들어 보았다.
+
+==== calc5.c ==== 
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "list.h"
+#include "stack.h"
+
+#define MAX 100 // 수식 문자열 저장 최대 크기
+
+// node 타입 정의
+typedef struct {
+	int select; // 0: int, operator, 1: float
+	double value;
+	char op;
+} node;
+
+int isp(char op)
+{
+	switch (op)
+	{
+		case '#': return 0; 
+		case '(': return 0;
+		case ')': return 19;
+		case '+': return 12;
+		case '-': return 12;
+		case '*': return 13;
+		case '/': return 13;
+	}
+}
+
+int icp(char op)
+{
+	switch (op)
+	{
+		case '#': return 0; 
+		case '(': return 20;
+		case ')': return 19;
+		case '+': return 12;
+		case '-': return 12;
+		case '*': return 13;
+		case '/': return 13;
+	}
+}
+
+// 실수값인가 검사
+int is_float(char *buf)
+{
+	int i;
+
+	for (i = 0; buf[i] != '\0'; i++)
+		if (buf[i] == '.') // dot(.)이 있으면
+			return i; // 인덱스 리턴
+
+	return -1;
+}
+
+// 정수부 합산
+// 예) 123.45이면 정수부가 3자리이므로 3번 10을 곱하여(10*3) 100을 리턴
+double get_ten(int dot_index)
+{
+	int i;
+	double value = 1;
+	
+	for (i = 0; i < dot_index; i++)
+		value *= 10;
+
+	return value;
+}
+
+// 소수부 합산
+// 예) 123.45이면 소수부가 2자리이므로 2번 0.1을 곱하여 0.01을 리턴
+double get_decimal(int dot_index)
+{
+	int i;
+	double value = 0.1;
+	for(i = 0; i < dot_index; i++)
+		value *= 0.1;
+
+	return value;
+}
+
+// node 추가
+int add_node(List *list, int select, double value, char op)
+{
+	node *p;
+
+	// 메모리 할당
+	if ((p = (node *)malloc(sizeof(node))) == NULL)
+		return 0;
+
+	p->select = select; // 값 또는 연산자 선택
+	p->value = value; // 값=피연산자(operand)
+	p->op = op; // 연산자(operator)
+
+
+#ifdef __DEBUG__
+	printf("p->select = %d\t", p->select);
+	printf("p->value = %lf\t", p->value);
+	printf("p->op = %c\n", p->op);
+#endif
+
+	// list에 저장
+	if (list_ins_next(list, list_tail(list), p) != 0)
+		return 0;
+
+	return 1;
+}
+
+// 피연산자 list에 추가
+void print_operand(List *list, char *buf, int i)
+{
+	double sum1, sum2, real;
+	int dot_index;
+	int digit;
+	int sum;
+	int k;
+
+				// 실수인가 검사
+				dot_index = is_float(buf);
+
+				if (dot_index > -1) // float value
+				{
+					// 정수부 계산(문자열을 숫자로 변환)
+					sum1 = 0.0;
+					for (k = 0; k < dot_index; k++)
+					{
+						digit = buf[k] - '0';
+						sum1 = sum1 + (digit * get_ten(dot_index-k-1)); 
+					}
+
+					// 소수부 계산(문자열을 숫자로 변환)
+					sum2 = 0.0;
+					for(k = dot_index + 1; k < i; k++)
+					{
+						digit = buf[k] - '0';
+						sum2 = sum2 + (digit * get_decimal(k-dot_index-1));
+					}
+
+					// 정수부와 소수부 합산
+					real = sum1 + sum2;
+					// list에 float value 추가
+					if (!add_node(list, 1, real, '\0'))
+						return;
+
+#ifdef __DEBUG__
+					printf("%f", real);
+#endif
+				}
+				else // integer value
+				{
+					// 정수 계산
+					sum = 0;
+					for (k = 0; k < i; k++)
+					{
+						digit = buf[k] - '0';
+						sum  = sum + (digit * get_ten(i-k-1)); 
+					}
+					// list에 integer value 추가
+					if (!add_node(list, 1, sum, '\0'))
+						return;
+
+#ifdef __DEBUG__
+					printf("%d", sum);
+#endif
+				}
+}
+
+// infix 방식으로 수식 입력
+int get_expr(List *list) // --> infix input
+{
+	int i, j, ch;
+	char buf[MAX];
+
+	i = 0;
+	for (j = 0; j < MAX; j++) // 초기화
+		buf[j] = '\0';
+
+	while((ch = getchar()) != '\n') // Enter칠 때까지 한 문자씩 입력
+	{
+		if (('0' <= ch && ch <= '9') || (ch == '.')) 
+				buf[i++] = ch; // 피연산자: 숫자(0~9)거나 dot(.)이면 buf에 저장
+		else // 연산자: '+', '-', '*', '/'
+		{
+			if (i != 0) // buf에 입력한 문자들이 있으면
+			{
+				print_operand(list, buf, i); // list에 buf 추가: 피연산자
+				
+				i = 0;
+				for (j = 0; j < MAX; j++) // 초기화
+					buf[j]='\0';
+			}
+	
+			if (!add_node(list, 0, 0, ch)) // list에 operator 추가
+				return 0;
+
+#ifdef __DEBUG__
+			printf(" %c ", ch);
+#endif
+		}
+	}
+
+	// buf에 입력한 문자들이 있으면
+	if (strlen(buf) > 0)
+	{
+		print_operand(list, buf, i); // list에 buf 추가: 피연산자
+	}
+
+	return 1;
+}
+
+// statck 출력
+void print_stack(const Stack *stack, int select)
+{
+    ListElmt *element;
+	int size, i;
+
+    fprintf(stdout, "print_stack: Stack size is %d\n", size = stack_size(stack));
+
+    i = 0;
+    element = list_head(stack);
+
+    while (i < size)
+    {
+			if (select) // 피연산자(값) 출력
+			{
+				double *data = list_data(element);
+				printf("val = stack[%03d]  = %lf\n", i, *data);
+			}
+			else // 연산자 출력
+			{
+				char *data = list_data(element);
+				printf("op = stack[%03d]  = %c\n", i, *data);
+			}
+            element = list_next(element);
+            i++;
+    }
+	
+	printf("\n\n");
+}
+
+// list 출력
+void print_list(const List *list)
+{
+	int i;
+	ListElmt *element;
+	node *data;
+
+#ifdef __DEBUG__
+	printf("list size = %d\n", list_size(list));
+#endif
+	i = 0;
+	element = list_head(list);
+
+	while (1)
+	{
+		data = list_data(element);
+	
+#ifdef __DEBUG__
+		printf("%d :\t", i++);
+		printf("data->select = %d\t", data->select);
+		printf("data->value = %lf\t", data->value);
+		printf("data->op = %c\n", data->op);
+#endif
+		if (data->select)
+			printf("%lf ", data->value);
+		else	
+			printf("%c ", data->op);
+		if (list_is_tail(element)) // list의 tail이면 break
+			break;
+		else // 그렇지 않으면
+			element = list_next(element); // 다음 element로 이동
+	}
+
+	printf("\n");
+}
+
+// infix방식의 수식을 postfix방식으로 변경
+int infix_to_postfix(List *ie_list, List *pe_list)
+{
+	Stack opstack;
+	ListElmt *element;
+	node *data;
+	node *p;
+	char *op;
+
+	element = list_head(ie_list);
+
+	stack_init(&opstack, free);
+
+	if ((op = (char *)malloc(sizeof(char))) == NULL)
+		return 0;
+	*op = '#';
+	if (stack_push(&opstack, op) != 0)
+		return 0;
+
+	while (1)
+	{
+		
+		data = list_data(element);
+	
+		switch (data->select)
+		{
+			case 0: // operator
+			{
+
+				if ((op = (char *)malloc(sizeof(char))) == NULL)
+                       			return 0;
+				*op = -1;
+
+				if (data->op == ')')
+				{
+					    // operator => statck pop
+						while (stack_pop(&opstack, (void **)&op) == 0) // success
+						{	
+							if (*op == '(')	// not operation
+							{
+								free(op);	
+								break;
+							}
+							else
+							{
+								if ((p = (node *)malloc(sizeof(node))) == NULL)
+									return 0;
+								
+								p->select = 0;
+								p->value = 0;	
+								p->op = *op;
+
+#ifdef __DEBUG__
+								printf("[2] p->select = %d\t", p->select);
+								printf("p->value = %lf\t", p->value);
+								printf("p->op = %c\n", p->op);
+#endif
+
+								if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+									return 0;
+							}
+						}
+				}
+
+				else 
+				{	
+					    // operator => statck pop
+						while (stack_pop(&opstack, (void **)&op) == 0) // success
+						{	
+#ifdef __DEBUG__
+							printf("stack_pop: %c\n", *op);
+#endif
+							if (isp(*op) < icp(data->op))
+								break;
+
+							if ((p = (node *)malloc(sizeof(node))) == NULL)	
+								return 0;
+
+							p->select = 0; // operator
+							p->value = 0;
+							p->op = *op;	
+					
+							if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+								return 0;
+						}
+
+#ifdef __DEBUG__
+						printf("1. op=%c,%x\n", *op, *op); 
+						printf("2. op=%x\n", *op);
+#endif
+						// operator => stack push
+						if (stack_push(&opstack, op) != 0)
+							return 0; 
+#ifdef __DEBUG__
+						printf("data->op=%c\n", data->op);
+#endif					
+						if ((op = (char *)malloc(sizeof(char))) == NULL)
+							return 0;
+						*op = data->op;
+
+						// operator => stack push
+						if (stack_push(&opstack, op) != 0) // stack push
+							return 0;
+				}
+				break;
+			}
+					
+			case 1: // int, value value
+			{
+				if ((p = (node *)malloc(sizeof(node))) == NULL)
+					return 0;
+
+				p->select = data->select;
+				p->value = data->value;
+				p->op = data->op;
+
+#ifdef __DEBUG__
+				printf("[3] p->select = %d\t", p->select);
+				printf("p->value = %lf\t", p->value);
+				printf("p->op = %c\n", p->op);
+#endif
+
+				if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+					return 0;
+
+				break;
+			}
+
+			default:
+			{
+				printf("Wrong Input!\n"); // 입력한 수식이 틀린 경우
+				break;
+			}
+		}
+
+		if (list_is_tail(element)) // list의 tail이면 break
+			break;
+		else // 그렇지 않으면
+			element = list_next(element); // 다음 element로 이동
+
+#ifdef __DEBUG__
+		printf("%03d\n", __LINE__); 
+		print_stack(&opstack, 0);
+#endif
+	}
+
+	// opstack에 남아있는 operator pop => postfix 수식 list
+	if ((op = (char *)malloc(sizeof(char))) == NULL) 
+    		return 0;
+	while (stack_pop(&opstack, (void **)&op) == 0) // success
+	{
+		if (*op == '#')
+		{
+			free(op);
+			break;
+		}
+
+		if ((p = (node *)malloc(sizeof(node))) == NULL)
+			return 0;
+
+		p->select = 0;
+		p->value = 0;	
+		p->op = *op;
+
+#ifdef __DEBUG__
+		printf("[4] p->select = %d\t", p->select);
+		printf("p->value = %lf\t", p->value);
+		printf("p->op = %c\n", p->op);
+#endif
+
+		if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+			return 0;
+	}
+
+	stack_destroy(&opstack);
+
+	return 1;
+}
+
+// 수식 계산
+double calc_expr(List *list)
+{
+	double result;
+	double *val1;
+	double *val2;
+	ListElmt *element;
+	node *data;
+	double *db;
+	Stack valstack;
+
+	stack_init(&valstack, free);
+
+	element = list_head(list);
+
+	while (1)
+	{
+		data = list_data(element);
+		
+		//printf("data->select = %d\tdata->value = %lf\tdata->op = %c\n", data->select, data->value, data->op);
+		if (data->select) // int, float
+		{
+			if ((db = (double *)malloc(sizeof(double))) == NULL)
+				return 0;
+		
+			*db = data->value;
+#ifdef __DEBUG__
+			printf("*db = %lf\n", *db);
+#endif
+			if (stack_push(&valstack, db) != 0)
+				return 0;
+
+#ifdef __DEBUG__
+			printf("added number\n");
+			print_stack(&valstack, 1);
+#endif
+		}
+		else  // operator
+		{
+			// 두개의 값을 statk에서 pop
+			if (stack_pop(&valstack, (void **)&val2) != 0) // success
+				return 0;
+			if (stack_pop(&valstack, (void **)&val1) != 0) // success
+				return 0;
+
+			// operator에 따라 두개값 연산
+			switch (data->op)
+			{
+				case '+':
+					result = *val1 + *val2;
+#ifdef __DEBUG__
+					printf("%lf + %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '-':
+					result = *val1 - *val2;
+#ifdef __DEBUG__
+					printf("%lf - %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '*':
+					result = *val1 * *val2;
+
+#ifdef __DEBUG__
+					printf("%lf * %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '/':
+					result = *val1 / *val2;
+#ifdef __DEBUG__
+					printf("%lf / %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				default:
+					printf("Wrong Input!\n");
+					exit(0);
+			}
+		
+			free(val1);
+			free(val2);
+			
+			// 계산한 결과를 stack에 저장			
+	        if ((db = (double *)malloc(sizeof(double))) == NULL)
+				return 0;
+		
+			*db = result;
+
+			if (stack_push(&valstack, db) != 0)
+				return 0;
+
+#ifdef __DEBUG__
+			printf("added result\n");
+			print_stack(&valstack, 1);
+#endif
+		}
+
+		if (list_is_tail(element))
+			break;
+		else
+			element = list_next(element);
+	}
+
+	// 모든 계산이 끝난 후 스택에 남아있는 값(최종결과값)을 pop
+	if (stack_pop(&valstack, (void **)&db) != 0) // success
+		return 0;
+
+	result = *db;
+
+#ifdef __DEBUG__
+	printf("result=%lf\n", result);
+#endif
+	stack_destroy(&valstack);
+
+	return result;
+}
+
+// main 함수
+int main(int argc, char *argv[])
+{
+	List infix_expr_list;
+	List postfix_expr_list;
+
+	// list 초기화
+	list_init(&infix_expr_list, free);
+	// infix방식의 수식 입력
+	get_expr(&infix_expr_list);
+
+	printf("infix expr list\n");
+	print_list(&infix_expr_list);
+
+	// list 초기화
+	list_init(&postfix_expr_list, free);
+	// infix방식의 수식을 postfix방식으로 변
+	if (infix_to_postfix(&infix_expr_list, &postfix_expr_list))
+	{
+
+	printf("postfix expr list\n");
+	print_list(&postfix_expr_list);
+		
+		// postfix expr을 이용한 값 계산
+		printf("=%lf\n", calc_expr(&postfix_expr_list));
+	}
+
+	// list 제거
+	list_destroy(&infix_expr_list);
+	list_destroy(&postfix_expr_list);
+
+	return 0;
+}
+}}}
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc5]$ make clean
+rm -rf calc5 calc5.o list.o stack.o core
+[mwyun@iokorea calc5]$ make
+gcc -c  calc5.c ../linkedlist_ex/list.c ../stack/stack.c -I../linkedlist_ex -I../stack
+gcc -o calc5 calc5.o list.o stack.o
+[mwyun@iokorea calc5]$
+}}}
+
+==== calc5 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc5]$ ./calc5
+10/(4-2)+3
+infix expr list
+10.000000 / ( 4.000000 - 2.000000 ) + 3.000000
+postfix expr list
+10.000000 4.000000 2.000000 - / 3.000000 +
+=8.000000
+[mwyun@iokorea calc5]$ ./calc5
+10-(4/2)+3-5
+infix expr list
+10.000000 - ( 4.000000 / 2.000000 ) + 3.000000 - 5.000000
+postfix expr list
+10.000000 4.000000 2.000000 / - 3.000000 + 5.000000 -
+=6.000000
+[mwyun@iokorea calc5]$
+}}}
+
+=== 계산기 프로그램 에러잡기 1 ===
+
+다음은 에러가 발생하는 계산기 프로그램 두가지를 소개한다.
+postfix로 바꾸는 과정에서 isp, icp 값을 이용해서 연산자 우선순위를 비교하여 스택에 값을 넣거나
+postfix 문자열에 포함시켜는게 관건이다.
+여러분들이 직접 버그를 잡으면서 계산기 프로그램을 완성해기 바란다.
+물론 이미 완성된 소스를 최대한 이용하는 것도 좋은 방법이다.
+행운이 있기를...
+
+'''첫번째 버그있는 프로그램'''
+
+==== calc_report1.cpp ====
+    
+{{{#!plain
+#include <iostream.h>
+#include <string.h>
+#include <conio.h>
+//#include "stack.cpp"
+typedef int  BOOLEAN;
+
+class Stack  {
+	private:
+	 char    *stack;
+	 int     isp;
+	 int     index;
+	 int     top_of_stack;
+	 int     STK_SIZ;
+	 char    *postfix;
+	public:
+	 Stack(int stk_siz);
+	 ~Stack();
+	 void     push (char new_data);
+	 int      isempty();
+	 char     pop();
+	 char     Select_stack(char str,BOOLEAN isp );
+	 void     POSTFIX(char str[]);
+	 void     print();
+	 void     RESult();
+  };
+
+ Stack::Stack(int stk_siz)
+	 {
+	   stack = new char[STK_SIZ = stk_siz];
+	   postfix = new char[80];
+		top_of_stack = -1;
+		index = 0;
+		 for(int j=0; j < STK_SIZ; j++)
+		 { stack[j] = postfix[j]= '\0';}
+	 }
+
+ Stack::~Stack()
+	 {
+	   delete []stack;
+	   delete []postfix;
+	 }
+
+int Stack::isempty()
+{
+  if (top_of_stack == -1) return 1;
+  else return 0;
+}
+
+void Stack::print()
+{ cout<<"# is ends print";
+  cout<<"\npostfix  output :::>  " << postfix << endl;
+}
+
+void Stack::push(char new_data)
+	   {
+		++top_of_stack;
+		stack[top_of_stack] = new_data;
+	   }
+
+char Stack::pop()
+{
+   char popped_data;
+   if (isempty()) return NULL;
+   popped_data=stack[top_of_stack--];
+   return popped_data;
+}
+
+char Stack::Select_stack(char str,BOOLEAN isp)
+	 {
+	  int icp;
+	   switch(stack[top_of_stack])
+		{
+		  case '+': case '-':
+			icp=1;
+			   if(isp<=icp) {
+				 pop();
+				 push(str);
+				 }
+			   else if(isp>icp)
+				 push(str);
+			break;
+		  case '*': case '/':
+			icp=2;
+			  if(isp<=icp){
+				pop();
+				 push(str);
+				 }
+			   else if(isp>icp)
+				 push(str);
+			break;
+		 default :
+			push(str);
+			break;
+	   }
+       return(top_of_stack);
+
+   }
+
+
+void Stack::POSTFIX(char str[])
+	{ int i=0;
+	  while(str[i] != '#')
+	   {
+	    switch(str[i])
+	      {
+	       case '+': case '-':
+		  Select_stack(str[i++],isp=1);
+		   break;
+	       case '*': case '/':
+		  Select_stack(str[i++],isp=2);
+		  break;
+	       case '(':
+		  Select_stack(str[i++],isp=10);
+		    break;
+	       case ')':
+		   while(stack[top_of_stack]!='(')
+			   postfix[index++] = pop();
+		   if(stack[top_of_stack]=='(')
+			   pop();
+		     str[i++];
+		    break;
+	       default :
+		   postfix[index++] = str[i++];
+		   break;
+	    }
+	}
+      while(!isempty()) postfix[index++] = pop();
+      strcat(postfix, "#");
+   }
+
+ void Stack::RESult()
+    {
+     int op1=0, op2=0, r, j;
+
+     for (j = 0; j < STK_SIZ; j++) stack[j] = ' ';
+     top_of_stack = -1;
+     j = 0;
+     while (postfix[j] != '#')
+	  {
+		if(postfix[j] >= '0' && postfix[j] <= '9')
+		   push(postfix[j]);
+		else
+		     {
+			  op2 = pop()-'0';
+			  op1 = pop()-'0';
+		      switch(postfix[j])
+			{
+				   case '+':
+					r = op1 + op2;
+						break;
+				   case '-':
+					r = op1 - op2;
+						break;
+				   case '*':
+					r = op1 * op2;
+						break;
+				   case '/':
+					r = op1 / op2;
+						break;
+			  }
+		   cout << op1 << postfix[j] << op2 << '=' << r << endl;
+		   push(r+'0');
+		  }
+		  j++;
+	  }
+
+       cout << "\noutput result::::>  ";
+       cout << pop();
+    }
+
+
+
+ void main()
+  {     clrscr();
+	Stack NEW_Stack(40);
+	static char str[80];
+	cout<<"infix input :::>";
+	cin>>str;
+	strcat(str, "#");
+	NEW_Stack.POSTFIX(str);
+	NEW_Stack.print();
+	NEW_Stack.RESult();
+	getch();
+  }
+}}}
+
+         
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc_report1
+g++ -c -g -Wno-deprecated calc_report1.cpp 
+g++ -o calc_report1 calc_report1.o -lstdc++      
+[mwyun@iokorea calc]$ 
+}}}
+
+==== calc_report1 실행 ====
+
+=== 계산기 프로그램 에러잡기 2 ===
+
+'''두번째 버그있는 프로그램'''
+
+==== calc_report2.cpp ==== 
+
+{{{#!plain
+#include  <stdio.h>
+#include  <conio.h>
+#include  <stdlib.h>
+#include  <ctype.h>  /* isdigit()함수 -> 입력된 문자가 '0' - '9'인가 검사 */
+const int STACKSIZE = 100;
+const int MAXCOLS = 80;
+enum Boolean { FALSE = 0, TRUE = 1 };
+
+class stack {
+private:
+     int   top;   /* 스택의 현위치 지정 */
+     float items[STACKSIZE];  /* float 형으로 100개의 요소 확보 */
+public:
+    friend class calc;
+    stack() { top = -1; }
+    Boolean empty();
+    float pop();
+    void push(char x);
+    int gettop() { return top; }
+    float getitems(int i) { return items[i]; }
+};
+
+    Boolean stack::empty()    /* 스택이 비었는가 검사 */
+   {
+    if (top == -1)    /* 비었으면 참(1) 반환 */
+	   return (TRUE);
+    else
+	   return ( FALSE);  /* 아니면 거짓(0) 반환 */
+   }
+
+float stack::pop()     /* 스택의 내용 꺼냄 */
+{                         /* 비었으면 "Stack Underflow" 출력 */
+    if(empty()) {
+	  printf("Stack Underflow");
+	  exit(1);           /* 아니면 스택 내용 반환 -> top 감소 */
+	}
+    return (items[top--]);
+}
+
+void stack::push(char x)  /* 스택에 요소 삽입 */
+{
+    if(top == STACKSIZE-1) {  /* 스택이 다 차 있으면 "Stack Overflow" 출력후 탈출 */
+	   printf("Stack Overflow");
+	   exit(1);
+	  }
+    else                         /* 아니면 top 증가후 요소 삽입 */
+	 items[++top] = x;
+}
+
+class calc {
+private:
+	char  infix[MAXCOLS];
+	char  postr[MAXCOLS];
+	int   pos;
+public:
+    calc() { pos = 0; }
+    void getinfix();
+    void output();
+    void popandtest(stack& ps, char& px,int& pund);
+    void postfix();
+    float eval();
+    float oper(char symb, float op1, float op2);
+    Boolean prcd (char topsymb, char symb);
+};
+
+void calc::getinfix()
+{
+	clrscr();
+	printf("INPUT STRING : ");
+	while((infix[pos++] = getchar()) != '\n');  /* 수식 입력 받음 */
+	infix[--pos] = '\0';                        /* 문자열의 끝에 NULL 입력 */
+	printf("%s%2s", "The Original Infix Expression Is %s", infix);
+}
+
+void calc::output()
+{
+	printf("\n-------------------------------------------------");
+	printf("\n symb   opnd1     opnd2     value     postr");
+	printf("\n-------------------------------------------------");
+	printf("\n\nThe Value Is: %6.3f\n", eval());  /* 연산 결과 출력 */
+}
+
+void calc::popandtest(stack& ps, char& px, int& pund)  /* 연산자 스택 내용 반환 */
+{
+    if(ps.empty()) {     /* 비었으면 pund에 참(1) 할당후 반환 */
+	   pund = TRUE;
+	   return;
+	  }
+    pund = FALSE;      /* 아니면 pund에 거짓(0) 할당하고, px에 스택내용 할당 -> top 감소 */
+    px = ps.items[ps.top--];
+    return;
+}
+
+void calc::postfix()  /* 후위 연산 표기 함수 */
+		      /* 가인수의 데이타형을 문자형 배열로 받음 */
+{
+    int  position, und;  /* position -> infix[]의 현위치 지정 */
+    int  outpos = 0, j=0;  /* outpos -> postfix[]의 현위치 지정 */
+    char topsymb ='+';   /* opstk.items[](연산자 스택)의 제일 끝의 연산자 */
+    char symb;
+
+    stack opstk;
+
+    printf("\n-------------------------------------");
+    printf("\n symb    postr           opstk       ");
+    printf("\n-------------------------------------");
+    for(position = 0; (symb = infix[position]) != '\0'; position++) /* 중위 표기의 끝('\0') 일때가지 */
+		if(isdigit(symb)) {  /* 숫자냐 ? */
+		   postr[outpos++] = symb;   /* 후위 표기 내용에 삽입 */
+		   printf("\n   %c     %s     ", symb, postr);
+		  for(j=0;j<=opstk.gettop();j++)  /* 연산자 스택의 내용 출력 */
+		      printf("   %c ", opstk.getitems(j));
+		   }
+		else { /* 연산자나  또는 다른 문자면 */
+		   popandtest(opstk,topsymb,und); /* 연산자 스택 내용 조사 */
+		   while(!und && prcd(topsymb,symb)) {  /* 비어있지 않고 연산자 순서가 맞으면 */
+			 postr[outpos++] = topsymb;        /* 연산자 스택의 내용 후위 표기 내용에 삽입 */
+			 popandtest(opstk,topsymb,und);
+			}
+		   if(!und)   /* 스택에 내용이 있으면 */
+			opstk.push(topsymb);  /* 스택에 연산자 삽입 */
+		 if(und || (symb != ')'))   /* 스택이 비어있고 연산자가 ')'가 아니면 */
+			opstk.push(symb);     /* 스택에 연산자 삽입 */
+		   else                     /* 아니면 스택의 내용 꺼냄 -> 연산자 비교를 위해 */
+			topsymb = opstk.pop();
+			   printf("\n   %c     %s     ", symb, postr);
+			  for(j=0;j<=opstk.gettop();j++);
+			      printf("   %c ", opstk.getitems(j));
+		}
+	while(!opstk.empty())   /* 연산자 스택의 내용 후위 표기에 할당 */
+	   postr[outpos++] = opstk.pop();
+	postr[outpos] = '\0';   /* NULL 삽입 */
+	printf("\n         %s ", postr);   /* 최종 후위 연산 표기법 내용 출력 */
+
+	printf("\n%s%2s", "\nThe Postfix Expression Is ", postr); /* 후위 표기된 내용 출력 */
+	return;
+}
+
+float calc::eval() /* 후위 표기법으로 표기된 연산식 계산 */
+		       /* 후위 표기 연산식 내용 */
+{
+	int  position,i;
+	char c;
+	float opnd1=0,opnd2=0,value=0; /* op1과 op2 그리고 연산결과 값 */
+
+	stack opndstk;
+
+	for(position = 0; (c = postr[position]) != '\0'; position++)
+	  {if(isdigit(c))  /* 숫자면  */
+		 {
+		  opndstk.push((float) (c - '0')); /* 문자형을 float형으로 형 전환후 스택에 삽입 */
+	  printf("\n  %c    %6.2f    %6.2f    %6.2f    ",c,opnd1,opnd2,value); /* 연산자,op1,op2,결과값 출력 */
+		  for(i=0; i<= opndstk.gettop();i++)    /* 오퍼랜드 스택의 내용 출력 */
+			 printf("%5.1f",opndstk.getitems(i));
+		 }
+		else {   /* 문자면 */
+		  opnd2 = opndstk.pop();  /*  나중에 PUSH된 수가 op2( LIFO)  */
+		  opnd1 = opndstk.pop();
+		  value = oper(c,opnd1,opnd2);  /* 연산 */
+		/*  push(&opndstk,value);        연산 결과 오퍼랜드 스택에 삽입 */
+	  printf("\n  %c    %6.2f    %6.2f    %6.2f    ",c,opnd1,opnd2,value);
+		  opndstk.push(value);
+		  for(i=0;i<=opndstk.gettop();i++)
+			 printf("%5.1f",opndstk.getitems(i));
+		}
+	   opnd1 = 0;
+	   opnd2 = 0;
+	  }
+	return (value);      /* 최종 연산 결과 반환 */
+}
+
+float calc::oper(char symb, float op1, float op2)    /* op1, op2를 연산자로 연산 */
+{
+	switch(symb) {
+	   case '+' : return(op1+op2);
+	   case '-' : return(op1-op2);
+	   case '*' : return(op1*op2);
+	   case '/' : return(op1/op2);
+	  default : printf("Illegal Opration");   /* 연산자가 아니면 ERROR */
+		    exit(1);
+	}
+	return 0;
+}
+
+Boolean calc::prcd (char topsymb, char symb)  /* 연산자의 순서가 맞는지 조사 */
+{
+	if(topsymb == '(')  return FALSE;
+	else if(topsymb != ')' && symb == '(') return FALSE;  /* 괄호 사이에 연산자가 없음 */
+	else if(topsymb != '(' && symb == '(') return TRUE;   /* '((' 형태 */
+	else if(topsymb == ')') {   /* ')'는 opstk.items[]의 마지막에 오면 안됨 */
+	   return TRUE;
+	   /*printf("\nERROR");
+		exit(0); */
+	   };
+	if(topsymb == '(' && symb == ')') return TRUE;
+	 else if(topsymb == '+' && symb == ')') return TRUE;
+	 else if(topsymb == '-' && symb == ')') return TRUE;
+	 else if(topsymb == '-' || symb == ('+'||'-')) return TRUE;
+	   else if(topsymb == '*' || symb == ('*'||'/'||'+'||'-')) return TRUE;
+		 else if(topsymb == '/' || symb == ('/'||'*'||'+'||'-')) return TRUE;
+		   else return FALSE;
+		   /* 연산자 우선순위가 높은 연산자가 낮은 연산자 보다 앞에 온다 */
+		   /* 우선순위가 높은 연산자가 낮은 연산자 뒤에 오면 높은 연산자를 먼저
+			오퍼랜드 스택에 삽입 */
+}
+
+void main()
+{
+  calc a;
+
+  a.getinfix();
+  a.postfix();    /* 중위 표기법을 후위 표기법으로 전환 */
+  a.output();
+}
+}}}
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc]$ make calc_report2
+g++ -c -g -Wno-deprecated calc_report2.cpp 
+g++ -o calc_report2 calc_report2.o -lstdc++      
+[mwyun@iokorea calc]$ 
+}}}
+
+==== calc_report6 실행 ====
+
+=== 참 조 1 ===
+
+ 1. 테스트: 좀더 복잡한 수식을 입력하여 실행시켜 보기 바란다.
+ 1. 소스정리: indent 프로그램을 이용하여 소스를 정리하였다.
+   예) indent -br -i4 *.cpp
+ 1. 소스파일: http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_calculator?action=download&value=calc.zip
+
+=== 참 조 2 ===
+
+ 1. 다른곳에 있던 소스이다. 이 소스는 비록 에러는 없지만 완벽하진 않다. 그러나, 참고삼아 알고리즘을 살펴볼 필요는 있을것이다.
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define  MAX_STACK_SIZE  100			//스택의 최대크기 
+#define  MAX_EXPR_SIZE   100			//수식의 최대크기 
+
+typedef    enum 
+{
+	lparen, rparen, plus, minus, times,  divide, mod, eos, operand
+} precedence;
+
+precedence pstack[MAX_STACK_SIZE];		
+int        stack[MAX_STACK_SIZE];
+
+char       expr[MAX_EXPR_SIZE];
+
+static int isp[ ] = { 0, 19, 12, 12, 13, 13, 13, 0};
+static int icp[ ] = {20, 19, 12, 12, 13, 13, 13, 0};
+
+
+void add(int *top, int item);					//stack에 삽입 
+void padd(int *top, precedence item);			//pstack에 삽입 
+int delete1(int *top);							//stack에서 삭제
+precedence pdelete(int *top);					//pstack에서 삭제 
+precedence get_token(char *symbol, int *n);		//문자를 토큰으로
+int eval(void);									//후위표기식 계산 
+char print_token(precedence token);				//토큰을 문자로
+void postfix(void);								//중위를 후위로
+
+
+
+void main()
+{
+    printf("수식을 입력하시오 [중위표기] = ");
+    scanf("%s",expr);
+
+    strcat(expr," ");			//수식에 eos 연결 (공백 삽입)
+    printf("[중위표기] %s\n",expr);
+
+    postfix( );
+
+    printf("[후위표기] %s\n",expr);
+    printf("계산결과 = %d\n",eval( ));
+}
+
+
+void add(int *top, int item)
+{
+   if(*top >= MAX_STACK_SIZE-1) 
+   {
+      fprintf(stderr,"\n스택이 꽉 찼습니다.\n");   /* print error message */
+      exit(1);
+   }
+   stack[++*top]=item;
+}
+
+void padd(int *top, precedence item)
+{
+   if(*top >= MAX_STACK_SIZE-1) 
+   {
+      fprintf(stderr,"\n스택이 꽉 찼습니다.\n");   /* print error message */
+      exit(1);
+   }
+   pstack[++*top]=item;
+}
+
+int delete1(int *top)
+{
+   if(*top == -1) 
+   {
+	   fprintf(stderr,"\n스택이 비었습니다.\n");
+	   exit(1);
+   }
+   return stack[(*top)--];
+}
+
+precedence pdelete(int *top)
+{
+   if(*top == -1) 
+   {
+	   fprintf(stderr,"\n스택이 비었습니다.\n");
+	   exit(1);
+   }
+   return pstack[(*top)--];
+}
+
+precedence get_token(char *symbol, int *n)
+{
+   *symbol = expr[(*n)++];
+   switch (*symbol) 
+   {
+      case '(' : return lparen;
+      case ')' : return rparen;
+      case '+' : return plus;
+      case '-' : return minus;
+      case '/' : return divide;
+      case '*' : return times;
+      case '%' : return mod;
+      case ' ' : return eos;
+      default  : return operand;
+  }
+}
+
+int eval(void)
+{
+	precedence token;
+	char symbol;
+	int op1, op2;
+	int n=0;							//수식 문자열을 위한 카운터 
+	int top=-1;
+	token =get_token(&symbol, &n);
+	
+	while (token != eos) 
+	{
+		if(token == operand)
+	        add(&top, symbol-'0');		//스택 삽입
+		else 
+		{
+			//두 피연산자를 삭제하여 연산을 수행한 후, 그 결과를 스택에 삽입함
+			op2 = delete1(&top);		//스택 삭제 	
+			op1 = delete1(&top);		//스택 삭제 
+			switch(token) 
+			{
+			case plus  : add(&top,op1+op2); break;
+			case minus : add(&top,op1-op2); break;
+			case times : add(&top,op1*op2); break;
+			case divide: add(&top,op1/op2); break;
+			case mod   : add(&top,op1%op2); break;
+			}
+		}
+		token = get_token(&symbol, &n);
+	}
+	return delete1(&top);				//결과를 반환 
+}
+
+char print_token(precedence token)
+{
+   switch (token) 
+   {
+      case lparen : return '(';
+      case rparen : return ')';
+      case plus   : return '+';
+      case minus  : return '-';
+      case divide : return '/';
+      case times  : return '*';
+      case mod    : return '%';
+      case eos    : return ' ';
+      default     : return ' ';
+  }
+}
+
+
+void postfix(void)
+{	//수식을  후위 표기식으로 출력한다. 
+	precedence token;
+	
+	char symbol, pexpr[MAX_EXPR_SIZE];
+	int pn=0,n=0, top=0;
+	pstack[0]=eos;
+
+	token = get_token(&symbol, &n);
+  
+	while (token != eos)  
+	{
+		if(token == operand) 
+		{
+			pexpr[pn++]=symbol;
+		}
+		else if (token == rparen) 
+		{		//왼쪽 괄호가 나올때까지 토큰들을 제거해서 출력시킴 
+			while(pstack[top] != lparen)
+				pexpr[pn++]=print_token(pdelete(&top));
+			pdelete(&top);
+		}
+		else  
+		{		
+			//simbol의 isp가 token의 icp보다 크거나 같으면 symbol을 제거하고 출력시킴
+			while(isp[pstack[top]] >= icp[token])
+				pexpr[pn++]=print_token(pdelete(&top));
+			padd(&top,token);
+		}
+		token = get_token(&symbol, &n);
+	}
+	while( (token=pdelete(&top)) != eos )
+		pexpr[pn++]=print_token(token);
+	pexpr[pn++]=' ';
+	pexpr[pn]='\0';
+	strcpy(expr,pexpr);
+}
+}}}
+
+
+

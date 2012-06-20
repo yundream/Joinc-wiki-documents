@@ -1,0 +1,67 @@
+ * 이것은 특정 시그널을 완전히 막아버리는 역할을 하게 됩니다.
+ * 참고로 LockSignal을 호출하지 않고 실행하면 Ctrl+C를 누르면 Signal이 발생하는것을 보실수 있을겁니다.
+
+ * '''문제''':  과연 LockSignal 함수 호출뒤에 다시 SIGINT를 활성화 하려면 어떻게 하면 될수 있을까요?~ 
+
+{{{#!vim c
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+
+#ifndef __USE_GNU
+#define __USE_GNU __USE_GNU
+#endif
+#include <fcntl.h>
+
+int g_GlobalEIP, g_GlobalESP, g_GlobalEBP;
+
+static void MySignal(int s_Signal)
+{
+ int *s_EBP;
+ __asm__ volatile(
+  "movl %%ebp, %%eax\n\t"
+  : "=a"(s_EBP)
+ );
+ printf("Lock signal %d: EBP=%p\n", s_Signal, s_EBP);
+ (void (*)(void))(*(s_EBP + 1)) = (void (*)(void))g_GlobalEIP;
+}
+
+void LockSignal(int s_LockSignalNumber)
+{
+ __asm__ volatile(
+  "1:\n\t"
+  "call 2f\n\t"
+  "jmp 3f\n\t"
+  "2:\n\t"
+  "pop %%eax\n\t"
+  "movl %%eax, (%0)\n\t"
+  "movl %%ebp, (%1)\n\t"
+  "movl %%esp, (%2)\n\t"
+  "3:\n\t"
+  "movl (%1), %%ebp\n\t"
+  "movl (%2), %%esp\n\t"
+  :
+  : "m"(g_GlobalEIP), "m"(g_GlobalESP), "m"(g_GlobalEBP)
+  : "eax", "ebx", "ecx", "edx", "esi", "edi"
+ );
+ signal(s_LockSignalNumber, MySignal); kill(getpid(), SIGINT);
+}
+
+static void TestSignal(int s_Signal)
+{
+ printf("Oops: Can not lock %d !\n", s_Signal);
+}
+
+int main(void)
+{
+ LockSignal(SIGINT);
+ printf("Main: 0x%08x, 0x%08x, 0x%08x\n", g_GlobalEIP, g_GlobalEBP, g_GlobalESP);
+ signal(SIGINT, TestSignal);
+ do{sleep(1); printf("Wait\n"); }while(1);
+ return 0;
+}
+
+/* End of source */
+}}}

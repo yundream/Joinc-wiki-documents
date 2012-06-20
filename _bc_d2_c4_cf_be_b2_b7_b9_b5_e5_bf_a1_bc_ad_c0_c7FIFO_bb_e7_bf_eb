@@ -1,0 +1,129 @@
+== 목적 ==
+ 소켓서버 프로그램이(데몬) 있다고치자. 그것은 select나 poll을 이용하여 비동기 다중소켓 입출력을 할 것이다. 또한 이 서버는 소켓의 내용에 따라 Mysql DB에 엑세스하고 그 결과를 다시 보내줄 것이다. 그래서 소켓입출력을 하는 소켓쓰레드와 DB입출력을 하는 DB쓰레드로 나누어 실행하기로 했다고 하자. 그럼 소켓쓰레드와 DB쓰레드간의 데이터통신은 어떤수단을 사용할것인가. 공유메모리, STL을 이용한 전역 큐객체, 메세지큐, 등 여러가지를 생각해볼 수 있을것이다. 여기서는 IPC통신을 위해 큐에 데이터가 있나없나를 검사하는 별도의 루틴을 두어야 하는 방법은 배제하고 속도도 빠르며, 가장 깔끔하게 처리하기 위하여 기존의 소켓쓰레드에서 소켓fd들의 상태를 감시하던 pollfd의 구조체에 FIFO의 fd 를 추가로 넣어 소켓이나 FIFO에 데이터가 들어올때 그것을 읽어 처리하는 방법을 선택하였고 테스트해보았다. DB쓰레드에서는 FIFO하나만 감시하면 되므로 동기 read를 사용하면 자동으로 데이터가 들어올때까지 방지될것이다. 또한 유닉스, 리눅스 시스템에서는 방지시 cpu를 소모하지 않으므로 효과적이라고 할 수 있겠다. 개인적으로 비동기소켓쓰레드에서의 사용이 아니라면 쓰레드간의 혹은 프로세스간의 통신으로 메시지큐가 훌륭한 선택이지 않을까 싶다. (물론 소켓쓰레드에서도 훌륭하게 사용될 수 있지만, 소켓fd감시와 메시지큐 감시를 따로 해야하므로..- poll에 작은 타임아웃을 주고 메시지큐를 검사하는 방법을 쓰야하지않을싶다)
+
+
+ * server.c
+
+{{{#!plain
+/* 소켓쓰레드에서 외부와의 통신을 위한 소켓과  다른 쓰레드간의 IPC를 위한 FIFO를
+ * poll 을 이용하여 함께 비동기 처리한다.       - code by 산하
+ */
+                                                                                                                             
+// 소켓 서버 프로그램
+                                                                                                                             
+#include <sys/socket.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <sys/poll.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <string.h>
+                                                                                                                             
+#define FIFO_NAME "/var/run/fifo"
+#define BUF_SIZE 128
+                                                                                                                             
+void* tFunc(void* arg) {
+   int fd, i = 0;
+   char buf[BUF_SIZE];
+   fd = open(FIFO_NAME, O_WRONLY);
+   printf("Thread started\n");
+   while (1) {
+      sprintf(buf, "%d : %s", i++, "This is thread");
+      write(fd, buf, BUF_SIZE);
+      sleep(1);
+   }
+}
+                                                                                                                             
+int main (void) {
+   int num, i;
+   char buf[BUF_SIZE];
+   pthread_t pt;
+   struct sockaddr_in addr;
+   socklen_t len;
+   struct pollfd pFd[3];   // 0: 서버소켓, 1: FIFO, 2: 클라이언트소켓
+   mkfifo(FIFO_NAME, 0777);
+   pthread_create(&pt, NULL, tFunc, NULL);
+   pFd[2].fd = -1;
+   pFd[1].fd = open(FIFO_NAME, O_RDONLY);
+   pFd[1].events = POLLIN;
+   memset(&addr, 0, sizeof(addr));
+   addr.sin_family = AF_INET;
+   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+   addr.sin_port = htons(7080);
+   pFd[0].fd = socket(AF_INET, SOCK_STREAM, 0);
+   pFd[0].events = POLLIN;
+   bind(pFd[0].fd, (struct sockaddr*) &addr, sizeof(addr));
+   listen(pFd[0].fd, 10);
+   printf("Main started\n");
+   while (1) {
+      sleep(3);
+      num = poll(pFd, 3, -1);
+      printf("It is ready to read %d\n", num);
+      for (i = 0; i < 3; i++) {
+         if (pFd[i].revents & (POLLIN | POLLERR)) {
+            if (i == 0) {
+               pFd[2].fd = accept(pFd[0].fd, (struct sockaddr*) &addr, &len);
+               pFd[2].events = POLLIN;
+               printf("Client connected\n");
+            } else {
+               if (read(pFd[i].fd, buf, BUF_SIZE) <= 0) {
+                  printf("Socket closed\n");
+                  close(pFd[i].fd);
+                  pFd[i].fd = -1;
+               } else printf("%s\n", buf);
+            }
+         }
+      }
+   }
+   return(0);
+}
+}}}
+
+ * client.c
+
+{{{#!plain
+// 클라이언트 프로그램
+                                                                                                                             
+#include <stdio.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+                                                                                                                             
+#define BUF_SIZE 128
+                                                                                                                             
+int main(void) {
+   int sFd, i = 0;
+   char buf[BUF_SIZE];
+   struct sockaddr_in addr;
+   sFd = socket(AF_INET, SOCK_STREAM, 0);
+   memset(&addr, 0, sizeof(addr));
+   addr.sin_family = AF_INET;
+   inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+   addr.sin_port = htons(7080);
+   if (connect(sFd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+      printf("connect error : %s\n", strerror(errno));
+      exit(-1);
+   }
+   while (1) {
+      printf("Send data : ");
+      scanf("%s", buf);
+      if (strcmp(buf, "exit")) write(sFd, buf, BUF_SIZE);
+      else {
+         printf("Exiting\n");
+         break;
+      }
+   }
+   return(0);
+}
+}}}
+
+== 결 과 ==
+  server 프로그램에서는 별도 쓰레드가 지속적으로 FIFO 를 통해 데이터를 전송하고 있으며 client프로그램에서는 표준입력을 받아 소켓으로 전송한다. exit를 입력시엔 빠져나간다. FIFO나 소켓에 데이터가 들어올때만 read가 수행되는 비동기입출력이 잘 되고 있음을 알 수 있다.

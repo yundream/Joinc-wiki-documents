@@ -1,0 +1,308 @@
+#title Pthread_모델
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Pthread(5) - Pthread 모델</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Pthread(5) - Pthread 모델</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN12"
+>Pthread 가 지원하는 thread scope mode</A
+></DT
+><DT
+>3&#51208;. <A
+HREF="#AEN29"
+>결론 - Pthread 에서의 쓰레드 Models</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번문서는 pthread 에서 지원하는 thread mode 와 이를 활용하는 
+		방법에 대해서 알아보도록 한다. 테스트는 solaris 와 linux(kernel 2.4.x)
+		하에서 이루어졌다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN12"
+>2&#51208;. Pthread 가 지원하는 thread scope mode</A
+></H1
+><P
+>		우리는 이전의 문서들에서 thread 가 User mode 와 kernel mode 에서 작동하는 
+		2가지 종류가 있다고 배웠었다. 그렇다면 한가지 궁금해 지는게 있다. 
+		과연 Pthread 는 user mode 와 kernel mode 중 어떤 mode 의 쓰레드를 지원하는가 ?
+	</P
+><P
+>		답은 모두 지원한다 이다. 즉 Pthread 는 필요에 따라서 user mode 쓰레드를 생성할수도 
+		있으며 kernel mode 쓰레드를 생성할수 있으며, 심지어는 하나의 메인 쓰레드에서 
+		kernel mode 쓰레드와 user mode 쓰레드를 각각 생성시킬수도 있다. 
+		이를두고 Pthread 는 <B
+CLASS="EMPHASIS"
+>hybrid thread</B
+> 를 지원한다라고 말한다. 
+		hybrid 는 "잡종", "뒤섞인" 을 나타낸다. 
+	</P
+><P
+>		이러한 mode 는 pthread_create 를 호출하면서 지정할수 있다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>nt pthread_create(pthread_t  *  thread, pthread_attr_t *
+                   attr, void * (*start_routine)(void *), void * arg);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위의 pthread_create 함수에서 두번째 아규먼트인 pthread_attr_t 를 세팅해 줌으로써, 
+		만들어질 쓰레드의 mode 를 결정시켜줄수 있다. 만약 pthread_attr_t 의 값이 NULL 이라면 
+		기본값으로 세팅되는데, 리눅스의 경우는 user mode 쓰레드로, 솔라리스의 경우에는 
+		kernel mode 로 쓰레드가 생성된다. 
+	</P
+><P
+>		pthread_attr_t 의 값은 pthread_attr_init(3) 함수를 이용해서 지정할수 있다. 
+		pthread 상에서 user mode 쓰레드를 사용을위해서는 
+		<B
+CLASS="EMPHASIS"
+>PTHREAD_SCOPE_SYSTEM</B
+>, kernel mode 쓰레드를 사용하기 위해서는 
+		<B
+CLASS="EMPHASIS"
+>PTHREAD_SCOPE_PROCESS</B
+>  값을 사용하면 된다. 
+		리눅스는 기본적으로 (pthread_attr_t 가 NULL 일경우) PTHREAD_SCOPE_SYSTEM 을 사용한다. 
+		그럼 간단한 예를 들어서 알아보도록 하겠다. 
+	</P
+><P
+>		<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=39"
+TARGET="_top"
+>Pthread(2)</A
+> 의 <B
+CLASS="EMPHASIS"
+>mutex_lock.c</B
+> 를 수정하도록 할것이다.  
+		위의 원본 예제를 보면 pthread_create 시에 2번째 아규먼트인 pthread_attr_t 를 NULL 로 
+		잡았는데, 이 새로운 예제는 pthread_attr_t 값을 직접 세팅 해서 쓰레드를 
+		생성하도록 할것이다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : mutex_lock_2.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+
+pthread_mutex_t mutex_lock   = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t   thread_cond  = PTHREAD_COND_INITIALIZER;
+pthread_cond_t   thread_cond2  = PTHREAD_COND_INITIALIZER;
+
+struct com_data
+{
+    int a;
+    int b;
+};
+
+struct com_data mydata;
+int sig_num;
+
+void *do_write(void *data)
+{
+    int loop = 0;
+    mydata.a = 0;
+    mydata.b = 0;
+    while(loop &#60; 10)
+    {
+        pthread_mutex_lock(&#38;mutex_lock);
+        mydata.a = random() % 6000;
+        mydata.b = random() % 6000;
+        pthread_cond_signal(&#38;thread_cond);
+        pthread_mutex_unlock(&#38;mutex_lock);
+        loop++;
+        sleep(1);
+    }
+    printf("sig is %d
+", sig_num);
+    exit(0);
+}
+
+void *do_read(void *data)
+{
+    sig_num = 0;
+    while(1)
+    {
+        pthread_mutex_lock(&#38;mutex_lock);
+        pthread_cond_wait(&#38;thread_cond, &#38;mutex_lock);
+        printf("%4d + %4d = %4d
+", mydata.a, mydata.b, mydata.a + mydata.b); 
+        sig_num++;    
+        pthread_mutex_unlock(&#38;mutex_lock);
+    }
+}
+
+int main()
+{
+    pthread_t p_thread[2];
+    pthread_attr_t myattr;
+    pthread_attr_t myattr2;
+
+    int thr_id;
+    int status;
+    int a = 1;
+    int b = 2;
+
+    int scope;
+
+    pthread_attr_init(&#38;myattr);
+    pthread_attr_init(&#38;myattr2);
+    pthread_attr_setscope(&#38;myattr, PTHREAD_SCOPE_PROCESS);
+    pthread_attr_setscope(&#38;myattr2, PTHREAD_SCOPE_SYSTEM);
+
+    status = pthread_attr_getscope(&#38;myattr, &#38;scope);
+    printf("PROCESS : %d, %d, %d
+", scope, PTHREAD_SCOPE_PROCESS, status);
+
+    status = pthread_attr_getscope(&#38;myattr2, &#38;scope);
+    printf("SYSTEM : %d, %d, %d
+", scope, PTHREAD_SCOPE_SYSTEM, status);
+
+    thr_id = pthread_create(&#38;p_thread[0], &#38;myattr, do_write, (void *)&#38;a); 
+    thr_id = pthread_create(&#38;p_thread[1], &#38;myattr2, do_read, (void *)&#38;b);
+
+    pthread_join(p_thread[0], (void **) status);
+    pthread_join(p_thread[1], (void **) status);
+
+    return 0;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		pthread_attr_t 는 구조체로써 /usr/include/bits/pthreadtypes.h 에 선언되어 
+		있다. pthread_attr_init 를 이용해서 이 구조체를 초기화 시켜줄수 있다.  
+		(솔라리스는 /usr/include/sys/types.h 에 선언되어 있음) 
+	</P
+><P
+>		그런데 위의 예제를 실행시켜 보면 이상한점을 발견할수 있을것이다. 
+		분명히 첫번째 쓰레드는 PTHREAD_SCOPE_SYSTEM 으로 다른 쓰레드는 PTHREAD_SCOPE_PROCESS 
+		로 pthread_attr_t 값을 세팅하고 실행시켰으며, 제대로 실행이 되었는데, 
+		pthread_attr_getscope 를 이용해서 pthread_attr_t 값을 가져온걸보면 모두다 PTHREAD_SCOPE_SYSTEM(0)
+		으로만 세팅되어 있다. 이와 관련된 내용은 pthread_attr_init 의 man 페이지를 보면 나오는데, 
+		"PTHREAD_SCOPE_PROCESS is not supported in LinuxThreads." 라고 되어 있다. 
+		결론적으로 말해서 리눅스는 아직까지는 Kernel mode 쓰레드를 지원하지 않는다(2.4.x 에서 테스트 
+		했음). 위의 코드를 솔라리스에서 테스트 해보면 솔라리스의 경우 kernel mode 와 user mode 쓰레드 
+		를 모두 지원하고 있음을 알수 있을것이다. 필자의 경우 Sun os 5.7 에서 테스트 해보았는데, 
+		두가지 mode 의 쓰레드를 모두 지원하고 있었다. 
+		리눅스에서 PTHREAD_SCOPE_PROCESS 를 남겨두는 이유는 
+		미래에 지원될때와 코드호환 때문으로 생각된다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>3&#51208;. 결론 - Pthread 에서의 쓰레드 Models</A
+></H1
+><P
+>		아직까지 리눅스 상에서는 pthread 를 통해서 Kernel mode thread 를 만들수는 없으며, 
+		단지 User mode thread 만 작동가능한걸로 조사되었다.
+		즉 M 개의 user mode 쓰레드가 1개의 커널 모드 프로세스(kernel space process)에서 작동한다.
+	</P
+><P
+>	
+		pthread 의 다음버전에서는 M:N 의 쓰레드 모델을 지원할것으로 보인다. 
+		이에 대한 내용은 <A
+HREF="http://oss.software.ibm.com/developerworks/opensource/pthreads/"
+TARGET="_top"
+>Next Generation POSIX Threading</A
+>를 참고하기 바란다. M:N 쓰레드 모델은 다른 유닉스 벤더들 (solarix, AIX, True64 ..)의 
+		쓰레드 모델로써 M개의 유저 모드 쓰레드가 N개의 커널모드쓰레드와 매핑되는 모델을 말한다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

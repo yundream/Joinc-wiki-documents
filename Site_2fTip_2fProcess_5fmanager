@@ -1,0 +1,89 @@
+#title [TIP] 프로세스 관리하기
+
+요즘들어 named 데몬(:12)이 죽는 일이 종종발생한다. 지난 신정연휴에는 거의 이틀 정도 named 데몬이 죽어있었고, 이 때문에 웹에 접근하지 못하는 일이 발생했다. 원인을 찾아서 해결을 해야 겠지만 시간이 얼마나 걸릴지 알 수 없고, 당장은 서비스가 문제없이 되는게 중요하다고 생각이 되어서, 간단한 프로세스 관리 프로그램을 만들기로 했다.
+
+이 프로그램은 프로세스(:12)가 떠있는지 검사해서, 떠있지 않을 경우 재실행 시킨다. 프로그램은 perl(:12)을 이용해서 작성했다. proc(:12)파일시스템을 분석해서, 프로세스 정보를 얻어올 수 있겠지만, 귀찮아서 그냥 ps(1)를 이용했다. thread(:12) 갯수를 얻기 위해서 proc(:12)파일시스템을 분석했다.  
+
+{{{#!plain
+#!/usr/bin/perl
+
+$argnum = $#ARGV+1;
+$PNAME = $ARGV[0];
+$PID=$$;
+
+# thread(:12) 갯수를 얻어온다.
+sub getThreadNum
+{
+  my($PID) = @_;
+  my $PROC = "/proc/$PID/status";
+  my $thread="";
+  my $line;
+  open(LFD, $PROC) || die "Process Status FAILURE |status=0\n";
+
+  while($line=<LFD>)
+  {
+    if ($line =~ m/^Threads:/)
+    {
+      $line =~ s/\s+$//;
+      @_=split /:[ \t]+/,$line;
+      $thread=$_[1];
+      close(LFD);
+      return atoi($thread);
+    }
+  }
+  close(LFD);
+}
+
+# 문자열을 int형 숫자로 변경한다.
+sub atoi
+{
+    my $num;
+    foreach my $d (split(//, shift()))
+    {
+        $num = $num * 10 + $d;
+    }
+    return $num;
+}
+
+# ps를 이용해서 프로세스 목록을 얻어온다.
+# 목록중에 인자로 주어진 프로세스 이름과 같은 줄을 분석해서
+# 프로세스의 정보를 얻어낸다.
+open(FD, "ps aux |") || die "Process Status FAILURE |status=0\n";
+$CpuUsage = 0.0;
+$MemUsage = 0.0;
+$MemSize = 0;
+$Pnum = 0;
+$TNum = 0;
+while($line = <FD>)
+{
+  if ($line =~ m/$PNAME/)
+  {
+    if ($line =~ m/$0/)
+    {
+    }
+    else
+    {
+      @_ = split / +/,$line;
+      $CpuUsage = $CpuUsage + $_[2];
+      $MemUsage += $_[3];
+      $MemSize += $_[4];
+      $TNum += getThreadNum($_[1]);
+      $Pnum++;
+    }
+  }
+}
+if ($Pnum == 0)
+{
+    printf "Process Status OK |status=0\n";
+    system("/etc/rc.d/init.d/named restart");
+}
+else
+{
+    printf "Process Status OK |status=1 cpu=%d mem=%d num=$Pnum size=%d thread=%d\n", $CpuUsage, $MemUsage, $MemSize, $TNum;
+}
+}}}
+프로그램은 예상외로 복잡한데, 그 이유는 애초에 이 프로그램이 프로세스의 상세정보를 알려주기 위한 목적으로 만들어졌기 때문이다. 여기에 프로세스 갯수가 0이면 system(3)함수를 이용해서 named 데몬을 리스타트 시키는 코드 한줄만 추가했다.  이 프로그램을 cron(:12)에 입력해서 일정 주기로 실행되게 만들었다.
+
+이 프로그램은 process(:12)갯수, thread(:12)갯수, 메모리및 cpu 사용율 등의 정보를 리턴한다. 리턴값은 시스템관리프로그램의 하나인 nagios(:12)에서 사용가능한 포맷의 문자열이다.
+
+[[tag(process,proc,시스템관리,ps,named,thread,sms,qos)]]

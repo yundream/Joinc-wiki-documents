@@ -1,0 +1,604 @@
+#title 네트워크 정보 수집
+[[TableOfContents]]
+
+== 소개 ==
+Unix 운영체제에서의 네트워크 정보수집에 대한 내용을 다룬다. Unix 운영체제 마다 수집해야하는 방법이 차이가 있음으로 운영체제별로 설명을 하도록 하겠다.
+
+여기에서 수집할 네트워크 정보는 아래의 목록들에 포함된 내용들이다.
+ 1. Interface 일반정보
+   1. Interface 주소(Ipaddress, Network, NetMask) 
+   1. MAC(12) Address 
+   1. MTU(12) Size
+   1. Interface 이름(eh0...) 
+   1. Interface 상태(Link Up, Down)
+ 1. Interface 패킷정보 
+   1. In/Out bps/pps
+   1. In/Out UniCast pps 
+   1. In/Out Drop/Error pps
+ 1. 일반 네트워크 정보 (SNMP 수집항목들)
+   1. ipForwarding  
+   1. ipDefaultTTL 
+   1. ipInHdrErrors
+   1. ipInDiscards
+   1. ipInAddrErrors
+   1. ipInReceives
+   1. ipOutRequests
+   1. icmpInmsgs
+   1. icmpInErrors
+   1. icmpOutMsgs 
+   1. icmpOutErrors
+   1. icmpInEchos
+   1. icmpOutEchos
+   1. tcpInSegs
+   1. tcpOutSegs
+   1. tcpInErrs
+   1. tcpMaxConn
+   1. udpInDatagrams
+   1. udpNoports
+   1. udpInerrors
+   1. udpOutDatagrams
+
+일반네트워크 정보의 경우 저외에도 수십개의 수집할 수 있는 항목들이 더 있지만, 여기에서는 그중 중요하다고 생각되는 일부만 수집하도록 하겠다. 일반 네트워크 정보들은 SNMP MIBII 의 항목들중에서 선택했다. 각 항목들은 MIB에 맵핑 시킬 수 있을 것이다. 여기에 대한 정리는 추후에 하도록 한다.
+
+== Linux ==
+리눅스 운영체제의 경우 대부분의 중요 정보들을 /proc 파일 시스템을 통해서 얻어올 수 있다.
+ 1. 인터페이스 패킷 정보 : /proc/net/dev
+ 1. 일반 네트워크 정보 (SNMP 수집항목들) : /proc/net/snmp
+다만 인터페이스의 일반정보는 /proc에서 지원하지 않는다. 이들 정보는 ioctl()을 이용해야 한다.  
+
+=== Snmp 항목 ===
+MIBII를 기준으로 한다.
+
+==== Interface 별 I/O 정보 ==== 
+|| 항목				|| 설명					|| 단위			||
+|| ifInOctets		|| 입력 Byte			|| Count		||
+|| ifInUcastPkts	|| 입력 UniCast			|| Count		||
+|| ifInDiscards		|| 입력 Discard			|| Count		||
+|| ifInErrors		|| 입력 Error			|| Count		||
+|| ifOutOctets		|| 출력 Byte			|| Count		||
+|| ifOutUcastPkts	|| 출력 UniCast			|| Count		||
+|| OutDiscards		|| 출력 Discard			|| Count		||
+|| ifOutErrors		|| 출력 Error			|| Count		||
+
+==== 전역 패킷정보(IP/ICMP/TCP/UDP) ==== 
+
+=== 인터페이스 일반정보 얻기 ===
+ioctl(2)함수는 입출력 장치를 제어하고, 장비를 얻기 위한 목적으로 사용하는 함수다. ioctl을 통해서 해당 장치에 대한 제어와 정보를 얻기 위해서는 해당 사항에 대해서 어떠한 flags를 사용하는지를 알고 있어야 한다.   
+
+이들 flags는 '''/usr/include/bits/ioctls.h'''에 정의되어 있다. 이중 네트워크 장치들은 '''SIOCGIF'''의 접두사를 가지고 정의되어 있다. 다음은 그중 일부분이다. 
+{{{#!plain
+#define SIOCGIFNAME     0x8910          /* get iface name               */
+#define SIOCSIFLINK     0x8911          /* set iface channel            */
+#define SIOCGIFCONF     0x8912          /* get iface list               */
+#define SIOCGIFFLAGS    0x8913          /* get flags                    */
+#define SIOCSIFFLAGS    0x8914          /* set flags                    */
+#define SIOCGIFADDR     0x8915          /* get PA address               */
+#define SIOCSIFADDR     0x8916          /* set PA address               */
+#define SIOCGIFDSTADDR  0x8917          /* get remote PA address        */
+#define SIOCSIFDSTADDR  0x8918          /* set remote PA address        */
+#define SIOCGIFBRDADDR  0x8919          /* get broadcast PA address     */
+#define SIOCSIFBRDADDR  0x891a          /* set broadcast PA address     */
+#define SIOCGIFNETMASK  0x891b          /* get network PA mask          */
+#define SIOCSIFNETMASK  0x891c          /* set network PA mask          */
+#define SIOCGIFMETRIC   0x891d          /* get metric                   */
+#define SIOCSIFMETRIC   0x891e          /* set metric                   */
+#define SIOCGIFMEM      0x891f          /* get memory address (BSD)     */
+#define SIOCSIFMEM      0x8920          /* set memory address (BSD)     */
+#define SIOCGIFMTU      0x8921          /* get MTU size                 */
+#define SIOCSIFMTU      0x8922          /* set MTU size                 */
+#define SIOCSIFNAME     0x8923          /* set interface name           */
+#define SIOCSIFHWADDR   0x8924          /* set hardware address         */
+}}}
+이름으로 어디에 사용되는 플레그들인지 충분히 알아볼 수 있으리라 생각된다. 
+
+==== ioctl(2)를 이용한 인터페이스 정보 수집 ====
+다음은 ioctl함수를 이용해서 eth0의 인터페이스 정보를 수집하는 방법이다. 
+{{{#!plain
+int fd;
+struct ifreq ifrq;
+struct sockaddr_in *sin;
+
+fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+// eth0에 대한 MAC 주소를 얻는다.
+strcpy(ifrq.ifr_name, "eth0");
+if (ioctl(fd,SIOCGIFHWADDR, &ifrq) < 0)  
+{
+	// 에러처리
+}
+printf("Mac Address : %s", ifrq.ifr_hwaddr.sa_data);
+// MAC주소를 ":"로 구분되는 표준포멧으로 만들기 위해서는 
+// 별도의 코드가 필요하다.
+
+// eth0에 대한 IP address 를 얻는다.
+if (ioctl(fd, SIOCGIFADDR, &ifrq) < 0) 
+{
+	// 에러처리
+}
+sin = (sockaddr_in *)&ifrq.ifr_addr;
+printf("%s\n", inet_ntoa(sin->sin_addr));
+}}}
+
+코드를 명확히 이해하고 사용하기 위해서는 ifreq 구조체에 대해서 정확한 정보를 가지고 있을 필요가 있다. ifreq 구조체는 '''/usr/include/net/if.h'''에 정의되어 있으니 참고하기 바란다.
+
+===== 인터페이스 상태 =====
+인터페이스는 여러가지 상태가 있을 수 있다. 현재 up상태가 아닐 수도 있고, loopback 상태의 장치일 수도 있다. 이러한 정보는 '''SIOCGIFFLAGS'''를 이용해서 flag값을 분석함으로써 얻어올 수 있다. flags에 관한 정보는 '''/usr/include/net/if.h'''에 정의되어 있으니 참고하기 바란다. 
+{{{#!plain
+#ifdef __USE_MISC
+/* Standard interface flags. */
+enum
+  {
+    IFF_UP = 0x1,               /* Interface is up.  */
+# define IFF_UP IFF_UP
+    IFF_BROADCAST = 0x2,        /* Broadcast address valid.  */
+# define IFF_BROADCAST  IFF_BROADCAST
+    IFF_DEBUG = 0x4,            /* Turn on debugging.  */
+# define IFF_DEBUG      IFF_DEBUG
+    IFF_LOOPBACK = 0x8,         /* Is a loopback net.  */
+# define IFF_LOOPBACK   IFF_LOOPBACK
+    IFF_POINTOPOINT = 0x10,     /* Interface is point-to-point link.  */
+# define IFF_POINTOPOINT IFF_POINTOPOINT
+    IFF_NOTRAILERS = 0x20,      /* Avoid use of trailers.  */
+......
+}}}
+
+다음은 ioctl(2)를 이용해서 인터페이스 정보를 얻어오는 예제다.
+{{{#!plain
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+
+#include <arpa/inet.h>
+
+int main(int argc, char **argv)
+{
+  int fd;
+  int i;
+
+  struct ifreq ifrq;
+  struct sockaddr_in *sin;
+
+  if (argc != 2)
+  {
+    printf("usage : ./ifinfo [ifname]\n");
+    return 1;
+  }
+  fd = socket (AF_INET, SOCK_DGRAM, 0);
+  if(fd < 0)
+  {
+    perror("Socket open error");
+    return 1;
+  }
+  strcpy(ifrq.ifr_name, argv[1]);
+  if(ioctl(fd, SIOCGIFHWADDR, &ifrq) < 0)
+  {
+    perror("Mac Error");
+  }
+  // MAC 주소는 적당히 변환시키도록 하자.
+  for (i = 0; i < 6; i++)
+  {
+    printf("%x\n",ifrq.ifr_addr.sa_data[i]);
+  }
+  if(ioctl(fd, SIOCGIFADDR, &ifrq) < 0)
+  {
+    perror("IPADDR Error");
+  }
+  sin = (struct sockaddr_in *)&ifrq.ifr_addr;
+  printf("IPADDR : %s\n", inet_ntoa(sin->sin_addr));
+
+  if(ioctl(fd, SIOCGIFMTU, &ifrq) < 0)
+  {
+    perror("IPADDR Error");
+  }
+  printf("MTU : %d\n", ifrq.ifr_mtu);
+
+  // GET NETMASK
+  if(ioctl(fd, SIOCGIFNETMASK, &ifrq) < 0)
+  {
+    perror("NETMASK Error");
+  }
+  sin = (struct sockaddr_in *)&ifrq.ifr_addr;
+  printf("NETMASK : %s\n", inet_ntoa(sin->sin_addr));
+  if(ioctl(fd, SIOCGIFFLAGS, &ifrq) < 0)
+  {
+    perror("SIOCGIFFLAGS");
+  }
+  if(!(ifrq.ifr_flags & IFF_UP))
+  {
+    printf("IF STATUS UP\n");
+  }
+  else
+  {
+    printf("IF STATUS DOWN\n");
+  }
+  close(fd);
+}
+}}}
+그런데 위의 코드는 약간의 문제가 있다. 그것은 인터페이스 이름을 반드시 알고 있어야만 정보를 얻어올 수 있다는 점이다. 좀더 범용성 있는 코드를 위해서는 현재 사용중인 인터페이스의 이름을 자동으로 얻어와서 거기에 대한 정보를 구조체 형식으로 넘겨주도록 작성되어야 할것이다.
+
+다행히도 ioctl(2)에는 작동중인 인터페이스의 목록을 위한 '''SIOCGIFCONF'''를 제공한다. 이 flag를 이용해서 인터페이스의 이름을 포함한 목록을 얻어올 수 있다. SIOCGIFCONF의 응용예는 [wiki:pcap pcap]페이지를 참고하기 바란다.  
+
+이상 '''SIOCGIFCONF'''를 이용하면 인터페이스의 목록을 얻어올 수 있는데, 작동중인 인터페이스의 목록만을 얻어온다는 문제점을 가진다. 현재 시스템에 몇개의 인터페이스가 있는지, 어떤 종류인지(인터페이스 이름을 보면 기가비트 이더넷인지 아닌지등에 대한 정보를 얻을 수 있다), MAC 등의 정보를 얻기 위해서는 작동중이지 않는 인터페이스라 하더라도 정보를 얻어올 필요가 있다. 
+
+이 문제는 '''/proc/net/dev'''를 분석함으로써 해결가능하다. '''dev'''파일에는 인터페이스의 이름뿐만 아니라 입출력되는 패킷과 데이터의 count정보까지 제공해준다. '''dev'''파일에 대한 내용은 뒤에서 따로 다루도록 하겠다. 
+
+MAC주소 변환은 [wiki:Code_C_char2hex char2hex]를 참고하기 바란다.
+
+==== 보강 코드 ====
+좀더 보강한 코드를 아래에 적어봅니다. - [minzkn]
+{{{#!plain down:ifconfig.c
+/* 
+ Copyright (c) 2002 Information Equipment co.,LTD. 
+ All Right Reserved. 
+
+ Code by JaeHyuk Cho <minzkn@infoeq.co.kr> 
+
+ - Simple is best 
+*/ 
+
+#if !defined(DEF_ifconfig_c) 
+#define DEF_ifconfig_c "ifconfig.c" 
+
+#include <stdio.h> 
+#include <unistd.h> 
+#include <stdlib.h> 
+#include <string.h> 
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <sys/ioctl.h> 
+#include <netinet/in.h> 
+#include <net/if.h> 
+#include <netinet/if_ether.h> 
+#include <arpa/inet.h> 
+#include <netdb.h> 
+#include <netinet/ether.h> 
+
+int main(int s_Argc, char **s_Argv); 
+
+int main(int s_Argc, char **s_Argv) 
+{ 
+ int s_SocketHandle;    
+ int s_RequestCount = 10; 
+ struct ifconf s_ifconfig; 
+ struct ifreq *s_ifrequest; 
+ struct sockaddr_in *s_SockAddr_In; 
+  
+ char s_StringBuffer[1 << 10]; 
+ char *s_MyTitle; 
+ char *s_MyDevice; 
+ char *s_MyIP, *s_MyBroadcastIP, *s_MyNetmaskIP; 
+ char *s_MyHWAddr; 
+ char *s_MyFlagString; 
+ int  s_MyFlags, s_MyMTU, s_MyMetric; 
+ fprintf(stdout, "MZ_ifconfig v0.0.1b - Copyright(c)InfoEQ co.,LTD - %s %s\n", __DATE__, __TIME__); 
+ fprintf(stdout, "Code by JaeHyuk Cho - <minzkn@infoeq.co.kr>\n\n"); 
+ s_SocketHandle = socket(AF_INET, SOCK_DGRAM, 0); 
+ if(s_SocketHandle >= 0) 
+ { 
+  memset((void *)&s_ifconfig, 0, sizeof(struct ifconf)); 
+  do 
+  { 
+   if(s_ifconfig.ifc_buf)free(s_ifconfig.ifc_buf); 
+   s_ifconfig.ifc_len = sizeof(struct ifreq) * s_RequestCount; 
+   s_ifconfig.ifc_buf = malloc(s_ifconfig.ifc_len); 
+   if(s_ifconfig.ifc_buf) 
+   { 
+    if(ioctl(s_SocketHandle, SIOCGIFCONF, &s_ifconfig) == 0) 
+    { 
+     if(s_ifconfig.ifc_len < (sizeof(struct ifreq) * s_RequestCount)) 
+     { 
+      s_ifrequest = s_ifconfig.ifc_req; 
+      if(s_ifrequest) 
+      { 
+       for(s_RequestCount = 0;s_RequestCount < s_ifconfig.ifc_len;s_RequestCount += sizeof(struct ifreq), s_ifrequest++) 
+       { 
+        /* ------------------------------------------------------------------------ */           
+   s_MyDevice = strdup(s_ifrequest->ifr_name); 
+    
+   /* ioctl(s_SocketHandle, SIOCGIFADDR, s_ifrequest); */ 
+   s_SockAddr_In       = (struct sockaddr_in *)(&s_ifrequest->ifr_addr); 
+        s_MyIP              = strdup(inet_ntoa(s_SockAddr_In->sin_addr));    
+   ioctl(s_SocketHandle, SIOCGIFBRDADDR, s_ifrequest);        
+   s_SockAddr_In       = (struct sockaddr_in *)&s_ifrequest->ifr_broadaddr; 
+        s_MyBroadcastIP     = strdup(inet_ntoa(s_SockAddr_In->sin_addr));    
+   ioctl(s_SocketHandle, SIOCGIFNETMASK, s_ifrequest);        
+   s_SockAddr_In       = (struct sockaddr_in *)&s_ifrequest->ifr_netmask; 
+        s_MyNetmaskIP       = strdup(inet_ntoa(s_SockAddr_In->sin_addr));    
+#if 0    
+   if(ioctl(s_SocketHandle, SIOCGIFHWADDR, s_ifrequest) == 0) 
+   { 
+    unsigned char s_NullHWAddr[] = {0, 0, 0, 0, 0, 0}; 
+         if(memcmp(&s_ifrequest->ifr_hwaddr.sa_data[0], &s_NullHWAddr[0], sizeof(s_NullHWAddr)) == 0)strcpy(s_StringBuffer, ""); 
+    else sprintf(s_StringBuffer, "HWAddr %s", ether_ntoa((struct ether_addr *)s_ifrequest->ifr_hwaddr.sa_data)); 
+   } 
+   else strcpy(s_StringBuffer, "HWAddr <ERROR>"); 
+#else 
+   if(ioctl(s_SocketHandle, SIOCGIFHWADDR, s_ifrequest) == 0) 
+   { 
+    sprintf(s_StringBuffer, "HWAddr %s", ether_ntoa((struct ether_addr *)s_ifrequest->ifr_hwaddr.sa_data)); 
+   } 
+   else strcpy(s_StringBuffer, "HWAddr <ERROR>"); 
+#endif 
+   s_MyHWAddr = strdup(s_StringBuffer); 
+    
+   if(ioctl(s_SocketHandle, SIOCGIFFLAGS, s_ifrequest) == 0)s_MyFlags = s_ifrequest->ifr_flags; 
+   else s_MyFlags = 0; 
+          strcpy(s_StringBuffer, ""); 
+   if(s_MyFlags == 0)strcpy(s_StringBuffer, "[NO FLAGS]"); 
+   else 
+   { 
+    if(s_MyFlags & IFF_UP          )strcat(s_StringBuffer, "UP ");    
+    if(s_MyFlags & IFF_BROADCAST   )strcat(s_StringBuffer, "BROADCAST ");    
+    if(s_MyFlags & IFF_DEBUG       )strcat(s_StringBuffer, "DEBUG ");    
+    if(s_MyFlags & IFF_LOOPBACK    )strcat(s_StringBuffer, "LOOPBACK ");    
+    if(s_MyFlags & IFF_POINTOPOINT )strcat(s_StringBuffer, "POINTOPOINT ");    
+    if(s_MyFlags & IFF_NOTRAILERS  )strcat(s_StringBuffer, "NOTRAILERS ");    
+    if(s_MyFlags & IFF_RUNNING     )strcat(s_StringBuffer, "RUNNING ");    
+    if(s_MyFlags & IFF_NOARP       )strcat(s_StringBuffer, "NOARP ");    
+    if(s_MyFlags & IFF_PROMISC     )strcat(s_StringBuffer, "PROMISC ");    
+    if(s_MyFlags & IFF_ALLMULTI    )strcat(s_StringBuffer, "ALLMULTI ");    
+    if(s_MyFlags & IFF_SLAVE       )strcat(s_StringBuffer, "SLAVE ");    
+    if(s_MyFlags & IFF_MASTER      )strcat(s_StringBuffer, "MASTER ");    
+    if(s_MyFlags & IFF_MULTICAST   )strcat(s_StringBuffer, "MULTICAST ");    
+   } 
+   s_MyFlagString = strdup(s_StringBuffer); 
+
+        s_MyTitle = strdup("Unknown"); /* Not support */ 
+    
+   if(ioctl(s_SocketHandle, SIOCGIFMTU, s_ifrequest) == 0)s_MyMTU = s_ifrequest->ifr_mtu; 
+   else s_MyMTU = 0; 
+    
+   if(ioctl(s_SocketHandle, SIOCGIFMETRIC, s_ifrequest) == 0)s_MyMetric = s_ifrequest->ifr_metric; 
+   else s_MyMetric = 0; 
+        
+   /* Print. */ 
+   fprintf(stdout, 
+      "%-8s Link encap:%s  %s\n" 
+      "%-8s inet addr %-15s  Broadcast %-15s  Netmask %-15s\n" 
+      "%-8s %s MTU:%d Metric:%d\n" 
+      "\n", 
+           s_MyDevice, s_MyTitle, s_MyHWAddr, 
+      "", s_MyIP, s_MyBroadcastIP, s_MyNetmaskIP, 
+      "", s_MyFlagString, s_MyMTU, s_MyMetric ? s_MyMetric : 1 
+          ); 
+    
+   /* Free. */ 
+   if(s_MyTitle      )free(s_MyTitle); 
+   if(s_MyDevice     )free(s_MyDevice); 
+   if(s_MyIP         )free(s_MyIP); 
+   if(s_MyBroadcastIP)free(s_MyBroadcastIP); 
+   if(s_MyNetmaskIP  )free(s_MyNetmaskIP); 
+   if(s_MyHWAddr     )free(s_MyHWAddr); 
+   if(s_MyFlagString )free(s_MyFlagString); 
+        /* ------------------------------------------------------------------------ */           
+       } 
+      } 
+      break; 
+     } 
+     else s_RequestCount += 10; 
+    } 
+    else break; 
+   } 
+   else break; 
+  }while(1);  
+  if(s_ifconfig.ifc_buf)free(s_ifconfig.ifc_buf); 
+  close(s_SocketHandle);     
+ } 
+ else fprintf(stderr, "Can not open socket !!!\n"); 
+ return(0); 
+} 
+
+#endif 
+
+/* End of source */
+}}}
+
+=== Interface별 입출력 정보 ===
+Linux 운영체제의 경우 /proc/net/dev에 각 인터페이스별 입출력 결과를 기록하고 있다.
+{{{#!plain
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:409140906 1037900   0    0    0     0          0         0 409140906  1037900  0    0    0     0       0          0
+  eth0:96555668  1756131   0    0    0     0          0         0  1919184     16396  0    0    0     0       0          0
+  eth1:264456417 12795632  0    0  130     0          0         0 795974945 13424861  0    0    0 632340      0          0
+}}}
+위와 같은 형식으로 되어 있으니 단순히 파싱해서 보여주기만 하면된다.
+
+단 위 파일에는 ON되어 있지 않은 비활성화 된 Interface까지를 전부보여주기 때문에, 정보를 가져오기 전에 해당 인터페이스가 활성화 되어 있는 인터페이스인지를 확인할 필요가 있다. 이 확인은 ioctl(2)에 '''SIOCGIFCONF'''을 이용하면 된다.
+
+다음은 간단한 예제 프로그램이다. 일반적으로 Interface 입출력 정보의 단위는 bps혹은 pps이다. 그러므로 '''byte'''section의 값은 *8 을 해서 bit로 변환시켜주는 작업이 필요할 것이다. 더욱 제대로 작동하게 하려면 이전의 값과 현재의 값을 비교해서 bps로 환산된 값을 보여줘야 겠지만 이 예제 코드에서는 생략하도록 하겠다. 
+
+아래의 코드는 최소한의 작동만을 보여준다. 시간이 된다면 그럴듯한 코드로 변경해보기 바란다.
+{{{#!plain down:ifconfig.c
+#include <iostream>
+#include <map>
+#include <unistd.h>
+#include <stdio.h>
+#include <vector>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <net/if.h>
+
+#include <arpa/inet.h>
+
+using namespace std;
+
+#define proc_net_dev_format "%s %s %s %s %s %s %s %s %s %s %s %s %s %s"
+
+vector<string> GetActiveInterface();
+
+typedef struct _Inter_IO
+{
+  char byte[16];
+  char packet[16];
+  char error[16];
+  char drop[16];
+  char fifo[16];
+  char frame[16];
+  char compressed[16];
+  char multicast[16];
+} Inter_IO;
+
+typedef struct _interface_IO
+{
+  char devname[16];
+  Inter_IO Rcv_IO;
+  Inter_IO Snd_IO;
+} interface_IO;
+
+// 인터페이스 입출력 정보가 들어갈 구조체
+typedef struct _devInfo
+{
+  char devname[12];
+  int inbps;
+  int outbps;
+  int inpps;
+  int outpps;
+  int inucast;
+  int outucast;
+  int inerrs;
+  int indrops;
+  int outerrs;
+  int outdrops;
+  int status;
+} devInfo;
+
+vector<devInfo> getInterIO();
+int main()
+{
+  vector<devInfo> ldevInfo;
+  cout << "=======================" << endl;
+  ldevInfo = getInterIO();
+  for (int i = 0; i < ldevInfo.size(); i++)
+  {
+    cout << ldevInfo[i].devname << " : " << ldevInfo[i].inbps
+          << " : " << ldevInfo[i].status << endl;
+  }
+}
+
+// proc/net/dev 파일을 분석해서 인터페이스 입출력 정보를 얻어온다.
+vector<devInfo> getInterIO()
+{
+  FILE *fp;
+  char line[1024];
+  unsigned int i;
+  char name[20];
+  char devname[12];
+  char *lp;
+  char *rp;
+  devInfo ldevInfo;
+  vector<devInfo> rtvInfo;
+  vector<string> ActiveInf = GetActiveInterface();
+
+  interface_IO IfIO;
+  if ((fp = fopen("/proc/net/dev", "r")) == NULL)
+  {
+    perror("fopen error");
+  }
+
+  int linenum = -2;
+  while(fgets(line, 1023, fp) != NULL)
+  {
+    if (linenum < 0)
+    {
+      linenum++;
+      continue;
+    }
+    memset((void *)&IfIO, 0x00, sizeof(IfIO));
+    sscanf(line,
+          proc_net_dev_format,
+          name,
+          IfIO.Rcv_IO.packet,
+          IfIO.Rcv_IO.error,
+          IfIO.Rcv_IO.drop,
+          IfIO.Rcv_IO.fifo,
+          IfIO.Rcv_IO.frame,
+          IfIO.Rcv_IO.compressed,
+          IfIO.Rcv_IO.multicast,
+
+          // Snd
+          IfIO.Snd_IO.byte,
+          IfIO.Snd_IO.packet,
+          IfIO.Snd_IO.error,
+          IfIO.Snd_IO.drop,
+          IfIO.Snd_IO.fifo,
+          IfIO.Snd_IO.frame,
+          IfIO.Snd_IO.compressed);
+      lp = strstr(name, ":");
+      sprintf(IfIO.Rcv_IO.byte, "%s", lp+1);
+      strncpy(IfIO.devname,name,lp-name);
+
+      sprintf(ldevInfo.devname, "%s", IfIO.devname);
+      ldevInfo.inbps = atoi(IfIO.Rcv_IO.byte);
+      ldevInfo.outbps = atoi(IfIO.Snd_IO.byte);
+      ldevInfo.inucast = atoi(IfIO.Rcv_IO.packet);
+      ldevInfo.outucast = atoi(IfIO.Snd_IO.packet);
+      ldevInfo.inerrs = atoi(IfIO.Rcv_IO.error);
+      ldevInfo.outerrs = atoi(IfIO.Snd_IO.error);
+      ldevInfo.indrops = atoi(IfIO.Rcv_IO.drop);
+      ldevInfo.outdrops = atoi(IfIO.Snd_IO.drop);
+      ldevInfo.status = 0;
+      for (i = 0; i < ActiveInf.size(); i++)
+      {
+        if (ActiveInf[i] == IfIO.devname)
+        {
+          ldevInfo.status = 1;
+        }
+      }
+      rtvInfo.push_back(ldevInfo);
+  }
+  fclose(fp);
+  return rtvInfo;
+}
+
+// 활성화된 인터페이스 목록을 얻어온다.
+vector<string> GetActiveInterface()
+{
+  struct ifreq *ifr;
+  struct sockaddr_in *sin;
+  struct ifconf ifcfg;
+  int fd;
+  int n;
+  int numreqs = 36;
+  vector<string> intername;
+  fd = socket (AF_INET, SOCK_DGRAM, 0);
+  memset(&ifcfg, 0x00, sizeof(ifcfg));
+  ifcfg.ifc_len = sizeof(struct ifreq) *numreqs;
+  (void *)ifcfg.ifc_buf = malloc(ifcfg.ifc_len);
+
+  ifcfg.ifc_len = sizeof(struct ifreq) * numreqs;
+  (void *)ifcfg.ifc_buf = realloc(ifcfg.ifc_buf, ifcfg.ifc_len);
+  if(ioctl(fd, SIOCGIFCONF, (char *)&ifcfg) < 0)
+  {
+    perror("ioctl error");
+  }
+
+  ifr = ifcfg.ifc_req;
+  for (n = 0; n < ifcfg.ifc_len; n+=sizeof(struct ifreq))
+  {
+    intername.push_back(ifr->ifr_name);
+    ifr++;
+  }
+  return intername;
+}
+}}}
+
+== Solaris ==
+거의 대부분의 네트워크정보를 /proc 파일시스템을 통하여 얻을 수 있는 Linux와 달리 Solaris는 '''kstat''' kernel library를 통해 얻어야 한다. kstat에 대한 자세한 정보는 [wiki:article/kstat kstat위키]를 참고하기 바란다. 
+
+
+==  관련 쓰레드 ==
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=31157&forum=1)]]

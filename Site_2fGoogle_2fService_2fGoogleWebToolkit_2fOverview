@@ -1,0 +1,64 @@
+#title 구글 웹 툴킷 Overview
+[[TableOfContents]]
+이 문서의 원문은 http://code.google.com/webtoolkit/overview.html 에서 확인할 수 있다.
+=== GWT에 대해서 ===
+Google Web Toolkit(이하 GWT)는 구글에서 개발자를 위해 제공하는 Ajax(:12)개발을 위한 프레임워크다. 특이하게도 자바스크립트가 아닌, Java를 이용한 프레임워크를 제공하는데, 덕분에 자바의 여러가지 기술들을 이용해서 좀더 편안한 환경에서 개발이 가능하다. Javascript를 직접 이용해서 Ajax응용을 개발해본 개발자라면, 디버깅과 개발이 얼마나 어려운지 잘 알고 있을 것이다. 즉 GWT를 이용하면 eclipse와 같은 훌륭한 환경에서 개발을 할 수 있다. eclipse(:12)를 통해서 개발과 디버깅을 끝내면, GWT컴파일러가 만들어진 자바애플리케이션을 JavaScript와 HTML(:12)로 된 코드로 변경시켜 준다.
+
+
+다음은 GWT를 이용한 개발방식이다.
+ 1. eclipse와 같은 개발툴과 GWT라이브러리를 이용해서 코드를 생성하고 디버깅한다.
+ 1. GWT의 Java to JavaScript 컴파일러를 이용해서 Javascript와 HTML로 된 코드로 변환한다.
+ 1. 이제 웹 브라우저를 이용해서 만들어진 웹애플리케이션이 제대로 작동하는지 확인한다.
+
+=== 왜 Java기술을 이용하는가 ===
+Java는 개발플렛폼을 제공한다. GWT가 Java 플렛폼을 이용할 경우 다음과 같은 이득을 얻을 수 있다.
+ 1. Eclipse, Intellij, JProfiler, JUnit와 같은 자바개발툴을 이용해서 Ajax응용을 개발할 수 있다.
+ 1. Static type checking등이 지원되는 견고한 자바언어를 사용함으로써, 에러를 줄일 수 있다.
+ 1. 자바스크립트언어에서 발생하는 에러들을 실행시간이 아닌 컴파일시간에 확인할 수 있다.
+ 1. 이해하고 공유하기 쉬운 객체지향적인 코드를 만들어낸다. 문서화에도 유리하다.
+ 1. 자바의 refactoring을 활용할 수 있다.
+
+=== GWT이용하기 ===
+GWT는 Widget라고 부르는 UI컴포넌트들을 제공한다. 이 Widget에는 Ajax응용에서 사용되는 여러가지 형태의 UI를 포함하고 있다. 여기에는 판넬, 레이아웃과 같은 애플리케이션 UI요소들이 포함된다. 다음은 클릭 핸들이 가능한 버튼을 가진 GWT응용의 예이다.
+{{{#!plain
+public class Hello implements EntryPoint {
+  public void onModuleLoad() {
+    Button b = new Button("Click me", new ClickListener() {
+      public void onClick(Widget sender) {
+        Window.alert("Hello, AJAX");
+      }
+    });
+    RootPanel.get().add(b);
+  }
+}
+}}}
+이외에도 hierachical tree, 탭바, 메뉴바, 다이얼로그 상자와 같은 Widget도 제공한다. 또한 RPC까지도 지원한다.
+[[sadsense()]]
+
+=== GWT응용의 개발 ===
+GWT 응용은 다음 두가지의 모드를 가진다.
+
+ * 호스트모드 : 호스트 모드에서 응용은 자바가상머신에서 Java bytecode형태로 실행된다. 아마도 당신은 개발의 거의 대부분의 시간을 이 모드에서 보내게 될 것이다. 자바가상머신을 사용한다는 것은 이클립스같은 툴과 자바의 디버깅환경을 사용할 수 있음을 의미하는 것이기 때문이다.
+ * 웹모드 : GWT의 Java-to-JavaScript 컴파일러를 이용해서 해석된 Javascript와 HTML로된 코드를 실행한다. 이것은 개발한 GWT응용을 웹서버에 올려서 브라우저를 통해서 확인하는 단계로, 서비스 테스트를 할 수 있다.
+
+응용개발을 호스트모드에서 할 경우 많은 이득이 있음을 알 수 있다. 또한 JVM에서 작동하는 특별한 웹브라우저를 제공하는데, 이걸 이용하면, 굳이 웹모드 상태가 아니더라도, 대부분의 테스트가 가능하다.
+
+=== GWT Architecture ===
+attachment:gwt-architecture.png
+
+GWT는 '''Java-to-JavaScript compiler''', '''hosted web browser''' 그리고 두개의 자바 클래스 라이브러리를 가진 4개의 컴포넌트로 이루어진다.
+
+ * Java-to-JavaScript 컴파일러
+   GWT Java-to-JavaScript 컴파일러는 자바언어로된 프로그램 코드를 JavaScript(:12) 프로그램 언어로 변환한다. 이렇게 컴파일된 코드는 웹모드에서 테스트할 수 있다. 
+ * Hosted Web Broswer
+  Hosted Web 브라우저는 만들어진 GWT응용을 호스트모드에서 테스트할 수 있도록 한다. 이러한 과정은 JVM에서 일어나게 되므로 JavaScript로의 컴파일 없이 테스트할 수 있다. 이를 위해서 JVM에서 작동하는 별도의 웹브라우저를 제공한다. 
+ * JRE emulation 라이브러리
+  자주 사용되는 JavaScript 구현을 포함한 자바 클래스 라이브러리로, java.lang 패키지와 java.util패키지를 포함한다.
+ * GWT Web UI class 라이브러리
+  웹브라우저를 통해서 유저에게 보여줄 UI를 위한 '''wigets'''을 포함하고 있다. 여기에는 button, text box, images, text 등과 관련된 위젯이 포함된다. 
+
+=== 얻을 수 있는 것들 ===
+ * 성능 : GWT응용은 손으로 직접 작성한 HTML, JavaScript 코드와 거의 동등한 수준의 속도를 보여준다. 
+ * 개발 시간 : 자신이 사용하는 웹브러우저를 이용해서 개발과 디버깅을 하는데에는 많은 시간이 소모된다. GWT를 이용하면 개발과 디버깅 시간을 극적으로 단축시킬 수 있다. 
+ * JavaScript 크기 : 완전한 기능을 가진 GWT응용을 만들면 대략 100k 정도의 캐쉬가능한 Javascript를 다운로드 받는다. 손으로 Ajax응용을 직접 만들어도 비슷한 크기의 Javascript가 생성될 것이다. 
+

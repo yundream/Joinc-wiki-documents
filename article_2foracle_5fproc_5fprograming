@@ -1,0 +1,1021 @@
+#title oracle pro*c programing
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>proc 파헤치기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>proc 파헤치기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN16"
+>오라클 서버/클라이언트 환경만들기</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN24"
+>오라클 서버 가동</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN28"
+>listener (서버측 설정)</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN33"
+>listener 설정</A
+></DT
+><DT
+>2.2.2&#51208;. <A
+HREF="#AEN40"
+>listener 가동</A
+></DT
+></DL
+></DD
+><DT
+>2.3&#51208;. <A
+HREF="#AEN44"
+>tnsnames (클라이언트측)</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN48"
+>tnsnames 설정</A
+></DT
+><DT
+>2.3.2&#51208;. <A
+HREF="#AEN53"
+>테스트</A
+></DT
+></DL
+></DD
+><DT
+>2.4&#51208;. <A
+HREF="#AEN57"
+>데이타 베이스 준비하기</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN63"
+>Pro *C/*C++ 소개</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN66"
+>왜 proc 를 사용하는가</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN73"
+>proc 컴파일 과정</A
+></DT
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN77"
+>간단한 proc 프로그램 예제</A
+></DT
+><DD
+><DL
+><DT
+>4.1&#51208;. <A
+HREF="#AEN84"
+>컴파일 하기</A
+></DT
+><DT
+>4.2&#51208;. <A
+HREF="#AEN89"
+>컴파일 과정을 Makefile 로 관리하기</A
+></DT
+></DL
+></DD
+><DT
+>5&#51208;. <A
+HREF="#AEN96"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		proc 프로그래밍은 간단히 다룰수 있는 주제가 아니다. 
+		그럭저럭 다루려고 한다고 해도 책한권 분량은 다루어야할 주제이다. 
+	</P
+><P
+>		그러므로 몇번의 문서에 걸쳐서 proc 프로그래밍에 대한 내용을 다룰것이다. 
+		그렇다고 해서 시중에 나와있는 proc 레퍼런스 수준의 방대하고 세밀한 
+		내용을 다룰것을 기대하지는 말기 바란다. 
+		이 사이트의 대부분의 문서들이 그렇듯이 초기에 문제에 쉽게 접근할수 
+		있는 지침서 역활수준에서 작성될것이다.  
+	</P
+><P
+>		깊이 있는 내용은 자신이 직접 - 시중의 책을 이용하던지, 아니면 
+		프로젝트를 진행하든지 - 익혀나가도록 해야 할것이다. 
+	</P
+><P
+>		이번장에서는 proc 에 대한 간략한 소개와 프로그래밍을 위한 
+		환경설명과, 환경준비과정 그리고 간단한 셈플예제와 이 셈플을 
+		제대로 컴파일 하기 위한 Makefile 제작등에 대해서 알아볼 것이다.  
+	</P
+><P
+>		이 문서는 여러분이 적어도 오라클은 설치할줄알고, 기본적인 
+		몇가지 환경정보들은 알고 있다는 가정하에 
+		씌여지게 될것이다. 또한 오라클 817 버젼을 기준으로 작성될것이다. 
+		다른 버젼의 오라클의 경우 경로등에서 약간의 차이가 있을수 
+		있을것이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>2&#51208;. 오라클 서버/클라이언트 환경만들기</A
+></H1
+><P
+>		proc 프로그래밍을 하기 위해서는 우선적으로 테스트 환경이 만들어져 
+		있어야 한다. 오라클 서버는 이미 설치되어서 가동중에 있다고 
+		가정을 하겠다. 설치 문서는 <A
+HREF="/modules.php?name=News&file=article&sid=92&mode=nested"
+TARGET="_top"
+>오라클817 설치하기</A
+>를 참조하기 바란다.  
+	</P
+><P
+>		우리가 proc 를 이용해서 만들고자 하는 프로그램은 c/s 모델기반으로 
+		클라이언트로 작동하게 될것이다. 서버는 오라클이 될것이며, 
+		클라이언트로써 오라클 서버에 접근해서 원하는 정보를 가져오는 프로그램을 
+		만들것이다. 
+	</P
+><P
+>		서버/클라이언트 프로그래밍 환경에 있어서 가장 기본적인 것은 
+		서버와 클라이언트의 네트웍 설정을 하는 것이다. 
+		서버측 프로그램은 연결을 받아들일 클라이언트의 주소영역과 포트를 
+		지정하고 클라이언트측에서는 연결을할 서버의 주소영역과 포트번호를 
+		역시 지정해야 할것이다.  
+	</P
+><P
+>		일반적인 c/s 모델 프로그램에서는 이러한 정보를 클라이언트 프로그램과 
+		서버 프로그램이 가지고 있지만 오라클의 경우 이러한 네트웍 정보를 
+		자체적으로 유지한다. 이게 바로 listener 와 tnsname 이라는 것이다.    
+	</P
+><P
+>		이제 listener 와 tnsname 에 대해서 자세히 알아보도록 하겠다. 
+		참.. 물론 그전에 오라클 서버를 가동 시켜놓아야 한다.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>2.1&#51208;. 오라클 서버 가동</A
+></H2
+><P
+>			oracle 계정으로 스위치 유저한다음에 svrmgrl 을 이용하면 
+			간단하게 오라클 서버를 가동시킬수 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>Server Manager complete.
+[oracle@localhost admin]$ svrmgrl
+
+Oracle Server Manager Release 3.1.7.0.0 - Production
+
+Copyright (c) 1997, 1999, Oracle Corporation.  All Rights Reserved.
+
+Oracle8i Enterprise Edition Release 8.1.7.0.1 - Production
+With the Partitioning option
+JServer Release 8.1.7.0.1 - Production
+
+SVRMGR&#62; connect internal
+Connected.
+SVRMGR&#62; startup
+ORACLE instance started.
+Total System Global Area                         93675680 bytes
+...
+...
+Database opened.
+SVRMGR&#62; 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			SVRMGR 프롬프트가 떨어지고 나면 connect internal -&#62; startup 
+			으로 오라클을 가동시킬수 있다. 중지는 connect internal -&#62; shutdown 
+			이다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN28"
+>2.2&#51208;. listener (서버측 설정)</A
+></H2
+><P
+>			아마도 listener 이라는 단어에서 대충 어떤 일을 하는 것인지 
+			유추할수 있을것이다. 즉 네트웍 서버로써 외부의 연결이 있는지 
+			대기 하고 있다가 연결이 있으면 연결을 받아들이는 역활을 한다. 
+			연결을 받고 나면 몇가지 처리를 한후 클라이언트를 위한 
+			오라클 인스턴스를 할당하고 만들어진 인스턴스를 이용해서 
+			클라이언트와 대화하게 된다.  
+		</P
+><P
+>			이러한 과정을 완전히 이해할려면 더 많은 내용이 보충되어야 하겠지만 
+			이 문서는 DBA 를 위한 문서는 아님으로 이런거다 라는 정도로 
+			이해하는 수준에서 넘어가도록 하겠다. 좀더 깊이 있는 내용에 관심이 
+			있다면 관련 책을 사서 공부해야 할것이다.  
+		</P
+><P
+>			간단히 말하자면 listener 은 인터넷 서비스를 위한 오라클 프로세스 
+			라고 생각할수 있는데, 모든 (제대로된) 서버 프로그램이 그렇듯이 
+			이 listener 역시 설정 파일을 가지고 있다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.2.1&#51208;. listener 설정</A
+></H3
+><P
+>				$ORACLE_HOME/network/admin/listener.ora 가 바로 listener 설정 
+				파일이다. 다음은 필자의 listener 의 초기 설정치 내용이다.    
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>LISTENER =
+  (DESCRIPTION_LIST =
+    (DESCRIPTION =
+      (ADDRESS_LIST =
+        (ADDRESS = (PROTOCOL = TCP)(HOST = localhost)(PORT = 1521))
+      )
+      (ADDRESS_LIST =
+        (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC))
+      )
+    )
+  )
+
+SID_LIST_LISTENER =
+  (SID_LIST =
+    (SID_DESC =
+      (SID_NAME = PLSExtProc)
+      (ORACLE_HOME = /usr/u01/product/8.1.7)
+      (PROGRAM = extproc)
+    )
+    (SID_DESC =
+      (GLOBAL_DBNAME = oracle)
+      (ORACLE_HOME = /usr/u01/product/8.1.7)
+      (SID_NAME = oracle)
+    )
+  )
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그리 이해하기 어렵지 않을 것이다. 크게 2개의 섹션으로 
+				이루어 져있는데 LISTENER 섹션은 연결을 받아들일 클라이언트를 
+				위한 호스트 IP 와 PORT 지정을 위한 내용을 
+				SID_LIST_LISTENER 은 서비스할 DB 의 정보를 가지고 있다.  
+			</P
+><P
+>				초기에는 단지 localhost(127.0.0.1) 에서의 접근과 내부(IPC) 접근
+				만을 위한 설정이 되어있다. 기본적으로 오라클은 포트번호 1521 을 
+				사용한다. 어드레스가 더 추가된다면   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>      (ADDRESS_LIST =
+        (ADDRESS = (PROTOCOL = TCP)(HOST = xxx.xxx.xxx.xxx)(PORT = 1521))
+      )
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이런 식으로 목록을 써나가면 된다. 
+			</P
+><P
+>				서비스하는 DB 는 최초에 우리가 만들었던 oracle 이 
+				서비스 될것이다. 마찬가지로 서비스할 DB 목록을 
+				계속적으로 추가해 나갈수 있다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.2.2&#51208;. listener 가동</A
+></H3
+><P
+>				listener.ora 설정을 마쳤다면(우선은 초기 기본 설정내용을 
+				그대로 사용하도록 하겠다) 이제 listener 을 가동시켜야 한다. 
+				oracle 계정으로 스위치 유저한다음에 lsnrctl 을 사용하면 
+				리스너를 가동시킬수 있다.    
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[oracle@localhost admin]$ lsnrctl
+
+LSNRCTL for Linux: Version 8.1.7.0.0 - Production on 30-OCT-2002 00:34:12
+
+(c) Copyright 1998 Oracle Corporation.  All rights reserved.
+
+Welcome to LSNRCTL, type "help" for information.
+
+LSNRCTL&#62; start
+Starting /usr/u01/product/8.1.7/bin/tnslsnr: please wait...
+
+TNSLSNR for Linux: Version 8.1.7.0.0 - Production
+System parameter file is /usr/u01/product/8.1.7/network/admin/listener.ora
+Log messages written to /usr/u01/product/8.1.7/network/log/listener.log
+Listening on: (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=localhost)(PORT=1521)))
+Listening on: (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC)))
+...
+...
+The command completed successfully
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				LSNRCTL&#62; 프롬프트 상에서 status 를 이용하면 현재 리스너의 
+				상태를 확인할수 있으며, stop 를 이용해서 리스너를 중지 
+				시킬수 있다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN44"
+>2.3&#51208;. tnsnames (클라이언트측)</A
+></H2
+><P
+>			이제 클라이언트측 설정을 해야 한다. 
+			당연히 클라이언트측 호스트에는 Oracle 클라이언트 제품군이 
+			설치되어 있어야 한다(설치되어 있다고 가정하고 문서를 진행 
+			하겠다).    
+		</P
+><P
+>			tnsnames 는 간단히 생각하자면 클라이언트 어플리케이션이 
+			오라클 서버에 접근하기 위해서 알아야될 서버측 정보를 담고 
+			있는 데이타베이스라고 알고 있으면 된다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.3.1&#51208;. tnsnames 설정</A
+></H3
+><P
+>				$ORACLE_HOME/network/admin/tnsnames.ora 라는 파일이 바로 
+				서버정보를 담고 있는 파일이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>INST1_HTTP =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = localhost)(PORT = 1521))
+    )
+    (CONNECT_DATA =
+      (SERVER = SHARED)
+      (SERVICE_NAME = oracle)
+      (PRESENTATION = http://admin)
+    )
+  )
+
+EXTPROC_CONNECTION_DATA =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC))
+    )
+    (CONNECT_DATA =
+      (SID = PLSExtProc)
+      (PRESENTATION = RO)
+    )
+  )
+
+ORACLE =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = localhost)(PORT = 1521))
+    )
+    (CONNECT_DATA =
+      (SERVICE_NAME = oracle)
+    )
+  )
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				역시 이해하는 데에는 별로 어려움이 없을것이다. 
+				다른건 별로 신경쓸것 없고 마지막에 있는 ORACLE 정도만 
+				알고 있으면 될것이다. 여기에 보면 접근할 서버의 정보들이 
+				나와 있다. listener.ora 와 비교하면 쉽게 이해가 가능할 
+				것이다. localhost 로 접근하며 1521 포트로 tcp 연결을 
+				하고 oracle DB를 사용하겠다는 정보를 가지고 있다. 
+				만약에 서버측에 zipcode 라는 DB 가 있고 zipcode 에 연결하기 
+				위한 내용을 추가하고 싶다면 아래와 같이 추가시켜주면 될것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>ORACLE =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = localhost)(PORT = 1521))
+    )
+    (CONNECT_DATA =
+      (SERVICE_NAME = zipcode)
+    )
+  )
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				물론 listener.ora 에도 여기에 알맞는 설정이 되어있어야 
+				할것이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>2.3.2&#51208;. 테스트</A
+></H3
+><P
+>				그럼 간단히 테스트를 해보도록 하자. 테스트는 sqlplus 라는 
+				오라클에서 제공하는 클라이언트 프로그램을 이용할것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+[oracle@localhost admin]$ sqlplus system/manager@ORACLE
+
+SQL*Plus: Release 8.1.7.0.0 - Production on Wed Oct 30 00:51:35 2002
+
+(c) Copyright 2000 Oracle Corporation.  All rights reserved.
+
+
+Connected to:
+Oracle8i Enterprise Edition Release 8.1.7.0.1 - Production
+With the Partitioning option
+JServer Release 8.1.7.0.1 - Production
+
+SQL&#62; 
+				</PRE
+></TD
+></TR
+></TABLE
+> 
+				SQL&#62; 프롬프트가 떨어진다면 listener 가 제대로 작동하며  
+				해당 tnsnames 를 이용해서 연결을 성공했음을 의미한다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN57"
+>2.4&#51208;. 데이타 베이스 준비하기</A
+></H2
+><P
+>			그럼 테스트를 위한 데이타베이스를 준비해 보도록 하자. 
+			준비할 데이타 베이스는 우편번호이다. 자료실에서 
+			<A
+HREF=""
+TARGET="_top"
+>다운로드</A
+> 받을수 있다.  
+		</P
+><P
+>			압축을 풀면 10개 정도의 파일이 생성될것인데, 오라클에서 
+			곧바로 읽어들일수 있다. sqlplus 를 이용해서 oracle db 에 
+			접근하도록 한다. 그다음 "@파일이름" 식으로 적재하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  
+SQL&#62; @postcode.sql
+Input truncated to 3 characters
+
+Table created.
+
+SQL&#62; @postcode1.sql 
+...
+SQL&#62; @postcod2.sql
+			</PRE
+></TD
+></TR
+></TABLE
+>  
+			이로써 테스트용 db 생성까지 모두 마쳤다. 
+			적재하기가 귀찮다면 그냥 테스트용으로 파일 하나 분량 정도만 
+			적재해도 관계는 없다.    
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>3&#51208;. Pro *C/*C++ 소개</A
+></H1
+><P
+>		Pro *C(이하 proc) 는 일종의 프리컴파일러다. 즉 C코드에 
+		오라클관리를 위해서 일상적으로 사용하는 SQL, PL/SQL 등을 결합시켜서 
+		코딩된 프로그램을 C컴파일러(여기에서는 gcc)가 인식할수 있는 
+		C 코드 파일로 변경시켜주는 일을 한다. 오라클에서는 proc 라는 
+		프리컴파일러를 제공하고 있다.   
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN66"
+>3.1&#51208;. 왜 proc 를 사용하는가</A
+></H2
+><P
+>			아마도 1GL 이니 2GL 이니 하는 프로그래밍 언어 세대를 
+			나타내는 말에 대해서 들어 보았을것이다. 
+			보통 1세대 언어, 2세대 언어라는 식으로 불리는데, 
+			이 분류에 따르면 C 언어는 3세대 언어(3GL)이다. 
+			이에 반해 SQL(Structur query language) 언어는 4세대 언어로써, 
+			3GL 언어가 절차식 언어인데 반해서, 
+			4세대 언어는 좀더 자연어에 
+			근접한 언어적 특성을 가진다. 
+		</P
+><P
+>			이러한 4GL 언어가 가지는 자연어에 근접한 특성은 언어 사용을 
+			직관적이고 쉽게 할수 있도록 만들어주지만, 절차지향 적인 
+			업무를 처리하기에는 그리 적합하지가 않다. 
+			그래서 많은 경우 C, C++, JAVA 등의 언어들과 결합해서 사용 
+			하게 된다.      
+		</P
+><P
+>			그런데 대게의 경우 이러한 3GL언어와 4GL 언어의 결합과정은 
+			꽤나 성가신 작업이며, 많은 시간을 필요로 한다. 
+			SQL 은 별도로 하고, 거기에 덧붙여서 다양한 API 들을 새로 
+			익혀야 하기 때문이다. 그나마 mysql, postgresql 과 같은 
+			비교적 단순한(오라클에 비해서) DB의 경우 몇가지 API 만 익힘으로써 
+			그리 어렵지 않게 프로그래밍 할수 있지만, 오라클의 경우 
+			상당한 노력을 필요로 한다. 이러한 저수준에서 직접접근을 위해서 
+			제공하는게 OCI(Oracle Call Interface) 라는 API 모음이다.  
+		</P
+><P
+>			그래서 높더 높은 레벨에서 C 언어와 SQL 언어를 결합해서 프로그래밍 
+			할수 있는 환경을 제공하고자 하는 목적에서 나온게 바로 proc 이다. 
+			proc 소쓰를 보면 알겠지만 복잡한 API 들 대신에 SQL 의 문장을 
+			그대로 사용하고 있음을 알수 있다. 
+		</P
+><P
+>			또한 proc 는 C 코드네에 PL/SQL 블럭을 직접 넣어서 코딩할수 있도록 
+			되어 있다. PL/SQL 은 4GL 언어의 자연어적인 특성에 절차식 언어인 
+			3GL 언어의 특징을 결합시킨 도구이다. PL/SQL 에 대한 내용은 
+			자세히 다루지는 않을것이며, 필요할경우 약간씩 다루도록 하겠다. 
+			어쨋든 proc 를 이요한 프로그래밍을 하려면 PL/SQL 에 어느정도 
+			익숙해질 필요가 있다. PL/SQL 은 4GL 언어의 특성을 가지므로 
+			C, JAVA 등에 비해서 매우 쉽게 익힐수 있다.   
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN73"
+>3.2&#51208;. proc 컴파일 과정</A
+></H2
+><P
+>			일단 프로그래머는 SQL 문이 포함되어 있는 코드를 작성한다. 
+			보통이러한 코드는 확장자가 .pc 로 되어있다. 
+			그러나 이러한 .pc 코드는 gcc 컴파일러가 컴파일 할수 없음으로 
+			gcc 가 이해할수 있는 .c 코드로 변경시켜주는 "선행컴파일" 과정이 
+			필요하다. 이 선행컴파일러거 .pc 파일을 .c 코드로 변경한 이후의 
+			컴파일 과정은 기존 c 컴파일 과정과 완전히 동일하다.     	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>     +--------------+
+     | Proc Program | SQL 문을 포함
+     | .pc          | 
+     +--------------+
+            ↓
+     +--------------+
+     | 오라클       | 
+     | 선행컴파일러 | 
+     | proc         |
+     +--------------+
+            ↓
+     +--------------+
+     | 해석된       | 기존의 SQL 문은 library 를 
+     | .c 쏘쓰코드  | 직접 호출하는 문으로 변경됨 
+     +--------------+
+            ↓
+     +--------------+
+     | C 컴파일러   | 
+     +--------------+
+            ↓
+     +--------------+
+     | Object 파일  | 
+     +--------------+
+            ↓
+     +--------------+
+     | Linker       | 오라클 라이브러리가 링크됨 
+     +--------------+
+            ↓
+     +--------------+
+     | 실행파일     | 
+     +--------------+
+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN77"
+>4&#51208;. 간단한 proc 프로그램 예제</A
+></H1
+><P
+>		다음은 zipcode 테이블에 총몇개의 자료가 들어있는지 
+		알아오는 아주 간단한 프로그램이다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : zipcode.pc</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+
+/* SQLCA 를 선언한다 */
+EXEC SQL INCLUDE SQLCA;
+
+int main(int argc, char **argv)
+{
+    /* 선언부 */
+    EXEC SQL BEGIN DECLARE SECTION;
+            int count = 0;
+            char userid[40]= "system/manager@ORACLE";
+    EXEC SQL END DECLARE SECTION;
+
+    /* DB 연결 */
+    EXEC SQL CONNECT :userid;
+
+    /* 에러 처리 */
+    if (sqlca.sqlcode &#60; 0)
+    {
+            printf("%s&#92;n", sqlca.sqlerrm.sqlerrmc);
+            EXEC SQL ROLLBACK WORK RELEASE;
+            exit(0);
+    }
+
+    /* 쿼리 */ 
+    EXEC SQL SELECT count(*) 
+            INTO: count  
+            FROM zipcode;
+
+    /* 쿼리 결과에 대한 에러처리 */
+    if (sqlca.sqlcode != 0) 
+    {
+            EXEC SQL COMMIT WORK RELEASE;
+            return 0;
+    }
+
+    printf("우편주소 데이타 : %d 개&#92;n", count);
+
+    /* DB 연결 종료 */
+    EXEC SQL COMMIT WORK RELEASE;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+> 
+		코드를 보면 알겠지만 뭐 복잡하게 이것 저것 인클루드 시켜줄 
+		필요도 없고, SQL 문이 거의 그대로 쓰여서 이해하기도 매우 쉽다는 
+		것을 알수 있을 것이다. 
+		참고로 오라클 proc 쏘쓰파일에서의 주석은 /* */ 만 사용가능하다. 
+		// 을 썼다가는 오류가 발생한다.  
+	</P
+><P
+>		이번 문서는 단지 이런식으로 프로그래밍이 가능하다라는 정도만 
+		보여줄 것임으로 위의 코드의 설명은 생략하도록 하겠다. 
+		나중에 자세히 다루도록 하겠다.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN84"
+>4.1&#51208;. 컴파일 하기</A
+></H2
+><P
+>			우선 zipcode.pc 파일을 proc 선행 컴파일러를 
+			이용해서 zipcode.c 파일을 얻어낸다음 gcc를 이용해서 
+			object 파일을 만들고 링크과정을 거쳐서 실행파일을 만들어야 한다. 
+			다음은 이러한 일련의 과정이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[oracle@localhost proc]$ proc zipcode INCLUDE=include/ &#92; 
+&#62; include=/usr/u01/product/8.1.7/precomp/public/ &#92;
+&#62; include=/usr/u01/product/8.1.7/rdbms/demo/ &#92;
+&#62; include=/usr/u01/product/8.1.7/rdbms/public/ &#92;
+&#62; include=/usr/u01/product/8.1.7/network/public/ &#92;
+&#62; PARSE=NONE RELEASE_CURSOR=YES MODE=ANSI
+
+Pro*C/C++: Release 8.1.7.0.0 - Production on Thu Oct 31 00:29:15 2002
+
+(c) Copyright 2000 Oracle Corporation.  All rights reserved.
+
+System default option values taken from: /usr/u01/product/8.1.7/precomp/admin/pcscfg.cfg
+
+[oracle@localhost proc]$ gcc -c -o zipcode.o zipcode.c -I$ORACLE_HOME/precomp/public &#92; 
+&#62; -I$ORACLE_HOME/rdbms/demo -I$ORACLE_HOME/rdbms/public &#92;
+&#62; -I$ORACLE_HOME/network/public
+
+[oracle@localhost proc]$ gcc -o zipcode zipcode.o -L$ORACLE_HOME/lib -lclntsh
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램을 실행시키면 다음과 같은 결과값을 
+			보여줄 것이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[oracle@localhost proc]$ ./zipcode 
+우편주소 데이타 : 43476 개
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN89"
+>4.2&#51208;. 컴파일 과정을 Makefile 로 관리하기</A
+></H2
+><P
+>			하지만 위의 방법대로 수동으로 코드를 컴파일 하는건 
+			비 생산적인 방법이다. 그러므로 Makefile 을 만들어서 
+			관리하도록 하자. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>Makefile</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>TARGET          = zipcode
+
+CC              = gcc
+PROC            = proc
+LIB             = -L$(ORACLE_HOME)/lib -lclntsh
+MYINC           = include/
+PROCINC         = include=$(ORACLE_HOME)/precomp/public/ include=$(ORACLE_HOME)/rdbms/demo/ &#92;
+	include=$(ORACLE_HOME)/rdbms/public/ &#92;
+	include=$(ORACLE_HOME)/network/public/ 
+CINC            = -I$(ORACLE_HOME)/precomp/public/ -I$(ORACLE_HOME)/rdbms/demo/ &#92;
+	-I$(ORACLE_HOME)/rdbms/public/ -I$(ORACLE_HOME)/network/public/ 
+
+ORA_OPT         = PARSE=NONE RELEASE_CURSOR=YES MODE=ANSI
+CC_OPT          =
+
+OBJECT          = zipcode.o
+ORA_GARBAGE     = *.dcl *.cod *.cud *.lis
+
+######## implicit rules
+.SUFFIXES: .pc .c
+
+.pc.c:
+	$(PROC) $* INCLUDE=$(MYINC) $(PROCINC) $(ORA_OPT)
+.c.o:
+	$(CC) -c -o $*.o $*.c -I $(MYINC) $(CINC)
+
+####### build rules
+
+all:            $(TARGET)
+
+$(TARGET):      $(OBJECT)
+	$(CC) -o $(TARGET) $(OBJECT) $(LIB)
+
+zipcode.c: zipcode.pc
+zipcode.o: zipcode.c
+
+clean:
+	rm -f $(TARGET) $(OBJECT) $(ORA_GARBAGE)
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이해하는데 특별히 어려움은 없을것이라고 생각된다. 
+			Makefile 에 대한 내용은 
+			<A
+HREF="/modules.php?name=News&file=article&sid=3"
+TARGET="_top"
+>make 를 이용한 프로젝트 관리 (1)</A
+>를 참고하도록 
+			한다.   
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN96"
+>5&#51208;. 결론</A
+></H1
+><P
+>		이상 proc 프로그래밍을 위한 가장 기본적인 환경에 대해서 알아보았으며, 
+		아주 간단한 예를 들어서 proc 프로그래밍을 맛보았다. 다음에는 
+		좀더 자세한 proc 프로그래밍에 관한 내용을 다루도록 하겠다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

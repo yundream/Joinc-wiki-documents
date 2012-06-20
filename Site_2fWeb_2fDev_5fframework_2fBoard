@@ -1,0 +1,91 @@
+#title 간단한 게시판 만들기
+
+dmf 용으로 간단한 게시판을 만들어보자. 댓글의 댓글은 지원하지 않으련다. 초초 심플하게 만들어보자.
+
+=== 환경 ===
+당연히 Apache(:12) + PHP(:12) 기반이다. mysql(:12)대신에 sqlite(:12)를 써보련다.
+
+=== 기능 ===
+  * 필요에 따라서 간단하게 게시판을 생성할 수 있도록 해야 겠다. sqlite(:12)를 선택한 이유다. 
+  * bbcode를 지원하도록 해봐야 겠다. bbcode 소스는 쉽게 구할 수 있겠지.
+
+=== 데이터베이스 ===
+게시판당 하나의 데이터베이스를 가지게 할 생각이다. 그렇다면 게시판이름을 관리할 관리용 데이터베이스도 하나 있어야 겠구나.
+
+sqlite는 mysql(:12)의 '''auto_increment'''에 해당하는 기능이 없는 것 같다. 없는 것 같다라고 한 것은 귀차니즘으로 제대로 찾아보지 않았기 때문이다. 있을지도 모른다. 난 그냥 아래와 같이 해결했다.
+{{{#!plain
+create table t1(a integer primary key, b);
+insert into t1 values((select max(a) from t1)+1, 234);
+}}}
+아래 테이블 구조에서 auto_increment로 되어 있는 것은 위의 방식으로 구현할 것이다.
+==== 관리 Table 구조 ====
+잡다한거 빼고 초 간단 모드로
+|| DID    || int           || auto_increment  || 일련번호        ||
+|| DName  || varchar(40)   || NOT NULL        || 게시판 이름     ||
+|| DDesc  || text          ||                 || 게시판 설명     ||
+|| DAdmin || int           || NOT NULL        || 게시판 관리자   ||
+{{{#!plain
+create table admin
+(
+did inter primary key,
+dname varchar(40),
+ddesc text,
+dadmin int
+);
+}}}
+==== 유저 Table 구조 ====
+로그인을 위한 간단한 Table이다. 유저 아이디, 이름, 패스워드, email 주소만을 요구한다. 패스워드는 md5(:12)로 해결한다. 
+|| UID         || int         || auto_increment  || 사용자 일련번호   ||
+|| NICK        || varchar(20) || NOT NULL        || 사용자 이름       ||
+|| EMAIL       || varchar(40) || NOT NULL        || 이메일 주소       ||
+|| HOMEPAGE    || varchar(40) ||                 || 홈페지            ||
+|| PASSWORD    || varchar(40) || NOT NULL        || 패스워드 MD5      ||
+{{{#!plain
+create table user 
+(
+	uid integer primary key,
+	nick varchar(20) NOT NULL, 
+	email varchar(40) NOT NULL,
+	homepage varchar(40),
+	password varchar(40) NOT NULL
+);
+}}}
+
+==== 게시판 Table 구조 ====
+Thread 목록 Table과 Comment Table 두개를 유지한다.
+'''Thread Table'''
+|| TID          || int           || auto_increment   || 일련번호        ||
+|| CREATE_DATE  || DATETIME      ||                  || 만든날짜        ||
+|| IP           || char(32)      ||                  || IP              ||
+|| Subject      || char(255)     ||                  || 제목            ||
+|| UID          || int           ||                  || 작성자 ID       ||
+{{{#!plain
+create table thread
+(
+  tid integer primary key,
+  create_date date, 
+  ip varchar(32),
+  subject char(255),
+  uid int,
+  contents text,
+  comment int default 0,
+  count int default 0
+)
+}}}
+
+'''Comment'''
+|| CID          || int           || auto_increment   || 일련번호        ||
+|| CREATE_DATE  || DATETIME      ||                  || 만든날짜        ||
+|| TID          || int           ||                  || Thread ID       ||
+|| IP           || char(32)      ||                  || IP              || 
+|| COMMENT      || text          ||                  || 내용            ||
+{{{#!plain
+create table comment
+(
+  cid integer primary key,
+  create_date date,
+  ip varchar(32),
+  comment text, 
+  uid int
+);
+}}}

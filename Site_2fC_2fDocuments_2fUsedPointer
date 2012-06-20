@@ -1,0 +1,453 @@
+#title 다양한 포인터 활용 예제들
+
+[[TableOfContents]]
+
+== 여러가지 포인터 예제 ==
+
+'''작성자:''' mwyun ([멍])
+ * 직접 주석을 달면서 읽어 보세요 이해하는데 많은 도움이 될겁니다. - [yundream]
+
+== 구조체 변수 사용 예제 1 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int a;
+	char *b;
+};
+
+int main()
+{
+	struct data aData;
+
+	aData.a = 100;
+	aData.b = (char *)malloc(10);
+	strcpy(aData.b, "mwyun");
+
+	printf("aData.a=%d\n", aData.a);
+	printf("aData.b=%s\n", aData.b);
+
+	free(aData.b);
+
+	return 0;
+}
+}}}
+
+== 구조체 변수 사용 예제 2 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int a;
+	char *b;
+};
+
+void SetData(struct data *pData)
+{
+	pData->a = 100;
+	pData->b = (char *)malloc(10);
+	strcpy(pData->b, "mwyun");
+}
+
+int main()
+{
+	struct data aData;
+
+	SetData(&aData);
+
+	printf("aData.a=%d\n", aData.a);
+	printf("aData.b=%s\n", aData.b);
+
+	free(aData.b);
+
+	return 0;
+}
+}}}
+
+
+== 구조체 변수 사용 예제 3 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int a;
+	char *b;
+};
+
+const char *str = "Hello, Joinc!";
+
+void SetData(struct data *pData)
+{
+	pData->a = 100;
+	pData->b = str; // <- 주목!
+}
+
+int main()
+{
+	struct data aData;
+
+	SetData(&aData);
+
+	printf("aData.a=%d\n", aData.a);
+	printf("aData.b=%s\n", aData.b);
+
+	return 0;
+}
+}}}
+
+== 구조체 포인터 변수 사용 예제 1 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int a;
+	char *b;
+};
+
+int main()
+{
+	struct data *pData;
+
+	pData = (struct data *)malloc(sizeof(struct data));
+
+	pData->a = 100;
+	pData->b = (char *)malloc(10);
+	strcpy(pData->b, "mwyun");
+
+	printf("pData->a=%d\n", pData->a);
+	printf("pData->b=%s\n", pData->b);
+
+	free(pData->b);
+	free(pData);
+
+	return 0;
+}
+}}}
+
+== 구조체 포인터 변수 사용 예제 2 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int a;
+	char *b;
+};
+
+void SetData(struct data *pData)
+{
+	pData->a = 100;
+	pData->b = (char *)malloc(10);
+	strcpy(pData->b, "mwyun");
+}
+
+int main()
+{
+	struct data *pData;
+
+	pData = (struct data *)malloc(sizeof(struct data));
+
+	SetData(pData);
+
+	printf("pData->a=%d\n", pData->a);
+	printf("pData->b=%s\n", pData->b);
+
+	free(pData->b);
+	free(pData);
+
+	return 0;
+}
+}}}
+
+== 함수 포인터 예제 1 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int Id;
+	char *Name;
+	void (*SetName)(struct data *pData, char *NewName);
+	char *(*GetName)(struct data *pData);
+	void (*Clear)(struct data *pData);
+};
+
+void SetName(struct data *pData, char *NewName)
+{
+	if (pData->Name)
+	{
+		if (strlen(pData->Name) < strlen(NewName))
+		{
+			free(pData->Name);
+			pData->Name = (char *)malloc(strlen(NewName)+1);	
+		}
+	}
+	else
+	{
+		pData->Name = (char *)malloc(strlen(NewName)+1);
+	}
+	
+	strcpy(pData->Name, NewName);
+}
+
+char *GetName(struct data *pData)
+{
+	if (pData->Name)
+		return pData->Name;
+	else
+		return NULL;
+}
+
+void Clear(struct data *pData)
+{
+	pData->Id = 0;
+	if (pData->Name)
+	{
+		free(pData->Name);
+		pData->Name = NULL;
+	}
+	pData->GetName = NULL;
+	pData->SetName = NULL;
+	pData->Clear = NULL;
+}
+
+int main()
+{
+	struct data aData;
+
+        memset((void *)&aData, 0x00, sizeof(struct data));
+	aData.Id = 100;
+	aData.GetName = GetName;
+	aData.SetName = SetName;
+	aData.Clear = Clear;
+
+	printf("aData.Id=%d\n", aData.Id);
+	aData.SetName(&aData, "mwyun");
+	printf("aData.Name=%s\n", aData.GetName(&aData));
+	aData.Clear(&aData);
+
+	return 0;
+}
+}}}
+
+
+== 함수 포인터 예제 2 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+
+struct data {
+	int Id;
+	char *Name;
+	void (*SetName)(struct data *pData, char *NewName);
+	char *(*GetName)(struct data *pData);
+	void (*Clear)(struct data *pData);
+};
+
+void SetName(struct data *pData, char *NewName)
+{
+	if (pData->Name)
+	{
+		if (strlen(pData->Name) < strlen(NewName))
+		{
+			free(pData->Name);
+			pData->Name = (char *)malloc(strlen(NewName)+1);	
+		}
+	}
+	else
+	{
+		pData->Name = (char *)malloc(strlen(NewName)+1);
+	}
+	
+	strcpy(pData->Name, NewName);
+}
+
+char *GetName(struct data *pData)
+{
+	if (pData->Name)
+		return pData->Name;
+	else
+		return NULL;
+}
+
+void Clear(struct data *pData)
+{
+	pData->Id = 0;
+	if (pData->Name)
+	{
+		free(pData->Name);
+		pData->Name = NULL;
+	}
+	pData->GetName = NULL;
+	pData->SetName = NULL;
+	pData->Clear = NULL;
+}
+
+int main()
+{
+	struct data *pData;
+
+	pData = (struct data *)malloc(sizeof(struct data));
+
+	pData->Id = 100;
+	pData->GetName = GetName;
+	pData->SetName = SetName;
+	pData->Clear = Clear;
+
+	printf("pData->Id=%d\n", pData->Id);
+	pData->SetName(pData, "mwyun");
+	printf("pData->Name=%s\n", pData->GetName(pData));
+	pData->Clear(pData);
+
+	free(pData);
+
+	return 0;
+}
+}}}
+
+== 함수 포인터 예제 3 ==
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+struct data {
+	int Id;
+	char *Name;
+	void (*SetName)(struct data *pData, char *NewName);
+	char *(*GetName)(struct data *pData);
+	void (*Print)(struct data *pData);
+	void (*Clear)(struct data *pData);
+};
+
+void SetName(struct data *pData, char *NewName)
+{
+	if (!pData)
+		return;
+
+	if (pData->Name)
+	{
+		if (strlen(pData->Name) < strlen(NewName))
+		{
+			free(pData->Name);
+			pData->Name = (char *)malloc(strlen(NewName)+1);	
+		}
+	}
+
+	else
+	{
+		pData->Name = (char *)malloc(strlen(NewName)+1);
+	}
+
+	strcpy(pData->Name, NewName);
+}
+
+char *GetName(struct data *pData)
+{
+	if (!pData)
+		return NULL;
+
+	if (pData->Name)
+		return pData->Name;
+	else
+		return NULL;
+
+}
+
+void Clear(struct data *pData)
+{
+	if (!pData)
+		return;
+
+	pData->Id = 0;
+	if (pData->Name)
+	{
+
+		free(pData->Name);
+		pData->Name = NULL;
+	}
+
+	pData->GetName = NULL;
+	pData->SetName = NULL;
+	pData->Clear = NULL;
+}
+
+void Print(struct data *pData)
+{
+	if (!pData)
+		return;
+
+	printf("pData->Id=%d\n", pData->Id);
+	printf("pData->Name=%s\n", pData->GetName(pData));
+}
+
+struct data *Create(int Id, char *Name)
+{
+	struct data *pData;
+
+	pData = (struct data *)malloc(sizeof(struct data));
+
+	if (!pData)
+		return NULL;
+
+         // 함수의 시작 주소를 저장
+	pData->GetName = GetName; 
+	pData->SetName = SetName;
+	pData->Print = Print;
+	pData->Clear = Clear;
+
+	pData->Id = Id;
+	pData->SetName(pData, Name);
+
+	return pData;
+}
+
+void Destroy(struct data *pData)
+{
+	if (!pData)
+		return;
+
+	pData->Clear(pData);
+	free(pData);
+
+	pData = NULL;
+}
+
+int main(int argc, char **argv)
+{
+	struct data *pData;
+
+	if (argc != 3)
+		return -1;
+
+	pData = Create(atoi(argv[1]), argv[2]);
+	pData->Print(pData);
+	Destroy(pData);
+
+	return 0;
+}
+}}}
+
+== 결 론 ==
+
+주석은 최대한 자제했습니다. 구조체 변수나 구조체 포인터 변수 예제를 통해서 포인터를 통한 참조 방식에 대해서 이해하시기 바립니다.
+
+간단한 함수 포인터 예제를 통해서 함수 포인터를 어떻게 쓰는지 이해하시기 바랍니다.
+
+== 참고문헌 ==
+[wiki:Site/C/Documents/FunctionPointer 함수포인터의 사용]
+
+----
+CategoryLanguage CategoryC

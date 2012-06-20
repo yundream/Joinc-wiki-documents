@@ -1,0 +1,92 @@
+#title QOS - DNS 서비스 QOS 측정
+
+호스팅을 받는 수준이 아닌, 기업수준에서의 웹서비스라면 별도의 DNS(:12) 서버를 필요로 할 것이다. DNS는 Domain 주소에 대한 IP:::Address(:12)를 되돌려주는 일을 하므로, 만약 DNS 서버가 죽어 버린다면 서비스가 정지 상태가 되어 버릴 것이다. 단순히 죽는 것 뿐만 아니라 응답시간이 느려지는 경우도 문제가 될 것이다. DNS 서비스는 DOS(:12), DDOS(:12) 공격에 노출되는 경우가 많으므로 특히 주의해서 관리해야할 필요가 있다.
+
+=== nslookup 이용 ===
+nslookup(8)의 응답속도를 계산하는 방식이다.
+{{{#!plain
+# nslookup google.co.kr dns.server.name
+Server:         www.joinc.co.kr
+Address:        218.234.19.87#53
+
+Non-authoritative answer:
+Name:   google.co.kr
+Address: 72.14.207.104
+Name:   google.co.kr
+Address: 72.14.235.104
+Name:   google.co.kr
+Address: 72.14.203.104
+}}}
+
+만약 실패한다면, 다음과 같은 결과가 나온다. dns.server.name 에 문제가 있음을 알 수 있다.
+{{{#!plain
+# nslookup google.co.kr dns.server.name
+;; connection timed out; no servers could be reached
+}}}
+
+시간측정은 time(1)을 이용할 경우 쉘스크립트 만으로도 측정 가능할 것이다. C(:12)를 이용한다면, popen(3)을 통해서 실행시킨다음 gettimeofday(2)를 이용해서 종료될때까지의 시간을 측정하면 된다. 측정된 데이터는 RRD(:12)등을 통해서 통계자료로 만들면, 모니터링 가능한 정보가 될 것이다.
+
+=== RRD 생성 ===
+다음과 같이 RRD Database를 생성했다. 단지 Reply Time만 저장하도록 했다.
+{{{#!plain
+NOW=`date +%s`
+echo $NOW
+rrdtool create dnsrtime.rrd --start $NOW --step 300 \
+DS:rtime:GAUGE:600:U:U \
+RRA:LAST:0.5:1:600 \
+RRA:LAST:0.5:6:700 \
+RRA:LAST:0.5:24:775 \
+RRA:LAST:0.5:288:797
+}}}
+
+=== RRD Update ===
+간단한 데몬 프로그램을 만들었다. 이 데몬 프로그램은 20초 간격으로 nslookup(8)을 시도해서, 응답시간을 조사하고 RRD 데이터 베이스를 업데이트 한다. 컴파일은 되지만 아직 완성된 코드는 아니다.
+{{{#!plain
+#include <sys/time.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+    FILE *fp;
+    char buf[256];
+    struct timeval ftime, stime;
+    int rtime = 0;
+    int i = 1;
+    char rrd[80];
+    char command[256];
+    sprintf(rrd, "%s", argv[1]);
+    if (access(rrd,F_OK) != 0)
+    {
+        printf("rrd not found!!\n");
+        return 1;
+    }
+
+    while(1)
+    {
+        gettimeofday(&ftime, NULL);
+        fp = popen("nslookup www.linux.com 218.234.19.87 -sil", "r");
+        while(fgets(buf, 254, fp))
+        {
+        }
+        fclose(fp);
+        gettimeofday(&stime, NULL);
+
+        rtime += (stime.tv_sec - ftime.tv_sec)*1000000+(stime.tv_usec - ftime.tv_usec);
+        printf("rtime %d\n", rtime);
+        if ((20*i)%300 == 0)
+        {
+            sprintf(command, "%s update /usr/local/rrddata/dnsrtime.rrd %d:%d", rrd, stime.tv_sec, rtime/15000);
+            printf("Command : %s\n", command);
+            rtime = 0;
+        }
+        sleep(20);
+        i++;
+    }
+}
+}}}
+
+=== RRD 그래프 ===
+이렇게 RRD 데이터베이스에 5분간격으로 DNS 응답시간 데이터가 쌓이게 되었다. 이제 이 정보를 그래프로 보여주면 된다. 다음과 같은 스크립트를 이용해서 RRD 그래프를 생성하도록 했다. 이 스크립트는 crontab에 등록되어서 5분단위로 실행될 것이다.
+{{{#!plain
+}}}

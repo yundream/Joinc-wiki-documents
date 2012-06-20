@@ -1,0 +1,442 @@
+#title 분기와 비교 의사명령
+
+[[TableOfContents]]
+
+=== 분기와 비교 의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_1.html
+
+MIPS 하드웨어는 분기구조와 반복구조를 구현하기 위한 여러가지 명령을 가지고 있다. 그러한 기본적인 명령들을 사용하여 보다 유연성있는 여러가지 의사명령을 만든다.
+
+장의 주제:
+
+    * 분기명령 (Branch instructions)
+    * 분기명령에서 직접 피연산자(Immediate operands in branch instructions)
+    * Set 명령(instructions)
+    * 인덱스화한 주소(Indexed Addressing)
+    * Byte arrays
+    * Integer arrays
+
+주:이 장에 사용한 예제는 스핌 시뮬레이터의 설정이 pseduoinstrictions는 ON과  delayed branches는 OFF 그리고 delayed loading은 OFF임을 가정한다.
+
+질문: 조건 분기란 무엇입니까?
+
+=== 0일때 분기하기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_2.html
+
+답: 조건분기는 조건을 확인하고 조건이 참일때(예를 들어 beq 명령처럼 beq $s0,$s1,label) PC를 변화 시킨다. 
+
+확장된 어셈블러에는 기초명령 이외에도 여러가지 조건분기명령을 구현하고있다. 예를 들어:
+
+{{{#!plain
+beqz    rs,label          #만약 register rs == 0라면  label로 분기한다.
+}}}
+하드웨어 자체가 이러한 작동을 위한 기계명령을 가지고 있는 것은 아니다. 하지만 하드웨어는 레지스터 zero와 beq명령을 가지고 있다. 
+
+질문: 빈칸을 채워서 레지스터 $t3가 0일 경우 분기하도록 하자.
+
+{{{#!plain
+______    $t3,________,label          # branch to label if register rs == 0
+}}}
+
+=== 무조건 분기 명령  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_3.html
+
+답:
+
+{{{#!plain
+beq    $t3,$0,label          #만약 레지스터 $t3==0이면 label로 분기한다. 
+}}}
+
+의사컴퓨터는  항산 분기를 하도록하는 무조건적인 분기 명령을 가지고 있다. 명령의 축약코드는 b이다:
+{{{#!plain
+b     label       # label로 분기한다. 
+}}}
+
+이 명령은 jump명령처럼 행동한다. label이 지정한 주소를 PC에 무조건 올린다. Jump명령과는 다른게 label이 지정한 분기 목적지는 모든 분기명령이 그러하듯이 분기명령에 비교적 근접해 있어야 한다. 명령의 16비트 offset과 PC의 현재값을 사용하여 32비트 주소를 계산한다.
+
+질문:
+확장된 어셈블러는 beq명령을 사용하여 b 명령을 구현하다. 다음 빈칸을 채워보자.
+
+{{{#!plain
+b  label     ==     beq  _____,_____,offset
+}}}
+Offset은 label의 값을 계산하기위해서 PC에 더해지는 16비트 값이다. 
+
+=== 분기명령표  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_4.html
+
+답:
+
+b  label     ==     beq  $0,$0,offset
+
+다음은 분기명령들을 나열한 표이다. 서브루틴을 링크하는데 사용하는 부수적인 분기 명령들은 생략하였다. 몇몇 명령들은 32비트 2의 보수 데이터임을 가정한다. 다른 명령들은 32비트 부호 없는 데이터를 가정하기도 하고 어떠한 데이터 포멧도 가정하지 않는 명령도 있다.
+
+첫번째 피연산자 s는 레지스터야만 한다. 두번째 피연산자 t는 레지스터이거나 또는 직접 피연산자 일 수 있다.(사용자가 어떤 값을 선택하느냐에 따라 확장된 어셈블러는 적확한 기토 명령을 생성한다). label은 16비트크기의 부호연장된 정수를 PC값에 더해서 도달할 수 있는 주소를 지정한다. 대략적으로 현재명령에서 위아래로 32k 영역이어야 한다.
+
+||축약코드(Mnemonic) || 피연산자(Operands) || 설명 (Description) || 부호있음 또는 부호없음 (signed or unsigned?) ||
+|| b ||	label	|| branch|| ||	 
+|| beq|| s,t,label || branch if s==t|| ||	 
+||beqz||s,label||branch if s==0|| ||	 
+||bge|| s,t,label || branch if s>=t || signed ||
+||bgeu||s,t,label ||branch if s>=t ||unsigned||
+||bgez||s,label	||branch if s>=0 ||signed||
+||bgt||s,t,label ||branch if s>t||signed||
+||bgtu||s,t,label||branch if s>t||unsigned||
+||bgtz||s,label	||branch if s>0||signed||
+||ble	||s,t,label||branch if s<=t||signed||
+||bleu	||s,t,label||branch if s<=t||unsigned||
+||blez	||s,label||branch if s<=0||signed||
+||blt	||s,t,label||branch if s<t||signed||
+||bltu	||s,t,label||branch if s<t||unsigned||
+||bltz	||s,label||branch if s<0||signed||
+||bne	||s,t,label||branch if s=/=t|| ||	 
+||bnez	||s,label||branch if s=/=0|| ||	 
+
+의사명령들 중에 몇몇은 기초명령으로 확장되는경우에 어셈블러 임시 레지스터($at또는 $1)을 사용한다.
+
+질문: bne 명령은 어떤 데이터 형태를 가정합니가?
+
+=== If-Else 구조 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_5.html
+
+답: 특별한 가정이 필요하지 않다. 단지 두비트패턴이 동일한지 시험해볼 뿐이다.
+
+분기 명령을 사용하여 조건문 형태의 구조를 구현할 경우 명령들은 조건이 거짓일 경우 분기명령 다음의 명령들을 즉각적으로 수행한다. 이것은 상위언어의 조건문에서 참일경우 뒤따르는 명령을 수행하는 구조와 반대의 형태이다. 코딩할 때에 이러한 문제를 주의 깊게 살펴보자. 문서의 주를 자세히 달아두는 것도 도움이된다.
+
+다음은 프로그램의 일부분이다. 이 부분은 레지스터 $t0 값을 $t0의 값이 짝수일 경우 $t2에 더하고 $t0의 값이 홀수 일 경우  $t1에 더한다.
+
+
+{{{#!plain
+        lw    $t0,val          # $t0에 값을 올린다.
+        andi  $t8,$t0,1        # 1의 자리가 0인지 1인지 확인한다. 
+        ____  $t8,odd          #  짝수일 경우 
+        addu  $t2,$t2,$t0      #     짝수 값을 더한다.
+        b     endif
+odd:                           # 아닐 경우
+        addu  $t1,$t1,$t0      #     홀수 값을 더한다.
+endif:
+}}}
+
+조건문의 참일 경우 분기하는 끝부분에 무조건 분기 명령이 사용된다.
+
+질문: 빈칸을 올바른 분기명령으로 채워보자 (표를 참조해 보자)
+
+
+=== 분기문에서 직접피연산자 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_6.html
+
+답:
+{{{#!plain
+        lw    $t0,val          # $t0에 값을 올린다.
+        andi  $t8,$t0,1        # 1의 자리가 0인지 1인지 확인한다. 
+         bnez  $t8,odd           #  짝수일 경우 
+        addu  $t2,$t2,$t0      #     짝수 값을 더한다.
+        b     endif
+odd:                           # 아닐 경우
+        addu  $t1,$t1,$t0      #     홀수 값을 더한다.
+}}}
+
+만약 분기명령이 두번째 피연산자를 가지고 있다면 피연산자는 직접 피연산자이거나 또는 레지스터일 것이다. 표에서 보여지는 예를 들자면:
+
+|| bge || s,t,label ||	branch if s>=t	|| signed ||
+
+다음은 명령의 예들이다:
+{{{#!plain
+bge    $t1,$t2,spot     # if ( $t1 >= $t2 ) goto spot
+
+bge    $t1,23,spot      # if ( $t1 >= 23  ) goto spot
+
+bge    $t1,-98,spot     # if ( $t1 >= -98 ) goto spot
+
+bge    12,$t1,oops      # 잘못된 명령이다. 첫번째 op은 레지스터여야만 한다. 
+
+bge    $t1,value,oops   # 잘못된 명령이다. 두번째 피연산자는 심볼주소가 될 수 없다. 
+}}}
+
+질문:
+다음 명령은 올바른가요?
+
+{{{#!plain
+bge     $t1,-67,spot     # if ( $t1 >= -67 ) goto spot
+}}}
+
+=== 예제 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_7.html
+
+답: 예
+
+사용자로부터 정수값들을 읽어서 정수값을 더하는 프로그램을 작성해보자. 정수값 x는 -32 <= x <= +32 범위이다. 범위이외의 값은 버려진다.
+사용자는 -999를 입력함으로써 프로그램의 종료를 알린다.(-999은 정수값에 더하여지지 않는다). 다음은 프로그램의 대략적인 윤곽이다.
+
+{{{#!plain
+main:   
+        li    $v1,0            # sum을 0으로 초기화한다.
+loop:
+        . . . .                # 유저의 입력을 알리는 프롬프트
+        li    $v0,5            # 정수값을 $v0로 읽는다.
+        syscall                
+
+        ____ $v0,____9,done    # while ( $v0 =/= -999 )
+
+        ____ $v0,____,out          # less than -32
+        
+        ____ $v0,____,out          # greater than 32
+               
+        addu  $v1,$v1,$v0          # if in range add           
+                                   # else skip
+out:    b     loop        
+        
+done:   . . . .                # 결과를 출력한다.
+}}}
+(이 장의 예에서는 스핌 시뮬레이터의 load delay와 branch delay 옵션을 사용하지 않는다)
+
+질문: 빈칸을 채워보자.
+
+=== 빈칸 채우기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_8.html
+
+답:아래를 보자.
+
+대략적인 프로그램이 아래처럼 완성 되었다. 입력부분과 출력부분은 생략되었다. 이프로그램에서처럼 입력 끝에 종료를 알리는 센티널(sentinel) 값을 찾아내서 프로그램을 종료시키는 것은 좋은 방법은 아니다. 단순한 예제를 제공하기 위해서 사용했다. 
+
+{{{#!plain
+main:   
+        li    $v1,0          # sum을 0으로 초기화한다.
+loop:
+        . . . .                # 유저의 입력을 알리는 프롬프트
+        li    $v0,5              # 정수값을 $v0로 읽는다.
+        syscall                
+
+        beq   $v0,-999,done    # while ( $v0 =/= -999 )
+        blt   $v0,-32,out         # less than -32
+        bgt   $v0,32,out          # greather than 32
+
+        addu  $v1,$v1,$v0         # if in range add           
+                                  # else skip
+out:    b     loop        
+
+done:   . . . .               # 결과를 출력한다.
+}}}
+
+질문: MIPS에서 set 명령은 무엇입니까?
+
+=== Set on Less Than ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_9.html
+
+답:Set 명령은 두값을 비교하여 그 결과로 레지스터를 1로 설정하거나 0으로 설정한다.
+
+set 명령이 레지스터에 집어넣는 1과 0을 참값과 거짓값으로 생각해보자. 다음은 18장에서 공부한 slt 명령이다. 확장된 어셈블러에서는 이명령이 더욱 유용하게 사용된다:
+
+
+{{{#!plain
+                   #  $s and t 레지스터는 2의 보수로 표현된 정수를 담고 있다.
+                   #
+slt   d,s,t        #  if ( $s < $t )
+                   #    d &lt-- 1
+                   #  else
+                   #    d &lt-- 0
+                   #
+                   #  t 는 레지스터가 될 수 도있고 즉시 피연산자가 될 수 도 있다.
+}}}
+
+확장된 어셈블러에서 피연산자 t는 직접 피연산자가 될 수 도 있습니다.
+
+답: 다음은 올바릅니까?
+{{{#!plain
+slt   $t5,$v0,87        #  if ( $v0 < 87 ) $t5 &lt-- 1
+}}}
+
+=== Set 명령표 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_10.html
+답: 예
+
+Set 명령표
+
+|| 축약코드(Mnemonic) || 피연산자(Operands) || 설명(Description) || 부호있음(signed) or 부호없음(unsigned)? ||
+|| seq || d,s,t || set d if s==t ||  ||	 
+|| sge || d,s,t || set d if s>=t ||  signed ||
+|| sgeu || d,s,t || set d if s>=t ||  unsigned ||
+|| sgt || d,s,t || set d if s> t ||  signed ||
+|| sgtu || d,s,t || set d if s> t ||  unsigned ||
+|| sle || d,s,t || set d if s<=t ||  signed ||
+|| sleu || d,s,t || set d if s<=t ||  unsigned ||
+|| slt || d,s,t || set d if s< t ||  signed ||
+|| slti || d,s,Imm || set d if s< Imm ||  signed ||
+|| sltu || d,s,t || set d if s< t ||  unsigned ||
+|| sltiu || d,s,Imm || set d if s< Imm ||  unsigned ||
+|| sne || d,s,t || set d if s =/= t ||  ||	 
+
+다음은 set 명령 표이다. 대부분 의사명령들이다. 피연산자 t 는 직접 피연산자가 될 수 도 있다. Imm 피연산자는 직접 피연산자이어야 한다.
+
+확장된 어셈블러는 축약코드와 피연산자에 따라서 적절한 기초 명령을 산출한다. 때로는 여러가지 방법으로 동일한 기초명령을 지정할 수 도 있다.
+
+어떤명령은 부호없는 이진수로 표현된 정수를 위한것일 수 도 있고 또는 2의보수로 로 표현된 정수를 위한것일 수 도 있고 또 어떤경우에는 아무런 차이점이 없는 명령일 수 있다.
+
+질문: 다음의 의사명령들이 동일한 기초명령으로 번역되겠습니까?
+
+{{{#!plain
+sltu $t4,$v0,45 	and 	sltui $t4,$v0,45
+}}}
+
+=== 색인 주소 지정하기(Indexed Addressing) ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_11.html
+
+답:
+{{{#!plain
+sltu $t4,$v0,45 	and 	sltui $t4,$v0,45
+}}}
+그렇습니다. 처음명령은 두번째 명령으로 번역됩니다.
+
+새로운 명령을 구현하는 것이외에도 확장된 어셈블러는 새로운 색인 주소 형식을 구현한다. 색인화된 주소 형식은 배열의 주소를 지정하는데 매우 유용하게 사용된다. 다음은 예이다.
+
+{{{#!plain
+      li    $t1,2                 # index 2
+      lb    $v0,data($t1)         # $v0 = data[$t1]
+      . . . 
+      
+data: .byte  6,34,12,-32, 90      # index zero is first
+}}}
+
+데이터를 5바이트 크기의 배열이라고 생각해보자. lb 명령은 2번으로 지정된 배열의 데이터(12를 담고 있는 바이트)를 레지스터  $v0로  로드한다.
+
+확장된 어셈블러는 과거에 보았던 프로그램에서처럼 똑같은 방식으로 작동한다. 기초명령은 $t1에 있는 색인값을 데이터로 심볼화된 주소에 더한다. 다음은 위의 코드를 어셈블러가 기초명령으로 재해석한 것이다.
+
+
+{{{#!plain
+      ori   $t1,$0,2           # index 2
+      lui   $at,4097           # $at 레지스터에  "data"의 주소값을 올린다.
+      addu  $at,$at,$t1       # add index to $at
+      lb    $v0,0($at)         # $v0 = data[$t1]
+      . . . 
+      
+data: .byte  6,34,12,-32, 90   
+}}}
+어셈블러는 레지스터 at을 사용하여 적절한 바이트의 주소를 계산하여 코드를 생성한다.그런후 그 주소를 사용하여 바이트를 레지스터 $v0에 올린다.
+
+질문: 실제 주소는 언제 계산됩니까?
+
+=== 네가지 단계 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_12.html
+
+답: 어셈블러가 코드를 생성할때 실제주소가 계산된다.
+
+다음은 컴퓨터 과학적인 측면에서 생각해 본것이다. 실제 무엇이 일어나는 지 주의깊게 살펴볼 필요가 있다. 다음의 표를 살펴 보자.
+
+|| 프로그래머가 작성하는 것 || 확장된 어셈블러가 기초명령으로 번역한 것 || 기초 어셈블러가 생성하는 것 || 실행시 일어나는 것 ||
+|| li    $t1,2  || ori   $t1,$0,2 || 34090002 || 처음 세개의 기계명령이 실행되고 ||
+|| lb    $v0,data($t1) || lui   $at,4097 || 3c011001 || 배열의 세번째 바이트 주소는 레지스터 $1에 올려진다 ||
+||  || addu  $at,$at,$t1 || 00290821  || 4번째 기계명령은 ||
+||  ||	lb    $v0,0($at) || 80220000 || 레지스터  $2 ($v0)에 바이트를 올려준다.  ||
+||  || (4097은 데이터 주소의 상위 반이다) || || ||	
+
+질문: C언어와 자바에서 배열의 인덱스는 무엇으로 시작합니까?
+
+=== 0으로 시작하는 인덱스 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_13.html
+
+답: 0
+
+경험상으로 배열의 인덱스는 0으로 시작하는 것이 좋다. 배열의 첫번째 요소는 0부터 시작하여 배치된다. 배열은 인덱스를 0부터 시작하고 인덱스를 배열의 요소의 크기 만큼 증가 시켜서 다음 배열의 요소로 이동한다.  
+
+다음은 배열의 모든 바이트를 더하는 프로그램의 일부분이다.
+{{{#!plain
+        li    $v1,0              # sum 값을 0으로 초기화한다.
+        li    $t1,0              # index를 0으로 초기화 한다.
+        li    $t2,0              # loop counter를 0으로 초기화 한다.
+        
+for:    beq   $t2,5,endfor       # for ( i=0; i < 5 ;i++ )
+        lb    $v0,data($t1)
+        addu  $v1,$v1,$v0        #     sum = sum+data[i]
+        addi  $t1,$t1,1          #     인덱스를 증가 시킨다.
+        addi  $t2,$t2,1          #     카운터를 증가 시킨다.
+        b     for
+
+endfor: 
+        . . . 
+      
+data: .byte  6,34,12,-32, 90   
+}}}
+
+질문: 32비트 정수 배열을 색인화된 주소로 지정할때 배열의 다음 요소로 이동하기 위해서는 인덱스의 값을 얼마만큼 증가시켜야 합니까?
+
+=== 정수 배열 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_14.html
+
+답: 4만큼
+
+다음은 위에 프로그램과 거의 동일하다. 다만 32비트 정수 배열의  정수 값을 더하는 프로그램이다. 프로그램의 논리는 전과 동일하다.
+
+{{{#!plain
+        .globl  main
+
+main:   
+        li    $v1,0              # sum을 0으로 초기화
+        li    $t1,_____          # index 를 초기화
+        
+        li    $t2,0              # iloop counter를 초기화
+for:    beq   $t2,5,endfor       # for ( i=0; i < 5 ;i++ )
+
+        l___  $v0,array($t1)
+        
+        addu  $v1,$v1,$v0        #     sum = sum+array[i]
+        
+        addi  $t1,$t1,_____      #     index를 증가시킨다.
+        
+        addi  $t2,$t2,_____      #     counter를 증가시킨다.
+        b     for
+ 
+endfor:
+        li    $v0,10             # exit
+        syscall   
+
+        .data
+array:  .word  1,2,3,-5,1
+}}}
+질문 : 빈칸을 채워보자.
+
+=== 완성된 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_15.html
+
+답:
+다음은 완성된 프로그램이다. C 언어로 작성된 루프가 컴파일 되어진 형태와 크게 다르지 않다. 파일로 복사해서 스핌에 실행시키기 위해서는 스핌옵션에서 의사명령을 허용하도록 하고 로드지연 분기지연의 옵션을 선택하지 말아야 한다.  
+{{{#!plain
+        .globl  main
+
+main:   
+        li    $v1,0              # sum을 0으로 초기화 한다.
+        li    $t1,0              # iindex를 0으로 초기화 한다.
+        li    $t2,0              #  loop counter를 초기화 한다.
+        
+for:    beq   $t2,5,endfor       # for ( i=0; i < 5 ;i++ )
+        lw    $v0,array($t1)
+        addu  $v1,$v1,$v0        #     sum = sum+array[i]
+        addi  $t1,$t1,4          #     index를 증가시킨다.
+        addi  $t2,$t2,1          #     counter를 증가시킨다.
+        b     for
+ 
+endfor:
+        li    $v0,10             # exit
+        syscall   
+
+        .data
+array: .word  1,2,3,-5,1
+}}}
+
+질문: 파스칼(Pascal)같은 언어에서는 배열의 첫번째 인덱스로 어떤 정수가 와도 상관없다. 그러한 언어가 MIPS 하드웨어를 위해 컴파일 될 수 있겠습니까?
+
+=== 24장 끝 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24_16.html
+
+답: 물론이다. 하지만 컴파일러는 확장된 어셈블러의 색인화된 주소 형태를 사용하지 않을 지도 모른다.
+
+논의된 주제
+
+    * 무조건 분기 (Unconditional branch)
+    * 분기 명령표 (Table of branch instructions)
+    * 분기 명령에서 직접 피연산자. 
+    * Set instructions
+    * 인덱스화된 주소 
+    * 인덱스화된 주소를 구현하기
+    * 배열의 인덱스 
+
+[http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24quiz.html 퀴즈]와 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-24/ass24programs.html 과제]를 풀어보자.

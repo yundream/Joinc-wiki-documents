@@ -1,0 +1,67 @@
+## [[Date(2003-11-27T01:07:26)]]
+== 이상훈 ==
+
+=== 생긴거 ===
+
+||[[Attachment(noohgnas.jpg)]]||
+
+=== E-mail ===
+mailto:nooh@kmu.ac.kr
+
+직업은 [http://www.kmu.ac.kr 계명대학교] 학생입니다.
+전공은 컴퓨터입니다. 고등학교를 문과를 나와서 입학해서 2학년까지는 정치외교학 전공이었습니다. >.<;; 계명대학교는 특이하게 이,문 관계없이 과를 바꿀 수 있습니다. ㅎㅎㅎㅎ 저에게는 행운이었죠. =)
+
+== 달력 ==
+|| [[Calendar(blog)]] ||
+|| [[DueDate(20030606)]] ||
+
+== My Blog ==
+[[RSS(http://blog.kldp.org/blog/feed/53)]]
+
+문자셋을 상호 변환 시켜주는건 없나? 쩝;;;
+ * UTF8을 EUC_KR로 변환시키도록 수정했습니다 - yundream
+  어떻게 하셨죠? ㅋㅋ 궁금하네요 RSS.php 를 고치면 되나요? 그렇다면 어느 부분을 고쳐야되는지 알 수 있을까요? 어설프게 알기로는 iconv 라는걸 쓴다는데... - [이상훈]
+   * iconv() php함수를 사용해야 하는데, iconv를 지원하려면 php컴파일시 옵션을 지정해 주어야 합니다. 제 php경우 iconv옵션을 지정하지 않았습니다. 그렇다고 아파치 데몬을 다시 빌드하기는 귀찮고 해서 iconv시스템 명령을 이용해서 문제를 해결했습니다. iconv를 exec시키고 파이프를 통해서 UTF8문자열을 넘기고 결과물을 받아와서 뿌리는 방법을 이용했습니다. 아래는 코드입니다. 에러처리같은건 아직 안했습니다. 빨리 적용해야 하는데 :-)
+    * 감사합니다. 많은 도움이 되겠습니다. :-) 문자셋에 대한 문제라서 잘모르면 상당히 난처하더군요... ㅎㅎㅎ - [이상훈]
+{{{
+if (function_exists('iconv') and strtoupper($DBInfo->charset) != $charset)
+{
+  $new=iconv($charset,$DBInfo->charset,$out);
+}
+else
+{
+  // rss.php의 macro_Rss()함수 
+  $despec = array(
+    0 => array("pipe", "r"),
+    1 => array("pipe", "w"),
+    2 => array("file", "/tmp/iconvout/", "w")
+    );
+    $process = proc_open("/usr/bin/iconv -f utf8 -t euc-kr", $despec, $pipes);
+    if (is_resource($process))
+    {
+        fwrite($pipes[0], $out);
+        fclose($pipes[0]);
+        while(!feof($pipes[1]))
+        {
+            $new .= fgets($pipes[1], 1024);
+        }
+        fclose($pipes[1]);
+        return $new;
+    }
+    else
+    {
+        echo "Converting Error ";
+    }
+    // ...
+}}}
+== etc. ==
+
+예전부터 이 사이트에서 많은 도움을 받았습니다. =)
+앞으로도 많은 도움 부탁드립니다. ㅎㅎㅎ
+
+[[UploadFile]]
+제 사진을 올리려는데 'jpg' 는 못 올린다네요;;; ㅠ.ㅠ
+ * jpg,gif 올리도록 수정했습니다. :-) - yundream 
+
+----
+CategoryHomepage

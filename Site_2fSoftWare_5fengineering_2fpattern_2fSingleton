@@ -1,0 +1,78 @@
+#title 소프트웨어 엔지니어링 : Singleton 패턴
+
+== singleton ==
+'''singletone'''은 한번에 하나씩의 패만 보여준다는 의미를 가지고 있다. 좀더 일반적으로는 '''한번에 하나의 사건만 일어나도록 한다'''라는 의미로 해석할 수 있을 것 같다.
+
+소프트웨어 엔지니어링 영역에서의 '''singletone'''은 객체지향프로그래밍시 클래스가 단하나의 사건, 즉 단 하나의 인스턴스만을 가지도록 하는 패턴이다. 이 패턴은 주로 중요한자원을 관리하고자 할때, 다수의 인스턴스가 생성되지 않도록 제한하기 위해서 사용한다. 예컨데, 한번에 하나의 인스턴스만이 데이터베이스(:12)에 연결되는게 보장받기를 원하는 경우등이다.
+
+singletone은 다른 패턴들과도 어울려서 사용할 수 있는데, 다음과 같은 경우들이다.
+  1. facade(:12) 객체는 단지 하나의 객체만이 요구되는데, 이를 보장하기 위해서 singletone을 사용할 수 있다. 예를들어 컴퓨터를 가동시키는 facade 클래스가 있다고 가정해보자. 컴퓨터를 가동시키기 위한 여러가지 공정들 즉 '''cpu freeze''', '''memory load''', '''cpu jump''', '''cpu execute'''은 단지 하나의 객체가 생성되어서 수행되는 것을 보장해야 할 것이다. 
+  1. 때때로 singleton 패턴은 전역변수(:12)접근을 제어하기 위해서 사용되기도 한다. 전역변수를 모아서 하나의 single 클래스에 담아두는 방식으로 사용한다. 전역변수 접근 문제를 해결하기 위한 용도로 사용할 경우에 singleton 패턴자체가 전역클래스가 된다는 문제점이 있지만, namespace 충동물제를 해결하고 전역변수를 한 지점에서 관리할 수 있다는 것만으로도 singleton 패턴은 충분히 역할을 해낼 것이다.
+
+== single class ==
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/lPG56cjk_VNGSIkjVYxbIA?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uYzv0UYvI/AAAAAAAABR0/PZxDOCpRri8/s800/sx95gER_bS4--x2Y1_iXuLA.png" /></a>
+}}}
+
+singleton의 인스턴스는 getInstance()메서드를 통해서만 생성할 수 있도록 하므로써, 하나의 인스턴스만을 생성하도록 제어할 수 있다.
+
+== 예제 ==
+{{{#!plain
+#include <iostream>
+using namespace std;
+
+class Mutex
+{
+};
+
+# Mutex(:12) 제어 클래스
+class Lock
+{
+	private:
+		Mutex &mutex;
+	public:
+		Lock(Mutex& m) : mutex(m) {}
+		~Lock() {}
+};
+
+class Singleton
+{
+	public :
+		static Singleton *GetInstance();
+		int a;
+	private:	
+		Singleton(int _a) 
+		{
+			a = _a;
+			cout << "In Ctor" << endl;
+		}
+		~Singleton() {cout << "In Dtor" << endl;}	
+		
+		static Mutex mutex;
+
+		Singleton(const Singleton&);
+};
+
+Mutex Singleton::mutex;
+
+Singleton *Singleton::GetInstance()
+{
+	Lock lock(mutex);
+	cout << "Get Inst" << endl;
+	static Singleton myinst(1);
+	return &myinst;
+};
+
+int main()
+{
+	Singleton *singleton = Singleton::GetInstance();
+	cout << "The value of the singleton : " << singleton->a << endl;
+	return 0;
+}
+}}}
+
+== 할일 ==
+ 1. 다른 패턴과의 활용 방법 더 찾아보기
+ 1. c++, perl, php의 singleton 구현예제 코드 만들어보기 
+
+[[Category(2)]]

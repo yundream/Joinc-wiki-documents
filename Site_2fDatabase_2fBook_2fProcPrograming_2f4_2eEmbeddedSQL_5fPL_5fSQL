@@ -1,0 +1,414 @@
+#title 4.EmbeddedSQL_PL_SQL here
+[[TableOfContents]]
+=== Embedded SQL & PL/SQL ===
+==== SQL의 사용 ====
+앞에서도 말한바와 같이 Pro*C/C++ 을 사용하는 이유는 C/C++ 프로그램에서 SQL 문장을 사용하기 위해서이다. 실행 가능한 SQL 문장을 삽입하여 DB에 접근하고, 조작하고, 관리 할 수 있다. 사용가능한 문장들에는 어떤것들이 있는지 살펴보자.
+
+ * 사용할 수 있는 SQL 문장
+|| SQL	|| Description			||
+|| DML	|| Delete, Insert, Select, Update, Explain Plan, Lock Table ||
+|| DDL	|| Alter, Analyze, Audit, Comment, Create, Drop, Grant, NoAudit,  Rename, Revoke, Truncate ||
+|| Session Control	|| Alter Session, Set Role ||
+|| Transaction Control	|| Commit, Rollback, Savepoint, Set Transaction ||
+|| System Control	|| Alter System		||
+|| PL/SQL Block		|| PL/SQL 문장들	||
+
+==== 데이터베이스에 접속 ====
+먼저 데이터베이스에 어떤 조작을 하려면 접속을 해야만 한다. 접속을 하기 위해선 데이터베이스에 계정을 가지고 있어야 한다. 우리는 오라클에서 테스트용으로 제공하는 SCOTT이라는 계정을 사용한다. 먼저 유의 해야할 사항은 사용자 계정과 패스워드역시 SQL 문장에서 사용될 것이므로 이것을 저장할 변수 역시 호스트 변수로 선언해야 한다는 것이다. 위에서 보았듯이 호스트 프로그램에 SQL 문장을 삽입하기 위해서는 반드시 EXEC SQL을 붙여주어야만 한다.
+
+아래에 예제를 보자.
+{{{#!plain
+EXEC SQL BEGIN DECLARE SECTION;
+	varchar username [20];
+	varchar password [20];
+	varchar dbname [20];
+EXEC SQL END DECLARE SECTION;
+… … …
+
+	strcpy (username.arr, “SCOTT”);
+	strcpy (password.arr, “TIGER”);
+	strcpy (dbname.arr,   “ORCL” );
+	username.len = strlen (“SCOTT”);
+	password.len = strlen (“TIGER”);
+	dbname.len   = strlen (“ORCL” );
+
+… … …
+	
+	EXEC SQL CONNECT :username IDENTIFIED BY :password USING :dbname;
+}}}
+
+사용자의 이름은 SCOTT이고 패스워드는 TIGER이다. 그리고 varchar형식의 변수를 선언했으므로 arr에 문자열을 넣어주고 len에 그 길이를 넣어준다. 주의하여 볼 만한 사항으로 USING :dbname 부분이 있다. 이것은 원격 데이터베이스에 접속할 때 사용하는 것으로 반드시 필요한 구문은 아니다. dbname 변수에 들어가는 것은 원격 데이터베이스를 지정하는 커넥트 스트링을 저장한다. 커넥트 스트링은 tnsnames.ora 파일에 들어있으며 여기에 먼저 선언이 되어 있어야만 사용 할 수 있다. 만약에 로컬 데이터베이스에 접속한다면 Using :dbname 구문은 필요 없다. 
+
+==== SELECT 구문 ====
+데이터베이스에서 데이터를 얻어 올 때 쓰이는 문장이다. 아래 예제를 보자.
+
+{{{#!plain
+/* 호스트 변수의 선언 시작 */
+EXEC SQL BEGIN DECLARE SECTION;
+	int empno;              /* emp 테이블의 empno를 받을 변수 */
+	char ename[10];         /* emp 테이블의 ename을 받을 변수 */
+	char jog[10];		/* emp 테이블의 job  을 받을 변수 */
+	float sal;              /* emp 테이블의 sal  을 받을 변수 */
+	float comm;             /* emp 테이블의 comm 을 받을 변수 */
+EXEC SQL EBD DECLARE SECTION;
+/* 호스트 변수의 선언 종료 */
+
+… … …
+
+/*
+ * empno를 얻어와서 해당하는 사람의 이름과 급여, 상여를 받아온다.
+ */
+empno = atoi (gets ());
+EXEC SQL
+SELECT ename, job, sal, comm
+INTO :ename, :job, :sal, :comm
+	FROM emp
+	WHERW empno = :empno;
+
+/*
+ * 얻어온 급여와 상여를 수정하여 다시 업데이트 한다.
+ */
+sal  = sal  + 3000;
+comm = comm + 1000;
+EXEC SQL
+	UPDATE emp
+	SET sal = :sal, comm = :comm.
+	WHERE empno = :empno;
+}}}
+… … …
+위의 문장은 사원정보테이블에서 사원번호가 7788인 사람의 이름, 직책, 급여, 상여를 얻어오는 문장이다. 앞에서 본 바와 같이 SQL문장을 사용하기 위해서 EXEC SQL 절을 붙여주어야 한다. 데이터베이스에서 패치된 칼럼의 내용이 ename, job, sal, comm이라는 호스트 변수 안에 들어가도록 되어있다. 이때 WHERE 절에서 사용된 사원번호 값도 호스트 변수를 이용하여 조건절을 넘긴 것이다.
+
+하지만 잘 동작할 것 처럼 보이는 위의 프로그램도 가만히 살펴보면 한가지 문제점이 있다. 무엇일까? 그것은 SELECT 할때 comm을 받아오는 부분이다. 실제로 데이터베이스에 테이블을 보면 comm 칼럼에는 NULL 값이 들어있다.(C 언어와 달리 데이터베이스에서의 NULL은 칼럼안에 값이 아예 없다는 것이다.) NULL이 들어있는 칼럼의 값을 가져와서 수치연산을 한다는 것은 문제다. 호스트 변수를 사용하여 데이터베이스와 통신할 때 문법상으로는 전혀 이상이 없지만 호스트 변수 안에 도대체 어떤 값이 들어갈지 알 수 없는 것이다. 이때 사용해야 하는 것이 INDICATOR 변수이다. 이것을 통하여 데이터베이스와 통신할 때 호스트 변수와 데이터베이스간에 값의 전달 상황을 좀더 정확히 알 수 있는 것이다.
+
+아래 INDICATOR 변수의 사용 예제가 있다.
+
+{{{#!plain
+EXEC SQL BEGIN DECLARE SECTION; /* 호스트 변수의 선언 시작 */
+	int empno;              /* emp 테이블의 empno를 받을 변수 */
+	char ename[10];         /* emp 테이블의 ename을 받을 변수 */
+	char job[10];		/* emp 테이블의 job  을 받을 변수 */
+	float sal;              /* emp 테이블의 sal  을 받을 변수 */
+	float comm;             /* emp 테이블의 comm 을 받을 변수 */
+	short ind_empno;	/* empno변수의 INDICATOR */
+	short ind_ename;	/* ename변수의 INDICATOR */
+	short ind_job;		/* job  변수의 INDICATOR */
+	short ind_sal;		/* sal  변수의 INDICATOR */
+	short ind_comm;		/* comm 변수의 INDICATOR */
+EXEC SQL END DECLARE SECTION;   /* 호스트 변수의 선언 종료 */
+
+… … …
+
+/*
+ * empno를 얻어와서 해당하는 사람의 이름과 급여, 상여를 받아온다.
+ */
+empno = atoi (gets ());
+EXEC SQL
+SELECT ename, job, sal, comm
+INTO :ename:ind_ename, :job:ind_job, :sal:ind_sal, :comm:ind_comm
+FROM emp
+WHERE empno = :empno;
+
+/*
+ * 얻어온 급여와 상여를 수정하여 다시 업데이트 한다.
+ */
+(ind_sal  == -1) ? sal  = 3000 : sal  = sal  + 3000;
+(ind_comm == -1) ? comm = 1000 : comm = comm + 1000;
+EXEC SQL
+	UPDATE emp
+	SET sal = :sal, comm = :comm.
+	WHERE empno = :empno;
+}}}
+
+… … …
+
+새로 작성한 프로그램이 좀더 정확한 프로그램이라 하겠다. 그럼 INDICATOR 변수의 선언을 보자. 이것 역시 DECLARE SECTION 안에 들어가야만 한다. 그리고 이것은 반드시 2 byte 정수형으로 선언되어야만 한다. INDICATOR 변수는 호스트 변수의 뒤에 바로 따라서 붙도록 되어있다. 이것도 역시 콜론(:)을 붙이도록 한다. 가독성을 높이기 위해서
+:comm:ind_comm; 대신 :comm INDICATOR :ind_comm; 을 사용하여도 되지만 거의 사용하지 않는다.
+
+아래의 표는 INDICATOR 변수의 값이 가지는 의미를 보여준다. 
+
+ * 표6 INDICATOR 값의 의미
+|| 값			|| 의미	||
+|| 0			|| 정상적으로 처리	||
+|| -1			||	SELECT시 NULL이 리턴되거나 INSERT, UPDATE시 NULL이 들어감 ||
+|| -2			|| 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 알 수 없음.			||
+|| >0			|| 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 나타냄.					||
+
+
+위의 예제처럼 SQL문장을 수행한 후에 의심되는 칼럼에 대해서 INDICATOR 값을 검사해 보도록 하라.
+
+SELECT 구문과 같이 일반적으로 알고있는 FROM, WHERE, INTO 절 이외에도 잘 쓰이지 않지만 계층적인 결과를 얻기위한 START WITH, CONNECT BY와 그룹핑, 오더링도 가능하며 FOR UPDATE OF절 까지도 가능하다.
+
+==== DML 구문 ====
+이번에는 DML문장에 대하여 차례대로 살펴보자.
+
+{{{#!plain
+EXEC SQL BEGIN DECLARE SECTION;
+	int deptno;
+	char dname[10];
+	char loc[10];
+EXEC SQL END DECLARE SECTION;
+
+
+/*
+ * 부서번호가 50번인 새로운 부서를 Insert 한다.
+ */
+deptno = 50;
+strcpy (dname, “MANAGER”);
+strcpy (loc, “SEOUL”);
+EXEC SQL
+INSERT INTO DEPT 
+	VALUES (:deptno, :dname, :loc);
+}}}
+
+위에서 보는 바와 같이 INSERT 문이라 하여 특별한 것은 없다. 단순히 VALUES 절에 들어가는 실제 데이터들만 호스트 변수 또는 실제 상수값으로 대체시켜 주면 되는 것이다.
+{{{#!plain
+EXEC SQL BEGIN DECLARE SECTION;
+	Int deptno;
+EXEC SQL END DECLARE SECTION;
+
+/*
+ * 부서번호가 50인 부서의 부서번호를 60번으로 변경한다.
+ */
+EXECL SQL 
+UPDATE DEPT
+	SET deptno = 60
+	WHERE deptno = 50;
+
+… … …
+
+/*
+ * 부서번호가 60인 부서를 삭제한다.
+ */
+EXEC SQL
+	DELETE DEPT
+	WHERE deptno = 60;
+}}}
+
+UPDATE, DELETE도 역시 별반 다를바는 없다. 
+
+==== Cursor 사용 ====
+커서를 사용하는 것 또한 가능하다. 먼저 커서를 선언하고 필요한 시점에서 오픈하고 필요한 만큼 패치한후 사용이 끝나면 닫으면 된다.
+
+{{{#!plain
+EXEC SQL BEGIN DECLARE SECTION;
+int empno;
+char ename[10];
+char job[10];
+float sal;
+float comm.;
+EXEC SQL END DECLARE SECTION;
+… … …
+
+/*
+ * 부서번호가 10번인 사원의 사원번호, 이름, 직책, 급여, 상여를
+ * 가져오는 커서를 선언한다.
+ */
+EXEC SQL
+DECLARE emp_cursor CURSOR FOR
+	SELECT empno, ename, job, sal, comm
+	FROM emp
+	WHERE deptno = 10;
+
+… … …
+
+/*
+ * 커서를 연다.
+ */
+EXEC SQL
+OPEN emp_cursor;
+
+… … …
+
+/*
+ * 커서에서 레코드를 더 이상 패치할 것이 없을 때 Loop를 break 하도록 한다.
+ */
+EXEC SQL
+WHENEVER NOT FOUND DO break;
+
+While (1)
+{
+	/*
+	 * 커서에서 레코드를 하나씩 패치한다.
+	 */
+	EXEC SQL
+FETCH emp_cursor
+INTO :empno, :ename, :job, :sal, :comm.;
+
+	printf (“Fetch Data : %d, %s, %s, %7.2f, %7.2f\n”,
+empno, ename, job, sal, comm );
+
+	/*
+	 * 패치한 레코드의 사원 정보에서 급여를 20% 인상한다.
+	 */
+	EXEC SQL 
+		UPDATE emp
+		SET sal = sal * 1.2;
+		WHERE empno = :empno;
+} 
+
+/*
+ * 사용이 끝난 커서를 닫는다.
+ */
+EXEC SQL
+	CLOSE emp_cursor;
+}}}
+
+
+위에서 보여주는 예제는 부서번호가 10번인 사람들을 찾아서 한 사람씩 얻어온 정보를 프린트 하고 각각 급여를 20% 인상하는 프로그램인 것이다.
+
+특별한 것 없이 앞에서 봐왔던 코드들과 비슷하다. 다만 한가지 WHENEVER절이 새로이 선보였다. 이것은 Pro*C/C++에서 SQL을 수행하면서 에러를 검증해내는 두가지 방법중에 하나이다. 좀더 뒤에서 자세히 살펴보기로 한다.
+
+==== Transaction Control ====
+위에서 살펴본 것들로 데이터를 얻어오고 수정하는 등의 작업을 했다고 가정하자. 그럼 이 변경 사항들을 적용시키던지 취소하던지 결정을 하여야 한다. 그 것들이 트랜잭션 제어 문장들이다. 우리가 일반적으로 알고 있는 Commit, Rollback이다.
+
+{{{#!plain
+EXEC SQL
+	COMMIT WORK;
+
+EXECL SQL
+	ROLLBACK WORK;
+}}}
+위의 두 문장중 위의 것은 지금까지의 변경사항을 데이터 베이스에 영구적으로 적용하는 문장이고 아래것은 취소하고 이전의 데이터로 되돌리는 문장이다. WORK 구문은 단순히 SQL표준을 따르기 위한 것으로 반드시 붙일 필요는 없다.
+
+{{{#!plain
+EXEC SQL
+	COMMIT WORK RELEASE;
+
+EXEC SQL
+	ROLLBACK WORK RELEASE;
+}}}
+위의 두 문장 중은 아까 봤던 문장과 약간 다른 점이 있다. 바로 RELEASE가 뜻하는 바인데 RELEASE는 컴퓨터에서 ‘놓는다’, ‘푼다’, ‘해재한다’라는 의미로 쓰인다. Pro*C/C++ 에서는 바로 데이터베이스와의 접속을 끊는다는 의미이다. 즉 지금까지의 변경사항을 적용하고 접속을 끊던지 취소하고 접속을 끊는 작업이다. 
+
+==== 에러처리 ====
+지금까지 Pro*C/C++에서 SQL을 사용하는 방법을 살펴보았다. 그렇다면 그러한 구문들이 100% 확실히 수행된다고 장담 할 수 있는가? 세상에 에러 없는 프로그램은 없다. 당연히 우리도 SQL 문장을 수행하면서 발생하는 에러들을 찾아 낼 수 있어야 한다. Pro*C/C++ 에서는 두가지 방법을 제공해 준다.
+1) WHENEVER 구문을 사용하는 것이다. 이것은 Pro*C/C++ 프로그램에서 런타임 에러를 찾아 핸들링 할 수 있게 해주는 기능을 가지고 있다.
+2) SQL Communications Area를 이용하는 것이다. 이것은 앞으로도 많이 쓰일 것으로 매우 중요하다. 일반적으로 줄여서 SQLCA라고 한다. 이것은 프로그램에 들어가는 데이터구조로 sqlca.sqlcode와 sqlca.sqlerrm.sqlerrmc 에 보면 에러 번호와 에러에 대한 설명이 들어있다. 우리는 이것들을 사용해서 발생한 에러를 알아내고 적절한 조치를 취해야 하는 것이다.
+
+아래에 각각의 예제가 있다. 먼저 WHENEVER 구문을 사용한 첫번째 예제를 살펴보도록 하자.
+
+{{{#!plain
+int main (void)
+{
+… … …
+
+EXEC SQL
+WHENEVER SQLERROR DO sql_error ();
+EXEC SQL
+	DELETE FROM dept
+	WHERE deptno = 10;
+EXEC SQL
+		WHENEVER SQLERROR DO CONTINUE;
+
+… … …
+}
+
+void sql_error (void)
+{
+	printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
+	printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
+
+	EXEC SQL
+		WHENEVER SQLERROR DO CONTINUE;
+	EXEC SQL
+		ROLLBACK WORK RELEASE;
+	
+	EXIT (EXIT_FAILURE);
+}
+}}}
+위의 예제는 DELETE 문장을 실행하기 전에 먼저 SQL 실행시 에러가 발생하면 sql_error 라는 함수를 실행하도록 만들어 놓고 DELETE를 실행한다. 만약 DELETE 구문을 실행하다가 에러를 만나게 되면 프로그램은 자동으로 sql_error 함수로 분기하게 되고 거기서 SQL 에러코드와 에러메세지를 출력하고 프로그램은 모든 변경사항을 취소하고 데이터베이스와 접속을 끊고 종료한다. 만약 DELETE 구문이 성공하였다면 WHENEVER SQLERROR DO CONTINUE을 수행하여 에러가 발생하여도 계속적으로 프로그램을 진행하도록 다시 변경할 것이다. 
+
+여기서 중요한 것이 있다. sql_error 함수에서는 ROLLBACK 구문을 사용하기 전에 WHENEVER SQLERROR DO CONTINUE 을 하였다는 점이다. 만약에 여기서도 SQL 실행시 에러가 발생하였을 때 sql_error 를 수행하도록 하였다면 큰 문제가 발생 할 수도 있다. 바로 무한 루프에 빠지게 되는데 ROLLBACK을 수행하면서 데이터베이스와 접속을 끊는 과정에서 또다시 에러가 발생한다면 다시 sql_error 을 수행할 것이고 다시 ROLLBACK을 수행하면서 Disconnect을 시도하고 또 다시 sql_error 을 수행하는 과정이 반복 되는 것이다. 반드시 지켜져야할 사항으로 에러처리에서는 SQL을 수행한다 하더라도 반드시 WHENEVER SQLERROR DO CONTINUE 로 지정하도록 하라.
+
+이번에는 SQLCA를 사용한 두번째 예제를 보도록 하자.
+
+{{{#!plain
+int main (void)
+{
+… … …
+
+EXEC SQL
+	DELETE FROM dept
+	WHERE deptno = 10;
+If (sqlca.sqlcode != 0)
+{
+	printf (“Error Occurred\n”);
+sql_error();
+}
+
+… … …
+
+exit (EXIT_SUCCESS);
+}
+
+void sql_error (void)
+{
+	printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
+	printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
+
+	EXEC SQL
+		WHENEVER SQLERROR DO CONTINUE;
+	EXEC SQL
+		ROLLBACK WORK RELEASE;
+	
+	EXIT (EXIT_FAILURE);
+}
+}}}
+
+먼저 첫번째 보았던 프로그램과 대동소이하다. SQL실행시 에러를 어떻게 찾아내느냐의 문제인데 첫번째의 프로그램은 암시적인 에러의 식별이고 두번째 것은 명시적인 에러의 식별이라는 것이다. 위 프로그램은 SQL 문장을 수행한 후 SQLCA에 있는 sqlcode를 검사한다. 이것은 정상적으로 처리 되었을 때 0으로 셋팅된다. 
+
+두가지 방법을 필요와 편의성에 따라서 적절히 사용하면 되겠다.
+
+먼저 WHENNEVER 구문의 완전한 구문을 살펴보자
+{{{#!plain
+EXEC SQL ---->  WHENEVER --+---> NOT FOUND -----+---> CONTINUE
+                           l---> SQLERROR       |---> GOTO Label
+                           +---> SQLWARNING     |---> STOP
+                                                |---> DO routine
+                                                |---> DO BREAK
+                                                +---> DO CONTINUE
+}}}
+
+다음으로 sqlca구조체의 정의를 살펴보자.
+{{{#!plain
+struct sqlca
+{
+char sqlcaid[8]; /* "SQLCA" */
+long sqlabc;     /* SQLCA 의 크기 */
+long sqlcode;    /* 오라클 에러 메시지 코드가 저장된다. */
+struct {
+unsigned short sqlerrml; /* 에러 메시지의 크기 */
+char sqlerrmc[70];       /* 에러 메시지 내용 */
+} sqlerrm;
+char sqlerrp[8]; /* 예약 */
+long sqlerrd[6]; /* 상태 코드 */
+char sqlwarn[8]; /* 경고 플래그 */
+char sqlext[8];
+};
+struct sqlca sqlca;
+}}}
+
+각 구조체 필드의 의미를 알아본다면
+
+ * sqlcode : 가장 많이 쓰이는 필드이다. 에러 검증에 사용되며 “< 0” , “0”, “> 0” 세가지 종류의 값을 가진다. 0 일 경우 정상적으로 동작한 경우이고 “< 0” 인 경우 문제가 발생하여 실행되지 못한 경우이고 “> 0” 인 경우 실행 되었으나 예외상황이 발생한 경우를 나타낸다. 에러가 발생 한 경우 sqlca 안에 있는 sqlerrm 구조체를 살펴보도록 하라.
+
+ * selerrp : 상위 버전에서 사용하기 위해 비워둔 예약된 필드다. 사용하지 않는다.
+
+ * sqlerrd :
+   * sqlerrd [0] : 사용하지 않는다.
+   * sqlerrd [1] : 사용하지 않는다.
+   * sqlerrd [2] : SQL 문장을 수행해서 영향을 받은 행의 개수를 가진다.
+   * sqlerrd [3] : 사용하지 않는다.
+   * sqlerrd [4] : SQL 문장을 파싱하면서 에러가 발생한 위치를 가진다.
+   * sqlerrd [5] : 사용하지 않는다.
+ * sqlwarm: 경고 플래그로 사용
+   * sqlwarm [0] : 플랙그가 설정된게 있는지를 설정하는 플래그.  다른 플래그가 하나라도  설정되면 이 플래그가 설정된다.
+   * sqlwarm [1] : 호스트 변수로 넘겨진 문자열 데이터가 불완전할 때 설정된다.
+   * sqlwarm [2] : SQL 그룹함수에서 널값이 사용되지 않았을 때 설정된다.
+   * sqlwarm [3] : SQL 에서 쿼리하는 행의 개수와 호스트 변수의 개수가 다를 때 설정된다.
+   * sqlwarm [4] : Update나 Delete에서 Where 절이 없을 경우 설정 된다.
+   * sqlwarm [5] : PL/SQL 에서 컴파일 오류로 CREATE PROCEDURE, CREATE FUNCTION, CREATE PACKAGE, CREATE PACKAGE BODY 가 실행이 실패하면 설정된다.
+   * sqlwarm [6] : 사용하지 않는다.
+   * sqlwarm [7] : 사용하지 않는다.
+ * sqlext : 상위 버전에서 사용하기 위해 비워둔 예약된 필드다. 사용하지 않는다.
+
+이상으로 살펴본 것들 외에 DDL, DCL은 Dynamic SQL 부분에서 다루도록 하고 PL/SQL Block PL/SQL 부분을 따로 할애하여 알아보도록 하겠다.

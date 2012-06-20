@@ -1,0 +1,467 @@
+#title 11. Large Ojbect
+
+=== Large Objects ===
+이제부터는 LOB에 대해서 알아볼 것이다. LOB란 위에서 보는 제목 그대로 Large Object이다. 이름에 걸맞게 저장할 수 있는 데이터의 양 또한 대단하다. 무려 4기가나 된다. 실제로 하나의 칼럼에 이만큼가 쓰일 일은 거의 없지만 여하튼 대단한 용량이라 할 수 있다. 위에서 보는 제목대로 LOB의 기본적인 내용들에 대해서 살펴보자. 
+
+==== LOB란 무엇인가? ====
+결론부터 말하자면 LOB도 하나의 데이터 타입이다. 프로그램을 작성하다보면 또는 데이터베이스를 정리하다보면 테이블 칼럼안에서 대용량의 데이터를 저장할 필요성이 있을 경우가 있다. 이렬 경우 LOB를 사용 할 수 있다. 데이터는 일반 텍스트가 될수도 있고 바이너리 데이터가 될 수도 있다. 데이터의 특성상 사용하는 빈도가 낮고 일반적인 숫자나 문자타입보다 다루기가 좀더 어려울 뿐이다. 좀 더 뒤에서 보겠지만 사실 그리 어렵지는 않다.
+
+==== LOB에는 어떤 것들이 있는가? ====
+크게 나누자면 Internal과 External 두가지로 나누는데 이 두가지는 사실 DB의 입장에서 볼 때 어디에 저장이 되는가를 기준으로 구분한 것이다. 개발자의 입장에서 보자면 저장되는 장소보다는 데이터의 타입이 더 중요하다. 개발자의 입장에서 구분한다면 BLOB(Binary LOBs), CLOB(Character LOBs), BFILE(Binary Files) 정도로 나눌 수가 있겠다. 사실 CLOB외에 NCLOB(National Character LOBs)도 있지만 이것도 역시 문자형 타입이므로 억지로 구분하지는 않겠다. 
+CLOB : DB내부에 존재하는 대용량의 텍스트
+BLOB : Image, Sound, Video 등의 대용량의 DB내부에 존재하는 데이터
+BFILE : MPEG, JPEG, DIVX 등의 대용량의 DB외부에 존재하는 파일
+
+==== LOB를 사용하는 이유는 무엇인가? ====
+결론부터 말하자면 데이터의 안전한 보호와 데이터 저장의 일관성 때문이라 할 수 있다. 먼저 데이터의 안전한 보호라는 문제를 살펴보자면 예전에 작성된 많은 어플리케이션에서는 사이즈가 큰 파일의 경우 OS차원에서 어플리케이션이 접근할 수 있는 디렉토리를 만들어 놓고 필요한 경우 접근하도록 한 경우가 많다. 이러한 경우 OS에서 누군가의 실수로 데이터를 삭제해 버린다면 데이터를 완전히 잃어버리는 것이다. 그래서 DB에 저장하는 것이다. 다음으로 일관성 문제를 보자면 어떤 데이터는 DB에 저장하고 어떤 데이터는 OS에 저장하고 언듯 보기에도 약간 문제가 있어 보인다. 실제로 심각하다고는 할 수 없지만 중요한 문제를 내포하고 있다. OS에 데이터를 저장한다는 것은 OS에서 어플리케이션이을 실행하는 사용자의 권한으로 데이터에 직접 !!! 접근이 가능하다는 것이고 이는 충분한 사고를 유발할 수 있는 가능성을 가지는 것이다. 데이터베이스를 사용한다면 모든 데이터(물론 경우에 따라 아닐 수도 있지만)는 데이터베이스를 통하여 읽고 쓰는 것이 어떤 시스템이든지 더 좋아보이지 않겠는가? 물론 프로그램 개발에서 약간의 수고가 더 필요하지만 개발 당시 좀더 고생하면 좀더 견고한 시스템으로 완성될 수 있으므로 LOB를 사용하게 되는 것이다. 위의 모든 설명은 OS 차원의 보호가 있을 경우에 한정하는 것이다. 그럴 일은 없지만 OS의 수퍼유저가 들어와서 데이터베이스와 어플리케이션을 지워버린다면 본인도 할말 없다.
+
+==== LOB와 Long 타입과는 무엇이 다른가? ====
+우선 앞에서 본 바와 같이 Long 타입을 사용하지 말고 LOB를 사용하도록 권하고 있다. 이에는 분명한 이유가 있으며 하나씩 살펴보자.
+
+ * 표9 LONG 타입과 LOB의 비교
+|| LONG, LONG RAW || LOB		||
+|| 테이블 하나당 한 칼럼만 허용 || 테이블 하나당 여러 칼럼 ||
+|| 최대 2기가 || 최대 4기가 ||
+|| Data에 직접 접근 || Locator로 데이터에 접근 ||
+|| 테이블안에 저장  || 테이블과 별도로 저장    ||
+|| Object 타입 지원 불가능 || Object 타입 지원 가능 ||
+|| 순차적 접근 || 랜덤 접근 가능 ||
+
+대부분 그냥 보면 알겠지만 몇가지 보충 설명을 하고 넘어가겠다. 먼저 Data를 저장하고 접근 하는 방식에 대해서 좀 더 살펴보자면 LOB의 경우 실체 테이블이 저장되는 세그먼트(오라클의 논리적 데이터 단위)에 저장되는 것이 아니고 LOB 세그먼트가 따로 존재한다. 실제 테이블에는 LOB 세그먼트의 위치정보만 가지고 있을 뿐이다. 그래서 테이블과 별도로 저장되고 데이터는 Locator을 이용하여 접근한다고 하는 것이다. 다음으로 Object 타입을 말하자면 이것은 오라클 8버전부터 지원하는 것으로 데이터베이스 객체의 개념을 접목한 것이다. 그리 많이 쓰지는 않는 것 같다. LOB의 경우 Object 타입을 지원한다.
+
+==== 어떤 방법으로 LOB를 다룰 수 있는가? ====
+LOB를 다루는 방법에는 세가지가 있다. 애석하게도 SQL로는 사용할 수 없으며 프로그래밍 언어로만 가능하다.
+
+ * 표10 프로그래밍 언어와 LOB
+|| 프로그래밍 언어  || 설명		||
+|| Pro*C/C++	    || 지금까지 우리가 배워온 것이다. C/C++ 프로그램안에 SQL문장을 삽입함으로써 사용할 수 있다. 배우기 간편하고 사용이 쉬운 장점이 있다. 단점으로는 proc를 통한 프리 컴파일 과정을 거쳐야 한다. ||
+|| PL/SQL	    || 데이터베이스 안에서 사용할 수 있는 프로그래밍 가능한 SQL이다. DBMS_LOB 패키지를 사용하여 LOB를 다룰 수 있다. 장점은 SQL을 직접 지원한다는 것이고 오라클과 통합되어 있어서 오라클의 데이터 타입을 그대로 지원하므로 데이터타입에 대해서 특별히 신경쓸 것이 없다. 단점으로는 역시 데이터베이스 안에서만 가능하다는 것이다. 장점이자 단점으로 작용한다. ||
+|| OCI              || 오라클과 C/C++을 위한 라이브러리를 직접 제공한다. Pro*C/C++같이 프리컴파일 과정이 필요 없으며 SQL을 프로그램안에 삽입하는 방식이 아닌 모든 과정이 함수로서 제공된다. 뛰어난 성능을 자랑하지만 사용이 Pro*C/C++보다 어렵다. ||
+
+==== LOB Locator ====
+먼저 C/C++ 프로그램 내에서 LOB를 사용하려면 LOB Locator에 대해서 알아야 한다. 앞에서 설명하였듯이 LOB는 테이블세그먼트 내에 존데하는 데이터가 아니라 LOB 세그먼트에 따로 존재한다고 하였다. LOB에 접근하기 위해서는 이 LOB의 Locator를 얻어와서 이 Locator를 통해서 모든 조작을 수행한다.  LOB Locator의 종류와 사용방법을 먼저 살펴보자.
+
+{{{#!plain
+/*
+ * LOBs를 사용하기 위해선 반드시 포함해 주어야 한다.
+ */
+#include <oci.h>
+
+…
+
+/*
+ * 각 LOB의 pointer 타입이다.
+ */
+OCIBlobLocator *blob;
+OCIClobLocator *clob;
+OCIBFileLocator *bfile;
+
+…
+
+int main (int argc, char *argv[])
+{
+…
+
+	/*
+	 * 위에서 선언한 LOB 타입의 포인터를 초기화하여 빈 LOB를 만들어 준다.
+	 */
+	exec sql allocate :blob;
+	exec sql allocate :clob;
+	exec sql allocate :bfile;
+
+…
+
+exec sql free :blob;
+exec sql free :clob;
+exec sql free :bfile;
+
+exit (EXIT_SUCCESS);
+}
+}}}
+
+위에서 초기화된 LOB Locator를 사용하여 데이터를 추가하고 변경하고 삭제한다. 만약 초기화된 상태 그대로 테이블에 Insert한다면 SQL문장에서 EMPTY_BLOB (), EMPTY_CLOB ()를 사용한 것과 동일한 결과이다. 
+
+==== LOB Statements ====
+ * 표11 LOB Statements
+|| 구문 	|| 설명				||
+|| Append	|| LOB의 끝부분에 데이터를 추가한다. ||
+|| Assign	|| 한 LOB Locator의 값을 다른 LOB Locator로 복사한다. ||
+|| Close	|| 열려있는 LOB를 닫는다.	||
+|| Copy		|| 한 LOB의 내용을 다른 LOB로 복사한다. ||
+|| Create Temporary || 임시 LOB를 생성한다. 임시 LOB는 초기화 할 필요가 없다. ||
+|| Disable Buffering || LBS(LOB Buffering System)을 사용하지 않도록 한다. ||
+|| Enable Buffering  || LBS(LOB Buffering System)을 사용한다. ||
+|| Erase	|| LOB의 내용을 지운다. ||
+|| File Close All || 열려있는 모든 BFILEs를 닫는다. ||
+|| File Set || BFILEs에 디렉토리와 파일을 지정한다. ||
+|| Flush Buffer || LOB Bubber의 내용을 데이터베이스로 기록한다. ||
+|| Free Temporary || 임시 LOB를 해제한다. ||
+|| Load From File || BFILEs의 내용을 BLOB나 CLOB로 읽어들인다. ||
+|| Open	|| LOBs를 연다. ||
+|| Read || LOB에서 버퍼로 읽는다. ||
+|| Trim || LOB의 내용을 삭제하여 지정한 크기만큼으로 줄인다. ||
+|| Write || 버퍼의 내용을 LOB로 기록한다. ||
+|| Describe || LOB에서 지정한 특징을 알아낸다. ||
+
+이제부터 본격적인 예제를 보기로 하자.
+
+예제는 Binary File의 내용을 BLOB칼럼으로 읽어 들이는 것이다. 두번째 예제는 앞에서 저장한 BLOB칼럼에서 데이터를 읽어서 Binary File로 기록하는 것이다. 두가지 과정을 수행한 후 두개의 파일을 비교하면 완벽히 같다는 것을 알 수 있다. Binary File의 내용을 데이터베이스에 쓰고 읽을 수 있다면 어떤 프로그램이라도 크게 문제 없을 것이다. pic.jpg 라는 테스트 파일은 각자 준비하도록 한다.
+
+{{{#!plain down:Makefile
+/* -----------------------------------------------------------------
+ * Makefile의 내용
+ * --------------------------------------------------------------- */
+
+CC		= gcc
+PROC		= proc
+INCLUDE1	= $(ORACLE_HOME)/precomp/public
+INCLUDE2	= $(ORACLE_HOME)/rdbms/demo
+INCLUDE3	= $(ORACLE_HOME)/rdbms/public
+LIB		= $(ORACLE_HOME)/lib
+
+TARGET1	= blob_file_to_db
+TARGET2	= blob_db_to_file
+TARGETS	= $(TARGET1) $(TARGET2)
+OBJ1		= blob_file_to_db.o
+OBJ2		= blob_db_to_file.o
+OBJS		= $(OBJ1) $(OBJ2)
+CFILE1		= blob_file_to_db.c
+CFILE2		= blob_db_to_file.c
+CFILES		= $(CFILE1) $(CFILE2) 
+PCFILE1		= blob_file_to_db.pc
+PCFILE2		= blob_db_to_file.pc
+PCFILES	= $(PCFILE1) $(PCFILE2)
+
+all	: $(TARGETS)
+
+$(TARGET1)	: $(OBJS)
+	$(CC) -o $(TARGET1) $(OBJ1) -L$(LIB) -lclntsh
+$(TARGET2)	: $(OBJS)
+	$(CC) -o $(TARGET2) $(OBJ2) -L$(LIB) -lclntsh
+
+.c.o : $(CFILES)
+	$(CC) -c $< -I$(INCLUDE1) -I$(INCLUDE2) -I$(INCLUDE3)
+
+$(CFILE1) : $(PCFILE1)
+	$(PROC) mode=ansi parse=none sqlcheck=full userid=scott/tiger $(PCFILE1)
+$(CFILE2) : $(PCFILE2)
+	$(PROC) mode=ansi parse=none sqlcheck=full userid=scott/tiger $(PCFILE2)
+
+clean : 
+	-rm -f *.o core *.lis tp* $(TARGET1) $(TARGET2) $(TARGET3) $(OBJS) $(CFILES)
+binclean : 
+	-rm -f *.o core *.lis tp* $(OBJS) $(CFILES)
+}}}
+----
+
+{{{#!plain
+
+/* -----------------------------------------------------------------
+ * Binary File을 읽어서 데이터 베이스의 BLOB칼럼에 저장하는 프로그램
+ * --------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <oci.h>
+
+#define FAILURE		0
+#define SUCCESS		!FAILURE
+
+exec sql include sqlca;
+
+/* --------------------------------------------------------------------------
+                   전   역    변   수       선   언   부
+-------------------------------------------------------------------------- */
+
+exec sql begin declare section;
+#define MAXBUFLEN	100000
+	char *userpass;
+	unsigned int amt;
+	unsigned int offset = 1;
+	unsigned int length;
+	unsigned char buffer[MAXBUFLEN];
+	OCIClobLocator *clob;
+	OCIBlobLocator *blob;
+exec sql end   declare section;
+
+
+/* --------------------------------------------------------------------------
+                        함   수       구   현   부
+-------------------------------------------------------------------------- */
+
+/*
+ * 데이타 베이스와의 연동에 문제가 생겼을 경우
+ * 실행되는 함수로서 SQL 에러번호와 메세지를
+ * 출력하고 디비와의 접속을 끊고 프로그램을 종료한다.
+ */
+void sql_error  (void)
+{
+	printf  ("Error : %d - %s\n", sqlca.sqlcode, sqlca.sqlerrm.sqlerrmc);
+
+	exec sql whenever sqlerror continue;
+	exec sql rollback work release;
+
+	exit (1);
+}
+
+
+/*
+ * 데이타베이스와 접속하는 함수.
+ */
+void ora_connect ()
+{
+	userpass = strdup ("scott/tiger");
+	exec sql whenever sqlerror do sql_error ();
+	exec sql connect :userpass;
+}
+
+
+/*
+ * 데이타베이스와 접속을 종료하는 함수.
+ */
+void ora_disconnect  (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql rollback work release;
+}
+
+
+/*
+ * DB의 변경사항을 COMMIT 하는 함수
+ */
+void ora_commit (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql commit work;
+}
+
+
+/*
+ * DB의 변경사항을 ROLLBACK 하는 함수
+ */
+void ora_rollback (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql rollback work;
+}
+
+
+/* ----------------------------------------------------------------------
+                     M A I N       F U N C T I O N
+---------------------------------------------------------------------- */
+
+int main (void)
+{
+FILE *f;
+int filelen = 0, nbytes = 0;
+
+	ora_connect ();
+
+	exec sql whenever sqlerror do sql_error ();
+	exec sql var buffer is raw(MAXBUFLEN);
+
+	/*
+	 * LOB 테이블을 드랍하고 새로 생성한다.
+	 */
+	exec sql drop table lobs;
+	exec sql create table lobs (b_lob blob);
+
+	/*
+	 * BLOB 타입의 포인터를 초기화하여 빈 LOB를 만들어 준다.
+	 */
+	exec sql allocate :blob;
+
+	/*
+	 * DB의 테이블에 BLOB 레코드를 생성하고 LOB 포인터와 연결한다.
+	 */
+	exec sql insert into lobs (b_lob) values (:blob);
+	exec sql select b_lob into :blob from lobs where rownum = 1 for update;
+
+	/*
+	 * 파일을 열고 파일 사이즈를 구한다.
+	 */
+	f = fopen ((const char *)"pic.jpg", (const char *)"r");
+	if (f == NULL)
+	{
+		printf ("File Open Error!!!\n");
+		exit(1);
+	}
+	fseek (f, 0, SEEK_END);
+	filelen = ftell (f);
+	fseek (f, 0, SEEK_SET);
+	printf ("File Length : %d\n", filelen);
+
+	/*
+	 * 파일을 버퍼로 읽어들인다.
+	 */
+	amt = filelen;
+	nbytes = fread (buffer, 1, MAXBUFLEN, f);
+	length = nbytes;
+	printf ("%d Bytes Read\n", nbytes);
+
+	/*
+	 * 버퍼의 내용을 DB에 넣는다.
+	 */
+	exec sql lob write one :amt from :buffer with length :length into :blob at :offset;
+	printf ("%d Bytes wrote\n", amt);
+
+	ora_commit ();
+	ora_disconnect ();
+	fclose (f);
+
+	exit (0);
+}
+}}}
+----
+
+{{{#!plain
+/* -----------------------------------------------------------------
+ * 데이터 베이스의 BLOB칼럼에서 Binary Data를 읽어서 파일로 저장하는 프로그램
+ * --------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <oci.h>
+
+#define FAILURE		0
+#define SUCCESS		!FAILURE
+
+exec sql include sqlca;
+
+/* --------------------------------------------------------------------------
+                   전   역    변   수       선   언   부
+-------------------------------------------------------------------------- */
+
+exec sql begin declare section;
+#define MAXBUFLEN	100000
+	char *userpass;
+	unsigned int amt;
+	unsigned int offset = 1;
+	unsigned int length;
+	unsigned char buffer[MAXBUFLEN];
+	OCIClobLocator *clob;
+	OCIBlobLocator *blob;
+exec sql end   declare section;
+
+
+/* --------------------------------------------------------------------------
+                        함   수       구   현   부
+-------------------------------------------------------------------------- */
+
+/*
+ * 데이타 베이스와의 연동에 문제가 생겼을 경우
+ * 실행되는 함수로서 SQL 에러번호와 메세지를
+ * 출력하고 디비와의 접속을 끊고 프로그램을 종료한다.
+ */
+void sql_error  (void)
+{
+	printf  ("Error : %d - %s\n", sqlca.sqlcode, sqlca.sqlerrm.sqlerrmc);
+
+	exec sql whenever sqlerror continue;
+	exec sql rollback work release;
+
+	exit (1);
+}
+
+
+/*
+ * 데이타베이스와 접속하는 함수.
+ */
+void ora_connect ()
+{
+	userpass = strdup ("scott/tiger");
+	exec sql whenever sqlerror do sql_error ();
+	exec sql connect :userpass;
+}
+
+
+/*
+ * 데이타베이스와 접속을 종료하는 함수.
+ */
+void ora_disconnect (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql rollback work release;
+}
+
+
+/*
+ * DB의 변경사항을 COMMIT 하는 함수
+ */
+void ora_commit (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql commit work;
+}
+
+
+/*
+ * DB의 변경사항을 ROLLBACK 하는 함수
+ */
+void ora_rollback (void)
+{
+	exec sql whenever sqlerror do sql_error ();
+	exec sql rollback work;
+}
+
+
+/* ----------------------------------------------------------------------
+                     M A I N       F U N C T I O N
+---------------------------------------------------------------------- */
+
+int main (void)
+{
+FILE *f;
+int nbytes = 0;
+
+	ora_connect ();
+
+	exec sql whenever sqlerror do sql_error ();
+	exec sql var buffer is raw(MAXBUFLEN);
+
+	/*
+	 * BLOB 타입의 포인터를 초기화하여 빈 LOB를 만들어 준다.
+	 */
+	exec sql allocate :blob;
+
+	/*
+	 * DB의 테이블에서  BLOB 레코드와 LOB 포인터와 연결한다.
+	 */
+	exec sql select b_lob into :blob from lobs where rownum = 1 for update;
+
+	/*
+	 * BLOB 칼럼의 데이타 길이를 얻어온다.
+	 */
+	exec sql lob describe :blob get length into :length;
+
+	/*
+	 * 빈 LOB칼럼이면 종료
+	 */
+	if (length == 0) sql_error ();
+
+	/*
+	 * BLOB 칼럼의 데이타를 저장할 파일을 생성한다.
+	 */
+	f = fopen ((const char *)"test.jpg", (const char *)"w");
+	if (f == NULL)
+	{
+		printf ("File Open Error!!!\n");
+		exit(1);
+	}
+
+	/*
+	 * BLOB 칼럼에서 데이타의 길이만큼 읽어와 파일에 저장한다.
+	 */
+	exec sql lob read :amt from :blob into :buffer with length :length;
+	printf ("%d bytes read from DB\n", amt);
+	nbytes = fwrite ((void *)buffer, 1, amt, f);
+	printf ("%d bytes write to file\n", nbytes);
+
+	fclose (f);
+	ora_disconnect ();
+
+	exit (0);
+}
+}}}

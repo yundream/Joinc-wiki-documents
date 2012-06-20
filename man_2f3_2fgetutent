@@ -1,0 +1,207 @@
+#title getuten : 로그인 정보를 얻어온다.
+
+== getutent ==
+ utmp파일을 이용해서 로그인
+
+== 사용법 ==
+{{{#!plain
+#include <utmp.h>
+
+struct utmp *getutent(void);
+struct utmp *getutid(const struct utmp *id);
+struct utmp *getutline(const struct utmp *line);
+struct utmp *pututline(const struct utmp *utmp);
+void setutent(void);
+void endutent(void);
+int utmpname(const char *file);
+}}}
+		
+
+== 설명 ==
+utmp는 커널에서 관리하는 로그인테이블 관리 시스템으로 현재 로그인된 유저와 언제 로그인했는지, 어떤 터미널(tty)를 사용하고 있는지, 접속한 호스트의 IP등의 정보를 남긴다. 로그아웃 했다면 언제 했는지에 대한 정보도 저장한다.
+{{{#!plain
+#include <utmp.h>
+
+struct utmp *getutent(void);
+}}}
+
+getutent(), getutid(), getutline(), pututline()를 이용하면 utmp 구조체의 포인터를 리턴한다. utmp 구조체는 다음과 같은 멤버변수를 가진다.
+{{{#!plain
+struct utmp                                                       
+{                                                           
+    short ut_type;              /* type of login */               
+    pid_t ut_pid;               /* pid of login process */         
+    char ut_line[UT_LINESIZE];  /* device name of tty - "/dev/" */
+    char ut_id[4];              /* init id or abbrev. ttyname */    
+    char ut_user[UT_NAMESIZE];  /* user name */                     
+    char ut_host[UT_HOSTSIZE];  /* hostname for remote login */
+    struct exit_status ut_exit; /* The exit status of a
+                                   process marked as DEAD_PROCESS. *
+    long ut_session;            /* session ID, used for
+
+    struct timeval ut_tv;       /* time entry was made.  */
+    int32_t ut_addr_v6[4];      /* IP address of remote host.  */
+    char pad[20];               /* Reserved for future use.  */
+};
+}}}
+	
+getutent()는 utmp 파일로 부터 다음 엔트리의 값을 읽어온다. 만약 utmp 파일이 열려있지 않다면 open한다. 더이상 읽을 엔트리가 없다면 NULL을 리턴한다.	
+
+getutid()는 utmp의 현재 ut_id 와 id_ut_id 가 일치하는 것을 현재 포인트부터 엔트리를 돌면서 찾아낸다. 엔트리의 끝까지 이동했을때까지 일치하는 정보가 없다면 NULL을 리턴한다. 
+
+getutline()는 ut_line 와 line->ut_line 문자열이 일치하는 것을 찾아서 리턴힌다. 일치하는 엔트리가 없다면 NULL을 리턴한다. ut_type 이 LOGIN_PROCESS인 것에 대해서 검사한다.
+
+setutent()를 사용하면 utmp 파일의 처음으로 이동한다.
+
+endutent() 최근 열린 utmp 파일을 닫는다.
+
+== 반환값 ==
+utmp구조체에 대한 포인터를 돌려준다. 더이상 데이터가 없다면 NULL을 되돌려준다.
+
+== 에러 ==
+에러가 발생하면 (struct utmp *)0 을 되돌려준다.
+
+{{{#!plain
+#include <unistd.h>
+#include <utmp.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+
+int get_current_pid(int login_pid);
+char *get_current_procname(int proc_num);
+
+
+int main(int argc, char **argv)
+{
+    struct utmp *utmpfp;
+    struct utmp *myutmp;
+
+    char *tty_name = NULL;
+    char *host_ip;
+
+    char now_local_time[50];
+
+    time_t the_time;
+    struct tm *tm_ptr;
+
+    myutmp = malloc(sizeof(struct utmp));
+    //utmpfp = malloc(sizeof(struct utmp));
+    setutent();
+
+    while ((utmpfp = getutent()) != NULL)
+    {
+        the_time = utmpfp->ut_time;
+        tm_ptr = localtime(&the_time);
+        sprintf(now_local_time, "%d/%02d/%02d %02d:%02d",
+                                tm_ptr->tm_year+1900, tm_ptr->tm_mon+1,
+                                tm_ptr->tm_mday, tm_ptr->tm_hour,
+                                tm_ptr->tm_min);
+
+        host_ip = utmpfp->ut_host;
+        if (strlen(host_ip) < 1)
+            host_ip = "-";
+        if (utmpfp->ut_type == USER_PROCESS)
+        {
+            printf("%-12s %-8s %-12s %s   %s\n",
+                        utmpfp->ut_user,
+                        utmpfp->ut_line,
+                        host_ip,
+                        now_local_time,
+                        now_local_time,
+                        get_current_procname(get_current_pid(utmpfp->ut_pid)));
+        }
+    }
+
+    setutent();
+    printf("\nmy utmp info is ---\n");
+    tty_name = ttyname(0);
+
+    printf("%s\n",tty_name+5);
+    strcpy(myutmp->ut_line, tty_name+5);
+    utmpfp = getutline(myutmp);
+    if(utmpfp == NULL)
+    {
+        printf("Not Fild utmp\n");
+        exit(0);
+    }
+
+    printf("%d\n", utmpfp->ut_time);
+    the_time = utmpfp->ut_time;
+    tm_ptr = localtime(&the_time);
+    sprintf(now_local_time, "%d/%02d/%02d %02d:%02d",
+                            tm_ptr->tm_year+1900, tm_ptr->tm_mon+1,
+                            tm_ptr->tm_mday, tm_ptr->tm_hour,
+                            tm_ptr->tm_min);
+    printf("%-12s %-8s %-12s %s   %s\n",
+                utmpfp->ut_user,
+                utmpfp->ut_line,
+                host_ip,
+                now_local_time,
+                get_current_procname(get_current_pid(utmpfp->ut_pid)));
+
+    return 1;
+}
+
+int get_current_pid(int login_pid)
+{
+    int  fd;
+    char buf[255];
+    char stat_file[25];
+    int  field_num = 7;
+    int  i, j;
+    int  buf_index;
+    char current_pid[11];
+
+    memset(buf, '\0', 255);
+    sprintf(stat_file, "/proc/%d/stat", login_pid);
+
+    if ((fd = open(stat_file, O_RDONLY)) == -1)
+    {
+        printf("error\n");
+        return -1;
+    }
+
+    read(fd, buf, 255);
+    j = 0;
+    for (i = 0, buf_index=0; i < 255; i++)
+    {
+        if (buf[i] == ' ')
+        {
+            j++;
+        }
+        else
+        {
+            if (j == field_num)
+            {
+                current_pid[buf_index] = buf[i];
+                buf_index++;
+            }
+            if (j > field_num)
+                break;
+        }
+    }
+    close(fd);
+    return atoi(current_pid);
+}
+
+char *get_current_procname(int proc_num)
+{
+    char *buf;
+    char proc_file[256];
+
+    buf = (char *)malloc(256);
+    memset(buf, '\0', 256);
+
+    memset(proc_file, '\0', 256);
+    sprintf(proc_file, "/proc/%d/exe", proc_num);
+
+    readlink(proc_file, buf, 256);
+    return buf;
+}
+}}}

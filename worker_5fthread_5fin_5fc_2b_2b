@@ -1,0 +1,1121 @@
+[[TableOfContents]]
+== 서문 ==
+   이 문서는 windows platform에서 vc++을 가지고 win32 api를 이용해서 작성 되었습니다. 
+   windows에 쓰레드를 어떻게 쓰느냐에 대해서 논의하는것이 아니라 쓰레드를 유용하게 사용하기 위해서 어떻게 디자인 하였느냐 입니다.
+
+== 목적 ==
+   * design of thread object
+   * implementation of thread-pool
+   * parameterized type 
+
+== 객체 지향적 쓰레드의 설계(design) ==
+
+사람의 몸 중에서 손가락하나의 대해서만 생각해 보기로 한다면. 이 손가락은 다음에 나열되는 상태와 행위를 가질수 있습니다.
+
+우선 손가락이 가질수 있는 상태는
+   1. 구부려져 있음
+   2. 곧바로 펴져 있음
+   3. 손가락에 피가 흐르고 있음
+   4. 손가락에 피가 흐르지 않고 있음
+물론 더 많지만 위의 4가지를 가지고 있다고 생각합니다.
+
+그리고 손가락이 가질수 있는 행위는
+   1. 손가락을 구부림
+   2. 손가락을 핌
+   3. 피를 흐르게 함
+
+이렇게 있을때 손가락의 행위는 크게 두가지로 나누어 집니다.
+   1. 관절에 의한 운동(손가락을 구부림, 손가락을 핌)
+   2. 혈관에 의한 피의 이동
+
+1번의 경우는 외부의 입력, 사람이 관절을 움직이는 신경을 동작시켜 근육을 잡아 당기게 됩니다.
+2번의 경우는 혈관내에서 피의 흐름을 끊이지 않게 하기 위해서 피를 원할이 흐르게 하여 줍니다.
+
+이걸 Object-Oriented 관점에서 바라 본다면 
+손가락이란 객체는
+   손가락의 구부림 상태,
+   피의 흐름에 상태,
+   손가락 운동
+   피의 이동
+으로 설명 할수 있습니다. 하지만 손가락의 운동과 피의 이동은 큰 차이점이 있습니다. 손가락의 운동은 외부 조작에 의한 경우이고
+피의 이동은 내부적인 움직임 입니다. 이런걸 프로세스의 관점에서 본다고 할때 피의 이동은 쓰레드로 설계할수 있습니다.
+기존의 설계 방법에서 쓰레드는 전역의 범주에 설계과 구현을 하였습니다. 
+하지만 이것은 객체 지향적 관점에서 바라보게 된다면 엄연한 손가락 객체의 행위에 해당하게 되부로 손가락 객체 포함 되어 있어야 합니다.
+
+이를 가상 코드로 만들보면
+
+class 손가락 {
+   구부림 상태
+   피의 흐름 상태
+   손가락운동()
+   피의 이동()
+}
+이 되겠죠 :)
+
+하지만 이 쓰레드란건 항상 어떤 객체든지 포함할수 있기도 하고 없기도 합니다.
+예를 들어 발가락 객체를 생각해 보았을때 발가락 또한 쓰레드를 포함 하기도 합니다.
+
+이걸 실제 구현으로 옮기게 된다면 손가락이란 객체와 발가락이란 객체의 구현에서 중복되는 코드를 생산하게 됩니다.
+이러한 문제를 해결하는 방법론이 바로 코드의 재사용성 입니다.
+
+코드의 재사용성이란 라이브러리 형태로 제공하여 코드를 다시 사용할수 있도록 하는 방법론입니다.
+손가락과 발가락을 객체 지향 패러다음으로 다이어그램을 그려보면
+
+  피의 이동 쓰레드
+    |         |
+   상속      상속
+    |         |
+  손가락    발가락
+
+위의 그림이 됩니다. 하지만 피의 이동 쓰레드라는거 또한 쓰레드를 확장하여 구현한거 뿐입니다. 
+피의 이동 쓰레드는 피의 이동에 행위와 , 쓰레드 행위 로 나뉘게 됩니다. 이거 또한
+
+   쓰레드
+     |
+    상속
+     |
+피의이동행위
+
+즉 쓰레드라는 독립된 하나의 객체의 단위가 나오게 되는 겁니다. 이런 쓰레드의 단위를 흔히 워커쓰레드(Worker Thread) 라고 합니다.
+
+== Worker Thread 의 구현 ==
+=== Worker Thread 뼈대 ===
+{{{#!vim cpp
+bool __wtstart(IWORKERTHREAD &pw);
+bool __wtterminate(IWORKERTHREAD &pw);
+bool __wtsuspend(IWORKERTHREAD &pw);
+bool __wtresume(IWORKERTHREAD &pw);
+
+class IWORKERTHREAD { // worker thread interface
+public:
+	enum state { stRunning , stSuspended, stStopped };
+public:
+	unsigned int idx;
+	HANDLE handle;
+	DWORD id;
+	state status;
+	IWORKERTHREAD(unsigned int id): idx(id), handle(0), id(0), status(stStopped) {}
+	IWORKERTHREAD(const IWORKERTHREAD &w){ id=w.id; idx=w.idx; handle=w.handle; status=w.status; }
+	~IWORKERTHREAD(){ __wtterminate(*this); }
+	static DWORD WINAPI __Work(LPVOID pParameter);
+	bool operator==(const IWORKERTHREAD &w){ return (idx==w.idx); }	
+	bool operator==(const IWORKERTHREAD *w){ return (idx==w->idx); }
+	bool operator()(const IWORKERTHREAD &w){ return (idx==w.idx); }
+	bool operator()(const IWORKERTHREAD *w){ return (idx==w->idx); }	
+private:
+	virtual void OnWork()=0; // you must overloading this method
+private:	
+};
+}}}
+=== Worker Thread 의 사용 ===
+{{{#!vim cpp
+#include "wt.h"
+#include <iostream>
+
+using namespace std;
+
+class wtx : public IWORKERTHREAD {
+public:
+	wtx(unsigned int x): IWORKERTHREAD(x) {}
+	~wtx(){}
+	bool Run(){ return __wtstart(*this); }
+	bool Kill(){ return __wtterminate(*this); }
+	bool Suspend(){ return __wtsuspend(*this); }
+	bool Resume(){ return __wtresume(*this); }
+private:
+	virtual void OnWork(){
+		static unsigned long n=0;
+		while(1){
+			cout << "thread idx : " << idx << ", thread id : " << id << " : " << n++ << endl;
+			Sleep(50);
+		}
+		return;
+	}
+};
+
+int main(int argc, char *argv[]){
+
+	wtx w(1);
+
+	cout << "thread run" << endl;
+	w.Run();
+	Sleep(9000);	
+
+	cout << "thread suspend" << endl;
+	w.Suspend();
+	Sleep(1000);
+
+	cout << "thread resume" << endl;
+	w.Resume();
+	Sleep(9000);
+
+	cout << "thread kill" << endl;
+	w.Kill();
+	Sleep(1000);
+
+	return 0;
+}
+
+}}}
+
+== Worker Thread Pool ==
+
+쓰레드 풀의 관련된 내용은 윤꿈님이 쓰신 쓰레드 풀에 대한 기사를 참조 하시기 바랍니다.
+
+=== Worker Thread Pool 뼈대 ===
+{{{#!vim cpp
+template<typename _REQ>
+class IXWORKERTHREAD : public IWORKERTHREAD{ // extension worker thread interface
+public:
+	IXWORKERTHREAD(unsigned int id, WorkersPool<_REQ> *wp): IWORKERTHREAD(id), pool(wp) {}
+protected:
+	void ReceiveJob(_REQ &req){
+
+		if(pool){
+			pool->PopJob(req);
+			if(req)
+				pool->NotifyReceivedJob(this);
+		}
+	}
+
+	void CompleteJob(){
+
+		if(pool)
+			pool->NotifyCompleteJob(this);
+	}
+private:
+	WorkersPool<_REQ> *pool;	
+};
+
+template<typename _REQ>
+class WorkersPool : public IWORKERTHREAD { // worker thread pool
+public:
+	enum wstate { wsReady, wsBusy };
+
+	typedef struct __WSET {
+		wstate ws;
+		IXWORKERTHREAD<_REQ> *worker;
+		__WSET(IXWORKERTHREAD<_REQ>*pi, wstate s=wsReady): worker(pi), ws(s) {}
+	} WSET, *PWSET;
+public:	
+	unsigned long GetJobSize(){ return _qRequests.size(); }
+	bool RequestPooling(IXWORKERTHREAD<_REQ> *pi, bool bStart=false){
+
+		WSET *pws=new WSET(pi);
+		_listReadyWorkers.push_back(pws);
+
+		if(bStart)
+			return __wtstart(*pi);
+		
+		return true;
+	}
+
+	void ReleasePooling(bool bJobClear=false){
+
+		if(_listBusyWorkers.size()>0){ // release busy workers
+			for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+				delete p;
+			}
+			_listBusyWorkers.clear();
+		}
+
+		if(_listReadyWorkers.size()>0){ // release ready workers
+			for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+				delete p;
+			}
+			_listReadyWorkers.clear();
+		}
+
+		if(bJobClear && _qRequests.size()>0){ // release request job queue
+			while(_qRequests.size()>0){
+				_qRequests.pop_front();				
+			}
+			_qRequests.clear();
+		}
+
+		return;	
+	}
+
+	void NotifyReceivedJob(IXWORKERTHREAD<_REQ> *pi){
+		
+		for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			if(p->worker->idx==pi->idx){
+				_listReadyWorkers.erase(it);
+				p->ws=wsBusy;
+				_listBusyWorkers.push_back(p);
+				break;
+			}
+		}
+
+		return;
+	}
+
+	void NotifyCompleteJob(IXWORKERTHREAD<_REQ> *pi){
+
+		for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			if(p->worker->idx==pi->idx){
+				_listBusyWorkers.erase(it);
+				p->ws=wsReady;
+				_listReadyWorkers.push_back(p);
+				break;
+			}				
+		}
+
+		return;
+	}
+
+	void PushJob(_REQ req){
+		::EnterCriticalSection(&_csJob);
+		_qRequests.push_back(req);
+		::LeaveCriticalSection(&_csJob);
+	}
+
+	void PopJob(_REQ &req){
+		if(_qRequests.size()>0){
+			::EnterCriticalSection(&_csJob);
+			req=_qRequests.front();
+			_qRequests.pop_front();
+			::LeaveCriticalSection(&_csJob);
+		}
+	}
+
+	bool StartPooling(){return __wtstart(*this);}
+	bool StopPooling(){
+
+		list<WSET*>::iterator it;
+
+		for(it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			__wtterminate(*(p->worker));
+		}
+
+		for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			__wtterminate(*(p->worker));
+		}
+
+		return __wtterminate(*this);
+	}
+
+	WorkersPool(): IWORKERTHREAD(0) {
+		::InitializeCriticalSection(&_csJob);
+	}
+	~WorkersPool(){
+		ReleasePooling();
+		::DeleteCriticalSection(&_csJob);
+	}
+private:
+	//virtual void OnWork();
+	virtual void OnWork(){	
+
+		while(true){
+
+			list<WSET*>::iterator it;
+
+			// step 1. ready thread check
+			for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+
+				if(p->worker->status!=IXWORKERTHREAD<_REQ>::stRunning) // running check
+					__wtstart(*(p->worker));
+			}
+
+			// step 2. busy thread check
+			//for(it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+			//	WSET *p=reinterpret_cast<WSET*>(*it);
+			//}
+
+			Sleep(__CHECK_THREAD_TIMESLEEP);
+		}
+
+		return;
+	}
+private:
+	std::list<WSET*> _listReadyWorkers; // ready wokers
+	std::list<WSET*> _listBusyWorkers; // list busy workers
+	//std::deque<WORKSET*> _qRequests; // request queue
+	std::deque<_REQ> _qRequests;
+	
+	CRITICAL_SECTION _csJob;
+
+	unsigned int _nRequestSize;
+	unsigned int _nQueueSize;
+};
+}}}
+
+=== Worker Thread Pool 사용 ===
+{{{#!vim cpp
+
+template<typename _X>
+class wtxx : public IXWORKERTHREAD<_X> {
+public:
+	wtxx(unsigned int x, WorkersPool<_X> *wp, CRITICAL_SECTION *cs): IXWORKERTHREAD<_X>(x, wp), _cs(cs) {}
+	~wtxx(){}
+	bool Run(){ return __wtstart(*this); }
+	bool Kill(){ return __wtterminate(*this); }
+	bool Suspend(){ return __wtsuspend(*this); }
+	bool Resume(){ return __wtresume(*this); }
+private:
+	virtual void OnWork(){		
+		while(1){
+			int x=0;
+			ReceiveJob(x);
+			if(x){
+				::EnterCriticalSection(_cs);
+				cout << " thread id : " << idx << ", value : " << x << endl;
+				::LeaveCriticalSection(_cs);				
+			}
+			CompleteJob();
+				
+			Sleep(50);
+		}
+		return;
+	}
+	CRITICAL_SECTION *_cs;
+};
+
+int main(int argc, char *argv[]){
+
+	CRITICAL_SECTION cs;
+
+	::InitializeCriticalSection(&cs);
+
+	WorkersPool<int> po;
+
+	po.RequestPooling(new wtxx<int>(1, &po, &cs));
+	po.RequestPooling(new wtxx<int>(2, &po, &cs));
+	po.RequestPooling(new wtxx<int>(3, &po, &cs));
+
+	po.PushJob(5);
+	po.PushJob(6);
+	po.PushJob(8);
+	po.PushJob(10);
+	po.PushJob(12);
+	po.PushJob(29);
+	po.PushJob(44);
+	po.PushJob(100);
+	po.PushJob(200);
+	po.PushJob(1);
+
+	po.StartPooling();
+	
+	while(po.GetJobSize()>0)
+		Sleep(1000);
+
+	po.StopPooling();
+
+	po.ReleasePooling(true);
+
+	::DeleteCriticalSection(&cs);
+
+	return 0;
+}
+}}}
+
+== Worker Thread 전체 소스 (For Windows) ==
+{{{#!vim cpp
+#if !defined(__WORKER_THREAD)
+#define __WORKER_THREAD
+
+#include <windows.h>
+#include <process.h>
+#include <deque>
+#include <list>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#define __CHECK_THREAD_TIMESLEEP 2000
+
+class IWORKERTHREAD;
+template<typename _REQ> class IXWORKERTHREAD;
+template<typename _REQ> class WorkersPool;
+
+bool __wtstart(IWORKERTHREAD &pw);
+bool __wtterminate(IWORKERTHREAD &pw);
+bool __wtsuspend(IWORKERTHREAD &pw);
+bool __wtresume(IWORKERTHREAD &pw);
+
+class IWORKERTHREAD { // worker thread interface
+public:
+	enum state { stRunning , stSuspended, stStopped };
+public:
+	unsigned int idx;
+	HANDLE handle;
+	DWORD id;
+	state status;
+	IWORKERTHREAD(unsigned int id): idx(id), handle(0), id(0), status(stStopped) {}
+	IWORKERTHREAD(const IWORKERTHREAD &w){ id=w.id; idx=w.idx; handle=w.handle; status=w.status; }
+	~IWORKERTHREAD(){ __wtterminate(*this); }
+	static DWORD WINAPI __Work(LPVOID pParameter);
+	bool operator==(const IWORKERTHREAD &w){ return (idx==w.idx); }	
+	bool operator==(const IWORKERTHREAD *w){ return (idx==w->idx); }
+	bool operator()(const IWORKERTHREAD &w){ return (idx==w.idx); }
+	bool operator()(const IWORKERTHREAD *w){ return (idx==w->idx); }	
+private:
+	virtual void OnWork()=0; // you must overloading this method
+private:	
+};
+
+template<typename _REQ>
+class IXWORKERTHREAD : public IWORKERTHREAD{ // extension worker thread interface
+public:
+	IXWORKERTHREAD(unsigned int id, WorkersPool<_REQ> *wp): IWORKERTHREAD(id), pool(wp) {}
+protected:
+	void ReceiveJob(_REQ &req){
+
+		if(pool){
+			pool->PopJob(req);
+			if(req)
+				pool->NotifyReceivedJob(this);
+		}
+	}
+
+	void CompleteJob(){
+
+		if(pool)
+			pool->NotifyCompleteJob(this);
+	}
+private:
+	WorkersPool<_REQ> *pool;	
+};
+
+template<typename _REQ>
+class WorkersPool : public IWORKERTHREAD { // worker thread pool
+public:
+	enum wstate { wsReady, wsBusy };
+
+	typedef struct __WSET {
+		wstate ws;
+		IXWORKERTHREAD<_REQ> *worker;
+		__WSET(IXWORKERTHREAD<_REQ>*pi, wstate s=wsReady): worker(pi), ws(s) {}
+	} WSET, *PWSET;
+public:	
+	unsigned long GetJobSize(){ return _qRequests.size(); }
+	bool RequestPooling(IXWORKERTHREAD<_REQ> *pi, bool bStart=false){
+
+		WSET *pws=new WSET(pi);
+		_listReadyWorkers.push_back(pws);
+
+		if(bStart)
+			return __wtstart(*pi);
+		
+		return true;
+	}
+
+	void ReleasePooling(bool bJobClear=false){
+
+		if(_listBusyWorkers.size()>0){ // release busy workers
+			for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+				delete p;
+			}
+			_listBusyWorkers.clear();
+		}
+
+		if(_listReadyWorkers.size()>0){ // release ready workers
+			for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+				delete p;
+			}
+			_listReadyWorkers.clear();
+		}
+
+		if(bJobClear && _qRequests.size()>0){ // release request job queue
+			while(_qRequests.size()>0){
+				_qRequests.pop_front();				
+			}
+			_qRequests.clear();
+		}
+
+		return;	
+	}
+
+	void NotifyReceivedJob(IXWORKERTHREAD<_REQ> *pi){
+		
+		for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			if(p->worker->idx==pi->idx){
+				_listReadyWorkers.erase(it);
+				p->ws=wsBusy;
+				_listBusyWorkers.push_back(p);
+				break;
+			}
+		}
+
+		return;
+	}
+
+	void NotifyCompleteJob(IXWORKERTHREAD<_REQ> *pi){
+
+		for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			if(p->worker->idx==pi->idx){
+				_listBusyWorkers.erase(it);
+				p->ws=wsReady;
+				_listReadyWorkers.push_back(p);
+				break;
+			}				
+		}
+
+		return;
+	}
+
+	void PushJob(_REQ req){
+		::EnterCriticalSection(&_csJob);
+		_qRequests.push_back(req);
+		::LeaveCriticalSection(&_csJob);
+	}
+
+	void PopJob(_REQ &req){
+		if(_qRequests.size()>0){
+			::EnterCriticalSection(&_csJob);
+			req=_qRequests.front();
+			_qRequests.pop_front();
+			::LeaveCriticalSection(&_csJob);
+		}
+	}
+
+	bool StartPooling(){return __wtstart(*this);}
+	bool StopPooling(){
+
+		list<WSET*>::iterator it;
+
+		for(it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			__wtterminate(*(p->worker));
+		}
+
+		for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+			WSET *p=reinterpret_cast<WSET*>(*it);
+			__wtterminate(*(p->worker));
+		}
+
+		return __wtterminate(*this);
+	}
+
+	WorkersPool(): IWORKERTHREAD(0) {
+		::InitializeCriticalSection(&_csJob);
+	}
+	~WorkersPool(){
+		ReleasePooling();
+		::DeleteCriticalSection(&_csJob);
+	}
+private:
+	virtual void OnWatchWorkers(){}
+	virtual void OnWork(){	
+
+		while(true){
+
+			list<WSET*>::iterator it;
+
+			// step 1. ready thread check
+			for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+				WSET *p=reinterpret_cast<WSET*>(*it);
+
+				if(p->worker->status!=IXWORKERTHREAD<_REQ>::stRunning) // running check
+					__wtstart(*(p->worker));
+			}
+
+			OnWatchWorkers();
+
+			Sleep(__CHECK_THREAD_TIMESLEEP);
+		}
+
+		return;
+	}
+private:
+	std::list<WSET*> _listReadyWorkers; // ready wokers
+	std::list<WSET*> _listBusyWorkers; // list busy workers
+	//std::deque<WORKSET*> _qRequests; // request queue
+	std::deque<_REQ> _qRequests;
+	
+	CRITICAL_SECTION _csJob;
+
+	unsigned int _nRequestSize;
+	unsigned int _nQueueSize;
+};
+
+using namespace std;
+
+void __wtexcept(unsigned int idx, const char *szmsg){
+
+	char sztmp[1024]="\0";
+	sprintf(sztmp, "[%04d] %s", idx, szmsg);
+#ifdef _DEBUG
+	::OutputDebugString(sztmp);
+#endif
+	return;
+}
+
+
+bool __wtstart(IWORKERTHREAD &w){
+	w.handle=::CreateThread(NULL, 0, w.__Work, reinterpret_cast<LPVOID>(&w), 0, &(w.id));
+	if(!w.handle || w.handle==INVALID_HANDLE_VALUE)
+		return false;
+	w.status=IWORKERTHREAD::stRunning;
+	return true;
+}
+
+bool __wtterminate(IWORKERTHREAD &w){
+
+	BOOL bt=::TerminateThread(w.handle, 0);
+	if(bt){
+		::CloseHandle(w.handle);
+		w.status=IWORKERTHREAD::stStopped;
+		return true;
+	}
+		
+	return false;
+}
+
+bool __wtsuspend(IWORKERTHREAD &w){
+	if(::SuspendThread(w.handle)!=-1){
+		w.status=IWORKERTHREAD::stSuspended;
+		return true;
+	}
+	return false;
+}
+
+bool __wtresume(IWORKERTHREAD &w){
+	if(::ResumeThread(w.handle)!=-1){
+		w.status=IWORKERTHREAD::stRunning;
+		return true;
+	}
+	return false;
+}
+
+DWORD IWORKERTHREAD::__Work(LPVOID pParameter){
+
+	IWORKERTHREAD *pw=NULL;
+
+	try{
+		pw=reinterpret_cast<IWORKERTHREAD*>(pParameter);
+
+		pw->OnWork();
+	}catch(...){
+		__wtexcept(pw->idx, "unknown exception");
+	}
+
+	::ExitThread(0);
+}
+
+#endif // !defined(__WORKER_THREAD)
+
+}}}
+
+== Worker Thread 전체 소스 (For POSIX Thread) ==
+
+=== wt.h ===
+{{{#!vim cpp
+#if !defined(__WORKER_THREAD)
+#define __WORKER_THREAD
+
+#include <pthread.h>
+#include <deque>
+#include <list>
+
+#define __CHECK_THREAD_TIMESLEEP 2000
+
+class IWORKERTHREAD;
+template<typename _REQ> class IXWORKERTHREAD;
+template<typename _REQ> class WorkersPool;
+
+bool __wtstart(IWORKERTHREAD &wt);
+bool __wtterminate(IWORKERTHREAD &wt);
+bool __wtsuspend(IWORKERTHREAD &wt);
+bool __wtresume(IWORKERTHREAD &wt);
+
+class IWORKERTHREAD {
+public:
+        enum state { stRunning, stSuspended, stStopped };
+public:
+        IWORKERTHREAD(unsigned int i): idx(i), status(stStopped), handle(0) {}
+        IWORKERTHREAD(const IWORKERTHREAD &w): idx(w.idx), status(w.status), handle(w.handle) {}
+        ~IWORKERTHREAD(){ __wtterminate(*this); }
+        static void* __Work(void *pParameter);
+        bool operator==(const IWORKERTHREAD &w){ return idx==w.idx; }
+        bool operator==(const IWORKERTHREAD *w){ return idx==w->idx; }
+        bool operator()(const IWORKERTHREAD &w){ return idx==w.idx; }
+        bool operator()(const IWORKERTHREAD *w){ return idx==w->idx; }
+public:
+        unsigned int idx;
+        pthread_t handle;
+        state status;
+private:
+        virtual void OnWork()=0;
+};
+
+template<typename _REQ>
+class IXWORKERTHREAD : public IWORKERTHREAD {
+public:
+        IXWORKERTHREAD(unsigned int i, WorkersPool<_REQ> *pw): IWORKERTHREAD(i), pool(pw) {}
+protected:
+        void ReceiveJob(_REQ &req){
+                if(pool){
+                        pool->PopJob(req);
+                        if(req)
+                                pool->NotifyReceivedJob(this);
+                }
+                return;
+        }
+
+        void CompleteJob(){
+                if(pool)
+                        pool->NotifyCompleteJob(this);
+                return;
+        }
+private:
+        WorkersPool<_REQ> *pool;
+};
+
+template<typename _REQ>
+class WorkersPool : public IWORKERTHREAD {
+public:
+        enum wstate { wsReady, wsBusy };
+        typedef struct __WSET {
+                wstate ws;
+                IXWORKERTHREAD<_REQ> *worker;
+                __WSET(IXWORKERTHREAD<_REQ> *pi, wstate s=wsReady): worker(pi), ws(s) {}
+        } WSET, *PWSET;
+public:
+        unsigned long GetJobSize(){ return _qRequests.size(); }
+        bool RequestPooling(IXWORKERTHREAD<_REQ> *pi, bool bStart=false){
+                WSET *pws=new WSET(pi);
+                _listReadyWorkers.push_back(pws);
+                if(bStart)
+                        return __wtstart(*pi);
+                return true;
+        }
+        void ReleasePooling(bool bJobClear=false){
+                if(_listBusyWorkers.size()>0){ // release busy workers
+                        for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+                                WSET *p=reinterpret_cast<WSET*>(*it);
+                                delete p;
+                        }
+                        _listBusyWorkers.clear();
+                }
+                if(_listReadyWorkers.size()>0){ // release ready workers
+                        for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+                                WSET *p=reinterpret_cast<WSET*>(*it);
+                                delete p;
+                        }
+                        _listReadyWorkers.clear();
+                }
+
+                if(bJobClear && _qRequests.size()>0){ // release request job queue
+                        while(_qRequests.size()>0){
+                                _qRequests.pop_front();
+                        }
+                        _qRequests.clear();
+                }
+
+                return;
+        }
+
+        void NotifyReceivedJob(IXWORKERTHREAD<_REQ> *pi){
+
+                for(list<WSET*>::iterator it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+                        WSET *p=reinterpret_cast<WSET*>(*it);
+                        if(p->worker->idx==pi->idx){
+                                _listReadyWorkers.erase(it);
+                                p->ws=wsBusy;
+                                _listBusyWorkers.push_back(p);
+                                break;
+                        }
+                }
+
+                return;
+        }
+
+        void NotifyCompleteJob(IXWORKERTHREAD<_REQ> *pi){
+
+                for(list<WSET*>::iterator it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+                        WSET *p=reinterpret_cast<WSET*>(*it);
+                        if(p->worker->idx==pi->idx){
+                                _listBusyWorkers.erase(it);
+                                p->ws=wsReady;
+                                _listReadyWorkers.push_back(p);
+                                break;
+                        }
+                }
+
+                return;
+        }
+
+        void PushJob(_REQ req){
+                pthread_mutex_lock(&_csJob);
+                _qRequests.push_back(req);
+                pthread_mutex_unlock(&_csJob);
+                return;
+        }
+
+        void PopJob(_REQ &req){
+                if(_qRequests.size()>0){
+                        pthread_mutex_lock(&_csJob);
+                        req=_qRequests.front();
+                        _qRequests.pop_front();
+                        pthread_mutex_unlock(&_csJob);
+                }
+                return;
+        }
+
+        bool StartPooling(){return __wtstart(*this);}
+        bool StopPooling(){
+
+                list<WSET*>::iterator it;
+
+                for(it=_listBusyWorkers.begin(); it!=_listBusyWorkers.end(); it++){
+                        WSET *p=reinterpret_cast<WSET*>(*it);
+                        __wtterminate(*(p->worker));
+                }
+                for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+                        WSET *p=reinterpret_cast<WSET*>(*it);
+                        __wtterminate(*(p->worker));
+                }
+
+                return __wtterminate(*this);
+        }
+        WorkersPool(): IWORKERTHREAD(0){ pthread_mutex_init(&_csJob, NULL); }
+        ~WorkersPool(){ pthread_mutex_destroy(&_csJob); }
+private:
+        virtual void OnWorkerWatch(){}; // you must overloading this method
+        void OnWork(){
+                while(true){
+                        list<WSET*>::iterator it;
+
+                        // step 1. ready thread check
+                        for(it=_listReadyWorkers.begin(); it!=_listReadyWorkers.end(); it++){
+                                WSET *p=reinterpret_cast<WSET*>(*it);
+                                if(p->worker->status!=IXWORKERTHREAD<_REQ>::stRunning) // running check
+                                        __wtstart(*(p->worker));
+                        }
+
+                        OnWorkerWatch(); // worker thread watch
+
+                        usleep(__CHECK_THREAD_TIMESLEEP);
+                }
+
+                return;
+        }
+private:
+        std::list<WSET*> _listReadyWorkers;
+        std::list<WSET*> _listBusyWorkers;
+        std::deque<_REQ> _qRequests;
+        pthread_mutex_t _csJob;
+};
+
+
+#endif // !defined(__WORKER_THREAD)
+}}}
+
+=== wt.cpp ===
+{{{#!vim cpp
+#include "wt.h"
+#ifdef _DEBUG
+        #include <iostream>
+#endif
+#include <cstdio>
+#include <signal.h>
+#include <unistd.h>
+
+using namespace std;
+
+void __wtexcept(unsigned int idx, const char *szm){
+        char szmsg[1024]="\0";
+        sprintf(szmsg, "[ %05d ] %s", idx, szm);
+#ifdef _DEBUG
+        cerr << szmsg << endl;
+#endif
+        return;
+}
+
+void __wtwait(int arg){
+        sigset_t mask;
+        int caught;
+
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGCONT);
+        sigwait(&mask, &caught);
+        return;
+}
+
+bool __wtstart(IWORKERTHREAD &w){
+
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+        if(pthread_create(&w.handle, &attr, w.__Work, reinterpret_cast<void*>(&w))){
+                pthread_attr_destroy(&attr);
+                return false;
+        }
+        pthread_attr_destroy(&attr);
+        w.status=IWORKERTHREAD::stRunning;
+        return true;
+}
+
+bool __wtterminate(IWORKERTHREAD &w){
+        if(pthread_cancel(w.handle))
+                return false;
+        w.status=IWORKERTHREAD::stStopped;
+        return true;
+}
+
+bool __wtsuspend(IWORKERTHREAD &w){
+        if(pthread_kill(w.handle, SIGSTOP))
+                return false;
+        w.status=IWORKERTHREAD::stSuspended;
+        return true;
+}
+
+bool __wtresume(IWORKERTHREAD &w){
+
+        if(pthread_kill(w.handle, SIGCONT))
+                return false;
+        w.status=IWORKERTHREAD::stRunning;
+        return true;
+}
+
+void* IWORKERTHREAD::__Work(void *pParameter){
+
+        IWORKERTHREAD *pw=NULL;
+        struct sigaction act;
+        sigset_t mask;
+
+        try{
+                pw=reinterpret_cast<IWORKERTHREAD*>(pParameter);
+
+                sigemptyset(&mask);
+                sigaddset(&mask, SIGSTOP);
+                act.sa_handler=__wtwait;
+                sigaction(SIGSTOP, &act, NULL);
+
+                pw->OnWork();
+        }catch(const char *szmsg){
+                __wtexcept(pw->idx, szmsg);
+        }catch(...){
+                __wtexcept(pw->idx, "unknown exception...");
+        }
+
+        pthread_exit(0);
+}
+}}}
+
+=== worker thread using in posix thread ===
+{{{#!vim cpp
+#include "wt.h"
+#include <iostream>
+#include <unistd.h>
+
+using namespace std;
+
+class wtx : public IWORKERTHREAD {
+public:
+        wtx(unsigned int x): IWORKERTHREAD(x) {}
+        ~wtx(){}
+        bool Run(){ return __wtstart(*this); }
+        bool Kill(){ return __wtterminate(*this); }
+        bool Suspend(){ return __wtsuspend(*this); }
+        bool Resume(){ return __wtresume(*this); }
+private:
+        virtual void OnWork(){
+                static unsigned long n=0;
+                while(1){
+                        cout << "thread idx : " << idx << " : " << n++ << endl;
+                        sleep(1);
+                }
+                return;
+        }
+};
+
+template<typename _X>
+class wtxx : public IXWORKERTHREAD<_X> {
+public:
+        wtxx(unsigned int x, WorkersPool<_X> *wp, pthread_mutex_t *cs): IXWORKERTHREAD<_X>(x, wp), _cs(cs) {}
+        ~wtxx(){}
+        bool Run(){ return __wtstart(*this); }
+        bool Kill(){ return __wtterminate(*this); }
+        bool Suspend(){ return __wtsuspend(*this); }
+        bool Resume(){ return __wtresume(*this); }
+private:
+        virtual void OnWork(){
+                while(1){
+                        int x=0;
+                        ReceiveJob(x);
+                        if(x){
+                                pthread_mutex_lock(_cs);
+                                cout << " thread id : " << idx << ", value : " << x << endl;
+                                pthread_mutex_unlock(_cs);
+                        }
+                        CompleteJob();
+
+                        usleep(5000);
+                }
+                return;
+        }
+        pthread_mutex_t *_cs;
+};
+
+int main(int argc, char *argv[]){
+
+        wtx *pw=new wtx(1);
+
+        if(pw->Run())
+                cout << "thread run" << endl;
+        sleep(4);
+
+        if(!pw->Suspend())
+                cout << "thread suspend failed..." << endl;
+        else
+                cout << "thread suspend" << endl;
+        sleep(4);
+
+        if(!pw->Resume())
+                cout << "thread resume failed..." << endl;
+        else
+                cout << "thread resume" << endl;
+        sleep(4);
+
+        if(pw->Kill())
+                cout << "thread kill" << endl;
+        sleep(4);
+
+        WorkersPool<int> po;
+
+        pthread_mutex_t cs;
+
+        pthread_mutex_init(&cs, NULL);
+        po.RequestPooling(new wtxx<int>(1, &po, &cs));
+        po.RequestPooling(new wtxx<int>(2, &po, &cs));
+        po.RequestPooling(new wtxx<int>(3, &po, &cs));
+
+        po.PushJob(5);
+        po.PushJob(6);
+        po.PushJob(8);
+        po.PushJob(10);
+        po.PushJob(12);
+        po.PushJob(29);
+        po.PushJob(44);
+        po.PushJob(100);
+        po.PushJob(200);
+        po.PushJob(1);
+
+        po.StartPooling();
+
+        while(po.GetJobSize()>0)
+                sleep(1);
+
+        po.StopPooling();
+
+        po.ReleasePooling(true);
+        pthread_mutex_destroy(&cs);
+
+        return 0;
+}
+}}}
+
+

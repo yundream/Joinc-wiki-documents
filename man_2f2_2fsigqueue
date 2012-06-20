@@ -1,0 +1,310 @@
+#title linux man page : sigqueue - 대기열 기반 시그널 전송
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sigqueue">sigqueue</a>(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. sigqueue(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN14"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN25"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN41"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	대기열 기반 시그널및 데이터 전송	</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+
+int sigqueue(pid_t pid, int sig, const union sigval value);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		<B
+CLASS="EMPHASIS"
+>sigqueue</B
+>는 지정된 시그널번호
+		<B
+CLASS="EMPHASIS"
+>sig</B
+>를 PID가 <B
+CLASS="EMPHASIS"
+>pid</B
+>인 프로세스 
+		에게 보낸다. 	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. kill(2)과 매우 비슷하게 작동하며, kill(2)과 마찬가지로 
+		null 시그널(:12)을 이용해서 프로세스가 존재하는지 확인하기 위한 
+		목적으로 사용할 수도 있다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>value</B
+>를 이용해서 시그널과 함께 필요한 데이터를 
+		함께 전송할수도 있다. value는 다음과 같은 타입을 가진다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>union sigval
+{
+    int sival_int;
+    void *sival_ptr;
+};
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		만약 시그널과 함께 데이터를 전송 받기를 원한다면 sigaction(2)을 
+		이용해서 <B
+CLASS="EMPHASIS"
+>SA_SIGINFO</B
+>플레그를 설정하고 
+		시그널핸들러의 두번째 인자를 <B
+CLASS="EMPHASIS"
+>siginfo_t</B
+>로 
+		설정하면 된다. 받는측 에서는 대기열 기반 시그널인지 확인을 
+		위해서 <B
+CLASS="EMPHASIS"
+>siginfo_t</B
+>의 <B
+CLASS="EMPHASIS"
+>si_code</B
+>
+		가 <B
+CLASS="EMPHASIS"
+>SI_QUEUE</B
+>인지를 검사하면 된다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					잘못된 시그널
+				</P
+></DD
+><DT
+>EPERM</DT
+><DD
+><P
+>					신호를 받을 프로세스에 대한 권한이 없다.
+				</P
+></DD
+><DT
+>ESRCH</DT
+><DD
+><P
+>					신호를 받을 프로세스의 PID가 존재하지 않는다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+
+#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+
+/* 
+ * 시그널 핸들러
+ * si_code가 SI_QUEUE 인지를 확인한후 원하는 작업을 한다.  
+ * SI_QUEUE일 경우 RTS형식으로 전달된 시그널이며 
+ * 그렇지 않을경우 표준 유닉스 시그널이다.  
+ */
+void sighandler(int signo, siginfo_t *si)
+{
+    if(si-&#62;si_code == SI_QUEUE)
+    {
+        printf("User RTS signal %d&#92;n", si-&#62;si_pid);
+        printf("Sig  Number %d&#92;n",     si-&#62;si_signo);
+        printf("User Data is %d&#92;n",    si-&#62;si_value.sival_int);
+        // 시그널이 큐잉되는지 확인하기 위한 코드
+        getchar();
+    }
+    else
+    {
+        // kill등을 이용해서 표준 유닉스 시그널을 보냈을 경우
+        // 실행되는 루틴 
+        printf("Get none realtime signal %d&#92;n", signo); 
+    }
+}
+
+int main()
+{
+    struct sigaction sigact;
+
+    printf("My pid %d&#92;n", getpid());
+
+    /*
+     * sa_flags를 SA_SIGINFO로 설정하고 
+     * 시그널 핸들러를 등록한다. 
+     */
+    sigemptyset(&#38;sigact.sa_mask);
+    sigact.sa_flags     = SA_SIGINFO;
+    sigact.sa_restorer  = NULL; 
+    sigact.sa_sigaction = sighandler; 
+
+    /*
+     * RTS시그널에 대한 핸들러를 설치한다.  
+     */
+    if (sigaction(SIGRTMIN, &#38;sigact, 0) == 1)
+    {
+        printf("signal error&#92;n");
+        exit(0);
+    }   
+    while(1)
+    {
+        sleep(1);
+    }   
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위 예제는 시그널을 받는 예제 프로그램으로 대기열 기반의 
+		리얼타임:::시그널(:12)에 대응한다. 프로그램 작동방식과 
+		예제에 대한 자세한 설명은 
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=134"
+TARGET="_top"
+>Real Time Signal - 1</A
+>을 참고하기 바란다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

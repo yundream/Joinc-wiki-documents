@@ -1,0 +1,52 @@
+#title linux man page : mknod 특수파일의 생성
+
+== 이름 ==
+mknod : 특수파일을 생성한다.
+
+== 사용방법 ==
+{{{#!plain
+mknod [options] ... NAME TYPE [MAJOR MINOR]
+}}}
+
+== 설명 ==
+이름 '''NAME'''을 가지는 특수파일을 생성한다. 파일 이름을 지정한뒤에는 반드시 파일의 타입을 명시해야 한다. 파일의 타입은 다음과 같이 정의되어 있다.
+  * '''p''' : FIFO(:12)
+  * '''b''' : 블럭 장치 파일 (block device file)
+  * '''c''', '''u''' : 문자 파일 (character special file), unbuffered special file
+블럭 장치는 블럭형식으로 데이터를 옮기기 위한 장치로 '''하드 디스크''', '''CD-ROM''' 처럼 주소체계를 가지고 있어서 랜덤으로 접근할 수 있는 장치를 말한다. 블럭 장치 파일은 이러한 블럭 장치에 대응되는 파일이다.
+
+문자 장치는 한번에 하나의 문자를 전달하기 위한 장치로 '''virtual terminal''', '''serial modem'''과 같은 것들이 여기에 포함된다. 일반적으로 이들 장치는 랜덤엑세스가 불가능하다. 
+
+b,c,u 옵션을 사용할때는 반드시 '''MAJOR'''와 '''MINOR'''을 명시해야만 한다. FIFO(:12) 파일을 제외하고는 슈퍼유저만이 생성가능하다. 
+
+'''MAJOR'''는 블럭장치 혹은 문자장치의 그룹에 할당되는 번호다. MINOR 번호는 MAJOR로 묶여진 문자장치의 그룹중 하나에 할당되는 번호다. 이 두개의 번호를 이용해서 장치를 명시할 수 있다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/qktaU5SLw_jDGeKr9ZtyDA?feat=embedwebsite"><img src="http://lh3.ggpht.com/_Os5qf5urx_A/S6uOhdjSHaI/AAAAAAAABPk/P6One3lX1y8/s800/5d32a.png" /></a>
+}}}
+
+== 옵션 ==
+  * -m, --mode mode
+    chmod(1)에서 사용하는 기호및 숙자형식이다. 이 값을 사용하면 초기값으로 지정되는 모드를 무시한다.
+  * --help 
+    도움말을 출력하고 종료한다.
+  * --version
+    버전정보를 출력하고 종료한다.
+
+
+== 예제 ==
+  * FIFO 파일의 생성
+    {{{#!plain
+# mknod myfifo p
+}}}
+  * block device file의 생성, 먼저 MAJOR 와 MINOR 번호를 알아야 한다. /proc/partitions 정보를 이용해서 알아낼 수 있다. 슈퍼유저만이 가능하다.
+    {{{#!plain
+# cat /proc/partitions
+major minor  #blocks  name
+
+   8        0  195360984 sda
+   8        1  180193041 sda1
+   8        2    1020127 sda2
+   8        3   14145232 sda3
+# mknod myblock b 8 1
+}}}

@@ -1,0 +1,160 @@
+#title 네트워크 정보 확인하기
+
+시스템 혹은 네트워크 관리를 위해서 내 주변의 네트워크 정보를 알아야 할 필요가 있습니다. 주변에 어떤 서버들이 어떤 아이피를 가지고 작동하고 있는지, 네트워크 성능은 어떤지, 어떤 포트가 열려있는지 등이죠. 이들 정보는 관리 측면에서 뿐만 아니라, 특히 네트워크 프로그램의 개발에 많은 도움을 줍니다.
+
+== 내 네트워크 주변 상황 살피기 ? ==
+nmap는 네트워크 상황을 파악하기 위한 최고의 도구죠. nmap은 매우 강력한 툴이기 때문에 사용방법을 숙지해서 주의깊게 사용하는 게 좋습니다. 그렇지 않으면, 네트워크 공격 징후로 판단해서 지역 네트워크에서 고립되는 등 문제가 생길 수 있기 때문입니다. 다음은 nmap(:12)을 이용해서 LAN 서브넷의 모든 호스트의 정보를 가져오는 방법입니다.
+
+{{{#!plain
+# nmap -sP 192.168.0.0/24
+
+Starting Nmap 4.03 ( http://www.insecure.org/nmap/ ) at 2011-08-06 23:36 KST
+Host 192.168.0.1 appears to be up.
+MAC Address: 00:D0:63:4D:A0:00 (Cisco Systems)
+Host 192.168.0.3 appears to be up.
+MAC Address: 00:0E:0C:3C:DD:A7 (Intel)
+Host 192.168.0.8 appears to be up.
+MAC Address: 00:A0:D1:E0:9D:B0 (Inventec)
+...
+Host test.ppp.com (192.168.0.246) appears to be up.
+MAC Address: 00:16:46:43:91:C0 (Cisco Systems)
+Nmap finished: 256 IP addresses (133 hosts up) scanned in 12.378 seconds
+}}}
+호스트의 IP와 MAC Address 정보를 확인할 수 있습니다. ARP(:12)를 브로드 캐스팅 해서 정보를 수집합니다.
+
+'''-sS''' 옵션을 이용하면 TCP SYN scan을 할 수 있습니다. 대상 호스트의 열린 포트를 확인합니다. TCP SYN scan은 Half-open scan 혹은 Stealth scan으로 불리기도 하는데요. 완전한 TCP 연결을 맺지는 않습니다. 아시다 시피 완전한 연결을 맺으려면 3번의 패킷 교환이 있어야 하는데요. 이 방법은 SYN 패킷을 보낸 후에 SYN/ACK를 받으면 open 된 것 까지만 확인하고, ACK를 보내지 않습니다. 그러니 완전한 연결이 만들어지지 않는 거죠. 만약 RST/ACK를 받으면 close 상태로 판단합니다.  
+
+SYN scan은 half-open 즉 완전한 연결이 이뤄지지 않기 때문에 시스템 로그등에 기록되지 않고, 따라서 애플리케이션에 영향을 주거나 로그를 남기지 않고 scanning이 가능합니다. 속도 또한 빠르고요. 첨언하자면, 클라이언트가 연결요청을 하면 ThreeWay Handshake 과정을 거치고, 이 과정이 끝나면 listen 대기열에 들어갑니다. 그러면 서버 프로그램은 accept(:2)함수로 연결 소켓을 가져오는 거죠. Threeway handshake 과정이 끝나지 않으면 listen 대기열에 들어가지 않구요. 그러니 응용 프로그램은 연결요청이 있었는지 알수도 없고, 기록을 남기지도 못하는 거죠. 
+
+{{{#!plain
+#nmap  -sS www.test.co.kr 
+
+Starting Nmap 4.03 ( http://www.insecure.org/nmap/ ) at 2011-08-07 00:21 KST
+Interesting ports on joinc (218.234.19.87):
+(The 1668 ports scanned but not shown below are in state: closed)
+PORT     STATE SERVICE
+22/tcp   open  ssh
+53/tcp   open  domain
+80/tcp   open  http
+110/tcp  open  pop3
+111/tcp  open  rpcbind
+3306/tcp open  mysql
+}}}
+www.test.co.kr은 SSH(:12) 서비스와 웹 서비스, mysql, pop3등의 서비스하고 있는 걸 확인할 수 있습니다.
+
+
+nmap을 이용한 네트워크 포트 스캐닝 범위 지정 방법 정리해봤습니다.
+|| 단일 호스트 스캔  || nmap 192.168.1.1                              ||
+|| 여러 호스트 스캔  || nmap 192.168.1.1, 192.168.1.2                 ||
+|| 목록 스캔         || nmap -iL targets.txt                          ||
+|| 호스트 범위 스캔  || nmap 192.168.1.1-10                           ||
+|| Ipv6(:12) 스캔    || nmap -6 2001:db8:85a3:8d3:1319:8a2e:370:7348  ||
+
+nmap 스캔 방법을 정리했습니다. 
+  * -sT  : 일반적인 TCP 포트 스캔 
+  * -sS  : half-open 스캔
+    TCP 연결을 끝내지 않기 때문에, 매우 빠르게 포트를 스캔할 수 있다. 연결을 끝내지 않기 때문에 애플리케이션 로그를 남기지 않는다는 장점도 있다. TCP는 연결을 맺을 때 3번의 패킷 교환을 한다. - Threeway Handsahke -. nmap은 검사하려는 원격 호스트에 '''SYN''' 패킷을 전송하는데, 원격 호스트로 부터 SYN/ACK가 전송되면, 포트가 열린 것으로 간주한다. 포트가 닫혀 있다면 '''RST'''패킷이 전송된다. 
+  * -sP  : ICMP를 이용한 스캔
+  * -sU  : UDP Scan
+  * -sA  : TCP ACK 스캔
+  * -sO  : IP Protocol 스캔
+    목표 Host가 어떤 IP 프로토콜을 지원하는지 검사한다. TCP, ICMP, IGMP 등을 검사한다.
+
+로컬 호스트라면 netstat를 이용해서 열린 포트를 검사할 수있습니다.
+{{{#!plain
+# netstat -untap
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name   
+tcp        0      0 0.0.0.0:3306            0.0.0.0:*               LISTEN      3906/mysqld         
+tcp        0      0 0.0.0.0:110             0.0.0.0:*               LISTEN      2197/xinetd         
+tcp        0      0 0.0.0.0:111             0.0.0.0:*               LISTEN      2041/portmap        
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      6746/httpd          
+tcp        0      0 218.234.19.87:53        0.0.0.0:*               LISTEN      19501/named         
+tcp        0      0 127.0.0.1:53            0.0.0.0:*               LISTEN      19501/named         
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      2183/sshd           
+tcp        0      0 127.0.0.1:953           0.0.0.0:*               LISTEN      19501/named         
+tcp        0      0 218.234.19.87:22        121.135.216.122:49161   ESTABLISHED 10271/sshd          
+tcp        0      0 127.0.0.1:3306          127.0.0.1:42309         TIME_WAIT   -                   
+tcp        0      0 127.0.0.1:3306          127.0.0.1:42310         TIME_WAIT   -                   
+tcp        0      0 218.234.19.87:80        220.255.2.28:23554      TIME_WAIT   -                   
+tcp        0      0 127.0.0.1:42311         127.0.0.1:3306          TIME_WAIT   -                   
+tcp        0      0 127.0.0.1:42308         127.0.0.1:3306          TIME_WAIT   -                   
+tcp        0  14770 218.234.19.87:80        66.249.67.75:64588      ESTABLISHED 13391/httpd         
+tcp        0      0 218.234.19.87:80        61.247.204.37:54360     TIME_WAIT   -                   
+}}}
+
+=== 호스트 찾기와 성능 측정 ===
+fping이라는 프로그램을 이용하면 원하는 네트워크 영역의 호스트를 찾을 수 있으며, 간단하게 성능도 측정할 수 있습니다.
+{{{#!plain
+$ fping -c1 -gds 172.30.1.0/24 2>&1 | egrep -v "ICMP|xmt"
+172.30.1.254 : [0], 84 bytes, 2.57 ms (2.57 avg, 0% loss)
+172.30.1.1   : [0], 84 bytes, 0.10 ms (0.10 avg, 0% loss)
+
+
+     256 targets
+       2 alive
+     256 unreachable
+       0 unknown addresses
+
+       0 timeouts (waiting for response)
+
+ 0.10 ms (min round trip time)
+ 1.33 ms (avg round trip time)
+ 2.57 ms (max round trip time)
+       10.671 sec (elapsed real time)
+}}}
+
+단일 호스트에 대한 테스트도 가능합니다.
+{{{#!plain
+# fping joinc
+joinc is alive
+}}}
+
+호스트의 목록을 파일로 저장해서 측정할 수 있습니다. 모니터링 프로그램을 만들 때 유용하겠죠. 
+{{{#!plain
+# fping -c1 < filename
+}}}
+
+=== 처리량 측정 ===
+fping 같은 프로그램으로도 성능을 측정할 수 있기는 합니다만 ICMP를 이용하기 때문에 제한적일 수 밖에 없죠. 본격적으로 처리량을 (Throughput) 측정하기를 원한다면 '''iperf'''를 사용하면 됩니다. 이 프로그램은 클라이언트/서버 환경으로 작동을 하는데요. 서버와 클라이언트가 데이터를 주고 받는 것을 측정하는 방식으로 작동합니다.
+
+예전에는 iperf를 사용하지 않고, 직접 서버/클라이언트 프로그램을 만들어서 사용했습니다. read, write 버퍼의 크기를 늘려가면서 테스트를 하는 방식이었습니다. 굳이 직접 만들어서 사용할 필요는 없을 것 같습니다. iperf로도 버퍼크기 변경, UDP/TCP, window size 변경등을 조절하면서 테스트 할 수 있으니까요. 
+
+iperf를 서버 모드로 실행한 다음
+{{{#!plain
+$ iperf -s
+------------------------------------------------------------
+Server listening on TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+}}}
+
+iperf를 클라이언트 모드로 실행하면 테스트가 진행됩니다.
+{{{#!plain
+------------------------------------------------------------
+Client connecting to host1, TCP port 5001
+TCP window size: 16.0 KByte (default)
+------------------------------------------------------------
+}}}
+
+테스트 결과는 다음과 같습니다.
+{{{#!plain
+[  3] local 192.168.10.25 port 40245 connected with 192.168.20.25 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-10.0 sec  8.18 MBytes  6.85 Mbits/sec
+}}}
+
+=== 내 서버에 누가 있는지 ===
+w 명령을 이용해서 내 서버에 접근한 유저의 행동을 확인할 수 있다는 것 알고 계실겁니다. 저도 w 외에는 사용한적이 없는데요. whowatch 라는 프로그램도 있습니다.
+{{{#!plain
+7 users: (1 local, 0 telnet, 1 ssh, 5 other)                            load: 0.05, 0.10, 0.13
+                                                                                                       
+(init)         yundream  pts/0  :0                  -                                                  
+(konsole)      yundream  pts/5  :0                  ssh kknd@172.30.1.1                                
+(sshd)         kknd      pts/6  172.30.1.1          -                                                  
+}}}
+써보긴 했는데, w에 비해서 딱히 좋다는 느낌은 없습니다. 좀 예쁘게 정보를 보여주긴 합니다만..
+
+== history ==
+  1. 작성일 : 2011년 8월 27일 
+

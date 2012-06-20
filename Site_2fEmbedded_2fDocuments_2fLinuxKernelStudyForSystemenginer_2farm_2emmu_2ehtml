@@ -1,0 +1,1311 @@
+#title ARM 리눅스
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>ARM 프로세서 MMU(Memory Management Unit)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="ARM 리눅스"
+HREF="chap04.html"><LINK
+REL="PREVIOUS"
+TITLE="ARM 리눅스"
+HREF="chap04.html"><LINK
+REL="NEXT"
+TITLE="Assabet 보드용 커널 컴파일"
+HREF="assabet.kernel.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="chap04.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>4장. ARM 리눅스</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="assabet.kernel.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="ARM.MMU"
+>4.1. ARM 프로세서 MMU(Memory Management Unit)</A
+></H1
+><P
+>			ARM 리눅스를 시작하기 전에 ARM 프로세서에 대해 충분히 알아야 쉽게 이해할 수 있을 것이다.
+			그러나 모든 것을 다루긴 힘들고 여기선 MMU에 대해 다루고 가상 어드레스를 어떻게 이해하면
+			되는지 정도를 습득하면 되겠다.
+		</P
+><P
+>			이 절의 그림과 글은 모두 ARM architectural Reference Manual(Dave Jaggar저)를 바탕으로 
+			번역했다.
+		</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="ARM.MMU.1"
+>4.1.1. 개요</A
+></H2
+><P
+>				ARM프로세서의 MMU는 다음의 큰 두가지 일을 한다.
+				<P
+></P
+><UL
+><LI
+><P
+>가상 어드레스를 물리 어드레스로 변환</P
+></LI
+><LI
+><P
+>메모리 접근 권한 제어</P
+></LI
+></UL
+>
+				그리고 MMU는 위의 일을 하기위해 다음과 같은 하드웨어를 갖고 있다.
+				<P
+></P
+><UL
+><LI
+><P
+>적어도 하나의 TLB(Translation Lookaside Buffer)</P
+></LI
+><LI
+><P
+>접근 제어 로직</P
+></LI
+><LI
+><P
+>translation-table-walking 로직</P
+></LI
+></UL
+>
+			</P
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN1298"
+>4.1.1.1. TLB</A
+></H3
+><P
+>					TLB는 가상 어드레스를 물리 어드레스로 변환하는 것과 접근 권한을 캐싱하고 있다.
+					만약 TLB가 가상 어드레스에 대한 변환된 엔트리를 갖고 있다면 접근 제어 로직은 접근이
+					가능한지 판별한다. 접근이 허용된다면 MMU는 가상 어드레스에 대한 물리 어드레스를 출력해준다.
+					접근이 허용되지 않는 경우엔 MMU가 CPU에서 abort 시그널을 보낸다.
+				</P
+><P
+>					TLB가 없다면(가상 어드레스에 대한 변환된 엔트리를 갖고 있지 않다) 하드웨어를 움직이는
+					변환 테이블은 물리 메모리 내에 있는 변환 테이블에서 정보를 읽어온다.
+					일단 읽어온 후엔 그 정보가 TLB에 저장된다. 이 때 원래 있던 엔트리는 지워질 지워질 수도 있다.
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN1302"
+>4.1.1.2. 메모리 접근</A
+></H3
+><P
+>					MMU는 두 가지의 메모리 접근 방식을 지원한다.
+					<P
+></P
+><UL
+><LI
+><P
+>섹션</P
+><P
+>1MB 블럭 단위로 메모리 제어</P
+></LI
+><LI
+><P
+>페이지</P
+><P
+>								페이지 방식엔 또 두 가지 방식이 있다.
+								<P
+></P
+><UL
+><LI
+><P
+>small page - 4kB 블럭 메모리</P
+></LI
+><LI
+><P
+>large page - 64kB 블럭 메모리</P
+></LI
+></UL
+>
+							</P
+></LI
+></UL
+>	
+				</P
+><P
+>					섹션과 큰페이지 방식은 TLB에 하나의 엔트리 만이 있을 때 큰 메모리 영역을 매핑하는데 사용된다.
+					추가로 작은 페이지 방식은 1kB 서브 페이지로 확장되고 큰 페이지 방식은 16kB로 확장 된다.
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN1318"
+>4.1.1.3. 변환 테이블</A
+></H3
+><P
+>					주 메모리 내의 변환 테이블은 두 가지 레벨을 갖고 있다.
+					<P
+></P
+><UL
+><LI
+><P
+>1 레벨 테이블</P
+><P
+>								섹션 변환과 섹션 레벨 테이블에 대한 포인터를 갖고 있다.
+							</P
+></LI
+><LI
+><P
+>2 레벨 테이블</P
+><P
+>								큰/작은 페이지 변환을 갖고 있다.
+							</P
+></LI
+></UL
+>
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN1328"
+>4.1.1.4. 도메인</A
+></H3
+><P
+>					MMU는 도메인이란 기능도 제공한다. 이 것은 개별적 접근 권한을 갖도록 정의된 메모리 영역을 말한다.
+					DACR(Domain Access Control Register)를 사용해 16개 까지의 도메인을 지정할 수 있다.
+				</P
+><P
+>					MMU가 off 상태일 때(프로세서가 리셋된 직후가 이렇다) 가상 어드레스의 출력은 직접 물리 어드레스를
+					가리키고 메모리 접근 권한 검사는 하지 않는다.
+				</P
+><P
+>					두 TLB 엔트리가 중첩된 메모리 영역을 가리는 경우는 예측할 수 없는 일이 발생한다. 이런 경우는
+					다른 크기의 페이지로 재 매핑된 후 TLB를 갱신하지 않아 발생할 수 있다.
+				</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1333"
+>4.1.2. 변환 절차</A
+></H2
+><P
+>				MMU는 CPU에의해 만들어진 가상 어드레스를 외부 메모리에 접근하기 위한 물리 어드레스로 변환한다.
+				그리고 접근 권한 검사도 병행한다. 어드레스가 변환되는 방식은 섹션 방식인가 페이지
+				방식(페이지 방식엔 또 두 가지 크기의 페이지가 있다)인가에따라 3가지가 있다. 
+			</P
+><P
+>				그러나 변환 절차는 언제나 같은 식으로 1레벨 읽기로부터 시작된다. 섹션 방식은 1레벨만 필요하고
+				페이지 방식은 2레벨도 사용해야한다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TABLE-BASE"
+>4.1.3. 변환 테이블 베이스</A
+></H2
+><P
+>				변환 절차는 요청된 가상 어드레스에 대한 엔트리가 칩에 내장된 TLB에 없을 때부터 시작된다.
+				TTBR(Translation Table Base Register)는 1레벨 테이블의 베이스를 가리키고 TTBR의 14에서 31
+				비트만이 사용된다. 나머지는 0이어야한다. 그러므로 1레벨 페이지 테이블은 반드시 16KB 단위로
+				정렬되야한다(2<SUP
+>14</SUP
+>=16384).
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1341"
+>4.1.4. 1레벨 읽기</A
+></H2
+><P
+>				TTBR의 비트 31:14는 <A
+HREF="arm.mmu.html#FIGURE.1STLEVEL-DESCRIPTOR"
+>그림 4-1</A
+>에서 보듯이 30비트 어드레스를
+				만들기 위해 가상 어드레스의 31:20 비트와 연결된다.
+				이 어드레스는 섹션용 1레벨 디스크립나 2레벨 페이지 테이블 포인터용 디스크립터를
+				나타내는 4바이트 길이의 변환 테이블 엔트리를 선택한다.
+			</P
+><P
+>				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.1STLEVEL-DESCRIPTOR"
+></A
+><P
+><B
+>그림 4-1. 변환 테이블 1레벨 디스크립터 접근</B
+></P
+><P
+>
+}}}
+attachment:accessing-the-translation-table-first-level-descriptors.png
+{{{#!html
+</p
+>
+</DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1349"
+>4.1.5. 1레벨 디스크립터</A
+></H2
+><P
+>				1레벨 디스크립터는 섹션 디스크립터나 2레벨 페이지 테이블 포인터가 될 수 있고 포맷을 그에 따라
+				변한다. <A
+HREF="arm.mmu.html#FIGURE.1STLEVEL-DESCRIPTOR-FORMAT"
+>그림 4-2</A
+>에서 비트 1:0이 디스크립터 타입을
+				나타낸다.
+			</P
+><P
+>				비트 1:0이 00인 디스크립터를 사용하면 변환 폴트를 발생한다.
+				비트 1:0이 11인 디스크립터는 어떻게 동작할지 모른다.
+			</P
+><P
+>				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.1STLEVEL-DESCRIPTOR-FORMAT"
+></A
+><P
+><B
+>그림 4-2. 1레벨 디스크립터 포맷</B
+></P
+><P
+>
+}}}
+attachment:first-level-descriptor-format.png
+{{{#!html
+</p
+>
+</DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1358"
+>4.1.6. 섹션 디스크립터와 섹션 변환</A
+></H2
+><P
+>				<A
+HREF="arm.mmu.html#FIGURE.SECTION-TRANSLATION"
+>그림 4-3</A
+>은 섹션 변환 전체를 나타낸다. 1레벨
+				디스크립터에 포함된 접근 권한은 물리 어드레스를 만들어내기 전에 먼저 체크된다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.SECTION-TRANSLATION"
+></A
+><P
+><B
+>그림 4-3. 섹션 변환</B
+></P
+><P
+>
+}}}
+attachment:section-translation.png
+{{{#!html
+</P
+>
+</DIV
+>
+			</P
+><P
+>				1레벨 디스크립터가 섹션 디스크립터인 경우 각 필드는 다음과 같은 의미를 갖는다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="TABLE.SECTION-DESCRIPTOR"
+></A
+><P
+><B
+>표 4-1. 섹션 디스크립터 필드</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 1:0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>디스크립터의 타입을 나타냄(10은 섹션 디스크립터를 의미함)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 3:2</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시가능, 버퍼가능 비트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 4</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 비트의 의미는 'IMPLEMENTATION DEPENDENt'</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 8:5</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 디스크립터에 의해 조정되는 모든 페이지에 대한 16개 까지의 도메인 지정</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 9</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용되지 않음. SHOULD BE ZERO</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 11:10</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>접근 권한</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 19:12</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용되지 않음. SHOULD BE ZERO</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 31:20</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>물리 어드레스의 상위 12비트를 구성하는 섹션 베이스 어드레스</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1394"
+>4.1.7. 페이지 테이블 디스크립터</A
+></H2
+><P
+>				페이지 테이블 디스크립터를 1레벨에서 읽고나면 2레벨 디스크립터 읽기가 시작된다.
+				<A
+HREF="arm.mmu.html#FIGURE.SECOND-LEVEL-DESCRIPTOR"
+>그림 4-4</A
+>에 나타나 있다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.SECOND-LEVEL-DESCRIPTOR"
+></A
+><P
+><B
+>그림 4-4. 2레벨 디스크립터 접근</B
+></P
+><P
+>
+}}}
+<IMG
+attachment:accessing-the-translation-table-second-level-desctiptors.png
+{{{#!html
+</P
+></DIV
+>
+			</P
+><P
+>				1레벨 디스크립터가 페이지 테이블 디스크립터인 경우 각 필드는 다음과 같은 의미를 갖는다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="TABLE.SECOND-LEVEL-DESCRIPTOR"
+></A
+><P
+><B
+>표 4-2. 페이지 디스크립터 필드</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 1:0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>디스크립터의 타입을 나타냄(01은 페이지 디스크립터를 의미함)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 4:2</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 비트의 의미는 'IMPLEMENTATION DEPENDENt'</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 8:5</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 디스크립터에 의해 조정되는 모든 페이지에 대한 16개 까지의 도메인 지정</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 9</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용되지 않음. SHOULD BE ZERO</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 31:10</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>페이지 테이블 베이스 어드레스는 2레벨 페이지 테이블 포인터이다. 2레벨 페이지
+								테이블은 1KB로 정렬되야한다(2<SUP
+>10</SUP
+>=1024)</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1422"
+>4.1.8. 2레벨 디스크립터</A
+></H2
+><P
+>				2레벨 디스크립터는 큰페이지 혹은 작은 페이지로 정의된다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.SECOND-LEVEL-DESCRIPTOR-FORMAT"
+></A
+><P
+><B
+>그림 4-5. 2레벨 디스크립터 포맷</B
+></P
+><P
+>
+}}}
+attachment:second-level-descriptor-format.png
+{{{#!html
+</P
+></DIV
+>
+			</P
+><P
+>				각필드는 다음과 같은 의미를 갖는다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="TABLE.SECOND-LEVEL-DESCRIPTOR-FORMAT"
+></A
+><P
+><B
+>표 4-3. 2레벨 디스크립터 포맷</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 1:0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>디스크립터의 타입을 나타냄</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 3:2</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시가능, 버퍼 가능 비트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 11:4</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>접근 권한</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 15:12</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용되지 않음. SHOULD BE ZERO</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 31:12</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>작은 페이지 모드에서 물리 어드레스를 만드는데 사용됨</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>비트 31:16</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>큰 페이지 모드에서 물리 어드레스를 만드는데 사용됨</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				비트 11:4의 접근 권한은 다음과 같은 4가지의 서브 페이지로 나뉜다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="TABLE.SECOND-LEVEL-DESCRIPTOR-ACCESS"
+></A
+><P
+><B
+>표 4-4. 2레벨 디스크립터 접근 권한</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>AP0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1서브 페이지에 대한 접근 권한</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>AP1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>2서브 페이지에 대한 접근 권한</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>AP2</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>3서브 페이지에 대한 접근 권한</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>AP3</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>4서브 페이지에 대한 접근 권한</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1468"
+>4.1.9. 큰 페이지 변환</A
+></H2
+><P
+>				<A
+HREF="arm.mmu.html#FIGURE.LARGE-PAGE-TRANSLATION"
+>그림 4-6</A
+>은 큰 페이지 변환을 나타낸다.
+				페이지 인텍스의 상위 4비트와 2레벨 테이블 인덱스의 하위 4비트는
+				서로 겹치는데 큰 페이지에 대한 각 페이지 테이블 엔트리는 페이지 테이블 내에 16번 복사되야한다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.LARGE-PAGE-TRANSLATION"
+></A
+><P
+><B
+>그림 4-6. 큰 페이지 변환</B
+></P
+><P
+>
+}}}
+attachment:large-page-translation.png
+{{{#!html
+</P
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1475"
+>4.1.10. 작은 페이지 변환</A
+></H2
+><P
+>				<A
+HREF="arm.mmu.html#FIGURE.SMALL-PAGE-TRANSLATION"
+>그림 4-7</A
+>은 작은 페이지 변환을 나타낸다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.SMALL-PAGE-TRANSLATION"
+></A
+><P
+><B
+>그림 4-7. 작은 페이지 변환</B
+></P
+><P
+>
+}}}
+attachment:small-page-translation.png
+{{{#!html
+</P
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1482"
+>4.1.11. 캐시와 쓰기 버퍼 제어</A
+></H2
+><P
+>				ARM 메모리 시스템은 각 가상 페이지 마다 개별적으로 선택 가능한 두가지 속성에 의해 제어된다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN1485"
+></A
+><P
+><B
+>표 4-5. 메모리 시스템 속성</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Cacheable</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 속성은 페이지 내의 데이터가 캐시될 수 있음을 나타낸다. 이렇게하면 다음
+								이어지는 동작은 메인 메모리를 읽을 필요가 없게된다. 또 현재 실행점을 넘어 미리
+								명령을 읽을수 있음을 나타내기도 한다. 캐시는 write-back 혹은 write-through로
+								만들어질 수 있다(각 가상 페이지마다 개별적으로 설정할 수 있다).</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Bufferable</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>페이지 내의 데이터가 쓰기 버퍼에 저장될 수 있음을 나타내고 이렇게하면
+								메인 메모리보다 빠른 동작을 할수 있게 된다. 쓰기 버퍼는 정확한 쓰기 명령을 보장하지
+								않는다. 그러므로 같은 위치에 대한 여러번의 쓰기 동작이 여러 번의 외부 쓰기 동작을
+								한다는 보장은 없다.</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				캐시와 쓰기 버퍼 비트 값은 다음과 같은 의미를 갖는다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN1496"
+></A
+><P
+><B
+>표 4-6. 캐시, 쓰기 버퍼 비트의 의미</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><THEAD
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>C</TH
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>B</TH
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>의미</TH
+></TR
+></THEAD
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시 불가능, 쓰기 버퍼 불가능</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시 불가능, 쓰기 버퍼 동작</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시 동작, 쓰기 버퍼 불가능 혹은 write-through 캐시, 쓰기 버퍼 동작</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>캐시 동작, 쓰기 버퍼 동작 혹은 write-back 캐시, 쓰기 버퍼 동작</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				두가지 타입의 캐시를 모두 지원하려면 10으로 write-through, 11으로 writeback 캐시를 지정한다.
+				어느 한가지 타입의 캐시만을 지원하려면 C와 B 비트를 엄격히 적용해 캐시 가능과 쓰기 버퍼 가능이
+				각각 동작하도록 한다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1522"
+>4.1.12. 접근 권한</A
+></H2
+><P
+>				섹션과 페이지 디스크립터 내의 접근 권한 비트는 해당 섹션이나 페이지의접근을 제어한다.
+				접근 권한은 시스템(S)과 롬(R) 제어 비트에 의해 변경된다. 테이블은 S, R 비트와 결합된 접근
+				권한 비트의 의미를 나타낸다. 필요한 권한 없이 메모리에 접근하면 퍼미션 폴트가 발생한다.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN1525"
+></A
+><P
+><B
+>표 4-7. 접근 권한</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><THEAD
+><TR
+><TH
+ROWSPAN="2"
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="MIDDLE"
+>AP</TH
+><TH
+ROWSPAN="2"
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="MIDDLE"
+>S</TH
+><TH
+ROWSPAN="2"
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="MIDDLE"
+>R</TH
+><TH
+COLSPAN="2"
+ALIGN="CENTER"
+VALIGN="TOP"
+>권한</TH
+></TR
+><TR
+><TH
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>수퍼바이저</TH
+><TH
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>유저</TH
+></TR
+></THEAD
+><TBODY
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>00</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>0</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>0</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>접근 불가</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>접근 불가</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>00</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>1</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>0</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기만 가능</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>접근 불가</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>00</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>0</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>1</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기만 가능</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기만 가능</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>00</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>1</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>1</TD
+><TD
+COLSPAN="2"
+ALIGN="CENTER"
+VALIGN="TOP"
+>예측 불가능</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>01</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기/쓰기</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>접근 불가능</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>10</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기/쓰기</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기만 가능</TD
+></TR
+><TR
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>11</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>x</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기/쓰기</TD
+><TD
+WIDTH="20%"
+ALIGN="CENTER"
+VALIGN="TOP"
+>읽기/쓰기</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="chap04.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="assabet.kernel.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>ARM 리눅스</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap04.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>Assabet 보드용 커널 컴파일</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

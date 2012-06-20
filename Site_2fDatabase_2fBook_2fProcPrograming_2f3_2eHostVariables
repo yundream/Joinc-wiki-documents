@@ -1,0 +1,113 @@
+#title Host Variables
+
+== Host Variables ==
+=== 호스트 변수 ===
+호스트 변수는 오라클 데이터베이스와 호스트에서 실행되는 프로그램간의 통신을 위한 일종의 통로라 할 수 있다.(오라클 매뉴얼을 보면 Key라고 정의 되어 있다.) 사용자는 호스트 변수를 통해 데이터베이스에 값을 전달 할 수도 있고 데이터에이스로부터 값을 전달 받을 수도 있다. 호스트 프로그램과 데이터베이스 사이의 모든 데이터 전달은 이 호스트 변수를 이용야만 가능하다. 호스트 변수의 사용을 위해서는 특별한 선언과 사용방법이 필요하다. 차례로 살펴보기로 하자.
+
+=== 호스트 변수의 종류 ===
+아래의 표는 Pro*C/C++에서 사용할 수 있는 호스트 변수의 데이터 타입을 보여준다.
+
+ * 표3 C Datatypes for Host Variables
+|| C Datatype or Pseudotype || Description		||
+|| char						|| 문자 데이터 타입 ||
+|| char[n]					|| 문자열 데이터 타입 ||
+|| int						|| 4 byte 정수 데이터 타입 ||
+|| short					|| 2 byte 정수 데이터 타입 ||
+|| long						|| 4 byte 정수 데이터 타입 ||
+|| float					|| 4 byte 실수 데이터 타입 ||
+|| double					|| 4 byte 실수 데이터 타입 ||
+|| VARCHAR[n]				|| 가변 문자열 데이터 타입(구조체로 표현) ||
+
+다른 것들은 다 C에서 존재하는 즉 많이 봐 왔고 많이 사용한 데이타 타입이지만 특이하게 VARCHAR[n]이란게 있다. 이것은 실제로 존제하는 것이 아니라 구조체로 정의 되어있고  Pro*C/C++로 프리컴파일 할 때 풀리도록 되어있다.  즉
+
+VARCHAR str[10]; 이라고 선언된 것은
+{{{#!plain
+struct
+{
+	unsigned char arr[10];
+	unsigned short len;
+} str;
+}}}
+으로 풀어서 쓰게 되어 있다. 정확히 말하면 실제 데이터 타입이라기 보단 슈도타입이다. 
+
+아래의 표는 호스트 변수와 오라클 데이터 타입간의 호환성을 보여준다.
+
+ * 표4 C와 오라클 데이터 타입간의 호환성
+|| Internal Type		|| C Type			||
+|| Description 			|| VARCHAR2(Y)		||
+|| Char					|| 단일 문자 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입 ||
+|| Int					|| 4 byte 정수 데이터 타입 ||
+|| float				|| 4 byte 실수 데이터 타입 ||
+|| CHAR(X)				|| Char[n] 문자열 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+|| Int					|| 4 byte 정수 데이터 타입 ||
+|| float				|| 4 byte 실수 데이터 타입 ||
+|| NUMBER(P,S)			|| Int 4 byte 정수 데이터 타입 ||
+|| Float				|| 4 byte 실수 데이터 타입 ||
+|| Char[n]				|| 문자열 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입 ||
+|| DATE					|| || 
+|| Char[n]				|| 문자열 데이터 타입   ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+|| LONG					|| ||
+|| Char[n]				|| 문자열 데이터 타입 			||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+|| RAW(X)				|| ||
+|| Unsigned Char[n]		|| 문자열 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+|| LONG RAW				|| ||
+|| Unsigned Char[n]		|| 문자열 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+|| ROWID				|| ||
+|| Unsigned Char[n]		|| 문자열 데이터 타입 ||
+|| Varchar[n]			|| 가변길이 문자열 데이터 타입	||
+위에서 보는 바와 같이 Internal Type이 문자열 이라고 해서 C Databype이 Int, long, float등으로 데이터를 받을 수 없는 것은 아니다. 들어 있는 데이터가 C Datatype에 맞기만 한다면 충분히 받을 수 있으며 C Datatype이 문자열일 경우에는 거의 대부분의 데이터를 받을 수 있다고 보면 된다.
+
+그 외에 특이사항으로 1차원 배열의 경우 호스트 변수로 사용가능하다. 그러나 2차원 배열의 경우 char[m][n]와 varchar[m][n]만이 사용 가능하다. 포인터의 경우는 가능하지만 포인터 배열의 경우 지원하지 않는다. 
+
+=== 호스트 변수의 사용 ===
+호스트 변수의 사용에 있어서 몇 가지 제약점이 있다. 첫 번째는 변수를 선언 할 경우 반드시 정해진 역영안에서만 해야 한다. SQL문장 내에서 사용할 경우에는 반드시 변수 이름 앞에 ‘:’을 붙여줘야만 한다. 이것은 SQL 또는 PL/SQL 문장안에서 정의된 칼럼, 테이블, 프로시저등의 이름과 혼동되지 안도록 하기 위함이다.
+
+아래에 호스트 변수의 선언을 보여주는 예를 보여준다.
+
+{{{#!plain
+/* 호스트 변수의 선언 시작 */
+EXEC SQL BEGIN DECLARE SECTION; 
+	int empno;              /* emp 테이블의 empno를 받을 변수 */
+	char ename[10];         /* emp 테이블의 ename을 받을 변수 */
+	float sal;              /* emp 테이블의 sal  을 받을 변수 */
+	float comm;             /* emp 테이블의 comm 을 받을 변수 */
+EXEC SQL EBD DECLARE SECTION; 
+/* 호스트 변수의 선언 종료 */
+
+/* 프로그램에서 사용될 일반 변수 */
+Int nCols, nRows, count;
+
+아래에 호스트 변수의 사용을 보여주는 예를 보자.
+
+/*
+ * 사원번호를 얻어와서 해당하는 사람의 이름과 급여, 상여를 받아온다.
+ */
+empno = atoi (gets ());
+EXEC SQL
+SELECT ename, sal, comm
+INTO :ename, :sal, :comm
+FROM emp
+WHERE empno = :empno;
+
+/*
+ * 얻어온 급여와 상여를 수정하여 다시 업데이트 한다.
+ */
+sal = sal + 3000;
+comm = comm + 1000;
+EXEC SQL
+	UPDATE emp
+	SET sal = :sal, comm = :comm.
+	WHERE empno = :empno;
+}}}
+	
+
+위의 예제에서 호스트 변수를 사용하기 위해서 변수 이름 앞에 콜론(:)을 붙여준다는 것을 알 수 있다.
+
+위에서 본 데이터 타입들로 호스트 변수를 만들수 있지만 그 이외에도 SQL 커서, 구조체, 포인터등도 호스트 변수들로 사용할 수 있다. 자세한 부분은 앞으로 하나하나의 과정을 거치면서 예제로 보도록 하겠다.

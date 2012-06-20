@@ -1,0 +1,554 @@
+#title /dev/random 을 이용한 랜덤값 생성
+[wiki:article_random HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>/dev/random 을 이용한 랜덤값 생성</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>dreamyun@yahoo.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>1.0</revnumber>
+			<date>2004년 1월 28일 19시</date>
+			<revremark>/dev/random 장치 노이즈 수집 문제점</revremark>
+		</revision>
+		<revision>
+			<revnumber>0.9</revnumber>
+			<date>2003년 2월 24일 22시</date>
+			<revremark>솔라리스에서 /dev/random 문자장치생성</revremark>
+		</revision>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2003년 2월 9일 21시</date>
+			<revremark>문서 작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>
+		이번글은 리눅스 시스템에서 제공하는 문자장치(character devices)를 
+		이용한 랜덤값을 얻어내는 방법에 대해서 담고 있다. 
+		Linux kernel 2.4.x 환경에서만 테스트되었으나, Kernel 2.2.x 에서도 
+		동일하게 작동될것으로 생각된다. 
+		Solaris 의 경우 2.8 버전이후로 패치를 통해서 /dev/random 을 
+		지원하는걸로 되어있다. 다른 Unix 들도 대부분 지원하지만 
+		버젼에 따라서 지원여부가 결정될것이다.  
+	</para>
+</section>
+<section>
+	<title>RANDOM 값 만들기</title>
+	<section>
+		<title>왜 RANDOM값이 중요한가</title>
+		<para>
+			random 의 의미가 "임의의", "일정치 않는"의 뜻을 가진다는 
+			것은 누구든지 알고 있을것이다. 가장 간단한 랜덤값의 예는 
+			주사위가 던져질경우 나오는 눈의 수 가 될것이며, 
+			던지는 사람이 아무 생각없이 던질경우 "임의의" 값이 나오게 
+			될것이다. 
+		</para>
+		<para>
+			이 "임의의" 값은 일상생활에서 자주 사용되며, 특히 "보안"을 
+			필요로 하는곳에서 더욱 중요하게 다루어진다. 
+			금고의 문을 열기 위한 6자리의 숫자를 조합한다고 
+			했을때, 카드에서 현금서비스등을 서비스받기 위해 사용하는 
+			4자리 숫자의 조합등 "임이의" 값이 사용되어야 할것이다. 
+			흔히 이러한 숫자조합을 만들때 가장 문제시 되는게, "임의의" 값을 
+			사용하지 않고 숫자조합을 만든다는 점이다. 자기 생일이라든지, 
+			아는 사람의 전화번호등이 대표적인 예로, 이런 값들은 
+			"임의의"값이 아니다. 임의의 값이 아니란 뜻은 유추가 가능함을 
+			뜻하며, 유추가 가능하다는 것은 그만큼 헛점이 많아질수 
+			있음을 뜻한다.  
+		</para>
+		<para>
+			컴퓨팅 환경에서도 이러한 "임의의"값 을 선택할수 있어야 한다. 
+			선택된 임의의 값은 여러가지 용도로 사용될것인데, 대표적으로 
+			사용할수 있는게 사용자 확인을 위한 "password" 와 
+			SSL 과 같은 라이브러리등에서 암호화및 복호화를 위한 key값등의 
+			제작일 것이다.  
+		</para>
+		<para>
+			이러한 "임의의"값들은 당연하지만 최대한 "임의의"값으로써, 
+			가능한 유추될수 없는 값이 되어야 할것이다. 
+			만약 우리가 "임의의"값 을 얻기 위한 어떤 함수를 만들었고, 
+			이 함수를 통해서 1-9999 사이의 임의의 값을 얻어내려고 하는데, 
+			함수를 사용했더니 5000 - 6000 사이의 값이 다른 값보다 
+			특별히 많이 나온다면, 이 함수는 믿을수 없는 "결함이 있는" 
+			함수가 될것이며, 이 함수를 사용하는 많은 프로그램은  
+			보안 결함을 가지게 될것이다. 이상적으로 각각의 값이 선택될 확률은 
+			모두 동일(1/값의범위)해야 할것이다-다른말로 표준편차 0-.  
+		</para>
+	</section>
+	<section>
+		<title>표준 C random 함수</title>
+		<para>
+			표준 C 에서는 랜덤값의 계산을 위해서 random()와 srandom() 두개의 
+			함수를 제공한다.  
+			<screen>
+#include &lt;stdlib.h&gt;
+
+long random(void);
+void srandom(unsigned int seed);
+			</screen>
+			srandom 함수는 random seed 값을 만들기 위해서 사용되며, 
+			random 은 만들어진 random seed 값을 이용해서 
+			일련의 랜덤값을 발생시킨다. 이 말은 random함수를 이용해서 
+			발생되는 랜덤값은 srandom 에 의존적임을 뜻하며, 실제 같은 
+			random seed 를 이용해서 random 함수를 돌릴경우 
+			언제나 동일한 일련의 랜덤값을 얻게 된다.  	
+		</para>
+		<para>
+			srandom 에서의 random seed 는 아규먼트로 주어지는 
+			<emphasis>seed</emphasis>에 의해서 생성된다. 
+		</para>
+		<para>
+			random 함수가 srandom 에서 만들어내는 random seed 에 의해서 
+			랜덤값을 만들어낸다는 것은 그리 좋지 않은 아이디어라고 생각된다. 
+			왜냐하면 seed 에 임의의 int 값을 할당한다는게 생각처럼 쉬운게 
+			아니기 때문이며(보통은 컴퓨터의 시간값을 사용한다), 이러한 
+			값은 유추될수 있기 때문이다. 기본적으로 동일한 seed 값을 
+			이용할경우 동일한 일련의 랜덤값을 얻을수 있기 때문이다. 
+		</para>
+		<para>
+			또한 random 으로 생성되는 랜덤값의 범위는 
+			16*((2**31)-1) 이다. 언뜻보면 매우 큰숫자인것 같다. 
+			그러나 최근 ssl 등에서 key 의 크기가 128bit 인것을 감안하면 
+			너무 작은 범위의 랜덤값만을 얻어올수 있어서, 현재 컴퓨팅 환경이 
+			요구하는 수준에 크게 미달되고 있음을 알수 있다.    
+		</para>
+		<para>
+			즉 그리 복잡하거나 중요하지 않은 어플리케이션에서의 
+			랜덤값을 만들기 위해서는 간단하게 사용가능하지만, 그렇지 않은 
+			실제 서비스환경에서 사용하기에는 부족한점이 있다.  
+		</para>
+		<section>	
+			<title>성능 테스트</title> 
+			<para>
+				일단 random seed 를 제외하고 생각한다면, 
+				랜덤값은 정말 랜덤하게 나와야 한다. 
+				예를들어 1-100 까지의 범위에서 랜덤값을 추출하고자 했을때 
+				이것을 100000번 돌리면 1-100 사이의 각각의 값이 
+				거의 비슷한 횟수로 선택되어져야 할것이다. 약간더 
+				많이 선택되거나 그렇지 않은 
+				랜덤값이 있겠지만 대충 1000 정도에서 선택되어져야 할것이며, 
+				이 오차 폭이 작을수록 성능이 좋은 랜덤 함수라고 할수 있다. 
+			</para>
+			<para>
+				보통 이러한 통계수치에서 각각의 관측값이 평균에서 
+				떨어진 정보를 가지고 얼마나 바람직하게 분포되어 있는지를 
+				판단하게 되는데, 이를 표준편차라고 한다. 
+				여기에서는 random 함수의 성능을 알아보기 위해서 표준편차를 
+				구하고 이를 그래프로 확인해보도록 하겠다(통계 계산값은 
+				숫자보다는 아무래도 그림이 이해하기가 쉽다).  
+			</para>
+			<para>
+				이러한 표준편차를 구하기 위해서 간단한 테스트용 코드를 
+				만들것이다. 이 코드는 srandom 을 이용해서 random seed 를 
+				만들고, 이 random seed 를 통해서 random 을 100000번 
+				돌리게 될것이다. 랜덤값의 범위는 1에서 100 사이가 될것이며, 
+				각 관측값이 몇번씩 출력되는지를 확인하고, 이것을 
+				이용해서 표준편차를 구하고, 그래프를 만들것이다. 
+				참고로 표준편차를 구하는 일반적인 공식은 다음과 같다. 	
+				<figure>
+					<title>표준편차 공식</title>
+					<graphic fileref="http://www.joinc.co.kr/albums/album01/abs.gif">
+				</figure>
+			</para>
+			<para>
+				다음은 테스트를 위한 코드이다. 
+			</para>
+			<para>
+				<emphasis>예제 : random_test.c</emphasis>
+				<screen>
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;math.h&gt;
+
+struct mdata
+{
+    int count;
+};
+
+int main()
+{
+    int i = 0;
+    struct mdata mydata[101];
+
+    int sum = 0;
+    int avg = 0;
+    int dosu = 0;
+    int dosu_p = 0;
+
+    memset((void *)&amp;mydata, 0x00, sizeof(struct mdata)*101);
+    // srandom(100);
+
+    // 100000번동안 0-99 사이의 랜덤값을 얻어온다. 
+    // 얻어온 랜덤값은 counting 된다. 
+    while( i &lt; 100000)
+    {
+        mydata[random()%100].count++;
+        i++;
+    } 
+
+    i = 0;
+
+    // 카운팅된 랜덤값을 이용해서 
+    // 평균,합,표준편차를 구해낸다. 
+    while (i &lt; 100) 
+    {
+        sum += mydata[i].count; 
+        printf("%d %d\n", i, mydata[i].count);
+        i++;
+    }
+    avg = sum/100;  
+    printf("평균 : %d\n", avg);
+    printf("합   : %d\n", sum);
+    
+    sum = 0;
+    i = 0;
+    while (i &lt; 100)
+    {
+        sum += (mydata[i].count - avg)*(mydata[i].count - avg);
+        i++;
+    }
+    // sqrt(sum/100) 을 하면 표준편차가 
+    // 나온다.  
+    printf("%d\n", sum/100);
+}
+				</screen>
+				위의 실행결과를 보면 표준편차는 대략 36 정도가 나온다. 
+				이말은 평균값인 1000 에서 대략 36정도의 범위내에 모든 
+				관측값이 위치함을 뜻한다. 
+				괜찮은 성능을 보여준다는걸 알수 있다. 
+				아래는 실행결과이다.  
+				<screen>
+96 1012
+97 992
+98 970
+99 1008
+평균 : 1000
+합   : 100000
+1303
+				</screen>
+				마지막 출력값인 1303 에 sqrt 연산을 해주면 표준편차를 구할수 
+				있다. 
+			</para>
+			<para>
+				다음은 위의 코드를 돌려서 나온 결과를 
+				그래프로 나타낸것인데, 평균값인 1000 부근에 대부분 위치하고 
+				있음을 알수 있다. 
+				이 그래프는 gnuplot 를 이용해서 만들어졌다.  	
+				<figure>
+					<title>random 성능테스트 결과</title>
+					<graphic fileref="http://www.joinc.co.kr/albums/album01/abr.gif">
+				</figure>
+				random.dat 는 srandom 함수를 사용하지 않은 상태에서 
+				기본 random seed 를 이용해서 만들어진 값이며, 
+				random2.dat 는 srandom 을 100 으로 한다음에 만들어진 
+				값이다.   
+			</para>
+		</section>
+	</section>
+	<section id="prob">
+		<title>/dev/random 의 이용</title>
+		<para>
+			Unix 에서는 좀더 범용적으로 사용할수 있는 방법을 제공한다. 
+			/dev/random 이라는 문자장치를 통한 랜덤값가져오기가 이 방법이다.  
+		</para>
+		<para>
+			이 문자장치는 커널에서 제공하는데, int 형의 값을 이용해서 random seed 를 
+			생성해내는 random 함수 와는 달리 다른 장치드라이버와 엔트로피풀안의 다른 소스
+			들로 부터 노이즈를 모으고 이러한 노이즈와 장치드라이버에 걸리는 인터럽트시간 
+			간격등을 이용해서 난수를 생성시킨다.  
+		</para>
+		<para>
+			간단히 생각해서 키보드, 마우스, 디스크 혹은 내부적으로 발생되는 다른 
+			인터럽트등을 이용해서 난수를 발생시킨다고 보면 된다. 
+			이들 인터럽트 값등은 예측하기가 매우 힘들기 때문에 근본적으로 random 함수를 
+			이용하는것보다 매우 안전하게 랜덤값을 생성할수가 있다. 또한 
+			난수의 범위를 매우 크게 잡을수 있기 때문에, 128bit 크기를 기본으로 사용하는 
+			지금의 컴퓨팅 환경에 유용하게 사용할수 있다   
+		</para>
+		<para>
+			실제 openssl 과 같은 라이브러리등은 암호화된 key의 생성을 위해서 /dev/random 
+			을 사용한다.  
+			다음은 128bit 크기의 난수를 생성하는 간단한 예제 프로그램이다. 
+		</para>
+		<para>
+			<emphasis>예제 : dev_mem.c</emphasis>
+			<screen>
+#include &lt;unistd.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main()
+{
+    int i, fd;
+    char key[16];
+    if ((fd = open("/dev/random", O_RDONLY)) == -1)
+    {
+        perror("open error");
+        exit(1);
+    }
+    if ((read(fd, key, 16)) == -1)
+    {
+        perror("read error");
+        exit(1);
+    }
+
+    for (i = 0; i &lt; 16; i++)
+    {
+        printf("%c", key[i]);
+    }
+}
+			</screen>
+			위의 코드는 16 * 8(128)bit 크기를 가지는 랜덤값을 만들어낸다. 
+			위프로그램을 실행시킨 결과값을 확인하기 좋게 만들기 위해서 mimecode 를 
+			통해서 아래와 같이 출력해보았다. 
+			<screen>
+[root@localhost c_source]# ./dev_mem | mimencode 
+6qK3AlTHc0nUUETnoL5LRA==
+			</screen>
+			mimencode 는 입력값을 base64 인코딩해서 그 결과를 출력하며, 
+			보통 MIME 메시지를 첨부하기 위한 목적으로 사용되는 어플리케이션이다.
+		</para>
+		<para>
+			코드는 매우 간단하며, 실행시마다 서로 다른 랜덤값이 출력되는걸 
+			확인할수 있을것이다. 또한 랜덤값의 크기 제한역시 매우 자유롭다. 
+			위의 key 배열의 크기를 32 로 한다면 간단하게 256bit 크기를 가지는 
+			함수를 생성할수 있다.
+		</para>
+		<section>
+			<title>조용한 시스템에서의 /dev/random 문제점</title>
+			<para>
+				/dev/random을 사용하는데 있어서 사소한(때에 따라서는 심각한) 
+				문제가 하나 있는데, 장치의 노이즈를 수집해서 앤트로피 풀에 
+				저장하고 이 값을 이용해서 랜덤값을 
+				만들어 낸다는 특징 때문에 장치에 노이즈가 없을 때는 
+				앤트로피 풀이 비어 버리고, 때문에   
+				매우 오랜 시간동안 랜덤값이 발생하지 않을 수 있다는 점이다.
+			</para>
+			<para>
+				다음의 코드를 테스트 해보기 바란다. 	
+				<screen>
+#include &lt;time.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;fcntl.h&gt;
+
+#define MAX_RND_SIZE 32 
+
+int random_init()
+{
+    int fd;
+    fd = open("/dev/random", O_RDONLY);
+    return fd;
+}
+
+int random_get(int fd, void *buf, size_t size)
+{
+    int i = 0;
+    int n = 0;
+
+    // 주석 1. 
+    while( n &lt; size)
+    {
+        n += read(fd, buf, size - n);
+    }
+    return n;
+}
+
+int random_clear(int fd)
+{
+    close(fd);
+}
+int main()
+{
+    int fd;
+    int n;
+    unsigned int value;
+
+    fd = random_init();
+    sleep(5);
+    while(1)
+    {
+        n = random_get(fd, (void *)&amp;value, 4);
+        printf("%d %lu\n", n, value);
+    }
+    random_clear(fd);
+}
+				</screen>
+				당신의 시스템이 조용한 상태라고 가정한다면 
+				처음 몇 개는 발생하지만 그 후에는 띄엄띄엄 발생 하는 것을 
+				확인할 수 있을 것이다. 자 이제 키보드를 눌러 보거나. 
+				마우스를 움직여 보거나 복사와 같은 파일 관련 작업을 
+				해보기 바란다.  아마 랜덤값이 빠르게 발생하는 걸 
+				확인 할 수 있을 것이다. 
+			</para>
+			<para>
+				이러한 /dev/random의 특징 때문에 연속해서 랜덤한 값을 얻고자 
+				할 때 문제가 발생할 수 있으니 이럴 경우 사용에 주의해야 
+				한다.(물론 그리 흔한 경우가 아니긴 하지만)   
+			</para>
+			<para>
+				만약 읽어 들이려는 크기만큼의 노이즈가 앤트로피 풀에 있지 
+				않을 경우 요청한 크기보다 더 적은 값을 읽어 올 수도 있으므로 
+				짧은 시간에 여러개의 랜덤값을 생성해야 할 경우    
+				<emphasis>주석 1.</emphasis>에서 처럼 사이즈를 계산해줘야 할 
+				필요성이 있다.  
+			</para>
+			<para>
+				짧은 시간에 여러개의 랜덤값 생성은 인증값과 같은 중요한 
+				부분에 사용된다고 보기는 힘들다. 이런 경우에는 그냥 random()을 
+				이용하도록 하자.  
+			</para>
+			<para>
+				커널 2.6에서는 /dev/random에 향상이 있다고 하니 
+				한번 확인해 보도록 하자. 
+			</para>
+		</section>
+		<section>
+			<title>지원 OS 제한</title>
+			<para>
+				/dev/random 문자장치를 이용해서 랜덤값을 얻어오는 방법은 
+				매우 효율적이긴 하지만, 모든 OS가 이 문자장치를 지원하는건 
+				아니다. 필자가 아는 바로는 Linux 의 경우 2.x 이상의 커널에서 
+				지원하며 Sun os 의 경우 5.8 이상에서만 지원하는 걸로 알고 있다. 
+				Sun os 5.8 의경우에는 패치를 통해서 지원한다.  
+			</para>
+			<para>
+				그럼으로 /dev/random 을 이용한 어플리케이션을 제작하고자 할때는 
+				배포하는 OS에 대해서 신경을 써줘야 한다. 
+			</para>
+			<section>
+				<title>Sun OS 에서의 /dev/random 생성</title>
+				<para>
+					Sun의 경우 /dev/random 을 생성하기 위한 간단한 방법이 있다. 
+					egd 라는 Perl 모듈을 이용하는 방법인데,  
+					방법인데 <ulink url="http://www.sunfreeware.com">sunfreeware</ulink> 나 
+					<ulink url="http://www.cpan.org">cpan.org</ulink> 에서 얻을수 있다. 
+					개인적으로 sunfreeware 에서 버젼에 맞는 egd 를 설치하는걸 추천한다.  
+				</para>
+				<para>
+					sunfreeware 에 가보면 각 버젼별로 egd 모듈이 존재할것이다. 
+					적당한 egd 를 다운받아서 설치하면 되는데, 패키지가 아닌 쏘쓰를 
+					다운받아서 직접 설치하도록 한다. 
+					egd-0.x.tar.gz 를 다운받아서 압축을 푼다음에 
+					다음과 같은 방식으로 컴파일후 설치하도록 한다. 
+					<screen>
+[root@localhost egd]# perl Makefile.PL 
+...
+[root@localhost egd]# make 
+...
+[root@localhost egd]# make install
+...
+					</screen>
+					성공적으로 컴파일을 마쳤다면 egd.pl 이라는 펄 스크립트가 
+					만들어지고 이걸 이용해서 /dev/random 을 생성할수 있다.  
+					<screen>
+[root@locaohost egd]# egd.pl /dev/random
+...
+					</screen>
+					egd.pl 을 실행시키면 /dev/random 이 만들어지는데 ls 로 확인해 보면 
+					문자장치 파일이 아닌 Unix Domain 소켓파일임을 알수 있다. 
+					그럼으로 우리가 랜덤값을 얻어오기 위해서는 직접 소켓에 연결해서 
+					/dev/random 소켓파일로 부터 값을 얻어와야 한다. 
+					egd.pl 은 perl 로된 Unix Domain 소켓 서버이다.  
+				</para>
+				<para>
+					다음과 같은 방법을 통해서 랜덤값을 얻어올수 있다. 
+					<screen>	
+#include &lt;unistd.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;sys/un.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main()
+{
+    int sockfd;
+    int clilen;
+    int value;
+    char de[36];
+    struct sockaddr_un clientaddr;
+
+    sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd &lt; 0)
+    {
+        perror("exit : ");
+        exit(0);
+    }
+
+    clientaddr.sun_family = AF_UNIX;
+    strcpy(clientaddr.sun_path, "/dev/random");
+    clilen = sizeof(clientaddr);
+    if (connect(sockfd, (struct sockaddr *)&amp;clientaddr, clilen) &lt; 0)
+    {
+        perror("connect error : ");
+        exit(0);
+    }
+    printf("OK READ\n");
+
+    while(1)
+    {
+        memset(de, 0x01, 4);
+        write(sockfd, de, 4);
+        read(sockfd, (void *)&amp;value, sizeof(int));
+        printf("%d\n", value);
+        sleep(1);
+    }
+
+    close(sockfd);
+    exit(0);
+}
+					</screen>	
+				</para>
+				<para>
+					참고로 edg.pl 은 SHA(Secure Hash algorithm)을 사용한다. 
+					MD5 계열의 Hash 함수와 매우 유사하게 작동하며, SHS(secure hash standard)
+					에 정의되어 있다. MD5 보다 다소 느리지만 더 안전하다는 평가를 
+					받고 있다.  
+				</para>
+			</section>
+		</section>
+	</section>
+</section>
+<section>
+	<title>결론</title>
+	<para>
+		이상간단하게 랜덤값을 얻어오는 2가지 일반적인 방법에 대해서 알아보았다.  
+		/dev/random 의 경우 나중에 다루게될 ssl 프로그래밍에서도 쓰임으로 
+		알아 놓으면 언젠가 유용하게 써먹을수 있을것이다.  
+	</para>
+</section>
+</article>
+}}}

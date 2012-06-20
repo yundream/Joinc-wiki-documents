@@ -1,0 +1,139 @@
+#title getopt를 이용한 프로그램 인자처리
+
+[[TableOfContents]]
+== 히스토리 ==
+ * 2010/3/25 wiki 스타일로 변환
+ * getopt_long함수도 다루자.
+
+== getopt를 이용한 프로그램 인자 처리 ==
+모든 C(C++)로 된 쏘쓰는 반드시 하나의 main() 함수를 포함하며, main 함수는 2개의 인자를 가지게 된다. 일반적으로 main() 함수는 아래와 같이 선언된다.
+{{{#!plain
+void main (int argc, char **argv) 
+}}}
+ 
+위와 같이 main 함수를 선언해 놓으면 프로그램이 시작할때마다, 프로그램의 인자를 argc 와 argv 로 받아들이게 된다. argc 는 프로그램이 실행될때 받아들인 인자의 갯수이며, argv 는 받아들인 인자의 문자열 집합이다. 아래의 예를 실행해보면 쉽게 이해가 가능할것이다.
+{{{#!plain
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+    int i;
+    printf("아규먼트의 수는 %d 개입니다", argc);
+
+    for (i = 0; i < argc; i ++)
+    { 
+        printf("%d 번째 아규먼트 : %s", i, argv[i]);
+    }   
+
+    return 0;
+} 
+}}}
+위의 프로그램을 컴파일 해서 실행시키면, 아규먼트의 수와 각각의 아규먼트를 돌려주는걸 볼수 있을것이다.
+{{{#!plain
+[yundream@localhost test]# ./argc hello myname 
+아규먼트의 수는 3 개입니다 
+0 번째 아규먼트 : ./argc 
+1 번째 아규먼트 : hello 
+1 번째 아규먼트 : myname
+}}}
+
+분명히 main() 함수의 아규먼트로 넘어오는 argc 와 argv 를 활용해서 기본적인 아규먼트 충분히 할수 있기는 하지만, 복잡한 실행 인자를 처리하기에는 적합하지 않다.
+
+우리가 언제나 사용하는 가장 간단한 ls 조차도 "ls -al" 과 같은 옵션을 지원한다. ls -al 에서 보듯이 이것은 ls -a -l 로도 사용될수도 있고, ls -l -a 로도 사용될수 있다. 이것을 프로그램내에서 사용자 정의 함수를 이용해서 처리하려고 하면 보통 일이 아닐것이다. 그래서 유닉스(:12) 에서는 이러한 옵션을 쉽게 처리할수 이또록 도와주는 getopt(3) 함수를 지원한다. 이번에는 getopt 를 이용해서 다양한 옵션을 처리하는 testopt 라는 프로그램을 만들어 보도록 하겠다. 프로그램 이름은 testopt.c로 하겠다.
+
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void help();
+void version();
+int main(int argc, char **argv)
+{ 
+    int opt;
+    int port_num;
+    int fp;
+    int opt_ok;
+    char file_name[16];
+    char buf[256];
+
+    while((opt = getopt(argc, argv, "hvf:")) != -1) 
+    {
+        switch(opt) 
+        { 
+            case 'h':
+                help(); 
+                break; 
+            case 'v':
+                version();  
+                break;
+            case 'f':
+                memcpy(file_name, optarg, 16);
+                opt_ok = 1;
+                break;
+        }
+    } 
+    if (opt_ok != 1)
+    { 
+        help();
+        exit(0);
+    } 
+
+    if (access(file_name, R_OK) != 0)
+    {
+        printf("파일이 존재하지 않습니다");
+        exit(0);
+    }
+    if((fp = open(file_name, O_RDONLY)) == -1)
+    {
+        printf("file open error");
+        exit(0);
+    }
+
+    memset(buf, '0', 256);
+    while(read(fp, buf, 256) > 0)
+    {
+        printf("%s", buf);
+        memset(buf, '0', 256);
+    }
+}
+
+void help()
+{
+    printf("Usage: ./testopt [OPTION] [FILE]"
+           "  -h                도움말"
+           "  -f [FILE]         파일출력"
+           "  -v                버전출력");
+    exit(0);
+}
+
+void version()
+{
+    printf("Version : 1.01");
+    exit(0);
+}
+}}}
+
+매우 간단하고 이해가 쉬운 예제이다. getopt 를 이용해서 프로그램의 인자를 검사 해서 '-' 가 앞에 붙어 있는 인자는 옵션으로 간주해서 "hvf" 중 어느 옵션인지를 건사해서 해당 루틴을 실행시켜준다. 단 "f" 의 경우에는 ":" 가 붙어 있는데, 이는 "f" 옵션은 반드시 뒤에 값이 따라야 함을 명시하고 있다. 여기에서 값이란 화면에 출력하고픈 파일이름이다. 
+{{{#!plain
+[yundream@localhost test]# ./testopt -h 
+Usage: ./testopt [OPTION] [FILE]
+  -h                            도움말
+  -f [FILE]                     파일출력
+  -v                            버전출력
+ [yundream@localhost test]# ./testopt -f
+./testopt: option requires an argument -- f
+Usage: ./testopt [OPTION] [FILE]
+  -h                            도움말
+  -f [FILE]                     파일출력
+  -v                            버전출력
+}}}
+== getopt_long ==
+  * getopt(3) 참고.
+
+[[tag(시스템 프로그래밍)]]
+

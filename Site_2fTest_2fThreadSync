@@ -1,0 +1,130 @@
+#title Lv4. 쓰레드 순서 지키기
+
+== 문제 ==
+Thread1, Thread2, Thread3, Thread4 이렇게 4개의 쓰레드가 있다. 이때 Thread1->Thread2->Thread3->Thread4->Thread1->Thread2... 이런식으로 순서대로 쓰레드(:12)가 작동되도록 해보자.
+
+다음의 조건을 만족시켜야 한다. 
+ 1. C/C++ 로 작성
+ 1. 바쁜대기 상태에 놓이면 안된다.
+=== 얻을 수 있는 것 ===
+ * 쓰레드 사용
+ * 쓰레드 제어와 동기를 위한 Mutex(:12)와 조건변수(:12) 응용
+
+
+== 참고문서 ==
+ 1. [wiki:Site/Thread Thread 위키]
+ 1. [wiki:article/message_queue message queue]
+
+== 메시지큐 구현 ==
+ * message type을 이용한 구현
+{{{#!plain
+#include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/stat.h>
+#include <regex.h>
+
+#include <fcntl.h>
+#include <string.h>
+
+#define ThreadNum 4
+
+pthread_mutex_t mutex_lock;
+pthread_cond_t  sync_cond;
+
+pthread_mutex_t gmutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  gcond  = PTHREAD_COND_INITIALIZER;
+
+struct Data
+{
+  int msgtype;
+  int id;
+  char data[8];
+  key_t key_id;
+};
+
+void *Tfunction(void *data)
+{
+  struct Data lData;
+  int myid;
+
+  lData = *(struct Data *)data;
+
+  // 쓰레드 동기화
+  pthread_mutex_lock(&mutex_lock);
+  usleep(1000);
+  pthread_cond_signal(&sync_cond);
+  pthread_mutex_unlock(&mutex_lock);
+
+  myid = lData.id;
+  while(1)
+  {
+    if(msgrcv(lData.key_id, (void *)&lData, sizeof(lData), lData.id, 0) == -1)
+    {
+      perror("msgrcv thread error: ");
+    }
+    if (myid < ThreadNum)
+    {
+      lData.msgtype = myid+1;
+    }
+    else
+    {
+      lData.msgtype = 1;
+    }
+    lData.id = myid;
+    if(msgsnd(lData.key_id, (void *)&lData, sizeof(lData), IPC_NOWAIT) <0)
+    {
+      perror("msg snd error");
+      exit(0);
+    }
+    printf("Thread Num %d\n", myid);
+    usleep(100);
+  }
+}
+
+int main(int argc, char **argv)
+{
+  struct Data lData;
+
+  pthread_t p_thread[ThreadNum];
+
+  // Message queue
+  key_t key_id;
+
+  // 메시지큐 생성
+  key_id = msgget((key_t)8888, IPC_CREAT|0666);
+  if (key_id == -1)
+  {
+    perror("msgget error : ");
+    exit(0);
+  }
+
+  for (int i = 0; i < ThreadNum; i++)
+  {
+    lData.msgtype = i+1;
+    lData.id = i+1;
+    lData.key_id = key_id;
+
+    printf("Create Thread %d\n", lData.id);
+    pthread_mutex_lock(&mutex_lock);
+    pthread_create(&p_thread[i], NULL, Tfunction, (void *)&lData);
+    pthread_cond_wait(&sync_cond, &mutex_lock);
+    pthread_mutex_unlock(&mutex_lock);
+  }
+  lData.msgtype = 1;
+  if(msgsnd(key_id, (void *)&lData, sizeof(lData), IPC_NOWAIT) <0)
+  {
+    perror("msg main snd error");
+    exit(0);
+  }
+  while(1)
+  {
+    sleep(1);
+  }
+}
+}}}
+

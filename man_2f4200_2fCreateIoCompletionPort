@@ -1,0 +1,44 @@
+#title 윈도 API : CreateIoCompletionPort - Input/Output 완료 포트의 생성
+
+== CreateIoCompletionPort ==
+이 함수는 지정된 파일에 대해서 '''Input/Output completion port''' (이하 입출력 완료 포트)를 만든다. 혹은 완료 포트를 만들어 놓은 다음 나중에 파일을 완료 포트에 파일을 지정할 수 있다. 이하 입출력 완료 포트에 파일을 지정하는 작업은 '''등록'''이라고 하겠다.
+
+열린 파일을 입출력 완료 포트에 등록하면, 프로세스가 비동기적으로 입출력 완료 보고를 통지 받을 수 있다.   
+
+=== 사용 법 ===
+{{{#!plain
+HANDLE WINAPI CreateIoCompletionPort(
+  __in      HANDLE FileHandle,
+  __in_opt  HANDLE ExistingCompletionPort,
+  __in      ULONG_PTR CompletionKey,
+  __in      DWORD NumberOfConcurrentThreads
+);
+}}}
+  1. FileHandle
+     열린 파일 혹은 '''INVALID_HANDLE_VALUE'''. 핸들은 반드시 중첩 입출력을 지원하는 객체여야 한다.  
+  1. ExistingCompletionPort 
+     이미 만들어진 입출력 완료 포트 혹은 NULL. 만약 매개 변수로 이미 만들어진 입출력 완료포트를 지정하면, 이 함수는 FileHandle을 입출력 완료 포트에 등록한다. 만약 NULL을 입력하면 새로운 입출력 완료 포트를 만들고 여기에 FileHandle를 등록한다.  
+  1. CompletionKey
+     입출력 완료 포트 '''핸들'''을 가리키는 '''키'''로 유저가 정의한 값이다. 매개 변수는 ULONG 타입이므로, 부가적인 정보를 함께 넘길 수 있다.  
+  1. NumberOfConcurrentThread
+     입출력 완료 포트의 처리를 위해서 몇개의 스레드를 할당할 것인가를 지정한다.
+
+=== 반환 값 ===
+이 함수는 성공하면 입출력 완료 포트를 가리키는 핸들을 반환한다.
+   * 만약 ExistingCompletionPort가 NULL이라면 새로운 핸들을 반환한다. 
+   * 만약 ExistingCompletionPort가 NULL이 아니라면, 매개 변수로 입력한 핸들과 같은 핸들을 반환한다. 
+만약 실패하면 NULL을 반환한다. 에러는 GetLastError(:4200)으로 가져올 수 있다.
+
+=== 설명 ===
+입출력 완료 포트는 등록된 핸들의 입출력이 완료되면 완료 보고정보를 큐에 쌓는다. 입출력 완료 포트 핸들은 프로세스에 종속되며, 다른 프로세스와 공유할 수 없다. 물론 같은 프로세스의 스레들 간에는 공유할 수 있다.
+
+CreateIoCompletionPort는 다음의 3가지 모드가 있다.
+  * 파일 핸들의 등록없이, 단지 입출력 완료 포트만 있다. 
+  * 존재하는 입출력 완료 포트에 파일 핸들을 등록한다. 
+  * 입출력 완료 포트를 새로 만들고 파일 핸들까지 등록한다.
+파일 핸들이 등록되지 않은 입출력 완료 포트는 해들 값에 '''INVALID_HANDLE_VALUE'''를 지정하고, ExistingcompletionPort를 NULL, CompletionKey를 0으로 함으로써 만들 수 있다.
+
+등록하는 파일 핸들은 overlapped(:12) 속성을 가지고 있어야 한다. 중첩 속성을 가지도록 하는 가장 일반적인 방법은 CreateFile(:4200)함수를 '''FILE_FLAG_OVERLAPPED'''으로 실행하는 것이다. 핸들이 소켓(:12)일 경우에도 중첩 속성을 가지고 있어야 한다. socket(:12)함수로 만든 소켓은 기본적으로 중첩 속성을 가진다.
+
+하나의 입출력 완료 포트는 여러 개의 파일 핸들을 처리할 수 있다.
+

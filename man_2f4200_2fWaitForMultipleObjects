@@ -1,0 +1,44 @@
+#title winapi : WaitForMultipleObjects 객체목록의 신호 상태를 기다린다.
+
+== WaitForMultipleObjects ==
+기다리기로 한 모든 객체가 신호 상태에 놓일 때까지 기다린다. 대기 시간을 정할 수도 있다.
+
+=== 사용 법 ===
+{{{#!plain
+DWORD WINAPI WaitForMultipleObjects(
+  __in  DWORD nCount,
+  __in  const HANDLE *lpHandles,
+  __in  BOOL bWaitAll,
+  __in  DWORD dwMilliseconds
+);
+}}}
+
+=== 매개 변수 ===
+  * nCount
+    기다리고자 하는 객체 핸들 (object handle)의 배열의 크기로 보통 '''lpHandles'''배열의 크기와 동일한 값을 쓴다. 객체 핸들의 최대 크기는 '''MAXIMUM_WAIT_OBJECTS'''로 정의되어 있다.
+  * lpHandles
+    객체 핸들의 배열이다. 기다릴 수 있는 객체 핸들은 아래에 따로 정리 해 두었다. 기다리기 위한 핸들은 반드시 '''SYNCHRONIZE''' access right여야 한다. 어떤 이유로 기다리기 위해 대기하고 있는 객체 핸들을 닫아 버리면 (CloseHandle함수등을 이용해서) 어떤 일이 일어날지 장담할 수 없다. 
+  * bWaitAll
+    TRUE면 모든 배열에 있는 모든 객체 핸들이 시그널 상태가 되어야 반환한다. 만약 FALSE라면 객체 핸들 중 하나만 시그널 상태가 되어도 반환한다. 
+  * dwMilliseconds
+    기다리는 시간을 밀리초 단위로 제한할 수 있다. dwMilliseconds가 0이면 즉시 반환한다. INFINITE이면 모든 핸들이 시그널 상태가 될 때까지 기다린다. 0보다 크면 해당 밀리초 만큼 기다리고 반환한다.
+
+=== 반환 값 ===
+성공적으로 실행되면 측정된 이벤트 값을 반환한다. 반환 값은 WAIT_OBJECT_0 혹은 WAIT_ABANDONED_0 둘 중 하나다.
+
+
+=== 설명 ===
+WaitForMultipleObject함수는 기다림의 척도를 결정하기 위해 사용한다. 만약 해당 척도를 가늠하는 (시그널 상태가 되는)사건을 만나지 못하면 호출한 쓰레드는 해당영역에서 봉쇄되거나 제한시간 까지 기다린다. 
+
+'''WaitForMultipleObject'''함수로 기다릴 수 있는 객체 핸들이다.
+  1. Change notification 
+  1. Console Input
+  1. Event
+  1. Memory resource notification
+  1. Mutex(:12)
+  1. 프로세스(:12) 
+  1. 세마포어(:12)
+  1. 쓰레드(:12)
+  1. waitable timer
+
+리눅스는 자원을 객체의 형태로 다루지 않는다. 때문에 윈도 처럼 하나의 함수로 자원의 해제를 기다릴 수 없다. 각 자원에 대응되는 전용의 기다림 함수를 가진다. 개인적으로는 리눅스의 방식이 좀더 명확해 보인다.

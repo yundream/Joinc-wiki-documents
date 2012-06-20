@@ -1,0 +1,209 @@
+#title man page 제작
+유닉스에서 작동하는 모든 (제대로 작성된) 프로그램들은 유닉스 고유의 도움말 파일음 man-page를 가진다. 이 문서는 메뉴얼 페이지를 작성하는 방법에 대해서 간단하게 설명하고 있다. 
+
+원문 : http://www.linuxfocus.org/English/November2003/article309.shtml
+
+[[TableOfContents]]
+== 소개 ==
+문서화의 중요성을 강조하는 것은 매우 새삼스런 일일 것이다. 귀찮아서 혹은 시간이 없어서 문서화를 하지 않기는 하지만 누구도 문서화의 중요성을 부인하지는 않는다. 특히 상용이든 공개용이든 배포되는 프로그램이라면, 그리고 성의있게 만든 프로그램이라면 반드시 메뉴얼 페이지를 제공하고 있다. 어떤 프로그램의 경우 프로그램 소스코드보다 메뉴얼 페이지의 양이 더 많은 경우도 종종 볼 수 있다. 
+
+유닉스에서는 이러한 메뉴얼 페이지를 위한 표준적인 방법을 제공한다. man page 시스템인데, 표준적인 메뉴얼 페이지 환경을 제공해 주므로써, 사용자는 전혀다른 프로그램이 제공되더라도 간단하게 메뉴얼 페이지를 참고할 수 있다. 프로그램마다 전혀 다른 메뉴얼 페이지가 제공된다면 상당히 끔찍한 일이 될 것이다.
+
+유닉스의 man page 시스템은 다음과 같은 장점을 제공한다.    
+
+ 1. 리눅스 터미널에서 곧바로 실행된다. 이는 어떠한 환경에서도 - 예를 들어 X가 떠있지 않는 - 메뉴얼 페이지를 참고할 수 있음을 의미한다. 
+ 1. man page는 매우 체계적으로 작성되기 때문에 HTML(12), PDF(12), Postscript(12), 일반 텍스트 등으로 쉽게 변경될 수 있다.  
+ 1. man page는 기본적으로 터미널에서 볼 수 있도록 만들어 졌지만, konqueror과 같은 외부프로그램에서도 쉽게 불러 올 수 있다.  
+
+== Man Page 활용 과 작성 ==
+=== 섹션 ===
+일단은 man page의 기본적인 구성을 알아보고 man page작성으로 넘어가도록 하겠다. 맨 페이지는 도움말을 가진 프로그램의 특성에 따라 섹션으로 구분된다. 이것은 책이 내용에 따라서 "장"으로 분류되는 것과 마찬가지다. 유닉스 시스템에는 여러가지 종류의 프로그램들과 함수들이 있으므로 - man page는 프로그램 도움말 뿐만 아니라 함수 도움말도 제공한다 - 이들을 특성별로 구분해서 쉽게 관리할 필요가 있다. 
+
+각 섹션은 번호를 통해서 구분된다. 예를 들어 1번은 일반 프로그램, 2는 시스템 호출 함수들, 3번은 일반 라이브러리 함수들 식이다. 이렇게 섹션으로 관리를 하게 되면 도움말을 쉽게 관리할 수 있을 뿐만 아니라. 도움말의 중복에서 오는 혼동도 피할 수 있다. printf를 예로 들어보자. printf는 C에서 형식화된 표준출력을 위한 함수의 용도로도 사용되지만 쉘에서 터미널에 문자열을 출력하기 위한 프로그램의 이름이기도 하다. 우리는 다음과 같이 섹션을 사용함으로써 중복된 이름의 사용에서 오는 혼동을 피할 수 있다. 
+{{{#!plain
+printf(1)
+printf(3)
+}}}
+가로안에 섹션번호를 넣어서 표기한다. 우리는 위의 printf는 프로그램이고 밑의 printf는 함수라는걸 쉽게 알 수 있다. 실제 맨 페이지를 참고할 때도 아래와 같은 방법으로 섹션번호를 지정해서 원하는 맨 페이지를 정확히 참고할 수 있다.   
+{{{#!plain
+# man 1 printf
+# man 3 printf
+}}}
+
+다음은 현재 유닉스에서 사용하고 있는 섹션의 번호와 그에 대한 설명이다.
+{{{#!plain
+1. 유저 명령 
+2. 시스템 콜(함수)
+3. 라이브러리 함수들
+4. /dev디렉토리에 있는 장치와 같은 특수 파일들 
+5. 파일 포맷에 대한 설명 (예 : /etc/passwd) 
+6. 게임 
+7. 매크로 패키지
+8. 루트가 실행할 수 있는 각종 시스템 관리도구들
+9. 기타등등 
+n. 그리고 필요에 따라서 섹션을 만들어서 사용할 수 있다. 
+l. 특별한 시스템에서만 사용되는 지역 문서들
+}}}
+
+konqueror와 같은 브라우저는 자체적으로 man page도 브라우징 할 수 있는데, printf에 대한 도움말을 요청할 경우 다음과 같이 섹션번호에 따라서 참고 가능한 도움말을 출력해서 사용자가 선택할 수 있도록 도와준다.
+
+{{{#!html
+<a href=http://www.joinc.co.kr/albums/album01/aip.png><img src=http://www.joinc.co.kr/albums/album01/aip.sized.png border=0></a>
+}}}
+
+=== man page 참조 경로 ===
+'''man''' 명령을 이용해서 도움말 찾기를 시도하면, 환경변수 '''MANPATH'''에 지정된 경로에서 맨 페이지를 검색한다. 만약 환경변수가 지정되어 있지 않다면 기본 경로에서 찾게 된다. 기본 맨페이지 찾기 경로는 /usr/local/man과 /usr/local/share/man이다. 그러나 이것만으로는 충분하지 않을 경우가 생긴다. 예를들어 Perl(12)의 도움말은 /usr/lib/perl5/man에 위치하는데, 배포판에 따라서 맨페이지 경로 문제로 도움말을 참조하지 못하는 경우가 발생할 수도 있다. 경로를 추가하고 싶다면 .bashrc등의 파일에 다음과 같은 내용을 추가하면 된다.  
+{{{#!plain
+MANPATH="/usr/local/man:/usr/man:/usr/share/man:/usr/X11R6/man:/usr/lib/perl5/man
+}}}
+이제 "man Pod::Man"과 같은 방법으로 Perl의 도움말을 참조할 수 있게 된다. 
+
+=== man page 만들기 ===
+맨페이지의 작성은 매우 간단하다. 간단한 마크업 언어의 형태를 가지며 단지 몇개의 키워드만 알고 있으면 된다. 이러한 키워드는 매크로라는 이름으로 부르는데, 다음과 같은 중요한 몇개의 매크로가 존재한다. 
+{{{#!plain
+.TH  -> 맨페이지의 타이틀 시작을 알려준다.
+.SH  -> 섹션 헤드
+.PP  -> 새로운 문단
+."   --> 주석
+.TP  --> 들여쓰기를 위해서 사용한다.
+}}}
+
+.TH 는 다음과 같이 사용한다.
+{{{#!plain
+.TH [프로그램 이름] [센션 번호] [center footer] [left footer] [center header]
+}}}
+
+.SH 는 다음과 같이 사용한다.
+{{{#!plain
+.SH 제목을 쓴다.
+}}}
+
+.PP 는 문단의 구분을 위해서 사용한다. 이것을 사용하면 개행이 이루어진다.
+
+==== 섹션 ====
+맨 페이지는 섹션(.SH) 단위로 페이지를 작성하게 된다(다른 문서들도 대부분 그러하겠지만). 맨 패이지는 표준적인 구조를 유지하기 위해서 각 섹션마다 사용되는 매크로가 고정되어 있다. 다음은 맨 페이지 작성에 필요한 매크로들이다.   
+{{{#!plain
+NAME            명령이나 함수의 제목을 위한 섹션 
+SYNOPSIS        사용방법
+DESCRIPTION     일반 설명
+OPTIONS         옵션과 인자들 
+RETRUN VALUES   리턴값 
+ENVIRONMENT     환경변수에 대한 설명
+FILES           주제와 관련된 각종 파일들
+EXAMPLES        예제가 있을경우 사용
+DIAGNOSTICS     보통 장치의 특징을 설명하기 위해서 사용한다. 
+ERRORS          2번과 3번섹션과 시그널 핸들링과 관련
+SEE ALSO        참고
+STANDARDS       표준과 관련된 내용들
+BUGS            알려진 버그들
+SECURITY CONSIDERATIONS   주의해야할 보안관련 문제들
+other           사용자 정의 헤더로 저자정보등을 추가할 수 있다.
+}}}
+
+==== 맨 페이지 예제 ====
+이제 간단한 맨페이지를 하나 만들어 보도록 하자. '''-'''의 경우 hypen과의 구분을 위해서 '''\-'''로 사용해야 한다. 적당한 에디터로 편집한다음 cdspeed.1으러 저장하자.
+{{{#!plain
+.TH cdspeed 1  "September 10, 2003" "version 0.3" "유저 명령"
+.SH NAME
+cdspeed \- decrease the speed of you cdrom to get faster access time
+.SH SYNOPSIS
+.B cdspeed
+[\-h] [\-d device] \-s speed
+.SH DESCRIPTION
+Modern cdrom drives are too fast. It can take several seconds
+on a 60x speed cdrom drive to spin it up and read data from
+the drive.  The result is that these drives are just a lot slower
+than a 8x or 24x drive.  This is especially true if you are only
+occasionally (e.g every 5 seconds) reading a small file. This
+utility limits the speed and makes the drive more responsive
+when accessing small files.
+.PP
+cdspeed makes the drive also less noisy and is very useful if
+you want to listen to music on your computer.
+.SH OPTIONS
+.TP
+\-h
+display a short help text
+.TP
+\-d
+use the given device instead of /dev/cdrom
+.TP
+\-s
+set the speed. The argument is a integer. Zero means restore maximum
+speed.
+.SH EXAMPLES
+.TP
+Set the maximum speed to 8 speed cdrom:
+.B cdspeed
+\-s 8
+.PP
+.TP
+Restore maximum speed:
+.B cdspeed
+\-s 0
+.PP
+.SH EXIT STATUS
+cdspeed returns a zero exist status if it succeeds to change to set the
+maximum speed of the cdrom drive. Non zero is returned in case of failure.
+.SH AUTHOR
+Guido Socher (guido (at) linuxfocus.org)
+.SH SEE ALSO
+eject(1).TH cdspeed 1  "September 10, 2003" "version 0.3" "USER COMMANDS"
+.SH NAME
+cdspeed \- decrease the speed of you cdrom to get faster access time
+.SH SYNOPSIS
+.B cdspeed
+[\-h] [\-d device] \-s speed
+.SH DESCRIPTION
+Modern cdrom drives are too fast. It can take several seconds
+on a 60x speed cdrom drive to spin it up and read data from
+the drive.  The result is that these drives are just a lot slower
+than a 8x or 24x drive.  This is especially true if you are only
+occasionally (e.g every 5 seconds) reading a small file. This
+utility limits the speed and makes the drive more responsive
+when accessing small files.
+.PP
+cdspeed makes the drive also less noisy and is very useful if
+you want to listen to music on your computer.
+.SH OPTIONS
+.TP
+\-h
+display a short help text
+.TP
+\-d
+use the given device instead of /dev/cdrom
+.TP
+\-s
+set the speed. The argument is a integer. Zero means restore maximum
+speed.
+.SH EXAMPLES
+.TP
+Set the maximum speed to 8 speed cdrom:
+.B cdspeed
+\-s 8
+.PP
+.TP
+Restore maximum speed:
+.B cdspeed
+\-s 0
+.PP
+.SH EXIT STATUS
+cdspeed returns a zero exist status if it succeeds to change to set the
+maximum speed of the cdrom drive. Non zero is returned in case of failure.
+.SH AUTHOR
+Guido Socher (guido (at) linuxfocus.org)
+.SH SEE ALSO
+eject(1)
+}}}
+
+맨페이지는 '''man2html'''을 이용해서 html포맷으로 쉽게 변환시킬 수 있다. 
+{{{#!html
+<a href=http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_make_manpage?action=download&value=cdspeed.html>cdpeed.html</a> 
+}}}
+
+{{{#!plain
+# man2html cdspeed.1 > cdspeed.html
+}}}
+
+=== Joinc Man Page 보기 ===
+ 1. [wiki:man Joinc Man Page System]

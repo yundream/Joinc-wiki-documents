@@ -1,0 +1,863 @@
+#title 오늘의 기사 모듈 작성기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>"오늘의 기사" 모듈만들기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>"오늘의 기사" 모듈만들기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN17"
+>프로그램 제작</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN19"
+>구현해야할 기능</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>프로세스</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN30"
+>주요 프로그램 모듈 설명</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN33"
+>아규먼트 분석 모듈</A
+></DT
+><DT
+>2.3.2&#51208;. <A
+HREF="#AEN36"
+>설정파일 읽기 모듈</A
+></DT
+><DT
+>2.3.3&#51208;. <A
+HREF="#AEN40"
+>DB 모듈</A
+></DT
+><DT
+>2.3.4&#51208;. <A
+HREF="#AEN43"
+>html 생성 모듈</A
+></DT
+><DT
+>2.3.5&#51208;. <A
+HREF="#AEN46"
+>time 모듈</A
+></DT
+></DL
+></DD
+><DT
+>2.4&#51208;. <A
+HREF="#AEN50"
+>실제코딩</A
+></DT
+><DD
+><DL
+><DT
+>2.4.1&#51208;. <A
+HREF="#AEN53"
+>DB TABLE 구조 와 query</A
+></DT
+><DT
+>2.4.2&#51208;. <A
+HREF="#AEN59"
+>실제 코딩</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN71"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이 사이트는 phpnuke 를 통해서 만들어 졌으며, weblog 형태를 취하고 
+		있다. 그런 이유로 한번 지나간 기사는 특별히 검색을 하지 않는한 
+		접하기가 어렵다는 단점이 있다. 
+		그래서 이번에 과거 지나간 기사를 랜덤하게 가져오는 모듈을 만들기로 
+		했다. 이 모듈은 mysql 에 연결해서 몇개의 기사를 랜덤하게 가져와서 
+		webpage 형태로 만들어주는 역할을 하게 되며, 하루 단위로 
+		기사를 교체하게 된다. 
+	</P
+><P
+>	
+		이전에도 <A
+HREF="/modules.php?name=News&file=article&sid=48&mode=&order=0&thold=0"
+TARGET="_top"
+>오늘의 명령어 모듈 제작기</A
+> 를 통해서 이미 mysql 에 접근해서 
+		랜덤하게 DB내용을 가져오는 프로그램을 작성한적이 있다. 
+		그러므로 이번에는 그때와는 조금 다른 방법으로 프로그램을 작성하게 
+		될것이다. 만들어진 모듈은 아래와 같이 서비스된다.  
+		<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN14"
+></A
+><P
+><B
+>&#44536;&#47548; 1. random_article</B
+></P
+><P
+><IMG
+SRC="/images/articles/random_article.gif"></P
+></DIV
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2&#51208;. 프로그램 제작</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.1&#51208;. 구현해야할 기능</A
+></H2
+><P
+>			만들어야 될 프로그램의 이름은 
+			<B
+CLASS="EMPHASIS"
+>random_article</B
+> 로 정했다. 
+			이 프로그램은 하루 단위로 실행이 되어서 랜덤하게 기사의 정보를 
+			가져와서 html 페이지로 만들어준다. 
+			하루단위로 일정하게 실행하기 위해서 cron 을 사용하는 대신에, 
+			프로그램 내부에서 이를 구현하도록 했으며, 그러기 위해서 
+			이 프로그램은 데몬모드로 작동되게 될것이다.  
+		</P
+><P
+>			또한 아규먼트를 처리할수 있어야 하며, 아규먼트를 통하여서 
+			여러가지 사항들(어떤 설정파일을 참조할것인지, 
+			데몬모드로 실행시킬것인지 등)을 지정하도록 
+			프로그래밍 할것이다. 
+		</P
+><P
+>			설정파일을 지원해야 한다. 이 프로그램은 설정파일을 가지며 
+			설정파일의 내용을 통하여서 프로그램의 실행을 제어하게 될것이다. 
+			설정파일에는 업데이트 시간, 가져올 기사의 숫자, html 페이지의 
+			위치, db 에 연결하기 위한 각종 정보 - 호스트, 유저이름, 패스워드, 
+			db 이름 - 등도 모두 설정파일의 내용에 들어가게 될것이다. 
+			즉 하드코딩을 지양하고 설정파일을 통해서 유동적으로 프로그램의 
+			실행 환경을 변경할수 있도록 할것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 프로세스</A
+></H2
+><P
+>			random_article 은 최초에 설정파일을 읽어들여서, 접근해야할 DB 
+			정보, 가져와야될 기사의 수, 기사 업데이트 시간 등의 기본정보를 
+			얻어온다. 일단 접근을 했다면 DB 에 연결해서 기사들을 가져와서 
+			html 페이지를 만든다. 그후에 기사 업데이트 시간까지 sleep 에 
+			들어가게 되고, 업데이트 시간이 되면 깨어나서 기사의 내용을 
+			업데이트 하게 될것이다. 
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>             +------------------+
+             |       시작       |
+             +------------------+
+                      | &#60;------- 설정파일  
+                      | 
+             +------------------+   query    +------+  +---+   +---+
+      +-----&#62;|   기사가져오기   | &#60;--------&#62; | DB   |  |   |   |   |
+      |      +------------------+            +------+  |   |   | B |
+      |               |                                | W |   | R |
+      |      +------------------+            +------+  |   |   | O |
+      |      | HTML 페이지 작성 | ---------&#62; | HTML |--| E |--&#62;| W |--&#62; Client
+      |      +------------------+            +------+  |   |   | S |
+      |               |                                | B |   | E |
+      |      +------------------+                      |   |   | R |
+      |      |      SLEEP       |                      |   |   |   |
+      |      +------------------+                      +---+   +---+
+      |               | 
+      +---------------+ 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN30"
+>2.3&#51208;. 주요 프로그램 모듈 설명</A
+></H2
+><P
+>			여기에서는 random_article 를 구성하는 각 모듈들을 
+			정의 할것이며, 각각의 모듈들을 구성하는 방식으로 
+			프로그래밍 작업이 진행 될것이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.3.1&#51208;. 아규먼트 분석 모듈</A
+></H3
+><P
+>	
+				아규먼트를 읽어들여서 이를 메모리에 적재하는 모듈이다. 
+				getopt를 통해서 구현을 하며, 
+				데몬모드인지 아닌지와 설정파일의 위치를 아규먼트를 통해서 
+				받아들인다. 또한 help 와 version 등의 정보를 보여주기 위한 
+				아규먼트도 받아들인다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>2.3.2&#51208;. 설정파일 읽기 모듈</A
+></H3
+><P
+>				설정파일을 읽어들이고 분석해서 구조체에 저장한다. 설정파일
+				에는 db 정보와 기사 업데이트 시간, 가져올 기사의 수등을 
+				지정하며 csv 스타일을 따른다. 구조체는 STL 의 map 을 
+				이용할것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># 설정파일의 예
+db_host,127.0.0.1
+db_user,yundream
+db_pass,password
+db_name,mydb
+
+# 업데이트 시간 HH
+up_time,4
+article,2
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 설정파일은 주석 '#' 역시 지원하게 될것이다. 또한 빈 라인은 그냥 넘어가게 될것이다.  
+				그러나 여러가지 예외 사항들 예를 들어 빈칸뒤에 '#' 이 오거나, '&#92;t' ' ' 다음에 '&#92;n' 이 오는 
+				등의 라인에 대해서는 체크하지 않을것이다. 이 프로그램은 사용자가 설정파일을 
+				정확하게 입력할것이라는걸 가정하고 프로그래밍 될것이다. 
+				예외 사항 처리는 각자의 몫이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.3.3&#51208;. DB 모듈</A
+></H3
+><P
+>				DB 에 접근 하고, 쿼리를 실행 그 결과를 받아오는 일을 한다. 
+				받아온 결과를 이용해서 랜덤한 기사 번호를 추출해낸다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.3.4&#51208;. html 생성 모듈</A
+></H3
+><P
+>	
+				기사번호를 이용해서 html 페이지를 생성해낸다. html 페이지에 
+				담기는 내용은 기사에 링크할수 있는 정보이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN46"
+>2.3.5&#51208;. time 모듈</A
+></H3
+><P
+>				sleep 시간을 조정하기 위해서 사용한다. 
+				최초 프로그램을 시작하면 현재의 시간에서 설정파일에 
+				지정된 시간까지의 시간을 '초' 단위로 계산해서 sleep 적용한다. 
+				그 뒤에는 무조건 하루(60*60*24 초)를 기다린다.
+			</P
+><P
+>				시간 계산 방법은 간단하다. 만약 지금 시간이 설정파일에 
+				지정된 시간보다 크다면, (지금시간 - 설정시간) * 60 을 하고, 
+				그렇지 않을경우 (설정시간 - 지금시간) * 60 을 할것이다. 
+				약간의 시간 오차(최대 59분) 는 무시하기로 한다. 
+
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN50"
+>2.4&#51208;. 실제코딩</A
+></H2
+><P
+>			실제코딩은 위의 모듈을 코딩하기만 하면 된다. 
+			새로운 모듈이 없으므로 이해하는데 크게 어려움이 없을것이다. 
+			각 모듈에 쓰인 기술 역시 이 사이트에서 대부분 다루었던 것이므로 
+			마찬가지로 쉽게 이해 가능할것이다. 	
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>2.4.1&#51208;. DB TABLE 구조 와 query</A
+></H3
+><P
+>				table 이름은 nuke_stories 이다. 
+				이 테이블 내용을 desc 한 결과는 다음과 같다. 
+				참고로 desc 는 테이블 구조를 보여주기 위해서 mysql 
+				에서 제공하는 명령어이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>mysql&#62; desc nuke_stories;
++-----------+-----------------------+------+-----+---------+----------------+
+| Field     | Type                  | Null | Key | Default | Extra          |
++-----------+-----------------------+------+-----+---------+----------------+
+| sid       | int(11)               |      | PRI | 0       | auto_increment |
+| catid     | int(11)               |      |     | 0       |                |
+| aid       | varchar(30)           |      |     |         |                |
+| title     | varchar(80)           | YES  |     | NULL    |                |
+| time      | datetime              | YES  |     | NULL    |                |
+~~
+~~
+| ratings   | int(10)               |      |     | 0       |                |
++-----------+-----------------------+------+-----+---------+----------------+
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				테이블 필드가 꽤 많으므로 중요치 않은것들은 생략했다. 
+				우리는 위의 플드중에서 기사의 번호를 나타내는 sid 와, 
+				title 를 가지고 오면 된다. 
+			</P
+><P
+>				여기에서는 2개의 쿼리가 사용될것이다. 
+				nuke_stories 테이블에 포함된 tuple 의 수를 가져오는 쿼리와 
+				실제 tuple 를 가져오는 쿼리이다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>query&#62; select count(sid) from nuke_stories;
+query&#62; select sid, title from nuke_sotires limit 10, 1;
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN59"
+>2.4.2&#51208;. 실제 코딩</A
+></H3
+><P
+>				컴파일러는 몇개의 STL 템플릿과, string 을 사용하기 위해서 
+				C++ 을 이용했다. 그러나 코드의 형태는 전적으로 C의 구조를 
+				따르고 있다.
+			</P
+><P
+>				설정파일내용을 저장하기 위한 자료구조로 STL 의 
+				map 를 사용하였다. perl 이나 php 를 사용해 보았다면 
+				많이 사용해 보았을 자료구조일것이다. map 은 
+				index key 를 int 형의 숫자말고도 문자열등을 index key 
+				로 가질수 있는 자료구조 형태이다.  
+			</P
+><P
+>				그밖의 내용들은 일반적인 내용이므로 코드 주석을 통해서 
+				설명하도록 하겠다. 이해하는데 전혀 어려움이 없을것이다.
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제: random_article.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;mysql.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;time.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;map&#62;
+#include &#60;string&#62;
+#include &#60;vector&#62;
+
+void opt_parser(int, char **, char **);
+void help();
+void version();
+void initdaemon();
+map&#60;string, string&#62; cfg_parser(FILE *fp);
+FILE *open_cfgfile(char *config_filename);
+void close_cfgfile(FILE *fp);
+int get_sleep_time(int cfgtime);
+vector&#60;int&#62; article_num(int num, int total_num);
+
+int main(int argc, char **argv)
+{
+    MYSQL        *connection=NULL, conn;
+    MYSQL_RES    *sql_result;
+    MYSQL_ROW    sql_row;
+    int            query_stat;
+    char        query[255];
+    char        *config_filename;
+    map&#60;string, string&#62; cfg_data;
+    FILE *fp, *html_fp;
+    int  late_time;
+    int  loop;
+    vector&#60;int&#62; list_num;
+
+    // 아규먼트를 해석한다. 
+    opt_parser(argc, argv, &#38;config_filename);
+
+    // 설정파일을 OPEN 한다.  
+    fp = open_cfgfile(config_filename);
+    if (fp == NULL)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+
+    // 설정파일을 분석한다. 
+    cfg_data = cfg_parser(fp);
+    close_cfgfile(fp);
+
+    // 최초 기사 업데이트 시간을 계산한다. 
+    late_time = get_sleep_time(atoi(cfg_data["up_time"].c_str()));
+
+    // DB 연결해서 필요한 랜덤한 기사정보를 가져온다. 
+    while(1)
+    {
+        mysql_init(&#38;conn);
+        connection =mysql_real_connect(&#38;conn, cfg_data["db_host"].c_str(),
+                                                 cfg_data["db_user"].c_str(),
+                                                 cfg_data["db_pass"].c_str(),
+                                               cfg_data["db_name"].c_str(),
+                                              3306,
+                                              (char *)NULL, 0); 
+        if (connection == NULL)
+        {
+            fprintf(stderr, "Mysql connection error : %s", mysql_error(&#38;conn));
+            exit(0);
+        }
+
+        // 전체 기사의 row(튜플) 갯수를 가져온다.
+        query_stat = mysql_query(connection, 
+                             "select count(sid) from nuke_stories"); 
+        if (query_stat != 0)
+        {
+            fprintf(stderr, "Mysql query erro : %s", mysql_error(&#38;conn));
+            return -1;
+        }
+        sql_result = mysql_store_result(connection);
+        if ((sql_row = mysql_fetch_row(sql_result)) == NULL)
+        {
+            fprintf(stderr, "Mysql query error : %s", mysql_error(&#38;conn)); 
+            return -1;
+        }
+
+        // 랜덤한 번호를 가져온다.
+        list_num = article_num(atoi(cfg_data["article"].c_str()), atoi(sql_row[0]));
+        mysql_free_result(sql_result);
+
+        html_fp = fopen(cfg_data["html"].c_str(),"w");
+        if (html_fp == NULL)
+        {
+            perror("file open error 1: ");
+            exit(0);
+        }
+
+        // 랜덤한 기사 번호를 이용해서 html 페이지를 작성한다. 
+        fputs("&#60;?&#92;n", html_fp);
+        for (loop = 0; loop &#60; list_num.size(); loop ++)
+        {
+            char url_query[255];
+            sprintf(query, "select sid, title from nuke_stories limit %d, 1", 
+                            list_num[loop]);  
+            query_stat = mysql_query(connection, query);
+            sql_result = mysql_store_result(connection);
+            sql_row = mysql_fetch_row(sql_result);
+            sprintf(url_query, "$content .= &#92;"&#60;a href=modules.php?name=News&#38;"
+                               "file=article&#38;sid=%d"
+                               "&#38;mode=&#38;order=0&#38;thold=0&#62;%s&#60;/a&#62;&#60;br&#62;&#92;";&#92;n"
+                               ,atoi(sql_row[0])
+                               ,sql_row[1]);
+            fputs(url_query, html_fp);
+        }    
+        fputs("?&#62;&#92;n", html_fp);
+        fclose(html_fp);
+
+        mysql_free_result(sql_result);
+        mysql_close(connection);
+
+        sleep(late_time);
+        late_time = 60*60*24; 
+    }
+}
+
+// 아규먼트를 분석한다.
+void opt_parser(int arg_num, char **arg_str, char **config_file)
+{
+    int opt;
+    int opt_ok = 0;
+    while((opt = getopt(arg_num, arg_str, "vhdf:")) != -1)
+    {
+        switch(opt)
+        {
+            case 'h':
+                help();
+                break;
+            case 'v':
+                version();
+                break;
+            case 'd':
+                initdaemon();
+                break;
+            case 'f':    
+                *config_file = optarg; 
+                opt_ok = 1;
+                break;
+            default:
+                help();
+                break;
+            
+        }
+    }
+    if (opt_ok != 1)
+    {
+        help();
+    }
+}
+
+// 도움말을 출력한다.
+void help()
+{
+    printf("Usage: random_article -[hvd] -f [cfg file]&#92;n");
+    exit(0);
+}
+
+// 버젼정보를 출력한다.
+void version()
+{
+    printf("random_article&#92;nVersion 1.0&#92;n");
+    exit(0);
+}
+
+// 프로세스를 데몬 상태로 만든다. 
+void initdaemon()
+{
+    pid_t pid;
+
+    if ((pid = fork()) &#60; 0)
+        exit(0);
+
+    else if (pid !=0)
+        exit(0);
+
+    setsid();
+    chdir("/");
+}
+
+// config 내용을 읽어들어셔 scanf 로 파싱한다.
+// 파싱한 내용은 map 형태로 리턴한다. 
+map&#60;string, string&#62; cfg_parser(FILE *fp)
+{
+    char buf[80];
+    char null[2];
+    char key[20], value[80]; 
+    map&#60;string, string&#62; cfg_data;
+    string s_key, s_value;
+
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        if ((buf[0] != '#' &#38;&#38; buf[0] != '&#92;n'))
+        {	
+            sscanf(buf,"%[a-zA-Z_]%[,]%s", key, null, value);
+            s_key = key;
+            s_value = value;
+            cfg_data[s_key] = s_value; 
+        }
+    }
+    return cfg_data;
+}
+
+// config 파일을 연다.
+FILE *open_cfgfile(char *config_filename)
+{
+    FILE *fp;        
+    fp = fopen(config_filename, "r");
+    return fp;
+}
+
+// config 파일을 닫는다.
+void close_cfgfile(FILE *fp)
+{
+    fclose(fp);
+}
+
+// sleep 시간을 검사한다. 
+// 시간(hour) 단위이며, 
+// sec 를 넘긴다.
+int get_sleep_time(int cfgtime)
+{
+    time_t now_time;
+    struct tm *tm_ptr;    
+    int    late_time;
+
+    time(&#38;now_time);
+    tm_ptr = localtime(&#38;now_time);
+    late_time = abs(tm_ptr-&#62;tm_hour - cfgtime);
+    return late_time * 60 * 60;
+}
+
+// 랜덤하게 가져올 기사번호의 리스트를 넘긴다.
+// 기사번호가 0이거나, 동일한 기사번호가 나오는지 
+// 검사한다.
+vector&#60;int&#62; article_num(int num, int total_num)
+{
+    vector&#60;int return_num;
+    int random_number;
+    int check_number = 1;
+    int count=0, i=0;;
+    time_t now_time;
+    time(&#38;now_time);
+    srandom((unsigned int)now_time);
+
+    while(count &#60; num)
+    {
+        check_number = 1;
+        random_number = random()%total_num;
+        if (random_number == 0)
+            continue;
+        for (i = 0; i &#60; return_num.size(); i++)
+        {
+            if (random_number == return_num[i])
+            {
+                check_number = 0;
+                break;
+            }    
+        }
+
+        if (check_number != 0)
+        {
+            return_num.push_back(random_number);
+            count++;
+        }
+    }
+    return return_num;
+}    
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				다음은 설정파일의 내용이다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>db_host,127.0.0.1
+db_user,test
+db_pass,password
+db_name,mydb
+
+up_time,4
+article,2
+html,/home/html/blocks/block-random_article.php
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>	
+				쏘쓰 컴파일은 g++ 을 이용해서 다음과 같이 컴파일한후 
+				실행한다. -d 옵션을 줄경우 daemon 모드로 실행된다.  
+				library 와 incldue 패스는 시스템에 따라서 달라질수 있다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost source]# g++ -o random_article random_article.cc -I/usr/local/include/mysql -L/usr/local/lib/mysql -lmysqlclient
+[root@localhost source]# ./random_article -f /etc/article.cfg
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN71"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 random_article 프로그램제작기에 대해서 알아보았다. 
+		테스트를 원한다면 적당하게 db 테이블을구성한다음 테스트하면 된다. 
+		물론 mysql 서버가 떠있다는 가정하에서 이다. 
+	</P
+><P
+>		위 프로그램은 여러가지 에러처리 등은 별로 신경을 쓰지 않았으며, 
+		효율적인 코딩방법을 찾기 위해서 특별히 노력한 코드가 아닌, 지극히 
+		보여주기 위한 목적으로 작성된 코드이므로, 개선할 여지가 많이 
+		있을것이다. 여기에 대해서는 각자 시간이 남을때 생각해 보기 바란다.   
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

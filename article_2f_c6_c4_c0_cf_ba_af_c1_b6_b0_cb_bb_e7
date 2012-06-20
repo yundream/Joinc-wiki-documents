@@ -1,0 +1,835 @@
+#title MD5를 이용한 파일변조검사
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>파일변조검사</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>파일변조검사</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN13"
+>파일보안</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN15"
+>파일보안의 필요성</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN18"
+>인터넷 에서의 파일보안</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN33"
+>시스템 파일 보안</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN37"
+>시스템파일 변조 검사 어플리케이션</A
+></DT
+><DD
+><DL
+><DT
+>2.4.1&#51208;. <A
+HREF="#AEN43"
+>파일이름 &#38; MD5 목록작성 프로그램</A
+></DT
+><DT
+>2.4.2&#51208;. <A
+HREF="#AEN51"
+>파일 변조검사 프로그램</A
+></DT
+><DT
+>2.4.3&#51208;. <A
+HREF="#AEN57"
+>테스트</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN62"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		현재 인터넷의 가장큰 이슈는 보안이다. 
+		이 문서는 이러한 보안문제중 호스트단에서 일어날수 있는 
+		파일변조와 관련된 문제와 그 해결을 위한 간단한 
+		해결책을 제시해보고자 한다.  
+	</P
+><P
+>		이러한 문제의 해결을 위해서 MD5 해쉬 알고리즘과 STL의 
+		몇가지 컨테이너와 알고리즘을 사용하게 될것이다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>2&#51208;. 파일보안</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2.1&#51208;. 파일보안의 필요성</A
+></H2
+><P
+>			일단 크래커가 어떤방법을 통해서든지 크래킹하고자하는 
+			목적 호스트에 접근했다면, 이 크래커가 단순한목적 
+			- 임의의 파일들을 무작위로 삭제한다거나, 단순히 자신의 실력
+			을 테스트할목적 - 이 아니라면, 지속적으로 호스트를 감시하면서 
+			중요 데이타들을 수집하기를 원할것이다. 심할경우 
+			특정 명령을 수행하면(ls 같은) 아예 모든 파일이 삭제되어 버리도록
+			만들수도 있을것이다.  
+			혹은 특정 웹페이지를 변조하는 작업등을 할수 있는데, 
+			어떤 경우이던지 간에 기업에 좋지 않은 결과를 초래할것이다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2.2&#51208;. 인터넷 에서의 파일보안</A
+></H2
+><P
+>			특히 인터넷을 통해 파일을 주고 받을경우 파일이 변조되었는지를 
+			확인하는 것은 더욱 중요해진다. APM
+			<A
+NAME="AEN21"
+HREF="#FTN.AEN21"
+>[1]</A
+> 
+			설치를 하기 위해서 
+			어떤 사이트에서 php쏘쓰를 다운받았다고 하자. 
+			그런데, 이 PHP쏘쓰가 
+			변조가 되어서 악의적인 코드가 들어가 있는지는 100% 장담할수 
+			없을것이다. 심지어는 php.net 사이트에서 받았다고 하더라도 100% 
+			안전한 코드라는걸 확인할수 없을것이며, 실제로 심심찮게 
+			"어느 사이트에서 받은 쏘쓰는 변조되어있음으로 사용하고 있을경우 
+			 업데이트 시키세요" 라는 보안 경고가 인터넷 상에 발표되곤 한다. 
+			평소 보안문제에 관심을 가지고 있었다면, sendmail 
+			"쏘쓰가 변조되었네, 어떤 쏘쓰가 변조되었으니 다시 
+			설치해야 하네.." 
+			하는 보안소식을 접해보았을것이다. 
+		</P
+><P
+>			그래서 요즘에는 인터넷상에서 파일을 전송할경우 
+			"md5 문자" 까지를 함께 전송해서 변조된 파일이 아님을 
+			확인할수 있는 방법을 제공한다. md5 는 단방향 hash 알고리즘을 
+			제공해주는 함수이다. 이 함수를 이용하면 어떠한 데이타에 
+			대해서 128 비트의 크기를 가지는 메시지 축약을 
+			만듦으로써 데이타에 대한 무결성을 검증할수 있다.   
+		</P
+><P
+>			그럼 실제 예를 하나 들어보도록 하겠다. 
+			www.php.net 에 가면 여러가지 쏘쓰파일을 배포하면서 
+			쏘쓰파일에 대한 무결성을 검증시켜주기 위해서 
+			md5 문자열까지 같이 제공한다. 
+			여러분이 이 사이트에서 어떤 쏘쓰파일을 받았는데, 
+			과연 원본그대로의 파일인지를 검증받고 싶다면, 해당 파일에 대한 
+			md5 문자열을 얻어서 www.php.net 의 md5 문자열과 일치하는지를 
+			확인하면 된다. 
+		</P
+><P
+>			필자는 www.php.net 에서 PHP 4.2.0 to 4.2.2 patch 라는 
+			패치파일을 다운로드 받았다. 다음은 www.php.net 에서 
+			제공하는 패치파일과 이 패치파일에 대한 md5 값이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>PHP 4.2.0 to 4.2.2 patch [313Kb] - 22 July 2002
+This unified diff will enable you to update your local PHP source to the latest version from 4.2.0.
+md5: 254bccc245d65cece1f40f782b70ec6b 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위 패치파일의 무결성을 점검하고 싶다면 
+			인터넷을 통해서 위의 파일을 다운로드받고, 다운로드 받은 
+			파일에서 md5 축약메시지를 얻어낸후, 얻어낸 메시지와 
+			www.php.net 에서 제공한 md5 메시지와 일치하는지를 
+			확인하면 된다. 
+			다음은 특정 파일로 부터 md5 축약 메시지를 얻어내는 
+			간단한 코드이다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : getmd5.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;openssl/md5.h&#62;
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main(int argc, char **argv)
+{
+    MD5_CTX lctx;
+    unsigned char digest[16];
+    char md5msg[40];
+    int i;
+    int fd;
+    struct stat status;
+    char *file_name = argv[1];
+    char *data;
+
+    MD5_Init(&#38;lctx);
+
+    fd = open(file_name, O_RDONLY);
+    if (fd &#60; 0)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    fstat(fd, &#38;status);
+
+    data = (char *)malloc(status.st_size);
+    read (fd, data, status.st_size);
+
+    MD5_Update(&#38;lctx, data, status.st_size);
+    MD5_Final(digest, &#38;lctx);
+
+    for (i = 0; i &#60; sizeof(digest); ++i)
+    {
+        sprintf(md5msg+(i*2), "%02x", digest[i]);
+    }
+    printf ("%s&#92;n", md5msg);
+    free(data);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위 코드는 Linux 2.4.x 운영체제에서 openssl 에서 제공하는 
+			MD5 함수를 이용해서 코딩되었다. 
+			다음은 컴파일 방법이다. 코드는 단지 MD5 함수몇개를 
+			사용하는 것임으로 특별히 설명하진 않을것이다. MD5 알고리즘에 
+			대한 내용들은 man 페이지와 인터넷의 다른 문서들을 
+			참고하기 바란다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>gcc -o getmd5 getmd5.c -lssl -lcrypto
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			보통 파일에 대한 무결성점검은 파일전체에 대해서 이루어짐으로 
+			파일을 open 한후 전체 데이타를 읽어들이고, 읽어들인 데이타를 
+			이용해서 md5 축약 메시지를 얻어낸다. 
+			이러한 작업을 위해서 open(2), stat(2) 함수들을 사용했다. 
+			다음은 위프로그램을 이용해서 테스트한 결과이다.      
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost md5]# ./getmd5 php-4.2.0-to-4.2.2.patch.gz 
+254bccc245d65cece1f40f782b70ec6b
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			www.php.net 에서 제공한 md5 문자와 정확하게 일치하고 있음을 
+			확인할수 있고, 이럼으로써 이 패치파일의 무결성을 
+			확인할수 있다. 
+		</P
+><P
+>			파일의 내용이 달라지면 정말로 md5 값이 달라지는지 확인하기 원한다면 
+			위의 프로그램을 이용해서 특정 파일을 변경전후의 md5 값을 비교하면 
+			될것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.3&#51208;. 시스템 파일 보안</A
+></H2
+><P
+>			시스템파일보안 역시 기본적으로는 위의 인터넷파일 보안과 같은 방법을  
+			이용해서 구현가능하다. 보안이 필요한 파일의 리스트를 만든다음에 
+			각파일에 대한 MD5 문자열을 얻은후, 이 데이타를 저장해 놓고, 
+			일정시간 간격으로 파일의 리스트에 대한 MD5 문자열을 가져와서, 
+			처음 만들어 놓은 MD5 문자열과 비교하면 될것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> +----------------+----------------+       +----------------------------+
+ | 파일 목록      | MD5 문자       | &#60;---- | MD5 해쉬목록 작성 프로그램 |
+ |---------------------------------|       +----------------------------+
+ | /bin/login     | 347717f89a ... |
+ | /bin/passwd    | 1629a99f6c ... |       +--------------------+
+ | /usr/bin/httpd | d044f3d3ad ... | ----&#62; | 파일 검사 프로그램 |
+ | ...            | ...            |       +--------------------+
+ +---------------------------------+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>2.4&#51208;. 시스템파일 변조 검사 어플리케이션</A
+></H2
+><P
+>			이제 어떤식으로 파일의 변조 유무를 검사할수 있는지에 대한 
+			기본적인 아이디어를 얻었으니, 아이디어를 코드로 구현해보도록 
+			하자. 이 아이디어를 구현하기 위해서 2개의 어플리케이션이 
+			만들어질것이다.  
+		</P
+><P
+>			우선은 검사하기 원하는 시스템파일의 목록을 만들어야 할것이다. 
+			그리고 만든 파일목록에 대한 MD5 문자열을 구하는 어플리케이션을 
+			만들어서 파일로 저장하는 프로그램이다. 
+		</P
+><P
+>			다음은 실제 파일을 검사하는 프로그램으로 파일검사 목록에서 파일목록과 
+			파일에 대한 MD5 문자를 읽어들여서 메모리에 저장하고, 
+			일정시간마다 파일목록의 파일에 대한 MD5 문자열을 얻어와서 원래의 MD5 문자열과 
+			일치하는지 검사하는 프로그램이다. 
+		</P
+><P
+>			파일 목록 검사를 위한 가장  
+			간단한 방법은 파일검사 목록과 MD5 정보를 읽어들여서 vector 등을 
+			이용해서 배열로 만들고, 첫번째 배열부터 마지막 배열의 파일목록이름을 
+			가져와서 이 파일에 대한 MD5 검사를 수행해서 원본 MD5 문자열과 비교하는 
+			방법일 것이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.4.1&#51208;. 파일이름 &#38; MD5 목록작성 프로그램</A
+></H3
+><P
+>				검사할 파일이름이 들어있는 list.cfg 를 읽어들여서 
+				파일에 대한 md5 문자열을 얻어오고, 이것을 .listmd5.cfg 
+				에 저장하는 프로그램이다. list.cfg 는 다음과 같은 내용을 
+				가진다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>1.txt
+2.txt
+3.txt
+4.txt
+5.txt
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음은 list.cfg 로부터 .listmd5.cfg 파일을 만들어 내는 
+				코드이다. 간단한 코드임으로 설명은 주석으로 대신하겠다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : makelist.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;openssl/md5.h&#62;
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;vector&#62;
+
+using namespace std;
+
+#define LISTFNAME "list.cfg"
+#define LISTFMDNAME ".listmd5.cfg"
+
+#define chop(str) str[strlen(str) - 1] = '&#92;0' 
+
+typedef struct _filelist
+{
+    char filename[80];
+    char md5[40];
+} filelist;
+
+int file2md5(char *, char *);
+int main(int argc, char **argv)
+{
+    int i;
+    FILE *fp;
+    struct stat status;
+    char *data;
+    filelist md5info; 
+    vector&#60;filelist&#62; vmd5info;
+    char buf[80];
+    char md5msg[40];
+
+    // 리스트를 읽어와서 파일 목록을 만든다. 
+    if ((fp = fopen(LISTFNAME, "r")) == NULL)
+    {
+        perror("error : ");
+        exit(0);
+    }
+
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        chop(buf);
+        // md5 문자를 얻어온다. 
+        file2md5(buf, md5msg);
+        strcpy(md5info.filename, buf);
+        strcpy(md5info.md5, md5msg);
+        // .listmd5.cfg 에 내용을 적는다. 
+        vmd5info.push_back(md5info);
+    }
+    fclose(fp);
+
+    if ((fp = fopen(LISTFMDNAME, "w")) == NULL)
+    {
+        perror("error : ");
+        exit(0);
+    }
+
+    for (int i = 0; i &#60; vmd5info.size(); i++)
+    {
+        char listbuf[80];
+        sprintf(listbuf, "%s:=%s&#92;n", vmd5info[i].filename, vmd5info[i].md5);
+        fputs(listbuf, fp);
+    }
+    fclose(fp);
+
+}
+
+// 입력된 파일에 대한 md5 문자열을 얻어온다. 
+int file2md5(char * file_name, char *md5msg)
+{
+    char *data;
+    int fd;
+    int i;
+    struct stat status;
+    unsigned char digest[16];
+    char *x;
+    MD5_CTX lctx;
+    MD5_Init(&#38;lctx);
+    fd = open(file_name, O_RDONLY);
+    if (fd &#60; 0)
+    {
+        perror("error : ");
+        exit(0);
+    }    
+    fstat(fd, &#38;status);
+
+    data = (char *)malloc(status.st_size);    
+    read (fd, data, status.st_size);
+
+    MD5_Update(&#38;lctx, data, status.st_size);
+    MD5_Final(digest, &#38;lctx);
+
+    for (i = 0; i &#60; sizeof(digest); ++i)
+    {
+        sprintf(md5msg+(i*2), "%02x", digest[i]);
+    }
+    free(data);
+    close(fd);
+    return 1;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위 프로그램을 컴파일한후 실행시키면 - 물론 그전에 list.cfg 와 검사할 파일들을 
+				미리 준비해야 한다 - 다음과 같은 .listmd5.cfg 파일이 만들어질것이다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>1.txt:=fb20e95d00a91f81936f84dc0fb3f770
+2.txt:=c34f2efffd4a8079cec1aff2c5dc98f0
+3.txt:=5da1f11dd590919eb2465151fbaad137
+4.txt:=b3f56e50a03224ce395eb4c34c6322da
+5.txt:=6ceadb3fae1a5a893b9c39dfa64e19b7
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN51"
+>2.4.2&#51208;. 파일 변조검사 프로그램</A
+></H3
+><P
+>				이제 본격적으로 파일변조 검사 프로그램을 만들어 보자. 
+				이 프로그램은 .listmd5.cfg 의 내용을 읽어들이고, 
+				내용에 있는 파일이름에 대한 MD5 문자열을 만들어서 내용에 있는 
+				MD5 와 내용이 같은지를 확인하는 프로그램이다. 역시 간단한 코드임으로 
+				설명은 주석으로 대신한다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : checklist.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;openssl/md5.h&#62;
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;vector&#62;
+
+using namespace std;
+
+#define LISTFMDNAME ".listmd5.cfg"
+
+#define chop(str) str[strlen(str) - 1] = '&#92;0' 
+
+typedef struct _filelist
+{
+    char filename[80];
+    char md5[40];
+} filelist;
+
+int file2md5(char *, char *);
+int main(int argc, char **argv)
+{
+    int i;
+    FILE *fp;
+    struct stat status;
+    char *data;
+    filelist md5info; 
+    vector&#60;filelist&#62; vmd5info;
+    char buf[80];
+    char md5msg[40];
+    vector&#60;filelist&#62;::iterator mi;
+
+    // 리스트를 읽어와서 파일 &#38; md5 메시지 목록을 만든다. 
+    if ((fp = fopen(LISTFMDNAME, "r")) == NULL)
+    {
+        perror("error : ");
+        exit(0);
+    }
+
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        char null[3];
+        chop(buf);
+        sscanf(buf, "%[^:=]%[:=]%s",
+                md5info.filename, null, md5info.md5);
+        vmd5info.push_back(md5info);
+    }
+    fclose(fp);
+
+    // 파일 변조를 검사한다. 
+    while(1)
+    {
+        int check = 1;
+        mi = vmd5info.begin();
+        while(mi != vmd5info.end())
+        {
+            printf("파일검사 : %s, ", mi-&#62;filename); 
+            if (file2md5(mi-&#62;filename, md5msg) &#60; 0)
+                printf("WARN : 파일삭제", --check);
+            else
+                if (strcmp(mi-&#62;md5, md5msg) != 0)
+                    printf("WARN : 파일변조 %s =&#62; %s", mi-&#62;md5, md5msg, --check);
+            *mi++;
+            if (check == 1)
+                printf("OK");
+            printf("&#92;n");
+
+        }
+        printf("&#92;n");
+        sleep(2);
+    }
+}
+
+int file2md5(char * file_name, char *md5msg)
+{
+    char *data;
+    int fd;
+    int i;
+    struct stat status;
+    unsigned char digest[16];
+    char *x;
+    MD5_CTX lctx;
+    MD5_Init(&#38;lctx);
+    fd = open(file_name, O_RDONLY);
+    if (fd &#60; 0)
+    {
+        return -1;
+    }    
+    fstat(fd, &#38;status);
+
+    data = (char *)malloc(status.st_size);    
+    read (fd, data, status.st_size);
+
+    MD5_Update(&#38;lctx, data, status.st_size);
+    MD5_Final(digest, &#38;lctx);
+
+    for (i = 0; i &#60; sizeof(digest); ++i)
+    {
+        sprintf(md5msg+(i*2), "%02x", digest[i]);
+    }
+    free(data);
+    close(fd);
+    return 1;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN57"
+>2.4.3&#51208;. 테스트</A
+></H3
+><P
+>				먼저 적당하게 list.cfg 를 만들고 나서 makelist 를 실행시킨다. 
+				그리고 나서 checklist 를 실행시키도록 한다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost md5]# ./makelist 
+[root@localhost md5]# ./checklist 
+파일검사 : 1.txt, OK
+파일검사 : 2.txt, OK
+파일검사 : 3.txt, OK
+파일검사 : 4.txt, OK
+파일검사 : 5.txt, OK
+
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이제 1.txt 파일을 변경하면 checklist 는 1.txt 가 변조되었다는걸 
+				발견해 내고 WARN 메시지를 출력한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>파일검사 : 1.txt, WARN : 파일변조 fb20e95d00a91f81936f84dc0fb3f770 =&#62; 7e8d5617272c76ad7ef16a113f50ed79
+파일검사 : 2.txt, 
+파일검사 : 3.txt, 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN62"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 간단하게 파일변조를 검색하는 방법에 대해서 알아보았다. 위의 내용에 
+		대해서 이해를 했다면 - 이해하고 말것도 없는 간단한 내용이지만 - 
+		다양한 용도로의 응용이 가능할것이다.
+		이러한 응용은 여러분의 몫이 될것이다. 
+	</P
+></DIV
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>&#51452;&#49437;</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN21"
+HREF="#AEN21"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>					"Apache 웹서버" + "PHP 서버사이트 스크립트" + 
+					"Mysql DB" 등으로 이루어진 웹서버의 조합으로 앞글자를 
+					따서 APM 이라고 부른다.
+				</P
+></TD
+></TR
+></TABLE
+></BODY
+></HTML
+>
+}}}

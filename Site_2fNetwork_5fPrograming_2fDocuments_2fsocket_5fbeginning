@@ -1,0 +1,298 @@
+#title BSD 소켓 프로그래밍 입문
+
+[[TableOfContents]]
+현재 네트워크는 internet(인터넷)으로 대변된다. 때문에 네트워크 대신 인터넷이라는 용어를 사용하도록 하겠다. 
+== 인터넷 프로그램 ==
+인터넷 프로그램은 인터넷상에서 멀리 떨어진 프로그램 사이에서 통신을 수행하는 프로그램이다. 인터넷 프로그램을 이용해서 우리는 웹페이지를 서핑하고 온라인 게임을 하며 주식거래를 하고 물건을 구입한다. 이메일을 주고 받을 수 있으며, 실시간으로 대화를 나눌 수도 있다. 이 모든 것이 인터넷 프로그램이 있음으로 가능해진다.
+
+== 서버 클라이언트 모델 ==
+인터넷 프로그램은 온라인 상에서 '''정보를 서비스'''한다. 이 과정은 오프라인 즉 매장에서 상품을 서비스하는 것과 완전히 동일하다. 다만 아래와 같은 점에서 기존의 상품 서비스와 차이를 보인다. 
+  1. 상품이 아닌 정보를 사고판다. (혹은 정보를 교환한다.) 
+  1. 오프라인이 아닌 온라인에서 정보를 교환한다. 
+
+인터넷 프로그램도 결국 정보를 서비스하는 것이므로 고유의 서비스 모델을 가지고 있어야 한다. 이 서비스 모델은 기성의 상품교환에서 사용한 모델을 그대로 채용하고 있으므로, 기성 모델에 대해서 살펴볼 필요가 있다.  상품교환은 몇 개의 모델이 있는데, 그 중 가장 널리 사용되는 모델이 서버/클라이언트 모델이다. 이 모델에서 서버는 상품을 제공하는 측으로 상점 혹은 창고에 대량의 상품을 진열한다. 그러면 클라이언트가 상점에 방문하여 물건을 구입하는 식으로 작동한다.
+
+서버/클라이언트 모델의 가장 큰 장점은 관리가 쉽다는데 있다. 하나의 관문만 존재하기 때문에 상품과 고객의 들고 남을 직접 제어할 수 있기 때문이다. 시스템을 구축하기도 매우 쉽다. 창고를 하나 만들고 거기에 상품을 진열한 뒤, 고객을 맞이하면 된다. 일반적으로 이들 창고는 하나의 문을 가지도록 한다. 가장 성공적인 모델이 된데에는 이런 장점이 큰 역할을 했다.
+
+=== 네트워크 서버 클라이언트 모델 ===
+오프라인의 서버/클라이언트 모델은 인터넷으로도 그대로 확장되었다. 초기 인터넷이 학구적인 목적에서 상업적인 목적으로 사용하기 시작하면서, 일차적으로 발을 들여놓은 기업들이 검증된데다 많은 경험이 축적된 모델을 그대로 가져다 쓰길 원했기 때문이다. 
+
+이렇게 해서 네트워크 서버 클라이언트 모델이 만들어 진다. 이 모델은 서버가 고객을 맞이하는 구조를 가진다. 서버는 정보처리와 정보 창고의 역할을 하며, 클라이언트가 정보를 요청할 경우 이를 서비스한다.
+
+하나의 서버는 다수의 클라이언트의 요청을 처리할 수 있다. 즉 '''1:n'''의 관계를 가진다.
+
+서버는 인터넷의 핵심 권력요소인 정보를 독점적으로 처리해야 하기 때문에, 일반적으로 강력한 컴퓨팅 파워와 거대한 저장공간을 필요로 한다.
+
+오프라인에서의 서버/클라이언트 모델과 마찬가지로, 온라인에서도 서버/클라이언트 모델은 비교적 구현이 용이하기 때문에 많은 기업들이 서버/클라이언트 모델에 기반한 프로그램을 만들어서 정보 서비스를 한다. 구축이 용이하다는 점 외에, 정보를 독점적으로 통제할 수 있다는 점이 서버/클라이언트 모델을 선택하도록 하는 주요한 이유가 된다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=18Ua9i1yq69jE0899WWv0NZaqo3UUvVo6CWL6eEGw1Xs&amp;w=439&amp;h=337">
+}}}
+
+이외에도 Agent/Manager, Peer to Peer (P2P)와 같은 모델이 있는데, 여기에서는 서버/클라이언트 모델을 중심으로 설명하도록 하겠다. 그만큼 대중적인 모델이기 때문이다.
+== 소켓 ==
+=== 소켓이란 ===
+인터넷에서 정보를 주고 받는 것은 매우 복잡한 매커니즘에 기반한다. 이를 단순화 하기 위해서 OSI7(:12)계층을 만들고, 다시 이를 단순화 해서 TCP/IP4 계층을 만들어서 인터넷 애플리케이션 개발에 활용하고 있다. 하지만 이 마저도 복잡하다. 그래서 만든게 '''소켓'''이다. 소켓(:12)은 몇 개의 간단한 함수만으로도 인터넷 애플리케이션을 만들 수 있도록 도와주는 '''함수 모음'''이다. 현재 소켓 함수 구현은 BSD:::소켓(:12)이 주로 사용되고 있다.  
+
+소켓은 인터넷 연결,종료,데이터 전송,도메인 이름 변환,주소 변환등과 관련된 주요 함수들을 제공한다. 소켓에서 제공하는 함수 목록은 [wiki:Site/Network_Programing/Documents/SocketAPI 소켓 API 레퍼런스]문서를 참고하기 바란다.
+
+=== 소프트웨어와 소프트웨어를 연결하는 소켓 ===
+흔히 이해하기 쉽게 컴퓨터와 컴퓨터의 네트워크를 인터넷이라고 하지만, 이참에 명확히 하고 넘어갈 필요가 있을 것 같다. 인터넷은 소프트웨어와 소프트웨어의 네트워크다. 소프트웨어의 네트워크 이므로 다양한 종류의 인터넷 서비스가 가능하다. 그러한 서비스의 소프트웨어를 개발하면 되기 때문이다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1tmuA6PyKPSOc0m3xRn1LeWH6G4b16idH1XnWI46boXo&amp;w=642&amp;h=235">
+}}}
+
+소켓은 운영체제에서 관리하는 객체로 소프트웨어를 인터넷에 연결해주는 '''접점'''역할을 한다.  인터넷과의 접점에 놓여서 인터넷으로 데이터를 전송하거나 또는 인터넷으로 부터 전송되는 데이터를 읽는 것이다. 소켓 API라고 하는 것은 이 소켓 객체를 제어하는 함수들의 모음이다. 소켓(socket)이라는 이름이 붙여진 것은 인터넷과 연결되는 그 모습이 (가전 제품과 전원을 연결시켜주는)소켓과 비슷하기 때문에 붙여졌다. 
+
+=== 소프트웨어 연결에 필요한 것들 ===
+인터넷에 묶여있는 컴퓨터를 찾기 위해서는 IP(인터넷 주소)가 필요하다. 하지만 소켓 프로그래밍은 소프트웨어와 소프트웨어를 연결하는 것임으로, 소프트웨어의 위치를 찾을 수 있어야 한다. 소프트웨어의 위치는 PORT 번호로 찾을 수 있다. 즉 IP와 PORT 번호가 있으면 전체 인터넷상에서 유일한 소프트웨어를 찾아서 연결할 수 있다.
+
+
+== 소켓 네트워크 프로그래밍 ==
+소켓 네트워크 프로그래밍이란 소켓 함수를 이용, 소켓 객체를 만들어서 인터넷을 가로 질러서 정보를 교환할 수 있는 소프트웨어를 만드는 프로그래밍 기술을 말한다.
+
+서버/클라이언트 모델에서 프로그램은 쌍으로 개발된다. 인터넷 서비스를 제공하는 '''서버 프로그램'''과 서비스를 요청하기 위해 고객에게 제공되는 '''클라이언트 프로그램'''이다.
+
+=== 애플리케이션 프로토콜 설계 ===
+네트워크 프로그램은 '''대화-통신'''으로 정보를 교환한다. 그러므로 서버와 클라이언트간 원할한 대화를 위해서는 사용하는 언어의 문법을 맞추어야 한다. 이를 애플리케이션 프로토콜 이라고 한다. 프리젠테이션 계층에서 사용하기 때문에, 프리젠테이션 프로토콜이라고 부르기도 한다. HTTP, IRC, FTP 프로토콜이 대표적인 애플리케이션 프로토콜이다. 
+
+네트워크 프로그램을 개발할 경우 가장 먼저 고민하는 것은, 전송 계층에서 어떤 프로토콜 (즉 UDP, TCP)를 사용할 것인지와 애플리케이션 프로토콜 설계에 대한 것이다. 최근에는 성능보다는 유연성과 적용성, 재활용성등이 중시되는 추세라서 XML(:12)기반으로 프로토콜을 제작하는 경우가 많다.  
+
+== 소켓 프로그래밍 흐름 ==
+소켓 프로그램은 서버와 클라이언트로 나뉘므로 각각 흐름을 살펴볼 필요가 있다.
+=== 서버 프로그램의 흐름 ===
+인터넷 프로그램은 '''데이터 통신'''을 위한 프로그램이다. 그러므로 통신의 관점에서 보면 흐름을 좀더 쉽게 이해할 수 있다.
+   1. 소켓 만들기 : 먼저 소켓을 만든다. 이 소켓은 인터넷을 가로질러서 원격지 컴퓨터의 소켓에 연결됨으로써, 소프트웨어간 통신을 가능하게 한다. 소켓은 커널에서 관리하는 객체다. 
+   1. binding : 하지만 이렇게 만들어진 소켓은 아직 '''프로그램'''과 연결이 되지 않은 상태다.  프로그램과의 연결을 위해서는 IP와 포트번호를 프로그램에 묶어주는 작업이 필요하다. 이렇게 함으로써 전체 인터넷 상에서 유일한 소프트웨어를 만든다. 이를 binding 작업이라고 한다.
+   1. 연결 대기열 만들기 : 클라이언트가 소켓을 통하여 접속요청을 하면, 이 접속 요청은 '''연결 대기열'''로 들어간다. 대기열은 원할한 서비스를 위해서 필요하다. 클라이언트가 잠시 동안 대기 한 후 연결할 수 있기 때문이다. 만약 대기열이 없다면, 클라이언트는 접속 거부가 될 것이다.
+   1. 연결 대기열에서 클라이언트 요청 가져오기 : 서버는 연결 대기열에서 맨 앞에 있는 클라이언트 요청을 가져온다. 
+   1. 클라이언트와 연결이 이루어졌다면, 데이터 통신을 하고 데이터를 처리한다.
+
+==== 소켓 만들기 ====
+소켓은 socket(:12) 함수로 만든다. 이렇게 만든 소켓은 인터넷과 소프트웨어를 연결하는 '''접점'''으로써의 역할을한다. 접점 역할을 하기 때문에 '''endpoint socket'''이라고 부르기도 한다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1m-v-ESboQ8NWNsnRYRYOq7f92eROsOrKj6mectcuDKY&amp;w=542&amp;h=265">
+}}}
+
+다음은 socket 함수의 원형이다. 
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int socket(int domain, int type, int protocol);
+}}}
+  * domain : 소켓이 사용될 주소 영역을 지정하기 위해서 사용한다. TCP/IP 기반의 인터넷 주소영역을 사용하는 프로그램이라면 AF_INET을 지정한다. 이외에 AF_IPX, AF_X25, AF_AX25 등의 주소영역이 있지만 거의 사용하는 일이 없다. 유닉스의 경우 소켓은 내부 프로그램을 연결하기 위한 용도로 사용할 수도 있다. 이 경우 AF_UNIX를 사용한다.  
+  * type : 통신에 사용될 패킷 타입을 지정하기 위해서 사용한다. 연결 지향 소켓인 SOCK_STREAM 과 데이터 그램 지향 소켓인 SOCK_DGRAM이 사용된다.
+  * protocol : 통신에 사용할 프로토콜을 지정하기 위해서 사용한다. 보통 type와 쌍으로 사용된다. SOCK_STREAM 이라면 IPPROTO_TCP, SOCK_DGRAM 이라면 IPPROTO_UDP가 사용된다. 
+
+자세한 내용은 socket(:2) 함수 man page를 참고한다.
+
+==== 프로세스를 소켓에 바인딩 하기 ====
+socket 함수로 만들어진 소켓은 커널에 존재하긴 하지만, 아직 프로세스와 연결되지 않았다. bind(:2) 함수를 이용해서 소켓에 연결할 수 있다. 이를 바인딩한다고 말한다. 바인딩된 프로세스는 인터넷 건너에 있는 프로세스가 찾을 수 있어야 한다. 컴퓨터의 위치는 IP 주소로 찾을 수 있으며, 컴퓨터에서 소프트웨어는 포트 번호로 찾을 수 있다. 
+
+즉 bind는 프로세스를 인터넷에서 유일한 개체로 인식시키기 위해서 IP 주소와 포트번호를 할당하는 일을 한다. 
+
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
+}}}
+
+다음은 사용 방법이다.
+{{{#!plain
+struct sockaddr_in sock_addr;
+
+sock_addr.sin_family = AF_INET;
+sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+sock_addr.sin_port = htons(12345);
+}}}
+
+bind 함수는 일반적으로 서버에서 사용한다. INADDR_ANY는 0.0.0.0을 의미한다. 모든 인터넷 주소로 부터 기다리겠다는 의미다. 이 프로세스는 12345 포트가 할당되었다.  
+
+==== 연결 대기열 만들기 ====
+이제 클라이언트는 서버에 연결할 수 있는 상태가 되었다. 클라이언트가 서버에 연결 요청을 하면, 이 연결 요청은 먼저 '''연결 대기열'''에 들어간다. 프로세스는 이 연결 대기열에 있는 요청 중 가장 앞에 있는 요청을 꺼내와서 클라이언트와의 통신을 위한 '''연결 소켓'''을 만든다.
+
+연결 대기열은 버퍼의 역할을 한다. 즉 서버가 아직 클라이언트의 요청을 받아들일 준비가 되어 있지 않더라도, 클라이언트를 거부하지 않고, 잠시 기다리도록 한다.  
+
+listen 함수를 이용해서 연결 대기열을 만들 수 있다.
+{{{#!plain
+#include <sys/socket.h>
+
+int listen(int s, int backlog);
+}}}
+  * '''s''' : 연결 대기열을 가질 소켓이다. 이 소켓은 연결 대기열에 클라이언트 연결 요청이 있는지를 검사하는 일을 한다.   
+  * '''backlog''' : 연결 대기열의 크기다. 일반적으로 5 정도면 무난하다.
+
+==== 연결 대기열 가져오기 ====
+연결 대기열에 있는 클라이언트의 연결 요청은 accept(:2)함수로 가져온다.
+
+http://lh6.ggpht.com/_Os5qf5urx_A/S6zkbS88lBI/AAAAAAAABSs/nrffDjD324U/s800/sh-i3WG-_iPPJ5JVmaUrThA.png
+
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int accept(int s, struct sockaddr *addr, socklen_t *addrlen);
+}}}
+  * s : 듣기 소켓으로 연결 대기열에서 클라이언트 요청을 가져온다.
+  * addr : 가져온 클라이언트의 주소 정보를 넘긴다. 
+  * addrlen : addr의 크기
+
+함수가 성공적으로 수행되면, 0보다 큰 '''소켓 지정 번호'''를 반환한다. 이 소켓 지정 번호는 클라이언트와 연결된 소켓으로 흔히 '''연결 소켓'''이라고 부른다. 서버는 이 '''연결 소켓'''을 이용해서 클라이언트와 통신한다. 
+
+서버는 연결 대기열에 클라이언트의 연결을 기다리는 '''듣기 소켓'''과 클라이언트와 실제 연결된 '''연결 소켓'''이 분리 된다는 점에 주목한다.
+
+==== 데이터 통신 ====
+accept 함수 호출로 만들어진 연결 소켓을 이용해서 클라이언트와 통신을 한다.
+
+리눅스 소켓은 파일과 동일하게 다루어짐으로 read(:2), write(:2)함수를 이용해서 통신할 수 있다. 혹은 BSD 소켓 함수인 recv(:2)와 send(:2)함수로 통신할 수도 있다. 
+
+=== 클라이언트 프로그램의 흐름 ===
+클라이언트 프로그램은 서버 프로그램에 비해서 매우 단순하다. 서버는 여러 클라이언트를 받아들여야 하는 특성상 연결 대기열을 만들고, 연결 대기열에 있는 클라이언트 요청을 가져오는 등의 작업이 필요하지만, 클라이언트는 그냥 하나의 소켓을 만들고 이것을 이용해서 바로 서버에 '''연결 요청'''을 하면 되기 때문이다. 
+
+==== 소켓 만들기 ====
+서버와 마찬가지로 socket 함수로 만든다. 만드는 방법은 완전히 동일하다. 단 서버 측과는 달리 이 소켓으로 통신을 한다.
+
+==== 서버에 연결 요청하기 ====
+서버로의 연결 요청은 connect(:2) 함수를 이용한다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int  connect(int sockfd, const struct sockaddr *serv_addr,
+         socklen_t addrlen);
+}}}
+이 함수는 소켓 지정 번호 sockfd를 이용해서 sockaddr에 지정된 IP와 포트번호로 연결을 시도한다. 성공하면 0을 반환하고 실패하면 -1을 반환한다. 
+
+==== 서버와의 데이터 통신 ====
+서버와의 통신은 recv(:2) 혹은 send(:2) 함수를 이용한다.
+
+=== 서버와 클라이언트의 연결과 데이터 통신 흐름 ===
+정리하자면, 서버 프로그램과 클라이언트 프로그램은 다음과 같은 연결되어서 데이터를 교환하게 된다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1gSbwhr_GX5xp0UaTfh9ymg4qWxeQuF-PnuMjhZugFXA&amp;w=405&amp;h=456">
+}}}
+
+== 예제 ==
+=== 서버 프로그램 ===
+{{{#!plain
+#include <sys/socket.h> 
+#include <sys/stat.h> 
+#include <arpa/inet.h> 
+#include <stdio.h> 
+#include <string.h> 
+ 
+#define MAXBUF  256 
+int main(int argc, char **argv) 
+{ 
+    int server_sockfd, client_sockfd; 
+    int client_len, n; 
+    char buf[MAXBUF]; 
+    struct sockaddr_in clientaddr, serveraddr; 
+ 
+    client_len = sizeof(clientaddr); 
+
+    // 소켓 만들기   
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0) 
+    { 
+        perror("socket error : "); 
+        exit(0); 
+    } 
+
+    // 소켓에 주소를 묶는다.
+    bzero(&serveraddr, sizeof(serveraddr)); 
+    serveraddr.sin_family = AF_INET; 
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY); 
+    serveraddr.sin_port = htons(atoi(argv[1])); 
+    bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)); 
+
+    // 소켓 연결 대기열을 만든다.
+    listen(server_sockfd, 5); 
+ 
+    while(1) 
+    { 
+        memset(buf, 0x00, MAXBUF); 
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, 
+                            &client_len); 
+        while(1)
+        {
+            if ((n = read(client_sockfd, buf, MAXBUF)) <= 0) 
+            { 
+                close(client_sockfd); 
+                break;
+            } 
+            if (write(client_sockfd, buf, MAXBUF) <=0) 
+            { 
+                perror("write error : "); 
+                close(client_sockfd); 
+                break;
+            } 
+        }
+        close(client_sockfd); 
+    } 
+} 
+}}}
+=== 클라이언트 프로그램 ===
+{{{#!plain
+#include <sys/stat.h> 
+#include <arpa/inet.h> 
+#include <stdio.h> 
+#include <string.h> 
+#include <stdlib.h> 
+#include <unistd.h> 
+ 
+#define MAXBUF    1024 
+ 
+int main(int argc, char **argv) 
+{ 
+    struct sockaddr_in serveraddr; 
+    int server_sockfd; 
+    int client_len; 
+    char buf[MAXBUF]; 
+    char rbuf[MAXBUF]; 
+ 
+ 
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+    { 
+        perror("error :"); 
+        exit(0); 
+    } 
+ 
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+    serveraddr.sin_family = AF_INET; 
+    serveraddr.sin_addr.s_addr = inet_addr("218.234.19.87"); 
+    serveraddr.sin_port = htons(atoi(argv[1])); 
+ 
+    client_len = sizeof(serveraddr); 
+ 
+    if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len) < 0) 
+    { 
+        perror("connect error :"); 
+        exit(0); 
+    } 
+ 
+    while(1)
+    {
+        memset(buf, 0x00, MAXBUF); 
+        read(0, buf, MAXBUF); 
+        if (write(server_sockfd, buf, MAXBUF) <= 0) 
+        { 
+            perror("write error : "); 
+            break;
+        } 
+        memset(buf, 0x00, MAXBUF); 
+        if (read(server_sockfd, buf, MAXBUF) <= 0) 
+       { 
+           perror("read error : "); 
+           break;
+        }
+        printf("read : %s", buf); 
+    } 
+    close(server_sockfd); 
+    return 0;
+} 
+}}}

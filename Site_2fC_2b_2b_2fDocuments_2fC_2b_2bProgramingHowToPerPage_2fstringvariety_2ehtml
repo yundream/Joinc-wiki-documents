@@ -1,0 +1,271 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>여러가지 문자열관련 class</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="C++ Programming HOW-TO"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="추천할만한 C++ 컴파일러 "
+HREF="cppcompilers.html"><LINK
+REL="NEXT"
+TITLE="String class 다운받기"
+HREF="downloadstring.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>C++ Programming HOW-TO</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="cppcompilers.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="downloadstring.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="STRINGVARIETY"
+></A
+>3. 여러가지 문자열관련 class</H1
+><P
+>문자열 class는 프로그래밍에서 가장 중요한 것들 중 하나이고, 문자열 조정을
+위해 매우 많이 쓰인다.
+문자열 class는 여러가지가 있고, 물론 이들을 상속받음으로써 자신만의
+문자열 class를 만들 수도 있다.
+
+<P
+></P
+><UL
+><LI
+><P
+> 이 문서에 쓰여진 문자열 클래스는 
+<A
+HREF="appendixa.html"
+>23&#51208;</A
+>를 보아라.</P
+></LI
+><LI
+><P
+> 표준 C++ 라이브러리 string class (ANSI/ISO string class <A
+HREF="http://www.msoe.edu/eecs/cese/resources/stl/string.htm"
+TARGET="_top"
+>http://www.msoe.edu/eecs/cese/resources/stl/string.htm</A
+> 와 <A
+HREF="http://www.sgi.com/tech/stl/basic_string.html"
+TARGET="_top"
+>http://www.sgi.com/tech/stl/basic_string.html</A
+></P
+></LI
+><LI
+><P
+> Qt의 외부 라이브러리에 있는 Qt String class <A
+HREF="http://doc.trolltech.com/qstring.html"
+TARGET="_top"
+>http://doc.trolltech.com/qstring.html</A
+> , mirror : <A
+HREF="http://www.cs.berkeley.edu/~dmartin/qt/qstring.html"
+TARGET="_top"
+>http://www.cs.berkeley.edu/~dmartin/qt/qstring.html</A
+></P
+></LI
+><LI
+><P
+> 이들 중 맘에 드는 것이 없다면, 자신만의 문자열 클래스를 만들 수도 있다.
+ 위에 언급된 하나 혹은 여러 class를 상속받아 만들 수도 있다.</P
+></LI
+></UL
+>&#13;</P
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="AEN191"
+></A
+>3.1. Multiple Inheritance - 자신만의 문자열 class 만들기</H2
+><P
+>위에 말한 것 같이, 하나 혹은 여러 class를 상속받아 자신만의 문자열 class를
+만들 수도 있다. 여기서는 표준 C++ 라이브러리의 string class와 부록 A의
+String class 를 상속받음으로써 다중상속을 이용한 문자열 class를 만들어 볼
+것이다.</P
+><P
+>우선 예제 파일 'string_multi.h'를 <A
+HREF="appendixa.html"
+>23&#51208;</A
+> 에서 다운로드 받아라.</P
+><P
+>이 파일은 다음과 같다 :</P
+><P
+>&#13;<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>// ******************************************************************
+// String class와 표준 라이브러리의 "string" class를 상속받음으로써
+// 직접 문자열 class를 만들어보는 예시를 위한 프로그램
+// ******************************************************************
+
+#ifndef __STRING_MULTI_H_ALDEV_
+#define __STRING_MULTI_H_ALDEV_
+
+#include &#60;string&#62;
+#include "String.h"
+#include "StringBuffer.h"
+
+#ifdef NOT_MSWINDOWS
+#else
+using namespace std;  // MS Visual C++ compiler Version 6.0 에서 필요함.
+#endif
+
+// 중요! : C++에서는 생성자, 파괴자, 복사 연산자가 같이 상속되지 않는다.
+//	따라서 만약 =, + 등의 연산자가 base class에 정의되어 있고, base
+//	class의 생성자를 이용한다면, 반드시 같은 역할을 하는 생성자를
+//	상속받는 class에도 만들어주어야 한다.
+//	아래에 주어진 mystring(), mystring(char [])를 보아라.
+//
+//	또한 atmpstr이 mystring으로 선언되었다고 할 때, atmpstr + mstr 
+//	과 같이 연산자를 쓸 때, 실제로 불리는 것은 atmpstr.operator+(mstr)이다. 
+
+class mystring:public String, string
+{
+	public:
+		mystring():String() {}  // =, + 연산자를 위해 필요하다
+		mystring(char bb[]):String(bb) {}  // =, + 연산자를 위해 필요하다
+
+		mystring(char bb[], int start, int slength):String(bb, start, slength) {}
+		mystring(int bb):String(bb) {}  // + 연산자를 위해 필요하다
+		mystring(unsigned long bb):String(bb) {}  // + 연산자를 위해 필요하다
+		mystring(long bb):String(bb) {}  // + 연산자를 위해 필요하다
+		mystring(float bb):String(bb) {}  // + 연산자를 위해 필요하다
+		mystring(double bb):String(bb) {}  // + 연산자를 위해 필요하다
+		mystring(const String &#38; rhs):String(rhs) {}  // + 연산자를 위해 필요한 Copy Constructor
+		mystring(StringBuffer sb):String(sb) {}  // Java와의 호환을 위해
+		mystring(int bb, bool dummy):String(bb, dummy) {}  // StringBuffer class를 위해
+
+		int mystraa; // mystring의 최적화
+	private:
+		int mystrbb; // mystring의 최적화
+};
+
+#endif // __STRING_MULTI_H_ALDEV_</PRE
+></TD
+></TR
+></TABLE
+>&#13;</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="cppcompilers.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="downloadstring.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>추천할만한 C++ 컴파일러</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>String class 다운받기</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

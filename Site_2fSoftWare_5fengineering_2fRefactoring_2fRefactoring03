@@ -1,0 +1,310 @@
+#title 리팩토링 - 모든 경고메시지를 체크하라.
+
+나 같은 경우 일단 돌아가는 코드를 만들고 돌아가는지 눈으로 확인한다음 손을 보는 스타일이라서, 나중에 많은 잔손질 - 거창하게 리팩토링 -을 하게 된다. 이때 [wiki:Site/SoftWare_engineering/Refactoring/Refactoring02 모듈화]와 함께 가장먼저 손쉽게 진행할 수 있는게 경고메시지를 제거하는 것이다. 이 문서는 gcc(:12) 4.0.x 를 기준으로 작성되었다.
+
+gcc라면 다음과 같은 옵션을 이용해서 경고메시지를 출력하도록 할 수 있다.
+{{{#!plain
+# gcc -Wall -c testcode.c
+# gcc -W -c testcode testcode.c
+...
+}}}
+보통은 -Wall 옵션만을 사용하는 경우가 많을 것이다. 그러나 경고메시지는 다양한 영역을 가지고 있으다. -Wall 의 '''all'''에 속지 말기 바란다. '''all'''이라는 단어가 붙은것 과는 다르게, 일부영역의 경고메시지만을 출력해준다. 예를 들면 아래와 같이 리턴값이 명시되지 않은 경우 경고메시지를 출력한다.  
+{{{#!plain
+int foo (unsigned int x)
+{
+  int y;
+  if (y < x) x=x+2;
+  else x= x+1;
+}
+}}}
+
+-Wall 옵션을 주고 컴파일 해보자.
+{{{#!plain
+# gcc -Wall -c foo.c 
+foo.c: In function `foo':
+foo.c:6: warning: control reaches end of non-void function
+}}}
+그러나 if (y < x)에서 unsigned와 signed와의 비교와 같은 경고는 잡아내지 않는 것을 알 수 있다. 결국 모든 경고메시지를 없애고 싶다면, 다양한 종류의 경고옵션을 함께 사용해야 한다.
+
+=== -W ===
+signed 와 unsigned의 비교. 조건문에서 body가 명시되지 않거나, 결코도달할 수 없는 조건문등을 찾아낼 수 있다. 아래의 코드는 컴파일되고 실행되는데 전혀 문제는 없을 것이다. 그러나 if (x < 0) 문은 결코 만족할 수 없다. 이러한 코드는 버그를 만들어낼 수 있을 것이다.
+{{{#!plain
+int foo (unsigned int x)
+{
+  if (x < 0)
+    return 0;  // 결코 도달할 수 없다. 
+  else
+    return 1;
+}
+}}}
+-Wall 옵션을 이용하면 경고메시지가 출력되지 않을 것이다.
+{{{#!plain
+# gcc -Wall -c foo.c
+}}}
+그러나 -W 옵션을 이용하면 다음과 같은 경고메시지가 출력되는걸 확인할 수 있다.
+{{{#!plain
+# gcc -W -c foo.c
+foo.c: In function `foo':
+foo.c:4: warning: comparison of unsigned expression < 0 is always false
+}}}
+
+일반적으로 '''-W''' 옵션은 '''-Wall''' 옵션과 함께 사용한다.
+
+=== -Wconversion ===
+이 옵션은 형변환(type conversion)과 관련되어서 잘못 사용된 코드에 대한 경고를 잡아낸다. floating-point와 integer, long과 short integers 사이의 형변환과 같은 것들이다. 예를 들어서 abs()는 실수형 정수에 대해서 절대값을 리턴하는 함수이다. 만약 인자로 float(:12)값을 입력한다면 원하지 않는 결과가 출력될 것이다. 
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+int main (void)
+{
+  double x = -3.14;
+  double y = abs(x);  /* fabs(x)를 사용해야 함. */
+  printf ("x = %g |x| = %g\n", x, y);
+  return 0;
+}
+}}}
+-Wall 옵션을 주고 컴파일 하면, 경고메시지를 출력하지 않을 것이다. 그러나 프로그램을 실행시키면 잘못된 결과를 보여주게 된다.
+{{{#!plain
+# gcc -Wall -o abs abs.c
+# ./abs
+x = -3.14 |x| = 3
+}}}
+
+이제 '''-Wconversion''' 옵션을 주고 실행시켜 보자.
+{{{#!plain
+# gcc -Wconversion -o abs abs.c
+abs.c: In function ‘main’:
+abs.c:7: warning: passing argument 1 of ‘abs’ as integer rather than 
+    floating due to prototype
+}}}
+abs() 함수대신에 fabs()함수를 이용하면, 위 코드의 논리적오류를 수정할 수 있다.
+
+이 외에도 -Wconversion 옵션은 변수에 잘못된 값을 할당하는 오류도 찾아낸다.
+{{{#!plain
+unsigned int x = -1;
+}}}
+기술적으로 ANSI/ISO:::C(:12) 표준은 위의 코드를 허용한다. 그러므로 대부분의 컴파일러가 에러없이 컴파일을 해준다. 그러나 코드가 제대로 작동할지는 보장할 수 없다. 
+
+=== -Wshadow ===
+이것은 선언된 변수명을 다른 scope에서 다시 선언한 경우 경고를 발생시킨다. 이렇게 변수가 선언될 경우 이것을 '''shadowing'''변수라고 한다. 다음의 코드를 확인해 보도록 하자. 
+{{{#!plain
+#include <stdio.h>
+double test (double x)
+{
+  double y = 1.0;
+  {
+    double y;
+    y = x;
+  }
+  return y;
+}
+int main (void)
+{
+  printf("%lf\n", test(5.0));
+}
+}}}
+2개의 scope에서 '''y'''변수가 선언되었음을 알 수 있다. 이경우 비록 이름은 같지만, scope가 다르므로 전혀다른 변수 이름 테이블을 가지게 된다. 당신이 사용하는 컴파일러가 ANSI/ISO C를 준수한다면, 1을 리턴할 것이다. shadowing 변수의 사용자체가 문제가 되는건 아니지만, 보통의 경우 실수로 사용하는 경우가 많으므로 -Wshadow 옵션을 이용해서 제거하도록 하자.
+{{{#!plain
+# gcc -Wshadow -o abs abs.c
+abs.c: In function ‘test’:
+abs.c:7: warning: declaration of ‘y’ shadows a previous local
+}}}
+
+=== -Wcast-qual ===
+'''const'''와 같은 타입 제한자를 잘못 사용했을 경우 경고메시지를 출력한다. 아래의 코드와 같은 경우다.
+{{{#!plain
+#include <stdio.h>
+
+void f (const char * str)
+{
+  char * s = (char *)str;
+  s[0] = '\0';
+}
+
+int main()
+{
+  char *a = "hello World";
+  f(a);
+}
+}}}
+이 프로그램은 아무런 문제없이 컴파일 될 것이다. 그러나 실행시키면 '''segmentation fault'''를 출력하고 종료되어 버릴 것이다. 오히려 위의 경우는 프로그램이 죽어버림으로 즉시 문제를 찾을 수 있으니 큰 문제가 되지 않을 것이다. 다음과 같은 경우가 문제가 된다. 
+{{{#!plain
+int main()
+{
+  char a[] = "hello World";
+  f(a);
+  printf("%s\n", a);
+}
+}}}
+우리가 f 함수의 인자를 const 로 한것은 str이 변경되는걸 막기 위한 목적도 가지고 있을 것이다. 그런데 위의 경우 의도하지 않게 str이 변경되어 버리게 된다. '''-Wcast-qual''' 옵션을 이용하면 이러한 문제를 사전에 예방할 수 있다.
+{{{#!plain
+# gcc -Wcast-qual -o f f.c
+f.c: In function ‘f’:
+f.c:5: warning: cast discards qualifiers from pointer target type
+}}}
+
+=== -Wtraditional ===
+대부분의 컴파일러는 ANSI/ISO 표준을 따르지만, 좀 더 유연하게 사용할 수 있도록 확장된 부분이 있다. 이 옵션을 주면 ANSI/ISO의 표준을 엄격하게 검사하고 이에 대한 경고메시지를 출력한다. 이 기종간 호환되는 코드를 작성하고자 한다면 고려해볼만 하다. 
+
+=== 경고메시지 제거 ===
+이제 위에 언급된 옵션을 이용해서 parse.cc를 컴파일 해보도록 하자. parse.cc는 두번의 리팩토링 과정이 끝난 코드로 [wiki:Site/SoftWare_engineering/Refactoring/Refactoring02 리팩토링 - 모듈화]문서의 코드를 사용할 것이다.
+
+{{{#!plain
+# g++ -W -Wall -Wcast-qual -Wshadow -o parse parse.cc
+parse.cc: In function `char* html_trim(char*, char*, int)':
+parse.cc:54: warning: unused variable `char specia[10]'
+parse.cc: In function `int main(int, char**)':
+parse.cc:87: warning: declaration of `lt_flag' shadows a global declaration
+parse.cc:22: warning: shadowed declaration is here
+parse.cc:83: warning: unused variable `int ridx'
+parse.cc:84: warning: unused variable `int widx'
+parse.cc:87: warning: unused variable `int lt_flag'
+parse.cc:96: warning: unused variable `int tag_status'
+}}}
+대부분 선언만 하고 사용하지 않는 변수에 관한 경고이고, shadows 변수사용에 따른 경고가 발견되었다.
+
+다음은 경고가 발생한 부분을 모두 정리한 코드다.
+{{{#!plain
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+
+using namespace std;
+
+const int MAX_BUF_SIZE=1024;
+
+enum tag_token {TAG_LT = '<', TAG_GT='>'};
+
+void help()
+{
+  printf("Usage : ./parse [-h] [-f FILENAME]\n");
+  printf("-f : Input Source File\n");
+  printf("-h : This Message\n");
+}
+
+int lt_flag = 0;
+
+char *html_trim(char *src, char *dst, int size)
+{
+  int ridx = 0;
+  int widx = 0;
+
+  while(ridx < size)
+  {
+    if (src[ridx] == TAG_LT)
+    {
+      lt_flag++;
+    }
+    if (src[ridx] == TAG_GT)
+    {
+      lt_flag--;
+      if (lt_flag == 0)
+      {
+        ridx++;
+        continue;
+      }
+    }
+
+    if (lt_flag == 1)
+    {
+      ridx++;
+      continue;
+    }
+
+    if(src[ridx] == '&')
+    {
+      unsigned int i = 0;
+      char specia[10] = {0x00,};
+      for (i = 0; i < 10; i++)
+      {
+        if (src[ridx+i] == ';')
+        {
+          ridx= (ridx+i);
+          break;
+        }
+      }
+    }
+
+    if (src[ridx] == '\n' || src[ridx] =='\r')
+    {
+      dst[widx] = ' ';
+    }
+    else
+    {
+      dst[widx] = src[ridx];
+    }
+    widx++;
+    ridx++;
+  }
+  return dst;
+}
+
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+  int lt_flag = 0;
+  int test_argv=0;
+  int c;
+  char *src_file;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\':`+#=";
+  char *tr;
+
+  int tag_status = 0;
+  int offset = 0;
+
+  while((c = getopt(argc, argv, "hf:")) != -1)
+  {
+    switch(c)
+    {
+      case 'h':
+        break;
+      case 'f':
+        src_file = optarg;
+        test_argv = 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!test_argv)
+  {
+    help();
+    return 1;
+  }
+
+
+  if ((fd = open(src_file, O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+    html_trim(rbuf, wbuf, readn);
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+      printf("%s ", tr);
+      tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, MAX_BUF_SIZE);
+    memset(wbuf, 0x00, MAX_BUF_SIZE);
+  }
+  return 0;
+}
+}}}
+
+=== 댓글 ===

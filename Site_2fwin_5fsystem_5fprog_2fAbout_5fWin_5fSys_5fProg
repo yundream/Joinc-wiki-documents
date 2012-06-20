@@ -1,0 +1,44 @@
+#title 윈도 시스템 프로그래밍 개념들 정리 
+
+윈도 환경에서 개발이 처음이다 보니 생소한 용어와 개념들이 여기저기에서 등장한다. 좀 정리 해야 겠다. 리눅스(:12) 운영체제(:12)와 비교 정리되는 경우가 많을 것 같다.
+
+== 커널 객체 와 객체 핸들 ==
+커널 객체란 운영체제가 자원을 관리하기 위해서 사용하는 '''데이터 블럭'''이다. 여기에서 자원은 세마포어(:12), 뮤텍스(:12), 이벤트, 파이프(:12) 등을 가리킨다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/I6cKCLvfZIPRL5h2Xa-A7g?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uYLV6sq5I/AAAAAAAABRs/JxVgs4CDQUY/s800/sN0ka3INtV_VsUAuz4m855A.png" /></a>
+}}}
+
+=== 커널 객체의 생성 ===
+커널 객체를 만드는 함수는 모두 '''Create'''라는 접두사를 가지는 명명 규칙을 따른다.
+  || CreateMutex(:4200)     || 뮤텍스 객체 생성           ||
+  || CreateFile(:4200)      || 파일 객체 생성             ||
+  || CreateEvent(:4200)     || 이젠트 객체 생성           ||
+  || CreateNamedPipe(:4200) || 네임드 파이프 객체 생성    ||
+  || CreatePipe(:4200)      || 익명 파이프 객체 생성      ||
+  || CreateThread(:4200)    || 쓰레드(:12) 객체 생성      ||
+  || CreateProcess(:4200)   || 프로세스(:12) 객체 생성    ||
+  || CreateSemaphore(:4200) || 세마포어 객체 생성         ||
+소켓 객체를 만들기 위해서 사용하는 BSD:::socket(:12)함수는 예외다. 
+
+=== 객체 핸들 ===
+'''Create'''계열의 함수로 커널 객체를 생성하면 이들 함수는 '''HANDLE'''데이타 형을 가지는 핸들 값을 반환한다. 이 핸들은 커널 객체를 가리키며, 프로그래머를 이 핸들을 조작함으로써 자원을 조작할 수 있다.
+
+=== 핸들 닫기 ===
+리눅스는 자원을 객체로 다루지 않기 때문에 자원마다 별도의 닫기 함수가 존재한다. 윈도는 CloseHandle(:4200)함수로 핸들을 닫을 수 있다.
+
+=== 커널 객체의 제거 ===
+하나의 커널 객체는 여러 개의 핸들이 존재할 수 있다. 그러므로 CloseHandle함수로 핸들을 종료한다고 해서 커널 객체가 제거되는 것은 아니다. 커널 객체를 가리키는 핸들이 더 이상 존재하지 않을 때, 비로서 메모리에서 제거된다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/AHuqMRFANBlkHaaj01LVsA?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uYLfhL4XI/AAAAAAAABRw/nTtptFIQXFc/s800/shAPPAnqK2OnkaV6Ma448hA.png" /></a>
+}}}
+== 신호 ==
+리눅스의 signal(:12)은 여러 의미가 준비되어 있있다. 즉 프로세스(:12)간 의미를 전달하기 위한 IPC(:12)설비에 포함된다. 반면 윈도에서 신호는 0과 1의 상태, 즉 신호 상태 (signaled)와 그렇지 않은 Non-Signaled 상태를 가진다. 
+
+윈도의 신호는 커널 객체의 상태 변화를 알려준다. 쓰레드가 종료되었는지, 뮤텍스를 얻을 수 있는 상태가 되었는 지 등에 대한 것들이다. 신호의 대기는 WaitForMultipleObjects(:4200)함수를 이용한다.
+
+== 멀티 프로세스 프로그래밍 ==
+윈도는 쓰레드 기반으로 리눅스의 fork(:2)함수를 제공하지 않는다. 멀티 프로세스 방식의 프로그램 개발은 이루어지지 않는다. CreateProcess(:4200)함수로 새로운 프로세스를 만들 수 있지만, 리눅스에서 처럼 프로세스를 분기하지는 않는다. '''새로운 프로세스를 만들 뿐이다''' 
+
+

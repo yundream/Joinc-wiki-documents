@@ -1,0 +1,95 @@
+#title winapi : ReadFile - 파일에서 데이터를 읽는다.
+
+== ReadFile ==
+특수 파일 혹은 입출력 장치로 부터 데이터를 읽는다. 
+
+이 함수는 동기, 비동기 모두에 사용할 수 있다. 비동기로만 사용할 수 아씨는 함수로 ReadFileEx(:4200)함수가 있다. 
+=== 사용법 ===
+{{{#!plain
+BOOL WINAPI ReadFile(
+  __in         HANDLE hFile,
+  __out        LPVOID lpBuffer,
+  __in         DWORD nNumberOfBytesToRead,
+  __out_opt    LPDWORD lpNumberOfBytesRead,
+  __inout_opt  LPOVERLAPPED lpOverlapped
+);
+}}}
+
+=== 매개 변수 ===
+ * hFile
+   파일, 파일 스트림, 물리디스크, 테이프 드라이브, 소켓과 같은 장치의 핸들.
+
+   hFile 매개 변수는 반드시 read 권한과 함께 만들어야 한다. 비동기 읽기를 원한다면 CreateFile(:4200)함수, socket(:12) 혹은 accept(:12)함수로  파일을 생성할 때 '''FILE_FLAG_OVERLAPPED'''플래그를 사용해야 한다.
+ * lpBuffer 
+   파일이나 장치로 부터 받은 데이터를 저장하기 위한 버퍼를 가리키는 포인터
+ * nNumberOfBytesToRead
+   읽을 최대 바이트 크기
+ * lpNumberOfByteRead
+   동기 입출력 모드에서, 읽어들인 데이터의 바이트 수를 넘긴다.
+ * lpOverlapped
+   비동기 입출력을 위한 OVERLAPPED 구조체의 포인터. hFile이 FILE_FLAG_OVERLAPPED 플로그로 열렸다면, 반드시 이 구조체를 사용해야 한다. 비동기 입출력이 아니라면 NULL을 사용한다.
+
+=== 반환 값 ===
+성공하면 0이 아닌 값을 리턴한다. 
+
+함수가 실패할때 혹은 비동기 입출력을 완료했을 때도 0을 반환한다. 자세한 에러 값은 GetLastError(:4200)함수로 확인 할 수 아씨다. 
+
+GetLastError 코드가 ERROR_IO_PENDING이면, 실패가 아니다. 이것은 비동기 입출력이 완료되었음을 의미한다.
+
+=== 상세 설명 ===
+ReadFile함수는 아래의 이유로 반환한다.
+  * 데이터를 읽었다.
+  * 파이프에 쓰기가 완료되었다.
+  * 비동기 핸들러가 사용되고, 비동기 입력이 발생했을 때 
+  * 에러의 발생 
+ReadFile함수가 파일의 끝에 도달하면 0을 반환하고 GetLastError함수는 ERROR_HANDLE_EOF를 반환한다.
+
+== 예제 ==
+프로그램 실행인자로 주어진 파일명을 열어서 내용을 출력한다.
+{{{#!plain linenum
+#include <stdio.h> 
+#include <windows.h> 
+ 
+#define MAX_LINE 1024 
+int main(int argc, char **argv) 
+{ 
+    HANDLE fp; 
+    DWORD readn; 
+    BOOL brtv; 
+    char buf[MAX_LINE]; 
+ 
+    if (argc != 2) 
+    { 
+        printf("Usage : %s [file]\n", argv[0]); 
+        return 1; 
+    } 
+ 
+    fp = CreateFile(:4200)( 
+        (LPCTSTR)argv[1],  
+        GENERIC_READ, 
+        0, 
+        NULL, 
+        OPEN_EXISTING, 
+        FILE_ATTRIBUTE_NORMAL, 
+        NULL); 
+    if (fp == INVALID_HANDLE_VALUE) 
+    { 
+        printf("File 1 Open Error (%d) : %s\n", GetLastError(), argv[1]); 
+        return 1; 
+    } 
+ 
+    while(1) 
+    { 
+        memset((void *)buf, 0x00, MAX_LINE);
+        brtv = ReadFile(fp,buf, MAX_LINE-1, &readn, NULL); 
+        if(brtv && readn == 0) 
+        { 
+            break; 
+        } 
+        printf("%s", buf); 
+    } 
+    return 1; 
+} 
+}}}
+
+[[tag(윈도 시스템 프로그래밍,파일)]]

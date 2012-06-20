@@ -1,0 +1,372 @@
+#title Qemu Networking
+
+[[TableOfContents]]
+== 소개 ==
+Qemu (KVM)은 OpenStack과 redhat에서 주요 하이퍼바이저로 사용하고 있으니, 이번참에 네트워크 쪽도 공부해 두면 클라우드 환경에 응용할 때 많은 도움이 되지 싶어서 살펴보려 합니다. [wiki:Site/cloud/Qemu Qemu]문서를 먼저 읽으셔야 문서 내용을 이해하기 쉬울겁니다.
+
+== 환경 ==
+이 문서의 내용은 아래의 환경에서 테스트 했습니다.
+  * Host 운영체제 : ubuntu 11.10 
+  * kernel : 3.0.9  
+  * 게스트 운영체제 : ubuntu 11.04-server-i386
+
+== 옵션들 == 
+
+-net 옵션을 이용해서 네트워크 카드를 설정할 수 있다. 네트워크 설정을 위해서는 두개의 -net 옵션을 이용해야 한다. 기본 값은 -net nic -net user 이다.
+
+vlan 설정은 다음과 같다.
+{{{#!plain
+-net nic,vlan=1 -net user,vlan=1
+}}}
+이제 이 네트워크는 VID를 1로 하는 VLAN으로 구성된다.
+
+게스트 운영체제에서 사용할 네트워크 카드의 종류를 지정할 수도 있다.
+{{{#!plain
+-net nic,mode=ne2k_pci -net user
+-net nic,mode=rtl8139 -net user
+-net nic,mode=pcnet -net user
+}}}
+네트워크 카드를 지정하지 않을 경우 rtl8139가 지정된다.
+
+Ubuntu 11.04를 -net nic -net user 옵션으로 올린다음 네트워크 카드정보를 확인한 결과다. lshw는 모든 하드웨어 정보를 보여주는 리눅스 프로그램이다.
+{{{#!plain
+# lshw
+.....
+       *-network
+           description: Ethernet interface
+           product: RTL-8139/8139C/8139C+
+           vecdor: Realtek Semiconductior Co., Ltd.
+           physical id: 3
+           bus info: pci@0000:00:03.0
+           logical name: eth0
+           version: 20
+           serial: 52:54:00:12:34:56
+           size: 100Mbit/s
+           capacity: 100Mbit/s
+           width: 32bits
+           clock: 33MHZ
+....
+}}}
+== 지원하는 네트워크 카드 ==
+NE2000 PCI, NE2000 ISA, RTL 8139, PCNET을 사용할 수 있다. -net nic,model을 이용해서 게스트 운영체제에 제공할 네트워크 카드를 설정할 수 있다.
+{{{#!plain
+-net nic,model=ne2k_pci -net user
+-net nic,model=ntl8139 -net user
+-net nic,model=pcnet -net user
+}}}
+
+ISA 카드를 사용할 경우 -M 옵션을 이용해야 한다.
+=== 자동 설정 ===
+NE2000 PCI카드는 Qemu 0.6.0부터 지원하고 있다. 게스트 운영체제가 NE2000을 지원한다면 자동으로 드라이버가 올라갈 것이다. 그리고 DHCP 클라이언트가 자동으로 IP까지 설정할 것이다. 요즘 나오는 리눅스는 NE2000을 기본으로 지원하지만 혹시 NE2000을 인식하지 못한다면, 수동으로 모듈을 올려줘야 한다.  
+{{{#!plain
+$ modprobe ne2k-pci
+$ dhclient eth0
+}}}
+
+=== 기본 네트워크 환경 테스트 ===
+-net nic,model-ne2k_pci -net user 옵션으로 게스트 운영체제를 실행한 후 모듈을 확인했다.
+{{{#!plain
+# lsmod
+Module                  Size  Used by
+ppdev                  12849  0 
+psmouse                59039  0 
+parport_pc             32111  1 
+serio_raw              12990  0 
+i2c_piix4              13095  0 
+lp                     13349  0 
+parport                36746  3 ppdev,parport_pc,lp
+floppy                 60032  0 
+ne2k_pci               13389  0 
+8390                   18429  1 ne2k_pci
+}}}
+
+irq는 11이고 io 메모리 주소는 0xc100이다.
+{{{#!plain
+# cat /proc/interrupts
+           CPU0       
+  0:         58   IO-APIC-edge      timer
+  1:       1281   IO-APIC-edge      i8042
+  6:          2   IO-APIC-edge      floppy
+  7:          0   IO-APIC-edge      parport0
+  8:          1   IO-APIC-edge      rtc0
+  9:          0   IO-APIC-fasteoi   acpi
+ 11:        728   IO-APIC-fasteoi   eth0
+ 12:       4598   IO-APIC-edge      i8042
+ 14:       2072   IO-APIC-edge      ata_piix
+ 15:         58   IO-APIC-edge      ata_piix
+NMI:          0   Non-maskable interrupts
+LOC:      55062   Local timer interrupts
+SPU:          0   Spurious interrupts
+PMI:          0   Performance monitoring interrupts
+}}}
+
+{{{#!plain
+# cat /proc/ioports
+0000-001f : dma1
+0020-0021 : pic1
+0040-0043 : timer0
+0050-0053 : timer1
+0060-0060 : keyboard
+0064-0064 : keyboard
+0070-0071 : rtc0
+0080-008f : dma page reg
+00a0-00a1 : pic2
+00c0-00df : dma2
+00f0-00ff : fpu
+c000-c00f : 0000:00:01.1
+  c000-c00f : ata_piix
+c100-c1ff : 0000:00:03.0
+  c100-c11f : ne2k-pci
+}}}
+
+네트워크 카드 설정 정보
+{{{#!plain
+# ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:12:34:56  
+          inet addr:10.0.2.15  Bcast:10.0.2.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fe12:3456/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:310 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:362 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:43315 (43.3 KB)  TX bytes:44761 (44.7 KB)
+          Interrupt:11 Base address:0xc100 
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:2 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:224 (224.0 B)  TX bytes:224 (224.0 B)
+
+}}}
+
+라우팅 테이블 정보
+{{{#!plain
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+10.0.2.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+0.0.0.0         10.0.2.2        0.0.0.0         UG    100    0        0 eth0
+}}}
+
+게이트웨이로 ping
+{{{#!plain
+# ping 10.0.2.2
+PING 10.0.2.2 (10.0.2.2) 56(84) bytes of data.
+64 bytes from 10.0.2.2: icmp_req=1 ttl=255 time=0.497 ms
+64 bytes from 10.0.2.2: icmp_req=2 ttl=255 time=1.38 ms
+64 bytes from 10.0.2.2: icmp_req=3 ttl=255 time=1.41 ms
+
+--- 10.0.2.2 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+rtt min/avg/max/mdev = 0.497/1.100/1.414/0.426 ms
+}}}
+
+=== DNS 서버 주소 ===
+도메인 주소를 사용하려면 DNS 서버를 설정해야 한다. /etc/resolv.conf에 사용할 DNS 서버를 나열하면 된다. 기본 주소는 10.0.2.3 으로 호스트 운영체제다.
+
+== Qemu Network ==
+=== Redirecting ports === 
+Qemu는 게스트 운영체제에 대한 포트 리다이렉트 기능을 제공한다. 이 기능을 이용하면 호스트 운영체제의 포트에 접속하는 것으로 게스트 운영체제에 접속할 수 있다.
+
+게스트 운영체제로 Ubuntu를 실행 했다. 이 게스트 운영체제의 아이피는 10.0.2.15으로, 호스트 운영체제에서는 직접 접근할 수가 없다. 예컨데 게스트 운영체제를 제어하기 위해서 ssh 연결을 할 수 없다. 포트 리다이렉트 기능을 간단하게 게스트 운영체제로 접근할 수 있다.  
+{{{#!plain
+# qemu-system-i386 -k en-us -hda ubuntu11-server.vhd -redir tcp:5555::22
+}}}
+호스트 운영체제의 5555번 포트를 게스트 운영체제의 22번호트로 리다이렉트 했다. 이제 호스트 운영체제의 5555번 포트로 접근하는 것으로 게스트 운영체제의 22번 포트에 접근할 수 있다.
+{{{#!plain
+# ssh localhost -p 5555
+yundream@localhost's password: 
+Welcome to Ubuntu 11.04 (GNU/Linux 2.6.38-8-generic-pae i686)
+
+ * Documentation:  https://help.ubuntu.com/
+
+  System information as of Tue Dec 13 22:42:59 KST 2011
+
+  System load:  0.0               Processes:           64
+  Usage of /:   22.7% of 3.27GB   Users logged in:     1
+  Memory usage: 8%                IP address for eth0: 10.0.2.15
+  Swap usage:   0%
+
+  Graph this data and manage this system at https://landscape.canonical.com/
+New release 'oneiric' available.
+Run 'do-release-upgrade' to upgrade to it.
+
+Last login: Tue Dec 13 22:36:34 2011 from 10.0.2.2
+}}}
+
+=== TUN/TAP 장치를 이용한 Network 환경 구축 ===
+TUN/TAP 장치를 이용하면 qemu로 완전한 (가상)네트워크 환경을 구축할 수 있다. TUN/TAP을 이용하면 유저 영역에 패킷을 전송/수송하기 위한 Point-to-Point 인터페이스를 만들 수 있다. 간단히 말해서 가상의 이더넷 장치를 만들 수 있다. 운영체제 가상화 + 네트워크 인터페이스 가상화.. 왠지 궁합이 잘 맞을 것 같다. TAP은 Layer 2 패킷을 다루고 TUN은 Layer 3 패킷을 다룬다.  
+
+계획은 이렇다. 
+  1. 호스트 운영체제에 TAP 인터페이스를 만든다.
+  1. TAP 인터페이스에 IP를 할당한다. 게스트 운영체제는 이 TAP 인터페이스와 L2 레벨에서 연결된다.
+  1. 게스트 운영체제는 TAP의 IP를 gateway로 한다. 
+    * 게스트 운영체제는 두 개를 만든다. 하나는 ubuntu-qemu-01 다른 하나는 ubuntu-qemu-02다.
+  1. 호스트 운영체제는 게스트 운영체제가 인터넷으로 나갈 수 있도록 SNAT 설정을 한다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1WOP_GdX1HYblkRT29eEn49r6YWen1HWkzTc3kO_5g3E&amp;w=541&amp;h=165">
+}}}
+
+TAP 드라이버 올릴려고 괜히 노가다 하지 말자. openvpn으로 간단히 올릴 수 있다. tap을 올린 후 ifconfig로 네트워크를 설정했다.
+{{{#!plain
+# openvpn --mktun --dev tap1
+# ifconfig tap0 192.168.105.1 up
+# ifconfig 
+...
+...
+tap1      Link encap:Ethernet  HWaddr 3a:ef:5b:41:07:b9  
+          inet addr:192.168.105.1  Bcast:192.168.105.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:100 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+}}}
+
+앞서 만든 tap1을 이용해서 ubuntu-qemu-01 운영체제를 올린다. 
+{{{#!plain
+# qemu-system-i386 -k en-us -hda ubuntu11-server.vhd -net nic -net tap,ifname=tap1,script=no -net socket,listen=localhost:1234
+}}}
+게스트 운영체제의 network 설정이다.
+{{{#!plain
+# cat /etc/network/interface
+iface eth0 inet static
+address 192.168.105.2
+netmask 255.255.255.0
+gateway 192.168.105.1
+auto eth0
+}}}
+
+두 번째 게스트 운영체제 ubuntu-qemu-02를 올린다. qemu는 기본 mac으로 "52:54:00:12:34:56"을 로딩한다. 그러므로 두 번째 올리는 게스트 운영체제 부터는 mac이 중복되지 않도록 직접 mac주소를 설정해야 한다. 
+{{{#!plain
+# qemu-system-i386 -k en-us -hda ubuntu11-server2.vhd -net nic,macaddr=52:54:00:12:34:57 -net socket,connect=localhost:1234
+}}}
+
+게스트 운영체제의 network 설정이다.
+{{{#!plain
+# cat /etc/network/interface
+iface eth0 inet static
+address 192.168.105.3
+netmask 255.255.255.0
+gateway 192.168.105.1
+auto eth0
+}}}
+
+문제 없이 네트워크가 구성될거다. 이제 SNAT를 설정해서 게스트 운영체제들이 인터넷으로 나갈 수 있게 한다. SNAT 설정은 [wiki:Site/System_management/NAT NAT 설정]문서를 참고한다.
+
+=== Bridge로 네트워크 구축 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1ju2zMXFX7DJWtEkoVPhhNi0nRuvbOdeFAoBnV7artAE&amp;w=527&amp;h=628">
+}}}
+
+호스트에서 VM 네트워크는 Bridge로 묶는다. 브릿지 네트워크는 VM의 NIC와 연결되는 vif와 외부로 외부 네트워크로 향하는 호스트 NIC를 서로 묶어 준다. 브릿지 네트워크는 호스트 NIC를 이용해서 다른 호스트의 VM들과 묶이게 된다. 
+
+브릿지 네트워크 구성을 위해서 아래처럼 테스트를 진행했다. 
+  1. 목적 : 두 개의 VM 네트워크를 브릿지로 묶는다. VM의 이름은 VM1과 VM2로 했다. 
+  1. 호스트 브릿지인 br0를 만든다. 
+  1. VM을 위한 tap 디바이스 2개를 만든다. 이름은 tap100과 tap101로 했다. 
+  1. br0에 tap100, tap101, eth0을 묶는다. 
+  1. 제대로 브릿지 네트워크를 구성됐는지 테스트 한다.
+      * br0에 VM들의 MAC 주소가 등록 됐는지 확인한다. 
+      * VM1과 VM2 와의 네트워크 통신 확인 
+      * eth0을 통한 통신 확인
+
+'''브릿지 생성'''
+{{{#!plain
+# brctl addbr br0
+# ifconfig br0 up
+}}}
+
+'''Tap interface 생성'''
+{{{#!plain
+# openvpn --mktun --dev tap100
+# openvpn --mktun --dev tap101
+# ifconfig tap100 up
+# ifconfig tap101 up
+}}}
+
+'''브릿지에 인터페이스 추가'''
+{{{#!plain
+# brctl addif br0 tap100
+# brctl addif br0 tap101
+# brctl addif br0 eth0 
+}}}
+
+'''VM 네트워크 설정'''
+  1. VM1: 192.168.101.98
+  1. VM2: 192.168.101.97
+
+'''VM1과 VM2를 실행'''
+{{{#!plain
+# qemu-system-x86_64 -m 512 -hda VM1.raw -net nic -net tap,ifname=tap100,script=no
+# qemu-system-x86_64 -m 512 -hda VM2.raw -net nic,macaddr=52:54:00:12:34:57 -net tap,ifname=tap101,script=no
+}}}
+
+'''네트워크 브릿지 정보'''
+{{{#!plain
+# brctl show
+bridge name     bridge id               STP enabled     interfaces
+br0             8000.d2a4aba39cf4       no              eth0
+                                                        tap100
+                                                        tap101
+}}}
+
+'''브릿지에 등록된 MAC 주소를 확인한다.''' eth0, VM1, VM2의 MAC 주소가 등록돼 있다면 성공
+{{{#!plain
+# brctl showmacs br0 
+port no mac addr                is local?       ageing timer
+  3     xx:xx:xx:xx:xx:xx       no                94.76
+  ....
+}}}
+MAC 주소 등록을 확인 했다면, 통신도 잘 될 것이다.
+
+== Network 성능 튜닝 ==
+=== virtio ===
+기본적으로 Qemu는 virtio 네트워크를 사용한다. 이 경우 다음과 같은 데이터 흐름을 가진다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=16uXkvQKXgyWRZpYGIKdfG7iJ5zvO6aWFfjgWQ7J7KEM&amp;w=321&amp;h=396">
+}}}
+
+가상 머신은 paravirtualized 네트워크 디바이스인 VirtIO를 사용한다. 리눅스 커널도 virtIO를 이용해서 데이터를 교환하는데, 이때 커널 모드와 유저 모드간에 context switch가 발생하면서 성능저하가 발생한다. 실제 bridge 네트워크를 구성한 다음, 두개의 VM간에 ping을 해보면 1 msec 정도의 지연이 발생하는 걸 확인할 수 있다. 물리적인 거리를 생각하면 매우 큰 수치다.
+
+=== vhost_net ===
+{{{#!html
+http://www.pearltrees.com/#/N-fa=5052200&N-f=1_5271210&N-s=1_5271210&N-p=46795592&N-u=1_633582&N-play=1
+}}}
+vhost_net 커널 모듈을 사용하면 이 문제를 해결할 수 있다. vhost_net을 이용하면 유저모드에서 커널모드로 직접 데이터를 교환할 수 있다. 복사과정이 줄어들고, context switching이 발생하지 않으므로 성능을 향상시킬 수 있다. 
+
+
+vhost_net은 커널 모듈이다. 테스트 중인 우분투 12.04에서 vhost net 모듈을 확인했다.
+{{{#!plain
+# modprobe vhost-net
+# lsmod | grep vhost
+vhost_net              32359  0 
+macvtap                18528  1 vhost_net
+}}}
+
+=== SR/IOV ===
+SR-IOV는 시스템 가상화의 일종으로 PCI-Express에 정의된 I/O 가상화 기술이다. SR-IOV를 이용하면 하나의 물리적인 PCI I/O자원에서 복수개의 가상 자원을 만들 수 있다. 가상 머신들은 이들 SR-IOV 가상자원에 직접 연결해서 데이터를 교환할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1HUQewzMC9oDRS_EijftZyiroH_i6s180Oa_M4BSi3Sk&amp;w=470&amp;h=436">
+}}}
+
+게스트운영체제는 직접 물리적인 네트워크 디바이스에 접근하기 때문에 빠른 성능을 기대할 수 있다. 물론 이 기능을 사용하기 위해서는 SR-IOV 기술이 적용된 네트워크 디바이스가 필요하다. 하드웨어의 가상화 기술을 사용하기 때문에 virtio는 물론이고 vhost-net 보다 성능이 좋다는 장점이 있다. 단점은 SR-IOV 기술에 종속된다는 것과 비용이 올라간다는 점이다. 
+
+아래는 성능 측정 결과다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/u0d6br49OYNek0cYvz9wmdMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-8d4sWfmHvvs/T9YGDVtae1I/AAAAAAAACGs/d1Y29CoVYts/s400/vnc_client1.png" height="208" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+SR-IOV의 성능이 가장 좋은 것을 확인할 수 있다.
+
+그렇다면 효율적인 네트워크 가상화를 위해서 SR-IOV를 사용해야 하느냐 하면, 그렇지는 않다. 나라면 더 많은 비용이 소모되는 SR-IOV 기술을 이용하느니 그냥 vhost-net을 이용하겠다.  
+
+== 참고 문헌 ==
+  * [wiki:Site/cloud/Qemu Qemu를 이용한 가상화]
+
+[[tag(가상화,kvm,qemu,network)]]

@@ -1,0 +1,80 @@
+#title planet : RSS News 출판엔진
+ <!> 속도 문제 때문에, sqlite제어를 php코드에서 하던걸 cron(:12)일괄작업으로 변경하는 중. 당분간 '''new'''표시가 제대로 안될겁니다. 예상작업종료일 10-23
+[[planetindex(Site/planet,1)]]
+
+|| [[Icon(moin-new.gif)]] || 최근 6시간 이내에 새로운 기사가 추가되었음 ||
+|| [[Icon(moin-hot.gif)]]   || 최근 1시간 이내에 새로운 기사가 추가되었음 ||
+
+planet은 '''RSS Reader'''라고 볼 수 있다. 그러나 다른 RSS Reader와는 달리, 관심있는 news를 가져와서 웹사이트에 맞도록 디자인할 수 있다. 내부적으로 Tomas Stybol's의 템플릿엔진을 사용하며, 이 엔진을 이용해서, 자유롭게 컨텐츠를 디자인할 수 있다. python 으로 만들어졌다. 관심있다면 [http://planetplanet.org planetplanet.org]를 방문해 보기 바란다. 
+
+keywords: feed, blog, aggregator, RSS, RDF 
+
+추가하기 원하는 RSS FEED를 남겨주세요
+[[comment]]
+== 최신 Planet 판단을 위한 프로그램 작성 ==
+예상 종료일 : 2006-10-30
+{{{#!plain
+#include <stdio.h>
+#include <sqlite.h>
+
+int IsNewPlanet(char *pname)
+{
+  char query[80];
+  sprintf(query, "select * from planet where p_name = '%s'", pname );
+}
+
+int main(int argc, char **argv)
+{
+  sqlite *db;
+  char *ErrMsg = 0;
+
+  if (argc != 2)
+  {
+    fprintf(stderr, "Usage : %s [dbname]\n", argv[0]);
+    return 1;
+  }
+
+  db = sqlite_open(argv[1], 0, &ErrMsg);
+  if (db == 0)
+  {
+    fprintf(stderr, "Cannot open DataBase : %s\n", ErrMsg);
+  }
+
+  // Planet Directory를 스캔해서 모든 디렉토리 이름을 얻어온다.
+  // 얻어온 Directory의 index.html의 크기를 구해서 planet.db의 크기와 비교한다.
+  // 만약 크기가 변경되었다면, 새로운 파일임을 의미한다.
+}
+}}}
+
+== Joinc planet 적용 ==
+Joinc에 planet를 적용하기 위해서 다음과 같은 작업을 했다.
+ 1. /etc/planet 디렉토리 밑에 각 RSS피드별로 설정파일을 만들었다. 확장자는 .ini 이다. 
+ 1. joinc wiki에 맞도록 planet 템플릿과 css를 수정한다.  
+ 1. perl 스트립트를 만들어서 주기적으로 RSS페이지를 긁어온다.  
+   {{{#!plain
+#!/usr/bin/perl
+
+open(handle, "/bin/ls -al /etc/planet |") or die "Cannot excute ls";
+while($line = <handle>)
+{
+    my($per, $one, $uid, $gid, $fsize, $mon, $mday, $hour, $fname) = split(" ", $line);
+    if ($fname =~ /^[a-zA-Z0-9]+\.ini/)
+    {
+        system("/usr/local/bin/planet.py /etc/planet/$fname");
+    }
+}
+}}}
+ 1. planet는 euc-kr을 지원하지 않는다. 몇 가지 방법이 있겠으나 '''wget'''으로 RSS페이지를 긁어온다음 '''iconv'''를 이용해서 utf로 바꾸는 방법을 사용했다. utf8로 바뀐 RSS페이지는 planet.py에 의해서 다른 RSS 페이지를 읽어갈 때, 함께 긁어가게 된다.   
+   {{{#!plain
+#!/bin/sh
+BASEDIR="/website/dir/planet/"
+
+#zdnet.co.kr
+wget http://www.zdnet.co.kr/services/rss/all/rss2.0.htm -O $BASEDIR/zdnetcokr/zdnet.htm
+iconv -f euckr -t utf8 $BASEDIR/zdnetcokr/zdnet.htm > $BASEDIR/zdnetcokr/zdnetutf.rss
+
+#hani.co.kr 
+wget http://www.zdnet.co.kr/services/rss/all/rss2.0.htm -O $BASEDIR/hani/hani.htm
+iconv -f euckr -t utf8 $BASEDIR/hani/hani.htm > $BASEDIR/hani/haniutf.rss
+}}}
+

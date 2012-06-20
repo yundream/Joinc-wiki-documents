@@ -1,0 +1,30 @@
+= 시간변경 검출 =
+ * 작성자: 조재혁(minzkn@infoeq.com)
+== 개요 ==
+ * 특정 프로세스가 외부로부터의 기준시간 참조 없이 시간이 수정된것을 감지하기 위한 방법을 모색해봅시다.
+ * 필자가 사용하는 방법이 절대적인것이 아니고 그저 꽁수라고 보이는 것이기에 보다 좋은 방법을 알고 계신분은 주저없이 이곳에 적어주시면 많은 분들에게 도움이 될듯 합니다.
+== UPTIME과 System clock과의 시간차 ==
+ * 시간이 변경되더라도 Uptime은 항상 시간을 유지한다는 점에 착안하여 uptime과 System clock간의 시간 간격을 기록해두고 시간이 변경되면 System clock만이 변경되므로 그 시간차가 벌어지거나 좁혀지는 것을 알수 있게 될겁니다. 필자는 이러한 점을 착안하여 다음과 같은 코드를 생성해봤습니다.
+ {{{#!vim c
+int CheckTime(void)
+{
+ const time_t c_TimeWidth = 2; /* 시간 오차율 : 적어도 1초 이상은 되어야 되겠죠..? */
+ static time_t s_DiffTime = (time_t)(0);
+ time_t s_SystemTime, s_CurrentDiffTime;
+ time((time_t *)(&s_SystemTime));
+ if(sysinfo(&s_SystemInfo) == 0)
+ {
+  if(s_DiffTime == (time_t)(0))
+  {
+   s_DiffTime = s_SystemTime - s_SystemInfo.uptime;
+   return(0); /* 첫번째 load */
+  }
+ }
+ s_CurrentDiffTime = s_SystemTime - s_SystemInfo.uptime;
+ if( (s_CurrentDiffTime - c_TimeWidth) < s_DiffTime && (s_CurrentDiffTime + c_TimeWidth) > s_DiffTime) )return(0); /* 변경 안되었음 */
+ return(1); /* 변경되었음 */
+}
+}}}
+ * 문제점: 위의 코드는 일단 문제점이 초단위의 해상도밖에 검출하지 못합니다. 
+
+----

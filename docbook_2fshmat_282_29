@@ -1,0 +1,276 @@
+#title shmat(2)
+[wiki:function_shmat(2) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/06/04           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>shmat(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	공유메모리 관련 연산		
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/ipc.h&gt;
+#include &lt;sys/shm.h&gt;
+
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		shmat()는 공유메모리 식별자인<emphasis>shmid</emphasis>에 공유 메모리 
+		세그먼트를 붙이기 위해서 사용한다. 붙이는 영역은 <emphasis>shmaddr</emphasis>로
+		결정할 수 있다.   
+	</para>
+	<para>
+		만약 <emphasis>shmaddr</emphasis>가 NULL이라면 시스템은 적당한 사용하지 않는 메모리
+		영역을 붙이게 된다.   
+	</para>
+	<para>
+		만약 <emphasis>shmaddr</emphasis>가 NULL이 아니고 SHM_RND가 shmflg로 지정되어 있다면 
+		shmaddr은 SHMLBA의 배수의 주소로 연결이 발생한다. 그렇지 않으면 shmaddr은 연결할 수 
+		있는 정렬된 페이지 주소여야 한다.
+	</para>
+	<para>
+		만일 <emphasis>SHM_RDONLY</emphasis>가 shmflg에 지정되었다면, 세그먼트는 읽기전용이 
+		되며 공유메모리 영역에 접근하고자 하는 프로세스는 읽기전용허가 접근권을 가져야 한다. 
+		그렇지 않을경우 세그먼트는 읽기/쓰기로 붙여지며 프로세스는 (반드시)읽기/쓰기 
+		허가권을 가져야한다. 쓰기전용 공유메모리 세그먼트를 위한 플래그는 없다.
+	</para>
+	<para>
+		프로세스가 종료되면 연결된 세그먼트는 자동적으로 분리된다. 동일한 세그먼트는 
+		읽기와 읽기/쓰기로 한번이상 연결시킬 수 있다.  
+	</para>
+	<para>
+		shmat가 성공하면 시스템은 shmid_ds구조체의 멤버들을 아래와 같이 업데이트 시킨다.
+		<orderedlist>
+		<listitem>
+			<para>
+				shm_atime을 현재 시간으로 수정한다.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				shm_lpid를 현재 호출한 프로세스의 ID로 설정한다.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				shm_nattch는 1 증가 시킨다.
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+			
+	<para>
+		공유메모리 세그먼트가 삭제로 표시될 때에도 마찬가지로 분리된다.
+	</para>
+	<para>
+		shmdt()는 공유 메모리 영역으로 부터 <emphasis>shmaddr</emphasis> 주쇼를 분리 
+		시키기 위해서 사용한다. 공유메모리 영역의 분리는 shmat 시스템 콜로 연결된 값과 
+		동일한 <emphasis>shmaddr</emphasis>을 가지고 있는 연결된 영역들중 하나여야 한다.  
+	</para>
+	<para>
+		shmdt()가 성공적으로 호출되면 shmid_ds구조체의 멤버를 다음과 같이 변경한다.
+		<orderedlist>
+		<listitem>
+			<para>
+				shm_dtime을 현재 시간으로 변경한다.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				shm_lpid를 현재 호출한 프로세스의 ID로 변경한다.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				shm_nattch을 1 감소 시킨다. 만약 값이 0이되고 세그먼트에 삭제표시가 되어 있다면
+				세그먼트는 삭제된다.
+			</para>
+		</listitem>
+		</orderedlist>
+		호출 프로세스의 유저공간에 점유된 영역은 대응이 풀리지 않는다.
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공하면 0을 반환하고 실패하면 -1을 반환한다.
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EACCES</term>	
+			<listitem>
+				<para>	
+					호출한 프로세스가 붙이기 원하는 영역에 대해서 권한을 가지고 있지 않다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					잘못된 shmid 값, 혹은 잘못된 shmaddr 값을 가지고 있다. 
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOMEM</term>	
+			<listitem>
+				<para>	
+					메모리할당을 할 수 없다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;sys/ipc.h&gt; 
+#include &lt;sys/shm.h&gt; 
+#include &lt;string.h&gt; 
+#include &lt;unistd.h&gt; 
+
+
+int main()
+{
+    int shmid;
+    int pid;
+
+    int *cal_num;
+    void *shared_memory = (void *)0;
+
+
+    // 공유메모리 공간을 만든다.
+		// 크기는 4byte로 한다.
+    shmid = shmget((key_t)1234, sizeof(int), 0666|IPC_CREAT);
+
+    if (shmid == -1)
+    {
+        perror("shmget failed : ");
+        exit(0);
+    }
+
+    // 프로세스 메모리를 공유메모리영역에 붙인다. 
+    shared_memory = shmat(shmid, (void *)0, 0);
+    if (shared_memory == (void *)-1)
+    {
+        perror("shmat failed : ");
+        exit(0);
+    }
+
+    cal_num = (int *)shared_memory;
+    pid = fork();
+    if (pid == 0)
+    {
+        shmid = shmget((key_t)1234, sizeof(int), 0);
+        if (shmid == -1)
+        {
+            perror("shmget failed : ");
+            exit(0);
+        }
+        shared_memory = shmat(shmid, (void *)0, 0666|IPC_CREAT);
+        if (shared_memory == (void *)-1)
+        {
+            perror("shmat failed : ");
+            exit(0);
+        }
+        cal_num = (int *)shared_memory;
+        *cal_num = 1;
+
+        while(1)
+        {
+            *cal_num = *cal_num + 1;
+            printf("child %d\n", *cal_num); 
+            sleep(1);
+        }
+    }
+
+    // 부모 프로세스로 공유메모리의 내용을 보여준다. 
+    else if(pid &gt; 0)
+    {
+        while(1)
+        {
+            sleep(1);
+            printf("%d\n", *cal_num);
+        }
+    }
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리와_세마포어를_이용한_프로세스간_데이터처리">공유 메모리를 이용한 프로세스간 데이터 교환</ulink>
+			</para>
+		
+		</listitem>
+		<listitem>
+			<para>
+			ftok(3)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			ipc(5)			
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmctl(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmat(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmdt(2)
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

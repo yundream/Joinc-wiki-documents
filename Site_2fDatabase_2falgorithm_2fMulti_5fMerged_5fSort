@@ -1,0 +1,376 @@
+#title 다중 Merged Sort
+
+== 소개 ==
+여기에서는 다중의 머지소트(Merged Sort)에 대해서 생각해 보도록 하겠다. 머지소트를 하기 위해서는 3개의 버퍼가 필요하다는 것을 알고 있을 것이다.  
+
+attachment:merged.png
+
+ 1. A에 자료를 집어 넣고 
+ 1. B에 자료를 집어 넣은다음 
+ 1. A와 B를 Merge 해서 결과를 C에 넣는다. 
+ 1. 새로운 데이터가 있다면 다시 A에 넣고
+ 1. A와 C를 Merged 해서 결과를 B에 놓는다.
+ 1. 위의 순서를 반복한다.
+
+이러한 일반적인 merged sort는 그다지 어려울 것이 없다고 생각된다. 그러나 다음과 같은 경우를 생각해볼 수 있다.
+
+attachment:mmerged.png
+
+3개의 A, B, C 그룹이 있고, C그룹의 데이터들을 머지소트한 결과와 B그룹의 데이터들을 머지소트한 결과를 다시 머지 소트하고, 이 결과를 다시 A그룹의 머지소트한 결과의 머지소트해서 최종 결과를 가져온다. 
+
+이러한 요구는 같이 가중치(Level)를 달리하는 서로다른 그룹에 대해서 머지소트하고 이들 그룹을 다시 머지소트해서 Score를 산출해야 하는 검색엔진(:12)등에서 발생할 수 있을 것이다.
+
+간단히 생각하자면, 각 그룹을 머지소트하는데 3개의 버퍼가 필요하므로, 3x2 = 6개의 버퍼로 필요한 계산을 할 수 있을 것이다. 그러나 이 경우 대량의 메모리를 낭비할 수 있다는 문제가 발생한다. 머지소트해야할 데이터가 1,000,000의 레코드로 이루어져 있고, 각각의 레코드의 크기가 20byte 정도라면 한번의 머지소트를 위해서 120M의 메모리를 소비해야 한다. 여기에 동시접속까지 제어해야 하는 서비스에 사용될 엔진이라면, 10명이 접속했을 때, 1.2기가의 메모리를 소비하게 된다.   
+
+이러한 경우 memory(:12)풀을 유지해서, 할당(:12)하는 등의 방법을 고려해야 겠으나 우선적으로 사용한 메모리의 양을 줄일 필요가 있다. '''이 방법에 대해서 고민'''해보기로 했다. 
+
+== 버퍼 레퍼런스 관리 ==
+이 문제를 해결하기 위해서 가능한 최소의 버퍼를 만들어 레퍼런스를 이용해서 재사용하는 방법을 생각해 보았다. 버퍼풀을 유지하기 위한 방법이라고 볼 수 있을 것이다.
+
+attachment:doublemerged.png
+
+여기에는 4개의 버퍼가 사용된다.
+  1. Buff Manager가 4개의 버퍼중 3개를 얻어낸 다음 Lv1 Merged Sorter 에게 돌려준다. 
+    1. Lv1 Merged Sorted는 주어진 3개의 버퍼를 이용해서 Merged Sorted를 한다.
+    1. 마지막으로 결과를 저장한 버퍼의 레퍼런스(주소값)을 저장한다.
+  1. Buffer Manager가 4개의 버퍼중 3개를 얻어낸 다음 Lv2 Merged Sorted 에게 돌려준다. 
+    1. 이때 Lv1 Merged Sorter의 최종결과물이 저장된 버퍼는 사용하면 안된다.
+    1. 우리는 Lv1 Sorter의 결과물 버퍼의 레퍼런스를 알고 있으므로, 이것을 제외한 3개의 버퍼를 Lv2 Sorter에게 할당할 수 있다.
+    1. Lv2 Sorter은 주어진 3개의 버퍼를 이용해서 merged Sorted를 수행한다. 
+    1. 최종결과를 저장한 버퍼의 레퍼런스를 저장한다.
+  1. 이제 두개의 버퍼에 Lv1 Sorter 과 Lv2 Sorter의 결과물이 있다. 두개를 merged해서 사용가능한 버퍼에 결과물을 저장한다. 
+
+[[badsense]]다음은 구현코드다. 아이디어가 실현되는지를 확인하기 위한 코드로 데이터는 int형으로 대신했으며, 실제 merged sort를 하지 않고, 2개의 int형 버퍼에 있는 값을 더해서 남는 버퍼에 저장하도록 했다. 실제 구현은 int형대신, 클래스나 구조체와 같은 자료구조가 들어가고, 덧셈연산대신에 Merged Sort 연산이 들어갈 것이다. 어쨋든 아이디어를 테스트하는데에는 무리가 없을 것으로 생각된다. 
+
+아이디어 구현에 집중하기 위해서 STL(:12)을 사용했다.
+
+  1. 4개의 int형 버퍼중에 3개의 int형 버퍼를 할당한다.
+    1. 첫번째 버퍼에 1이 들어간다.
+    1. 두번째 버퍼에 2가 들어간다.
+    1. 3번째 버퍼에 1+2=3 이 들어간다. 
+    1. 4번째 버퍼에 3이 들어간다.
+    1. 5번째 버퍼에 3+3=6 이 들어간다.
+    1. 즉 101번을 루프를 돌면 5050이라는 값이 나와야 한다. 
+  1. 4개의 int형 버퍼중에, 이전 결과값이 저장된 버퍼를 제외한 3개를 할당한다.
+    1. 1번을 반복한다.
+  1. 2개의 버퍼가 모두 찼다면, 이걸 다시 더해서 남는 버퍼에 넣는다.
+
+{{{#!plain
+#include <iostream>
+#include <vector>
+#include <stdlib.h>
+#include <unistd.h>
+
+using namespace std;
+
+#define BUFSIZE  4
+
+class Buff
+{
+	private:
+		int currentIdx;
+		vector<int *> LBuf;
+		int *tmpptr;
+
+	public:
+		Buff()
+		{
+			currentIdx = 0;
+		}
+
+		void Set(int *a)
+		{
+			LBuf.push_back(a);
+		}
+
+		void Clear()
+		{
+			LBuf.clear();
+		}
+
+		// Merged Sort를 한다. 
+		// 여기에서는 + 연산을 한다.
+		void SetUnion(int a)
+		{
+			int current = (currentIdx+1)%3;
+			int prev = (currentIdx)%3;
+			int tmp = (currentIdx+2)%3;
+
+			if (*LBuf[prev] != -1)
+			{
+				currentIdx++;
+			}
+			*LBuf[current] = a;
+			*LBuf[tmp] = a + *LBuf[prev]; 
+			printf("Debug %d + %d = %d\n", *LBuf[current], *LBuf[prev], *LBuf[tmp]);
+			currentIdx ++;
+
+			tmpptr = LBuf[(currentIdx)%3];
+		}
+
+		// 결과가 저장된 버퍼의 레퍼런스를 넘겨준다.
+		int *GetSumResult()
+		{
+			return tmpptr; 
+		}
+
+		int TmpIdx()
+		{
+			return currentIdx;
+		}
+};
+
+class BufManager
+{
+	private:
+		int *a;
+		vector<Buff> NodeBuf;
+		int checkIdx;
+
+	public:
+
+		BufManager()
+		{
+			// 버퍼를 4개 할당한다.
+			a = (int *)malloc(sizeof(int) * BUFSIZE);
+			checkIdx = 3;
+		}
+
+		void Run()
+		{
+			Buff lBuff1, lBuff2;
+
+			// 각각의 Buff1에 3개씩의 버퍼의 레퍼런스를 할당한다.
+			for (int i = 0; i < BUFSIZE; i++)
+			{
+				a[i] = -1;
+				if (&a[i] != &a[checkIdx])
+				{
+					lBuff1.Set(&a[i]);
+				}
+			}
+			NodeBuf.push_back(lBuff1);
+
+			for (int i = 0; i < BUFSIZE; i++)
+			{
+				a[i] = -1;
+				if (&a[i] != &a[checkIdx])
+				{
+					lBuff1.Set(&a[i]);
+				}
+			}
+			NodeBuf.push_back(lBuff2);
+
+			int idxflag = 0;
+			int idx;
+
+			// 2개의 그룹이 있다고 가정하고 루프를 돌렸다. 
+			for (int i = 0; i < 2; i++)
+			{
+				Buff Bf;
+				idxflag = i % 2;
+				printf("Node Number %d\n", idxflag);
+				getchar();
+
+				// 101번의 merged Sort가 이루어진다고 가정한다.
+				for (int k = i; k < 101+i; k++)
+				{
+					NodeBuf[idxflag].SetUnion(k);
+				}
+
+				// merged Sort가 끝났다면, 버퍼를 초기화 한다.
+				NodeBuf[idxflag].Clear();
+				checkIdx = NodeBuf[idxflag].TmpIdx();
+
+				// 2개의 버퍼에 결과값이 만들어졌다면, 이 두개를 다시 Merged sort한다.
+				// 아래의 코드는 SetUnion 메서드를 사용하도록 바꿀 수 있을 것이다.
+				if (i > 0)
+				{
+					printf("RESULT : %d : %d\n", *NodeBuf[0].GetSumResult(), *NodeBuf[1].GetSumResult() );
+					getchar();
+				}
+
+				// 다음 Level의 Merged Sort를 위해서 3개의 메모리의 레퍼런스를 할당한다.  
+				// 이때 이전에 결과값이 있는 메모리는 사용하지 않도록 한다. 
+				for (int k = 0; k < BUFSIZE; k++)
+				{
+					// 주소값이 같지 않을 경우에만 할당한다.
+					if (&a[k] != NodeBuf[idxflag].GetSumResult())
+					{
+						a[k] = -1;
+						printf("SET %d\n", k);
+						Bf.Set(&a[k]);
+					}
+				}
+				NodeBuf[idxflag?0:1] = Bf;
+				printf("Current Result : %d\n", *NodeBuf[idxflag].GetSumResult());
+				getchar();
+			}
+		}
+};
+
+int main(int argc, char **argv)
+{
+	BufManager *MyBuff; 
+	MyBuff = new BufManager();
+	MyBuff->Run();
+}
+}}}
+=== 약간 수정된 코드 ===
+동일하게 SetUnion 메서드를 사용하도록 약간 수정했다.
+{{{#!plain
+#include <iostream>
+#include <vector>
+#include <stdlib.h>
+#include <unistd.h>
+
+using namespace std;
+
+#define BUFSIZE  4
+
+class Buff
+{
+	private:
+		int currentIdx;
+		vector<int *> LBuf;
+		int *tmpptr;
+	public:
+		
+		Buff()
+		{
+			currentIdx = 0;
+		}
+
+		void Set(int *a)
+		{
+			LBuf.push_back(a);
+		}
+
+		void Clear()
+		{
+			LBuf.clear();
+		}
+
+		void SetUnion(int a)
+		{
+			int current = (currentIdx+1)%3;
+			int prev = (currentIdx)%3;
+			int tmp = (currentIdx+2)%3;
+
+			if (*LBuf[prev] != -1)
+			{
+				currentIdx++;
+			}
+			*LBuf[current] = a;
+			*LBuf[tmp] = a + *LBuf[prev]; 
+			printf("Debug %d + %d = %d\n", *LBuf[current], *LBuf[prev], *LBuf[tmp]);
+			currentIdx ++;
+
+			tmpptr = LBuf[(currentIdx)%3];
+		}
+
+		int *GetSumResult()
+		{
+			return tmpptr; 
+		}
+		int TmpIdx()
+		{
+			return currentIdx;
+		}
+};
+
+class BufManager
+{
+	private:
+		int *a;
+		vector<Buff> NodeBuf;
+		int checkIdx;
+
+	public:
+
+		BufManager()
+		{
+			a = (int *)malloc(sizeof(int) * BUFSIZE);
+			checkIdx = 3;
+		}
+
+		void Run()
+		{
+			Buff lBuff1, lBuff2;
+
+			for (int i = 0; i < BUFSIZE; i++)
+			{
+				a[i] = -1;
+				if (&a[i] != &a[checkIdx])
+				{
+					lBuff1.Set(&a[i]);
+				}
+			}
+			NodeBuf.push_back(lBuff1);
+
+			for (int i = 0; i < BUFSIZE; i++)
+			{
+				a[i] = -1;
+				if (&a[i] != &a[checkIdx])
+				{
+					lBuff1.Set(&a[i]);
+				}
+			}
+			NodeBuf.push_back(lBuff2);
+
+			int idxflag = 0;
+			int idx;
+			for (int i = 0; i < 3; i++)
+			{
+				Buff Bf;
+				idxflag = i % 2;
+				printf("Node Number %d\n", idxflag);
+				getchar();
+				for (int k = 0; k < 10; k++)
+				{
+					NodeBuf[idxflag].SetUnion(k);
+				}
+
+				NodeBuf[idxflag].Clear();
+
+				checkIdx = NodeBuf[idxflag].TmpIdx();
+				if (i > 0)
+				{
+					int another = idxflag?0:1; 
+
+					printf("RESULT : %d : %d\n", *NodeBuf[idxflag].GetSumResult(), *NodeBuf[another].GetSumResult() );
+					NodeBuf[idxflag].SetUnion(*NodeBuf[another].GetSumResult());
+					printf("Current Result : %d\n", *NodeBuf[idxflag].GetSumResult());
+					getchar();
+				}
+
+				for (int k = 0; k < BUFSIZE; k++)
+				{
+					if (&a[k] != NodeBuf[idxflag].GetSumResult())
+					{
+						a[k] = -1;
+						Bf.Set(&a[k]);
+					}
+				}
+				NodeBuf[idxflag?0:1] = Bf;
+
+				//printf("Current Result : %d\n", *NodeBuf[idxflag].GetSumResult());
+				getchar();
+			}
+		}
+};
+
+int main(int argc, char **argv)
+{
+	BufManager *MyBuff; 
+	MyBuff = new BufManager();
+	MyBuff->Run();
+}
+}}}
+
+=== 결론 ===
+버퍼풀을 이용한 merged sort는 유연하게 확장가능하다는 장점이 있다. 검색엔진을 예로 들자면, 어절이 분리될 경우, 2개 이상의 트리를 가지게 될건데, 이렇게 다수의 트리를 가지는 데이터들을 merged sort 하길 원한다면, 5개의 버퍼를 가지는 풀을 유지하면 될 것이다.
+
+attachment:multi_tree.png
+=== 관련글 ===
+ * [wiki:Site/Database/algorithm/Merged_Sort 일반 Merged Sort]

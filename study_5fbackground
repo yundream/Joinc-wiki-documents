@@ -1,0 +1,135 @@
+#title background 구현
+[[TableOfContents]]
+
+=== 개요 ===
+Ctrl+Z 를 입력 받으면 Background로 넘어가는 것을 구현하기 위한 간단한 테스트 프로그램입니다.
+
+최소한의 기능만을 가진 쉘 프로그램이라고 생각하시면 될것 같습니다. 실행시키면 '''#''' 프롬프트가 뜹니다. 여기에서 적당한 명령어를 실행시키시고 - while 무한 루프도는 간단한 프로그램을 만들어서 테스트하는게 좋을듯 - 실행도중 Ctrl+Z 키를 누르면 Background상태로 넘어가서 (테스트)쉘프롬프트가 뜨는걸 확인 할 수 있을 겁니다. 실행도중 Ctrl+C를 누르면 물론 해당 프로그램이 종료되고 쉘프롬프트가 뜨겠죠.
+
+아래의 원리에 의해서 signal(2) 구현을 했습니다.
+ 1. fork & exec 기법으로 프로그램을 실행한다. 
+ 1. 부모는 waitpid(2)를 이용해서 자식이 STOP 되는 시점을 확인할 수 있다. 
+ 1. Ctrl+Z를 누르면 '''SIGTSTP''' 시그널이 발생한다.
+ 1. waitpid(2)를 통해서 기다리던 부모는 자식이 STOP되었음을 확인하고 
+ 1. 다음 루틴(프롬프트 띄우기)로 넘어갈 수 있다. 
+ 1. Ctrl+C가 입력될경우 '''SIGINT''' 시그널이 발생하고, 프로그램은 죽는다.
+ 1. 프로그램이 시그널을 받고 죽은 건, waitpid(2)를 통해서 부모가 감지 가능하다.
+
+=== 예제 코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <set>
+
+using namespace std;
+
+#define chop(str) str[strlen(str)-1] = 0x00
+
+int pid;
+int main()
+{
+  char buf[256];
+  struct sigaction chldact;
+  sigset_t newmask, oldmask;
+  int signo;
+  setsid();
+  set<int> jobpid;
+  set<int>::iterator si;
+
+  sigemptyset(&newmask);
+  // SIGINT와 SIGTSTP 시그널을 Block 시킨다.
+  sigaddset(&newmask, SIGINT);
+  sigaddset(&newmask, SIGTSTP);
+  sigprocmask(SIG_BLOCK, &newmask, &oldmask);
+
+  printf("My Shell\n");
+  while(1)
+  {
+    printf("# ");
+    fflush(stdout);
+    fgets(buf, 255, stdin);
+    chop(buf);
+
+    // 내부명령 처리
+    if (strncmp(buf,"quit",4) == 0)
+      exit(0);
+    // 백그라운드 상태의 프로세스들을 체크한다.
+    else if (strncmp(buf,"job",4) == 0)
+    {
+      int i = 1;
+      si = jobpid.begin();
+      while(si != jobpid.end())
+      {
+        printf("%d : %d\n", i, *si);
+        si++;
+      }
+    }
+
+    // 외부명령 처리
+    // fork&exec 기법으로 처리한다.
+    else if (access(buf, X_OK) == 0)
+    {
+      pid = fork();
+      if (pid < 0)
+      {
+        fprintf(stderr, "Fork Error");
+      }
+      if (pid == 0)
+      {
+        // 자식 프로세스는 signalmask를 상속받는다.
+        // 고로 이전에 블럭시킨 SIGINT와 SIGSTP는 Unblock시켜줘야 한다.
+        sigaddset(&newmask, SIGINT);
+        sigaddset(&newmask, SIGTSTP);
+        sigprocmask(SIG_UNBLOCK, &newmask, &oldmask);
+        if(execl(buf, buf, NULL) == -1)
+          fprintf(stderr, "Command Not Found\n\n");
+
+      }
+      else if (pid > 0)
+      {
+        int status;
+        int rsig;
+        // 자식프로세스의 종료 혹은 STOP를 기다린다.
+        waitpid(pid, &status, WUNTRACED);
+
+        // STOP(Background 전환) 일경우
+        if (WIFSTOPPED(status))
+        {
+          printf("STOP Process %d\n", pid);
+          jobpid.insert(pid);
+          printf("Return\n");
+        }
+
+        // 종료일 경우
+        // 사실 이부분들은 Signal handler로 처리를 해야 겠지만
+        // 귀찮아서
+        if (WIFEXITED(status) != 0)
+        {
+          printf("Kill Process %d\n", pid);
+          jobpid.erase(pid);
+        }
+        if (WIFSIGNALED(status))
+        {
+          printf("SigNal %d\n", pid);
+        }
+
+      }
+    }
+    else
+      fprintf(stderr, "Command Found\n\n", buf);
+  }
+}
+}}}
+
+=== 토론 ===
+ 1. fg 내부 명령을 만들어서, forground 상태로 변환할 수 있도록 해보자. 
+ 1. 실행시킨 프로그램이 백그라운드 상태에서 다른 외부 프로그램에 의해서 signal을 받고 죽었을 경우, 위 코드에서는 이를 관리할 수 없다. 관리 가능하도록 수정해 보자. 
+ 1. 위 코드는 실행 프로그램의 인자를 처리하지 못한다. 처리하도록 확장시켜보자. 
+
+=== 관련 자료 ===
+
+=== 관련 게시물 ===
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=31164&forum=1&1)]]

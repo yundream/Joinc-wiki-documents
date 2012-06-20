@@ -1,0 +1,303 @@
+#title Search 셈플을 통한 Ajax 설명
+
+== xmlhttp.js ==
+{{{#!plain
+function paramEscape(paramValue)
+{
+   return encodeURIComponent(paramValue);
+}
+
+function formData2QueryString(docForm)
+{   
+   var submitString = '';
+   var formElement = '';
+   var lastElementName = '';
+   
+   for(i = 0 ; i < docForm.elements.length ; i++)
+   {
+     formElement = docForm.elements[i];
+     switch(formElement.type)
+     {
+        case 'text' :
+        case 'select-one' :
+        case 'hidden' :
+        case 'password' :
+        case 'textarea' :
+           submitString += formElement.name + '=' + paramEscape(formElement.value) + '&';
+           break;
+        case 'radio' :   
+           if(formElement.checked)
+           {
+             submitString += formElement.name + '=' + paramEscape(formElement.value) + '&';
+           }
+           break;
+        case 'checkbox' :   
+           if(formElement.checked) 
+           {
+             if(formElement.name = lastElementName)
+             {
+                if(submitString.lastIndexOf('&') == submitString.length - 1)
+                {
+                   submitString = submitString.substring(0, submitString.length - 1);
+                }
+                submitString += ',' + paramEscape(formElement.value);
+             }
+             else
+             {
+                submitString += formElement.name + '=' + paramEscape(formElement.value); 
+             }
+             submitString += '&';
+             lastElementName = formElement.name;
+           }
+           break; 
+     }                                                                            
+   }
+   submitString = submitString.substring(0, submitString.length - 1);
+   //document.all("result").value = submitString;
+   return submitString;                               
+}
+
+function xmlHttpPost(actionUrl, submitParameter, resultFunction)
+{
+   var xmlHttpRequest = false;
+   
+   //IE인경우
+   if(window.ActiveXObject)
+   {
+     xmlHttpRequest = new ActiveXObject('Microsoft.XMLHTTP');
+   }
+   else
+   {
+     xmlHttpReq = new XMLHttpRequest();
+     xmlHttpReq.overrideMimeType('text/xml');
+   }   
+        
+   xmlHttpRequest.open('POST', actionUrl, true);
+   xmlHttpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+   xmlHttpRequest.onreadystatechange = function() {
+     if(xmlHttpRequest.readyState == 4)
+     {
+        switch (xmlHttpRequest.status) 
+        {
+           case 404:
+             alert('오류: ' + actionUrl + '이 존재하지 않음');
+             break;
+          case 500:
+             alert('오류: ' + xmlHttpRequest.responseText);
+             break;
+          default:
+             eval(resultFunction + '(xmlHttpRequest.responseText);');
+             break;     
+        }        
+     }
+   }
+   
+   xmlHttpRequest.send(submitParameter);             
+}                        
+}}}
+
+
+ajax_search.html
+{{{#!plain
+<HTML>
+<HEAD>
+<META http-equiv="Content-Type" content="text/html;" charset="euc-kr">
+<SCRIPT type="text/javascript" src="http://jaso.co.kr/xmlhttp.js"></SCRIPT>
+
+<SCRIPT Language="javascript">
+<!--
+      
+function keywordKeyDown()
+{
+    var keyCode = window.event.keyCode;
+    
+    if(keyCode ==  9)   return;     //Tab 키
+    if(keyCode == 13)   return;     //Enter 키
+    if(keyCode == 16)   return;     //Shift 키
+    if(keyCode == 16)   return;     //Ctrl 키
+    if(keyCode == 18)   return;     //Alt 키
+    if(keyCode == 45)   return;     //Ins 키
+    if(keyCode == 46)   return;     //Del 키
+    if(keyCode == 33)   return;     //PgUp 키
+    if(keyCode == 34)   return;     //PgDn 키
+    if(keyCode == 35)   return;     //End 키
+    if(keyCode == 36)   return;     //Home 키
+    
+    if(keyCode >= 37 && keyCode <= 40)   return;     //방향키
+    
+    //Keydown 이벤트 발생 시점에는 아직 TextField에 사용자가 입력한 키 값이 설정되지 않았기 때문에
+    //브라우저가 이벤트에 반응하여 값을 설정할때 까지 잠시 기다린다.
+    setTimeout('submitSearchKeyword()', 250);    
+
+}
+
+function submitSearchKeyword()
+{
+    var url = 'http://jaso.co.kr/searchKeyword.jsp';
+    var queryString = formData2QueryString(document.MAIN_FORM);
+    var resultProcessMethod = 'viewSearchKeywordResult'; 
+    
+    xmlHttpPost(url, queryString, resultProcessMethod);
+} 
+                
+function viewSearchKeywordResult(result)
+{
+    if(result == "")
+    {
+        var searchKeywordDiv = document.all("searchKeyword");
+        searchKeywordDiv.innerHTML = "";
+        searchKeywordDiv.style.visibility = "hidden";
+    }
+    else
+    {
+        var resultList = result.split('|');
+        var viewResult = '';
+        for(i = 0 ; i < resultList.length; i++)
+        {
+            if(i == 0)  viewResult += '<B>' + resultList[i] + '</B> <A href="javascript:hiddenSearchKeywordResult();">[닫기]</A><BR>'
+            else        viewResult += '<A href="javascript:setKeyword(\'' + resultList[i] + '\');">' + resultList[i] + '</A><BR>'
+        }        
+        var searchKeywordDiv = document.all("searchKeyword");
+        searchKeywordDiv.innerHTML = viewResult;
+        searchKeywordDiv.style.visibility = "visible";
+    }
+}
+   
+function hiddenSearchKeywordResult()
+{
+    var searchKeywordDiv = document.all("searchKeyword");
+    searchKeywordDiv.innerHTML = "";
+    searchKeywordDiv.style.visibility = "hidden";
+}
+   
+function setKeyword(selectedKeyword)
+{
+    document.MAIN_FORM.keyword.value = selectedKeyword;    
+} 
+               
+//-->
+</SCRIPT>
+
+<STYLE type="text/css">
+<!--
+  .scroll_div { scrollbar-face-color:#FFFFFF;
+                scrollbar-highlight-color: #aaaaaa;
+                scrollbar-3dlight-color: #FFFFFF;    
+                scrollbar-shadow-color: #aaaaaa;
+                scrollbar-darkshadow-color: #FFFFFF;
+                scrollbar-track-color: #FFFFFF;    
+                scrollbar-arrow-color: #aaaaaa;}
+-->
+</STYLE>
+</HEAD>
+<BODY onLoad="MAIN_FORM.keyword.focus()">
+<FORM name="MAIN_FORM">
+"가", "강"을 입력 해보세요.</BR>
+<INPUT type="text" name="keyword" onkeydown="keywordKeyDown()" style:width=150px" autocomplete="off"><A href="javascript:alert('검색처리');">검색</A>
+<DIV id="searchKeyword" style="width:250px;height:100px;visibility:hidden;background-color:#D1EED2;overflow=auto;font-size:12px" class="scroll_div">
+</DIV>
+</FORM>
+</BODY>
+</HTML>
+}}}
+[[sadsense(center)]]
+소스에는 복잡한 내용은 거의 없다. 검색어 입력 Text의 Keydown 이벤트에 대한 처리 부분과 결과를 받아 화면에 나타내는 부분이 대부분이다. AJAX로 서버에 대한 요청은 다음과 같은 순서로 처리한다.
+
+1.XMLHttpRequest 객체 생성
+IE의 경우 new ActiveXObject('Microsoft.XMLHTTP');와 같이 생성하고 IE가 아닌 경우 new XMLHttpRequest(); 로 생성한다.
+
+2. XMLHttpRequest open
+open() 메소드에는 3개의 파라미터가 있는데 첫번째는 호출방법인 GET, POST 중에 하나가 온다.
+필자의 경우 GET 방식보다는 POST 방식을 선호하기 때문에 대부분의 Request는 POST로 전송하는데 AJAX에서도 당연히 POST를 선호한다.
+두번째 파라미터는 처리하는 서버의 URL 정보이다.
+세번째 파라미터는 비동기/동기 방식에 대한 선택인데 true인 경우 비동기 방식으로 처리한다.
+비동기 방식의 경우 Request를 전송한 다음 서버로부터 응답이 없더라도 브라우저는 계속해서 다른 처리를 할 수 있다.
+사용자로부터 입력을 받거나 다른 스크립트를 수행할 수도 있다.
+반면 동기방식은 요청후 서버로부터 결과를 받을때까지 다른 처리는 할 수 없도록 하는 방식이다.
+검색 입력 필드의 예제에서와 같은 경우는 비동기 방식으로 처리하는 것이 보통이지만 데이터의 수정, 삭제, 입력에 대한 처리의 경우에는 처리가 완료되었다는 서버로부터의 응답을 받은 후 다른 액션을 할 수 있도록 하는 것이 좋다.
+
+3.request의 content type 설정
+GET 방식인 경우 설정할 필요가 없지만 POST 방식인 경우에는 content type을 다음과 같이 설정한다.
+  
+xmlHttpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+4.서버로부터 처리결과 전송 후 수행해야 하는 기능에 대한 정의
+XMLHttpRequest의 onreadystatechange 속성은 서버로부터의 처리 결과에 대한 상태코드가 변경되었을 때 수행해야 하는 스크립트 function을 지정한다.
+여기서는 anonymous function을 사용하여 직접 정의 햐였다.
+   
+   xmlHttpRequest.onreadystatechange = function() {
+     if(xmlHttpRequest.readyState == 4)
+     {
+        //서버로부터 받은 상태코드 및 데이터를 이용하여 처리로직 구현
+     }
+   }
+   
+서버로부터 받은 결과는 XMLHttpRequest의 responseText 속성에 저장되어 있으며 이것은 HttpServletResponse에 의해 전송된 문자열일수도 있고 웹서비스로 Request를 전송한 경우라면 SOAP 프로토콜로 전송된 XML 형식의 데이터일 것이다.
+문자열인 경우 여기서의 예제와 같이 처리할 수 있지만 SOAP 프로토콜로 전송된 XML 데이터인 경우 각각의 브라우저에서 제공하는
+XML 또는 SOAP을 지원한 객체를 이용하여 쉽게 핸들링할 수 있을 것이다.
+
+5. 4번까지의 작업으로 Request가 전송되지 않는다. 전송을 위한 준비 작업과 처리결과 수신시 처리방법에 대한 정의만 하였을 뿐이다.
+  실제 Request를 전송하기 위해서는 send()를 호출하여 전송한다.
+  send()의 파라미터는 전송되는 Request의 파라미터 값이다. 물론 여기서도 일반적인 Request와 같이 '&', '=' 으로 구성된 문자열(예: keyword=test&page=2 )을 만들어서 전송하지만, XML 형태로 만들어서 전송하는 것도 가능하다
+  
+  xmlHttpRequest.send(submitParameter);             
+
+searchKeyword.jsp
+{{{
+<%@ page contentType="text/html; charset=euc-kr" %>
+<%@ page import="java.util.*" %>
+<%
+    HashMap keywordData = new HashMap();
+    keywordData.put("가", "강타|강일|가을소나타|강주희|강은비|강력3반|강동원|가격비교|가방|강수지");
+    keywordData.put("강", "강타|강일|강주희|강은비|강력3반|강동원|가방|강수지");
+    
+    request.setCharacterEncoding("UTF-8"); 
+
+    String keyword = request.getParameter("keyword");
+    //여기에서 데이터베이스로부터 해당 keyword로 시작하는 단어 검색
+    //예제에서는 간단하게 하기 위해 Hash에서 가져오는 것으로 처리
+    String result = (String)keywordData.get(keyword);
+    if(result == null)      result = "키워드 없음";
+    
+    out.print(keyword + " 키워드 목록|" + result);
+%>
+}}}   
+
+AJAX의 Request에 대해 서버에서의 처리는 위의 소스에서 보는 것과 같이 비즈니스 기능에 대한 처리(여기서는 데이터조회)에 대해서는 기존과 동일하지만 처리결과를 브라우저로 전송할때 HTML 형태가 아닌 순수한 데이터형태만 제공하여 클라이언트에서 처리하도록 한다.
+여기서는 데이터의 구분자를 '|' 문자로 구분하도록 처리하였다.
+   
+AJAX의 경우 JavaScript로 처리되기 때문에 인코딩에 대한 처리를 모두 UTF-8로 처리한다. 
+따라서 서버에서 Request를 받아 처리할 때에는 처리할 때에서 반드시 UTF-8로 디코딩하여 처리하여야 한다.
+예제의 경우 searchKeyword.jsp에서 다음과 같이 request에 대해 처리하고 있다.
+
+request.setCharacterEncoding("UTF-8"); 
+
+지금까지 AJAX를 이용하여 간단한 기능을 구현함으로써 AJAX에 대해서 살펴보았다.
+현재 AJAX의 위치는 위의 예제와 같이 애플리케이션의 특정 부분에 대해서만 주로 사용되어지고 있다. 
+앤터프라이즈 애플리케이션에서 전체를 AJAX 기반으로 구현하기에는 아직까지 경험과 사례가 많이 부족하고 AJAX가 Rich Client의 주류로 자리 잡을 것인지에 대해서는 아직까지는 미지수이다. 
+
+
+단점 : 복잡한 HTML에 대한 생성을 자바 스크립트와 같은 스크립트 언어로 처리 (View에 대한 처리가 기존의 Servlet에서 처럼 복잡하게 구현됨. 현재는 JSP 또는 Struts의 taglib를 이용하여 쉽게 처리하고 있지만 이것이 어렵다.)
+
+
+
+연구해야할 사항 : 이런 단점을 극복할 수 있는 스크립트 처리에 대한 표준 마련 및 솔루션 echo2와 같이 이미 나와 있지만 좀 더 많은 연구 및 레퍼런스의 확보가 필요하다고 할 수 있다.
+그리고 지금까지의 아키텍처는 프리젠테이션 - 컨트롤 - 비즈니스 - 데이터와 같은 형태의 레이어 구조만 있었지만 이제는 프리젠테이션 계층을 좀 더 세분화하여 프리젠테이션 내부에서의 View(Dynamic 화면 구성), 컨트롤(요청 및 응답에 대한 제어), 데이터(서버로부터 받은 또는 서버로 전송할)와 같은 세부적인 아키텍쳐에 대한 연구도 필요할 것 같다.
+
+
+테스트 페이지 : ajax_search.html
+
+소스다운로드 : source.zip
+
+레퍼런스
+http://www.onlamp.com/pub/a/onlamp/2005/05/19/xmlhttprequest.html
+http://developer.apple.com/internet/webcontent/xmlhttpreq.html
+http://www.onlamp.com/pub/a/onlamp/2005/05/19/xmlhttprequest.html
+http://www.state26.com/download/formdata2querystring.txt
+http://jania.pe.kr/wiki/jwiki/moin.cgi/JavaScriptTips 
+}}} 
+
+=== Display ===
+http://jaso.co.kr/ajax_search.html
+----
+CategoryHomepage

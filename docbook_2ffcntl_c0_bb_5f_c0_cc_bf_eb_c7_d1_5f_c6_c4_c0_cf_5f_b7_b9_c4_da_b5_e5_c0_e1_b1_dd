@@ -1,0 +1,478 @@
+#title fcntl을 이용한 파일 레코드잠금
+[wiki:article_fcntl을_이용한_파일_레코드잠금 HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>fcntl 을 이용한 파일/레코드잠금</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>dreamyun@yahoo.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+</articleinfo>
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>
+		예를 들어 DB와 같은경우에는 단지 파일잠금을 하는이외에, 파일의 일정부분을 
+		잠그는 레코드 잠금 기능을 필요로 한다. 유닉스에서는 이러한 레코드 잠금을 
+		위해서 fcntl(2) 함수를 제공한다. 사실 fcntl 은 단순히 레코드 잠금만을 
+		위해서 만들어진 함수는 아니며, 제공하는 다양한 파일 조작 기능중 하나일 뿐
+		이다. 이 문서는 그러한 많은 기능중 fcntl 을 이용한 레코드 잠금에 대해서 
+		알아볼 것이다. 
+	</para>
+</section>
+<section>
+	<title>왜 레코드 잠금이 필요한가.</title>
+	<para>
+		사실 대부분의 파일 공유 문제는 파일을 잠그는 정도로 간단하게 해결할수 
+		있다. 하나의 프로세스가 파일을 열기전에 파일이 잠겨 있는지 검사하고, 
+		파일이 잠겨 있지 않다면, 파일을 열고, 파일에 잠금을 걸면 되기 때문이다. 
+		하지만 상당히 많은 사용자가 동시에 접근 해서 파일을 조작해야 한느 RDBMS 
+		같은경우, 유저가 작업을 할때 마다 파일을 잠그게 되면, DBMS의 성능에 
+		좋지 않은 영향을 미치게 될것이다. 
+	</para>
+	<para>
+		이럴경우에는 파일 전체를 잠그는것 보다 실제 해당 프로세스가 엑세스 하는 
+		부분만을 잠그고 나머지 부분은 다른 프로세스에서 접근가능하도록 한다면, 
+		파을전체를 잠그는 것보다 훨씬 빠른 시간에 많은 작업요청을 끝낼수 있을
+		것이다(동시 처리가 가능하므로).
+	</para>
+</section>
+<section>
+	<title>fcntl 잠금</title>
+	<para>
+		우리는 fcntl 이라는 파일 기술자를 조작하는 함수를 이용해서, 
+		파일중 일부분을 잠글수 있다. 다음은 fcntl 함수 원형이다.   
+		<screen>
+#include &lt;unistd.h&gt;
+#include &lt;fcntl.h&gt;
+
+int fcntl(int fd, int cmd);
+int fcntl(int fd, int cmd, long arg);
+int fcntl(int fd, int cmd, struct flock* lock);  // 파일잠금을 위한 fcntl 원형
+		</screen>
+		fcntl 은 위에서 설명했듯이 파일잠금외에도 다양한 파일 기술자 조작기능을 제공한다.
+		그러므로 여러개의 함수원형이 존재하는데 그중 3번재 함수 원형이 레코드 잠금을 
+		위해서 사용된다. 
+	</para>
+
+	<para>
+		3번째 아규먼트를 보면 flock 라는 구조체가 설정되어 있는데, 이 구조체에 
+		파일 레코드 잠금을 위해 필요한 여러가지 정보 즉 잠금의 형태, 어디서 부터 
+		어띠 까지를 잠글것인지, 몇바이트 크기만큼을 잠글것인지 하는 정보가 
+		들어간다. 이러한 정보의 저장을 위해서 flock 구조체는 아래와 같은 
+		멤버들을 포함한다. 
+		<screen>
+struct flock
+{
+    short int l_type;   /* 잠김 타입: F_RDLCK, F_WRLCK, or F_UNLCK.  */
+    short int l_whence; /* 파일의 절대적 위치 */
+    __off_t l_start;    /* 파일의 offset */ 
+    __off_t l_len;      /* 잠그고자 하는 파일의 길이 */
+    __pid_t l_pid;      /* 잠그을 얻은 프로세스의 pid */
+};
+
+		</screen>
+	</para>
+
+	<para>
+		flock.l_type 는 F_RDLCK, 와 F_WRLCK, F_UNLCK 3가지로 세팅가능하다.
+		F_RDLCK와 F_WRLCK 는 읽기와 쓰기전용으로 잠금이 걸려있음을 뜻하며, 
+		F_UNLCK 는 잠금이 되어 있지 않음을 나타낸다. 
+	</para>
+	<para>
+		l_whence, l_start, l_len 은 잠금할 레코드의 위치와 크기를 지정하기 위해서 
+		사용한다. l_whence 는 파일에서의 절대적위치이며, l_start 는 l_whence 에서 
+		이동한 거리 즉 offset 이며, l_len 는 잠금할 레코드의 크기이다. 
+		예를 들어서 l_whence 가 SEEK_SET 이고 l_start 가 16이라면 레코드의 위치는 
+		처음 + 16 이므로 16번째 가 된다. l_len 이 16 이라고 가정하면, 
+		레코드 잠금을 위해서 가르키는 레코드 블럭은 16 에서 32 사이에 있는 데이타 
+		블럭이 될것이다. 
+	</para>
+	<para>	
+		fd 는 조작하기 위한 파일 기술자를 나타내며, cmd 는 조작명령을 나타낸다. 
+		cmd 는 여러가지 조작명령을 포함하고 있는데, 레코드 잠금을 위해서 사용하는 
+		명령어들은 다음과 같은것들이 있다. 
+		<variablelist>
+			<varlistentry>
+			<term>F_SETLK</term>
+			<listitem>
+				<para>
+					flock 구조체에 설정된 잠금을 얻거나, 혹은 잠금을 풀기 위해서 사용된다. 
+					프로세스는 특정 영영의 잠금을 검사해서 잠금을 사용할수 있으면, 잠금을 
+					얻게 되고, 영역에 대한 작업이 끝나면 잠금을 풀어서 다른 프로세스가 
+					사용가능하도록 만든다. 만약 잠금을 얻을수 없으면 (-1)을 리턴한다.  
+				</para>	
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term>F_SETLKW</term>
+			<listitem>	
+				<para>
+					F_SETLK 와 같은 일을하지만, 에러를 리턴하는데신 잠금이 풀릴때까지
+					해당영역에서 기다린다(block). F_SETLK 의 봉쇄형이다. 
+				</para>
+			</listitem>	
+			</varlistentry>
+
+			<varlistentry>
+			<term>F_GETLK</term>
+			<listitem>	
+				<para>
+					잠금이 있는지 없는지 검사를한다. 만약 잠금이 없다면 
+					flock.l_type 를 F_UNLCK로 설정한다. 만약 잠금이 있다면, 현재의 
+					flock 정보를 flock 구조체로 돌려준다. 
+				</para>
+			</listitem>	
+			</varlistentry>
+		</variablelist>
+	</para>
+</section>
+<section>
+	<title>파일잠그기와 레코드 잠그기</title>
+	<section>
+		<title>파일잠그기</title>
+		<para>	
+			fcntl 을 이용한 파일잠그기와 레코드 잠그기의 방법은 동일하다. 
+			파일을 잠그고자 한다면, 파일을 열때 fcntl 을 이용해서 특정바이트(보통 파일의 
+			첫바이트)를 잠그고, 이 파일을 열고자 하는 다른 모든 프로세스는 파일의 첫번째 
+			바이트를 검사해서 잠겨있다면 풀릴때까지 기다리거나, 리턴하면 된다. 
+		</para>	
+		<para>	
+			레코드 잠금은 단지 이러한 검사를 레코드 단위별로 나눠서 한다는것만 다를 뿐이다. 
+		</para>	
+		<para>
+			다음은 fcntl 을 이용해서 파일잠금을 이용한 예이다. 
+			이 프로그램은 <ulink url=/modules.php?name=News&file=article&sid=40&mode=&order=0&thold=0>세마포어의 사용</ulink>에 나오는 예제 sem_test.c 을 fcnlt 버젼으로 재 작성한 것이다. 
+		</para>	
+		<para>	
+			<emphasis>예제: fcntl_test.c</emphasis>
+			<screen>
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+int fd_lock(int fd);
+int fd_open(int fd);
+int fd_isopen(int fd);
+
+int main()
+{
+    int fd;
+    int n_read;
+    char buf[11];
+    char wbuf[11];
+
+    fd = open("counter.txt", O_CREAT|O_RDWR); 
+    if (fd == -1)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+    if (fd_isopen(fd) == -1)
+    {
+        perror("file is lock "); 
+        exit(0);
+    }
+    printf("I get file lock\n");
+
+    memset(buf, 0x00, 11);
+    memset(wbuf, 0x00, 11);
+    if ((n_read = read(fd, buf, 11)) > 0)
+    {
+        printf("%s\n", buf); 
+    }
+
+    // 처음위치로 되돌린다. 
+    lseek(fd, 0, SEEK_SET);
+    sprintf(wbuf, "%d", atoi(buf) + 1);
+    write(fd, wbuf, 11);
+    
+    // 숫자외의 필요없는 부분을 자른다.  
+    ftruncate(fd, strlen(wbuf)); 
+    // 10 초를 쉰다. 
+    sleep(10);
+
+    // 파일잠김을 뿐다. 
+    if (fd_unlock(fd) == -1)
+    {
+        perror("file unlock error ");
+    }
+    printf("file unlock success\n");
+    sleep(5);
+
+    close(fd);
+}
+
+// 파일이 잠겨있는지 확인하고 잠겨 있지 않으면
+// 잠금을 얻고 
+// 잠겨 있을경우 잠김이 풀릴때까지 기다린다(F_SETLKW) 
+int fd_isopen(int fd)
+{
+    struct flock lock;
+
+    lock.l_type = F_WRLCK; 
+    lock.l_start = 0;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 0;
+
+    return fcntl(fd, F_SETLKW, &amp;lock);
+}
+
+// 파일 잠금을 얻은후 모든 작업이 끝난다면 
+// 파일 잠금을 돌려준다. 
+int fd_unlock(int fd)
+{
+    struct flock lock;
+
+    lock.l_type = F_UNLCK; 
+    lock.l_start = 0;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 0;
+
+    return fcntl(fd, F_SETLK, &amp;lock);
+}
+			</screen>
+			테스트 하기전에 counter.txt 파일을 하나 만들고 내용은 '1' 로 한다음에 저장하자. 
+		</para>	
+		<para>	
+			위의 예제는 counter 를 증가시키는 프로그램이다. counter.txt 에 대해서는 여러개의 
+			프로세스가 동시에 접근이 가능하므로 한번에 하나의 프로세스만 접근해서 counter 을 증가
+			시키도록 파일 잠금을 해야 한다. 이전의 "세마포어의 사용"에서는 세마포어를 이용해서 
+			구현했는데, 이번에는 fcntl 을 이용해서 구현했다. 세마포어 버젼에 비해서 코드가 
+			한결간단해 졌음을 알수 있다.  
+		</para>	
+		<para>
+			프로그램은 파일의 내용을 읽어들여서 읽어들인 문자를 숫자로 변환한다음 1을 더한후 
+			다시 저장하게 된다. 
+			숫자를 읽어서 저장하는 도중에 다른 프로세스가 끼어들면 안되므로 파일을 열기전에 
+			fcntl 을 이용해서 잠금을 얻고, 파일을 닫기전에 잠금을 풀도록 했다.  
+		</para>	
+	</section>
+	<section>
+		<title>레코드 잠그기</title>
+		<para>
+			기본적으로 파일잠그는 방법과 동일하다고 보면 된다. 단지 특정 범위에 대해서
+		 	만 잠금을 허용하는게 다를 뿐이다. 이번에는 레코드 잠금을 테스트 하긴 프로그램은 
+			이러한 지역 파일 잠금의 특성을 테스트 하기 위해서 별도의 셈플 파일을 만들도록 
+			할것이다. 다중 프로세스 카운터로써 하나의 파일에 여러개의 카운터를 동시에 관리 
+			하는 프로그램을 만들것이다. 이것은 아마도 가장 간단한 형태의 db시스템이 
+			될것이다. 잠금과 풀기를 할때 레코드의 영역을 쉽게 정의 하기 위해서 하나의 
+			카운터 블럭은 16 바이트로 고정할 것이고, 카운터 숫자이외의 영역은 널로 채워질 
+			것이다.   
+            <screen>
+ 1              16            31 
++--------------+-------------+--------------+
+|31|\0\0\0 ... |15|\0\0\0 ...|105|\0\0\0 ...|
++--------------+-------------+--------------+
+1st counter    2st counter   3st counter 
+            </screen>
+			파일은 위와 같은 내용을 가지게 될것이다. 프로세스가 1번째 counter 데이타에 
+			접근할때 굳이 1번부터 16번까지 전부다 잠글필요는 없으므로 1번만 잠그도록 
+			한다. 그러면 프로세스가 1번째 counter 데이타에 접근중일때 다른 프로세스는 
+			접근을 하지 못할것이다. 그렇지만 2번째와 3번째 counter 데이타에는 접근이 
+			가능할것이다.   
+		</para>
+		<para>
+			다음의 예제는 counter 데이터를 만들기 위한 코드이다. 데이터 파일 이름은 
+			b_counter 로 정했다. 
+		</para>
+		<para>
+			<emphasis>예제: mkcount.c</emphasis>
+			<screen>
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;fcntl.h&gt;
+
+#define BLOCK_SIZE 16
+int main()
+{
+    int fd;
+    int i;
+    char buf[BLOCK_SIZE];
+    if ((fd = open("b_counter", O_CREAT|O_WRONLY)) == -1)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+    for(i = 1; i < 4; i++)
+    {
+        memset(buf, 0x00, BLOCK_SIZE);
+        sprintf(buf,"%d", i);
+        write(fd, buf, BLOCK_SIZE);
+    }    
+    close(fd);
+}
+			</screen>
+			위 코드를 실행시키면 b_counter 이란 파일을 만들어낸다. 파일의 데이타가 
+			제대로 생성되었는지 알아보기 위해서 od(1) 라는 명령어를 사용했다.   
+			<screen>
+[root@localhost test]# od -c b_counter 
+0000000   1  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+0000020   2  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+0000040   3  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+0000060
+[root@localhost test]# 
+			</screen>
+		</para>
+		<para>
+			다음은 위의 b_counter 를 직접 조작하는 프로그램이다.
+		</para>
+		<para>
+			<emphasis>예제: fcntl_counter.c</emphasis> 
+			<screen>	
+#include &lt;fcntl.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+#define BLOCK_SIZE 16
+int fd_isopen(int fd, int data_index);
+int fd_unlock(int fd, int data_index);
+int main(int argc, char **argv)
+{
+    int fd;
+    int n_read;
+    int data_index;
+    char buf[BLOCK_SIZE];
+    char wbuf[BLOCK_SIZE];
+
+    if (argc < 2)
+    {
+        printf("Usage: ./fcntl_counter.c [데이타번호]\n");
+        exit(0);
+    }
+
+	// 데이타의 위치를 찾음
+    data_index = BLOCK_SIZE * (atoi(argv[1]) - 1); 
+
+    fd = open("b_counter", O_RDWR);
+    if(fd == -1)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+
+    // 해당 데이타를 포함한 레코드 영역을 
+    // 데이타 위치에서 부터 BLOCK_SIZE 크기 만큼 잠금
+    if (fd_isopen(fd, data_index) == -1)
+    {
+        perror("file is lock ");
+        exit(0);
+    }
+
+    // 파일내에서 조작할 데이타 위치로 이동
+    // 해서 counter 정보를 읽어들임
+    lseek(fd, data_index, SEEK_SET);
+    memset(buf, 0x00, BLOCK_SIZE);
+    if ((n_read = read(fd, buf, BLOCK_SIZE)) < 0)
+    {
+        perror("read error : ");
+        exit(0);
+    }    
+
+    memset(wbuf, 0x00, BLOCK_SIZE);
+    sprintf(wbuf, "%d", atoi(buf)+1);
+    printf("count %s -> %s\n", buf, wbuf);
+
+    
+    // 파일내에서 조작할 데이타 위치로 이동해서
+    // counter 정보를 씀
+    lseek(fd, data_index, SEEK_SET);
+    write(fd, wbuf, BLOCK_SIZE);
+
+    sleep(10);
+
+    // 잠금을 해제함
+    if (fd_unlock(fd, data_index) == -1)
+    {
+        perror("file unlock error ");
+        exit(0);
+    }
+    close(fd);
+}
+
+int fd_isopen(int fd, int data_index)
+{
+    struct flock lock;
+
+    lock.l_type = F_WRLCK;
+    lock.l_start = data_index;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 1;
+
+    return fcntl(fd, F_SETLKW, &amp;lock);
+}
+
+int fd_unlock(int fd, int data_index)
+{
+    struct flock lock;
+
+    lock.l_type = F_UNLCK;
+    lock.l_start = data_index;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 1;
+
+    return fcntl(fd, F_SETLK, &amp;lock);
+}
+			</screen>	
+		</para>
+		<para>
+			이 예제는 fcntl_test.c 를 약간 수정해서 작성했다. fcntl_test.c 에서 
+			레코드 잠금을 블럭단위로 지정할수 있도록 fd_isopen, fd_unlock 함수를 
+			약간 수정했으며, 실지로 counting 할수 있도록 만들었다.  
+		</para>
+		</para>
+			테스트 방법은 간단하다. ./fcntl_counter 은 하나의 아규먼트를 가질수 있으며, 
+			아규먼트는 각 데이타에 접근하기 위한 인덱스 값을 가진다. 
+			즉 첫번째 데이타에 접근하기 위해서는 1, 2번재는 2, 3번째는 3 이런식으로 아규먼트를 
+			주면 된다. 그러면 프로그램은 해당 데이타의 값을 읽어들이고 +1을 시켜준다음에 
+			저장한다. 이때 해당 데이타블럭은 한번에 하나의 프로세스만 접근할수 있도록 "레코드잠금"
+			을 사용한다.  
+		</para>
+		<para>
+			이건 파일잠금이 아니므로 하나의 프로세스가 첫번재 데이타에 접근할때, 파일전체가 
+			잠기지 않고 해당 레코드 영역만 잠기게 된다. 그러므로 해당 레코드에 대한 접근만 
+			할수 없으며 다른 데이타 블럭에는 접근가능하다. ./fcntl_counter 을 여러가지 
+			방법으로 테스트 해보면, 파일잠금과 레코드 잠금의 특징을 이해할수 있을것이다.    
+		</para>
+	</section>
+</section>
+<section>
+	<title>권고 잠금과 필수 잠금</title>
+	<para>	
+		우리가 지금까지 다룬 잠금은 권고잠금형태이다. 즉 협력되지 않는 프로세스에 대해서는 
+		잠금이 보장되지 않는다. 반드시 해당 파일이나 레코드에 대해서 프로세스간에 fcntl 을 
+		이용해서 협력을 해야지만 잠금이 이루어지게 된다. 그러므로 위의 카운터 프로그램에서 
+		레코드 잠금이 되어 있다고 하더라도, vi 로 파일을 열어서 직접 데이타를 조작하는것을 
+		막을수는 없다.     
+	</para>	
+	<para>	
+		이와 반대되게 협력되지 않는 프로세스간에도 잠금을 사용할수 있도록(잠금을 강제하도록) 
+		하는 잠금을 필수 잠금이라고 한다. 이문서에서는 필수 잠금은 다루지 않을것이다. 
+		왜냐하면 아직 표준이 아니고, 굳이 필수 잠금까지 다룰필요는 없다고 생각되기 때문이다. 
+		필수 잠금대신에 파일 퍼미션과 권고잠금을 잘 조합해서 이용하는게 더 구현이 용이하고 
+		좀더 표준적으로 프로그래밍 할수 있다. 
+	</para>	
+</section>
+</article>
+
+}}}

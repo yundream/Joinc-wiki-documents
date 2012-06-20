@@ -1,0 +1,132 @@
+#title 자바하는놈 님의 구현
+
+
+{{{#!plain
+/*
+ * PriorityQueue.java
+ *
+ * Created on 2006년 9월 28일 (목), 오후 9:41
+ *
+ * To change this template, choose Tools | Template Manager
+ * and open the template in the editor.
+ */
+
+package com.wkang.util.priorityqueue;
+
+import java.security.InvalidParameterException;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.NoSuchElementException;
+import java.util.Random;
+
+/**
+ *급하게 짰으므로 다른태클 삼가ㄳ 
+ * added oct 3 06 : actually it doesnt really need a pop operation because iterator has 
+ * remove() method. however, i added anyway
+ * @author 자바하는놈/자바쉑키
+ */
+
+public class PriorityQueue<E extends Comparable<E>> implements Iterable<E>{
+    private int size;
+    private LinkedList<E> topList = new LinkedList<E>();
+    
+    
+    public PriorityQueue(int size) {
+        if(size <= 0) {
+            throw new IllegalArgumentException();
+        }
+        this.size = size;
+    }
+    
+    public boolean offer(E o) {
+        try {
+            E lowest = null;
+            E highest = null;
+            //if empty
+            try {
+                lowest = topList.getFirst();
+                highest = topList.getLast();
+            } catch(NoSuchElementException e) {
+                return topList.offer(o);
+            }
+            //not empty
+            
+            {//search , insert
+                int idx = topList.size() / 2;
+                int range = topList.size() / 4;
+                if(range < 1) {
+                    range = 1;
+                }
+                while(true) {//search
+                    E val = topList.get(idx);
+
+                    if( o.compareTo(val) == 0 ) { // if it's the same'
+                        topList.add(idx+1, o);
+                        break;
+                    } else {
+                        if(topList.size()-1 >= idx) { //if idx is not at the very end
+                            if(o.compareTo(topList.getLast()) > 0) {// if it's bigger than the biggest
+                                topList.addLast(o);
+                                System.out.println(o + " is bigger than "+ val + " : putting in");
+                                break;
+                            }if(o.compareTo(topList.getFirst()) < 0) {
+                                topList.addFirst(o);
+                                System.out.println(o + " is smaller than the smallest, putting it");
+                                break;
+                            }
+                        }
+                        if( (o.compareTo(val)) > 0 && ( o.compareTo(topList.get(idx+1)) < 0 ) ) { // if it fits in the middle
+                            topList.add(idx+1, o);
+                            System.out.println(o + " is bigger than "+ val + " and smaller than " + topList.get(idx+1) + " : putting in");
+                            break;
+                        }
+                    }
+                    if( o.compareTo(val) < 0) { // smaller
+                        idx = idx - range;
+                        System.out.println(o + " is smaller than " + val + " changing idx to " + idx);
+                    } else { // bigger
+                        idx = idx + range;
+                        System.out.println(o + " is bigger than " + val + " changing to " + idx);
+                    }
+                    if(range > 1) {
+                        range = range / 2;
+                        System.out.println("setting range to +"+ range);
+                    }
+                }//while end
+            }
+            if(topList.size() > size) {
+                topList.remove(0);
+            }
+            
+        } catch(Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    public Iterator<E> iterator() {
+        return topList.iterator();
+    }
+    public E pop() {
+        return topList.remove(topList.size()-1);
+    }
+
+    //TESTING MAIN
+    public static void  main(String args[]) {
+        PriorityQueue<Integer> q = new PriorityQueue<Integer>(100);
+        Random r = new Random();
+        for(int ix=0;ix<1000; ix++) {
+            q.offer(r.nextInt(1000));
+            for(Integer i: q) {
+                System.out.print("[ "+ i + " ] ");
+            }
+            System.out.println();
+        }
+        
+    }
+    
+  
+}
+}}}
+

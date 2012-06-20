@@ -1,0 +1,131 @@
+#title XenServer Command
+
+== XenServer Command ==
+=== 명령어 규칙 === 
+xe는 명령어 규칙이 있다. 이 규칙을 알면 xe 명령을 쉽게 사용할 수 있다.
+  * ''class''-list
+  * ''class''-param-get
+  * ''class''-param-set
+  * ''class''-param-list
+  * ''class''-param-add
+  * ''class''-param-remove
+  * ''class''-param-clear
+다음 중 하나를 class이름으로 사용하면 된다.
+  * console
+  * host
+  * host-crashdump
+  * host-cpu
+  * network
+  * patch
+  * pbd
+  * pif
+  * pool
+  * sm
+  * sr
+  * task
+  * template
+  * vbd
+  * vdi
+  * vif
+  * vm
+예를 들어 vm의 설정 정보들을 가져오고 싶다면, 다음과 같이 명령을 내리면 된다.
+{{{#!plain
+# xe vm-param-list uuid=5d67711a-1510-7a68-4655-1e54e6557195
+uuid ( RO)                          : 5d67711a-1510-7a68-4655-1e54e6557195
+                    name-label ( RW): dream test
+              name-description ( RW): 
+                  user-version ( RW): 1
+                 is-a-template ( RW): false
+                 is-a-snapshot ( RO): false
+                   snapshot-of ( RO): <not in database>
+                     snapshots ( RO): 
+                 snapshot-time ( RO): 19700101T00:00:00Z
+                 snapshot-info ( RO): 
+                        parent ( RO): 70035f20-a9e7-9285-4d19-d3a55e1d8cdc
+                      children ( RO): 
+             is-control-domain ( RO): false
+                   power-state ( RO): running
+...
+}}}
+명령이 잘 기억나지 않을 경우 '''TAB'''키를 누르면 된다. 그러면 사용할 수 있는 옵션을 보여준다.
+
+=== VM 목록과 간단한 정보 ===
+Node의 vm 목록과 간단한 정보를 출력한다.
+{{{#!plain
+# xe vm-list
+uuid ( RO)           : 5d67711a-1510-7a68-4655-1e54e6557195
+     name-label ( RW): dream test
+    power-state ( RO): running
+}}}
+  * uuid : vm의 유니크한 ID 
+  * name-label : VM의 이름 
+
+=== CD 목록 ===
+Node에서 사용할 수 있는 CD/DVD 목록과 사용할 수 있는 ISO 이미지를 보여준다.
+{{{#!plain
+# xe cd-list
+uuid ( RO)          : 489a20dc-4a60-4c0f-8b53-edd81c5e7422
+    name-label ( RW): CentOS-5.4-x86_64-bin-DVD.iso
+
+
+uuid ( RO)          : 23051172-255b-4899-90df-22e6b03927f5
+    name-label ( RW): XenCenter.iso
+}}}
+
+=== Console 목록 ===
+XenServer가 VM을 만들면, VM을 직접 관리할 수 있는 Console을 만든다. 이 콘솔은 RFB 프로토콜을 이용해서 원격에서 VM을 직접 제어할 수 있도록 한다.
+{{{#!plain
+# xe console-list 
+uuid ( RO)             : 37cb241b-b917-3c3b-2ee0-eced56094707
+          vm-uuid ( RO): 5d67711a-1510-7a68-4655-1e54e6557195
+    vm-name-label ( RO): dream test
+         protocol ( RO): RFB
+         location ( RO): https://11.11.11.11/console?ref=OpaqueRef:d9557e71-cfd9-f934-5c2a-2ac98e6ec839
+}}}
+
+=== 물리적인 Network interface scan ===
+{{{#!plain
+# xe pif-scan host-uuid=xxxxxx-xxxx-xxxx-xxxx-xxxxxxx
+}}}
+  * Dome0에서 물리적인 네트워크를 등록하기 위해서 사용한다. 
+  * host-uuid는 host-list로 확인할 수 있다.
+
+=== 물리적인 Network interface 목록 출력 ===
+{{{#!plain
+# xe pif-list
+uuid ( RO)                  : xxxxxx-xxxx-xxxx-xxxx-xxxxxxx
+                device ( RO): eth0
+    currently-attached ( RO): true
+                  VLAN ( RO): -1
+          network-uuid ( RO): b4c7ae98-213a-60e2-5ebb-1069a95d0c0a
+
+
+uuid ( RO)                  : 648f497a-d930-fe59-b5c6-b3a5f43c778b
+                device ( RO): eth1
+    currently-attached ( RO): false
+                  VLAN ( RO): -1
+          network-uuid ( RO): 91eaac85-e275-8f59-78ea-a3e9ec7ede3f
+}}}
+
+=== xen 네트워크 관리 ===
+==== xen 네트워크 목록 확인 ====
+{{{#!plain
+# xe network-list
+...
+uuid ( RO)                : 7eec0787-93e0-aef5-6732-08c8e93e3afb
+          name-label ( RW): Host internal management network
+    name-description ( RW): Network on which guests will get assigned a private link-local IP address
+              bridge ( RO): xapi4
+
+
+uuid ( RO)                : e53d975c-b66b-3543-aa9a-3a9b41682caa
+          name-label ( RW): public
+    name-description ( RW): 
+              bridge ( RO): xenbr1
+}}}
+
+==== xen 네트워크 삭제 ====
+{{{#!plain
+# xe network-destroy uuid=<network uuid>
+}}}
+

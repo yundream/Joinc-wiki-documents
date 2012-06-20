@@ -1,0 +1,131 @@
+#title Command Pattern
+
+== Command Pattern ==
+패턴과 패턴에 대한 (UML을 포함한)설명글을 보면 역시 사용하는 것보다 설명하는게 더 어렵군이라는 느낌이다. 내 생각을 잘 이해하기 쉽게 잘 전달해보자라는 마음가짐으로 가능한 평이하게 글을 만들어 봐야겠다.
+
+'''Command Pattern'''은 행동자체를 객체로 본다. 행동을 객체로 봄으로써 좀더 쉽게 명령을 내리기 전의 상태로 복귀할 수 있다. 문제가 생길때 마다 그때 그때 쪽지로 일거리를 만들어서 주는 경우를 생각해 보자. 나중에 그 결과를 정리하는 것도 매우 복잡한 일이 될 확률이 높을 것이다. 이렇게 하지 않고 문제자체를 객체로 만들어서, 그러니까 문제를 분류하고 묶어서 서류철을 만들어서 넘기고 결과를 포함한 서류철을 다시 받게 된다면 문제에 대한 처리가 훨씬 간결해 질 것이다. 일반적인 업무처리에서도 흔히볼 수 있는 방식이기도 하다. Command Pattern이란 즉 수행해야할 문제 혹은 명령을 객체로 처리하는 방식이라고 정의내릴 수 있을 것이다. 
+
+이러한 특징은 다음과 같은 응용에 유용하다.
+  1. Multi-level undo  
+    유저의 명령을 객체로 만든다. 만들어진 명령객체은 stack(:12)에 유지시키면,가장 최근에 실행된 명령이 가장 위에 놓이게 될 것이다. undo를 원한다면 undo() 메서드를 실행시켜서 pop을 하면 된다.  
+  1. Progress bar
+    프로그램에게 주어진일의 명령의 연속으로 이루어진다고 가정한다. 이때 각각의 명령객체는 '''getEstimatedDuration'''메서드를 가진다. 프로그램은 이 메서드를 이용해서 명령이 어느정도 수행되었는지를 쉽게 판단할 수 있다. 
+  1. thread pool
+  1. parallel processing
+  1. networking
+
+attachment:Command_pattern.png
+
+ '''Command'''
+   이 패턴에서 가장 중요한 클래스는 명령을 수행하는데 필요한 인터페이스를 가지고 있는 '''Command'''객체다. 일상업무에서의 '''작업요청서'''라고 볼 수 있을 것이다. 우리가 이 패턴을 사용하는 이유는 명서세에 적혀있는 명령을 '''실행'''하는 것이므로 명령을 수행하기 위한 '''execute'''메서드를 포함한다.
+ '''ConcreteCommand'''
+   '''Receiver'''객체가 어떤 Action을 취할지를 정의한다.
+ '''Receiver'''
+   주어진 요청에 대해서 어떤일을 수행해야 하는지를 알고 있는 객체.
+ '''Invoker'''
+   명령의 수행을 요청한다.
+ '''Client'''
+   ConcreteCommand 객체를 생성한다.
+
+== 예제 ==
+=== C++ ===
+간단한 요리 프로그램이다. 재료를 준비를 위한 준비명령객체, 준비된 재료를 가지고 프라이팬에 볶는등의 작업을 하는 행동명령객체가 준비된다. 요리는 사람이 하는 거라서 때때로 실수가 있을 수 있기 때문에 '''Undo'''기능을 가진다. Undo 기능은 명령객체를 stack(:12)에 쌓아두고 '''pop'''하는 것으로 구현할 수 있다. 빠른 구현을 위해서 STL(:12)의 vector(:12)를 사용했다.
+
+{{{#!plain
+#include <iostream>
+#include <vector>
+#include <string>
+
+using namespace std;
+
+// 가상메서드를 포함한 인터페이스 슈퍼 클래스 
+class Command{
+  public:
+   virtual void execute(void) =0;
+   virtual ~Command(void){};
+};
+ 
+class Ingredient : public Command {
+  public:
+   Ingredient(string amount, string ingredient){
+      _ingredient = ingredient;
+      _amount = amount;
+   }
+   void execute(void){
+      cout << " *Add " << _amount << " of " << _ingredient << endl;
+   }
+  private:
+   string _ingredient;
+   string _amount;
+};
+ 
+class Step : public Command {
+  public:
+   Step(string action, string time){
+      _action= action;
+      _time= time;
+   }
+   void execute(void){
+      cout << " *" << _action << " for " << _time << endl;
+   }
+  private:
+   string _time;
+   string _action;
+};
+
+// command를 저장하고 꺼내기 위한 stack(:12) 클래스 
+class CmdStack{
+  public:
+   void add(Command *c) {
+      commands.push_back(c);
+   }
+   void createRecipe(void){
+      for(vector<Command*>::size_type x=0;x<commands.size();x++){
+         commands[x]->execute();
+      }
+   }
+   void undo(void){
+      if(commands.size() > 0) {
+         commands.pop_back();
+      }
+      else {
+         cout << "Can't undo" << endl;
+      }
+   }
+  private:
+   vector<Command*> commands;
+};
+ 
+int main(void) {
+   CmdStack list;
+ 
+   //Create ingredients
+   Ingredient first("두스푼", "식용유");
+   Ingredient second("세컵", "쌀");
+   Ingredient third("한스푼","케찹");
+   Ingredient fourth("네홉", "콩");
+   Ingredient fifth("한스푼", "간장");
+ 
+   //Create Step
+   Step step("후라이팬에 볶기","3-4분 정도");
+ 
+   //Create Recipe
+   cout << "볶음밥을 만들어봅시다." << endl;
+   list.add(&first);
+   list.add(&second);
+   list.add(&step);
+   list.add(&third); 
+   list.undo();
+   list.add(&fourth);
+   list.add(&fifth);
+   list.createRecipe();
+   cout << "요리시작!" << endl;
+   return 0;
+}
+}}}
+
+=== C ===
+음.. 그닥 객체지향적이지 않다고 생각되는 C(:12)를 이용해서도 구현해 봐야 겠다. 다음과 같은 요소들이 필요하지 않을까 싶다.구조체에 함수포인터(:12) 다발을 두는 것으로 클래스 비슷하게 만들어낼 수 있긴 하겠다. 
+
+=== PHP ===
+애초에 전혀 객체지향적이지 않게 만들어졌던 php는 php4가 되어서야 class 키워드를 제공하기 시작했고 php5에 이르러서 그럭저럭 객체지향적이다라는 얘기를 듣게 되었다. 이제는 객제지향 패턴을 사용해서 만들어진 PHP(:12) 프로그램도 어렵지 않게 찾아볼 수 있다. 

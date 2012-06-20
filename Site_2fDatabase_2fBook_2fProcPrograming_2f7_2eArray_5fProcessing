@@ -1,0 +1,528 @@
+#title Array Processing 
+
+=== Array Processing ===
+커서를 사용한 프로그램을 본다면 아주 잘 된 프로그램 같아 보인다. 실제로도 아주 훌륭하게 동작하고 별 무리 없이 사용할 수 있는 프로그램이다. 그러나 여기에도 한가지 문제점이 있다. 바로 네트웍 트레픽을 잡아 먹고 그에 따른 시간이 많이 걸린다는 것이다. 이것은 어떻게 본다면 별 문제가 아닌거 같지만 패치할 행이 아~~~ 주 많은 경우에는  프로그램 성능면에서 상당한 문제를 일으킨다. 바로 전체 크기가 같더라도 큰 파일 하나를 복사하는 것 보다 수많은 작은 파일들을 복사하는 것이 더 오래걸리는 것과 같은 이유일 것이다. 이런 문제를 해결 할수 있는 가장 훌륭하다고 할 수 있는 프로그램이 바로 Array Processing이다. 이름을 봐서도 알 수 있듯이 한번에 한 행을 패치 해 오는 것이 아니라 한번에 여러 행을 패치해 오는 것이다. 예제를 통해서 자세히 보도록 하자.
+{{{#!plain
+/* --------------------------------------------------------------------------------
+파일 이름 : array_select.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <stdlib.h>
+
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+ * 호스트 변수 선언
+ */
+exec sql begin declare section;
+    /*
+     * 사용자 ID와 패스워드
+     */
+    char *username;
+    char *password;
+
+    /*
+     * emp 테이블의 칼럼 리스트
+     * 받아올 테이블의 행의 수만큼 배열을 설정한다.
+     */
+    int empno [14];
+    int mgr [14];
+    int sal [14];
+    int comm [14];
+    int deptno [14];
+    char ename [14][11];
+    char job [14][10];
+    char hiredate [14][10];
+
+    /*
+     * emp 테이블 칼럼들의 Indicator 변수
+     * 받아올 테이블의 행의 수만큼 배열을 설정한다.
+     */
+
+short ind_empno [14];
+    short ind_mgr [14];
+    short ind_sal [14];
+    short ind_comm [14];
+    short ind_deptno [14];
+    short ind_ename [14];
+    short ind_job [14];
+    short ind_hiredate [14];
+exec sql end declare section;
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 롤백 후에 접속을 종료한다.
+ * sqlca로 에러 검사.
+ */
+void sql_error (void)
+{
+    printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+    printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exec sql whenever sqlerror continue;
+    exec sql rollback work release;
+
+    exit (EXIT_FAILURE);
+}
+
+int main (void)
+{
+int i = 0;
+char buf [256] = {'\0', };
+
+    username = (char *)strdup ("scott");
+    password = (char *)strdup ("tiger");
+
+    /*
+     * scott 사용자 계정으로 접속 시도
+     * 접속 시도 후에 성공 여부를 위해 에러를 검사한다.
+     * sqlca로 에러 검사.
+     */
+    exec sql
+        connect :username identified by :password;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Connected to Oracle Database\n");
+
+    /*
+     * 해당 사원의 사원 정보를 가져온다.
+     * Indicator 변수를 붙여서 NULL이 있는지 검사한다.
+     * 이때 호스트 변수들이 전부 배열로 지정 되면 그 배열의 수만큼 자동으로 가져온다.
+     * 한번의 SQL문 실행으로 14개의 행을 모두 가져온다.
+     * sqlca를 통해서 에러를 검사한다.
+     */
+exec sql
+        select empno, ename, job, mgr, hiredate, sal, comm, deptno
+        into :empno:ind_empno, :ename:ind_ename, :job:ind_job, :mgr:ind_mgr,
+             :hiredate:ind_hiredate, :sal:ind_sal, :comm:ind_comm, :deptno:ind_deptno
+        from emp;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+/*
+     * 칼럼의 이름을 프린트 하고 패치한 행의 수만큼 돌려서 프린트한다.
+     */
+    printf ("EMPNO ENAME JOB MGR HIREDATE SAL COMM DEPTNO\n");
+    for (i = 0; i < 14; i ++)
+    {
+        /*
+         * Indicator 변수를 검사하여 -1 인 경우는 실제 데이터가 NULL 인
+         * 경우 이므로 숫자인 경우 -1을 문자인 경우 NULL을 찍어 준다.
+         */
+        printf ("%5d %10s %9s %4d %9s %7d %7d %2d\n",
+                (ind_empno [i]    == -1) ? -1 : empno [i],
+                (ind_ename [i]    == -1) ? "NULL" : ename [i],
+                (ind_job [i]      == -1) ? "NULL" : job [i],
+                (ind_mgr [i]      == -1) ? -1 : mgr [i],
+                (ind_hiredate [i] == -1) ? "NULL" : hiredate [i],
+                (ind_sal [i]      == -1) ? -1 : sal [i],
+                (ind_comm [i]     == -1) ? -1 : comm [i],
+                (ind_deptno [i]   == -1) ? -1 : deptno [i]);
+    }
+
+    /*
+     * 데이터베이스와 접속을 종료한다.
+     * sqlca 로 에러 검사.
+     */
+    exec sql
+        rollback work release;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Disconnect from Oracle Database\n");
+
+    exit (EXIT_SUCCESS);
+}
+}}}
+
+처음에 봤던 select 문과 다른점이 없다. 단지 호스트 변수를 선언할 때 배열로 선언하여 배열의 크기를 한번에 패치할 행의 수로 지정해 주면 된다. 별다른 네트웍 트래픽 없이 고도의 생산성 향상과 프로그램의 성능 향상을 가질 수 있다. 위의 경우 emp 는 총 14 행으로 구성되어 있으므로 배열 크기는 14이다. 만약에 테이블의 행의 수가 너무 많다면 배열로 선언 한 후에 다시 커서를 선언하여 한번에 여러행으로 패치해 오는 형식으로 하면 될 것이다. 커서와 Array Processing을 섞어서 사용하면 된다. 특별하게 어려울 것 없이 구성해 낼 수 있다. 커서를 사용할 경우 패치가 끝나게 되면 sqlca.sqlerrd [2] 를 셋팅하고 sqlcode를 1403으로 셋팅하게 된다. 여기서는 위에서 본 경우와 달리 마지막 패치가 성공하면서 sqlcode를 1403으로 셋팅하고 sqlerrd [2]의 값도 마지막 패치할때의 행의 수가 아니라 패치를 실행 할수록 행의 수는 쌓이게 된다. 그러므로 프로그램을 작성할 때 주의 하도록 하라. 실제 예제 코드가 아래에 있다.
+
+{{{#!plain 
+/* --------------------------------------------------------------------------------
+파일 이름 : array_cursor.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdlib.h>
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+ * 호스트 변수 선언
+ */
+exec sql begin declare section;
+    /*
+     * 사용자 ID와 패스워드
+     */
+    char *username;
+    char *password;
+
+    /*
+     * emp 테이블의 칼럼 리스트
+     * 받아올 테이블의 행의 수만큼 배열을 설정한다.
+     */
+    int empno [5];
+    int mgr [5];
+    int sal [5];
+    int comm [5];
+    int deptno [5];
+    char ename [5][11];
+    char job [5][10];
+    char hiredate [5][10];
+
+/*
+     * emp 테이블 칼럼들의 Indicator 변수
+     * 받아올 테이블의 행의 수만큼 배열을 설정한다.
+     */
+    short ind_empno [5];
+    short ind_mgr [5];
+    short ind_sal [5];
+    short ind_comm [5];
+    short ind_deptno [5];
+    short ind_ename [5];
+    short ind_job [5];
+    short ind_hiredate [5];
+exec sql end declare section;
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 롤백 후에 접속을 종료한다.
+ */
+void sql_error (void)
+{
+    printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+    printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exec sql whenever sqlerror continue;
+    exec sql rollback work release;
+
+    exit (EXIT_FAILURE);
+}
+
+int main (void)
+{
+int i = 0;
+char buf [256] = {'\0', };
+
+    username = (char *)strdup ("scott");
+    password = (char *)strdup ("tiger");
+
+    /*
+     * scott 사용자 계정으로 접속 시도
+     * 접속 시도 후에 성공 여부를 위해 에러를 검사한다.
+     */
+    exec sql
+        connect :username identified by :password;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Connected to Oracle Database\n");
+
+    /*
+     * 해당 사원의 사원 정보를 가져오는 커서를 선언한다.
+     * sqlcode를 통해서 에러를 검사한다.
+     */
+    exec sql
+        declare emp_cur cursor for
+            select empno, ename, job, mgr, hiredate, sal, comm, deptno
+            from emp;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+/*
+     * 커서를 열고 sqlca로 에러를 검사한다.
+     */
+    exec sql
+        open emp_cur;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+    /*
+     * 칼럼의 이름을 프린트 하고 패치한 행의 수만큼 돌려서 프린트한다.
+     */
+    printf ("EMPNO ENAME JOB MGR HIREDATE SAL COMM DEPTNO\n");
+    while (1)
+    {
+        /*
+         * 한번에 5 행씩 패치해낸다.
+         * Indicator 변수를 붙여서 NULL이 있는지 검사한다.
+         * 패치한 후 sqlca를 통해 에러를 검사한다.
+         */
+        exec sql
+            fetch emp_cur
+into :empno:ind_empno, :ename:ind_ename, :job:ind_job, :mgr:ind_mgr,
+:hiredate:ind_hiredate, :sal:ind_sal, :comm:ind_comm,
+:deptno:ind_deptno;
+if (sqlca.sqlcode != 1403 && sqlca.sqlcode != 0)
+        {
+            sql_error ();
+        }
+
+/*
+         * 만약에 sqlcode 가 1403 으로 셋팅 된경우
+         * 마지막으로 패치한 행의 수를 계산하여 프린트 하고
+         * 루프를 종료한다.
+         */
+        if (sqlca.sqlcode == 1403)
+        {
+            for (i = 0; i < sqlca.sqlerrd [2] % 5; i ++)
+            {
+                /*
+                 * Indicator 변수를 검사하여 -1 인 경우는 실제 데이터가 NULL 인
+                 * 경우 이므로 숫자인 경우 -1을 문자인 경우 NULL을 찍어 준다.
+                 */
+                printf ("%5d %10s %9s %4d %9s %7d %7d %2d\n",
+                        (ind_empno [i]    == -1) ? -1 : empno [i],
+                        (ind_ename [i]    == -1) ? "NULL" : ename [i],
+                        (ind_job [i]      == -1) ? "NULL" : job [i],
+                        (ind_mgr [i]      == -1) ? -1 : mgr [i],
+                        (ind_hiredate [i] == -1) ? "NULL" : hiredate [i],
+                        (ind_sal [i]      == -1) ? -1 : sal [i],
+                        (ind_comm [i]     == -1) ? -1 : comm [i],
+                        (ind_deptno [i]   == -1) ? -1 : deptno [i]);
+            }
+            break;
+        }
+else
+        {
+            for (i = 0; i < 5; i ++)
+            {
+                /*
+                 * Indicator 변수를 검사하여 -1 인 경우는 실제 데이터가 NULL 인
+                 * 경우 이므로 숫자인 경우 -1을 문자인 경우 NULL을 찍어 준다.
+                 */
+                printf ("%5d %10s %9s %4d %9s %7d %7d %2d\n",
+                        (ind_empno [i]    == -1) ? -1 : empno [i],
+                        (ind_ename [i]    == -1) ? "NULL" : ename [i],
+                        (ind_job [i]      == -1) ? "NULL" : job [i],
+                        (ind_mgr [i]      == -1) ? -1 : mgr [i],
+                        (ind_hiredate [i] == -1) ? "NULL" : hiredate [i],
+                        (ind_sal [i]      == -1) ? -1 : sal [i],
+                        (ind_comm [i]     == -1) ? -1 : comm [i],
+                        (ind_deptno [i]   == -1) ? -1 : deptno [i]);
+            }
+        }
+    }
+
+    /*
+     * 데이터베이스와 접속을 종료한다.
+     */
+    exec sql
+        rollback work release;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Disconnect from Oracle Database\n");
+
+    exit (EXIT_SUCCESS);
+}
+}}}
+
+Array로 Select를 할 수 있다면 역시 Insert, Update, Delete도 할 수 있는 것이다. 지금까지 보아왔던 것처럼 Select보다는 DML작업이 더 쉬웠다. 이것도 단순히 배열을 만들고 값을 넣고 SQL문을 수행하기만 하면 된다. 아래에 예제가 있다. 5개의 행을 가진 배열을 만든 후 이것을 emp테이블에 Insert하고 Commit한다. 그 다음 Insert한 사원정보에서 급여를 20% 인상하고 역시 Commit한다. 마지막으로 Insert한 모든 사원을 Delete하고 Commit한다. 단순히 배열로 호스트 변수를 만들고 사용한 것 밖에는 없으니 천천히 살펴보도록 하라. 중간중간에 getchar()함수를 넣어 놓았다. 이 시점에 다른 터미널에서 sqlplus로 들어가 emp 테이블을 살펴보라. 데이터가 적용된 것을 볼 수 있을 것이다.
+
+{{{#!plain
+/* --------------------------------------------------------------------------------
+파일 이름 : array_dml.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdlib.h>
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+ * 호스트 변수 선언
+ */
+exec sql begin declare section;
+    /*
+     * 사용자 ID와 패스워드
+     */
+    char *username;
+    char *password;
+
+    /*
+     * emp 테이블의 칼럼 리스트
+     * 작업할 행의 수만큼 배열을 설정한다.
+     */
+    int empno [5] = {9000, 9001, 9002, 9003, 9004};
+    int mgr [5] = {7788, 7788, 7788, 7788, 7788};
+    int sal [5] = {3000, 2500, 2500, 2500, 2500};
+    int comm [5] = {300, 500, 500, 0, 0};
+    int deptno [5] = {40, 40, 40, 40, 40};
+    char ename [5][11] = {"Ryu", "Kim", "Lee", "Seo", "Son"};
+    char job [5][10] = {"Developer", "Developer", "Developer",
+"Developer", "Developer"};
+
+    /*
+     * emp 테이블 칼럼들의 Indicator 변수
+     * 작업할 행의 수만큼 배열을 설정한다.
+     */
+    short ind_empno [5] = {0, };
+    short ind_mgr [5] = {0, };
+    short ind_sal [5] = {0, };
+    short ind_comm [5] = {0, 0, 0, -1, -1};
+    short ind_deptno [5] = {0, };
+    short ind_ename [5] = {0, };
+    short ind_job [5] = {0, };
+exec sql end declare section;
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 롤백 후에 접속을 종료한다.
+ */
+void sql_error (void)
+{
+    printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+    printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exec sql whenever sqlerror continue;
+    exec sql rollback work release;
+
+    exit (EXIT_FAILURE);
+}
+
+int main (void)
+{
+int i = 0;
+char buf [256] = {'\0', };
+
+    username = (char *)strdup ("scott");
+    password = (char *)strdup ("tiger");
+
+    /*
+     * scott 사용자 계정으로 접속 시도
+     * 접속 시도 후에 성공 여부를 위해 에러를 검사한다.
+     */
+    exec sql
+        connect :username identified by :password;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Connected to Oracle Database\n");
+
+    /*
+     * 해당 사원의 사원 정보를 Insert 한다.
+     * Indicator 변수를 붙여서 NULL이 있는지 검사한다.
+     * 이때 호스트 변수들이 전부 배열로 지정 되면
+     * 그 배열의 수만큼 자동으로 Insert한다.
+     * 한번의 SQL문 실행으로 5개의 행을 모두 Insert 한다.
+     * sqlcode를 통해서 에러를 검사한다.
+     */
+exec sql
+        insert into emp (empno, ename, job, mgr, hiredate, sal, comm, deptno)
+        values (:empno:ind_empno, :ename:ind_ename, :job:ind_job, :mgr:ind_mgr,
+		sysdate, :sal:ind_sal, :comm:ind_comm, :deptno:ind_deptno);
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+    /*
+     * Insert한 데이터를 Commit 한다.
+     */
+exec sql
+	commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+printf ("%d Array Inserting Succeeded\n", sqlca.sqlerrd [2]);
+printf ("Press any key to continue\n");
+getchar ();
+
+/*
+ * 위에서 Insert 한 행의 급여를 20% 인상하여 업데이트 한다.
+ */
+exec sql
+	update emp
+	set sal = sal * 1.2
+	where empno = :empno;
+if (sqlca.sqlcode != 0)
+{
+sql_error ();
+}
+
+    /*
+     * Update한 데이터를 Commit한다.
+     */
+exec sql
+	commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+printf ("%d Array Updating Succeeded\n", sqlca.sqlerrd [2]);
+printf ("Press any key to continue\n");
+getchar ();
+
+/*
+ * 위에서 Insert 한 행을 모두 Delete 한다.
+ */
+exec sql
+	delete from emp
+	where empno = :empno;
+if (sqlca.sqlcode != 0)
+{
+	sql_error ();
+    }
+
+    /*
+     * Delete한 데이터를 Commit한다.
+     */
+exec sql
+	commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+printf ("%d Array Deleting Succeeded\n", sqlca.sqlerrd [2]);
+printf ("Press any key to continue\n");
+getchar ();
+
+    /*
+     * 데이터베이스와 접속을 종료한다.
+     */
+exec sql
+	rollback work release;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }printf ("Disconnect from Oracle Database\n");
+
+    exit (EXIT_SUCCESS);
+}
+}}}

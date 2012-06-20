@@ -1,0 +1,73 @@
+#title Disqus API 사용하기
+
+== 이유 ==
+Disqus API를 이용해서 가상게시판을 만들고 싶었다. 가상게시판을 만들려고 하니 Disqus API 사용방법을 알아야 했다. Disqus wiki에 API 사용방법이 있긴 했는데, 워낙에나 불친절? 해서 직접 API를 사용해봐야 할 것 같아서 문서를 작성하게 되었다. 
+
+== 기본 사용법 ==
+대부분의 웹어플리케이션이 그러하듯이 Disqus 도 Web Api를 제공한다. API 기본 URI는 다음과 같다.
+ * http://disqus.com/api/{method_name}
+
+== 출력데이터 포맷 ==
+JSON 형태로 넘어온다. PHP(:12) 5.2.0 부터JSON 관련 함수를 제공하고 있다. 혹시나 해서 테스트 해봤는데 문제없이 encoding 되는걸 확인했다. 다행이다.
+{{{#!plain
+$json = '{"a":1,"b":2,"c":3,"d":4,"e":5}';
+print_r(json_decode($json));
+}}}
+
+== API ==
+=== User_Key 얻기 ===
+Disqus API를 사용하기 위해서는 먼저 User_key 를 얻어야 한다. 다음 URI 에서 얻을 수 있다. 물론 Disqus 계정을 만들어야지만 얻을 수 있다.
+  * http://disqus.com/api/get_my_key
+아래는 내가 사용하는 user key 어차피 해당 도메인에서만 사용가능하다.
+{{{#!plain
+HW0szoHeq2w32W97dy9y69Cw3T8GEurWSJ1gPjDDCJITylEaPiMm9MURp100UAfA
+}}}
+이하 유저키는 '''UserKey'''로 하겠다.
+
+=== Forum List 얻기 ===
+데이터는 JSON 형태로 넘어온다.
+ * get_forum_list
+    http://disqu.com/api/get_forum_list?user_api_key=UserKey
+{{{#!plain
+{"message": [{"created_at": "2009-07-16 22:50:12.398084", "shortname": "joinc", "id": "155749", "name": "joinc"},
+{"created_at": "2009-07-17 09:37:30.818062", "shortname": "manpage", "id": "155977", "name": "man page"}, 
+{"created_at": "2009-07-18 03:58:23.098781", "shortname": "yundream", "id": "156390", "name": "yundream\uc758 \ud504\ub85c\uadf8\ub798\ubc0d \uc774\uc57c\uae30"}, 
+{"created_at": "2009-07-27 11:40:43.383182", "shortname": "joincman", "id": "161474", "name": "joinc man"}], "code": "ok", "succeeded": true}
+}}}
+
+=== Forum API KEY 얻기 ===
+Forum을 제어하기 위한 KEY를 얻는다.
+ * get_forum_api_key
+ * 필요한 인자 
+   * froum_id : get_forum_list 를 이용해서 얻어온 "id" 값 
+ * http://disqus.com/api/get_forum_api_key?user_api_key=HW0szoHeq2w32W97dy9y69Cw3T8GEurWSJ1gPjDDCJITylEaPiMm9MURp100UAfA&forum_id=155977
+{{{#!plain
+{"message": "dbAjYEJbMeziNAfgEjqmQv9evM8UDq3l12Csl2PFyruEHdJAbxWh2xMCBgAR68Gz", "code": "ok", "succeeded": true}
+}}}
+
+=== Thread 목록 얻어오기 ===
+Forum의 Thread 목록을 얻어온다.
+ * get_thread_list
+ * 필요한 인자
+   * forum_key : forum의 "key"값  
+ * http://disqus.com/api/get_thread_list?forum_api_key=dbAjYEJbMeziNAfgEjqmQv9evM8UDq3l12Csl2PFyruEHdJAbxWh2xMCBgAR68Gz
+ * 얻어오는 값 : title, url, thread id, 생성일 등등..
+
+=== post 갯수 ===
+해당 Thread 의 post 갯수를 얻어온다. 
+ * get_num_posts
+ * Key : get_from_api_key 로 얻어온 forum Key 값 
+ * 인자 : thread_ids 
+ * http://disqus.com/api/get_num_post?forum_api_key=dbAjYEJbMeziNAfgEjqmQv9evM8UDq3l12Csl2PFyruEHdJAbxWh2xMCBgAR68Gz&thread_ids=155977
+
+=== get_thread_posts ===
+해당 쓰레드의 포스트 내용을 읽어온다.
+  * Key : Forum Key
+  * 인자 : thread_id 
+  * http://disqus.com/api/get_thread_posts?forum_api_key=dbAjYEJbMeziNAfgEjqmQv9evM8UDq3l12Csl2PFyruEHdJAbxWh2xMCBgAR68Gz&thread_id=25866873
+
+=== update_thread ===
+쓰레드를 update 한다.
+  * Key : Forum Key
+  * Method : POST(:12)
+  * 인자 : thread_id, title, slug, url, allow_comments

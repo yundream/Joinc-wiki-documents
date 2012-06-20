@@ -1,0 +1,114 @@
+#title D언어에서의 정규표현
+
+
+== 정규표현 == 
+정규표현은 텍스트에서 매칭되는 문자의 패턴을 찾아내기 위해 사용하는 강력한 툴로, Perl, Ruby, Javascript 등의 언어에 포함되어 있다. C언어의 경우에도 라이브러리 형태로 이용할 수 있다. 이중 Perl과 Ruby는 정규표현을 매우 능숙하게 다루도록 만들어져 있다. D언어는 런타임 라이브러리(:12) 형태로 정규표현(:12)을 지원한다. 여기에서는 펄과 비교해가면서, D언어에서의 정규표현에 대해서 알아보도록 할 것이다. 
+역자주 : 원문은 Ruby와 비교해서 설명하고 있지만, 개인적으로 Perl에 더 익숙한 관계로 Perl로 대체했습니다.  
+ 
+장규표현에 대한 자세한 내용은 [wiki:man/12/정규표현 정규표현]문서들을 참고하기 바란다.  
+ 
+=== 패턴매칭 === 
+perl은 정규표현과 관련된 전용의 문법을 제공한다. 패턴매칭은 다음과 같은 방법으로 이루어진다. 
+{{{#!plain 
+$string = "hello yundream"; 
+$string =~ m/yundream/; 
+}}} 
+매칭이 이루어지편 참이 리턴된다. 
+{{{#!plain 
+$string = "hello world"; 
+ 
+if($string =~ m/yundream/) 
+{ 
+print "OK\n"; 
+} 
+}}} 
+ 
+D는 perl에서와 같은 전용의 문법을 가지고 있지는 않고, 함수차원에서 지원한다. 
+{{{#!plain 
+auto s = "hello yundream"; 
+std.regexp.find(s, "yundream"); // 처음 일치된 위치인 6이 리턴된다. 
+std.regexp.find(s, "world"); // 일치된 패턴이 없을경우 -1이 리턴된다. 
+}}} 
+ 
+Perl에서는 ()를 사용해서 각각의 매칭된값을 변수명으로 얻어올 수 있다.  
+{{{#!plain 
+$line = "abcdefg"; 
+$line =~ m/(.*)(cd)(.*)/; 
+print "$1\n"; 
+print "$2\n"; 
+print "$3\n"; 
+}}} 
+ 
+C나 C++로 이런코드를 만들어야 한다고 생각해보라. 벌써부터 골치가 아파올 것이다. 그러나 D에서는 간단하게 해치울 수 있다. 
+{{{#!plain 
+auto s = std.regexp.search("abcdefg","c"); 
+if (s) 
+{ 
+writefln("%s[%s]%s", s.pre, s.match(0), s.post); 
+} 
+}}} 
+다음과 같이 더 간단하게 만들 수도 있다. 
+{{{#!plain 
+if (auto s = std.regexp.search("abcdefg","c")) 
+{ 
+writefln("%s[%s]%s", s.pre, s.match(0), s.post); 
+} 
+}}} 
+[[adsense]] 
+=== 치환 === 
+치환은 더 유용하고 재미있는 기능이다. 다음은 문장중에 등장하는 모든 "a"를 "ZZ"로 변경하는 Perl 코드다. 
+{{{#!plain 
+#!/usr/bin/perl 
+ 
+$s = "Strap a rocket engine on a chicken.\n"; 
+$s =~ s/a/ZZ/g; 
+print $s; 
+}}} 
+ 
+이걸 D로 바꾸어 보았다. 
+{{{#!plain 
+char[] s = "Strap a rocket engine on a chicken."; 
+char[] b = new char[80]; 
+b = sub(s, "a", "ZZ"); // 처음 매칭되는 문자열만 치환 
+writefln(b); 
+b = sub(s, "a", "ZZ", "g"); // 모든 매칭되는 문자열을 치환 
+writefln(b); 
+}}} 
+ 
+다음과 같이 매치된 문자열의 레퍼런스를 이용한 치환도 가능하다.  
+{{{#!plain 
+b = sub(s, "[ar]", "[$&]", "g");  
+// result: St[r][a]p [a] [r]ocket engine on [a] chicken. 
+}}} 
+ 
+매칭된 문자열을 대문자로 치환할 수도 있다.  
+{{{#!plain 
+b = sub(s, "[ar]", 
+(RegExp m) {return toupper( m.match(0));}, "g"); 
+}}} 
+toupper 은 std.string를 import해서 사용할 수 있다. 
+ 
+=== 루프 === 
+문자열에 대해서 루프를 돌면서 모든 매칭되는 것들을 찾는 것도 가능하다. 
+{{{#!plain 
+import std.stdio; 
+import std.regexp; 
+ 
+void main() 
+{ 
+foreach(m; RegExp("ab").search("abcabcabab")) 
+{ 
+writefln("%s[%s]%s", m.pre, m.match(0), m.post); 
+} 
+}  
+// 출력결과 :  
+// [ab]cabcabab 
+// abc[ab]cabab 
+// abcabc[ab]ab 
+// abcabcab[ab] 
+}}} 
+ 
+== 참고문헌 == 
+* http://www.troubleshooters.com/codecorn/littperl/perlreg.htm 
+* http://www.digitalmars.com/d/regular-expression.html 
+* [wiki:Code/C/Indexer C와 regex로 구현한 단어 추출기 예제] 

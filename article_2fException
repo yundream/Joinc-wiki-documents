@@ -1,0 +1,56 @@
+* 예외 발생시의 경로를 추적해보았다. throw 에서 인자로 무엇을 어떻게 넘기냐를 주의하여 보라.
+
+{{{#!vim cpp
+class A {
+        public:
+        int b;
+        A(A const & a) { cout << "copy" << endl; b = a.b; }
+        A(int i): b(i) { cout << "default : " << b << endl; }
+        ~A() { cout << "dest : " << b << endl;}
+};
+
+void prn3() throw (A) {
+        A a(3);
+        throw a;
+        cout << "end prn3" << endl;
+}
+
+void prn2() {
+        A a(2);
+        prn3();
+        cout << "end prn2" << endl;
+}
+
+void prn1() {
+        A a(1);
+        prn2();
+        cout << "end prn1" << endl;
+}
+
+int main() {
+        try {
+                cout << "ready" << endl;
+                prn1();
+                cout << "go" << endl;
+        } catch(A& a) {
+                cout << "b is " << a.b << endl;
+        }
+        cout << "end main" << endl;
+}
+}}}
+
+
+{{{
+bash-2.03$ ./a.out
+ready
+default : 1
+default : 2
+default : 3
+copy
+dest : 3
+dest : 2
+dest : 1
+b is 3
+dest : 3
+end main
+}}}

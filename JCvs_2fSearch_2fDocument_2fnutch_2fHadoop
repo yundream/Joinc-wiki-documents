@@ -1,0 +1,219 @@
+#title Nutch Hadoop 설치 운용 문서 
+
+[[TableOfContents]]
+
+ <!> .. 좀 오래된 문서라서, 지금 상황 (2008/10/22)에 맞도록 수정할 계획임)
+== Nutch 소개 ==
+Hadoop은 분산(distributed file system)으로 MapReduce(:12)프로그래밍 모델을 통해서 구현되었다. 이 문서는 Hadoop을 이용해서 분산파일 시스템 환경을 만들고, 그 위에서 Nutch를 운용하는 방법에 대해서 다룬다. Nutch 0.7.x 이하의 버젼이라면 이 문서를 읽을 필요가 없다. Hadoop은 Nutch 0.8.x 이상의 버젼부터 사용되고 있다. 
+
+이 문서는 Nutch와 Hadoop의 구조적인 부분을 설명하지는 않을 것이다. 단지 설치하고 운용하는데에 촛점을 맞출 것이다. 
+
+원문은 http://wiki.apache.org/nutch/NutchHadoopTutorial 에서 확인할 수 있다.
+ * 운영체제 : Linux(:12) Kernel(:12)2.6.x
+ * Tomcat 5.x + JDK1.5
+
+== 네트워크 환경 설정 ==
+분산파일 시스템을 위해서 네트워크 환경을 만들 필요가 있다. 시스템이 충분히 준비되지 않았다면, 단일 시스템으로 구성해도 별 문제는 없을 것이다. 우선은 분산파일시스템을 위한 적당한 시스템이 준비되어 있다는 가정하에 설명을 하도록 한다. 256Mbyte 이상의 램과 10Gbyte 이상의 하드디스크등의 물리적인 환경과 Linux(:12)와 Nutch(:12)가 작동될 수 있는 소프트웨어적인 환경이 구축되어 있어야 한다. 테스트를 위해서 다음과 같은 3대의 컴퓨터를 준비했다. 
+{{{#!plain
+devcluster01
+devcluster02
+devcluster03
+}}}
+master node는 devcluster01으로 할 것이다. master node란 다른 하위 노드(slave node)를 통합하기 위한 Hadoop 서비스가 실행되는 환경이다. 또한 crawl을 수행해서 웹문서를 수집하고 검색엔진이 탑재된 시스템이기도 하다. 
+
+== Nutch와 Hadoop 설치 ==
+Hadoop은 Nutch 0.8.x 이상의 버전부터 사용되고 있다. subversion 저장소를 통해서 다운로드 받아서 설치하도록 한다. 
+
+다음 URL을 통해서 subversion저장소로 접근할 수 있다.
+ *  http://svn.apache.org/repos/asf/lucene/nutch/
+cvs를 사용한다면 아래의 URL을 이용하도록 하자.
+ * http://cvs.apache.org/dist/lucene/nutch/nightly/ 
+ * http://cvs.apache.org/dist/lucene/hadoop/nightly/
+
+이클립스를 개발환경으로 사용한다면 subversion 플러그인을 설치해야 한다.
+ * [wiki:JCvs/Search/Document/nutch/NutchDevEnv eclipse Nutch 개발환경 만들기]
+
+== Nutch Hadoop 설치 ==
+설치는 간단하다. 원하는 디렉토리에 Nutch압축을 풀어주기만 하면된다. 나는 /home/yundream/workspace에 압축을 풀었다.
+
+== Hadoop 지원 설정 ==
+nutch는 master node와 data 노드에서 bin/start-all.sh 를 실행함으로써 hadhoop환경을 만들게 된다. 이는 master 노드에서 관리하는 data 노드에 연결을 한다음에 해당 스크립트를 실행시켜줘야 하는 걸 의미한다. 연결을 위해서 ssh를 사용한다. 
+
+start-all.sh 스크립트는 모든 서버의 같은 위치에 설치되어야 한다. 또한 분산파일을 저장하기 위한 경로역시 동일하게 잡아 주어야 한다. 이를 위해서 아래와 디렉토리 구조를 만들었다. 
+{{{#!plain
+ / --+-- home/yundream/nutch/search   <nutch 설치 디렉토리>
+     |
+     +-- nutch/filesystem             <hadoop 파일시스템> 
+     |
+     +-- usr/local/tomcat             <tomcat 설치 디렉토리>
+}}}
+
+tomcat(:12)은 유저에게 검색 인터페이스를 제공하기 위한 목적으로 사용된다. 자세한 내용은 [JCvs/Search/Document/nutch/Searching nutch 검색]문서를 참고하기 바란다. 분산파일 시스템이 구성되는 흐름은 아래와 같다. 
+ 1. master node 에서 hadoop 스크립트를 실행한다.  
+ 1. hadoop 스크립트는 hadoop-site.xml의 정보를 읽어서 master node의 HOSTNAME:PORT 정보를 얻어온다.
+ 1. ssh 프로토콜을 이용해서 master node의 HOSTNAME:PORT로 연결을 한다.  
+ 1. 연결후 hadoop-env.sh을 실행시켜서, data node의 hadoop실행환경을 확인한다.
+ 1. master node의 hadoop이 실행이 되고, hadoop-site.xml의 정보를 이용 분산디렉토리 루트를 생성한다.
+ 1. slaves 에 있는 data node host 목록을 읽어들인다.
+ 1. slaves 로 연결해서 hadoop-env.sh를 읽어서 hadoop을 실행 분산 디렉토리 운용을 시작한다. 
+
+핵심 설정파일은 '''hadoop-env.sh'''와 '''hadoop-site.xml''', '''slaves'''임을 알 수 있다.
+ * hadoop-env.sh   : hadoop을 운용하기 위한 환경변수
+ * hadoop-site.xml : master node의 호스트정보와 분산디렉토리 파일시스템 정보
+ * slaves : data node 호스트이름  
+
+다음은 conf/hadoop-env.sh의 내용이다. 이 파일은 master node와 date node에서 hadoop을 실행시키기 위해서 반드시 필요하다.
+{{{#!plain
+export HADOOP_HOME=/home/yundream/workspace/nutch-nightly
+export JAVA_HOME=/usr/local/java
+export HADOOP_LOG_DIR=${HADOOP_HOME}/logs
+export HADOOP_SLAVES=${HADOOP_HOME}/conf/slaves
+}}}
+
+다음은 conf/hadoop-site.xml의 내용이다.
+{{{#!plain
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+<property>
+  <name>fs.default.name</name>
+  <value>devcluster01:9000</value>
+</property>
+
+<property>
+  <name>mapred.job.tracker</name>
+  <value>ubuntu:9001</value>
+</property>
+
+<property>
+  <name>dfs.name.dir</name>
+  <value>/nutch/filesystem/name</value>
+</property>
+
+<property>
+  <name>dfs.data.dir</name>
+  <value>/nutch/filesystem/data</value>
+</property>
+
+<property>
+  <name>mapred.system.dir</name>
+  <value>/nutch/filesystem/mapreduce/system</value>
+</property>
+
+<property>
+  <name>mapred.local.dir</name>
+  <value>/nutch/filesystem/mapreduce/local</value>
+</property>
+
+<property>
+  <name>dfs.replication</name>
+  <value>1</value>
+</property>
+
+</configuration>
+}}}
+master node인 devclust01의 연결정보와 분산파일 시스템 정보를 포함하고 있다. 분산파일 시스템의 root 경로는 '''/nutch/filesystem'''으로 했다. 
+
+다음은 slaves의 내용이다. 관리할 data node의 호스트이름을 가지고 있다. 
+{{{#!plain
+devcluster02
+devcluster03
+}}}
+
+== hadoop 환경 만들기 ==
+=== ssh 연결 환경 만들기 ===
+master node는 data node를 관리하기 위해서 ssh 연결을 사용한다. 이 경우 최초연결이 있을 때, 패스워드를 물어보게 되는데, 이를 자동화할 필요가 있다. 그래서 인증키를 만들어서 배포하는 방법을 사용하기로 했다. 우선 master node에서 아래와 같은 방법으로 인증키를 생성하도록 한다.    
+{{{#!plain
+# ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+/root/.ssh/id_rsa already exists.
+Overwrite (y/n)? y
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+a5:f9:0d:96:77:57:8d:0c:c4:70:0f:19:5a:f2:d0:3e root@ubuntu
+}}}
+----
+{{{#!plain
+# cd /root/.ssh
+# cp id_rsa.pdu authorized_keys
+}}}
+이제 만들어진 인증키를 모든 data node에 복사하도록 한다.  
+{{{#!plain
+# scp /root/.ssh/authorized_keys root@devcluster02:/nutch/home/.ssh/authorized_keys
+}}}
+
+인증키가 복사되었으므로, 일반 ssh 연결시에도 패스워드를 입력할 필요가 없다. 
+{{{#!plain
+# ssh devcluster02
+// 패스워드 입력 프롬프트가 뜨지 않고 바로 연결이 된다. 
+}}}
+
+=== 분산 파일 시스템 만들기 ===
+ 1. 모든 node에 /nutch/filesystem을 만들도록 하자. 
+ 1. master node에서 다음의 명령을 이용해서 분산파일 시스템 디렉토리를 초기화 한다.  
+   {{{#!plain
+# bin/hadoop namenode -format
+}}}
+ 1. start-all.sh를 실행시켜서 분산파일 시스템을 가동한다. 
+   {{{#!plain
+# bin/start-all.sh
+}}}
+ 1. 분산파일 시스템의 중지는 stop-all.sh 스크립트를 이용한다.
+   {{{#!plain
+# bin/stop-all.sh
+}}}
+
+이제 urls/urllist.txt를 편집해서 tcl.apache.org 사이트를 가상파일시스템 경로에 추가하도록 한다. 만들어진 경로는 nutch crawl이 웹문서를 수집할 때 사용하게 된다.
+{{{#!plain
+# bin/hadoop dfs -put urls urls
+}}}
+
+다음과 같은 명령으로 성공적으로 경로가 추가되었는지 확인할 수 있다.
+{{{#!plain
+# bin/hadoop dfs -ls
+Found 2 items
+/user/root/apache       <dir>
+...
+}}}
+
+=== 분산 파일 시스템에 crawling 하기 ===
+hadoop으로 분산파일 시스템도 구축했으니, nutch crawl을 실행할 차례다. 먼저 crawl-rulfilter.txt를 수정하도록 한다. 
+{{{#!plain
++^http://tcl.apache.org/
+}}}
+이제 nutch crawl을 가동시키도록 하자. 대략 20분 정도의 시간이 소요될 것이다.
+{{{#!plain
+cd /nutch/search
+bin/nutch crawl urls -dir crawled -depth 3
+}}}
+
+=== 검색 테스트 ===
+그럼 분산파일 시스템으로 부터 검색이 제대로 이루어지는 지를 확인해 보도록 하자. 여러분이 eclipse로 nutch - lucene 개발환경을 구축하고 있다고 가정하겠다. 
+nutch 에서 검색은 lucene의 Searcher이 담당하고 있는데, lucene는 local에 있는 파일시스템의 검색만을 지원하고 있다. 결국 분산파일 시스템에 저장된 파일로 부터 검색을 하기 위해서는 nutch에서 제공하는 hadoop API를 이용해서 lucene.searcher에 local 파일시스템화 한 경로를 넘겨줘야 한다. 정확히 말하자면 index디렉토리를 넘겨줘야 한다. 예를 들어서 색인검색을 하길 원한다면 lucene의 IndexSearcher을 이용해야 한다. 
+
+여기에 대한 내용은 http://www.joinc.co.kr/modules/moniwiki/wiki.php/JCvs/Search/Document/nutch/query#s-8.2 를 참고하기 바란다.
+
+
+== Hadoop MapReduce ==
+Hadoop는 MapReduce 프로그래밍 모델을 통해서 구현되었다. 여기에서는 분산파일 시스템을 위해서 MapReduce가 어떻게 적용되었는지에 대해서 개략적으로 알아보도록 할 것이다.
+=== Map ===
+Map을 위해 입력(Input)되는 데이터는 병렬로 처리되기 위한 파일들의 리스트들이다. 이들 파일들은 FileSplits를 통해서 여러개의 조각으로 나뉘어진다. 만약에 매우 큰 단일 파일이 존재한다면, 이 파일은 seek(:2)연산을 통해서 여러개의 작은 조각으로 나뉘게 된다. 이러한 조각화는 파일의 논리적인 구성은 전혀 상관하지 않고 이루어진다. 예를들어서 줄을 기본단위로 하는 text 파일의 경우에도 byte단위로 조각화 될것이다. 이렇게 해서 각각의 Map task는 FileSplit를 생성하게 된다.
+
+개별적인 MapTask가 시작하게 되면 새로운 Output을 위한 Reduce task가 시작되게 된다. 이것은 RecordReader를 이용해서 FileSplit로 부터 데이터를 읽어들인다. 읽어들인 데이터는 InputFormat에 의해서 key value형식으로 변환된다. InputFormater은 FileSplit의 각각의 조각화된 파일을 제어하기 위한 루틴을 가지고 있다. 예를 들어 TextInputFormat는 조각파일의 마지막을 읽은 다음 그게 새로운 라인을 나타내는 문자가 아니라면, 개행문자를 만날 때까지 문자를 더 읽어들이게 될것이다. 그리고 FileSplit의 다음 조각을 읽을 때에는 처음 개행문자전의 문자들은 무시하게 될 것이다.
+
+
+=== Reduce ===
+Reduce 작업을 위한 Input은 여기 저기 흩어져 있는 많은 파일이 될 것이다. 이러한 파일들은 map 작업에 의해서 노드에 상관없이 흩어져 있다. Reduce를 통한 분산환경이 실행된다면, 필요한 파일들을 일단 로컬파일시스템으로 복사하게 된다.
+
+모든 데이터들은 로컬파일시스템에 하나의 파일로 추가되게 되며, 이 파일들은 다시 key, pair에 의해서 연속된 완전한 하나의 파일로 만들어지게 된다. Reduce는 다음키가 있는지를 확인하면서 계속 순환하면서, key value를 순차적으로 읽어들인다. read iterator을 통해서 순환하고 value를 읽어들이면 되기 때문에, Reduce 작업은 간단하다고 볼 수 있다.
+
+== 토론 ==
+ * hadoop 대신 [http://www.redhat.com/software/rha/gfs GFS]를 이용하는건 어떤가 ?
+

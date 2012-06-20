@@ -1,0 +1,276 @@
+#title Unix 시간 얻어오기
+[[tag(time,gmtime,ctime,mktime,시스템프로그래밍)]]
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=localtime">localtime</a>(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=localtime">localtime</a>(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN13"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN16"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+></P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;time.h&#62;
+
+struct tm *<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=localtime">localtime</a>(const time_t *timep);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		timep 를 입력받아서 유저 시스템의 time zone 에 맞도록 
+		시간 값을 돌려준다. 시간 값은 tm 구조체에 들어간다. 
+		tm 구조체는 다음과 같은 멤버 변수들을 포함한다.   
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct tm
+{
+        int     tm_sec;         /* 초 */ 
+        int     tm_min;         /* 분 */
+        int     tm_hour;        /* 시간 */
+        int     tm_mday;        /* 일/월 */
+        int     tm_mon;         /* 월 */
+        int     tm_year;        /* 년 */
+        int     tm_wday;        /* 일/주 */
+        int     tm_yday;        /* 일/년 */
+        int     tm_isdst;       /* 섬마타임 */
+};
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		월은 0부터 시작한다. 그러므로 프로그램상에서 제대로 표현하려면 +1을 
+		해주어야 한다. 또한 년의 경우에는 +1900 해주어야 한다.  
+	</P
+><P
+>		아규먼트로 들어가는 timeptr 은 1970년 1월 1일 00:00:00 부터의 
+		계산하고픈 때까지의 시간의 차이를 초로 환산한 값이다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		tm 구조체를 넘겨준다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>1.4&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;time.h&#62;
+
+#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+
+void <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=swaptime">swaptime</a>(time_t, char *);
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=main">main</a>()
+{
+    char buffer[255];
+    time_t the_time;
+
+    // time 함수를 이용해서 현재 시간을 얻어온다. 
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=time">time</a>(&#38;the_time);
+
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=memset">memset</a>(buffer, 0x00, 255);
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=swaptime">swaptime</a>(the_time, buffer);
+    printf("%s&#92;n", buffer);
+}
+
+void <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=swaptime">swaptime</a>(time_t org_time, char *time_str)
+{
+    struct tm *tm_ptr;
+    tm_ptr = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=localtime">localtime</a>(&#38;org_time);
+
+    sprintf(time_str, "%d-%d-%d %d:%d:%d", tm_ptr-&#62;tm_year+1900,
+                    tm_ptr-&#62;tm_mon+1,
+                    tm_ptr-&#62;tm_mday,
+                    tm_ptr-&#62;tm_hour,
+                    tm_ptr-&#62;tm_min,
+                    tm_ptr-&#62;tm_sec);
+
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위 프로그램을 컴파일한다음 실행시키면 다음과 같은 결과를 보여줄것이다. 
+<TABLE BORDER="0" BGCOLOR="#E0E0E0" WIDTH="100%">
+<TR> <TD>
+<PRE CLASS="SCREEN">
+[root@localhost test]# ./localtime
+2002-8-23 18:18:32
+</PRE></TD></TR>
+</TABLE>
+
+Sun 5.9 에서 작업시 localtime 에 초를 다르게 해서 연달아 호출 할 경우 마지막에 호출한 함수의 초 값으로 2개의 tm 구조체 값이 같아짐
+<TABLE BORDER="0" BGCOLOR="#E0E0E0" WIDTH="100%">
+<TR> <TD>
+<PRE CLASS="SCREEN">
+#include    <stdio.h>
+#include    <string.h>
+#include    <stdlib.h>
+#include    <sys/time.h>
+
+int main(void)
+{
+    struct tm       *ctp;
+    struct tm       *ltp;
+    struct timeval  tp;
+    int             rtn;
+    long            lSec;
+    long            lSecDiff;
+
+
+    lSecDiff    =   3600 * 13;
+
+    rtn = gettimeofday(&tp, NULL);
+    if (rtn != -1)
+    {
+        lSec    =   tp.tv_sec   -    lSecDiff ;
+        printf("lSecDiff =[%ld]tp.tv_sec   =   [%ld] lSec = [%ld]\n",lSecDiff ,tp.tv_sec, lSec   );
+        ctp = localtime(&lSec);
+        printf("CTP: %02d:%02d:%02d.%06d\n",ctp->tm_hour, ctp->tm_min, ctp->tm_sec, tp.tv_usec);
+
+        ltp = localtime(&tp.tv_sec );
+        printf("LTP: %02d:%02d:%02d.%06d\n",ltp->tm_hour, ltp->tm_min, ltp->tm_sec, tp.tv_usec);
+    }
+
+    rtn = gettimeofday(&tp, NULL);
+    if (rtn != -1)
+    {
+        lSec    =   tp.tv_sec   -    lSecDiff ;
+        printf("lSecDiff =[%ld]tp.tv_sec   =   [%ld] lSec = [%ld]\n",lSecDiff ,tp.tv_sec, lSec   );
+
+        ctp     = localtime(&lSec);
+        ltp = localtime(&tp.tv_sec );
+        printf("CTP: %02d:%02d:%02d.%06d\n",ctp->tm_hour, ctp->tm_min, ctp->tm_sec, tp.tv_usec);
+        printf("LTP: %02d:%02d:%02d.%06d\n",ltp->tm_hour, ltp->tm_min, ltp->tm_sec, tp.tv_usec);
+    }
+
+    return  0;
+}
+</PRE></TD></TR>
+</TABLE>
+
+위 예제의 결과는 다음과 같다
+
+<TABLE BORDER="0" BGCOLOR="#E0E0E0" WIDTH="100%">
+<TR> <TD>
+<PRE CLASS="SCREEN">
+lSecDiff =[46800]tp.tv_sec   =   [1212155871] lSec = [1212109071]
+CTP: 09:57:51.828102
+LTP: 22:57:51.828102
+lSecDiff =[46800]tp.tv_sec   =   [1212155871] lSec = [1212109071]
+CTP: 22:57:51.829294
+LTP: 22:57:51.829294
+</PRE></TD></TR>
+</TABLE>
+	</P></DIV></DIV>
+</BODY
+></HTML
+>
+}}}
+----
+CategoryC

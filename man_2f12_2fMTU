@@ -1,0 +1,66 @@
+#title MTU 
+
+=== MTU === 
+'''M'''aximum '''T'''ransmission '''U'''nit 의 줄임말로 한번에 보낼 수 있는 패킷의 최대크기로 네트워크 환경에 따라 달라질 수 있다. 이더넷의 경우 1500, ATM의 경우 9600, SLIP는 576의 크기를 가진다. 
+
+=== MTU에 관련된 트러블 슈팅 ===
+==== 블랙홀 라우터 ====
+VPN환경을 예로 생각합시다. 통상적으로 router는 설정된 mtu 이상의 패킷을 전송하려고 할때 이를 mtu근사치 이하로 쪼개어 전송을 하게 됩니다. 하지만 여기서 DF (Don't fragment) flag가 1로 설정된 경우 이러한 쪼개어 주는 작업을 원치 않는것으로 해석되게 되며 VPN에 상응하는 헤더를 그대로 붙여서 전송하게 될겁니다. 그러나 반대편 router까지 전송하면서 중간에 MTU가 자신의 설정된 크기보다 커다란 패킷을 받게 되면 이를 버리는 동작이 유발될수 있습니다. 때문에 이러한 문제를 봉착하게 된다면 다음과 같은 방법을 시도하여 이를 해결해야 합니다.
+ 1. 반대편 router까지의 모든 MTU설정중에서 '''가장 작은 MTU를 가진 네트웍을 선택'''하여 패킷을 전송하도록 프로그램에서 제어합니다. 이것은 DF가 0인경우는 꼭 필요한 사항은 아닙니다.
+ 1. 반대편 router까지의 모든 DF flag를 1으로 설정합니다.
+ 1. DF flag를 조절하는 것에 대해서는 신중한 상황점검이 필요합니다. 일부 VPN장비는 DF flag를 1로 설정하는것을 지원하지 않을수도 있고 이 자체가 부하를 많이 주게 될수 있으므로 프로그래밍을 게을리 하고 싶을경우만 시도하는것이 좋습니다.
+여기서 중간에 패킷이 MTU보다 클때 버리는 라우터를 블랙홀 라우터라고도 불립니다. 또한 이를 처리하기 위해서 MTU discovery기능을 설정할수도 있습니다.  MTU discovery의 동작은 간단합니다. 블랙홀 라우터에서 해당 패킷을 손실처리할때 Can't fragment 라고 반환할수 있는데 이런경우 그것을 돌려받는 호스트는 다시 MTU보다 작은 패킷으로 fragment 화 하여 재 전송을 하는 방법입니다. 단, 이것이 사용가능한 경우는 ICMP type 3 의 code 4(fragment needed and don't fragment)가 사용가능해야 합니다. (참고할만한 링크: [http://support.microsoft.com/default.aspx?scid=kb;ko;159211])[[BR]]
+아래는 간단히 MTU를 설정하고 얻어오는 예제를 구현해봤습니다. 물론 이것은 리눅스 용입니다. MTU는 68 이하로 설정하는것은 곤란합니다.
+{{{#!plain
+/* Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> */
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+#include <memory.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <net/if.h>
+#include <errno.h>
+
+int io_mtu(const char *s_interface, int s_set)
+{
+ int s_mtu = (-1), s_socket;
+ struct ifreq s_ifrequest;
+ s_socket = socket(PF_INET, SOCK_STREAM, 0);
+ if(s_socket != (-1))
+ {
+  (void)memset((void *)(&s_ifrequest), 0, sizeof(s_ifrequest));
+  (void)strcpy(&s_ifrequest.ifr_name[0], s_interface);
+  if(s_set > 0)
+  {
+   s_ifrequest.ifr_mtu = s_set;
+   if(ioctl(s_socket, SIOCSIFmtu, &s_ifrequest, sizeof(s_ifrequest)) != 0)fprintf(stdout, "io_mtu error !\n");
+  }
+  if(ioctl(s_socket, SIOCGIFmtu, &s_ifrequest, sizeof(s_ifrequest)) == 0)s_mtu = s_ifrequest.ifr_mtu;
+  close(s_socket);
+ }
+ return(s_mtu);
+}
+
+int main(int s_argc, char **s_argv)
+{
+ char *s_interface = "eth0";
+ int s_set_mtu = 0;
+
+ if(s_argc >= 2)
+ {
+  s_interface = s_argv[1];
+  if(s_argc >= 3)(void)sscanf(s_argv[2], "%i", &s_set_mtu);
+ }
+ fprintf(stdout, "Usage: %s [<interface> [<mtu>]]\n\n", s_argv[0]);
+ fprintf(stdout, "Interface: \"%s\"\n", s_interface);
+ fprintf(stdout, "\tmtu=%d\n", io_mtu(s_interface, s_set_mtu));
+ return(0);
+}
+
+/* End of source */
+}}}
+

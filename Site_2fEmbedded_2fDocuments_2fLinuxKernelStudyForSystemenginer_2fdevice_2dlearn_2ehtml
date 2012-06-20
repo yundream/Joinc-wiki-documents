@@ -1,0 +1,402 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>알아야할 것 들</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="디바이스 드라이버"
+HREF="chap06.html"><LINK
+REL="PREVIOUS"
+TITLE="모듈 동작의 이해"
+HREF="device-understanding.html"><LINK
+REL="NEXT"
+TITLE="SEGA DreamCast Linux"
+HREF="app1.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="device-understanding.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>6장. 디바이스 드라이버</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="app1.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="DEVICE-LEARN"
+>6.4. 알아야할 것 들</A
+></H1
+><P
+>			디바이스 드라이버를 만들기 위한 아주 기본 적인 것은 이미 알았을 것이다. 이제는 좀더 복잡하지만
+			알아야만 하는 것들에 대해 얘기해보자.
+		</P
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+><B
+CLASS="EMPHASIS"
+>버전</B
+></DT
+><DD
+><P
+>						모듈을 만드는 것은 커널의 버전과 밀접한 관계가 있고 커널의 버전이 변경되면서 디바이스
+						드라이버의 구조 자체도 조금씩 변하므로 여러 버전의 커널에서 동시에 사용될 수 있도록
+						만들기 위해선 커널의 버전을 구분해 컴파일되고 동작되도록 해줘야한다.
+					</P
+><P
+>						리눅스에선 현재 커널의 버전을 LINUX_VERSION_CODE로 나타낸다. 그리고 KERNEL_VERSION이란
+						매크로가 있어 이 것을 사용하면 LINUX_VERSION_CODE와 비교할 수 있게된다.
+					</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>디바이스 번호 동적 할당</B
+></DT
+><DD
+><P
+>						디바이스 번호가 이미 정해진 것이 많기 때문에 그 값을 정해 쓸 필요가 없는 경우엔 현재
+						시스템에서 사용하지 않는 번호를 찾아 사용하면 되기 때문에 모듈을 등록하는 당시에 비어
+						있는 번호를 동적으로 알아내 그 것을 사용한다. 사용은 init_module()에서 다음 함수를
+						사용해 주번호를 얻어 온다.
+					</P
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#define DEVICE_NAME "char_dev"
+
+static int Major;
+
+...
+
+int init_module()
+{
+	Major = module_register_chrdev(0, DEVICE_NAME, &#38;Fops);
+
+	...
+}
+
+...</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+><P
+>						module_register_chrdev() 함수의 처음 값인 주번호에 0을 넘겨주면 동적으로 할당해 준다.
+						리턴되어 오는 값이 음수인 경우는 에러가 있는 것이고 양수인 경우는 그 것을 그대로 사용
+						하면 된다. cleanup_module()에선 얻어져 저장되어 있는 Major 변수의 값을 사용하면 된다.
+					</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>Use Count</B
+></DT
+><DD
+><P
+>						lsmod 명령으로 현재 시스템에 등록된 모듈에 대해 열거해보면 세번재 항목이 'Used'인데
+						이 것은 이 모듈이 다른 모듈에 의해 멀마나 사용되는 가를 나타낸다. 이 값을 위한 매크로가
+						준비되어 있는데 MOD_INC_USE_COUNT, MOD_DEC_USE_COUNT 이고 각각을 open과 release에 넣어
+						주면 lsmod를 사용해 값을 알 수 있게 된다.
+					</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>/proc</B
+></DT
+><DD
+><P
+>						리눅스 커널은 /proc 이란 파일 시스템이 존재한다. /proc엔 커널의 내부에 존재하는 정보를
+						얻을 수 있거나 혹은 커널이나 모듈 프로세스로 정보를 전달하고 읽을 때 사용할 수 있다.
+						예를 들어 'cat /proc/interrupt'을 해보면 현재 시스템의 인러텁드에 대한 정보를 알 수
+						있는데 이 내용은 모두 커널 내부에 들어 있는 것들이다.
+					</P
+><P
+>						/proc을 사용하기 위해선 init_module()에서 특정 정보를 등록해 주고 cleanup_module()에서
+						해제해 주면된다. 그러나 /proc으로는 Use Count를 알 수 없고 특히 파일은 열리고 모듈은
+						제거됐으면 결과는 예측할 수 없게 된다. /proc을 위한 구조체의 정의는
+						include/linux/proc_fs.h에 정의된 proc_dir_entry다.
+					</P
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>struct proc_dir_entry {
+	unsigned short low_ino;
+	unsigned short namelen;
+	const char *name;
+	mode_t mode;
+	nlink_t nlink;
+	uid_t uid;
+	gid_t gid;
+	unsigned long size;
+	struct inode_operations * proc_iops;
+	struct file_operations * proc_fops;
+	get_info_t *get_info;
+	struct module *owner;
+	struct proc_dir_entry *next, *parent, *subdir;
+	void *data;
+	read_proc_t *read_proc;
+	write_proc_t *write_proc;
+	atomic_t count;		/* use count */
+	int deleted;		/* delete flag */
+	kdev_t	rdev;
+};</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+><P
+>						실제 사용하는 것은 다음과 같다. Ori Pomerantz가 지은 ' 리눅스 커널 모듈 프로그래밍 안내서'
+						에서 발췌 했다.
+					</P
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>int procfile_read(char *buffer, char **buffer_location, off_t offset, int buffer_length, int zero) 
+{ 
+	int len;
+
+	static char my_buffer[80]; 
+	static int count = 1; 
+        
+	if (offset &#62; 0)  return 0; 
+
+	len = sprintf(my_buffer, "For the %d%s time, go away!\n",
+                 count, 
+                 (count % 100 &#62; 10 &#38;&#38; count % 100 &#60; 14) ? "th" : 
+                 (count % 10 == 1) ? "st" : 
+                 (count % 10 == 2) ? "nd" : 
+                 (count % 10 == 3) ? "rd" : "th" ); 
+        
+	count++; 
+
+	*buffer_location = my_buffer; 
+
+	return len; 
+} 
+
+struct proc_dir_entry Our_Proc_File = 
+{ 
+	0,
+	4,
+	"test",
+	S_IFREG | S_IRUGO,
+	1,
+	0, 0,
+	80,
+	NULL,
+	procfile_read,
+	NULL
+};
+
+int init_module()
+{
+	return proc_register(&#38;proc_root, &#38;Our_Proc_File);
+}
+
+void cleanup_module() 
+{ 
+	proc_unregister(&#38;proc_root, Our_Proc_File.low_ino); 
+}</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>변수</B
+></DT
+><DD
+><P
+>						리눅스에서 Ethernet Card나 Sound Card 설정을 해본 사람은 이 카드들에게 특정 경우 IO
+						어드레스나 IRQ 등을 지정하기 위해 insmod 등을 사용하면서 같이 파라미터를 넘겨준 경
+						험이 있을 것이다.
+					</P
+><P
+>						커널 모듈은 argc, argv를 받을 수 없기 때문에 대신 전역 변수를 사용해 값을 넘겨 줄 수
+						있도록 되어 있다. 변수는 전역으로 설정하고 특정 매크로를 사용해 준다.
+					</P
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>char *str1, *str2; 
+
+#if LINUX_VERSION_CODE &#62;= KERNEL_VERSION(2,2,0) 
+MODULE_PARM(str1, "s"); 
+MODULE_PARM(str2, "s"); 
+#endif</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+><P
+>						위에서 str1과 str2가 전역 변수로 선언되고 모듈 파라미터로 정의됐다. 나중에 insmod를
+						실행할 때 'insmod str1=abc str2=def'와 같이 하면되다.
+					</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>실수</B
+></DT
+><DD
+><P
+>						모듈은 커널과 같은 레벨에서 실행되므로 표준 라이브러리는 사용할 수 없다. 사용할 수 있는
+						것은 커널 함수이고 /proc/ksyms에서 확인할 수 있다.
+					</P
+><P
+>						인터럽트를 사용하는 경우 처리하는 동안 다른 인터럽트가 걸리지 않도록 하기 위해
+						인터럽트를 막아 놓았다면 처리가 다 끝나고 나서는 반드시 인터럽트를 가능하도록 해줘야한다.
+						그러지 않으면 시스템은 먹통이 될 것이다.
+					</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="device-understanding.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="app1.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>모듈 동작의 이해</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap06.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>SEGA DreamCast Linux</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

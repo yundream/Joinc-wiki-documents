@@ -1,0 +1,263 @@
+#title inet_addr(3) 
+[wiki:docbook_inet_addr(3) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>inet_addr(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. inet_addr(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN23"
+>예제</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN27"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	인터넷 주소를 변환한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/socket.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+in_addr_t inet_addr(const char *cp);
+int inet_aton(const char *cp, struct in_addr *inp);
+in_addr_t inet_network(const char *cp);
+char *inet_ntoa(struct in_addr in);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		inet_addr()함수는 (점박이 3형제)인터넷 주소 <B
+CLASS="EMPHASIS"
+>cp</B
+>를
+		32bit 바이너리 주소로 변경한값을 리턴한다. 리턴된 값은 네트워크 바이트 오더를 
+		따른다. 만약 잘못된 값을 입력했다면 INADDR_NONE(-1)을 리턴한다. 
+		이 함수는 입력을 제대로 검사할 수 없으므로 가능하면 이 함수보다 
+		inet_aton()을 사용하기 바란다. 왜냐하면 리턴되는 값 -1은 255.255.255.255로 올바른 
+		주소를 나타내기 때문이다. inet_aton()은 에러 체크를 위한 확실한 방법을 제공한다. 
+	</P
+><P
+>		inet_aton()함수는 inet_addr()의 보다 최신 버젼이다. inet_aton()은 주어진 인터넷 주소
+		<B
+CLASS="EMPHASIS"
+>cp</B
+>를 변경한 값을 <B
+CLASS="EMPHASIS"
+>inp</B
+>에 복사한다. 잘못된 
+		인터넷 주소를 입력했을 경우 0을 리턴한다. 변환값과 리턴값이 분리되어 있으므로 
+		보다 확실한 입력 체크가 가능하다.
+	</P
+><P
+>		inet_network()함수는 인터넷 주소 <B
+CLASS="EMPHASIS"
+>cp</B
+>에 대한 호스트 바이트 오더를 
+		따르는 바이너리 주소값을 리턴하는 걸 제외하면 inet_addr()과 동일하다.  
+	</P
+><P
+>		inet_ntoa()는 <B
+CLASS="EMPHASIS"
+>in</B
+>의 바이너리 인터넷 주소를 점박이 3형제 
+		인터넷 주소로 변경한 다음 되돌려준다. 입력되는 값은 네트워크 바이트 오더를 
+		따라야 한다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>in_addr</B
+>구조체는 <B
+CLASS="EMPHASIS"
+>netinet/in.h</B
+>에 정의되어 
+		있다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct in_addr
+{
+    unsigned long int s_addr;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN23"
+></A
+>1.3. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/socket.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    char buf[256];
+    struct in_addr laddr;
+    int stat;
+
+    while(1)
+    {
+        // 인터넷 주소를 입력 받는다.
+        printf("INPUT ADDRESS : ");
+        fgets(buf, 255, stdin);
+
+        buf[strlen(buf) -1] = 0x00;
+        if (strcmp(buf, "quit") == 0) break;
+
+        stat = inet_aton(buf, &#38;laddr);
+        if (!stat)
+        {
+            printf("Format Error\n");
+        }
+        else
+        {
+            printf("inet_addr    : %s =&#62; %d\n", buf, laddr.s_addr);
+            printf("inet_ntoa    : %d =&#62; %s\n", laddr.s_addr, inet_ntoa(laddr)); 
+        }
+    }
+    return 0;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN27"
+></A
+>1.4. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=79"
+TARGET="_top"
+>Endian에 대해서</A
+>
+				</P
+></LI
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=57"
+TARGET="_top"
+>Socket Layer</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

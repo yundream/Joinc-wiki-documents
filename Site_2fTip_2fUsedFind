@@ -1,0 +1,133 @@
+#title find 활용
+
+[[TableOfContents]]
+=== 설명 ===
+출처 : http://www.coffeenix.net/doc/misc/find.html
+
+find 명령어는 파일 시스템에서 주어진 조건으로 파일을 찾을 때 아주 유용하게 쓰입니다.  대표적인 용도는 오래되거나 크거나, 사용하지 않는 파일들을 찾을 때 그 위력을 발휘합니다.  기본적인 사용 방법은 다음과 같습니다.
+
+{{{#!plain
+# find path operators
+# find 대상디렉토리 검색조건 처리방법
+}}}
+
+검색종류
+|| -name filename 		|| filename 파일 이름으로 찾는다.		||
+|| -user username 		|| user이름으로 찾는다.					||
+|| -group groupname 	|| group 이름으로 찾는다.				||
+|| -perm nnn 			|| 파일 권한이 nnn인 파일을 찾는다. (ex. -perm 755) ||
+|| -type x 				|| 파일 타입이 x인 파일들을 찾는다.	||
+|||| ( f : 일반파일, b : 블록 특수파일, d: 디렉토리, l : 심볼릭 링크 등. ) ||
+|| -atime +n 			|| access time 이 n일 이전인 파일을 찾는다.		||
+|| -atime -n 			|| access time이 n일 이내인 파일을 찾는다.		||
+|| -mtime +n 			|| n일 이전에 변경된 파일을 찾는다.			||
+|| -mtime -n 			|| n일 이내에 변경된 파일을 찾는다.			||
+|| -size n 				|| 사이즈가 n이상인 파일들을 찾는다.		||
+|| -links n 			|| 링크된 개수가 n인 파일들을 찾는다.		||
+|| -print 				|| 표준출력									||
+|| -exec command 		|| command 실행.							||
+|| -operator 			|| -a and 연산, -o or 연산, ! not 연산, ＼( expression ＼)	||
+
+몇가지 예를 들어 설명드리겠습니다.
+
+{{{#!plain
+$ find /home. -name ping -print
+}}}
+root 디렉토리 밑에서 파일이름이 ping인 파일을 찾아 절대 경로명을 화면에 출력한다.
+
+{{{#!plain
+$ find /home -name test* -print
+}}}
+/home 아래에서 파일이름이 test로 시작하는 모든 파일을 찾아서 화면에 보여줍니다.
+
+{{{#!plain
+$ find /home -name *.c -print
+}}}
+/home 밑에 이름이 .c로 끝나는 모든 파일들을 찾아 경로명을 보여준다.
+
+{{{#!plain
+$ find /home -name who.txt -print
+}}}
+home 디렉토리 아래에 who.txt라는 파일을 찾아 경로명을 보여준다.
+
+{{{#!plain
+$ find /home -name core -size +2048 -print
+}}}
+파일 이름이 core이고 크기가 2048블럭 이상인 파일을 찾아준다.
+
+{{{#!plain
+$ find /home -name core -exec ls -l {} \;
+}}}
+이름이 core인 파일을 찾아서 ls -l 한다.
+
+{{{#!plain
+$ find /home -name core -exec rm -i {} \;
+}}}
+현재 디렉토리 밑에서 이름이 core인 파일을 찾아 지운다(지우기 전에 정말 지울 지를 물어본다.)
+
+
+{{{#!plain
+$ find /home -size 0 -exec rm -f {} \;
+}}}
+크기가 0인 파일을 찾아서 (물어보지 않고 바로)지운다.
+
+{{{#!plain
+$ find /home -user unix01 -print
+}}}
+파일 소유자가 unix01인 파일을 찾아준다.
+
+{{{#!plain
+$ find /home -group unix -print
+}}}
+사용자그룹이 unix인 파일을 찾아준다.
+
+{{{#!plain
+$ find /home -perm 700 -print
+}}}
+파일 권한이 700인 파일을 찾아준다.
+
+{{{#!plain
+$ find /home \ ( -perm 400 -o -perm 200 ) -print
+}}}
+파일 권한이 400인 파일과 200인 파일을 찾아준다. (주의 : "\"의 앞뒤에 space 가 반드시 있어야 한다.)
+
+{{{#!plain
+$ find /home -type d -print
+}}}
+파일 타입이 d인 파일을 찾아 경로명을 화면에 출력한다.
+
+{{{#!plain
+$ find /home -type c -print
+}}}
+/dev디렉토리 아래에서 파일 타입이 c인 파일을 찾아 경로명을 보여 준다.
+
+{{{#!plain
+$ find /home -atime +30 -print
+}}}
+30일 이전에 억세스되었던 파일을 찾는다.
+
+{{{#!plain
+$ find /home -mtime -7 -print
+}}}
+7일 이내에 수정된 적이 있는 파일을 찾는다.
+
+{{{#!plain
+$ find /home -size +1024 -print
+}}}
+파일의 블럭 크기가 1024 이상인 파일을 찾아준다.
+
+{{{#!plain
+$ find /home -name *.bak -exec rm -rf {} \;
+}}}
+파일 이름이 .bak 로 끝나는 파일을 찾아서 지운다.
+
+{{{#!plain
+$ find /home -name \*.c -atime +30 -exec ls -l {} \;
+}}}
+30일 이전에 억세스된 파일 중 *.c를 찾아 ls -l 한다.
+
+=== 관련 게시물 ===
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=30915&forum=1)]]
+
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=30914&forum=1)]]
+

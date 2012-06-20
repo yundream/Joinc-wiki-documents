@@ -1,0 +1,294 @@
+#title gettimeofday - 현재 시간을 가져오고 시스템의 시간값을 설정한다.
+[wiki:docbook/gettimeofday(2) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>gettimeofday(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. gettimeofday(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN16"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN19"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN27"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN31"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	현재 시간을 가져오고 시스템의 시간값을 설정한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;unistd.h&#62;
+
+int gettimeofday(struct timeval *tv, struct timezone *tz);
+int settimeofday(const struct timeval *tv ,  const  struct
+             timezone *tz);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		gettimeofday()은 time(2)와 매우 비슷하지만 마이크로초 단위의 시간
+		까지 되돌려준다. 현재는 time(2)를 대신해서 쓰이고 있으며, 
+		가능한 time(2)대신 이 함수를 사용하는 걸 권장한다.	
+	</P
+><P
+>		첫번째 인자인 <B
+CLASS="EMPHASIS"
+>tv</B
+>는 현재 시스템 시간을 저장하기 
+		위한 구조체로 다음과 같이 정의되어 있다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct timeval
+{
+    long tv_sec;       // 초
+    long tv_usec;      // 마이크로초
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		두번째 인자인 <B
+CLASS="EMPHASIS"
+>tz</B
+>은 타임존을 설정하기 
+		위해서 사용된다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct timezone
+{
+    int tz_minuteswest:  // 그리니치 서측분차  
+    int tz_dsttime       // DST 보정타입(일광 절약시간)
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		현재 timezone 구조체는 사용되지 않고 있으며, 앞으로도 지원되지 
+		않을 것이다. 간혹 커널 소스등에서 이 필드가 사용되는 경우가 있는데, 
+		모든 경우에 버그로 판단되어서 무시한다. 복잡하게 생각할 필요 없이 
+		tz은 NULL을 사용하도록 한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+></A
+>1.3. 반환값</H1
+><P
+>		성공하면 0 실패하면 -1을 리턴한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EFAULT</DT
+><DD
+><P
+>	
+				tv나 tz이 접근할 수 없는 영역을 가리키고 있다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN27"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main()
+{
+    struct timeval mytime;
+
+    // 현재 시간을 얻어온다.
+    gettimeofday(&#38;mytime, NULL);
+    printf("%ld:%ld\n", mytime.tv_sec, mytime.tv_usec);
+
+    // 시간을 1시간 뒤로 되돌려서 설정한다.
+    mytime.tv_sec -= 3600;
+    settimeofday(&#38;mytime, NULL);
+    return 0;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN31"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>				<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_unixtime"
+TARGET="_top"
+>Unix 시간 다루기</A
+>
+			</P
+></LI
+><LI
+><P
+>			</P
+></LI
+><LI
+><P
+>				time(2)
+			</P
+></LI
+><LI
+><P
+>				stime(2)
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+'''참고 :'''
+ * [http://alones.byus.net/moniwiki/wiki.php/c_cpp_windows_tip_gettimeofday 윈도우에서의 gettimeofday 구현]

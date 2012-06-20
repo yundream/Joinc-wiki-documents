@@ -1,0 +1,193 @@
+#title 리눅스 Native ZFS 모듈 사용하기 
+
+[[TableOfcontents]]
+== 리눅스 native zfs 모듈 ==
+zfs는 nexcentastor를 다루면서 관심을 가지게 된 파일 시스템이다. 궁극의 파일 시스템이라고 선전하는데, 궁극까지인지는 모르겠지만 매우 좋은 파일 시스템인 것만은 분명해 보인다. 볼륨 메니저로서의 기능 뿐만 아니라 아래의 다양한 기능들을 별도의 소프트웨어 지원없이 사용할 수 있다. 
+  * 미러링
+  * RAIDZ (RAID-5와 비슷 함) 풀 구성
+  * RAIDZ2 (RAID-6와 비슷 함) 풀 구성
+  * 하이브리드 저장소 풀 
+  * 데이터 치료
+    * 미러링 혹은 RAID-Z 구성으로 데이터 자가 치료 가능
+
+ZFS는 Opensolaris에서 제공하는 파일 시스템으로 SUN의 CDDL라이센스를 따른다. GPL을 따르는 리눅스에서 상용 제품을 만드는 SUN의 CDDL과 얼마나 궁합이 맞을지가 좀 걱정이여서 CDDL 관련 정보를 찾아봤다. 원문을 읽기가 귀찮아서 http://openlook.org:625/blog/2005/06/16/cb-938/ 의 정리된 문서를 읽었다. 그냥 걱정없이 사용해도 될 것 같다. 그러니 리눅스에 포함됐겠지 ? 
+
+리눅스에서 ZFS는 두 가지 형태로 개발되고 있다. 하나는 ZFS-FUSE이다. 유저  레벨 파일 시스템인 Fuse응용이다. 유저 레벨에서 ZFS를 경험할 수 있다는 장점이 있기는 한데, 기능이 제한적이고 무엇보다 성능이 너무 떨어진다. 그냥 경험삼아 사용해보는 정도의 완성도다. 
+
+다른 하나는 오늘 다룰 native zfs 모듈이다. 현재 0.6 버전인데, ZFS의 기능도 대부분 지원하고 성능도 괜찮은 것으로 보고되서 테스트 해보기로 했다. 
+
+== native zfs 모듈 설치 ==
+=== 설치 환경 ===
+설치 환경은 다음과 같다.
+  * Host 운영체제 : Ubuntu 11.10
+  * Guest 운영체제 : Ubuntu 11.10
+    * virtualbox로 VM을 만들어서 테스트 했다.
+    * kernel 3.0.9
+
+=== native zfs 설치 ===
+http://zfsonlinux.org에서 spl-0.6.0-rc6와 zfs-0.6.0-rc6 다운로드 받은 소스코드를 컴파일 해서 설치했다. 
+
+먼저 몇 개 필요한 패키지를 인스톨 한다. 
+{{{#!plain
+# apt-get install zlib1g-dev uuid-dev libblkid-dev libselinux-dev parted lsscsi
+}}}
+
+spl을 컴파일해서 설치한다.
+{{{#!plain
+# ./configure
+# make
+# sudo make install
+}}}
+
+zfs도 같은 방법으로 컴파일후 설치한다.
+{{{#!plain
+# ./configure
+# make
+# sudo make install
+}}}
+
+이걸로 끝. lsmod로 확인 해보자. 
+{{{#!plain
+# lsmod | grep zfs
+zfs                  1032995  2 
+zcommon                46636  1 zfs
+znvpair                52918  2 zfs,zcommon
+zavl                   15010  1 zfs
+zunicode              331186  1 zfs
+spl                   126473  5 zfs,zcommon,znvpair,zavl,zunicode
+}}}
+
+=== native zfs 테스트 ===
+테스트 ubuntu vm에 SATA disk를 4개 추가 한 다음 부팅했다. fdisk로 확인한 디스크 정보는 다음과 같다.
+   * /dev/sdb : 8 Gbyte
+   * /dev/sdc : 8 Gbyte
+   * /dev/sdd : 8 Gbyte
+   * /dev/sde : 8 Gbyte
+
+zpool create, zfs create 등등은 당연히 잘 된다.
+{{{#!plain
+# zpool create -f tank /dev/sdb /dev/sdc /dev/sdd /dev/sde
+# zfs create tank/fish
+}}}
+
+==== 압축 ====
+압축은 잘 될까. 테스트 해봤다.
+{{{#!plain
+# zfs set compression=gzip tank/fish
+}}}
+
+정말 압축이 되는 지를 테스트 해보기 위해서 dd로 500M 파일을 하나 만들었다.
+{{{#!plain
+# cd /tank/fish
+# dd if=/dev/zero of=dd.dat bs=1M count=500
+500+0 records in
+500+0 records out
+524288000 bytes (524 MB) copied, 1.12752 s, 465 MB/s
+}}}
+
+du로 파일의 크기를 확인했다.
+{{{#!plain
+# du -h
+2.0K
+}}}
+2.0 K로 압축됐다. 
+
+ls로 파일을 보면
+{{{#!plain
+# ls -al dd.dat 
+-rw-r--r-- 1 root root 524288000 2011-12-07 22:57 dd.dat
+}}}
+원래 파일 크기로 보인다. 파일의 실제 물리적 크기가 아닌 메타 정보를 보여주기 때문이다.
+
+==== raidz ====
+raidz으로 풀을 만들었다. 최소 2개의 디스크가 필요하다.
+{{{#!plain
+# zpool create tank raidz /dev/sdb /dev/sdc /dev/sdd /dev/sde
+# zpool status
+  pool: tank
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          raidz1-0  ONLINE       0     0     0
+            sdb     ONLINE       0     0     0
+            sdc     ONLINE       0     0     0
+            sdd     ONLINE       0     0     0
+            sde     ONLINE       0     0     0
+
+}}}
+raidz은 single parity를 지원하므로 하나의 디스크에 문제가 생기더라도 데이터 손실이 없어야 한다. 물리적인 디스크로 zpool을 구성했다면 디스크를 제거하는 것으로 테스트가 가능하겠는데, 가상 환경에서는 테스트가 좀 애매모호 하다. 나중에 물리적인 환경이 구성되면 그대 제대로 테스트 해봐야 겠다.
+
+raidz2 풀을 만들었다. 최소 3개의 디스크가 필요하다.
+{{{#!plain
+# zpool create tank raidz2 /dev/sdb /dev/sdc /dev/sdd /dev/sde
+}}}
+double parity를 지원하므로 두개 디스크에 문제가 생겨도 데이터 손실 없이 운용할 수 있다.
+
+raid3 풀도 잘 만들어진다. 
+
+==== spare ====
+spare 지원도 테스트 해봤다. 3개의 디스크를 raidz로 묶고, 디스크 하나를 spare로 묶었다. 
+{{{#!plain
+# zpool create tank raidz /dev/sdb /dev/sdc /dev/sdd spare /dev/sde
+# zpool status
+  pool: tank
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          raidz1-0  ONLINE       0     0     0
+            sdb     ONLINE       0     0     0
+            sdc     ONLINE       0     0     0
+            sdd     ONLINE       0     0     0
+        spares
+          sde       AVAIL   
+}}}
+이제 raidz1 pool의 디스크 중 하나가 FAILURE가 되면 spares의 디스크가 FAILURE 디스크를 대신해서 작동할 거다.
+
+역시 물리적 환경을 구성해야 제대로 테스트할 수 있을 것 같다. 기능은 구현된 것 같으니, 어서 발리 물리적 환경을 만들어서 실제로 테스트 해보고 싶다. 
+
+==== nfs ====
+zfs는 nfs와 smb서비스와 통합돼 있다. zfs 명령으로 간단하게 폴더를 공유할 수 있다. 물론 nfs 서버는 설치돼 있어야 한다.
+{{{#!plain
+# zfs set sharenfs=on tank/home
+# nfsstat 
+Server rpc stats:
+calls      badcalls   badclnt    badauth    xdrcall
+1          0          0          0          0       
+
+Server nfs v3:
+null         getattr      setattr      lookup       access       readlink     
+1       100% 0         0% 0         0% 0         0% 0         0% 0         0% 
+read         write        create       mkdir        symlink      mknod        
+0         0% 0         0% 0         0% 0         0% 0         0% 0         0% 
+remove       rmdir        rename       link         readdir      readdirplus  
+0         0% 0         0% 0         0% 0         0% 0         0% 0         0% 
+fsstat       fsinfo       pathconf     commit       
+0         0% 0         0% 0         0% 0         0% 
+}}}
+
+
+==== 기타 ====
+아래 기능도 지원한다. 중요한건 물리적 환경에서의 테스트가 될 듯.
+  * mirror
+  * log
+  * cache
+  * snapshot
+  * import, export
+  * 기타등등...
+
+== 참고 문헌 ==
+  * [wiki:Site/System_management/ZFS 오픈 솔라리스에서 ZFS]
+  * [http://www.phoronix.com/scan.php?page=article&item=kq_zfs_gold&num=1 zfs 성능 측정 보고서]
+  * [http://www.phoronix.com/scan.php?page=article&item=linux_kqzfs_benchmarks&num=1 linux zfs 성능 측정 보고서]
+== 결론 ==
+  * 물리적 환경에서 테스트 하고 싶다. JBOD으로.
+  * nexentastor 같은 리눅스 기반 볼륨 메니저 소프트웨어 찾아봐야 겠다.
+
+[[tag(linux,ZFS,Zpool)]]
+[[Category(50)]]

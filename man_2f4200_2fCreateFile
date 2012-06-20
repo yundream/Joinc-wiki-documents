@@ -1,0 +1,121 @@
+#title winapi : CreateFile - 파일을 오픈한다. 
+
+== CreateFile ==
+파일이나 입출력 장치를 연다. 대표적인 입출력 장치로는 파일, 파일 스트림, 디렉토리, 물리적인 디스크, 볼륨, 콘솔 버퍼, 테이브 드라이브, 파이프 등이 있다. 이 함수는 각 장치를 제어할 수 있는 handle(핸들)을 반환한다. 
+
+=== 사용 법 ===
+{{{#!plain
+HANDLE WINAPI CreateFile(
+  __in      LPCTSTR lpFileName,
+  __in      DWORD dwDesiredAccess,
+  __in      DWORD dwShareMode,
+  __in_opt  LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+  __in      DWORD dwCreationDisposition,
+  __in      DWORD dwFlagsAndAttributes,
+  __in_opt  HANDLE hTemplateFile
+);
+}}}
+
+=== 매개 변수 ===
+  * lpfileName 
+    열고자 하는 파일 이름
+  * dwDesiredAccess 
+    접근 방법을 명시하기 위해서 사용한다. 일반적으로 GENERIC_READ, GENERIC_WRITE 혹은 GENERIC_READ|GENERIC_WRITE를 사용한다. 만약 0을 사용하면, 장치를 직접 접근하는 대신 속성을 얻기위한 요청을 한다.
+  * dwShareMode
+    개체의 공유 방식을 지정한다. 0을 지정하면 공유할 수 없는 상태가 되고, 핸들이 닫히기 전까지 다른 열기는 실패하게 된다.
+    || FILE_SHARE_DELETE  || 삭제 접근을 요청했을 때, 연속된 열기가 허용된다.        ||
+    || FILE_SHARE_READ    || 읽기 접근을 요청했을 때, 연속된 열기가 허용된다.        ||
+    || FILE_SHARE_WRITE   || 쓰기 접근을 요청했을 때, 연속된 열기가 허용된다.        ||
+  * lpSecurityAttributes
+  * dwCreationDisposion
+    파일의 생성방식을 명시한다.
+    || CREATE_NEW         || 새로운 파일을 생성한다.                                 ||
+    || CREATE_ALWAYS      || 새로운 파일을 생성한다. 동일한 이름의 파일이 존재하면, 파일을 덮어쓴다.   ||
+    || OPEN_EXISTING      || 파일이 존재하면 연다. 만약 파일이나 장치가 존재하지 않으면, 에러 코드로 ERROR_FILE_NOT_FOUND (2)를 설정한다. ||
+    || TRUNCATE_EXISTING  || 파일이 존재하면 연다. 이때 파일 크기는 0이 된다. 만약 파일이나 장치가 존재하지 않으면, ERROR_FILE_NOT_FOUD를 설정한다. ||
+  * dwFlagsAndAttributes
+    파일의 기타 속성을 지정한다.
+    || FILE_ATTRIBUTE_ARCHIVE  ||                  ||
+    || FILE_ATTRIBUTE_HIDDEN   || 숨김 파일을 생성한다.         ||
+    || FILE_ATTRIBUTE_NORMAL   || 다른 속성을 가지지 않는다.    ||
+    || FILE_ATTRIBUTE_OFFLINE  ||                               ||
+    || FILE_ATTRIBUTE_READONLY  || 읽기 전용이다. 응용 프로그램은 이 파일을 읽을 수 있으나 쓰거나 삭제할 수 없다.  ||
+    || FILE_ATTRIBUTE_SYSTEM    || 운영체제의 일부로 배타적으로 사용한다.     ||
+    || FILE_ATTRIBUTE_TEMPORARY || 임시저장을 위해 사용한다.                  ||
+
+    || FILE_FLAG_BACKUP_SEMANTICS  ||                 ||
+    || FILE_FLAG_DELETE_ON_CLOSE   ||                 ||
+    || FILE_FLAG_NO_BUFFERING      ||                 ||
+    || FILE_FLAG_OPEN_NO_RECALL    ||                 ||
+    || FILE_FLAG_OPEN_REPARSE_POINT    ||                 ||
+    || FILE_FLAG_OVERLAPPED        ||                 ||
+    || FILE_FLAG_POSIX_SEMANTICS   ||                 ||
+    || FILE_FLAG_RANDOM_ACCESS     ||                 ||
+    || FILE_FLAG_SEQUENTIAL_SCAN   ||                 ||
+    || FILE_FLAG_WRITE_THROUGH     ||                 ||
+
+    || SECURITY_ANONYMOUS         ||            ||
+    || SECURITY_CONTEXT_TRACKING  ||            ||
+    || SECURITY_DELEGATION        ||            ||
+    || SECURITY_EFFECTIVE_ONLY    ||            ||
+    || SECURITY_IDENTIFICATION    ||            ||
+    || SECURITY_IMPERSONATIION    ||            ||
+  * hTemplateFile
+
+dwFlagAndAttributes의 상세 내용은 기술하지 않았다. (뭐하자는 값들인지 몰라서)
+
+=== 반환 값 ===
+성공하면 파일에 대한 핸들을 반환한다. 실패하면 INVALID_HANDLE_VALUE를 반환한다. 자세한 에러 코드는 GetLastError(:4200)함수로 가져올 수 있다.
+
+=== 상세 내용 ===
+
+=== 예제 ===
+{{{#!plain
+#include <stdio.h>  
+#include <windows.h>  
+#include <tchar.h>
+  
+#define MAX_LINE 1024  
+int main(int argc, char **argv)  
+{  
+    HANDLE fp;  
+    DWORD readn;  
+    BOOL brtv;  
+    char buf[MAX_LINE];
+  
+    if (argc != 2)  
+    {  
+        printf("Usage : %s [file]\n", argv[0]);  
+        return 1;  
+    }
+  
+    fp = CreateFile(  
+		argv[1],   
+        GENERIC_READ,  
+        0,  
+        NULL,  
+        OPEN_EXISTING,  
+        FILE_ATTRIBUTE_NORMAL,  
+        NULL);  
+    if (fp == INVALID_HANDLE_VALUE)  
+    {  
+        printf("File 1 Open Error (%d) : %s\n", GetLastError(), argv[1]);  
+        return 1;  
+    }  
+  
+    while(1)  
+    {  
+        memset((void *)buf, 0x00, MAX_LINE); 
+        brtv = ReadFile(fp,buf, MAX_LINE-1, &readn, NULL);  
+        if(brtv && readn == 0)  
+        {  
+            break;  
+        }  
+        printf("%s", buf);  
+    }  
+    return 1;  
+}  
+}}}
+
+[[tag(윈도 시스템 프로그래밍,파일)]]
+

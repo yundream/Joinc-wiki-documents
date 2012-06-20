@@ -1,0 +1,70 @@
+ * 이 소스는 Linux에서 간략하게 구현된 startup코드입니다. 이것은 인자를 받기 위해서 DOS처럼 공백을 구분해서 만들어야 하는 불편함이 없습니다. Linux에서는 프로그램이 구동되면 마치 하나의 함수를 호출한것같이 스택에 해당 PSP(Linux에서도 이렇게 부르는지는 잘 모르겠네요.)를 넘겨주게 됩니다. 때문에 DOS 보다는 상당히 편하게 사용할수 있습니다. 그리고 아래의 예제에서 env는 인자로 넘겨주지 않았습니다. 사실 저는 쓸일이 없어서 예제를 이따위로 만들어 놓았습니다. 너그럽게 용서하시길 바라면서 다음과 같이 예제를 올려봅니다.
+
+ * NOTE: Startup 코드는 Linux에서 C를 할때 링크과정에서 항상 포함되는 crt<0..1>.o 를 말합니다. 즉, 이것이 하는 일은 프로그램이 기동되고 몇가지 기초과정(아래에서는 빠졌지만 이것보다 훨씬 많은 일을 해야 합니다.)를 초기화 하고 마지막으로 main을 호출하게 됩니다. 그리고 main에서 return되었을때 exit(0)함수를 호출하는 것과 같은 역할의 코드를 수행해주도록 합니다.
+----
+{{{#!plain
+#
+# [ GPL ]
+#
+# File : mzstartup.c
+# Code : JaeHyuk Cho <minzkn@infoeq.com>
+# Date : 2002.12.23 MON
+
+.code32
+
+.globl mzstartup /* 외부(Linker)에서 Startup entry를 기본값으로 _start를 호출하게 됩니다. 하지만 이 예제에서는 mzstartup이라는 라벨을
+                    개인적인 편의로 사용하는것으로 Linker에 의해서 Link과정을 수행할때 이 라벨을 지정해줘야 합니다. */
+
+/* Global로 이 변수를 갖게 하여 굳이 main함수 내에서만 참조할수 있는것이 아니고 다른 함수에서도 이 전역변수를 
+                 통해서 접근할수 있게 편의상 public으로 선언합니다. */
+.globl g_Argc 
+.globl g_Argv
+
+/* 이것이 외부참조되는 C의 main함수를 가르킵니다. C++의 경우는 _main이 될수도 있고 __main도 될수 있는데 이것은 따로 
+   알아보시기 바랍니다. (컴파일러마다 다를수 있다는 예기) */
+.extern main
+
+.org 0x0000
+mzstartup:
+               /* 이 시점부터 스택에 초기화 되어 있는 상태이고 마치 mzstartup부분을 호출해준것과 같은 스택 구조를 갖게 됩니다.
+                  그래서 일반적은 스택프레임을 다루듯 argc, argv를 복사하여 가져오게 되면 됩니다. */
+               pushl %ebp
+               movl %esp, %ebp
+
+               leal 0x0008(%ebp), %eax
+               movl %eax, g_Argv
+               pushl %eax
+
+               movl 0x0004(%ebp), %eax
+               movl %eax, g_Argc
+               pushl %eax
+
+               /* Register 초기화 : 꼭 필요한 과정은 아니지만 간혹 문제(Linux의 버그를 말하는 것이 아님)를 발생할수도 있어 초기화를 수행합니다. */
+               xorl %eax, %eax
+               xorl %ebx, %ebx
+               xorl %ecx, %ecx
+               xorl %edx, %edx
+               xorl %ebp, %ebp
+               xorl %esi, %esi
+               xorl %edi, %edi
+
+               call main
+               addl $4+4, %esp
+
+               movl %eax, %ebx
+               movl $1, %eax
+               int $0x80
+               
+               /* 이 이후의 코드가 실행된다면 이것은 Linux kernel이 정상이 아닙니다. 즉, 이 이후에 나오는 명령은 의미가 크게 없습니다. */
+               hlt
+
+               popl %ebp
+               ret
+
+.data
+g_Argc:        .long 0
+g_Argv:        .long 0
+
+# End of source
+}}}
+----

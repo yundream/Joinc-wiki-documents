@@ -1,0 +1,203 @@
+#title php 를 이용한 간단한 xml 파서기
+
+=== php xml 파서기 ===
+php를 이용해서 간단한 xml 파서기를 만들어 봤습니다. 개인적으로 joinc(:12)에서 간단히 사용할 RSS(:12)리더기 제작을 위한 베이스 클래스 용도로 사용할 생각입니다.
+
+코드는 정재되지 않았으며, 충분히 지저분합니다. 에러처리도 안했고요. 여하튼지간에 작동되네? 하는 것에 중점을 둔거라서 말이죠. 깔끔하게 하는건 나중일로 할 생각입니다. php(:12)의 xml(:12)조작은 expat(:12) 라이브러리(:12)를 이용합니다. libexpat가 설치되어 있는지 미리 확인해봐야 겠죠 ? 만약 C(:12)에서 expat(:12)라이브러리를 이용한 프로그래밍을 해보았다면, 거의 동일한 방법으로 사용할 수 있을겁니다. 함수명들도 거의 동일하고 하는일도 비슷합니다.
+
+{{{#!plain
+<?php
+class XmlParser
+{
+    public $parser;
+    public $depth=0;
+    public $termStack;
+    public $nodeData;
+    public $fullParseData;
+    public $prevdepth;
+    public $uri;
+    public $last_node;
+    public $inside_data;
+
+    function XmlParser($uri)
+    {
+        $this->setURI($uri);
+        $this->run();
+    }
+
+    function run()
+    {
+        $this->termStack = array();
+        $this->xmlInit();
+        $this->parsing();
+    }
+
+    function setURI($uri)
+    {
+        $this->uri = $uri;
+    }
+
+    function xmlInit()
+    {
+        $this->parser = xml_parser_create();
+        if(!$this->parser) echo "Parser Error<br>";
+        if(!xml_set_object($this->parser, $this)) echo "xml set object error<br>";
+        if(!xml_set_element_handler($this->parser, "tag_open", "tag_close")) echo "handler set error<br>";
+        if(!xml_set_character_data_handler($this->parser, "cdata")) echo "cdata handler error<br>";
+    }
+
+    function cdata($parser, $cdata)
+    {
+        if($this->depth > $this->prevdepth)
+        {
+            if($this->inside_data)
+                $this->nodeData[$this->nodeName()] .= $cdata;
+            else
+                $this->nodeData[$this->nodeName()] = $cdata;
+            $this->last_node = $this->nodeName();
+        }
+        $this->inside_data=true;
+    }
+
+    function getData($node=null)
+    {
+        if($node == null)
+        {
+            return $this->fullParseData;
+        }
+        return $this->fullParseData[$node];
+    }
+
+    function parsing()
+    {
+        $fp = fopen($this->uri, "r");
+        if(!$fp)
+        {
+            return 0;
+        }
+        while($data = fread($fp, 9182))
+        {
+            $this->parse($data);
+        }
+        fclose($fp);
+        return 1;
+    }
+
+    function parse($data)
+    {
+        if(!xml_parse($this->parser, $data)) echo xml_error_string(xml_get_error_code($this->parser));
+    }
+
+    function getpNode($depth=0)
+    {
+        if($depth != 0)
+        {
+            $node=count($this->termStack) + $depth;
+            $stack = array_slice($this->termStack, 0, $node);
+        }
+        else
+        {
+            $stack = $this->termStack;
+        }
+        return join("/",$stack);
+    }
+
+    function pushStack($name)
+    {
+        array_push($this->termStack, $name);
+    }
+
+
+    function getStackSize()
+    {
+        return count($this->termStack);
+    }
+
+    function tag_open($parser, $tag, $attributes)
+    {
+        $this->pushStack($tag);
+        if($this->depth > $this->prevdepth)
+        {
+            if(count($this->nodeData))
+            {
+                $last_node = $this->getpNode(-2);
+                $this->fullParseData[$last_node] = $this->nodeData;
+            }
+            $this->nodeData=array();
+            $this->prevdepth = $this->depth;
+        }
+        $this->depth++;
+        $this->inside_data=false;
+    }
+
+    function tag_close($parser, $tag)
+    {
+        $count = count($this->nodeData);
+        if($count == 0)
+            array_pop($this->termStack);
+        $this->depth--;
+        if($this->depth < $this->prevdepth)
+        {
+            if(count($this->nodeData) > 1)
+                $this->fullParseData[$this->getpNode()][] = $this->nodeData;
+            else
+                $this->fullParseData[$this->getpNode()] = $this->nodeData;
+            $this->nodeData=array();
+        }
+        else
+        {
+            $this->prevdepth = $this->depth;
+        }
+        if($count != 0)
+            array_pop($this->termStack);
+                $this->inside_data=false;
+    }
+
+    function nodeName()
+    {
+        return $this->termStack[$this->depth-1];
+    }
+
+}
+
+// yundream 블로그의 RSS를 이용해서 테스트해보았다.
+$parser = new XmlParser('http://teamblog.joinc.co.kr/yundream/rss');
+$items = $parser->getData('RSS/CHANNEL/ITEM');
+print_r($items);
+foreach($items as $item)
+{
+    echo $item['AUTHOR'],"<br>";
+    echo $item['TITLE'],"<br>";
+}
+?>
+}}}
+
+=== 사용방법 ===
+다음은 사용방법입니다.
+{{{#!plain
+$parser = new XmlParser('http://teamblog.joinc.co.kr/yundream/rss');
+$data = $parser->getData();
+}}}
+
+getData() 메서드를 이용해서 필요한 노드의 정보를 가져올 수 있습니다. 노드의 표현은 디렉토리 방식을 이용하고 있습니다. ITEM 정보를 가져오길 원한다면 '''RSS/CHANNEL/ITEM'''하는 식이 됩니다. 위의 예제에서는 RSS(:12)를 파싱하고 있습니다. 각 NODE의 정보는 다음과 같이 얻어올 수 있겠습니다. 
+{{{#!plain
+$channel = $parser->getData('RSS/CHANNEL');
+echo $channel['TITLE'];
+echo $channel['LINK'];
+echo $channel['PUBDATE'];
+}}}
+
+다음은 ITEM을 얻어오는 예입니다.
+{{{#!plain
+$items = $parser->getData('RSS/CHANNEL/ITEM');
+foreach($items as $item)
+{
+    echo $item['AUTHOR'],"<br>";
+    echo $item['TITLE'],"<br>";
+}
+}}}
+그럭저럭 얻어오네요 !!??
+
+=== 해야할 것 ===
+  1. 현재는 data만 얻어올 수 있습니다. Attribute도 얻어올 수 있어야 겠죠. RSS(:12)정보를 가져오는데에는 일단 이정도로도 충분하긴 하지만요.
+  1. RDF 문서가 파싱이 안되네. 일반적으로 적용할 수 있도록 위의 코드를 수정해보도록 하자.

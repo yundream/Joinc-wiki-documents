@@ -1,0 +1,103 @@
+#title winapi : WriteFile - 파일에 데이터를 쓴다.
+
+== WriteFile ==
+특수 파일 혹은 입출력 장치에 데이터를 쓴다. 
+
+이 함수는 동기,비동기 모두에 쓸 수 있다. 이와 비슷한 함수로 비동기에만 사용할 수 있는 WriteFileEx(:4200)함수가 있다.
+
+=== 사용 법 ===
+{{{#!plain
+BOOL WINAPI WriteFile(
+  __in         HANDLE hFile,
+  __in         LPCVOID lpBuffer,
+  __in         DWORD nNumberOfBytesToWrite,
+  __out_opt    LPDWORD lpNumberOfBytesWritten,
+  __inout_opt  LPOVERLAPPED lpOverlapped
+);
+}}}
+
+=== 매개 변수 ===
+  * hFile 
+    파일, 파일 스트림, 물리적인 디스크, 콘솔 버퍼, 테이프 드라이버, 소켓(:12), 파이프(:12)와 같은 파일의 핸들러
+  * lpBuffer
+    파일에 쓸 데이터를 가리키는 포인터
+  * nNumberOfBytestoWrite
+    파일에 쓸 데이터의 바이트 크기. 
+  * lpNumberOfBytesWrite
+    hFile이 동기입출력을 위한 핸들러일 경우, 실제 전송한 바이트의 크기다. 0이면 에러가 발생했음을 의미한다. 
+  * lpOverlapped
+    hFile이 FILE_FLAG_OVERLAPPED로 열린 핸들러라면 '''OVERLAPPED'''구조체 포인터를 설정해야 한다. 그렇지 않을 경우 NULL을 넘긴다.
+
+=== 반환 값 ===
+성공했다면 TRUE를 반환한다.
+
+비동기 입출려이거나 함수가 실패했다면 0 (FALSE)을 반환한다. 자세한 에러 코드는 GetLastError(:4200)함수의 반환 값을 검사한다.
+
+GetLastError 코드가 ERROR_IO_PENDING이면 함수 실패가 아니다. 이는 비동기 입출력에 의한 반환을 의미한다.
+
+=== 예제 ===
+파일 복사 프로그램. source file을 dest file로 복사한다.
+{{{#!plain
+#include <windows.h>
+#include <stdio.h>
+
+#define MAX_LINE 1024
+
+int main(int argc, char **argv)
+{
+	char buf[MAX_LINE];
+	HANDLE source_fh,dest_fh;
+	int readn, writen;
+	if (argc != 3)
+	{
+		printf("Usge : %s [source file] [dest file]\n", argv[0]);
+		return 0;
+	}
+
+	source_fh= CreateFile(
+		argv[1],
+		GENERIC_READ,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+		);
+	if(source_fh == INVALID_HANDLE_VALUE)
+	{
+		printf("FILE Open Error %d\n", GetLastError);
+		return 1;
+	}
+	dest_fh = CreateFile(
+		argv[2],
+		GENERIC_WRITE,
+		0,
+		NULL,
+		CREATE_NEW,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+		);
+	if (dest_fh == INVALID_HANDLE_VALUE)
+	{
+		if (GetLastError() == ERROR_FILE_EXISTS) 
+			printf("Dest File Already exists\n");
+		else 
+			printf("Dest File Open Error\n");
+		return 1;
+	}
+	
+
+	while(1)
+	{
+		memset(buf, 0x00, MAX_LINE);
+		ReadFile(source_fh, buf, MAX_LINE-1, &readn, NULL);
+		if(readn <= 0)
+			break;
+		WriteFile(dest_fh, buf, readn, &writen, NULL);
+		printf("%d\n", writen);
+	}
+	return 0;
+}
+}}}
+
+[[tag(윈도 시스템 프로그래밍,파일)]]

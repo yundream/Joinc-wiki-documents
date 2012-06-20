@@ -1,0 +1,976 @@
+#title RTS와 Thread Pool의 결합
+
+[wiki:docbook_RTS와_Thread_Pool의_결합 Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>RTS와 Thread Pool의 결합</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>RTS와 Thread Pool의 결합</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 9월 16일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN19"
+>좀더 효율적인 네트워크 애플리케이션을 위해서</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#RTSTH"
+>RTS와 쓰레드의 조합</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#RTSPOLL"
+>RTS와 Thread Pool의 조합</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN40"
+>얻을 수 있는 장점</A
+></DT
+><DT
+>2.2.2&#51208;. <A
+HREF="#AEN54"
+>구현 프로시져</A
+></DT
+><DT
+>2.2.3&#51208;. <A
+HREF="#AEN74"
+>실제 구현</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN80"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		RTS(:12)는 기본적으로 고성능 네트워크 애플리케이션을 작성하기 위한 
+		목적으로 사용된다. 이런 이유로 네트워크 애플리케이션의 처리능력을 
+		향상시키기 위해서 사용되는 Thread/Process pool 등과 함께 사용되는 
+		경우가 많다.  
+	</P
+><P
+>		이번 강좌에서는 Thread Pool과 RTS를 조합해서 고성능 네트워크 
+		애플리케이션을 작성하는 방법에 대해서 알아보도록 하겠다.   
+	</P
+><P
+>		이 문서를 읽기전에 반드시 이전의 RTS문서들을 읽어 보기바란다. 
+		그렇지 않다면 이해하기 힘든 내용이 많을 것이다.  	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2&#51208;. 좀더 효율적인 네트워크 애플리케이션을 위해서</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="RTSTH"
+>2.1&#51208;. RTS와 쓰레드의 조합</A
+></H2
+><P
+>			RTS와 쓰레드풀의 조합에 대해서 알아보기 전에 그 전단계 과정이라고 
+			볼수 있는 RTS와 쓰레드와의 조합에 대해서 알아보자.
+}}}
+[[sadsense(small)]]
+{{{#!html 
+		</P
+><P
+>			일반적인 쓰레드및 프로세스 기반의 네트워크 서버 애플리케이션과 
+			동일한 방법으로 제작된다. 즉 메인 쓰레드에서 socket-&#62;bind-&#62;listen
+			의 순서를 따라서 듣기 소켓을 작성하고 accept로 클라이언트의 연결을 
+			대기하고 있다가 클라이언트의 연결이 만들어지면 클라이언트와 데이터 
+			통신을 위한 쓰레드를 생성하는 방법이다.  
+		</P
+><P
+>			이들 고전적인 쓰레드/포크방식과의 차이점이라면 데이터 통신을 
+			위해서 RTS를 사용한다는 점이다. RTS를 제대로 적용하기 위해서는 
+			유닉스의 쓰레드에서 작동되는 시그널 매커니즘에 대해서 
+			이해를 하고 있어야 한다.  
+		</P
+><P
+>			몇번 이 사이트의 문서를 통해서 간접적으로 언급되었을 건데, 쓰레드는 
+			기본적으로 스택(:12), 쓰레드, 파일, 시그널(:12) 등의 자원을 서로 
+			공유하게 된다. 이것은 유닉스(:12) 표준 시그널의 확장판인 
+			RTS에도 동일하게 적용되며, 
+			모든 쓰레드에서 공유할 수 있다. 핵심은 
+			프로세스에서 시그널을 받을경우 특정 쓰레드로 
+			시그널을 전달되도록 해야한다는 것이다. 
+		</P
+><P
+>			다행히(혹은 당연히) pthread라이브러리에서는 다음과 같은 시그널과 
+			관련된 라이브러리를 제공한다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;signal.h&#62;
+
+int pthread_sigmask(int how, const sigset_t *newmask, sigset_t *oldmask);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			pthread_sigmask(3)를 이용하면 각각의 쓰레드가 
+			어떤 시그널셋(<B
+CLASS="EMPHASIS"
+>newmask</B
+>)에 
+			대해서 특정한 행동(<B
+CLASS="EMPHASIS"
+>how</B
+>)를 할 수 있도록 
+			만들 수 있다. 
+		</P
+><P
+>			또 한가지 신경써야할 점은 각각의 쓰레드가 받아들여야할 
+			RTS가 달라야 한다는 점이다. 모든 생성된 쓰레드가 
+			동일한 <B
+CLASS="EMPHASIS"
+>SIGRTMIN</B
+>만을 사용하게 된다면 
+			SIGRTMIN이 발생했을 때 어느 쓰레드로 RTS가 전달되어야 할지 
+			알 수 없을 것이다. 
+		</P
+><P
+>			위의 문제는 각 생성되는 쓰레드마다 
+			다른 RTS가 전달되게 하므로써 해결할 수 있다. 
+			리눅스의 경우 SIGRTMIN에서 부터 SIGRTMAX까지 32개의 RTS가 
+			존재하므로 각 쓰레드마다 다른 RTS를 처리하도록 만들어 
+			줄 수 있다. 
+			클라이언트가 연결해서 A쓰레드가 생성되었다면, 
+			클라이언트와의 연결소켓(:12)에 이벤트가 발생했을 때 
+			SIGRTMIN+1이 전달되도록 하고, 또다른 클라이언트가 연결되어서 
+			B쓰레드가 생성되었다면 이 연결소켓에 대해서 SIGRTMIN+2가 
+			발생하도록 하는 식이다.
+		</P
+><P
+>			여기에서는 방법론적인 얘기만 하고 실제 코드를 작성하지는 
+			않을 것이다. 어차피 다음장에서 모두 다루어질 내용이기 
+			때문이다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="RTSPOLL"
+>2.2&#51208;. RTS와 Thread Pool의 조합</A
+></H2
+><P
+>			그럼 이제부터 진정으로 관심있어하는 RTS와 쓰레드 풀과의 
+			조합에 대해서 알아보도록 하겠다. 여기에 있는 내용을 충분히 
+			이해한다면 덤으로 <A
+HREF="#RTSTH"
+>2.1&#51208;</A
+>까지 이해할 수 있게 될 것이다. 
+		</P
+><P
+>			여기에서는 RTS와 쓰레드풀을 조합함으로써 얻을 수 있는 장점과 
+			어떤 방식으로 조합이 가능한지에 대해서 설명하도록 하겠다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.2.1&#51208;. 얻을 수 있는 장점</A
+></H3
+><P
+>				쓰레드 풀에 대해서는 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=104"
+TARGET="_top"
+>쓰레드 풀 작성</A
+>에서 간단하게 
+				언급했었다. 그렇다면 RTS와 쓰레드 풀을 조합해서 사용할 경우 
+				얻을 수 있는 장점에 대해서 우선알아보도록 하자.  
+				<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>						미리 생성된 쓰레드에서 클라이언트를 처리하게 되므로 
+						쓰레드 생성에 대한 비용을 줄일 수 있다. 
+						이러한 기술은 웹서버와 같이 연결과 종료가 빈번한 서버 
+						애플리케이션에 특히 유용할 것이다. 실제 많은 웹서버들은 
+						쓰레드풀(혹은 프로세스 풀)을 이용해서 구현된다.  
+					</P
+><P
+>						이 외에도 빈번한 데이터 교환이 발생하는 게임서버와 
+						같은 곳에도 훌륭하게 응용 될수 있을 것이다.  
+					</P
+></LI
+><LI
+><P
+>						특정 소켓에 이벤트가 발생했을 때 별다른 연산없이 
+						해당 소켓을 처리하는 쓰레드에서 이벤트를 (자동적으로) 
+						감지하고 처리 할 수 있도록 도와준다.    	
+					</P
+><P
+>						쓰레드 풀 혹은 프로세스(:12) 풀 기반의 경우 소켓을 전달하기 
+						위해서 꽤나 복잡한 과정을 거쳐야 하는 것에 비하면 
+						매우 간단하게 소켓이벤트의 처리가 가능하다. 
+					</P
+></LI
+><LI
+><P
+>						몇몇의 서버는 프로세스(쓰레드) 
+						풀과 select(2)등을 동시에 
+						사용한다. 대개의 경우 이러한 프로세스(쓰레드)풀과 
+						select(2)의 사용은 상당한 수준의 프로그래밍 능력을 
+						요구한다.  
+					</P
+><P
+>						RTS를 이용할 경우 
+						쓰레드 풀에 있는 각각의 쓰레드에서 
+						여러개의 소켓을 처리하는 과정을 
+						비교접 손쉽게 구현할 수 있으며, 
+						select(2)나 poll(2)보다 
+						훨씬 저렴한 비용으로 구현가능하다.   
+					</P
+></LI
+></OL
+>
+				첫번째 장점은 쓰레드 풀을 사용하게 됨으로써 얻는 장점이고, 
+				두번째 세번째 장점은 RTS를 사용하게 됨으로써 얻는 장점들이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>2.2.2&#51208;. 구현 프로시져</A
+></H3
+><P
+>				다음은 구현을 위한 대략적인 프로세스를 나타낸 슈도코드이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int main()
+{
+  accept 쓰레드를 생성한다.
+  int k=1 ; // 쓰레드 일련번호로 RTS번호를 지정하기 위해서 사용한다. 
+  SIRTMIN에 대한 시그널 마스크 설정
+
+  for (지정한 갯수 만큼)
+  {
+1.  connect(k) 쓰레드를 생성한다.
+    k++;
+  }
+}
+
+accept() 쓰레드
+{
+  socket-&#62;bind-&#62;listen;
+  만들어진 듣기 소켓에 대하여 RTS반응하도록 한다.  
+  while(1)
+  {
+2.  accept()를 통해서 연결이 발생하면 fcntl을 통해서 해당 소켓이 
+    RTS를 발생하도록 한다. 
+  }
+}
+
+connect() 쓰레드
+{
+  pthread_sigmask를 이용해서 RTS에 쓰레드가 반응하도록 한다.  
+  반응하는 RTS번호는 쓰레드마다 다르다. 
+  첫번째 생성된 쓰레드는 SIGRTMIN+1, 그다음은 SIGRTMIN+2.. 식이다.
+  while(1)
+  {
+    sigwaitinfo()를 이용해서 RTS를 기다린다.   
+    RTS가 발생하면 소켓지정자를 통해서 클라이언트와 통신한다.  
+  }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>				connect()쓰레드를 생성할때 각 쓰레드는 고유의 
+				일련번호를 가지며 이 일련번호는 쓰레드가 
+				반응할 RTS번호를 할당받기 
+				위해서 사용한다. 예를 들어 첫번째 쓰레드는 
+				1이 인자로 넘어가므로 
+				이 쓰레드는 SIGRTMIN+1에 대해서 반응한다. 두번째 쓰레드는 
+				SIGRTMIN+2에 대해서 반응한다. 
+				</P
+></LI
+><LI
+><P
+>				각 쓰레드가 반응해야될 RTS번호에 대해서 지정을 했으므로 
+				이제 accept()쓰레드를 통해서 만들어진 연결 소켓이 적당한 
+				RTS번호로 시그널을 발생시키도록 하면 될것이다. 
+				이작업은 fcntl(2)을 통해서 이루어지며, 만약 fcntl을 이용해서 
+				SIGRTMIN+1시그널을 발생하도록 연결 소켓을 설정한다면, 앞으로 
+				이 소켓에 데이터 이벤트가 발생하면 SIGRTMIN+1이 발생할 
+				것이며 자동적으로 첫번째 connect()쓰레드로 	
+				시그널이 전달될 것이다.    
+				</P
+></LI
+><LI
+><P
+>				connect()로 시그널이 전달된다면, 쓰레드는 sigwaitinfo()를 
+				통해서 RTS정보를 얻어올 수 있으며, 이벤트가 발생한 
+				소켓을 통하여 데이터 통신을 하면 된다. connect()쓰레드가 
+				여러개의 소켓을 관리하고 있다고 하더라도 sigwaitinfo()를 
+				이용해서 이벤트가 발생한 소켓에 대한 정보를 얻어 올 수 있으므로
+				쉽게 여러개의 소켓관리가 가능하다.   
+				</P
+></LI
+></OL
+>
+			</P
+><P
+>				쓰레드 풀을 작성하는 이유는 네트워크 처리를 각각의 
+				쓰레드로 분산시키기 위한 목적이다.  
+				여기에서의 로드밸런싱은 단순히 하나의 쓰레드가 몇개의 
+				클라이언트를 
+				관리하는지를 검사해서 가장 적은 클라이언트를 처리하고 있는 
+				쓰레드에 소켓에 대한 처리를 넘기는 간단한 방식을 사용한다. 
+				이러한 처리를 위해서 각각의 쓰레드가 몇개의 소켓을 
+				처리하고 있는지에 
+				대한 정보를 유지하고 있어야 한다. 다음은 쓰레드 소켓 분배를 
+				위한 자료 구조다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedf struct _fd_sig
+{
+   int signum;
+   int pid;
+} fd_sig;
+
+multimap&#60;int, fd_sig&#62; pool_list;
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				pool_list는 multimap으로 구성된다. key값은 쓰레드에서 처리중인 
+				소켓의 갯수를 나타낸다. 		  
+				value는 fd_sig구조체이다. fd_sig구조체의 멤버변수인 signum은
+				RTS시그널 번호이며, 동시에 쓰레드를 지정하기 위한 번호로도 
+				사용된다. pid는 파일(소켓)에 이벤트가 발생했을 때 이벤트 
+				통보를 받게될 쓰레드의 pid로 fcntl()을 통해서 시그널을 
+				전달받을 쓰레드를 지정하기 위해서 사용된다. 
+				아시다시피 리눅스에서의 
+				쓰레드는 clone(2)호출을 통한 프로세스개념으로 작동되기 때문에 
+				반드시 각 쓰레드별 pid를 구분해줘야 한다. 
+				<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>					솔라리스 같은 경우 완전한 쓰레드를 지원하므로 모든 쓰레드가
+					동일한 pid를 가지게 된다 그러므로 굳이 각 쓰레드의 pid를 
+					넘겨줄 필요 없이 필요할때 getpid(2)만 호출하면 된다. 
+					</P
+><P
+>					리눅스도 최근 커널 2.4.20 에서는 하나의 pid만으로 
+					생성되는걸 확인했다. 자세한 커널문서를 읽어 보지 않아서 
+					확신할 수는 없지만 리눅스도 clone()을 사용하지 않는 
+					완전한 쓰레드를 지원하는 것으로 보인다. 이러한 
+					최신 리눅스 커널에서의 경우 getpid()만을 이용해도 
+					관계없이 작동 되었다.  
+					</P
+><P
+>					그러나 Unix와 리눅스 그리고 리눅스 커널버젼간 
+					호환을 유지하길 원한다면 쓰레드별 PID를 읽어와서 
+					작업하는 것을 추천한다. 
+					</P
+></BLOCKQUOTE
+></DIV
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>fd_sig lfd_sig;
+for (i = 0, k=1; i &#60; thread_num; i++, k++)
+{
+  // 변수 k는 쓰레드가 기다릴 시그널의 번호이다. 
+  // (SIGRTMIN+k)형식으로 사용된다.  
+  pthread_create(&#38;th_t, NULL, thread_func, (void *)&#38;k);
+  lfd_sig.signum = (k);
+  lfd_sig.pid    = pid; // pthread_create를 통해서 생성된 쓰레드의 pid 
+  pool_list.insert(pair&#60;int, fd_sig&#62;(0, lfd_sig));
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				accept()가 발생해서 연결 소켓이 만들어지면 
+				pool_list컨테이너의 첫번째 데이터를 가져온후 해당 key를 +1
+				증가시켜주고 연결 소켓에 대해서는 fcntl()을 이용해서 
+				SIGRTMIN+fd_sig.signum 시그널을 발생시키도록 세팅하면 된다.						멀티맵은 오름차순으로 정렬이 되므로 우리는 언제나 가장 적은 
+				소켓을 처리하는 쓰레드에 소켓처리를 위임 할것이라는걸 
+				보증할 수 있게된다. 소켓연결이 종료되거나 어떤 이유로 
+				끊겼을 경우에는 k-1을 하면 된다. 소켓이 종료되었을 경우에는 
+				종료된 소켓을 처리하는 컨테이너 멤버데이터를 찾아내야 하므로  
+				pool_list 컨테이너를 순환하면서 fd_sig.signum과 쓰레드번호가 
+				일치하는 멤버를 찾아내야 한다.  
+				<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>					여기에서는 설명의 편의를 위해서 key+1한다고 했는데, 
+					멀티맵에서 키의 값은 변경불가능 하다. 그러므로 실제로 
+					삽입후 삭제 하는 과정이 필요하다. 
+				</P
+></BLOCKQUOTE
+></DIV
+>
+				위의 자료구조는 물론 효율성등을 고려한건 아니다. 단지 
+				편의성만을 고려한 것이니 마음에 들지 않는다면 
+				적당한 자료구조를 만들어서 사용하기 바란다. 
+				보통 쓰레드 풀을 구성한다고 하면 아마도 20개 이상의 쓰레드를 
+				생성해서 사용하는 경우는 매우 드물 것이므로, 
+				단지 배열로 만들어서 
+				비교하는 방식을 사용해도 별 문제는 없을 것이다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+>
+}}}
+[[adsense]]
+{{{#!html
+<HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN74"
+>2.2.3&#51208;. 실제 구현</A
+></H3
+><P
+>				이러한 네트워크 프로그램 구현을 위한 여러가지 
+				개발방법들 자체가 "이거다"라고 정해진게 없이 환경과 필요에 
+				따라 달라지기 때문에 단지 예제코드만 달랑 설명해서는 
+				너무 경직될 수가 있다. 이런 이유로 단지 예제 
+				셈플만 보여주는게 아닌 기타 이런 저런 아이디얼한 내용까지 
+				담게 되었다. 지루했더라도 이해해 주길 바라면서 다음의 
+				예제를 분석하고 테스트 해보기 바란다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : rts_poll.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;iostream&#62;
+#include &#60;signal.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;vector&#62;
+
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+#include &#60;map&#62;
+
+#ifndef __USE_GNU
+#define __USE_GNU
+#endif
+#include &#60;fcntl.h&#62;
+
+using namespace std;
+
+pthread_mutex_t mutex_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sync_cond  = PTHREAD_COND_INITIALIZER;
+
+int gpid;
+typedef struct _fd_sig
+{
+    int signum;
+    int pid;
+} fd_sig;
+
+/*
+ * 1
+ * 쓰레드당 처리중인 소켓의 정보를 유지하기 
+ * 위한 자료구조. 
+ * key   : 처리중인 소켓의 수 
+ * value : 쓰레드(RTS 정보)
+ */
+multimap&#60;int, fd_sig&#62; pool_list;
+multimap&#60;int, fd_sig&#62;::iterator mi; 
+
+// RTS overflow가 발생했을 때 실행되는 핸들러
+void do_sigio(int signo)
+{
+    printf("SIGIO : RTS signal queue overflow&#92;n");    
+}
+
+/* 
+ * 기본 시그널 핸들로 초기화 및 등록
+ * 여기에서는 RTS overflow의 처리를 위한 시그널 
+ * 핸들러를 등록한다.  
+ */
+void init_signal_handler()
+{
+    struct sigaction sigact;
+    sigemptyset(&#38;sigact.sa_mask);
+    sigact.sa_flags        = SA_SIGINFO;
+    sigact.sa_restorer    = NULL;
+    sigact.sa_handler    = do_sigio;
+    if (sigaction(SIGIO, &#38;sigact, NULL) &#60; 0)
+    {
+        perror("sigaction SIGIO ");
+        exit(0);
+    }
+
+    return ;
+}
+
+/*
+ * 2
+ * 인자로 주어지는 소켓지정자 fd가 RTS시그널을
+ * 발생하도록 설정한다. 
+ * 발생시키는 RTS시그널 번호는 sig_num에 의해서 
+ * 결정된다. 
+ */
+int setup_sigio(int fd, int sig_num, int pid)
+{
+    if (fcntl(fd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC) &#60; 0)
+    {
+        perror("fcntl NONBLOCK ");
+        return -1;
+    }
+    if (fcntl(fd, F_SETSIG, SIGRTMIN+sig_num) &#60; 0)
+    {
+        perror("fcntl SETSIG "); 
+        return -1;
+    }
+
+    // 인자로 주어진 파일지정자 fd에서 이벤트가 발생할 경우  
+    // pid를 가지는 쓰레드로 RTS SIGRTMIN+sig_num 시그널이 전달된다.  
+    if (fcntl(fd, F_SETOWN, pid) &#60; 0)
+    {
+        perror("fcntl SETOWN ");
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * 3 
+ * 듣기 소켓을 만들고 
+ * 연결을 기다린다. 
+ * 만약 연결이 들어온다면 pool_list자료구조를 통해서 
+ * 가장 적은 소켓을 처리하는 쓰레드를 알아오고 
+ * 그 쓰레드에 해당되는 RTS시그널 번호로 RTS시그널을 
+ * 발생하도록 소켓을 설정한다.  
+ */
+void *accept_listener(void *data)
+{
+    int server_sockfd, cli_sockfd;    
+    fd_sig lfd_sig;
+    int count;
+    sigset_t set;
+    int client_sockfd;
+    socklen_t clilen;
+    int ret;
+
+    int signum = *((int *)data);
+    struct sockaddr_in serveraddr, clientaddr;
+    struct siginfo si;
+
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) &#60; 0)
+    {
+        perror("socket error ");
+        exit(0);
+    }
+
+    bzero(&#38;serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family        = AF_INET;
+    serveraddr.sin_addr.s_addr    = htonl(INADDR_ANY);
+    serveraddr.sin_port            = htons(1234);
+
+    if (bind (server_sockfd, (struct sockaddr *)&#38;serveraddr, 
+            sizeof(serveraddr)) == -1)
+    {
+        perror("bind error ");
+        exit(0);
+    }
+
+    if (listen(server_sockfd, 5) == -1)
+    {
+        perror("listen error ");
+        exit(0);
+    }
+    if (setup_sigio(server_sockfd, signum, getpid()) == -1) 
+    {
+        printf("sigio error&#92;n");
+        exit(0);
+    }
+
+    sigemptyset(&#38;set);
+    sigaddset(&#38;set, SIGRTMIN+signum);
+    sigprocmask(SIG_BLOCK, &#38;set, NULL);
+
+    pthread_mutex_lock(&#38;mutex_lock);
+    pthread_cond_signal(&#38;sync_cond);
+    pthread_mutex_unlock(&#38;mutex_lock);
+
+    while(1)
+    {
+        int ret;
+        ret = sigwaitinfo(&#38;set, &#38;si);
+        if (ret == SIGRTMIN+signum)
+        {
+            if (si.si_fd == server_sockfd) 
+            {
+                cli_sockfd = accept(server_sockfd, 
+                                (struct sockaddr *)&#38;clientaddr,
+                                &#38;clilen);
+                if(cli_sockfd &#60; 0)
+                {
+                    printf("Accept error&#92;n");
+                    continue;
+                }
+                mi = pool_list.begin();
+                lfd_sig = mi-&#62;second;
+                count = mi-&#62;first+1;
+
+                /*
+                 * 연결소켓에 대해서 SIGRTMIN+signum RTS를 발생하도록 
+                 * 설정한다. 
+                 * fcntl()을 위해서 pid를 넘기는걸 주목하기 바란다.  
+                 */
+                cout &#60;&#60; "Accept " &#60;&#60; cli_sockfd &#60;&#60; " : " 
+                    &#60;&#60; mi-&#62;second.signum &#60;&#60; " : " 
+                    &#60;&#60; mi-&#62;second.pid &#60;&#60; endl;
+                setup_sigio(cli_sockfd, mi-&#62;second.signum, mi-&#62;second.pid);
+                pool_list.erase(mi);
+                pool_list.insert(pair&#60;int, fd_sig&#62;(count, lfd_sig));
+            }
+            else
+            {
+            }
+        }
+    }
+}
+
+/*
+ * 클라이언트와 데이터를 주고 받을 쓰레드 함수이다. 
+ * 클라이언트로 부터 읽은 데이터를 반향(echo)한다. 
+ */
+void *jecho(void *rts_num)
+{
+
+    int signum = *((int *)rts_num);
+    int ret; 
+    socklen_t clen;
+    char buf[256];
+    struct sockaddr_in cname;
+    int n;
+
+    // 쓰레드의 PID를 얻어온다.     
+    gpid = getpid(); 
+
+    sigset_t set;
+
+    sigemptyset(&#38;set);
+    sigaddset(&#38;set, SIGRTMIN+signum);
+    pthread_sigmask(SIG_BLOCK, &#38;set, NULL);
+
+    pthread_mutex_lock(&#38;mutex_lock);
+    pthread_cond_signal(&#38;sync_cond);
+    pthread_mutex_unlock(&#38;mutex_lock);
+
+    struct siginfo si;
+    fd_sig lfd_sig;
+    int count;
+    int lpid;
+
+    while(1)
+    {
+        clen = sizeof(cname);
+        ret = sigwaitinfo(&#38;set, &#38;si);
+        memset(buf,0x00, 256); 
+        if (ret == SIGRTMIN+signum)
+        {
+            if ((n = read (si.si_fd, buf, 255)) &#60;= 0)
+            {
+                printf("read error &#92;n");
+                close(si.si_fd);
+                mi = pool_list.begin();
+                while(mi != pool_list.end())
+                {
+                    if (mi-&#62;second.signum == signum)
+                    {
+                        lfd_sig = mi-&#62;second;
+                        count = mi-&#62;first - 1;
+                        pool_list.erase(mi);
+                        pool_list.insert(pair&#60;int, fd_sig&#62;(count, lfd_sig));
+                    }
+                    *mi++;
+                }
+            }    
+            else
+            {
+                getsockname(si.si_fd, (struct sockaddr *)&#38;cname, &#38;clen);
+                printf("%s(%d) : %s", inet_ntoa(cname.sin_addr), signum, buf);
+                write(si.si_fd, buf, strlen(buf));
+            }
+        }
+        else
+        {
+        }
+    }
+}
+
+int main(int argc, char **argv)
+{
+    struct siginfo si;
+    int status;
+    int k;
+    fd_sig lfd_sig;
+    sigset_t set;
+    unsigned int i;
+
+    if (argc !=2 )
+    {
+        printf("Usage : ./rts_th [thread num]&#92;n");
+        exit(1);
+    }
+    int thread_num = atoi(argv[1]);
+    vector&#60;void *(*)(void *)&#62; thread_list;
+    vector&#60;pthread_t&#62; tident(thread_num);
+    pthread_attr_t myattr;
+    init_signal_handler();
+
+    sigemptyset(&#38;set);
+    sigaddset(&#38;set, SIGRTMIN);
+    sigprocmask(SIG_BLOCK,&#38;set, NULL);
+
+    thread_list.push_back(accept_listener);
+    for (i = 0; i &#60; thread_num; i++) 
+    {    
+        thread_list.push_back(jecho);
+    }
+
+    /*
+     * 쓰레드를 생성한다.  
+     * 첫번째 쓰레드는 accept()전용 쓰레드이며
+     * 이후 생성되는 쓰레드가 클라이언트 통신전용 쓰레드이다. 
+     * 쓰레드를 생성할때 넘어가는 인자 K는 쓰레드가 기다릴 
+     * RTS 시그널 번호이다. 
+     * 각 쓰레드는 SIGRTSMIN+k 번호를 가지는 RTS를 기다리게된다.  
+     */    
+    for (i = 0, k = 1; i &#60; thread_list.size(); i++, k++)
+    {
+        /*
+         * 메인 쓰레드와 생성되는 쓰레드간에 정확한 데이터 
+         * 전달이 필요하므로 뮤텍스와 조건변수를 이용해서  
+         * 쓰레드 동기화를 시켜준다.
+         */
+        pthread_mutex_lock(&#38;mutex_lock);
+        pthread_create(&#38;tident[i], NULL, thread_list[i], (void *)&#38;k);
+
+        /*
+         * 쓰레드 자료구조
+         * 각 쓰레드에서 처리하는 RTS번호와 처리중인 소켓의 갯수를
+         * 유지한다. 
+         */
+        lfd_sig.signum = k;  
+        pthread_cond_wait(&#38;sync_cond, &#38;mutex_lock);
+        lfd_sig.pid    = gpid;
+        if (i !=0)
+            pool_list.insert(pair&#60;int, fd_sig&#62;(0, lfd_sig));
+        pthread_mutex_unlock(&#38;mutex_lock);
+    }
+
+    cout &#60;&#60; "Thread Join " &#60;&#60; endl;
+    for (i = 0; i &#60; thread_list.size(); i++)
+    {
+        pthread_join(tident[i], (void **)&#38;status);
+    }
+    return 1;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				쓰레드, 프로세스, 시그널에 대한 내용을 이해하고 있다면 
+				이해하기에 어려운 부분이 없을 것이다. 코드는 최소한의 
+				에러처리만 신경썼으며 효율,유지보수 같은 것들 역시 
+				신경쓰지 않았다. 
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN80"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 RTS와 쓰레드풀간의 조합에 대해서 알아보았다. 
+		아마도 꽤 흥미있는 내용이 되었으리라고 생각된다. 이번에 다루었던 
+		주제에 대해서는 아직도 고민해야될 부분이 많이 있으므로 
+		틈틈히 더 효율적이고 깔끔한 방법에 대해서 고민해 보도록 하자..
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

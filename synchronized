@@ -1,0 +1,151 @@
+=== 개 요 ===
+
+자바의 GC, Synchronized, Thread, Runnable, notify, wait, Array 등을 Brew로 포팅하던중.
+
+하나의 SmartPointer template class로 오버헤드적은 light-weight 한  thread-safe, array, reference object 를 모두 만족시키는 스마트포인터를 제작중 a++, --a, 등 값 하나를 올리고 내리는것을 멀티쓰레드 환경에서 굳이 뮤텍스 동기화할 필요가 있을까? 에 의문을 가지고 (전통적으로는 반드시 해야하는것이 당연하다) 테스트를 해보았다. 결론은? 적어도 저 일만하는거라면 안해도 된다 는것이다(단, 멀티프로세스가 아닌경우를 얘기하고 있는것이다). 하지만  저 결과값으로 어떤 판단을 하고 거기따른 행위를 하는 다른코드가 좀더 있다면? 일반적으론 동기화를 하는게 안전할 것이나 코드에 따라서 또한 오버헤드감소가 중요한 모바일이라면? 한번쯤 안해도될법한 코드인지 검토해볼만한 가치가 잇을것이다. 특히나 빈번히 발생하는 경우라면 더더욱...
+
+아래는 소타님이 한 테스트이다.
+
+[http://sota.nonun.com/moniwiki/wiki.php/tmp/mutex_test]
+
+다음은 어셈코드를 보기위해 내가 간단히 만든 소스이다.
+
+{{{#!plain
+int i;
+
+void p1() {
+        i++;
+}
+
+void p2() {
+        i--;
+}
+
+void p3() {
+        ++i;
+}
+
+void p4() {
+        --i;
+}
+
+void p5() {
+        i = i + 1;
+}
+
+
+int main() {
+    return 0;
+}
+}}}
+
+위 소스의 어셈코드이다 보면 알겟지만 증가, 감소시 모두  incl, decl 등으로 하나의 어셈으로 처리하고 있는것을 알수있다.
+
+{{{#!plain
+
+    .file   "t5.cpp"
+    .version    "01.01"
+gcc2_compiled.:
+.text
+    .align 4
+.globl p1__Fv
+    .type    p1__Fv,@function
+p1__Fv:
+.LFB1:
+    pushl   %ebp
+.LCFI0:
+    movl    %esp, %ebp
+.LCFI1:
+    incl    i
+    popl    %ebp
+    ret
+.LFE1:
+.Lfe1:
+    .size    p1__Fv,.Lfe1-p1__Fv
+    .align 4
+.globl p2__Fv
+    .type    p2__Fv,@function
+p2__Fv:
+.LFB2:
+    pushl   %ebp
+.LCFI2:
+    movl    %esp, %ebp
+.LCFI3:
+    decl    i
+    popl    %ebp
+    ret
+.LFE2:
+.Lfe2:
+    .size    p2__Fv,.Lfe2-p2__Fv
+    .align 4
+.globl p3__Fv
+    .type    p3__Fv,@function
+p3__Fv:
+.LFB3:
+    pushl   %ebp
+.LCFI4:
+    movl    %esp, %ebp
+.LCFI5:
+    incl    i
+    popl    %ebp
+    ret
+.LFE3:
+.Lfe3:
+    .size    p3__Fv,.Lfe3-p3__Fv
+    .align 4
+.globl p4__Fv
+    .type    p4__Fv,@function
+p4__Fv:
+.LFB4:
+    pushl   %ebp
+.LCFI6:
+    movl    %esp, %ebp
+.LCFI7:
+    decl    i
+    popl    %ebp
+    ret
+.LFE4:
+.Lfe4:
+    .size    p4__Fv,.Lfe4-p4__Fv
+    .align 4
+.globl p5__Fv
+    .type    p5__Fv,@function
+p5__Fv:
+.LFB5:
+    pushl   %ebp
+.LCFI8:
+    movl    %esp, %ebp
+.LCFI9:
+    incl    i
+    popl    %ebp
+    ret
+.LFE5:
+.Lfe5:
+    .size    p5__Fv,.Lfe5-p5__Fv
+    .align 4
+.globl main
+    .type    main,@function
+main:
+.LFB6:
+    pushl   %ebp
+.LCFI10:
+    movl    %esp, %ebp
+.LCFI11:
+    movl    $0, %eax
+    popl    %ebp
+    ret
+.LFE6:
+.Lfe6:
+    .size    main,.Lfe6-main
+.globl i
+.bss
+    .align 4
+    .type    i,@object
+    .size    i,4
+i:
+    .zero   4
+    .ident  "GCC: (GNU) 2.96 20000731 (Red Hat Linux 7.3 2.96-113)"
+}}}
+
+
+

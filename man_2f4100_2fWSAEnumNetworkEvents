@@ -1,0 +1,69 @@
+#title 윈속 API : WSAEnumNetworkEvents - 소켓에서 발생한 네트워크 이벤트의 종류를 알아낸다.
+
+[[TableOfContents]]
+== WSAEnumNetworkEvents ==
+WSAEnumNetworkEvents 함수는 소켓에서 발생한 네트워크 이벤트의 종류를 알아내고 내부 네트워크 이벤트 레코드를 클리어하고, (선택할 수 있다)이벤트 객체를 리셋한다.
+=== 사용 법 ===
+{{{#!plain
+int WSAEnumNetworkEvents(
+  __in   SOCKET s,
+  __in   WSAEVENT hEventObject,
+  __out  LPWSANETWORKEVENTS lpNetworkEvents
+);
+}}}
+
+=== 매개 변수 ===
+  * s
+    소켓을 가리키는 소켓 지정 번호
+  * hEventObject
+    리셋하기 원하는 이벤트 객체.
+  * lpNetworkEvents
+     WSANETWORKEVENTS(:4500) 구조체를 가리키는 포인터(:12)로 소켓(:12)에 발생한 네트워크 이벤트의 종류와 에러 코드를 포함하고 있다.
+
+=== 반환 값 ===
+성공적으로 수행되면 0을 반환한다. 그렇지 않으면 SOCKET_ERROR를 반환한다. 에로 코드 값은 WSAGetLastError(:4100)함수로 가져올 수 있다.
+
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSANOTINITIALISED || 10093 || WSAStartup() 함수가 성공적으로 실행되지 않은 상황에서 윈속 함수를 호출했을 때  ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+|| WSAEINVAL  || 10022     || 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때  ||
+|| WSAEINPROGRESS || 10036 || 블록화 함수가 진행되는 동안 부적절한 윈속 API함수가 호출.  ||
+|| WSAENOTSOCK   || 10038 || 잘못된 소켓기술자를 사용했음  ||
+|| WSAEFAULT  || 10014     || 잘못된 주소를 사용했음                 ||
+
+=== 설명 ===
+WSAEnumnetWorkEvents 함수는 함수를 호출하기 바로 전에 지정된 소켓 '''s'''에 발생한 네트워크 이벤트의 상세 정보를 가져온다. 이 함수는 WSAEventSelect(:4100)함수와 함께 사용된다. 
+
+WSAEnumNetworkEvents 함수는 단지 WSAEventSelect 함수로 지정한 네트워크 동작과 에러 정보만을 다룬다. 이 함수가 네트워크 동작과 에러를 어떻게 다루는지 이해하려면 select(:4100) 함수와 WSAAsyncSelect(:4100)함수의 명세를 확인하면 도움이 될 것이다.
+
+소켓의 내트워크 이벤트 레코드는 '''lpNetworkEvents'''에 복사가 되고 그 후 레코드는 클리어 된다. 만약 '''hEventObject''' 매개 변수가 NULL 이 아니라면 측정된 이벤트 객체도 리셋 된다. 윈도 소켓(:12) 프로바이더는 네트워크 이벤트 레코드를 복사하며 클리어하고, 관련된 이벤트 객체를 리셋하는 작업을 책임진다. 만약 SOCKET_ERROR이 반환되면 이벤트 객체는 리셋되지 않으며 네트워크 이벤트 레코드도 클리어 되지 않는다.
+
+각 이벤트 타입에 대해서 발생할 수 있는 에러 코드를 정리했다.
+
+이벤트 : FD_CONNECT
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSAEAFNOSUPPORT || 10047 || 윈속에서 지원하지 않는 주소체계를 사용했음       ||
+|| WSAECONNREFUSED || 10061 || 서버가 연결시도를 거절함. 수신 대기열이 가득찬 상태에서 클라이언트의 connect 호출이 있을 경우 ||
+|| WSAENETUNREACH  || 10051 || 네크워크에 접근할 수 없음                         ||
+|| WSAENOBUFS    || 10055 || 남아있는 버퍼공간이 없어서 소켓을 사용할 수 없음 ||
+|| WSAETIMEDOUT  || 10060 || 접속시도 제한 시간 초과         ||
+
+이벤트 : FD_CLOSE
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+|| WSAECONNRESET || 10054 || 연결이 원격 호스트에 의해 재설정되었음.             ||
+|| WSAECONNABORTED || 10053  || 타임아웃 혹은 상대방의 접속종료들과 같은 소프트웨어적인 문제로 연결이 끊겼음.      ||
+
+이벤트 : FD_WRITE
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+
+이벤트 : FD_ROUTING_INTERFACE_CHANGE
+|| '''이름''' || '''값'''  || '''설명'''    ||
+|| WSAENETUNREACH  || 10051 || 네크워크에 접근할 수 없음                         ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+
+=== 예제 ===
+  * [wiki:Site/win_network_prog/doc/multiplex 윈도 비동기 소켓 프로그래밍 참고]
+
+[[tag(윈속,소켓,윈도 네트워크 프로그래밍)]]

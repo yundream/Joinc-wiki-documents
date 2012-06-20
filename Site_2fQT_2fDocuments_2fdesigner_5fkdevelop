@@ -1,0 +1,489 @@
+#title QT Designer과 Kdevelop를 이용한 GUI 애플리케이션 개발 
+
+[[TableOfContents]]
+
+=== 현재상황 및 해야할 일 ===
+ 1. designer와 kdevelop(12) 연동에 관한 기초적인 내용 완성
+ 1. 소켓 통신과 관련된 슬롯함수를 제작해야함. 
+
+=== 소개 ===
+qt designer이 편한 GUI 제작툴이긴 하지만 통합개발 환경을 지원하지 않는 관계로 본격적인 GUI 프로그램을 작성하고자 하면 이래 저래 걸리적거리는게 많다. 그래서 KDE환경의 통합 개발 환경인 kdevelp와 designer를 이용해서 프로그램을 만들어 보기로 했다. 
+
+프로그램의 개발 방향은 프로젝트 관리와 디버깅 기능이 강력한 kdevelop로 대략적인 프로젝트 개발환경을 만들고 designer를 통해서 GUI를 만든후 두 개를 결합하는 방식이다. vc++과 꽤 비슷한 방식이다. 
+
+==== 만들고자 하는 프로그램 ====
+만들 프로그램은 계산기 프로그램이다. 단지 사칙연산 만을 하는 간단한 프로그램인데, 다양성을 테스트 하기 위해서 서버/클라이언트 모델로 만들기로 했다. 클라이언트에서 GUI를 통해서 연산자와 피연산자를 입력한 후 버튼을 누르면 소켓을 통해서 서버로 전송되고 서버에서 이에 대한 값을 보내오는 방식이다.  
+
+서버 프로그램은 일반적인 소켓 프로그램이다. 다음은 이번 프로젝트를 위해서 사용할 서버 프로그램 예제다. 
+{{{#!plain
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#define SA   struct sockaddr
+struct cal
+{
+    int  numa;
+    int  numb;
+    char op;
+    int result;
+    int error;
+};
+
+// 네트워크를 통해서 읽어들인 cal 구조체를  
+// 호스트 바이트 순서에 맞도록 변경한다. 
+void H2N(struct cal *acal)
+{
+    acal->numa  = htonl(acal->numa);
+    acal->numb  = htonl(acal->numb);
+    acal->result = htonl(acal->result);
+    acal->error = htonl(acal->error);
+}
+
+// write(2)를 통해서 인터넷으로 보낼 때 
+// 네트워크 바이트 순서에 맞도록 변환한다. 
+void N2H(struct cal *acal)
+{
+    acal->numa  = ntohl(acal->numa);
+    acal->numb  = ntohl(acal->numb);
+    acal->result = ntohl(acal->result);
+    acal->error = ntohl(acal->error);
+}
+
+int main(int argc, char **argv)
+{
+    int client_sockfd, server_sockfd;
+    int clilen;
+    struct sockaddr_in clientaddr, serveraddr;
+    struct cal mycal;
+
+    // 듣기 소켓을 생성한다.
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    // TCP프로토콜을 이용하며 포트번호 8085로
+    // 연결을 기다리도록 소켓을 설정한다.
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(8085);
+    if (bind(server_sockfd, (SA *)&serveraddr, sizeof(serveraddr)) < 0)
+    {
+        perror("bind error :");
+        return 1;
+    }
+
+    // 소켓 연결 대기열을 작성한다.
+    if (listen(server_sockfd,5) == -1)
+    {
+        perror("listen error :");
+        return 1;
+    }
+
+    // 클라이언트의 연결을 받아들여서 처리를 하는 주요 코드부분 
+    while(1)
+    {
+        clilen = sizeof(clientaddr);
+        // 소켓 연결 대기열에 연결이 있는지 검사해서 
+        // 연결이 있다면 연결 소켓을 리턴한다. 
+		printf("Accept\n");	
+        if ((client_sockfd = accept(server_sockfd, (SA *)&clientaddr, &clilen)) < 0)
+        {
+            perror("accept error : ");
+            close(client_sockfd);
+            continue;
+        }
+		printf("OK\n");	
+        // 클라이언트로 부터 데이터를 읽어들여서 연산을 한다.
+		while(1)
+		{
+        	if (read(client_sockfd, (void *)&mycal, sizeof(mycal)) <= 0)
+			{
+             	close(client_sockfd);
+				break;
+			}
+			N2H(&mycal);
+   	        switch(mycal.op)
+   	        {
+                 case '+':
+                     mycal.result = mycal.numa + mycal.numb;
+                     mycal.error  = 0;
+                     break;
+                 case '-':
+                     mycal.result = mycal.numa - mycal.numb;
+                     mycal.error  = 0;
+                     break;
+                 case '/':
+                     mycal.result = mycal.numa / mycal.numb;
+                     mycal.error  = 0;
+                     break;
+                 case '*':
+                     mycal.result = mycal.numa * mycal.numb;
+                     mycal.error  = 0;
+                     break;
+                // 클라이언트로 부터 'e'가 전송되면 연결을 종료한다.
+ 	    		case 'e':	
+             		close(client_sockfd);
+					break;
+        	}
+			if (mycal.op == 'e')
+			{
+				break;
+			}
+            // 디버깅용
+       		printf("%d %c %d = %d\n",mycal.numa, mycal.op, 
+                        mycal.numb, mycal.result); 
+    	    // 연산결과를 다시 클라이언트에 전송한다.
+			H2N(&mycal);
+       	    write(client_sockfd, (void *)&mycal, sizeof(mycal));
+		}
+    }
+}
+}}}
+
+코드는 간단하다. 클라이언트로 부터 받은 cal구조체의 numa와 numb를 연산자 op를 통해서 연산한후 결과값을 result에 적어도 그대로 클라이언트로 전송한다. 
+
+=== kdevelop 를 통한 GUI 프로그램 개발 ===
+==== 프로젝트 생성 ====
+일단 kdevelop 프로젝트를 생성한다. 프로젝트의 이름은 '''calc'''로 하겠다. 프로젝트 생성시 여러개의 준비된 템플릿 중 '''C++> KDE > Simple KDE Application'''을 선택하도록 하자. 프로젝트 이름을 입력한 후 몇번의 Next 버튼 클릭으로 프로젝트가 생성된다.   
+
+==== GUI 코드 생성 ====
+이제 GUI화면을 만들차례다. '''File > New File'''을 클릭하면 다음과 같이 파일의 타입을 지정할 수 있는 파일 생성창이 뜨게 되는데, GUI 디자인을 위해 사용되는 designer는 '''.ui''' 파일을 사용함으로 아래와 같이 GUI파일을 만들도록 한다. 
+
+http://www.joinc.co.kr/albums/album01/akm.png
+
+여기에서 OK 버튼을 클릭하면 아래와 같은 AutoMaker Manager 창이 뜬다. 그냥 OK 버튼을 클릭하도록 하자. 
+
+http://www.joinc.co.kr/albums/album01/akn.png
+
+이렇게 해서 designer에서 사용할 caldlg.ui 파일을 생성했다. 이제 designer로 .ui파일을 열어서 GUI를 디자인 하면된다. 직적 desinger를 실행시켜서 파일을 불러와도 되고, develop의 왼쪽 창의 '''File Selector'''에서 caldlg.ui파일을 선택한후 designer를 실행 시켜도 된다. 
+
+http://www.joinc.co.kr/albums/album01/ako.sized.png
+
+designer의 간단한 사용방법은 [wiki:Site_QT/Documents QT 문서]에 있는 내용을 살펴보기 바란다. 
+
+==== GUI 디자인 하기 ====
+designer는 비쥬얼한 GUI 제작 환경을 제공한다. 개발자는 골머리 썩일 필요 없이 마우스를 통해서 필요한 위젯을 배치하고 특성(Properties)를 조정하는 정도로 간단하게 GUI 화면을 만들어 낼 수 있다. 
+
+필자가 만든 GUI 화면은 다음과 같다. 볼품없다고 뭐라 하진 말자. GUI 멋있게구성하는게 목적은 아니니..  
+
+http://www.joinc.co.kr/albums/album01/akp.png
+
+사용되는 위젯은 QPushButton, QLineEdit, QLabel, QCombBox와 위젯 배치를 위한 QFrame, QGroupBox다. 요령껏 위젯을 배치시키기 바란다. 참고로 각 위젯의 propertise는 나중에 프로그램에서 호출되는 이름이기도 함으로 위젯 특성에 맞도록 작명하기 바란다.
+
+각 위젯의 이름은 마음대로 정하되 메인창의 이름은 FormCalc로 하자. 메인창의 이름은 나중에 UI 클래스의 이름으로 사용된다. 이후 모든 설명은 메인창의 이름이 FormCalc로 되었다는 가정하에 이루어지도록 하겠다.
+
+designer 사용방법에 따른 자세한 설명은 하지 않겠다. 완성시켰다면 저장시키기 바란다.
+
+==== UI를 kdevelop 프로젝트에 등록 시키기 ====
+kdevelop를 이용하는 목적은 클래스,함수,헤더파일,소스파일,디버깅을 통합적으로 관리할 수 있기 때문이다. 이러한 장점을 사용하기 위해서는 우리가 만들어둔 UI를 kdevelop프로젝트에 통합시킬 필요가 있다. 
+
+프로젝트로의 통합은 클래스를 등록함으로서 이루어진다. 등록 시킬 클래스의 이름은 Cal로 하겠다. 그런데 Calc 클래스는 calc프로젝트를 생성시키면서 이미 생성이 된 상태다. 그러므로 기존의 Calc 클래스를 포함한 calc.cpp, calc.h를 삭제 시키고 새로 만들도록 하겠다. - 물론 전혀 다른 이름의 클래스를 만들어도 되고, 기존의 클래스를 UI 클래스인 FormCalc로 부터 상속되도록 수정해도 되지만 일단은 속편하게 이렇게 한다. - 
+
+쓸데없는 파일들을 지웠다면 프로젝트를 다시 열어서(open) 변경사항이 적용되도록 한다. 그다음 '''Project > New Class'''를 이용해서 Class 관리 창을 뜨게 한다. 
+
+http://www.joinc.co.kr/albums/album01/akq.sized.png
+
+이제 Name에 클래스 이름인 Calc를 입력한다. 그러면 File Names에 헤더파일과 소스파일의 이름이 만들어질 것이다. 우리가 만들 프로그램은 QT를 이용하게 됨으로 반드시 options의 '''Generate QWidget child class'''를 체크하도록 하자. '''OK''' 버튼을 누르면 Automake Manager 창이 뜬다. 그냥 '''OK'''버튼을 눌러준다. 
+
+http://www.joinc.co.kr/albums/album01/akr.png
+
+이제 '''classes'''탭을 클릭해보면 Calc클래스가 생긴걸 확인할 수 있을 것이다.  
+
+http://www.joinc.co.kr/albums/album01/aks.png
+
+
+==== UI와 소스코드의 분리 ====
+당연하지만 가능한 UI와 소스코드는 분리되는게 좀더 편한 개발환경을 만드는데
+도움을 준다. UI와의 완전한 분리를 위해서 모든 슬롯함수와 기타 함수들은 순수 가상함수화 하도록 할것이다. 실제 구현은 FormCalc로 부터 상속되는 Calc클래스를 통해서 구현할 것이다. 
+
+물론 굳이 가상함수를 등록할 필요 없이 Calc에서 상속받은 FormCalc 위젯의 슬롯함수와 시그널을 그대로 이용해도 된다. 이것은 기호의 차이이니 취향에 따라서 선택하도록 한다. 어쨋든 여기에서는 가상함수를 사용하도록 하겠다. 
+
+==== UI 코드 생성 ====
+이제 .ui 파일로 부터 실제 코드를 생성해 내야할 시간이다. .ui로 부터 코드를
+만들어 내기 위해서 qt는 uic (User Interface Compiler)라는 프로그램을 제공한다.
+이 프로그램을 이용해서 다음과 같이 헤더파일과 소스코드 파일을 생성할 수 있다.
+{{{#!plain
+uic -o cacdlg.h cacdlg.ui
+uic -o cacdlg.cpp -i cacdlg.h cacdlg.ui
+}}}
+
+그럼 designer를 통해서 ui를 변경할때 마다. uic를 이용해서 코드를 만들어내줘야 하는지 라는 의문이 생길 수 있을 것 같은데, 걱정하지 말기 바란다. kdevelop는 Makefile을 통해서 .ui파일까지 자동으로 관리한다. 만약 .ui파일이 수정되었다면 자동적으로 uic를 실행시켜서 코드를 만들어 내게 된다.
+
+=== Calc 실제 구현 ===
+이제 '''소켓 연결''', '''소켓 종료''', '''데이터 송/수신'''과 관련된 모든 주요
+메서드들을 완성시키도록 하자.
+
+==== designer를 이용해서 가상함수 등록하기 ====
+이들 메서드들은 UI화면에서 각 위젯요소를 클릭할 때 발생하는 메서드들 임으로
+FormCalc에 순수 가상함수(슬롯 함수)로 등록 시키고, 실제 구현은 Calc에서
+이루어질 것이다. 다음과 같이 designer에서 각 위젯에 대응되는 슬롯 함수를 등록
+시키도록 한다.
+
+http://www.joinc.co.kr/albums/album01/akt.png
+
+ 1. ButtonExit  : 프로그램 종료 (닫기)
+ 1. PushConnect : 소켓 연결 버튼 (연결)
+ 1. PushSend    : 데이터 전송 버튼 (전송)
+ 1. PushClose   : 소켓 연결 종료 버튼 (종료)
+
+==== 코드 구현 ====
+이제 실제로 Calc의 메서드들을 정의해보도록 하자. 여기에서는 FormCalc로 부터
+상속된 가상함수와 자체적으로 사용될 슬롯 메서드들에 대한 정의를 설명한다. 
+
+중간 중간에 멤버변수들도 사용될 건데, 이것들은 각자 Calc클래스에 선언해서
+사용하기 바란다.
+
+===== 통신할 데이터 구조체 정의 =====
+먼저 통신에 사용할 데이터 구조체를 정의 한다. 서버측과 동일하다.
+{{{#!plain
+struct cal
+{
+    int numa;
+    int numb;
+    char op;
+    int result;
+    int error;
+    void H2N()
+    {
+        numa = htonl(numa);
+        numb = htonl(numb);
+        result = htonl(result);
+        error = htonl(error);
+    }
+    void N2H()
+    {
+        numa = ntohl(numa);
+        numb = ntohl(numb);
+        result = ntohl(result);
+        error = ntohl(error);
+    }
+};
+}}}
+
+===== calc.h ===== 
+Calc클래스를 QWidget가 아닌 FormCalc로 부터 상속되도록 약간 수정한다.
+{{{#!plain
+#ifndef CALC_H
+#define CALC_H
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <qwidget.h>
+#include <qsocket.h>
+
+#include "caldlg.h"
+
+/**
+@author root
+*/
+struct cal
+{
+    int numa;
+    int numb;
+    char op;
+    int result;
+    int error;
+    void H2N()
+    {
+        numa = htonl(numa);
+        numb = htonl(numb);
+        result = htonl(result);
+        error = htonl(error);
+    }
+    void N2H()
+    {
+        numa = ntohl(numa);
+        numb = ntohl(numb);
+        result = ntohl(result);
+        error = ntohl(error);
+    }
+};
+
+class Calc : public FormCalc
+{
+Q_OBJECT
+
+public:
+    QSocket *socket;
+    Calc(QWidget *parent = 0, const char *name = 0);
+    void Test();
+    ~Calc();
+
+public slots:
+    virtual int Connection();
+    virtual void Close();
+    void socketError(int);
+    void Send();
+    void socketConnected();
+    void socketRead();
+    void sockClose();
+
+private slots:
+
+private:
+    struct cal mycal;
+    int is_connect;
+
+};
+#endif
+}}}
+
+===== calc.cpp =====
+소스는 이해하는데 큰 어려움이 없을 것이다. 소스는 세세한 에러처리및 효율성은 고려하지 않았다. 
+{{{#!plain
+#include "calc.h"
+#include "calc.moc"
+
+#include <iostream>
+#include <string>
+
+#include <qmessagebox.h>
+#include <qlineedit.h>
+#include <qstring.h>
+#include <qcombobox.h>
+#include <qlabel.h>
+
+#include <stdlib.h>
+#include <netinet/in.h>
+
+#include <errno.h>
+#include <string.h>
+
+
+using namespace std;
+
+// 생성자
+// is_connect는 현재 연결중인지를 확인용
+Calc::Calc(QWidget *parent, const char *name)
+ : FormCalc(parent, name)
+{
+    is_connect = 0;
+}
+
+Calc::~Calc()
+{
+}
+
+/*!
+  소켓에 에러가 발생했을 경우 실행될 슬롯 함수	 
+  메시지 박스를 통해서 에러를 통보하지만 에러 종류까지는 통보하지 않는다.
+  수정해보자.	
+ */
+void Calc::socketError(int e)
+{
+    QMessageBox::warning(this, "Connection Error ", "Sorry", "Close");
+    /// @todo implement me
+}
+
+/*
+ Close 버튼을 눌렀을 경우 op멤버에 종료를 알려주는 'e'가 설정된 후  
+ 전송된다.
+*/
+void Calc::Close()
+{
+    if (is_connect)
+    {
+        mycal.op = 'e';
+        mycal.H2N();
+        socket->readBlock((char *)&mycal,  sizeof(mycal));
+        socket->close();
+    }
+    close();
+}
+
+/*!
+  소켓 연결함수
+ */
+int Calc::Connection()
+{
+    QString Buf;
+    socket = new QSocket(this);
+
+    // error, 연결, 읽을 데이터가 발생했을 때의 슬롯함수 등록
+    connect(socket, SIGNAL(error(int)), SLOT(socketError(int)));
+    connect(socket, SIGNAL(connected()), SLOT(socketConnected()));
+    connect(socket, SIGNAL(readyRead()), SLOT(socketRead()));
+    socket->connectToHost(LineIP->text(),  atoi(LinePort->text().ascii()));
+    /// @todo implement me
+}
+
+/*!
+    전송 버튼을 눌렀을 경우 실행되는 함수 
+ */
+void Calc::Send()
+{
+    QString Buf;
+    if (is_connect)
+    {
+        Buf = EditNuma->text() + " : " + EditNumb->text();
+
+        mycal.numa = atoi(EditNuma->text().ascii());
+        mycal.numb = atoi(EditNumb->text().ascii());
+        mycal.op = *(comboBox1->currentText().ascii());
+        mycal.H2N();
+
+        socket->writeBlock((char *)&mycal, sizeof(mycal));
+    }
+    else
+    {
+        QMessageBox::warning(this, "Send error", "Socket is no open", "Close");
+    }
+    /// @todo implement me
+}
+
+
+/*!
+   소켓이 연결되었을 경우 실행되는 슬롯함수로
+   메시지 박스로 연결성공했음을 알려준다.
+ */
+void Calc::socketConnected()
+{
+    QMessageBox::warning(this, "Connect", "Sucess", "Close");
+    is_connect = 1;
+    /// @todo implement me
+}
+
+
+/*!
+   서버로 부터 데이터를 읽어들인다.
+ */ 
+void Calc::socketRead()
+{
+    char result[16];
+    socket->readBlock((char *)&mycal,  sizeof(mycal));
+    mycal.N2H();
+    sprintf(result,"%d", mycal.result);
+    // 결과 textlabel에 값을 설정한다.
+    textLabel2->setText(result);
+    /// @todo implement me
+}
+    
+    
+/*! 
+  종료 버튼을 눌럿을 경우 소켓 연결을 닫는다. 
+ */
+void Calc::sockClose()
+{
+    if(is_connect)
+    {
+        QMessageBox::warning(this, "socket close", "Sucess", "Close");
+        is_connect = 0;
+        socket->close();
+    }
+    else
+    {
+        QMessageBox::warning(this, "close failure", "Socket Not connected",
+          "Close");
+    }
+    /// @todo implement me
+}   
+}}}
+
+==== 테스트 결과 ====
+다음은 테스트 결과 화면이다.
+
+http://www.joinc.co.kr/albums/album01/aku.png

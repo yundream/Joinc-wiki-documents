@@ -1,0 +1,746 @@
+#title fcntl을 이용한 파일제어
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>fcntl 을 이용한 파일제어</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>fcntl 을 이용한 파일제어</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN14"
+>fcntl 을 이용한 파일제어</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN19"
+>fcntl 로 할수 있는 일들</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN54"
+>close-on-exec 에 대해서</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN65"
+>파일특성조작 하기</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN67"
+>F_DUPFD</A
+></DT
+><DT
+>2.3.2&#51208;. <A
+HREF="#CLOSEONEXEC"
+>F_SETFD/F_GETFD</A
+></DT
+><DT
+>2.3.3&#51208;. <A
+HREF="#AEN80"
+>F_GETFL/F_SETFL</A
+></DT
+><DT
+>2.3.4&#51208;. <A
+HREF="#AEN97"
+>F_GETOWN/F_SETOWN</A
+></DT
+></DL
+></DD
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		유닉스의 모든것은 파일로 이루어져 있다는 사실은 아마도 잘알고 있을 
+		것이다. 그러므로 유능한? 유닉스 프로그래머로 성장하기 위해서는 
+		파일관련된 여러가지 작업들을 능숙하게 처리할수 있어야한다. 
+		실제로 유닉스 프로그램을 하게 되면 가장 많이 하는 작업이 파일과 
+		연관된 작업이다.   
+	</P
+><P
+>		일반 파일은 물론이고, 네트웍 프로그래밍시 소켓을 다룰때, 
+		IPC, 디바이스등을 다루는 모든 것이 결국은 파일을 다루는 것들이다.  
+	</P
+><P
+>		fcntl 은 이러한 파일들의 특성 제어를 위해 제공하는 함수이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>2&#51208;. fcntl 을 이용한 파일제어</A
+></H1
+><P
+>		fcntl 시스템호출은 이미 열려있는 파일의 특성 제어를 위해서 사용된다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;fcntl.h&#62;
+
+int fcntl(int fd, int cmd);
+int fcntl(int fd, int cmd, long arg);
+int fcntl(int fd, int cmd, struct flock *lock);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		첫번째 인자로 주어지는 fd 는 open(2), socket(2) 등의 시스템 호출을 
+		통해서 만들어진 파일 지정자이다. 두번째 인자인 cmd 가 fd 에 대한 
+		특성을 제어하기위한 값이다.    
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.1&#51208;. fcntl 로 할수 있는 일들</A
+></H2
+><P
+>			fcntl 로 할수 있는 일들은 결국 cmd 에 의해서 결정된다고 
+			볼수 있다. 대략적으로 할수 있는 일들은 다음과 같다. 
+			할수 있는 일은 cmd 에 의해서 결정됨으로 cmd 별로 설명을 
+			했다. 
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>F_DUPFD</DT
+><DD
+><P
+>						이름에서 주는 어감처럼 열려진 파일지정자를 복사하기 
+						위해서 사용한다. 언뜻보면 dup2(2) 함수와 매우 비슷한데, 
+						dup2 는 복사될 파일지정자를 사용자가 지시하는 
+						반면, F_DUPFD 를 사용할경우 arg 와 같은 크기의 
+						파일지정자를 되돌려주거나, 이미 사용되어지고 있다면, 
+						arg 보다 큰 할당가능한 파일지정번호중 가장 작은 
+						번호를 되돌려준다. 
+					</P
+><P
+>						이 복사된 파일지정번호는 잠금, 파일위치 포인터, 플레그 
+						등을 공유한다. 즉 파일지정자들중 하나에서 
+						파일의 위치가 변경된다면(lseek등을 이용), 다른 
+						파일지정자도 변경된다.  
+					</P
+><P
+>						그렇지만 close-on-exec 는 공유하지 않는다. 
+						close-on-exec 는 다음장에서 다루도록 하겠다.  
+					</P
+></DD
+><DT
+>F_GETFD</DT
+><DD
+><P
+>						리턴값으로 fd 에 대한 flag 값을 넘겨준다. 
+						현재는 FD_CLOEXEC 정보만 넘겨준다. 
+						FD_CLOEXEC 는 close-on-exec 정책에 관한 내용으로 
+						다음장에서 다루도록 하겠다.  
+					</P
+></DD
+><DT
+>F_SETFD</DT
+><DD
+><P
+>						FD_CLOEXEC(close-on-exec) 의 값을 지정된 
+						비트값으로 설정한다. 
+					</P
+></DD
+><DT
+>F_GETFL</DT
+><DD
+><P
+>						파일지정자에 대한 플래그값 - open(2) 호출시 
+						지정한 플래그를 되돌려준다.
+					</P
+></DD
+><DT
+>F_SETFL</DT
+><DD
+><P
+>						arg 에 지정된 값으로 파일지정자 fd 의 플래그를 재 
+						설정한다. 현재는 단지 O_APPEND, O_NONBLOCK, O_ASYNC 
+						만을 설정할수 있다. 다른 플래그들 (O_WRONLY 와 같은) 
+						은 영향을 받지 않는다.   
+					</P
+></DD
+><DT
+>F_GETOWN</DT
+><DD
+><P
+>						이것은 비동기 입출력과 관련되어서 사용되며, 
+						SIGIO와 SIGURG 신호를 받는 프로세스 아이디를 
+						얻기 위해서 사용된다. 
+					</P
+></DD
+><DT
+>F_SETOWN</DT
+><DD
+><P
+>						비동기 입출력과 관련되어서 사용되며, SIGIO, SIGURG 
+						시그널을 수신하는 프로세스 아이디(혹은 그룹)을 
+						설정하기 위해서 사용된다. 	
+					</P
+></DD
+></DL
+></DIV
+>		
+			이외에도 F_SETLK, F_SETLKW, F_SETLK 와 같은 레코드 잠금에 대한 
+			설정도 가능하다. 
+			이 내용들은 <A
+HREF="/modules.php?name=News&file=article&sid=44"
+TARGET="_top"
+>fcntl 레코드잠금</A
+>에서 다루고 
+			있음으로 여기에서 설명하진 않겠다. (또한 이문서의 내용은 
+			파일단위의 특성 조작이므로 레코드단위의 특성조작은 
+			이 문서의 내용과 다른분야이다.) 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>2.2&#51208;. close-on-exec 에 대해서</A
+></H2
+><P
+>			fcntl의 특성제어를 다루기 전에 close-on-exec에 대해서 
+			간단히 알아보도록 하겠다.  
+		</P
+><P
+>			보통 프로세스에서 exec(3) 를 시켜서 새로운 프로세스를 
+			실행시키면 이 새로운 프로세스는 기존의 프로세스의 이미지를 
+			덮어쓰게 된다. 그러면서 특별한 설정이 없을경우 열린파일지정자를 
+			그대로 넘겨주게 된다. 다음 예제를 open-on-exec.c 로 저장하도록 
+			하자.  
+		</P
+><P
+>	
+			<B
+CLASS="EMPHASIS"
+>예제 : open-on-exec.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+int main()
+{
+    int fd;
+    int val;
+    fd = open("exec_copy.txt", O_CREAT);
+
+    execl("/home/my_cvs/test/c_source/loop", "./loop", 0);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			execl 로 실행시키는 loop 프로그램은 그냥 무한루프 도는 프로그램 
+			이니 각자 만들기 바란다.  
+		</P
+><P
+>			위 프로그램을 실행시킨후 ps 를 확인하고 /proc/pid/fd 로 
+			이동해서 ls 를 해보면   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco fd]# ls -al
+합계 0
+dr-x------    2 root     root            0 10월 25 13:59 .
+dr-xr-xr-x    3 root     root            0 10월 25 13:59 ..
+lrwx------    1 root     root           64 10월 25 13:59 0 -&#62; /dev/ttyp0
+lrwx------    1 root     root           64 10월 25 13:59 1 -&#62; /dev/ttyp0
+lrwx------    1 root     root           64 10월 25 13:59 2 -&#62; /dev/ttyp0
+lr-x------    1 root     root           64 10월 25 13:59 3 -&#62; /home/mycvs/test/exec_copy.txt
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			exec 하면서 열린파일지정자가 상속되었음을 알수 있다. 
+		</P
+><P
+>			그러나 때때로 exec 를 이용해서 프로세스를 만들기전에 
+			기존에 열렸던 파일지정자들을 깨끗하게 정리하고 싶을때가 
+			있을것이다. 이러한 경우를 close-on-exec 시킨다라고 말하며, 
+			fcntl 을 이용해서 열린 파일지정자에 대해서 close-on-exec 작동을 
+			하도록 할수 있다. 위의 open-on-exec.c 를 close-on-exec 버젼으로 
+			바꾸는 방법은 <A
+HREF="#CLOSEONEXEC"
+>2.3.2&#51208;</A
+>에서 설명하도록 하겠다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN65"
+>2.3&#51208;. 파일특성조작 하기</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN67"
+>2.3.1&#51208;. F_DUPFD</A
+></H3
+><P
+>				위에서 설명을 이미 했음으로 간단한 예제로 이해를 
+				돕는 수준에서 끝내도록 하겠다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : f_dupfd.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;fcntl.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    int testfd;
+    int fd;
+
+    fd  = open("test.txt", O_CREAT);
+
+    testfd = fcntl(fd, F_DUPFD, 10);
+    printf("testfd :%d&#92;n", testfd);
+    testfd = fcntl(fd, F_DUPFD, 10);
+    printf("testfd :%d&#92;n", testfd);
+
+    getchar();
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 실행시켜보면 testfd 로 각각 4, 5 가 
+				아닌 (0, 1, 2 는 표준 입력/출력/에러, 3 은 test.txt) 
+				10, 11 로 파일지정번호가 지정됨을 알수 있을것이다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="CLOSEONEXEC"
+>2.3.2&#51208;. F_SETFD/F_GETFD</A
+></H3
+><P
+>	
+				close-on-exec 값을 조정하기 위해서 사용된다. 
+				F_GETFD 를 이용해서 FD_CLOEXEC 값을 가져오고 
+				F_SETFD 를 이용해서 이 값을 변경한다.    
+				기본적으로는 exec 할때 close 되지 않는다. 
+				그럼 f_dupfd.c 를 close-on-exec 하도록 약간 변경 해보도록 
+				하자. 
+			</P
+><P
+>	
+				<B
+CLASS="EMPHASIS"
+>예제 : close-on-exec</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+int main()
+{
+    int fd;
+    int val;
+    fd = open("exec_copy.txt", O_CREAT);
+
+    // FD_CLOEXEC 값을 fcntl 을 이용해서 
+    // 가져온 다음 세팅되어 있는지 검사한다.  
+    val = fcntl(fd, F_GETFD, 0);
+    if (val &#38; FD_CLOEXEC)
+        printf("close-on-exec bit on&#92;n");
+    else
+        printf("close-on-exec bit off&#92;n");
+
+
+    // FD_CLOEXEC 를 세팅한다. 
+    val |= FD_CLOEXEC;
+    if (val &#38; FD_CLOEXEC)
+        printf("close-on-exec bit on&#92;n");
+    else
+        printf("close-on-exec bit off&#92;n");
+    fcntl(fd, F_SETFD, val);
+
+    // loop 프로그램을 exec 시킨다.  
+    execl("/home/my_cvs/test/c_source/loop", "./loop", 0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 실행하면 아래와 같은 실행 결과를 
+				보여줄것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c_source]# ./close-on-exec 
+close-on-exec bit off
+close-on-exec bit on
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 실행시켜둔 상태에서 과연 fd 가 close-on-exec 
+				되었는지 /proc/pid/fd 를 확인해보면 기존에 열려있던 fd 가 
+				상속되어있지 않음을 확인할수 있을것이다. 	 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN80"
+>2.3.3&#51208;. F_GETFL/F_SETFL</A
+></H3
+><P
+>				F_GETFL 을 open(2)등에 의해서 열려진 파일지정자 에 대한 
+				플레그 값을 읽어온다. 그리고 F_SETFL 에 의해서 
+				파일지정자에 대한 값(특성)을 세팅한다.  
+			</P
+><P
+>	
+				F_SETFL 을 이용해서 변경할수 있는 파일지정자의 특성은 
+				O_APPEND, O_NONBLOCK, O_ASYNC 등이다. 
+				O_RDONLY, O_WRONLY, O_RDWR 등의 정보는 읽어올수는 있지만 
+				변경할수는 없다.  
+			</P
+><P
+>	
+				우선 읽기권한 정보를 읽어오는 것은 O_ACCMODE 와 비트연산을 
+				함으로써 가져올수 있다. 그밖에 정보는 
+				각각의 플레그(O_APPEND, O_NONBLOCK, O_ASYNC) 등과 비트연산을 
+				함으로써 얻어올수 있다.  
+			</P
+><P
+>	
+				<B
+CLASS="EMPHASIS"
+>예제 : fgetfl_test.c</B
+>	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+int main()
+{
+    int mode, fd, value;
+
+    fd = open("test.sh", O_RDONLY|O_CREAT);
+    if (fd &#60; 0)
+    {
+        perror("open error : ");
+        exit(0);
+    }
+
+    value = fcntl(fd, F_GETFL, 0);
+
+    mode = value &#38; O_ACCMODE;
+    if (mode == O_RDONLY)
+        printf("O_RDONLY setting&#92;n");
+    else if (mode == O_WRONLY)
+        printf("O_WRONLY setting&#92;n");
+    else if (mode == O_RDWR)
+        printf("O_RDWR setting&#92;n");
+
+    if (value &#38; O_NONBLOCK)
+        printf("O_NONBLOCK setting&#92;n");
+    else
+        printf("BLOCKING mode setting&#92;n");
+    if (value &#38; O_ASYNC)
+        printf("O_ASYNC setting&#92;n");
+
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 프로그램을 실행시키면 다음과 같은 결과를 
+				보여줄것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c_source]# ./fgetfl_test
+O_RDONLY setting
+BLOCKING mode setting
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				최초 open 시의 파일 플레그 값을 읽어오고 있음을 
+				알수 있다.  
+			</P
+><P
+>	
+				특성을 변경할수 있는 3개의 경우 단순히 비트연산을 
+				해서 해당 flag 를 킨다음에 그값을 fcntl 을 이용해서 
+				파일지정자에 세팅해주면 된다. 다음 예제는 
+				표준입력(0) 을 NONBLOCK 모드로 변경 시킨 예이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>fsetfl_test.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+#define STDIN 0 
+int main()
+{
+    int mode, fd, value;
+    char buf[255];
+
+    memset(buf, 0x00, 255);
+
+    // 처음 입력은 봉쇄모드로
+    read (STDIN, buf, 255);
+    printf("-&#62; %s&#92;n", buf);
+    memset(buf, 0x00, 255);
+
+    // NONBLOCKING 모드로 변경한다. 
+    value = fcntl(STDIN, F_GETFL, 0);
+    value |= O_NONBLOCK;
+    fcntl(STDIN, F_SETFL, value);
+    printf("NON BLOCKING MODE 로 변경 &#92;n");
+
+    // 2초후 비봉쇄 모드로 들어간다.
+    sleep(2);
+
+    // 바쁜대기(busy wait) 시작
+    while(1)
+    {
+        read (STDIN, buf, 255);
+        printf("-&#62; %s&#92;n", buf);
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				기본적으로 표준입력(0) 은 봉쇄모드로 시작된다. 
+				이것을 fcntl 을 이용해서 비봉쇄 모드로 만들고 
+				테스트한것이다. 위의 프로그램을 실행하면 
+				처음 입력은 봉쇄모드로 사용자 입력이 있을때까지 
+				기다리고, 그 후에는 비봉쇄 모드로 바쁜 상태에서 
+				사용자 입력을 처리하는것을 볼수 있을것이다.    
+			</P
+><P
+>				O_ASYNC 와 O_APPEND 역시 동일한 방법으로 처리가능하다. 
+			</P
+><P
+>				O_APPEND 는 대충 어떠한 특성변경을 위해서 사용하는지 
+				알것이다. O_ASYNC 에 대해서는 별로 익숙하지 않을수도 있는데, 
+				유닉스 I/O 모델중 흔히 말하는 "비동기 입출력" 모델을 
+				구현하기 위해서 사용된다. 비동기는 언제 일어날지 알수 없는 
+				사건을 말하며, 유닉스에서는 이러한 비동기 사건을 알려주기 
+				위해서 시그널(signal)을 사용한다. 
+				유닉스의 I/O 모델의 종류는 <A
+HREF="/modules.php?name=News&file=article&sid=80&mode=nested&order=0&thold=0"
+TARGET="_top"
+>리눅스 I/O 모델</A
+> 을 
+				참고하기 바란다.  
+			</P
+><P
+>				이 문서에서는 비동기 입력출방법 자체에 대한 내용은 다루지 
+				않을것이다. 이것은 리눅스 I/O 모델의 또다른 구현임으로 
+				리눅스 I/O 모델 관련 문서를 다루면서 언급할것이다. 
+				(현재는 Blocking I/O, Non-Blocking I/O, I/O Multiplexing 
+				까지를 다룬 문서들이 제공되고 있다) 
+				다루고 있다) 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN97"
+>2.3.4&#51208;. F_GETOWN/F_SETOWN</A
+></H3
+><P
+>				바로 윗장에서 우리는 F_GETFL/F_SETFL 을 이용해서 
+				파일지정자의 특성을 변경하는 법을 배웠었다. 
+				그중에서 비동기 입출력 설정을 위한 O_ASYNC 플레그를 
+				설정하는 방법을 배웠었는데, F_GETOWN/F_SETOWN 은 
+				이 비동기 입출력과 관련되어서 사용되는 플래그이다.  
+			</P
+><P
+>				이들 플레그를 사용함으로써 비동기 입출력 모드로 파일지정자가 
+				설정되어 있을때, 어떤 프로세스(혹은 그룹) 아이디로 부터 오는 
+				시그널을 받을지를 지정해줄수 있다. 
+				역시 자세한 내용은 리눅스 I/O 모델 문서에서 다루도록 
+				하겠다.   
+			</P
+></DIV
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

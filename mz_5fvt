@@ -1,0 +1,203 @@
+[[TableOfContents]]
+
+= VT입력처리 =
+ * VT(tty)로부터 글자를 입력받는 예제 입니다. 이것은 많은 분들이 궁굼해 하는 부분으로 알고 있습니다. 좋은 참고자료 되기를 바랍니다.
+ * 대부분의 구현설명은 termios사용법에 대한 문서를 찾아보시면 그리 어렵지 않게 구현 가능합니다. 필자는 "man termios"에서 이러하 방법을 찾았습니다.
+ * 해당 참고 자료로는 '''"/usr/include/linux/vt.h"''' 및 '''"/usr/include/linux/kd.h"''' 를 참조하시면 여러가지 다양한 기능을 사용할수 있습니다.
+ * 아래의 예제는 단점이 한가지 있는데 일부 키를 입력받지 못합니다. 예를 들면 '''"한/영"''' 키를 예로 들수 있습니다. 이것을 입력받도록 하려면 VT mode를 사용하면 방법이 없는듯 하며 '''K_RAW''' mode를 사용해야 합니다. 또한 이를 사용하게 되면 키보드 코드가 Scan code로 입력이 들어옵니다. 또한 '''struct vt_mode'''를 사용하는 것이 아니고 ioctl cmd '''KDGKBMODE'''를 사용하여 전환하게 합니다. 즉, 아래의 예제에서 ioctl 부분을 전부 '''KDGKBMODE, KDSKBMODE''' 로 바꿔줘야 합니다. 이에 대한 모드로는 '''/usr/include/linux/kd.h''' 에 그 내용이 있으니 참조 하시기 바랍니다.
+ * 경우에 따라서는 Serial console상에서 입력 받는 키보드 및 별도의 psaux를 통한 키보드 2가지를 동시에 처리할 경우가 있습니다. 필자가 만든 프로그램이 그런적이 있었는데 이때는 '''/dev/tty, /dev/console''' 2개를 매핑하여 작용하도록 한적이 있습니다. 사실 대부분은 이 2가지의 디바이스를 다루면 거의 모든 키보드 입력이 이뤄지지만 경우에 따라서는 다른 경우도 있습니다. 하지만 결국 termios 의 사용에 대해서는 아래의 예제와 맥락이 거의 동일합니다. 중요한것은 키보드 디바이스 이름이 어떤것이냐와 키보드를 다룰때 어떤 MODE를 사용하는가를 결정하면 된다는 예기가 되겠습니다. 
+ * 필자는 x86계열에서만 이 코드를 테스트 하였으며 다른 machine을 접해보지 못했습니다. 혹시 다른 machine을 보유하고 계시다면 아래의 코드를 테스트해보시고 잘되거나 안되거나 이곳에 그 유효성을 기록해주시면 좋겠습니다. 참고로 프로그램 종료키는 Escape 를 2번 연속 누르면 빠져나옵니다.
+ || '''machine''' || '''작동유무''' ||
+ || x86 || 잘 동작함 ||
+
+{{{#!vim c
+/*
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> Made in KOREA
+ http://minzkn.pe.ky
+*/
+
+#ifndef DEF_SOURCE_mzplugin_vt_c 
+#define DEF_SOURCE_mzplugin_vt_c "mzplugin_vt.c"
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <malloc.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <termios.h>
+#include <sys/vt.h>
+
+#ifndef t_MZ_VT
+typedef struct ts_VT
+{
+ int Handle, InitLevel;
+ struct termios NewTermios, OldTermios;
+ struct vt_mode NewMode, OldMode;
+}t_VT;
+#define t_VT t_VT
+#endif
+
+t_VT *MZ_OpenVT(void);
+t_VT *MZ_CloseVT(t_VT *s_Handle);
+int MZ_ReadVT(t_VT *s_Handle, int s_TimeOut /* mSec */);
+
+static void __MZ_CopyMemory__(void *s_To, const void *s_From, int s_Size)
+{
+#ifdef WIN32
+ (void)memcpy(s_To, s_From, (size_t)s_Size);
+#else
+ __asm__ volatile(
+  "\n\t"
+  "cld\n\t"
+  "shrl $1, %2\n\t"
+  "jnc 0f\n\t"
+  "movsb %%ds:(%1), %%es:(%0)\n\t"
+  "0:\n\t"
+  "shrl $1, %2\n\t"
+  "jnc 0f\n\t"
+  "movsw %%ds:(%1), %%es:(%0)\n\t"
+  "0:\n\t"
+  "repz movsl %%ds:(%1), %%es:(%0)\n\t"
+  "\n\t"
+  :
+  : "D"(s_To), "S"(s_From), "c"(s_Size)
+ );
+#endif
+}
+
+t_VT *MZ_OpenVT(void)
+{
+ const char c_DefaultTTY[] = {"/dev/tty"};
+ t_VT *s_Return;
+ int s_IsOK = 0;
+ char *s_TTY_Name;
+ s_Return = (t_VT *)malloc(sizeof(t_VT));
+ if(s_Return)
+ {
+  s_Return->InitLevel = 0;
+  s_TTY_Name = ttyname(STDIN_FILENO);
+  s_Return->Handle = open(s_TTY_Name ? s_TTY_Name : c_DefaultTTY, O_RDONLY | O_NOCTTY);
+  if(s_Return->Handle != (-1))
+  {
+   s_Return->InitLevel |= 0x00000001;
+   if(ioctl(s_Return->Handle, VT_GETMODE, (void *)(&s_Return->OldMode)) != (-1))
+   {
+    s_Return->InitLevel |= 0x00000002; 
+    __MZ_CopyMemory__((void *)(&s_Return->NewMode), (void *)(&s_Return->OldMode), sizeof(struct vt_mode)); 
+    s_Return->NewMode.mode = VT_PROCESS;
+    if(ioctl(s_Return->Handle, VT_SETMODE, (void *)(&s_Return->NewMode)) != (-1))
+    {
+     s_Return->InitLevel |= 0x00000004; 
+    }
+   }
+   /* else fprintf(stdout, "ioctl set VT_MODE error !\n"); */
+   if(tcgetattr(STDIN_FILENO, (struct termios *)(&s_Return->OldTermios)) != (-1))
+   {
+    s_Return->InitLevel |= 0x00000008; /* 3 */
+    __MZ_CopyMemory__((void *)(&s_Return->NewTermios), (void *)(&s_Return->OldTermios), sizeof(struct termios)); 
+    s_Return->NewTermios.c_iflag &= (~BRKINT); 
+    s_Return->NewTermios.c_iflag |= (IGNBRK); 
+    s_Return->NewTermios.c_lflag &= (~( ISIG | ECHO | ICANON ));
+    tcsetattr(STDIN_FILENO, TCSANOW, (struct termios *)(&s_Return->NewTermios));
+    s_IsOK = 1;
+   }
+   else fprintf(stdout, "get tcgetattr error !\n");
+  }
+  if(s_IsOK == 0)s_Return = MZ_CloseVT(s_Return);
+ }
+ return(s_Return);
+}
+
+t_VT *MZ_CloseVT(t_VT *s_Handle)
+{
+ if(s_Handle)
+ {
+  if(s_Handle->Handle != (-1))
+  {
+   if((s_Handle->InitLevel & 0x00000008))
+   {
+    tcsetattr(STDIN_FILENO, TCSANOW, (struct termios *)(&s_Handle->OldTermios));
+    tcflush(s_Handle->Handle, TCIOFLUSH);
+   }
+   if((s_Handle->InitLevel & 0x00000004))ioctl(s_Handle->Handle, VT_SETMODE, (void *)(&s_Handle->OldMode));
+   if((s_Handle->InitLevel & 0x00000001))close(s_Handle->Handle); 
+  }
+  free(s_Handle);
+  s_Handle = (t_VT *)0;
+ }
+ return(s_Handle);
+}
+
+int MZ_ReadVT(t_VT *s_Handle, int s_TimeOut /* mSec */)
+{
+ int s_Return = (-1), s_ReadBytes;
+ fd_set s_FD_Read;
+ struct timeval s_LocalTimeVal;
+ unsigned char s_Byte;
+ if(s_Handle)
+ {
+  if(s_Handle->Handle != (-1))
+  {
+   if(s_TimeOut > 0)
+   { /* Select */
+    s_LocalTimeVal.tv_sec = s_TimeOut / 1000, s_LocalTimeVal.tv_usec =i(s_TimeOut % 1000) * 1000;
+    FD_ZERO(&s_FD_Read);
+    FD_SET(s_Handle->Handle, &s_FD_Read);
+    if(select(s_Handle->Handle + 1, (fd_set *)(&s_FD_Read), (fd_set *)0, (fd_set *)0, (struct timeval *)(&s_LocalTimeVal)) > 0)
+    {
+     if(FD_ISSET(s_Handle->Handle, &s_FD_Read))
+     {
+      if(read(s_Handle->Handle, (void *)(&s_Byte), sizeof(s_Byte)) > 0)s_Return = (int)s_Byte;
+     }
+    }
+   }
+   else 
+   { /* Block */
+    s_ReadBytes = read(s_Handle->Handle, (void *)(&s_Byte), sizeof(s_Byte));
+    if(s_ReadBytes > 0)s_Return = (int)s_Byte;
+   }
+  }
+ }
+ return(s_Return);
+}
+
+int main(void)
+{
+ int s_Return = 0, s_Escape, s_Key;
+ t_VT *s_VT; 
+ s_VT = MZ_OpenVT();
+ if(s_VT)
+ {
+  fprintf(stdout, "Use VT : Handle=%d\n", s_VT->Handle);
+  s_Escape = 0;
+  while(1)
+  {
+   s_Key = MZ_ReadVT(s_VT, 8000);
+   if(s_Key >= 0)
+   {
+    if(s_Key == 0x1b)s_Escape++;
+    else s_Escape = 0;
+
+    fprintf(stdout, "[%c(0x%02x)]\n", (s_Key < 0x20 || s_Key >= 0x7f) ? '.' : s_Key, s_Key);
+   }
+   else fprintf(stdout, "Wait for key : 'ESC' key double press to exit.\n");
+   if(s_Escape >= 2)break;
+  }
+  s_VT = MZ_CloseVT(s_VT);
+ }
+ else fprintf(stdout, "Can not open VT !\n");
+ return(s_Return);
+}
+
+#endif
+
+/* End of source */
+}}}
+
+== HP-UX에서의 작동 ==
+ 1. 코드 그대로 테스트해본 결과 '''sys/vt.h'''과 관련된 모든 부분에서 문제가 발생했습니다. 실제 확인해본 결과 sys/vt.h파일이 존재하지 않더군요. 한번 알아봐야 겠군요. - [yundream]  
+
+== AIX에서의 작동 ==
+ 1. 조만간 AIX 계정을 얻을 것 같으니 테스트 결과를 올리도록 하겠습니다. IBM의 AIX 운영체제 선전을 보니까 리눅스와 최대한 호환을 염두에 두고 만들어지고 있다고 하던데.. 말대로라면 그냥 컴파일 되어야 겠죠 ? [AIX]위키 참조 :-)  

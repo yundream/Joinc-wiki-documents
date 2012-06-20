@@ -1,0 +1,309 @@
+#title Linux man : listen - 소켓의 연결을 위한 대기열을 만든다.
+[wiki:docbook/listen(2) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>listen(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. listen(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN16"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN20"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN42"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN46"
+>관련문헌</A
+></DT
+></DL
+></DIV
+><P
+>	소켓(:12)의 연결 대기열(:12)을 만든다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/socket.h&#62;
+
+int listen(int s, int backlog);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		서버(:12)측 프로그램은 socket(2)함수를 이용해서 클라이언트(:12)의 연결을 받아들일 
+		듣기소켓을 만들게 된다. 클라이언트의 연결은 듣기소켓(:12)을 통해서 이루어지는데 
+		클라이언트는 connect(2)를 호출해서 서버에 연결을 시도하고, 3번:::악수기법(:12)이 
+		성공하면 서버와 완전한 연결이 만들어 진다.    
+	</P
+><P
+>		만들어진 연결은 queue(:12)에 들어가게 되고 서버측에서 accept(2)를 호출하면 
+		비로서 서버는 연결소켓을 만들고 만들어진 연결소켓(:12)을 이용해서 
+		클라이언트와 통신하게 된다.   
+	</P
+><P
+>		listen(2) 시스템호출(:12)은 SOCK_STREAM과 SOCK_SEQPACKET에만 사용된다.
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>a</B
+>는 socket(2)에 의해서 만들어진 듣기 소켓이다. 
+		<B
+CLASS="EMPHASIS"
+>backlog</B
+>는 연결이 대기할 수 있는 큐의 갯수이다. 
+		만약 backlog에 연결이 모두 찬 상태에서 새로운 연결을 시도한다면, 
+		클라이언트는 ECONNREFUSED 에러를 받게될 것이다. 만약 재전송을 지원하는 
+		프로토콜을 사용한다면 에러를 무시하고 성공할 때까지 재시도를 하게 된다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+></A
+>1.3. 반환값</H1
+><P
+>		성공하면 0을 리턴하고 실패했을 경우 -1을 리턴하고 <B
+CLASS="EMPHASIS"
+>errno</B
+>
+		를 설정한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN20"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EADDRINUSE</DT
+><DD
+><P
+>	
+					다른 소켓이 동일한 포트(:12)를 사용하고 있다.
+				</P
+></DD
+><DT
+>EBADF</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>s</B
+>가 잘못된 소켓지정자이다.
+				</P
+></DD
+><DT
+>EOPNOTSUP</DT
+><DD
+><P
+>	
+					소켓이 listen을 지원하지 않는다.
+				</P
+></DD
+><DT
+>ENOTSOCK</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>s</B
+>가 소켓이 아니다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN42"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/socket.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[80];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    client_len = sizeof(clientaddr);
+
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, 0)) &#60; 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&#38;serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    bind (server_sockfd, (struct sockaddr *)&#38;serveraddr, sizeof(serveraddr));
+    listen(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, 80);
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&#38;clientaddr,
+                            &#38;client_len);
+
+        if ((n = read(client_sockfd, buf, 80)) &#60;= 0)
+        {
+            close(client_sockfd);
+            continue;
+        }
+        if (write(client_sockfd, buf, 80) &#60;=0)
+        {
+            perror("write error : ");
+            close(client_sockfd);
+        }
+        close(client_sockfd);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위 프로그램은 클라이언트의 메시지를 읽어서 그대로 재 전송하는 echo(:12)
+		프로그램이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN46"
+></A
+>1.6. 관련문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=57"
+TARGET="_top"
+>Socket Layer</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

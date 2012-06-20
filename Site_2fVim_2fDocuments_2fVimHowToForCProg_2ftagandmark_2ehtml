@@ -1,0 +1,344 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>C파일에서 임의의 위치로 이동하기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="C 프로그래머를 위한 Vim 사용"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="이동"
+HREF="move.html"><LINK
+REL="NEXT"
+TITLE="자동완성"
+HREF="autocomplet.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>C 프로그래머를 위한 Vim 사용</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="move.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="autocomplet.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="TAGANDMARK"
+></A
+>3. C파일에서 임의의 위치로 이동하기</H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN58"
+></A
+>3.1. ctags</H2
+><P
+>			Tag는 코드에서 사용되는 논리적인 요소들의 집합을 정렬한 것으로, Tag를
+			이용하면 C코드를 쉽게 분석할 수 있다. C파일에 사용되는 함수들의 북마크
+			라고 이해할 수 있다. Tag는 특히, 함수의 원형을 보고자 할때, 유용하게 
+			사용할 수 있다.   
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>foo()
+{
+	...
+	bar();
+	...
+}
+bar()
+{
+	...
+}</PRE
+></TD
+></TR
+></TABLE
+>
+			foo함수를 분석하다보면 bar함수가 사용되고 있음을 알 수 있는데, bar함수가
+			어떤일을 하는지 명확히 알고 싶다면, 함수의 원형을 확인해 보는 수 밖에 
+			없을 것이다. 만약 Tag를 사용하지 않는다면 vim의 찾기 기능이나 grep등을 
+			이용해서 눈으로 확인해서 찾아야 할 것이다. 
+		</P
+><P
+>			tag를 이용하면 <B
+CLASS="EMPHASIS"
+>CTRL-]</B
+>와 <B
+CLASS="EMPHASIS"
+>CTRL-T</B
+>
+			두개의 키로 함수원형으로의 이동을 간단하게 끝낼 수 있다.
+		</P
+><P
+>			tag기능은 물론 그냥 쓸 수는 없다. 모든 함수에 대해서 북마크 자료가 
+			만들어져 있어야만 사용가능하기 때문이다. ctags명령을 사용하면 
+			C코드들에 포함된 함수의 북마크를 생성할 수 있다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ctags *.c</PRE
+></TD
+></TR
+></TABLE
+>
+			만약 하부디렉토리에 있는 모든 C코드에 대한 북마크(테그)를 만들기를 원한다면
+			-R 옵션을 사용하면 된다.	
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ctags -R *.c</PRE
+></TD
+></TR
+></TABLE
+>
+			ctags에 대한 자세한 설명은<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/ctags"
+TARGET="_top"
+>ctags 사용하기</A
+>를 참고하기 바란다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="MARK"
+></A
+>3.2. Mark</H2
+><P
+>			mark는 tag와 비슷한면이있다. 다른 점이라면 자신이 위치할 지점을 능동적으로 
+			mark(표시)할 수 있고, 동일한 파일 내에서만 이동이 가능하다는 점이다. 
+		</P
+><P
+>			자주 참고해야 하는 함수나 코드라인은 표시를 해두고 필요할 때 마다가 
+			한번의 단축키로 찾아갈 수 있도록 한다면 매우 편리할 것이다. vim은 
+			사용자가 표시한 라인을 기억하고 있다가 요청할 경우 바로 이동시켜주는 Mark
+			기능을 제공한다. 역시 일종의 북마크 기능이라고 볼 수 있을 것이다.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>100 foo()
+101 {
+102	int x,y;
+103	x = 0;
+104	y = 1;
+105	x++;
+106	y++;
+107	if (x != y)
+108		x=y;
+109	y=x
+110 }
+&#13;</PRE
+></TD
+></TR
+></TABLE
+>
+			지금 당신은 foo함수에서 x++ 라인을 편집하고 있다. 그러다가 foo함수를 참조하는 다른 함수를 
+			임시로 확인해야 하는 상황이 생겼다고 가정해 보자. 다른 함수의 확인이 끝났다면, 분명 당신은
+			원래 작업하던 위치인 x++로 돌아오길 원할 것이다. 당신의 기억력이 매우 좋다면 105라인을 
+			기억해 두고 있다가 <B
+CLASS="EMPHASIS"
+>105G</B
+>키를 입력해서 이동할 수 있긴 하겠지만 
+			그리 좋은 방법이 아니다. 105라인에서 <B
+CLASS="EMPHASIS"
+>ma</B
+>로 현재위치를 기억시키니 다음
+			기억된 위치로 가고자 할때 <B
+CLASS="EMPHASIS"
+>'a</B
+>로 이동하는게 훨씬 편리하다. ma는 현재 위치를
+			a로 표시하겠다는 뜻이다. mb로 했다면 b로 표시하겠다라는 뜻이고 'b로 위치를 찾아갈 수 있다. 
+		</P
+><P
+>			표시에 사용되는 이름은 단일 문자여야 한다. 그리고 대문자와 소문자를 구분하므로, 하나의 파일에서
+			약 50개 정도의 위치를 기억시킬 수 있다. 그러나 인간의 기억의 한계로 보통은 2-3개 정도의 
+			위치만 기억시키고 사용하며, 이정도로도 충분히 유용하게 사용할 수 있다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN78"
+></A
+>3.3. gd 키</H2
+><P
+>			아래와 같은 코드를 편집한다고 가정해보자.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct X x;
+
+void foo()
+{
+	struct Y y;
+	struct Z z;
+	...
+	/* Lost of lines later */
+	x.bar();
+	y.bar();
+	z.bar();
+}</PRE
+></TD
+></TR
+></TABLE
+>
+			코딩을 하다보면 x,y,z이 도대체 어떻게 선언된건지를 까먹는 경우가 발생할 수 있다. 이럴경우 
+			x,y의에서 <B
+CLASS="EMPHASIS"
+>gd</B
+>키를 입력하면 선언된 위치로 바로 이동한다. 
+			<B
+CLASS="EMPHASIS"
+>gD</B
+>는 전역에서 선언된 위치를 찾아서 이동한다. 일단 이동한 다음에는 
+			원래 자리로 돌아오는게 좀 불편할 수 있는데, <A
+HREF="tagandmark.html#MARK"
+>3.2&#51208;</A
+>와 함께 사용하면 
+			불편함을 해소할 수 있다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="move.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="autocomplet.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>이동</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>자동완성</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

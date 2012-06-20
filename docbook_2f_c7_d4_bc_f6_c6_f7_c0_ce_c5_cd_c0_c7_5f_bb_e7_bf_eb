@@ -1,0 +1,348 @@
+#title 함수포인터의 사용
+[wiki:article_함수포인터의_사용 HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>함수포인터의 사용</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>dreamyun@yahoo.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2003년 3월 1일 23시</date>
+			<revremark>최초 문서작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>함수포인터란 ?</title>
+	<para>
+		C 에서의 함수포인터는 언어와 관련된 문법적인 내용임으로 
+		함수포인터에 대한 설명은 지극히 의례적인 내용이 될수 
+		있겠지만, 꽤 복잡하기도 하고 재미있게 사용할수도 있음으로 
+		굳이 강좌를 만들었다.	 
+	</para>
+	<para>
+		함수 포인터는 말그대로 함수의 위치를 가르키는 포인터이다. 
+	</para>
+	<para>
+		C 언어의 경우 함수자체를 변수로 만들수는 없다. 
+		대신 함수를 포인터하는 것은 가능한데, 
+		이것을 통해서 함수를 포인터 처럼 사용할수 있으며, 이 포인터가 
+		가르키고 있는 곳의 함수를 실행시킬수도 있다.    	
+	</para>
+	<section>
+		<title>선언방법</title>
+		<para>
+			포인터는 하나의 자료형임으로 포인터가 가르키는 데이타의 
+			타입정보를 이용해서 포인터를 선언해줘야 한다. 
+			물론 함수포인터의 경우 포인터하는 대상이 데이타가 
+			아니고 함수라는 점이 다르긴 하지만.. 말이다.   
+		</para>
+		<para>
+			다음은 함수포인터를 선언하기 위한 전형적인 방법이다. 
+			<screen>
+return_type (*function)(arg1, arg2, ...);
+			</screen>
+			이해하기 쉽게, 만약 <emphasis>int hello(char *)</emphasis> 라는 
+			함수를 가르키는 <emphasis>함수포인터</emphasis>를 
+			선언하고자 한다면 아래와 같이 하면 된다.  
+			<screen>
+int (*func_name)(char *);
+			</screen>
+			다음 간단한 예제이다. 
+		</para>
+		<para>
+			<emphasis>funcpter.c</emphasis>
+			<screen>
+#include &lt;stdio.h&gt;
+void hello(char *name)
+{
+    printf ("Hi %s\n", name);
+}
+
+int main(int argcint argcint argcint argc)
+{
+    void (*Func)(char *);
+    Func = hello;
+    Func("test");
+}
+			</screen>
+			위 코드를 이해하는 데에는 별무리가 없을것이다. 
+			void 리턴타입을 가지고 인자로 캐릭터 포인터를 가지는 
+			함수포인터를 사용하고 있음을 알수 있다.    
+		</para>
+	</section>
+	<section>
+		<title>왜 함수포인터를 사용하는가</title>
+		<para>
+			익히 경험해서 알고 있겠지만, C 에서의 포인터는 잘못사용하면 
+			악몽이 될수 있다. 특히 함수포인터를 선언해서 쓸경우는 
+			그 독특한 문법과 익숙지않은 포인터개념의 짬뽕으로 인하여 
+			코드자체가 암호문처럼 변할수도 있다. 
+			이것은 프로그램의 유지/보수를 어렵게 할수도 있다. 
+		</para>
+		<para>
+			그러나 그럼에도 불구하고 제대로 사용할경우 그 장점을 
+			활용하여 유용한 프로그래밍 기법에 활용할수 있는데,  
+			바로 <emphasis>generic</emphasis>한 
+			함수(혹은 알고리즘)의 작성을 가능하게 한다는 점이다. 
+			또한 잘만 사용하면 오히려 유지/보수가 수월하게끔 만들수도 있다.
+			다음장에서는 간단한 예제를 이용해서 <emphasis>함수포인터</emphasis>
+			의 장점을 활용하는 방법에 대해서 알아보도록 하겠다. 
+		</para>
+	</section>
+</section>
+<section>
+	<title>함수포인터의 활용</title>
+	<para>
+		이번장에서는 함수포인터의 활용방법에 대해서 
+		몇가지 예를 들어서 알아보도록 하겠다. 
+	</para>
+	<section>
+		<title>Generic 함수(알고리즘)의 작성</title>
+		<para>
+			각 학생의 과목별 성적데이타가 있고, 
+			과목별 최고 점수를 가져오는 프로그램이 있다고 가정하자. 
+			처음에 이 프로그램은 각 과목중 "국어" 최고 점수만을 
+			가져오도록 만들었다. 그런데 "수학" 최고 점수만을 
+			가져오도록 변경하고 싶으면 어떻게 해야 할까? 혹은 최고 
+			평점을 가져오기를 원할수도 있을것이다.  
+			물론 각각의 경우에 대해서 별도의 이름을 가지는 
+			함수를 만들면 되기는 하겠지만 
+			이러한 경우에 함수포인터를 이용하면, 
+			좀더 유지보수가 쉬운 깔끔한 코드를 만들어 낼수가 있다. 			
+		</para>
+		<para>
+			<emphasis>max.cc</emphasis>
+			<screen>
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;vector&gt;
+
+using namespace std;
+
+typedef struct _pinfo
+{
+    char name[12];  
+    int  math;
+    int  korean;
+    int  eng;
+} pinfo;
+
+void printmax(vector&lt;pinfo&gt; va, void (*SortFunc)(vector&lt;pinfo&gt;))
+{
+    printf("최고 성적 출력 프로그램\n");
+    SortFunc(va);
+}   
+
+void engmax(vector&lt;pinfo&gt; va)
+{
+    int max = 0;
+    int index = 0;
+    for (int i = 0; i &lt; va.size(); i++)
+    {
+        if (va[i].eng &gt; max)
+        {
+            max = va[i].eng;
+            index = i;
+        }
+    }
+    printf("영어 최고점수 획득자는 %s : %d\n", 
+        va[index].name,
+        va[index].eng);
+};
+
+
+int main()
+{
+    pinfo myinfo;
+    vector&lt;pinfo&gt; va;
+
+    void (*Sort)(vector&lt;pinfo&gt;);
+
+    myinfo.korean = 80;
+    myinfo.eng    = 65;
+    myinfo.math   = 99;
+    strncpy(myinfo.name, "yundream", 12);
+    va.push_back(myinfo);
+
+    myinfo.korean = 90;
+    myinfo.eng    = 65;
+    myinfo.math   = 74;
+    strncpy(myinfo.name, "kknd", 12);
+    va.push_back(myinfo);
+
+    myinfo.korean = 63;
+    myinfo.eng    = 88;
+    myinfo.math   = 55;
+    strncpy(myinfo.name, "junny", 12);
+    va.push_back(myinfo);
+
+    printmax(va, engmax);
+}
+			</screen>
+			위의 코드를 보면 printmax 라는 함수가 있는데, 
+			함수포인터를 인자로 넘겨 받음으로써, 
+			좀더 제너릭하게 확장시킬수 있도록 만들어져 있다. 
+			위의 경우는 영어최고점자의 정보를 출력시키도록 
+			해놓았는데, 만약 최고 평점자에 대한 정보를 
+			출력 시키기를 원한다면, 
+			다음과 같은 함수를 만들고, printmax 에 인자로 
+			넘기면 될것이다.      
+			<screen>
+void avgmax(vector&lt;pinfo&gt; va)
+{
+    int max   = 0;
+    int total;
+    int index = 0;
+    for (int i = 0; i &lt; va.size(); i++)
+    {
+        total = (va[i].eng + va[i].math + va[i].korean);
+        if ( total &gt; max)
+        {
+            max = total;
+            index = i;
+        }
+    }
+    printf("최고평자 점정보 : \n");
+    printf("이름 : %s\n", va[index].name);
+    printf("영어 : %d\n", va[index].eng);
+    printf("국어 : %d\n", va[index].korean);
+    printf("수학 : %d\n", va[index].math);
+    printf("평점 : %.2f\n", (float)max/3.);
+}
+			</screen>
+				아래와 같이 printmax 를 호출하면 된다. 
+			<screen>
+printmax(va, avgmax);
+			</screen>
+			이처럼 함수포인터를 직접 넘김으로 인해서, 
+			프로그래머는 필요에 따라 원 쏘쓰의 큰 변화없이 
+			자기가 필요로 하는 코드만 만들어서 쉽게 
+			확장시킬수 있다.  
+		</para>
+	</section>
+
+	<section>
+		<title>그외의 활용</title>
+		<para>
+			여기에서는 이러한 용도로도 사용이 
+			가능하다는걸 보여주는 팁수준의 활용용도를 
+			보여줄것이다.   
+		</para>
+		<para>
+			필자가 쓰레드 프로그래밍을 할때 가끔 사용하는 방법인데, 
+			코드를 훨씬 깔끔하고 보기 쉽게 만들어준다. 
+			포인트는 쓰레드 함수를 <emphasis>함수포인터</emphasis>를 
+			값으로 하는 vector 에 등록시켜서 쓰레드 생성등에 
+			사용하는 방법이다. 
+		</para>
+		<para>
+			이방법을 쓰면 비록 몇줄이긴 하지만 분명히 코딩량을 
+			줄일수 있다. 그리고 쓰레드 함수를 한영역에서 모아서 관리함으로 
+			코드를 좀더 보기 쉽게 만들어준다.  
+		</para>
+		<para>
+			<emphasis>funcpt_tip.cc</emphasis>
+			<screen>
+#include &lt;pthread.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;vector&gt;
+#include &lt;iostream&gt;
+
+#define MAX_THREAD_NUM 20
+
+using namespace std;
+
+void *func1(void *)
+{
+    printf("Thread 1\n");
+    pause();
+}
+void *func2(void *)
+{
+    printf("Thread 2\n");
+    pause();
+}
+void *func3(void *)
+{
+    printf("Thread 3\n");
+    pause();
+}
+void *func4(void *)
+{
+    printf("Thread 4\n");
+    pause();
+}
+
+int main()
+{
+    // 인자가 함수포인터인 vector 생성
+    vector&lt;void *(*)(void *)&gt; thread_list;
+    vector&lt;pthread_t&gt; tident(MAX_THREAD_NUM);
+    int status;
+
+    thread_list.push_back(func1);
+    thread_list.push_back(func2);
+    thread_list.push_back(func3);
+    thread_list.push_back(func4);
+
+    cout &lt;&lt; "등록된 쓰레드 " &lt;&lt; thread_list.size() &lt;&lt; endl;
+    for (int i = 0; i &lt; thread_list.size(); i++)
+    {
+        pthread_create(&amp;tident[i], NULL, thread_list[i], (void *)NULL);
+    }
+
+    cout &lt;&lt; "thread Join Wait" &lt;&lt; endl;
+    for (int i = 0; i &lt; tident.size(); i++)
+    {
+        pthread_join(tident[i], (void **)&amp;status);
+    }
+    return 1;
+}
+			</screen>
+		</para>
+	</section>
+</section>
+
+<section>
+	<title>결론</title>
+	<para>
+		이상 간단하게 함수포인터의 사용방법에 대해서 알아보았다. 
+		함수포인터는 몇몇경우에 유용하게 사용할수 있지만, 
+		잘못사용하게 될경우 대단히 유지보수가 어려운 코드를 만들어 
+		낼수도 있다. 위의 함수포인터의 선언을 보면 알겠지만, 
+		결코 익숙한 선언및 사용방법이 아니기 때문이다. 또한 
+		포인터라는 개념자체가 혼동을 줄수 있기 때문이다.  
+	</para>
+	<para>
+		어쨋든 사용방법은 알아두는게 좋다. 위에서는 예로 들지 않고 
+		있지만, C 에서 객체지향을 흉내내기 위한 목적으로써, 
+		함수포인터를 사용하는 경우도 많기 때문이다.   
+	</para>
+</section>
+</article>
+}}}

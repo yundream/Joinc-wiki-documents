@@ -1,0 +1,225 @@
+#title linux man page : seteuid - 유효 사용자 ID 를 생성한다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>seteuid(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. seteuid(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN11"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN14"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN22"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>유효 사용자 ID를 설정한다. </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=seteuid">seteuid</a>(uid_t euid);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		유효:::사용자:::ID(:12) 설정을 하기 위해서 사용된다. 
+		유효 사용자 ID 는 파일(:12) 생성과 접근등에 영향을 미치게 된다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN11"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 보통 슈퍼유저권한일 경우 사용가능한 함수이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		다양한 원인에 의해서 에러가 발생할수 있으며 아래와 같은 에러 메시지들이 있다. 
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EPERM</DT
+><DD
+><P
+>	
+					현재 프로세스의 권한이 슈퍼유저권한이 아닐때 
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main()
+{
+    int fd;
+    int state;
+
+    // 500 은 yundream 이라는 계정의 UID 이다.
+    // yundream 유저ID로 effective UID 를 설정한다.  
+    state = seteuid(500);
+
+    if (state &#60; 0)
+    {
+        perror("error ");
+       exit(0);
+    }
+
+    // 테스트용 파일을 하나 생성한다. 
+    if ((fd = open("setuid.txt", O_CREAT|O_RDWR, S_IRWXU|S_IRUSR)) &#60; 0 )
+    {
+        perror("error ");
+        exit(0);
+    }
+
+    close(fd);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위 프로그램을 실행시키면 현재 디렉토리(:12)에 setuid.txt 라는 파일을 
+		생성하는데 다음과 같은 권한으로 생성된다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost testdir]# ls -al
+drwxr-xr-x    2 yundream yundream     4096 10월 31 23:25 .
+drwxr-xr-x    8 root     root         4096 10월 31 23:13 ..
+-rwx------    1 yundream root            0 10월 31 23:13 setuid.txt
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		파일이 생성될때 effective UID 인 yundream ID 로 생성되었음을 
+		알수 있다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

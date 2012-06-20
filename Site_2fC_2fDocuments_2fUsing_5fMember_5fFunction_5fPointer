@@ -1,0 +1,277 @@
+#title C++ 에서 멤버 함수포인터 사용하기
+
+원문 : http://www.vmlinux.org/jakov/community.borland.com/15837.html
+
+=== 소개 ===
+아마도 여러분은 함수포인터(:12)를 사용해봤을 것이다. C(:12)에서 제공하는 qsort(3)와 같은 함수도 함수포인터를 사용한다. 다음은 qsort(3)을 이용해서 정렬하는 간단한 프로그램이다.   
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int compare(const int *one, const int *two)
+{
+	if (*one > *two)
+		return  -1;
+	else
+		return 1;
+}
+
+int a[3] = { 50, 10, 20 };
+int main()
+{
+	qsort(a, 3, sizeof(a[0]), compare);
+	print("%d\n", a[0]);
+	return 0;
+}
+}}}
+qsort 함수는 인자로, 비교에 사용할 함수의 포인터를 받고 있음을 알 수 있다. 만약 함수포인터를 사용하지 않는다면, 비교연산의 종류의 갯수만큼 새로운 qsort함수를 만들어야 될 것이다. 
+
+위 코드는 일반적으로 잘 컴파일 되지만, 컴파일러의 특성에 따라서 '''경고'''를 발생하거나 컴파일이 안되는 문제가 발생할 수 있다. C 컴파일러에서 컴파일을 한다면 '''경고'''를 발생할 것이고, C++ 컴파일러에서 컴파일 한다면 에러가 발생할 것이다. 이는 이들 두개의 언어가 '''강타입'''언어이기 때문이다. C++에서 에러가 발생하는 이유는 일반적으로 C++이 더욱 강하게 타입을 검사하기 때문이다.
+
+qsort 함수는 stdlib.h에 다음과 같이 선언되어 있다.
+{{{#!plain
+void qsort(void *base, size_t nmemb, size_t size,
+           int(*compar)(const void *, const void *));
+}}}
+
+그러므로 타입을 명확히 하는 것으로 문제를 해결할 수 있다. 이제 C 컴파일러건 C++ 컴파일러건 간에 경고메시지 하나 없이 깔끔하게 컴파일 될 것이다. 
+{{{#!plain
+  qsort(a, 3, sizeof(a[0]), (int (*)(const void *, const void *))compare);
+}}}
+
+
+=== 클래스 에서의 함수 포인터 사용 ===
+다음은 C 스타일의 함수포인터다. 
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+void apple(void)
+{
+  cout << "apple" << endl;
+};
+
+void berry(void)
+{
+  cout << "berry" << endl;
+}
+
+int main()
+{
+  void (*fptr)(void);
+  fptr = apple;
+  fptr();
+  fptr = berry;
+  fptr();
+}
+}}}
+
+위의 코드를 C++ 스타일로 바꾸어 보았다. 함수포인터를 이용해서 멤버변수에 접근함을 알 수 있다. 
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+class fruit
+{
+	public:
+		void apple()
+		{
+			cout << "apple" << endl;
+		}
+		void berry()
+		{
+			cout << "berry" << endl;
+		}
+};
+
+int main()
+{
+	fruit x, *y;
+	void (fruit::*f)(void);
+	
+	y = new fruit;
+	f = &fruit::apple;
+	(x.*f)();
+
+	f = &fruit::berry;
+	(y->*f)();
+
+	delete y;
+}
+
+}}}
+C++에서의 멤버포인터를 위한 연산자를 따로 제공하다. '.*'을 사용해서 멤버함수를 포인팅할 수 있다. 호출은 '->*'를 이용하면 된다. 
+
+이제 qsort() 함수에 정렬연산을 위해서 멤버함수 포인터를 넘겨보도록 하자.
+{{{#!plain
+#include <stdlib.h>
+#include <iostream>
+
+using namespace std;
+class fruit
+{
+public:
+    fruit() { f = &fruit::compare; }
+    int (fruit::*f)(const int*, const int*);
+    int compare(const int *one, const int *two)
+    {
+       return ( (*one == *two) ? 0 : *one > *two );
+    }
+} apple;
+
+int funcptr(const void* one , const void* two)
+{
+   return ( (apple.*apple.f)( (const int *)one, (const int *)two ) );
+};
+
+int a[3] = { 3, 2, 1 };
+int main()
+{
+    int i;
+    cout << "before ";
+    for( i=0; i < 3; i++ ) cout << a[i] << "  ";
+    cout << endl;
+    qsort(a, 3, sizeof(a[0]), funcptr );
+    cout << "after ";
+    for( i=0; i < 3; i++ ) cout << a[i] << "  ";
+    cout << endl;
+    return 0;
+}
+}}}
+
+=== friend와 static 에서의 함수포인터 사용 ===
+이제 friend와 static 멤버함수에 접근하는 방법을 알아보자. 다음은 friend 함수에 접근하는 방법이다.
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+class fruit
+{
+	public:
+		void apple()
+		{
+			cout << "apple" << endl;
+		}
+		void berry()
+		{
+			cout << "berry" << endl;
+		}
+		friend void cherry(void (fruit::*func)(), fruit x)
+		{
+			(x.*func)();
+		}
+};
+
+int main()
+{
+	fruit x;
+	void (fruit::*f)(void);
+	f = &fruit::apple;
+	(x.*f)();
+
+	f = &fruit::berry;
+	cherry(f,x);
+}
+}}}
+
+다음은 static 멤버함수에 접근하는 방법이다.
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+class fruit
+{
+	public :
+		void apple()
+		{
+			cout << "apple" << endl;
+		}
+		void berry()
+		{
+			cout << "berry" << endl;
+		}
+		static void cherry(void(fruit::*func)(), fruit x)
+		{
+			(x.*func)();
+		}
+};
+
+int main()
+{
+	fruit x;
+	void (fruit::*f)(void);
+	f= &fruit::apple;
+	(x.*f)();
+
+	f = &fruit::berry;
+	x.cherry(f,x);
+	return 0;
+}
+}}}
+
+클래스에 임베디드(:12)된 함수포인터를 호출하는 방법에 대해서 알아보겠습니다. 약간더 복잡합니다.
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+class fruit
+{
+  public:
+    void (fruit::*ff)(void);
+    void apple()
+    {
+      cout << "apple" << endl;
+    }
+    void berry()
+    {
+      cout << "berry" << endl;
+    }
+};
+
+int main()
+{
+  fruit x;
+  void (fruit::*f)(void);
+  f = &fruit::apple;
+  x.ff = &fruit::berry;
+  (x.*f)();
+  (x.*x.ff)();
+  return 0;
+}
+}}}
+
+=== 템플릿에서의 함수 포인터 사용 ===
+마지막으로 템플릿에서 함수포인터를 사용하는 방법입니다.
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+template<class T>
+class alpha
+{
+	T data;	
+	public :
+		alpha(T x) {data = x;}
+		T show() {cout << data << endl;}
+};
+
+int main()
+{
+	int (alpha<int>::*ifunc)();
+	float (alpha<float>::*ffunc)();
+	alpha<int> a(123);
+	alpha<float> b(456.78);
+
+	ifunc = a<int>::show;
+	ffunc = a<float>::show;
+
+	(a.*ifunc)();
+	(b.*ffunc)();
+
+}
+}}}

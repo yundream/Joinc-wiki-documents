@@ -1,0 +1,644 @@
+[[TableOfContents]]
+
+= 시작하기 =
+
+== 개요 ==
+ * 이 문서는 PAM이 파일로 사용자 인증을 하도록 구성되었을 때 /etc/passwd, /etc/group 파일을 LDAP 데이터베이스로 변환하여 사용자 인증 시스템을 LDAP로 전환하는 작업에 대한 문서이다.
+ * 이 문서에서는 PAM이 파일을 통해 사용자 인증을 실패하면 LDAP서버를 통해 사용자 인증을 처리하게끔 한다.
+ * 이 문서대로 진행할 경우 사용자 인증, 계정 정보 확인(# id userid), 비밀번호 변경 등의 작업이 LDAP를 통해 이루어지게 된다. LDAP는 원격접속, 관리가 가능하므로 많은 수의 머신이 있을 경우 통합된 계정관리가 가능해진다.
+ * 이 문서에서는 사용자 계정과 관련된 것(passwd, shadow, group)만 다루고 있지만. host 등의 설정도 가능하다.
+
+== PAM 이란 ==
+ * PAM (Pluggable Authentication Modules for Linux)
+ * 자세한건 man pam -_-;
+
+== LDAP 이란 ==
+ * LDAP (Lightweight Directory Access Protocol API)
+ * 자세한건 man ladp -_-;;
+
+== 파일로 PAM 인증 ==
+ * 일반적인 리눅스 시스템은 PAM 인증을 위해 /etc/passwd, /etc/shadow 파일을 가지고 있다.
+ * pam_unix(파일을 이용)로 사용자 인증을 하는 구조는 다음과 같다.
+''''
+     1. 파일(예: /etc/passwd )에서 사용자를 찾는다.
+     1. 사용자를 찾지 못하면 인증 실패
+     1. 파일(예: /etc/shadow )로 비밀번호를 확인한다.
+
+== LDAP로 PAM 인증 ==
+ * pam_unix와 pam_ldap(LDAP를 이용)를 통해 사용자 인증을 하는 구조는 다음과 같다.
+''''
+ 1. 파일(예: /etc/passwd )에서 사용자를 찾는다.
+ 1. 사용자를 찾으면 기존의 방법과 동일한 사용자 인증을 진행한다.
+ 1. 사용자를 파일에서 찾지 못하면 nss_ldap 설정 파일(예: /etc/ldap.conf)의 설정에 따라 LDAP 서버에서 사용자를 검색한다.
+ 1. 사용자를 찾지 못하면 인증 실패, 사용자를 찾으면 검색한 사용자의 DN(distinguished name, 모든DN은 대소문자 구별을 하지 않는다.)으로 인증한다.
+ 1. 사용자의 DN에 인증을 시도해서 성공하면 최종적으로 인증이 성공한다.
+
+= OpenLDAP 서버 설치 =
+
+== 설치 환경 ==
+ * 이 문서에서는 RedHat Linux 7.3을 대상으로 한다.
+ * RedHat리눅스 7.3에는 OpenLDAP관련 패키지가 포함되어 있으며 OpenLDAP 서버에 필요한 패키지의 목록은 아래와 같다.
+{{{
+openldap-servers-x.x.x.rpm
+openldap-x.x.x.rpm
+}}}
+ * 위의 패키지가 설치되어 있지 않다면 [http://rpmfind.net/] 등을 통해 다운로드 한 뒤 설치한다.
+{{{
+# rpm -ivh openldap-x.x.x.rpm
+# rpm -ivh openldap-servers-x.x.x.rpm
+}}}
+
+== OpenLDAP 서버 설정 ==
+ * OpenLDAP 서버의 설정파일은 /etc/openldap/slapd.conf 이다.
+ * 아래는 /etc/openldap/slapd.conf 파일을 환경에 맞게 수정한 내용이다.
+''''
+ * slapd.conf
+{{{#!vim c
+# 스키마 파일
+include		/etc/openldap/schema/core.schema	# 필수 스키마
+include		/etc/openldap/schema/cosine.schema
+include		/etc/openldap/schema/inetorgperson.schema
+include		/etc/openldap/schema/nis.schema	# LDAP+PAM을 위해 필요한 스키마
+include		/etc/openldap/schema/redhat/rfc822-MailMember.schema
+include		/etc/openldap/schema/redhat/autofs.schema
+include		/etc/openldap/schema/redhat/kerberosobject.schema
+
+# 권한 설정: 먼저 쓰여진 권한이 우선시 된다. self 에게는 쓰기권한, 모두에게 읽기권한을 부여한다.
+access to *
+        by self write
+        by * read
+        by anonymous auth
+
+# database: LDAP 데이터를 저장할 데이터베이스 백엔드 종류 설정. 기본 패키지에서는
+# ldbm, shell, passwd 3가지를 지원한다. SQL등의 다른 백엔드도 지원한다.
+database	ldbm
+
+# suffix: 최상위 DN을 설정한다. 복수로 설정할 수 있다.
+# 이 서버의 설정에서는 dc (Domain Component)로 companyname와 com(company를 의미)으로 설정했다.
+suffix		"dc=companyname,dc=com"
+
+# rootdn: 관리자의 DN을 설정한다.
+# LDAP의 DN은 인터넷 도메인처럼 오른쪽으로 갈수록 범주가 커진다.
+# 아래는 com(회사) -> 회사 -> 의 관리자를 의미한다.
+rootdn		"cn=Manager,dc=companyname,dc=com"
+
+# rootpw: 관리자의 비밀번호를 설정한다.
+# 아래와 같이 텍스트(예: secret)나 LDAP가 지원하는 몇가지의
+# 암호화 된 문자열(예: {CRYPT}BkN6DK7kgAC92 또는 {MD5}Xr4ilOzQ4PCOq3aQ0qbuaQ==)을 입력한다.
+rootpw		secret
+
+# index: 인덱스를 적용할 오브젝트의 속성을 첫번째 인자로 나열한다.
+# pres, eq, approx, sub, none 등의 두번째 인자는 인덱스의 종류이다.
+index	objectClass,uid,uidNumber,gidNumber,memberUid		eq
+index	cn,mail,surname,givenname				eq,subinitial
+}}}
+
+== OpenLDAP 서버 실행 ==
+ * 서버를 실행시키기 위해서는 쉘에서 아래와 같이 입력한다. 다음은 OpenLDAP서버를 성공적으로 실행시킨 화면이다.
+{{{
+# /etc/init.d/ldap start
+Starting slapd:                                    [  OK  ]
+}}}
+
+== OpenLDAP 데이터 베이스 초기화 ==
+ * 이 부분은 LDAP 클라이언트에 대한 지식이 필요하므로 아래의 OpenLDAP 클라이언트 섹션에서 다루겠습니다.
+
+= OpenLDAP 클라이언트 =
+
+== OpenLDAP 클라이언트 툴 ==
+ * OpenLDAP 서버에 접근하는데 필요한 클라이언트 패키지는 아래와 같다.
+{{{
+openldap-x.x.x.rpm
+openldap-clients-x.x.x.rpm
+}}}
+ * 위의 패키지를 설치하면 아래와 같은 클라이언트 툴들이 설치된다.
+''''
+ 1. ldapadd:
+  LDAP 데이터베이스에 엔트리를 추가한다.
+''''
+ 1. ldapdelete:
+  LDAP 데이터베이스의 엔트리를 삭제한다.
+''''
+ 1. ldapmodify:
+  LDAP 데이터베이스의 엔트리를 수정한다.
+''''
+ 1. ldappasswd:
+  LDAP 데이터베이스의 엔트리의 비밀번호를 변경한다.
+''''
+ 1. ldapsearch:
+  LDAP 데이터베이스를 검색한다.
+''''
+ 1. ud:
+  대화형 LDAP 질의 프로그램
+
+== OpenLDAP 클라이언트 설정 ==
+ * 아래는 LDAP 클라이언트의 설정 파일인 /etc/openldap/ldap.conf 파일을 환경에 맞게 수정한 내용이다.
+''''
+ * ldap.conf
+{{{
+# host: LDAP 서버의 호스트이름이나 IP주소를 적어준다.
+# 이 문서에서는 LDAP 서버의 주소를 ldap.companyname.co.kr 로 하였다.
+host ldap.companyname.co.kr
+
+# base: 기본 데이터베이스를 설정하는 부분이다.
+# LDAP 서버에서 설정한 suffix(dc=companyname,dc=com)를 입력한다.
+base dc=companyname,dc=com
+# bindpw: LDAP 서버에서 설정한 rootdn의 비밀번호(secret)를 입력한다.
+bindpw secret
+
+# rootbinddn: LDAP 서버에서 설정한 rootdn(cn=Manager,dc=companyname,dc=com)을 입력한다.
+rootbinddn cn=Manager,dc=companyname,dc=com
+
+# port: LDAP서버의 포트를 입력한다. 기본은 389 이다.
+port 389
+}}}
+
+== LDAP 서버에 데이터베이스 생성하기 ==
+ * LDAP 서버의 데이터베이스를 import/export 하기 위한 데이터 포맷인 ldif (LDAP Data Interchange Format)으로 아래와 같은 파일(ldap_init.ldif)을 만든 후 LDAP 클라이언트인 ldapadd로 데이터베이스에 import 시킨다.
+ * 아래는 LDAP 서버의 설정중 suffix(dc=companyname,dc=com)를 초기화하고 “직원” 이라는 organization 오브젝트 클래스를 사용하는 엔트리(dn: o=직원,dc=companyname,dc=com)와 “부서” 라는 organization 오브젝트 클래스를 사용하는 엔트리(dn: o=부서,dc=companyname,dc=com)에 대한 나타낸 ldif파일이다.
+ * ldif파일에 영어가 아닌 문자(예: 한글)이 들어 있으면 캐릭터 셋을 UTF-8로 한다.
+
+ * ldap_init.ldif (인코딩: utf-8)
+{{{
+# LDAP 서버의 설정 파일인 slapd.conf 에 설정한 suffix를 아래와 같이 선언해준다.
+# “dc=companyname,dc=com”의 오브젝트 클래스를 “top” 으로 설정한다.
+dn: dc=companyname,dc=com
+objectClass: top
+
+# organization 오브젝트를 추가하고 DN을 “o=직원,dc=companyname,dc=com“ 로 설정한다.
+dn: o=직원,dc=companyname,dc=com
+objectClass: organization
+o: 직원
+
+# organization 오브젝트를 추가하고 DN을 “o=부서,dc=companyname,dc=com“ 로 설정한다.
+dn: o=부서,dc=companyname,dc=com
+objectClass: organization
+o: 부서
+}}}
+
+ * 위 파일을 ldapadd로 LDAP서버의 데이터베이스에 입력한다.
+''''
+ * ldapadd의 사용법
+{{{
+ldapadd [옵션들]
+ -h LDAP 서버의 호스트이름 또는 IP주소
+	 -f 임포트할 LDIF 파일 경로
+	 -D slapd.conf 파일에서 설정한 rootdn
+	 -x 간단한 인증을 거친다
+	 -w 비밀번호를 입력한다
+이 외에도 여러가지 옵션이 있다.
+
+# ldapadd &#8211;h ldap.companyname.co.kr -f ldap_init.ldif -D "cn=Manager,dc=companyname,dc=com" &#8211;x &#8211;wsecret
+
+ldap.companyname.co.kr 에 위치한 LDAP 서버에 rootdn(cn=Manager,dc=companyname,dc=com) 권한으로 ldap_init.ldif 파일을 import 한다.
+}}}
+
+= PAM + LDAP 설정 =
+== 필요한 패키지 ==
+ * PAM이 LDAP 데이터베이스를 통한 인증을 위해서는 아래와 같은 패키지가 필요하다.
+{{{
+nss_ldap-x-x.rpm
+}}}
+
+== nsswitch.conf 파일 설정 ==
+ * /etc/nsswitch.conf 파일은 사용자 정보, 그룹 정보, 비밀번호 정보 등에 대한 요청을 처리하는 방법을 결정하는 설정 파일이다.
+ * 아래의 내용대로 수정한다. (아래와 같이 files ldap 로 설정해도 실제로는 파일에서 사용자를 발견해도 LDAP 서버에서 사용자를 찾는 과정을 거친다. 이유는 모름 -_-;)
+''''
+ * nsswitch.conf
+{{{
+…
+# 사용자 계정에 대한 정보를 처리하는 방법
+# files ldap 라고 설정하면 /etc/passwd 파일을 먼저 검사한 뒤 원하는 결과를 얻지 못하면
+# ldap를 통해 처리한다.
+passwd:	 files ldap
+
+# 사용자의 비밀번호를 처리하는 방법
+# /etc/shadow 파일을 먼저 검사한 뒤 원하는 결과를 얻지 못하면 ldap를 통해 처리한다.
+shadow: files ldap
+
+# 그룹에 대한 정보를 처리하는 방법
+# /etc/group 파일을 먼저 검사한 뒤 원하는 결과를 얻지 못하면 ldap를 통해 처리한다.
+group: files ldap
+…
+}}}
+
+== system-auth 파일 설정 ==
+ * /etc/pam.d/system-auth 파일의 가장 위에 아래의 내용을 추가해준다.
+''''
+ * system-auth
+{{{
+…
+auth		sufficient	/lib/security/pam_ldap.so use_first_pass
+account		sufficient	/lib/security/pam_ldap.so
+#아래의 passwd 파일을 고치지 않으려면 password 부분의 use_authtok 를 뺀다.
+password	sufficient	/lib/security/pam_ldap.so use_authtok
+session		sufficient	/lib/security/pam_ldap.so
+…
+}}}
+
+== passwd 파일 설정 ==
+ * /etc/pam.d/passwd 파일의 윗쫏에 아래의 내용을 추가해야 /usr/bin/passwd 명령으로 비밀번호 변경을 할 수 있다.
+ * 단 system-auth을 설정할 때 password 부분에서 use_authtok 를 뺐다면 이 파일을 설정하지 않아도 된다.
+''''
+ * passwd
+{{{
+…
+auth		sufficient	/lib/security/pam_ldap.so
+account		sufficient	/lib/security/pam_ldap.so
+password	sufficient	/lib/security/pam_ldap.so
+…
+}}}
+
+== ldap.conf 파일 설정 ==
+ * nss_ldap를 사용할 때 참조할 설정파일(/etc/ldap.conf)을 설정한다.
+ * 위쪽의 몇몇 설정은 위에서 설명한 LDAP 클라이언트 설정 파일(파일 2 ldap.conf)과 비슷하다.
+''''
+ * ldap.conf
+{{{
+host ldap.companyname.co.kr
+base dc=companyname,dc=com
+bindpw secret
+rootbinddn cn=Manager,dc=companyname,dc=com
+port 389
+
+# 아래의 설정들은 기본적으로 #로 주석처리 되어 있다. 인증에 필요한 부분이니 주석을 풀어준다.
+
+# pam_filter: PAM이 /etc/passwd 파일을 통해 사용자를 찾는 대신 LDAP서버에서
+# 사용자를 찾을 때 사용한다. objectClass 가 posixAccount 인 엔트리를 검색한다.
+pam_filter objectclass=posixAccount
+# pam_login_attribute: 사용자가 입력한 ID가 검색된 엔트리의 어떤 속성에서 확인할 것인지 설정한다.
+pam_login_attribute uid
+
+# pam_check_host_attr: ?
+pam_check_host_attr yes
+
+# pam_password: 기본적으로 사용할 암호화 알고리즘을 선택한다. 이 옵션을 설정하지 않으면
+# 비밀 번호 변경시 플레인 텍스트로 저장된다. ssh는 crypt(DES)로 암호화 해야만 로그인 할 수 있다.
+# 꼭 crypt 를 선택하도록 한다.
+pam_password crypt
+
+# pam_groupdn: /etc/group 파일 대신에 LDAP에서 그룹 정보를 찾아낼 때 쓰인다.
+# LDAP 서버의 인덱스 설정에 gidNumber 에 대한 부분이 없다면 Full DN을 적어줘야 한다.
+# 이 문서에는 LDAP 서버의 설정에 gidNumber에 대해 인덱스를 했으므로 아래와 같이 설정한다.
+pam_groupdn dc=companyname,dc=com
+
+# pam_min_uid, pam_max_uid: posixGroup스키마의 속성들로 검색된 엔트리에 설정이 되어 있지 않을 때
+# 기본적으로 사용할 값을 적는다. 0, 99999가 기본 값이다.
+pam_min_uid 0
+pam_max_uid 99999
+}}}
+ * 위와 같이 설정하고 사용자가 ID를 입력하면 LDAP서버는 objectClass가 posixAccount 이면서(posixAccount 스키마를 사용하면서) 속성중에 uid가 사용자가 입력한 ID와 일치하는 엔트리를 찾는다. 그 후에 사용자가 입력한 비밀번호로 찾아낸 엔트리에 Bind 한다. Bind가 성공하면 사용자 인증이 성공하고 실패하면 사용자 인증이 실패한다.
+
+== LDAP 서버 테스트 ==
+ * LDAP 서버의 데이터를 검색하는 클라이언트인 ldapsearch로 LDAP 서버가 정상적으로 동작하는지 확인한다.
+{{{
+# ldapsearch "(&(objectClass=*))" &#8211;x
+# 위와 같은 명령을 내리면 아래와 같이 출력된다.
+version: 2
+
+#
+# filter: (&(objectClass=*))
+# requesting: ALL
+#
+
+# companyname, com
+dn: dc=companyname,dc=com
+objectClass: top
+
+# 직원, companyname, com
+dn:: bz3sp4Hsm5AsZGM9bmVvcGxlLGRjPWNvbQ==
+o:: 7KeB7JuQ
+objectClass: organization
+
+# 부서, companyname, com
+dn:: bz3rtoDshJwsZGM9bmVvcGxlLGRjPWNvbQ==
+o:: 67aA7ISc
+objectClass: organization
+}}}
+ * 위와 같이 나오거나 비슷하게 나오면 정상적으로 데이터가 입력되고 검색된 것이다.
+
+= 사용자 계정 마이그레이션 =
+ * 이 부분은 기존에 사용자들이 입력이 되어 있으면 하지 않아도 된다.
+== 사용자, 그룹, 비밀번호 데이터 마이그레이션 ==
+ * /etc/passwd(사용자 정보), /etc/group(그룹 정보) 파일에 들어 있는 데이터를 마이그레이션 툴을 이용해 ldif 포맷으로 변환한다. 변환된 파일은 LDAP 데이터베이스에 입력하여 위의 두 파일의 역할을 LDAP 서버가 대신하게 한다.
+ * /usr/share/openldap/migration 안에 위치한 마이그레이션 툴들(openldap-servers 패키지에 포함되어 있음)을 이용해 /etc/passwd 파일과 /etc/group 파일을 변환한다.
+ * 마이그레이션 툴을 현재 상황에 맞는 데이터로 변환하도록 수정한다. (수정전에 복사본을 남긴다.)
+ * migrate_common.ph (설정파일), migrate_group.pl (/etc/group -> ldif 변환), migrate_passwd.pl(/etc/passwd -> ldif 변환) 세개의 파일을 아래와 같은 ldif 포맷으로 변환되도록 수정한다.
+''''
+ * 아래는 본인이 사용한 설정에 맞게 passwd 를 변경하기 위해 사용한 패치 파일의 내용이다.
+  사용자의 정보가 마이그레이션 될 때 “cn={사용자이름},$NAMINGCONTEXT,$DEFAULT_BASE” 와 같이 변환된다. 입력할 값은 파일 3 ldap_init.ldif 를 참조한다.
+  아래의 내용을 가지는 파일(migrate_common.diff)을 만든후 아래의 명령어로 패치한다. 내용중 탭과 공백을 잘 구분한다
+''''
+ * migrate_common.diff (인코딩: utf-8)
+{{{#!vim perl
+# patch -l migrate_common.ph migrate_common.diff
+
+--- migrate_common.ph.old       Fri Feb 14 17:06:49 2003
++++ migrate_common.ph   Tue Feb 18 18:39:20 2003
+@@ -37,46 +37,46 @@
+
+ # Naming contexts. Key is $PROGRAM with migrate_ and .pl
+ # stripped off.
+ $NETINFOBRIDGE = (-x "/usr/sbin/mkslapdconf");
+
+ if ($NETINFOBRIDGE) {
+        $NAMINGCONTEXT{'aliases'}           = "cn=aliases";
+        $NAMINGCONTEXT{'fstab'}             = "cn=mounts";
+-       $NAMINGCONTEXT{'passwd'}            = "cn=users";
++       $NAMINGCONTEXT{'passwd'}            = "o=직원";
+        $NAMINGCONTEXT{'netgroup_byuser'}   = "cn=netgroup.byuser";
+        $NAMINGCONTEXT{'netgroup_byhost'}   = "cn=netgroup.byhost";
+-       $NAMINGCONTEXT{'group'}             = "cn=groups";
++       $NAMINGCONTEXT{'group'}             = "o=부서";
+        $NAMINGCONTEXT{'netgroup'}          = "cn=netgroup";
+        $NAMINGCONTEXT{'hosts'}             = "cn=machines";
+        $NAMINGCONTEXT{'networks'}          = "cn=networks";
+        $NAMINGCONTEXT{'protocols'}         = "cn=protocols";
+        $NAMINGCONTEXT{'rpc'}               = "cn=rpcs";
+        $NAMINGCONTEXT{'services'}          = "cn=services";
+ } else {
+        $NAMINGCONTEXT{'aliases'}           = "ou=Aliases";
+        $NAMINGCONTEXT{'fstab'}             = "ou=Mounts";
+-       $NAMINGCONTEXT{'passwd'}            = "ou=People";
++       $NAMINGCONTEXT{'passwd'}            = "o=직원";
+        $NAMINGCONTEXT{'netgroup_byuser'}   = "nisMapName=netgroup.byuser";
+        $NAMINGCONTEXT{'netgroup_byhost'}   = "nisMapName=netgroup.byhost";
+-       $NAMINGCONTEXT{'group'}             = "ou=Group";
++       $NAMINGCONTEXT{'group'}             = "o=부서";
+        $NAMINGCONTEXT{'netgroup'}          = "ou=Netgroup";
+        $NAMINGCONTEXT{'hosts'}             = "ou=Hosts";
+        $NAMINGCONTEXT{'networks'}          = "ou=Networks";
+        $NAMINGCONTEXT{'protocols'}         = "ou=Protocols";
+        $NAMINGCONTEXT{'rpc'}               = "ou=Rpc";
+        $NAMINGCONTEXT{'services'}          = "ou=Services";
+ }
+
+ # Default DNS domain
+ $DEFAULT_MAIL_DOMAIN = "padl.com";
+
+ # Default base
+-$DEFAULT_BASE = "dc=padl,dc=com";
++$DEFAULT_BASE = "dc=companyname,dc=com";
+
+ # Turn this on for inetLocalMailReceipient
+ # sendmail support; add the following to
+ # sendmail.mc (thanks to Petr@Kristof.CZ):
+ ##### CUT HERE #####
+ #define(`confLDAP_DEFAULT_SPEC',`-h "ldap.padl.com"')dnl
+ #LDAPROUTE_DOMAIN_FILE(`/etc/mail/ldapdomains')dnl
+ #FEATURE(ldap_routing)dnl
+}}}
+
+ * migrate_group.diff
+{{{#!vim perl
+# patch -l migrate_group.pl migrate_group.diff
+--- migrate_group.pl.old        Fri Feb 14 17:05:48 2003
++++ migrate_group.pl    Tue Feb 18 19:07:13 2003
+@@ -60,22 +60,23 @@
+ }
+
+ sub dump_group
+ {
+        local($HANDLE, $group, $pwd, $gid, $users) = @_;
+
+        local(@members) = split(/,/, $users);
+
+-       print $HANDLE "dn: cn=$group,$NAMINGCONTEXT\n";
++       print $HANDLE "dn: ou=$group,$NAMINGCONTEXT\n";
+        print $HANDLE "objectClass: posixGroup\n";
+-       print $HANDLE "objectClass: top\n";
++       print $HANDLE "objectClass: organizationalUnit\n";
+        print $HANDLE "cn: $group\n";
++       print $HANDLE "ou: $group\n";
+        if ($pwd) {
+-               print $HANDLE "userPassword: {crypt}$pwd\n";
++               #print $HANDLE "userPassword: {crypt}$pwd\n";
+        }
+
+        print $HANDLE "gidNumber: $gid\n";
+
+        @members = uniq($group, @members);
+        foreach $_ (@members) {
+                print $HANDLE "memberUid: $_\n";
+        }
+}}}
+
+ * migrate_passwd.diff
+{{{#!vim perl
+# patch -l migrate_passwd.pl migrate_passwd.diff
+--- migrate_passwd.pl.old       Fri Feb 14 17:05:57 2003
++++ migrate_passwd.pl   Wed Feb 19 11:58:42 2003
+@@ -93,19 +93,20 @@
+        if ($name) { $cn = $name; } else { $cn = $user; }
+
+        $_ = $cn;
+        @tmp = split(/\s+/);
+        $sn = $tmp[$#tmp];
+        pop(@tmp);
+        $givenname=join(' ',@tmp);
+
+-       print $HANDLE "dn: uid=$user,$NAMINGCONTEXT\n";
++       print $HANDLE "dn: cn=$user,$NAMINGCONTEXT\n";
+        print $HANDLE "uid: $user\n";
+-       print $HANDLE "cn: $cn\n";
++       print $HANDLE "cn: $user\n";
++       print $HANDLE "sn: $user\n";
+
+        if ($EXTENDED_SCHEMA) {
+                if ($wphone) {
+                        print $HANDLE "telephoneNumber: $wphone\n";
+                }
+                if ($office) {
+                        print $HANDLE "roomNumber: $office\n";
+                }
+@@ -123,21 +124,22 @@
+                        print $HANDLE "mailRoutingAddress: $user\@$DEFAULT_MAIL_HOST\n";
+                        print $HANDLE "mailHost: $DEFAULT_MAIL_HOST\n";
+                        print $HANDLE "objectClass: mailRecipient\n";
+                }
+                print $HANDLE "objectClass: person\n";
+                print $HANDLE "objectClass: organizationalPerson\n";
+                print $HANDLE "objectClass: inetOrgPerson\n";
+        } else {
+-               print $HANDLE "objectClass: account\n";
++               print $HANDLE "objectClass: person\n";
+        }
+
+        print $HANDLE "objectClass: posixAccount\n";
+-       print $HANDLE "objectClass: top\n";
++       print $HANDLE "objectClass: organizationalPerson\n";
++       print $HANDLE "objectClass: shadowAccount\n";
+
+        if ($DEFAULT_REALM) {
+                print $HANDLE "objectClass: kerberosSecurityObject\n";
+        }
+
+        if ($shadowUsers{$user} ne "") {
+                &dump_shadow_attributes($HANDLE, split(/:/, $shadowUsers{$user}));
+        } else {
+@@ -166,17 +168,16 @@
+
+       if ($homedir) {
+               print $HANDLE "homeDirectory: $homedir\n";
+       } else {
+               print $HANDLE "homeDirectory:\n";
+       }
+
+        if ($gecos) {
+-               print $HANDLE "gecos: $gecos\n";
+        }
+
+        print $HANDLE "\n";
+ }
+
+ close(INFILE);
+ if (OUTFILE != STDOUT) { close(OUTFILE); }
+
+@@ -195,26 +191,22 @@
+ {
+        local($HANDLE, $user, $pwd, $lastchg, $min, $max, $warn, $inactive, $expire, $flag) = @_;
+
+        print $HANDLE "objectClass: shadowAccount\n";
+        if ($pwd) {
+                print $HANDLE "userPassword: {crypt}$pwd\n";
+        }
+        if ($lastchg) {
+-               print $HANDLE "shadowLastChange: $lastchg\n";
+        }
+        if ($min) {
+-               print $HANDLE "shadowMin: $min\n";
+        }
+        if ($max) {
+-               print $HANDLE "shadowMax: $max\n";
+        }
+        if ($warn) {
+-               print $HANDLE "shadowWarning: $warn\n";
+        }
+        if ($inactive) {
+                print $HANDLE "shadowInactive: $inactive\n";
+        }
+        if ($expire) {
+                print $HANDLE "shadowExpire: $expire\n";
+        }
+        if ($flag) {
+}}}
+ * 죄송합니다.. 문서 원본에 위에서 잘려버렸네요 -.-; 왜 그런거지 --;
+''''
+ * passwd, group 파일복사
+{{{
+# cd /usr/share/openldap/migration/
+# cp /etc/passwd .
+# cp /etc/group .
+}}}
+
+ * 마이그레이션 툴 사용법은 아래와 같다.
+{{{
+# ./migrate_passwd.pl {복사해서 수정한 /etc/passwd 파일} {저장할 파일}
+# ./migrate_group.pl {복사해서 수정한 /etc/group 파일} {저장할 파일}
+}}}
+
+ * 위의 과정이 모두 잘 되었다면 아래와 비슷한 모양의 ldif 파일이 나올것이다.
+''''
+ * passwd.ldif
+{{{
+# 회사 -> 회사 -> 직원 -> minnesota 를 의미한다.
+dn: cn=minnesota,o=직원,dc=companyname,dc=com
+
+#cn: common name으로 이름이 들어가는 부분이다.
+cn: minnesota
+
+# gidNumber: posixAccount 스키마에 포함된 속성으로 사용자의 GID를 의미한다.
+# 아래에 나오는 group.ldif 파일에서의 posixGroup 의 gidNumber와 일치해야 한다.
+gidNumber: 500
+
+# homeDirectory: 사용자의 홈디렉토리에 대한 설정이다.
+homeDirectory: /home/minnesota
+
+# sn: surname 성, 별명, 다른 이름
+sn: minnesota
+
+# uid: 이 사용자의 ID
+uid: minnesota
+
+# uidNumber: 사용자의 UID
+uidNumber: 500
+
+# objectClass: 아래의 오브젝트 클래스를 사용한다. 이 엔트리에는 아래의 스키마에 있는 내용들이 입력된다.
+objectClass: person
+objectClass: posixAccount
+objectClass: organizationalPerson
+objectClass: shadowAccount
+
+# loginShell: 사용자의 로그인 쉘을 의미한다.
+loginShell: /bin/bash
+
+
+# userPassword: 사용자의 암호를 Crypt(DES) 방식으로 암호화 하여 입력한다.
+# 마이그레이션 툴은 passwd 파일 내의 암호를 그대로 이부분에 입력하는데 LDAP 서버로 import 시켜도
+# 사용할 수 없다. 추후 수작업이 필요한 부분이다.
+userPassword: {CRYPT}x
+}}}
+
+ * group.ldif
+{{{
+# 회사 -> 회사 -> 부서 -> 그룹 system 을 의미한다.
+dn: ou=system,o=부서,dc=companyname,dc=com
+
+# ou: organizationalUnit 이름을 입력한다.
+ou: system
+
+# cn: common name 그룹의 이름을 입력한다.
+cn: system
+
+# gidNumber: 그룹의 GID를 입력한다. 이 부분은 위의 passwd.ldif 에서 사용자의
+# gidNumber와 연동되는 부분이다.
+gidNumber: 5001
+objectClass: posixGroup
+objectClass: organizationalUnit
+}}}
+
+ * 위와 같은 ldif 포맷이 나오도록 마이그레이션 툴을 수정한다.
+ * 위와 같은 결과물이 나오면 LDAP 클라이언트 툴중 하나인 ldapadd(사용법 참조: 명령 1 ldapadd)로 LDAP 데이터베이스에 입력한다.
+{{{
+# ldapadd &#8211;h ldap.companyname.co.kr -f passwd.ldif -D "cn=Manager,dc=companyname,dc=com" &#8211;x &#8211;wsecret
+# ldapadd &#8211;h ldap.companyname.co.kr -f group.ldif -D "cn=Manager,dc=companyname,dc=com" &#8211;x &#8211;wsecret
+}}}
+
+= LDAP + PAM 테스트 =
+ * LDAP + PAM이 잘 연동되는지 테스트 하기 위해서는 /etc/passwd 파일에는 없고 LDAP 서버의 데이터베이스에는 등록된 사용자 계정에 대한 정보가 있어야 한다.
+ * 아래는 정상적으로 LDAP 서버와 PAM이 연동되었을 때의 예이다. 아래의 명령들은 LDAP서버로 인증하도록 PAM이 설정된 컴퓨터에서 실행했다.
+''''
+ * 아래는 LDAP 서버에 등록된 minnesota 라는 사용자를 id 명령으로 본 예이다.
+
+{{{
+# id minnesota
+uid=12001(minnesota) gid=5001(system) groups=5001(system)
+}}}
+
+ * 아래는 ssh로 로그인 했을때의 예이다.
+{{{
+# ssh minnesota@ldap.companyname.co.kr
+minnesota@localhost's password:	# 비밀번호 입력
+You must be a uniquemember of dc=companyname,dc=com to login.
+Last login: Sat Feb 15 12:44:06 2003 from db1
+sh-2.05a$
+}}}
+
+ * 아래는 비밀번호를 변경하는 예이다.
+{{{
+# passwd minnesota
+Changing password for user minnesota.
+Enter login(LDAP) password:		# 기존의 비밀번호 입력
+New password:				# 새 비밀번호 입력
+Re-enter new password:			# 새 비밀번호 확인
+LDAP password information changed for minnesota
+passwd: all authentication tokens updated successfully.
+}}}
+
+= 참고 문서 =
+ 1. [http://kldp.org/HOWTO/html/LDAP/LDAP-HOWTO.html LDAP Linux HOWTO]
+ 1. [http://www.redbooks.ibm.com/pubs/pdfs/redbooks/sg244986.pdf Understanding LDAP]
+ 1. [http://www.redbooks.ibm.com/pubs/pdfs/redbooks/sg245110.pdf LDAP Implementation Cookbook]
+
+= 참고 자료 =
+ 1. [http://www.ldapadministrator.com/ LDAP Administrator]

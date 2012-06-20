@@ -1,0 +1,108 @@
+#title do_brk 커널 취약점 패치
+
+
+/*
+        joinc서버에 취약점/문제 가 있을시
+        mail&msn: hkpco@korea.com
+        으로 알려주세요 ^^
+*/
+
+대표적인 커널 취약점인 do_brk()의 결점을 보안하기 위해서 방어모듈을 이용하여 패치를 하였습니다.
+( 커널 업그레이드도 있지만 상당한 노가다(?)작업이기 때문에,, )
+
+우선 해당 취약점의 exploit성공여부를 패치를 적용시킨 전후와 비교해 보겠습니다.
+
+{{{#!plain
+[hkpco@ns tmp]$ ls -l do_brk_exploit
+-rwxr-xr-x    1 hkpco    hkpco      428451 Aug 25 01:05 do_brk_exploit
+// 미리 컴파일 해 둔 exploit
+
+[hkpco@ns tmp]$ ./do_brk_exploit
+sh-2.05b# whoami
+uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel)
+// 성공
+}}}
+
+이제 패치를 해 보겠습니다.
+다음 링크에 있는 방어모듈 소스를 이용하여 커널에 적재합니다.
+{{{#!plain
+http://joinc.co.kr/kernel_vuln_path/brk_fix.c
+http://joinc.co.kr/kernel_vuln_path/include.tar.gz >>> 방어코드 object파일 생성에 필요한 헤더파일
+}}}
+커널에 적재하기 위해선 몇가지 작업을 해 주면 됩니다.
+{{{#!plain
+[root@ns kernel_vuln_path]# tar zxvf include.tar.gz
+include/acpi/
+include/acpi/actypes.h
+include/acpi/actbl2.h
+include/acpi/actbl1.h
+include/acpi/actbl.h
+include/acpi/acstruct.h
+include/acpi/acpi_bus.h
+include/acpi/acexcep.h
+include/acpi/acdisasm.h
+include/acpi/acconfig.h
+include/acpi/platform/
+include/acpi/platform/aclinux.h
+include/acpi/platform/acgcc.h
+include/acpi/platform/acenv.h
+include/acpi/amlresrc.h
+.
+.
+.
+include/video/fbcon-iplan2p8.h
+include/video/fbcon-mac.h
+include/video/fbcon-mfb.h
+include/video/fbcon-vga.h
+include/video/font.h
+include/video/macmodes.h
+include/video/s3blit.h
+include/video/sbusfb.h
+include/video/fbcon-vga-planes.h
+include/video/newport.h
+include/video/fbcon-hga.h
+
+[root@ns kernel_vuln_path]# gcc -c brk_fix.c -I./include
+// 컴파일에 필요한 헤더파일의 위치를 "-I"옵션을 이용하여 지정해줍니다.
+
+[root@ns kernel_vuln_path]# ls -l brk_fix.o
+-rw-r--r--    1 root     root         1668 Aug 25 00:32 brk_fix.o
+
+[root@ns kernel_vuln_path]# /sbin/insmod brk_fix.o --force
+Warning: kernel-module version mismatch
+        brk_fix.o was compiled for kernel version 2.4.23
+        while this kernel is version 2.4.20-8
+Warning: loading brk_fix.o will taint the kernel: forced load
+  See http://www.tux.org/lkml/#export-tainted for information about tainted modules
+Module brk_fix loaded, with warnings
+
+[root@ns kernel_vuln_path]# /sbin/lsmod
+Module                  Size  Used by    Tainted: GF
+brk_fix                 1204   1               <<<<<<<<<<<<<<<<커널 방어모듈이 성공적으로 적재되었습니다.
+ipt_REJECT              3928   1  (autoclean)
+autofs                 13268   0  (autoclean) (unused)
+tun                     5696   0  (unused)
+iptable_filter          2412   1  (autoclean)
+ip_tables              15096   2  [ipt_REJECT iptable_filter]
+8139too                18088   1
+mii                     3976   0  [8139too]
+keybdev                 2944   0  (unused)
+mousedev                5492   0  (unused)
+hid                    22148   0  (unused)
+input                   5856   0  [keybdev mousedev hid]
+usb-uhci               26348   0  (unused)
+usbcore                78784   1  [hid usb-uhci]
+ext3                   70784   2
+jbd                    51892   2  [ext3]
+}}}
+
+방어모듈이 잘 작동하는지 확인하기 위해 다시 한 번 exploit테스트를 해 보겠습니다.
+{{{#!plain
+[hkpco@ns tmp]$ ./do_brk_exploit
+[-] Unable to change page protection: Cannot allocate memory
+[-] Unable to exit, entering neverending loop.
+
+[3]+  Stopped                 ./do_brk_exploit
+}}}
+
+성공적으로 잘 동작합니다. :-)

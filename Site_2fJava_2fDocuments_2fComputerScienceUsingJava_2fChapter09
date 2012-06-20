@@ -1,0 +1,319 @@
+#title 입출력 - input/output
+
+원문 : http://chortle.ccsu.edu/java5/Notes/chap10/ch10_1.html
+
+이번장에서는 자바5.0에서의 입력과 출력에 대해서 다룰 것이다. 모든 프로그램은 데이터를 입력받아서 그것을 처리하고, 처리한 결과를 출력한다. 이번장에서는 키보드를 이용해서 데이터를 입력받는 방법과 결과를 모니터에 출력하는 방법에 대해서 알아보도록 하겠다. 디스크, CD와 같은 매체로의 입출력은 나중에 다루도록 하겠다.
+
+'''다룰 내용들'''
+  * 입출력 Stream
+  * 표준입력/출력 Streams
+  * 예외 - Exceptions
+  * '''int'''형 데이터를 String 로 변경하기
+
+=== 입출력 I/O ===
+I/O 는 입출력(input output)의 약자다. 입출력은 소프트웨어뿐만 아니라 전자기적 수준까지 다루어는 매우 복잡한 영역이다. 컴퓨터가 외부에서 데이터를 읽어들이는 방법과 외부로 데이터를 출력하는 것은 다양하며 서로 전혀 다르기 때문에 이둘에 대해서 이해를 하고 있어야 한다. 입력을 통해서 읽어들인 데이터는 출력이 가능하게끔 변환하는 복잡한 과정을 거치게 된다. 그러나 다행히도, 이러한 복잡한 내부과정은 당신의 프로그램에서 사용하는 메서드들이 전부 알아서 처리하므로 크게 신경쓰지 않아도 된다.  
+
+이 문서는 입력을 위해서 '''java.util.Scanner'''클래스를 이용할 것이다. '''Scanner'''는 Java의 기본요소가 아니며, java 5.0에 새로이 추가된 '''패키지'''다. '''package'''는 다른 프로그램에서 사용할 수 있게 마들어놓은 클래스의 모임이다. C(:12)와 같은 언어에서의 라이브러리(:12)와 비슷하다고 보면 될 것이다. 클래스가 툴 이라면, 패키지는 툴박스 정도라고 이해하자. 
+
+입출력은 매우 기본적인 작업이므로 Java가 자체적으로 I/O 관련 클래스를 내장하면 편할 것이라고 생각할 수 있지만, I/O의 종류가 매우 다양하고, 이들을 자체적으로 포함하면 쓸데없이 프로그램이 커질 수 있으므로, 패키지 형태로 용도에 맞게 선택할 수 있도록 해 놓았다.
+
+'''문제'''
+  당신의 자동차는 컴퓨터를 가지고 있다. 이 컴퓨터는 모터와 센서, 계기판을 제어한다. 이 컴퓨터의 입장에서 입력과 출력기기는 무엇인가. 
+
+=== I/O Streams ===
+만약 당신의 자동차의 프로그램이 java로 만들어져 있다면, 센서와 모터를 제어하기 위한 특별히 만들어진 I/O 패키지들을 포함하고 있을 것이다. 이 패키지는 여러분이 사용하는 키보드와 터미널을 제어하기위한 일반적인 I/O 패키지와는 전혀다를 것이다. 
+
+자바에서 입력된 데이터의 원본은 '''input stream'''이라고 하고, 출력 데이터를 '''output stream''' 이라고 한다. 스트림은 다음과 같이 이해할 수 있다. 
+
+attachment:IOStreams.gif
+
+위의 그림에서 각각의 "O"는 datum(데이터의 초각)을 의미한다. 이들 datum은 일종의 컨테이너 벨트를 통해서 흐르는 것처럼 Java Program으로 흘러들어가게 된다. 스트림(흐름)이라고 부르는 이유가 여기에 있다. 입력되는 데이터를 '''reading 데이터''' 출력되는 데이터를 '''writing 데이터'''라고 한다. 출력 스트림은 모니터 혹은 프린터로 흘러들어가게 된다. 
+
+보통 프로그램은 여러개의 입력데이터를 읽은 다음 하나의 결과를 출력하게 된다. 숫자의 목록을 입력받아서 더한결과값 하나를 출력하는 프로그램이 대표적인 예다. 
+
+'''문제'''
+  문서 편집기 - vi(:12) 같은 -에서 입력 데이터와 출력 데이터는 무엇인가.
+
+=== 표준 Stream ===
+입력과 출력에는 다양한 종류가 존재할 수 있다. 예를들어 똑같이 모니터에 출력하는 데이터라고 하더라도 결과값을 출력할 수도 있지만 에러를 출력할 수도 있다. 만약 아무런 속성이 없이 데이터를 모니터에 출력한다면, 사용자는 출력된 데이터가 에러메시지인지 아니면 정상처리되어서 나온 메시지인지를 확인할 수가 없다.
+
+그래서 프로그램은 표준적으로 사용할 수 있는 스트림의 속성을 분류해 놓고 있다.
+ * System.in  : 입력 스트림
+ * System.out : 출력 스트림으로 일반적인 결과를 출력한다.
+ * System.err : 출력 스트림으로 에러메시지를 출력한다. 
+
+일반적으로 '''System.in'''은 키보드로 연결되며, 문자들을 입력받는다. '''System.out'''와 '''System.err''"은 모두 모니터에 연결되어 있으며, 동일하게 문자데이터를 출력한다. System.out와 System.err에 대한 내용은 표준입력(:12)과 표준출력(:12)관련 문서를 읽어보기 바란다.
+
+'''문제'''
+  키보드로 '''1234'''를 입력했다면, 프로그램에 어떤 데이터가 전달되는가.
+
+=== 문자열 입력과 출력 ===
+키보드는 컴퓨터에 '''문자'''데이터를 전달한다. 숫자판의 숫자를 입력했다고 하더라도, 문자가 전달이 된다. 그리고 모니터는 문자를 모니터에 출력한다. 아래의 그림은 키보드로 입력된 데이터가 모니터에 출력되는 과정을 묘사하고 있다.
+
+attachment:charsINcharsOUT.gif
+
+그러므로 만약 여러분의 프로그램이 산술계산을 한다면, 키보드로 입력된 문자값을 원시데이터타입 중의 하나인 '''int'''형으로 변환해야 한다. 이러한 일은 '''Scanner'''객체를 이용하면 된다. 이렇게 해서 산술연산을 한 결과는 모니터에 뿌려지게 되는데, 이때 반드시 문자 데이터로 변경이 되어야 한다. 이것은 System.out 메서드를 이용하면 된다.
+
+'''문제'''
+  '''System.out'''메서드를 사용해본적이 있는가?
+
+=== 입출력 예제 프로그램 ===
+다음은 자바프로그램이 입출력 데이터를 다루는 방식을 묘사하고 있다. 이 그림에서 네모상자 안의 부분이 프로그램이다.  프로그램은 '''Scanner'''를 이용해서 입력을 받고, '''System.out'''을 이용해서 출력한다.
+
+attachment:EchoPicture.gif
+
+'''Scanner'''은 nextLine() 메서드를 호출해서 키보드로 부터 줄단위로 문자들을 읽어들인다. 읽어들인 문자들은 '''String''' 객체로 보내진다. 보내진 데이터는 String 객체의 레퍼런스 변수인 inData에 의해서 참조된다. 이제 '''System.out'''의 println()메서드를 이용해서 inData의 값을 모니터에 출력하게 된다.
+
+'''문제'''
+  Scanner 에 nextLine 말고 다른 메서들도 있다고 생각되는가 ?
+
+=== Echo.Java ===
+실제 작동한 자바프로그램이 있다. 이 프로그램은 키보드로 부터 문자를 읽어들여서 String 객체에 저장한후, 모니터에 출력하는 일을 한다.
+{{{#!plain
+import java.util.Scanner;
+
+class Echo
+{
+  public static void main (String[] args) 
+  {
+    String inData;
+    Scanner scan = new Scanner( System.in );
+
+    System.out.println("Enter the data:");
+    inData = scan.nextLine();
+
+    System.out.println("You entered:" + inData );
+  }
+}
+}}}
+'''import java.util.Scanner;'''는 java.util.Scanner 패키지에 있는 Scanner 클래스를 사용하겠다는 걸을 알려주기 위해서 사용한다. '''java.io''' 패키지는 자동으로 import 된다. 다음은 실행결과다. 
+{{{#!plain
+$ java Echo
+Enter the data:
+Hello World
+You entered:Hello World
+}}}
+컴파일 시키는 방법은 앞장에서 다룬바가 있으므로 설명하지 않도록 하겠다.
+
+'''문제'''
+  123 과 같은 숫자정보도 받아들일 수 있는가 ?
+
+=== 숫자도 문자다 ===
+이렇게 키보드로 받아들인 데이터는 그게 눈으로 보기에 숫자라고 하더라도 모두 문자로 처리된다. 만약 산술계산을 하고 싶다면, 문자를 숫자로 바꾼다음 산술계산을 해야 한다.
+
+문자를 숫자로 바꾸는 방법은 차차 알아나가게 될 것이다.
+
+'''문제'''
+  키보드로는 문자만 받아들일 수 있습니까 ?
+
+=== 자세히보기 ===
+앞의 Echo 프로그램을 자세히 파헤쳐 보도록 하자.
+{{{#!plain
+import java.util.Scanner;
+
+class Echo
+{
+  public static void main (String[] args) 
+  {
+    String inData;
+    Scanner scan = new Scanner( System.in );
+
+    System.out.println("Enter the data:");
+    inData = scan.nextLine();
+
+    System.out.println("You entered:" + inData );
+  }
+}
+}}}
+==== class Echo ====
+프로그램의 클래스 이름은 '''Echo'''로 main() 메서드를 가진다.
+
+ * public static void main (String[] args)
+   모든 main() 메서드는 동일한 방법으로 시작하며, 실행되기 위해서는 main() 메서드를 포함해야만 한다.
+ * String inData;
+   프로그램이 생성한 String 객체를 reference 하기 위한 reference 변수 inData를 선언한다.
+ * Scanner scan = new Scanner( System.in );
+   Scanner 객체를 생성하며, 생성된 객체를 위한 레퍼런스 변수 scan에 대입한다.
+
+'''문제'''
+  Scanner는 어떤 데이터 stream에 연결되어있는가. 
+
+ * System.out.println ("Enter the data:");
+   이 메서드는 모니터에 문자열 "Enter the data"를 출력한다.
+ * inData = scan.nextLine();
+   nextLine()메서드를 이용하면 키보드로 부터 한줄의 문자열을 읽어들일 수 있다. 읽어들인 문자열은 String 객체인 inData가 refer한다. 
+ * System.out.println("You entered:" + inData );
+   "You entered:" 다음에 inData가 refer하고 있는 문자열을 모니터에 출력한다.
+
+'''문제'''
+  '''enter'''키를 누르기전에 문자열의 편집이 가능한가? (backspace 혹은 키보드 이동을 통한)
+
+=== 숫자입력 ===
+여기에 또다른 프로그램이 있다.
+{{{#!plain
+Enter the data:
+Columbus sailed in 1492.
+You entered:Columbus sailed in 1492.
+}}}
+
+문자 '1', '4', '9', '2' 에 주목하라. 우리는 숫자라고 하더라도 모두 문자로 처리된다는 것을 알고 있다. 이러한 경우에는 입력받은 데이터를 문자로 인식해도 문제가 되지는 않을 것이다. 그러나 콜롬버스가 지금으로 부터 몇년전에 항해를 했는지를 계산하고자 할 경우에는 문제가 발생한다. 
+
+=== nextInt() ===
+Scanner 객체에서 제공하는 nextInt 메서드는 읽어들인 문자열을 '''int'''타입으로 변환한다. Scanner 객체는 문자열의 스트림에서 한자씩 문자로 읽어들여서 숫자로 변환한다. 변환된 숫자는 32bit 데이터 타입으로 저장된다. 
+
+attachment:charsConversion.gif
+
+위의 그림은 읽어들인 문자열이 어떻게 숫자로 변환되는지를 보여주고 있다. 입력된 데이터는 integer로 변환된다음 num에 저장된다. 변환된 숫자는 제곱된다음 '''square''' 에 저장되고, println 메서드를 이용해서 문자열로 변환된 다음 화면에 출력이 된다. 
+
+'''문제'''
+문자열에 대해서 산술연산이 가능한가 ?
+
+=== EchoSquare.java ===
+다음의 프로그램은 이전에서 그림으로 묘사되었던 일을 수행한다. 키보드로 입력을 받아서 제곱을 한다음 그 결과를 화면에 출력한다.
+{{{#!plain
+import java.util.Scanner;
+
+class EchoSquare
+{
+  public static void main (String[] args)
+  { 
+    Scanner scan = new Scanner( System.in );
+    int num, square;      // declare two int variables 
+
+    System.out.println("Enter an integer:");
+    num = scan.nextInt();
+    square = num * num ;  // compute the square 
+
+    System.out.println("The square of " + num + " is " + square);
+  }
+}
+}}}
+다음은 컴파일하고 실행시킨 결과다.
+{{{#!plain
+$ javac EchoSquare.java
+$ java EchoSquare
+Enter an integer:
+12
+The square of 12 is 144
+$ 
+}}}
+
+'''문제'''
+이 프로그램이 아래와 같은 입력을 처리할수 있을까?
+  천이백삼십사
+
+=== integer로 변환하기 ===
+위의 프로그램에서 integer형으로 변환하는 것은 아래의 코드를 통해서 이루어진다.
+   num = scan.nextInt();
+
+이코드는 다음과 같은 과정을 밟는다.
+ 1. 대입연산자의 오른쪽에 있는 코드가 먼저 평가되고 실행된다.
+ 1. 실행된 결과값이 변수 num 에 저장된다. 
+
+nextInt 메서드는 공백문자나 개행문자를 만나기 전까지의 입력된 문자열을 int형으로 변환하고 그 결과를 num 변수에 저장한다.
+
+만약 주어진 문자열이 변환할수 없는 문자를 포함하고 있다면, java는 '''Exception'''을 발생시키고 프로그램을 종료시킨다. Exception은 프로그램의 오동작과 관련된 정보를 담고 있는 객체다. 실제 산업현장에서 사용되는 프로그램은 Exception이 발생했을 때, 이에 대한 처리를 해주어야 하지만, 이 프로그램은 그냥 프로그램을 종료시킨다. 
+
+'''문제'''
+이 프로그램은 아래의 입력을 제대로 처리할수 있을까?
+  Enter an integer:  1492
+  Enter an integer:  Fourteen ninety two
+  Enter an integer:  14.92
+  Enter an integer:  -1492
+  Enter an integer:  1 4 9 2
+
+=== InputMismatchException ===
+사용자가 숫자로 변경할 수 없는 잘못된 문자를 입력한다면, 이 프로그램은 다음과 같이 예외(exception)을 발생시킨다. 
+{{{#!plain
+$ java EchoSquare
+Enter an integer:
+14.92
+Exception in thread "main" java.util.InputMismatchException
+        at java.util.Scanner.throwFor(Scanner.java:819)
+        at java.util.Scanner.next(Scanner.java:1431)
+        at java.util.Scanner.nextInt(Scanner.java:2040)
+        at java.util.Scanner.nextInt(Scanner.java:2000)
+        at EchoSquare.main(EchoSquare.java:11)
+$
+}}}
+
+예외는 자바 프로그램이 잘못실행될 때, 자바시스템에 의해서 발생되며 특별한 처리를 해주지 않을경우 프로그램을 종료시킨다.
+
+'''문제'''
+다음의 입력을 integer 형으로 받아들일 수 있을까 ?
+ +65
+
+=== 다른 예제 ===
+다음은 두개의 숫자를 입력받아서 더한후 출력하는 프로그램이다.
+{{{#!plain
+import java.util.Scanner;
+
+class AddTwo
+{
+  public static void main (String[] args) 
+  { 
+    Scanner scan = new Scanner( System.in );
+    int first, second, sum ;      // declaration of int variables
+
+    System.out.println("Enter first  integer:");
+    first = scan.nextInt();       // read chars and convert to int
+
+    System.out.println("Enter second integer:");
+    second = scan.nextInt();      // read chars and convert to int
+
+    sum = first + second;         // add the two ints, put result in sum
+
+    System.out.println("The sum of " + first + " plus " + second +" is " + sum );
+  }
+}
+}}}
+다음은 실행결과다.
+{{{#!plain
+$ java AddTwo
+Enter first  integer:
+100
+Enter second integer:
+200
+The sum of 100 plus 200 is 300
+
+$ java AddTwo
+Enter first  integer:
+800
+Enter second integer:
+-400
+}}}
+
+=== 나누기 테스트 ===
+앞에서 다루었던 프로그램을 약간 수정해서, 다양한 산술연산이 가능한 프로그램을 작성했다. 
+ * '''divident'''와 '''divisor''' 두개의 수를 입력받는다.  
+ * '''몫'''(quotient)과 '''나머지'''(remainder)를 구한다. 
+ *  quotient * divisor + remainder 를 계산해서 출력한다. 
+{{{#!plain
+import java.util.Scanner;
+class IntDivideTest
+{
+  public static void main (String[] args) 
+  { 
+    Scanner scan = new Scanner( System.in );
+ 
+    int dividend, divisor ;                      // int versions of input
+    int quotient, remainder ;                    // results of "/" and "%"
+
+    System.out.println("Enter the dividend:");   // read the dividend
+    dividend = scan.nextInt();          
+
+    System.out.println("Enter the divisor:");    // read the divisor
+    divisor  = scan.nextInt();          
+
+    quotient = dividend / divisor ;              // perform int math
+    remainder= dividend % divisor ;
+
+    System.out.println( dividend + " / " + divisor + " is " + quotient );
+    System.out.println( dividend + " % " + divisor + " is " + remainder );
+    System.out.println( quotient + " * " + divisor + 
+        " + " + remainder + " is " + (quotient*divisor+remainder) );
+  }
+}
+}}}
+프로그램을 실행시키고 다양한 값을 입력해서 어떤결과가 발생하는지 테스트해보도록 하자.
+

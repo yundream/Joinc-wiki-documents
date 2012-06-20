@@ -1,0 +1,79 @@
+#title 중국사이트에서의 Dos 공격 
+
+=== Dos 공격 발생및 대처 ===
+다음 IP에서 웹서버에 대한 Dos(:12)공격이 있었으며, 이때문에 웹서비스가 중단되었다.
+{{{#!plain
+# whois 221.203.246.132
+inetnum:      221.200.0.0 - 221.203.255.255
+netname:      CNCGROUP-LN
+descr:        CNCGROUP Liaoning Province Network
+descr:        China Network Communications Group Corporation
+descr:        No.156,Fu-Xing-Men-Nei Street,
+descr:        Beijing 100031
+country:      CN
+admin-c:      CH455-AP
+tech-c:       GZ84-AP
+mnt-by:       APNIC-HM
+mnt-lower:    MAINT-CNCGROUP-LN
+mnt-routes:   MAINT-CNCGROUP-LN
+mnt-routes:   MAINT-CNCGROUP-RR
+status:       ALLOCATED PORTABLE
+changed:      hm-changed@apnic.net 20030612
+changed:      hm-changed@apnic.net 20060126
+source:       APNIC
+
+route:        221.200.0.0/14
+descr:        CNC Group CHINA169 Liaoning Province Network
+country:      CN
+origin:       AS4837
+mnt-by:       MAINT-CNCGROUP-RR
+changed:      abuse@cnc-noc.net 20060118
+source:       APNIC
+...
+}}}
+
+이문제는 iptables를 이용해서 해결했다.
+{{{#!plain
+[root@ns root]# iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+REJECT     tcp  --  221.203.246.132      anywhere           tcp dpt:http flags:SYN,RST,ACK/SYN reject-with icmp-port-unreachable
+}}}
+
+이러한 류의 단순한 DOS공격이 한달에 한두번꼴로 발생하는 것 같다. 이에 대한 해결방법을 찾아야 한다.  
+ 1. netstate를 검사해서 특정 포트에 대해서 일정량 이상의 연결이 발생할 때, 자동으로 iptables에 등록시키고, 이를 관리자에게 통보 하는 프로그램의 작성   
+
+=== 관련 글 ===
+ * http://kldp.org/node/73105
+{{{#!html
+<h1 class="title">중국발 공격 어떻게 막으시나요?</h1>
+ <div class="tabs"></div>
+                        <!-- begin content -->  <div class="node">
+    <div class="picture"><a href="/user/893" title="사용자 프로필 보기"><img src="//kldp.org/files/pictures/16565496203e3fef5dd81e7.gif" alt="wkpark의 그림" title="wkpark의 그림"  /></a></div>        <span class="submitted"><a href="/user/893" title="사용자 프로필 보기">wkpark</a> 씀 (목, 2006/08/24 - 1:31pm)</span>
+    <span class="taxonomy"><a href="/taxonomy/term/1318" rel="tag" title="">brute force attack</a> | <a href="/taxonomy/term/51" rel="tag" title="">보안</a> | <a href="/forum/32" rel="tag" title="">토론, 토의</a></span>
+    <div class="content"><!-- google_ad_section_start -->
+<p>중국발 해커같은데, 최근에는 국내에서도 공격을 하는 것 같더군요. 아마도 그곳에서 뚤린 다음에 그곳을 기점으로 공격하는 것이겠죠.</p>
+<p>관련 글타래를 찾아보니 cron + iptables조합에 대한 이야기, GeoIP얘기 등등이 있군요.</p>
+<ol class="bb-list" style="list-style-type:circle;">
+<li> 중국 해커가 문제는 문제군요 <a href="http://kldp.org/node/52579" title="http://kldp.org/node/52579">http://kldp.org/node/52579</a></li>
+<li> 보안에 어느정도로 신경을 쓰시고 계신지요? <a href="http://kldp.org/node/42960" title="http://kldp.org/node/42960">http://kldp.org/node/42960</a></li>
+<li> ip 블럭에 관하여 <a href="http://kldp.org/node/50560" title="http://kldp.org/node/50560">http://kldp.org/node/50560</a>
+<p></li>
+<li> kisarbl을 돌렸습니다. <a href="http://kldp.org/node/71529" title="http://kldp.org/node/71529">http://kldp.org/node/71529</a></p>
+<p></li>
+<li> 드디어 말로만 듣던 중국발 습격을 당하다 <a href="http://kldp.org/node/59455" title="http://kldp.org/node/59455">http://kldp.org/node/59455</a></li>
+</ol>
+</p>
+<p>제가 찾아본 것중에 잘 정리된 곳은 다음과 같았습니다.</p>
+<p><a href="http://www.ducea.com/tag/brute-force-attacks/" title="http://www.ducea.com/tag/brute-force-attacks/">http://www.ducea.com/tag/brute-force-attacks/</a></p>
+<ol class="bb-list" style="list-style-type:circle;">
+<li> PAM으로 막기 (pam_abl)
+</li>
+<li> iptables쓰기 (ipt_recent)
+</li>
+<li> fail2ban (log based) <a href="http://fail2ban.sourceforge.net" title="http://fail2ban.sourceforge.net">http://fail2ban.sourceforge.net</a>
+</li>
+</ol>
+<p>저는 일단 pam_abl을 설치해봤는데 (fedora용 패키지가 있길래) 괜찮은 것 같네요.</p>
+<p>여러분들은 어떤식으로 공격을 막고 계시나요?</p>
+}}}

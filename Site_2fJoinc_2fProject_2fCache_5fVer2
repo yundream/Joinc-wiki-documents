@@ -1,0 +1,29 @@
+#title Joinc Cache Ver. 2
+
+=== Joinc Cache Ver 2 ===
+[wiki:Site/Joinc/Project/Cache Joinc wiki cache 프로젝트]를 이용해서 어느정도 성능향상을 이루긴 했지만 여전히 느리다. 기존의 Cache 시스템은 wiki엔진을 통해서 HTML(:12)로 해석된 본문내용을 파일로 저장해 놓고, 다음 방문때에는 wiki 해석엔진을 거치지 않고 그냥 파일을 읽어와서 출력하는 방식이다. 
+
+성능향상을 이루긴 했지만, 여전히 너무 느리다. wiki엔진이 호출하는 wiki.php 가 너무 크고, 너무 복잡하기 때문이다. 그래서 아예 페이지를 통째로 cache 할 계획을 세웠다.
+
+아래는 아이디어다. 
+  * Joinc Webpage 는 '''wiki page''' 와 '''wiki page'''를 포함하는 container 로 구성되어 있다. 
+  * 이중 wiki page 는 이미 cache 되고 있다. container 까지 cache 한다면, 많은 비용이 소모되는 wiki.php를 거치지 않고, 2개의 HTML(:12) 파일을 읽어서 곧바로 출력할 수 있다.
+
+container는 어떤 방식으로 cache 할것인가.
+  1. container 만을 가지는 빈페이지 파일을 하나 생성한다. 이 페이지 이름을 container page 라고 한다.
+  1. wget(:12) 으로 container page 를 읽어온다. 그러면 container의 HTML 파일이 만들어 질 것이다. 
+     * container 구성은 변경될 수 있으므로 cron(:12)에 등록시켜서 주기적으로 재 생성하도록 한다.
+  1. wiki.php는 단순 page view 요청에 대해서는 위키엔진을 돌리지 않고, cache 된 container page 와 wiki page 를 읽어서 그대로 출력한다.
+  1. 위키엔진은 URL(:12)에 action name이 주어질 경우에만 작동한다. edit, diff 등에 대한 것들이 이에 해당된다.
+     * google 크롤러의 경우 쓸데 없는 diff action 등을 요청하는데, 이걸 막도록 한다.
+
+음.. 제대로만 된다면 상당한 성능향상이 기대된다.
+
+=== 작업내용 ===
+  * 2009-11-14
+     1. __Template 작성__
+     1. Template에 동적정보들이 처리되도록 해야함.
+  * 2009-11-16
+     1. Template 동적정보들을 처리해야함.
+          * 로그인 처리
+          * 각종 액션들에 대한 동적처리

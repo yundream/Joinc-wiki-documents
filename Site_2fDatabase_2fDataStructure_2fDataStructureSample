@@ -1,0 +1,2226 @@
+#title 기본 자료구조 예제 
+
+[[TableOfContents]]
+== 자료구조를 익히자!! ==
+
+'''작성자:''' mwyun([멍])
+
+프로그래밍 분야에서 자료구조의 중요함은 누구나 아는 사실입니다.
+
+실제 많이 활용하는 꼭 필요한 자료 구조 몇가지의 소개와 함께 활용분야에 대해 설명드리겠습니다.
+
+== 링크드 리스트 ==
+스택과 큐를 설명하기 전에 링크드 리스트를 먼저 설명하겠습니다.
+
+이 링크드 리스트를 기반으로 나중에 나올 스택과 큐에 활용하게 되므로 잘 이해하고 있어야 합니다.
+
+링크드 리스트는 말그대로 각 원소가 연결된 리스트 형태로 관리되는 자료구조 입니다. 각 원소는 다음 연결된 원소의 위치를 알고 있어야 하는데, 포인터를 통해서 다음 원소의 위치를 알아내게 됩니다. 
+
+링크드 리스트는 어떻게 연결되었는지에 따라서, 선형 링크드 리스트, 더블(이중)링크드 리스트, 환형 링크드 리스트가 있습니다.
+{{{#!html
+<p>
+<img src=http://www.joinc.co.kr/albums/album01/adb.gif><br>
+선형 링크드 리스트
+</p>
+<p>
+<img src=http://www.joinc.co.kr/albums/album01/adc.gif><br>
+더블 링크드 리스트
+</p>
+<p>
+<img src=http://www.joinc.co.kr/albums/album01/add.gif><br>
+환형 링크드 리스트
+</p>
+}}}
+좀더 자세한 내용은 링크드리스트(:12)문서 를 참고하시기 바랍니다.
+
+=== 소 스 ===
+
+'''list.h'''
+
+{{{#!plain
+#ifndef _LIST_H
+#define _LIST_H
+
+#include <stdlib.h>
+
+// List Element 구조체
+typedef struct ListElmt_ {
+        void *data; // 데이터: 타입에 제한이 없는 void *사용
+        struct ListElmt_ *next; // 다음 노드를 가리키는 포인터(단일 연결 리스트는 링크 포인터가 한개이다)
+} ListElmt;
+
+// List 구조체
+typedef struct List_ {
+        int size;
+        int (*match)(const void *key1, const void *key2); // 함수포인터
+        void (*destroy)(void *data); // 함수포인터 
+        ListElmt *head; // 리스트의 처음 노드를 가리키는 포인터
+        ListElmt *tail; // 리스트의 마지막 노드를 가리키는 포인터
+} List;
+
+void list_init(List *list, void (*destroy)(void *data));
+void list_destroy(List *list);
+int list_ins_next(List *list, ListElmt *element, const void *data);
+int list_rem_next(List *list, ListElmt *element, void **data);
+
+#define list_size(list) ((list)->size)
+#define list_head(list) ((list)->head)
+#define list_tail(list) ((list)->tail)
+#define list_is_head(list, element) ((element) == (list)->head ? 1 : 0)
+#define list_is_tail(element) ((element)->next == NULL ? 1 : 0)
+#define list_data(element) ((element)->data)
+#define list_next(element) ((element)->next)
+
+#endif
+}}}
+
+'''list.c'''
+
+{{{#!plain
+#include <stdlib.h>
+#include <string.h>
+
+#include "list.h"
+
+// List 초기화
+void list_init(List *list, void (*destroy)(void *data)) 
+{
+	list->size = 0;
+	list->destroy = destroy;
+	list->head = 0;
+	list->tail = 0;
+
+	return;
+}
+
+// List 파기(메모리 해제) 
+void list_destroy(List *list)
+{
+	void *data;
+	
+  // List의 size가 0보다 크면 element가 남아있으므로 삭제작업 진행
+	while (list_size(list) > 0)
+	{
+    // 2번째 인자가 NULL이면 head element 삭제
+		if (list_rem_next(list, NULL, (void **)&data) == 0 && list->destroy != NULL) 
+		{
+			// free(data);
+			list->destroy(data); 
+		}
+	}
+
+	memset(list, 0, sizeof(List));
+
+	return;
+}
+
+// List의 element 다음에 새로운 element 추가
+int list_ins_next(List *list, ListElmt *element, const void *data)
+{
+	ListElmt *new_element;
+
+	if ((new_element = (ListElmt *)malloc(sizeof(ListElmt))) == NULL)
+		return -1;
+
+	new_element->data = (void *)data;
+
+	// element가 NULL이면  
+	if (element == NULL)
+	{
+		// List에 element가 한 개도 없으면
+		if (list_size(list) == 0)
+			list->tail = new_element; 
+		new_element->next = list->head; // head element 앞에 추가
+		list->head = new_element; 
+	}
+	else // element 다음에 새로운 element를 추가
+	{
+		if (element->next == NULL)
+			list->tail = new_element;
+    // new_element의 다음 element로 element->next를 저장
+		new_element->next = element->next;
+    // element 다음에 new_element 추가
+		element->next = new_element;
+	}
+
+	list->size++; // List의 size 증가
+
+	return 0;
+}
+
+// List의 element 다음의 element를 삭제
+int list_rem_next(List *list, ListElmt *element, void **data)
+{
+	ListElmt *old_element;
+
+  // List의 size가 0이면(즉, element가 한개도 없으면...)
+	if (list_size(list) == 0)
+		return -1;
+
+  // element가 NULL이면 List의 head element 삭제 
+	if (element == NULL)
+	{
+		*data = list->head->data;
+
+		old_element = list->head;
+		list->head = list->head->next; // head element에 head의 다음 element를 저장 
+	
+		if (list_size(list) == 1)
+			list->tail = NULL;
+	}
+  // 그렇지 않으면
+	else 
+	{
+    // 삭제할 element가 없으면
+		if (element->next == NULL)
+			return -1;
+
+		*data = element->next->data;
+		// 삭제할 element인 element->next를 저장
+		old_element = element->next;
+    // element->next은 삭제할 element가 가리키는 다음 element를 저장 
+		element->next = element->next->next;
+
+    // 삭제할 element의 다음 element가 없는 경우
+		if (element->next == NULL)
+			list->tail = element; 
+	}
+
+  // element 삭제
+	free(old_element);
+	list->size--; // List의 size 감소
+
+	return 0;
+}
+}}}
+
+===  예 제 ===
+
+'''linkedlist.c'''
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "list.h"
+
+// List의 모든 element 출력
+static void print_list(const List *list)
+{
+	ListElmt *element;
+	int *data, i;
+
+	fprintf(stdout, "List size is %d\n", list_size(list));
+
+	i = 0;
+  // List의 head 저장
+	element = list_head(list);
+	
+	while (1)
+	{
+    // element의 data 저장
+		data = list_data(element);
+		fprintf(stdout, "list[%03d] = %03d\n", i, *data);
+		
+		i++;
+		
+		if (list_is_tail(element)) // element가 tail이면 break
+			break;
+		else
+			element = list_next(element); // 그렇지 않으면 다음 element 저장
+	}
+
+	return;
+}
+
+// 메인함수
+int main(int argc, char *argv[])
+{
+	List list;
+	ListElmt *element;
+	int *data, i;
+
+  // List 초기화
+	list_init(&list, free);
+
+	element = list_head(&list);
+
+  // List에 element 추가(1~10)
+	for (i = 10; i > 0; i--)
+	{
+		if ((data = (int *)malloc(sizeof(int))) == NULL)
+			return 1;
+
+		*data = i;
+
+    // List에 element 추가
+    // 2번째 인자가 NULL이므로 새로운 element는 head 앞에 추가
+
+		if (list_ins_next(&list, NULL, data) != 0)
+			return 1;
+	}
+  // List는 data=1이 head, data=10이 tail이 된다.
+
+	print_list(&list);
+
+  // head element 저장
+	element = list_head(&list);
+
+	for (i = 0; i < 7; i++)
+		element = list_next(element);
+	
+  // data 저장
+	data = list_data(element);
+	fprintf(stdout, "Removing an element after the one containing %03d\n", *data);
+	// 8번째 다음 element 삭제
+	if (list_rem_next(&list, element, (void **)&data) != 0) 
+		return 1;
+
+	print_list(&list);
+	
+	fprintf(stdout, "Inserting 011 at the tail of the list\n");
+	
+	*data = 11;
+  // List의 tail element 다음에 element에 추가
+	if (list_ins_next(&list, list_tail(&list), data) != 0)
+		return 1;
+
+	print_list(&list);
+
+  // head element 다음 element 삭제
+	fprintf(stdout, "Removing an element after the first element\n");
+	
+	element = list_head(&list);
+  
+	if (list_rem_next(&list, element, (void **)&data) != 0)
+		return 1;
+
+	print_list(&list);
+
+  // head element 앞에 element 추가
+	fprintf(stdout, "Inserting 012 at the head of the list\n");
+	
+	*data = 12;
+	if (list_ins_next(&list, NULL, data) != 0)
+		return 1;
+  
+	print_list(&list);
+
+	// 4번째 element 삭제
+	fprintf(stdout, "Inserting and removing the fourth element\n");
+	
+	element = list_head(&list);
+	element = list_next(element);
+	element = list_next(element);
+
+  // element의 다음 element 삭제
+	if (list_rem_next(&list, element, (void **)&data) != 0)
+		return 1;
+
+	print_list(&list);
+	
+  // head element 다음에 element 추가
+	fprintf(stdout, "Inserting 013 after the first element\n");
+
+	*data = 13;
+	if (list_ins_next(&list, list_head(&list), data) != 0)
+		return 1;
+
+	print_list(&list);
+
+  // List의 head, tail element가 올바른지 비교 
+	i = list_is_head(&list, list_head(&list));
+	fprintf(stdout, "Testing list is head value = %d (1=OK)\n", i);
+	i = list_is_head(&list, list_tail(&list));
+	fprintf(stdout, "Testing list is head value = %d (0=OK)\n", i);
+	i = list_is_tail(list_tail(&list));
+	fprintf(stdout, "Testing list is tail value = %d (1=OK)\n", i);
+	i = list_is_tail(list_head(&list));
+	fprintf(stdout, "Testing list is tail value = %d (0=OK)\n", i);
+
+	fprintf(stdout, "Destroying the list\n");
+	list_destroy(&list);
+
+	return 0;
+}
+}}}
+
+===  실 행 ===
+
+{{{#!plain
+[0058][mwyun@mwyun:~/Project/linkedlist_ex]$ gcc -o linkedlist linkedlist.c list.c
+[0058][mwyun@mwyun:~/Project/linkedlist_ex]$ ./linkedlist
+List size is 10
+list[000] = 001 <=== head
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 009
+list[009] = 010 <=== tail
+Removing an element after the one containing 008
+List size is 9
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+Inserting 011 at the tail of the list
+List size is 10
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+list[009] = 011
+Removing an element after the first element
+List size is 9
+list[000] = 001
+list[001] = 003
+list[002] = 004
+list[003] = 005
+list[004] = 006
+list[005] = 007
+list[006] = 008
+list[007] = 010
+list[008] = 011
+Inserting 012 at the head of the list
+List size is 10
+list[000] = 012
+list[001] = 001
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+list[009] = 011
+Inserting and removing the fourth element
+List size is 9
+list[000] = 012
+list[001] = 001
+list[002] = 003
+list[003] = 005
+list[004] = 006
+list[005] = 007
+list[006] = 008
+list[007] = 010
+list[008] = 011
+Inserting 013 after the first element
+List size is 10
+list[000] = 012
+list[001] = 013
+list[002] = 001
+list[003] = 003
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+list[009] = 011
+Testing list is head value = 1 (1=OK)
+Testing list is head value = 0 (0=OK)
+Testing list is tail value = 1 (1=OK)
+Testing list is tail value = 0 (0=OK)
+Destroying the list
+[0059][mwyun@mwyun:~/Project/linkedlist_ex]$
+}}}
+
+
+==  링크드 리스트를 이용한 스택 ==
+
+다음은 링크드 리스트를 기반으로 스택을 만들어 활용하는 예입니다.
+
+===  소 스 ===
+
+'''stack.h'''
+
+{{{#!plain
+#ifndef STACK_H
+#define STACK_H
+
+#include <stdlib.h>
+
+#include "list.h"
+
+typedef List Stack;
+
+#define stack_init list_init
+
+#define stack_destroy list_destroy
+
+int stack_push(Stack *stack, const void *data); 
+int stack_pop(Stack *stack, void **data);
+
+// 스택에 top element에 데이터가 있는지 검사
+#define stack_peek(stack) ((stack)->head == NULL ? NULL : (stack)->head->data)
+
+#define stack_size list_size
+
+#endif
+}}}
+
+'''stack.c'''
+
+{{{#!plain
+#include <stdlib.h>
+
+#include "list.h"
+#include "stack.h"
+
+// 스택에 저장(밀어넣기)
+int stack_push(Stack *stack, const void *data)
+{
+        return list_ins_next(stack, NULL, data); // head element 앞에 추가
+}
+
+// 스택에서 꺼내기
+int stack_pop(Stack *stack, void **data)
+{
+        return list_rem_next(stack, NULL, data); // head element 삭제
+}
+}}}
+
+===  예 제 ===
+
+'''stack_ex.c'''
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "list.h"
+#include "stack.h"
+
+static void print_stack(const Stack *stack)
+{
+        ListElmt *element;
+        int *data, size, i;
+
+        fprintf(stdout, "Stack size is %d\n", size = stack_size(stack));
+
+        i = 0;
+        element = list_head(stack);
+
+        while (i < size)
+        {
+                data = list_data(element);
+                fprintf(stdout, "stack[%03d] = %03d\n", i, *data);
+                        element = list_next(element);
+                        i++;
+        }
+
+        return;
+}
+
+int main(int argc, char *argv[])
+{
+				// 스택 변수 정의
+        Stack stack;
+        int *data, i;
+
+				// 스택 초기화
+        stack_init(&stack, free);
+
+        // 10개의 element 저장
+        fprintf(stdout, "Pushing 10 elements\n");
+        for (i = 0; i < 10; i++)
+        {
+                if ((data = (int *)malloc(sizeof(int))) == NULL)
+                        return 1;
+                *data = i + 1;
+
+								// 스택에 저장
+                if (stack_push(&stack, data) != 0)
+                        return 1;
+        }
+
+				// 스택 출력
+        print_stack(&stack);
+
+				// 5개 element 꺼내기
+        fprintf(stdout, "Popping 5 elements\n");
+        for (i = 0; i < 5; i++)
+        {
+                if (stack_pop(&stack, (void **)&data) == 0)
+                        free(data);
+                else
+                        return 1;
+        }
+
+				// 스택 출력
+        print_stack(&stack);
+
+				// 100, 200을 스택에 저장
+        fprintf(stdout, "Pushing 100 and 200\n");
+
+				// 100을 스택에 저장
+        if ((data = (int *)malloc(sizeof(int))) == NULL)
+                return 1;
+
+        *data = 100;
+        if (stack_push(&stack, data) != 0)
+                return 1;
+
+				// 200을 스택에 저장
+        if ((data = (int *)malloc(sizeof(int))) == NULL)
+                return 1;
+		
+        *data = 200;
+        if (stack_push(&stack, data) != 0)
+                return 1;
+
+				// 스택 출력
+        print_stack(&stack);
+
+				// 스택의 top element에 데이터가 있는지 검사 
+        if ((data = stack_peek(&stack)) != NULL) // 있으면 data 출력
+                fprintf(stdout, "Peeking at the top element... value = %03d\n", *data);
+        else // 없으면
+                fprintf(stdout, "Peeking at the top element... value = NULL\n");
+
+				// 스택 출력
+        print_stack(&stack);
+		
+			  // 모든 element 꺼내기		
+        fprintf(stdout, "Popping all elements\n");
+				// stack size가 0일 때까지 반복 실행
+        while (stack_size(&stack) > 0)
+        {
+							  // 스택의 element 꺼내기
+                if (stack_pop(&stack, (void **)&data) == 0)
+                        free(data);
+        }
+
+				// 스택 출력
+        print_stack(&stack);
+
+				// 스택 엿보기
+        if ((data = stack_peek(&stack)) != NULL) // 스택이 empty가 아니면 data 출력
+                fprintf(stdout, "Peeking at an empty stack... value = %03d\n", *data);
+        else // 스택이 empty(비었다)라고 출력
+                fprintf(stdout, "Peeking at an empty stack... value = NULL\n");
+
+				// 스택 출력
+        print_stack(&stack);
+
+				// 스택 제거
+        fprintf(stdout, "Destroying the stack\n");
+        stack_destroy(&stack);
+
+        return 0;
+}
+}}}
+
+===  실 행 ===
+{{{#!plain
+[2340][mwyun@mwyun:~/Project/stack]$ gcc -c stack_ex.c stack.c ../linkedlist_ex/list.c -I../linkedlist_ex
+[2340][mwyun@mwyun:~/Project/stack]$ gcc -o stack_ex stack_ex.o stack.o list.o
+[2341][mwyun@mwyun:~/Project/stack]$ ./stack_ex
+Pushing 10 elements
+Stack size is 10
+stack[000] = 010 <=== head(top)
+stack[001] = 009
+stack[002] = 008
+stack[003] = 007
+stack[004] = 006
+stack[005] = 005
+stack[006] = 004
+stack[007] = 003
+stack[008] = 002
+stack[009] = 001 <== tail(bottom)
+Popping 5 elements
+Stack size is 5
+stack[000] = 005
+stack[001] = 004
+stack[002] = 003
+stack[003] = 002
+stack[004] = 001
+Pushing 100 and 200
+Stack size is 7
+stack[000] = 200
+stack[001] = 100
+stack[002] = 005
+stack[003] = 004
+stack[004] = 003
+stack[005] = 002
+stack[006] = 001
+Peeking at the top element... value = 200
+Stack size is 7
+stack[000] = 200
+stack[001] = 100
+stack[002] = 005
+stack[003] = 004
+stack[004] = 003
+stack[005] = 002
+stack[006] = 001
+Popping all elements
+Stack size is 0
+Peeking at an empty stack... value = NULL
+Stack size is 0
+Destroying the stack
+}}}
+
+==  배열을 이용한 스택 ==
+
+링크드 리스트를 이용한 스택보다 배열을 이용한 스택의 구현은 유연성이나 효용성면에서는 링크드 리스트보다 떨어지지만 빠른 실행속도와 구현의 단순함 등의 장점이 있습니다.
+
+스택은 일반 생활에서 쉽게 볼 수 있는 구조입니다. 서류더미 정도로 생각하면 되겠군요. 처리를 위한 서류더미(스택)가 있을 때 우리는 가장 위에 있는 서류 부터 꺼내어서 처리할 겁니다. 흔히 '''LIFO(후입선출)'''의 자료구조라고 합니다. 
+
+스택에 대한 좀더 학문?적인 내용은 [wiki:article_Stack_데이타_추상 stack 데이타 추상]을 참고하기 바란다.
+
+===  소 스 ===
+
+'''stack2.h'''
+
+{{{#!plain
+#ifndef STACK2_H
+#define STACK2_H
+
+#define STACKSIZE 10
+
+typedef struct _stack {
+        int top;
+        int items[STACKSIZE];
+} stack;
+
+int push(stack *s, int value);
+void print_stack(stack *s);
+void stack_init(stack *s);
+int auto_push(stack *s, int begin, int end);
+int auto_pop(stack *s, int count);
+
+#endif
+}}}
+
+'''stack2.c'''
+
+{{{#!plain
+#include "stack2.h"
+
+// 스택 초기화
+void stack_init(stack *s)
+{
+        int i;
+
+        s->top = -1;
+        for (i = 0; i < STACKSIZE; i++)
+                s->items[i] = 0;
+}
+
+// 스택에 저장
+int push(stack *s, int value)
+{
+        if (s->top == STACKSIZE-1)
+        {
+                printf("stack overflow!!\n");
+                return -1;
+        }
+
+        s->top++; // top element를 하나 증가시킨다.
+        s->items[s->top] = value; // 새로운 top element에 value 저장
+//      printf("s->top = %d\n", s->top);
+
+        return value;
+}
+
+// 스택에서 꺼내기
+int pop(stack *s)
+{
+        int value;
+
+        //printf("s->top = %d\n", s->top);
+
+        if (s->top == -1)
+        {
+                printf("stack empty!!\n");
+                return -1;
+        }
+
+        value = s->items[s->top]; // top element의 value를 꺼낸다.
+        // s->items[s->top] = 0;
+        s->top--; // top element를 꺼냈으므로 top을 -1시킨다.
+
+        return value;
+}
+}}}
+
+===  예 제 ===
+
+'''stack2_ex.c'''
+
+{{{#!plain
+#incldue "stack2.h"
+
+// 지정한 범위 내의 숫자를 스택에 Push
+int auto_push(stack *s, int begin, int end)
+{
+        int i;
+        int value;
+
+        for (i = begin; i <= end; i++) // push 1~5
+        {
+                value = push(s, i);
+                if (value == -1)
+                        return -1;
+                else
+                        printf("pushed value = %3d\n", value);
+        }
+
+				// 스택 출력
+        print_stack(s);
+
+        return 1;
+}
+
+// 지정한 개수만큼 element를 스택에서 Pop
+int auto_pop(stack *s, int count)
+{
+        int i;
+        int value;
+
+        for (i = 1; i <= count; i++)
+        {
+                value = pop(s);
+                if (value == -1)
+                        return -1;
+                else
+                        printf("poped value = %3d\n", value);
+        }
+
+				// 스택 출력
+        print_stack(s);
+
+        return 1;
+}
+
+int main(int argc, char *argv[])
+{
+				// 스택 변수 정의
+        stack s;
+        int i, value;
+
+				// 스택 초기화
+        stack_init(&s);
+
+				// 스택 테스트
+        auto_push(&s, 1, 5); // push 1~5
+        auto_pop(&s, 2); // pop 2 element
+        auto_push(&s, 6, 10); // push 6~10
+        auto_pop(&s, 6); // pop 6 element
+        auto_push(&s, 11, 14); // push 11~14
+
+        return 0;
+}
+}}}
+
+===  실 행 ===
+
+{{{#!plain
+[2351][mwyun@mwyun:~/Project/stack2]$ gcc -c stack2_ex.c stack2.c
+[2351][mwyun@mwyun:~/Project/stack2]$ gcc -o stack2_ex stack2_ex.o stack2.o
+[2351][mwyun@mwyun:~/Project/stack2]$ ./stack2_ex
+pushed value =   1
+pushed value =   2
+pushed value =   3
+pushed value =   4
+pushed value =   5
+
+stack size =   5
+stack[  4] =   5 <=== top
+stack[  3] =   4
+stack[  2] =   3
+stack[  1] =   2
+stack[  0] =   1 <== bottom
+
+poped value =   5
+poped value =   4
+
+stack size =   3
+stack[  2] =   3
+stack[  1] =   2
+stack[  0] =   1
+
+pushed value =   6
+pushed value =   7
+pushed value =   8
+pushed value =   9
+pushed value =  10
+
+stack size =   8
+stack[  7] =  10
+stack[  6] =   9
+stack[  5] =   8
+stack[  4] =   7
+stack[  3] =   6
+stack[  2] =   3
+stack[  1] =   2
+stack[  0] =   1
+
+poped value =  10
+poped value =   9
+poped value =   8
+poped value =   7
+poped value =   6
+poped value =   3
+
+stack size =   2
+stack[  1] =   2
+stack[  0] =   1
+
+pushed value =  11
+pushed value =  12
+pushed value =  13
+pushed value =  14
+
+stack size =   6
+stack[  5] =  14 <=== top
+stack[  4] =  13
+stack[  3] =  12
+stack[  2] =  11
+stack[  1] =   2
+stack[  0] =   1 <=== bottom
+
+[2351][mwyun@mwyun:~/Project/stack2]$
+}}}
+
+== template을 이용한 스택 ==
+
+template class를 구현해보았습니다.
+
+template은 컴파일 타임에 정적으로 타입이 결정되어 바인딩됩니다.
+
+그러므로 template으로 구현된 클래스의 모든 메소드의 구현은 헤더파일(.h)에 정의되어야 합니다.
+
+g++환경에서 컴파일을 하시면 되구요 VC++에서도 정상적으로 동작하는 것을 확인하였습니다.
+
+=== 소 스 ===
+
+'''tstack.h'''
+
+{{{#!plain
+#ifndef _TSTACK_H_
+#define _TSTACK_H_
+
+// 스택 클래스의 구조 정의및 멤버함수의 구현
+#include <iostream.h>
+
+const int DefaultSize = 80;
+enum Boolean { FALSE = 0, TRUE = 1 };
+
+template <class KeyType>
+class Stack
+{
+  private:
+    int top;                                 // 스택의 top을 나타내는 인덱스
+    KeyType *stack;                          // 스택을 가리키는 포인터
+    int MaxSize;                             // 스택의 크기
+  public:
+    Stack(int MaxStackSize = DefaultSize);   // 객체생성자
+    ~Stack();                                // 객체파괴자
+    KeyType* Add(const KeyType& x);          // 스택의 top에 해당 값을 저장
+    KeyType* Delete(KeyType& x);             // 스택의 top에서 해당 값을 빼냄 
+    Boolean IsFull();                        // 스택이 가득찼는가를 체크
+    Boolean IsEmpty();                       // 스택이 비었는가를 체크
+    KeyType* GetStackTop(KeyType& x);
+    int GetTop() { return top; };
+    void Print(void);	
+};
+
+template <class KeyType>
+Stack<KeyType>::Stack(int MaxStackSize):MaxSize(MaxStackSize)
+{
+  stack = new KeyType[MaxSize];
+  top = -1;
+}
+
+template <class KeyType>
+Stack<KeyType>::~Stack()
+{
+  delete stack;
+}
+
+template <class KeyType>
+Boolean Stack<KeyType>::IsFull()
+{
+  if (top == MaxSize-1) return TRUE;
+  else return FALSE;
+}
+
+template <class KeyType>
+Boolean Stack<KeyType>::IsEmpty()
+{
+  if (top == -1) return TRUE;
+  else return FALSE;
+}
+
+template <class KeyType>
+KeyType *Stack<KeyType>::Add(const KeyType& x)
+{
+  if (IsFull()) return;
+  stack[++top] = x;
+  return (KeyType *)&x;
+}
+
+template <class KeyType>
+KeyType* Stack<KeyType>::Delete(KeyType& x)
+{
+  if (IsEmpty()) return 0;
+  x = stack[top--];
+  return &x;
+}
+
+template <class KeyType>
+KeyType* Stack<KeyType>::GetStackTop(KeyType& x);
+{
+  if (IsEmpty()) return 0;
+  x = stack[top];
+  return &x;
+}
+
+#endif
+}}}
+
+=== 예 제 ===
+
+'''stack3_ex.cpp'''
+
+{{{#!plain
+#include "tstack.h"
+
+template <class KeyType> int auto_push(Stack<KeyType> &s, int begin = 0, int end = 0)
+{
+	int i;
+	int value;
+
+	for (i = begin; i <= end; i++)
+	{
+		value = *s.Add(i);
+		if (value)
+		{
+			cout << "pushed value = " << value << endl;
+		}
+		else
+		{
+			cout << "stack full" << endl;
+			return 0;
+		}
+	}
+
+	s.Print();
+
+	return 1;
+}
+
+template <class KeyType> int auto_pop(Stack<KeyType> &s, int count = 0)
+{
+	int i;
+	int value;
+
+	for (i = 1; i <= count; i++)
+	{
+		value = i;
+		value = *s.Delete(value); 
+	
+		if (value)
+		{
+			cout << "poped value = " << value << endl;
+		}
+		else
+		{
+			cout << "stack empty" << endl;
+			return 0;
+		}
+	}
+
+	s.Print();
+
+	return 1;
+}
+
+int main(int argc, char *argv[])
+{
+	Stack<int> stack;
+	
+	if (!auto_push(stack, 1, 5)) return -1;
+	if (!auto_pop(stack, 2)) return -1;
+	if (!auto_push(stack, 6, 10)) return -1;
+	if (!auto_pop(stack, 6)) return -1;
+	if (!auto_push(stack, 11, 14)) return -1;
+
+	return 0;
+}
+}}}
+
+=== 실 행 ===
+
+{{{#!plain
+[2358][mwyun@mwyun:~/Project/stack3]$ g++ -c -g -Wno-deprecated stack3_ex.cpp
+[2358][mwyun@mwyun:~/Project/stack3]$ g++ -o stack3_ex stack3_ex.o
+[2358][mwyun@mwyun:~/Project/stack3]$ ./stack3_ex
+pushed value = 1
+pushed value = 2
+pushed value = 3
+pushed value = 4
+pushed value = 5
+
+stack size = 5
+stack[4] = 5
+stack[3] = 4
+stack[2] = 3
+stack[1] = 2
+stack[0] = 1
+
+poped value = 5
+poped value = 4
+
+stack size = 3
+stack[2] = 3
+stack[1] = 2
+stack[0] = 1
+
+pushed value = 6
+pushed value = 7
+pushed value = 8
+pushed value = 9
+pushed value = 10
+
+stack size = 8
+stack[7] = 10
+stack[6] = 9
+stack[5] = 8
+stack[4] = 7
+stack[3] = 6
+stack[2] = 3
+stack[1] = 2
+stack[0] = 1
+
+poped value = 10
+poped value = 9
+poped value = 8
+poped value = 7
+poped value = 6
+poped value = 3
+
+stack size = 2
+stack[1] = 2
+stack[0] = 1
+
+pushed value = 11
+pushed value = 12
+pushed value = 13
+pushed value = 14
+
+stack size = 6
+stack[5] = 14
+stack[4] = 13
+stack[3] = 12
+stack[2] = 11
+stack[1] = 2
+stack[0] = 1
+[2358][mwyun@mwyun:~/Project/stack3]$
+}}}
+
+== 링크드 리스트를 이용한 큐 ==
+
+다음은 링크드 리스트를 기반으로 큐를 만들어 활용하는 예입니다.
+
+===  소 스 ===
+
+'''queue.h'''
+
+{{{#!plain
+#ifndef QUEUE_H
+#define QUEUE_H
+
+#include "list.h"
+
+typedef List Queue;
+
+#define queue_init list_init
+#define queue_destroy list_destroy
+int queue_enqueue(Queue *queue, const void *data);
+int queue_dequeue(Queue *queue, void **data);
+
+// 큐이 head element에 데이터가 있는지 검사
+#define queue_peek(queue) ((queue)->head == NULL ? NULL : (queue)->head->data)
+#define queue_size list_size
+
+#endif
+}}}
+
+'''queue.c'''
+
+{{{#!plain
+#include <stdlib.h>
+
+#include "list.h"
+#include "queue.h"
+
+// 큐의 tail 다음에 element 저장
+int queue_enqueue(Queue *queue, const void *data)
+{
+        return list_ins_next(queue, list_tail(queue), data);
+}
+
+// 큐의 head element 꺼내기 
+int queue_dequeue(Queue *queue, void **data)
+{
+        return list_rem_next(queue, NULL, data);
+}
+}}}
+
+===  예 제 ===
+
+'''queue_ex.c'''
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "list.h"
+#include "queue.h"
+
+static void print_queue(const Queue *queue)
+{
+        ListElmt *element;
+        int *data, size, i;
+
+        fprintf(stdout, "Queue size is %d\n", size = queue_size(queue));
+
+        i = 0;
+        element = list_head(queue);
+        while (i < size)
+        {
+                data = list_data(element);
+                fprintf(stdout, "queue[%03d] = %03d\n", i, *data);
+                element = list_next(element);
+                i++;
+        }
+
+        return;
+}
+
+int main(int argc, char *argv[])
+{
+				// 큐 변수 정의
+        Queue queue;
+        int *data, i;
+
+				// 큐 초기화
+        queue_init(&queue, free);
+
+				// 10개의 element 저장
+        fprintf(stdout, "Enqueuing 10 elements\n");
+
+        for (i = 0; i < 10; i++)
+        {
+                if ((data = (int *)malloc(sizeof(int))) == NULL)
+                        return 1;
+                *data = i + 1;
+								// 큐에 저장
+                if (queue_enqueue(&queue, data) != 0)
+                        return 1;
+
+        }
+
+				// 큐 출력
+        print_queue(&queue);
+
+				// 5개 element 꺼내기
+				fprintf(stdout, "Dequeuing 5 elements\n");
+
+        for (i = 0; i < 5; i++)
+        {
+                if (queue_dequeue(&queue, (void **)&data) == 0)
+                        free(data);
+                else
+                        return 1;
+        }
+
+				// 100, 200을 큐에 저장
+        fprintf(stdout, "Enqueuing 100 and 200\n");
+
+				// 100을 큐에 저장
+        if ((data = (int *)malloc(sizeof(int))) == NULL)
+                return 1;
+
+        *data = 100;
+        if (queue_enqueue(&queue, data) != 0)
+                return 1;
+
+				// 큐 출력
+        print_queue(&queue);
+
+				// 200을 큐에 저장
+        if ((data = (int *)malloc(sizeof(int))) == NULL)
+                return 1;
+
+        *data = 200;
+        if (queue_enqueue(&queue, data) != 0)
+                return 1;
+
+				// 큐 출력
+        print_queue(&queue);
+
+				// 큐의 head element에 데이터가 있는지 검사 
+        if ((data = queue_peek(&queue)) != NULL)
+                fprintf(stdout, "Peeking at the head element... value = %03d\n", *data);
+        else
+                fprintf(stdout, "Peeking at the head element... value = NULL\n");
+
+				// 큐 출력
+        print_queue(&queue);
+
+				// 모든 element 꺼내기
+        fprintf(stdout, "Dequeuing all elements\n");
+
+				// queue size가 0일 때까지 반복 실행
+        while (queue_size(&queue) > 0)
+        {
+								// 큐의 element 꺼내기
+                if (queue_dequeue(&queue, (void **)&data) == 0)
+                        free(data);
+        }
+
+				// 큐 엿보기
+        if ((data = queue_peek(&queue)) != NULL) // 큐가 empty가 아니면 data 출력
+                fprintf(stdout, "Peeking at an empty queue... value = %03d\n", *data);
+        else // 큐가 empty(비었다)라고 출력
+                fprintf(stdout, "Peeking at an empty queue... value = NULL\n");
+
+				// 큐 제거
+        fprintf(stdout, "Destroying the queue\n");
+        queue_destroy(&queue);
+
+        return 0;
+}
+}}}
+
+
+===  실 행 ===
+
+{{{#!plain
+[0046][mwyun@mwyun:~/Project/queue]$ gcc -c queue_ex.c queue.c ../linkedlist_ex/list.c -I../linkedlist_ex
+[0046][mwyun@mwyun:~/Project/queue]$ gcc -o queue_ex queue_ex.o queue.o list.o
+[0046][mwyun@mwyun:~/Project/queue]$ ./queue_ex
+Enqueuing 10 elements
+Queue size is 10
+queue[000] = 001 <=== head(top)
+queue[001] = 002
+queue[002] = 003
+queue[003] = 004
+queue[004] = 005
+queue[005] = 006
+queue[006] = 007
+queue[007] = 008
+queue[008] = 009
+queue[009] = 010 <=== tail(bottom)
+Dequeuing 5 elements
+Enqueuing 100 and 200
+Queue size is 6
+queue[000] = 006
+queue[001] = 007
+queue[002] = 008
+queue[003] = 009
+queue[004] = 010
+queue[005] = 100
+Queue size is 7
+queue[000] = 006
+queue[001] = 007
+queue[002] = 008
+queue[003] = 009
+queue[004] = 010
+queue[005] = 100
+queue[006] = 200
+Peeking at the head element... value = 006
+Queue size is 7
+queue[000] = 006
+queue[001] = 007
+queue[002] = 008
+queue[003] = 009
+queue[004] = 010
+queue[005] = 100
+queue[006] = 200
+Dequeuing all elements
+Peeking at an empty queue... value = NULL
+Destroying the queue
+[0046][mwyun@mwyun:~/Project/queue]$
+}}}
+
+==  배열을 이용한 큐 ==
+
+링크드 리스트를 이용한 큐보다 배열을 이용한 큐의 구현은 유연성이나 효용성면에서는 링크드 리스트보다 떨어지지만 빠른 실행속도와 구현의 단순함 등의 장점이 있습니다.
+
+본 장에서의 소스는 환형큐의 제일 간단한 예를 든 것입니다.
+
+===  소 스 ===
+
+'''queue2.h'''
+
+{{{#!plain
+#ifndef QUEUE2_H
+#define QUEUE2_H
+
+#define MAXQUEUE 10
+
+typedef struct _queue {
+        int front;
+        int rear;
+        int items[MAXQUEUE];
+} queue;
+
+int queue_enqueue(queue *q, int value);
+int queue_dequeue(queue *q);
+void print_queue(queue *q);
+void queue_init(queue *q);
+int auto_enqueue(queue *q, int begin, int end);
+int auto_dequeue(queue *q, int count);
+
+#endif
+}}}
+
+'''queue2.c'''
+
+{{{#!plain
+#include "queue2.h"
+
+// 큐 초기화
+void queue_init(queue *q)
+{
+        int i;
+
+        q->front = -1;
+        q->rear = -1;
+
+        for (i = 0; i < MAXQUEUE; i++)
+                q->items[i] = 0;
+}
+
+// 큐에 rear에 element 추가
+int queue_enqueue(queue *q, int value)
+{
+				// 큐가 가득찬 경우
+        if ((q->front == 0 && q->rear == MAXQUEUE - 1)  ||
+                (q->rear + 1 == q->front))
+        {
+                printf("queue full!!\n");
+                return -1;
+        }
+
+				// rear값이 큐 버퍼의 최대 크기이면 
+				// 큐 버퍼의 남은 공간을 활용하기 위해 rear를 -1로 초기화(환형큐)
+        if (q->rear == MAXQUEUE - 1)
+                q->rear = -1; 
+				// 1증가(rear는 항상 1증가하면서 버퍼를 활용후 최대 크기(MAXQUEUE-1)가 되면 0부터 다시 시작한다.
+        q->rear++; 
+        q->items[q->rear] = value;
+
+        printf("front = %d, rear = %d ---> ", q->front, q->rear);
+
+        return value;
+}
+
+// 큐의 front element 원소 삭제
+int queue_dequeue(queue *q)
+{
+        int value;
+
+				// 큐가 빈 경우
+        if (q->front == q->rear)
+        {
+                printf("queue empty!!\n");
+
+                return -1;
+        }
+
+				// front값이 큐 버퍼의 최대 크기이면 
+				// 큐 버퍼의 남은 공간을 활용하기 위해 front를 -1로 초기화(환형큐)
+        if (q->front == MAXQUEUE - 1)
+                q->front = -1;
+				// 1증가(front는 항상 1증가하면서 버퍼를 활용후 최대 크기(MAXQUEUE-1)가 되면 0부터 다시 시작한다.
+        q->front++; // 1증가
+
+        value = q->items[q->front];
+        q->items[q->front] = 0;
+
+        printf("front = %d, rear = %d ---> ", q->front, q->rear);
+
+        return value;
+}
+}}}
+
+front와 rear는 항상 인덱스값이 증가하다가(같은 방향으로 인덱스 이동) 큐의 최대 크기(MAXQUEUE-1)가 되면 다시 처음 인덱스(0번)부터
+다시 시작한는 것을 보여주며 이것은 전형적인 환형큐의 예입니다.
+
+환형는 이미 사용한 남아있는 빈 공간은 활요할 수 있다는 장점이 있습니다.
+
+큐보다 더욱 효율적입니다.
+
+===  예 제 ===
+
+'''queue2_ex.c'''
+
+{{{#!plain
+#include "queue2.h"
+
+void print_queue(queue *q)
+{
+        int i;
+
+        for (i = 0; i < MAXQUEUE; i++)
+        {
+                printf("queue[%3d] = %3d\n", i, q->items[i]);
+        }
+        printf("\n");
+}
+
+// 지정한 범위 내의 숫자를 큐에 추가
+int auto_enqueue(queue *q, int begin, int end)
+{
+        int i;
+        int value;
+
+        for (i = begin; i <= end; i++) // enqueue 1~5
+        {
+                value = queue_enqueue(q, i);
+                if (value == -1)
+                        return -1;
+                else
+                        printf("enqueued value = %3d\n", value);
+        }
+
+				// 큐 출력
+        print_queue(q);
+
+        return 1;
+}
+
+
+// 지정한 개수만큼 element를 큐에서 삭제
+int auto_dequeue(queue *q, int count)
+{
+        int i;
+        int value;
+
+        for (i = 1; i <= count; i++)
+        {
+                value = queue_dequeue(q);
+                if (value == -1)
+                        return -1;
+                else
+                        printf("dequeued value = %3d\n", value);
+        }
+
+				// 큐 출력
+        print_queue(q);
+
+        return 1;
+}
+
+int main(int argc, char *argv[])
+{
+				// 큐 변수 정의
+        queue q;
+
+				// 큐 초기화
+        queue_init(&q);
+
+				// 큐 테스트
+        auto_enqueue(&q, 1, 5);
+        auto_dequeue(&q, 4);
+        auto_enqueue(&q, 6, 12);
+        auto_dequeue(&q, 5);
+        auto_enqueue(&q, 13, 14);
+
+        return 0;
+}
+}}}
+
+=== 실 행 ===
+
+{{{#!plain
+[0022][mwyun@mwyun:~/Project/queue2]$ gcc -c queue2_ex.c queue2.c
+[0022][mwyun@mwyun:~/Project/queue2]$ gcc -o queue2_ex queue2_ex.o  queue2.o
+[0022][mwyun@mwyun:~/Project/queue2]$ ./queue2_ex
+front = -1, rear = 0 ---> enqueued value =   1
+front = -1, rear = 1 ---> enqueued value =   2
+front = -1, rear = 2 ---> enqueued value =   3
+front = -1, rear = 3 ---> enqueued value =   4
+front = -1, rear = 4 ---> enqueued value =   5
+queue[  0] =   1 
+queue[  1] =   2
+queue[  2] =   3
+queue[  3] =   4
+queue[  4] =   5 <=== rear
+queue[  5] =   0 <--------------+- unused buffer
+queue[  6] =   0                |
+queue[  7] =   0                |
+queue[  8] =   0                |
+queue[  9] =   0 <--------------+
+
+front = 0, rear = 4 ---> dequeued value =   1
+front = 1, rear = 4 ---> dequeued value =   2
+front = 2, rear = 4 ---> dequeued value =   3
+front = 3, rear = 4 ---> dequeued value =   4
+queue[  0] =   0 <--------------+- unused buffer
+queue[  1] =   0                | 
+queue[  2] =   0                |
+queue[  3] =   0 <=== front <---+
+queue[  4] =   5 <=== rear
+queue[  5] =   0 <--------------+-unused buffer 
+queue[  6] =   0                |
+queue[  7] =   0                | 
+queue[  8] =   0                |
+queue[  9] =   0 <--------------+
+
+front = 3, rear = 5 ---> enqueued value =   6
+front = 3, rear = 6 ---> enqueued value =   7
+front = 3, rear = 7 ---> enqueued value =   8
+front = 3, rear = 8 ---> enqueued value =   9
+front = 3, rear = 9 ---> enqueued value =  10
+front = 3, rear = 0 ---> enqueued value =  11
+front = 3, rear = 1 ---> enqueued value =  12
+queue[  0] =  11
+queue[  1] =  12 <=== rear
+queue[  2] =   0 <--------------+- unused buffer
+queue[  3] =   0 <=== front <---+ 
+queue[  4] =   5 
+queue[  5] =   6
+queue[  6] =   7
+queue[  7] =   8
+queue[  8] =   9
+queue[  9] =  10 
+
+front = 4, rear = 1 ---> dequeued value =   5
+front = 5, rear = 1 ---> dequeued value =   6
+front = 6, rear = 1 ---> dequeued value =   7
+front = 7, rear = 1 ---> dequeued value =   8
+front = 8, rear = 1 ---> dequeued value =   9
+queue[  0] =  11
+queue[  1] =  12 <=== rear
+queue[  2] =   0 <--------------+- unused buffer
+queue[  3] =   0                |
+queue[  4] =   0                |
+queue[  5] =   0                |
+queue[  6] =   0                |
+queue[  7] =   0                |
+queue[  8] =   0 <=== front <---+
+queue[  9] =  10 
+
+front = 8, rear = 2 ---> enqueued value =  13
+front = 8, rear = 3 ---> enqueued value =  14
+queue[  0] =  11 
+queue[  1] =  12
+queue[  2] =  13
+queue[  3] =  14 <=== rear
+queue[  4] =   0 <---------------+- unused buffer
+queue[  5] =   0                 | 
+queue[  6] =   0                 |
+queue[  7] =   0                 |
+queue[  8] =   0 <=== front <----+
+queue[  9] =  10 
+
+[0022][mwyun@mwyun:~/Project/queue2]$
+}}}
+
+배열의 사용하여 큐를 구현하는 경우 링크드 리스트와는 달리 빈 공간을 낭비할 수 있습니다.
+
+그래서 일반적인 큐가 아닌 환형큐를 예를 든 것입니다.
+
+물론 링크드 리스트로도 환형큐를 구현할 수 있습니다.
+
+front와 rear의 증가 방향을 잘보면 빈 공간의 활용을 어떻게 하는지 알 수 있으며 환형큐의 작동원리를 이해할 수 있습니다.
+
+==  더블 링크드 리스트 ==
+단일 링크드 리스트는 링크가 한개만 존재하나 더블 링크드 리스트는 말 그대로 링크가 두개가 존재합니다.
+
+즉 노드는 다음 노드를 링크하는 포인터와 이전 노드를 링크하는 포인터를 가지게 됩니다.
+
+단일 링크드 리스트는 다음 노드를 링크하는 포인터만 가지므로 단방향이지만, 더블 링크드 리스트는 양방향이라고 보시면 됩니다.
+
+노드 탐색이 휠씬 유리합니다.
+
+===  소 스 ===
+
+'''dlist.h'''
+
+{{{#!plain
+#ifndef _DLIST_H
+#define _DLIST_H
+
+#include <stdlib.h>
+
+typedef struct DListElmt_ {
+        void *data;
+        struct DListElmt_ *prev; // 이전 element의 포인터
+        struct DListElmt_ *next; // 다음 element의 포인터
+} DListElmt;
+
+typedef struct DList_ {
+        int size;
+        int (*match)(const void *key1, const void *key2);
+        void (*destroy)(void *data);
+        DListElmt *head; // head element
+        DListElmt *tail; // tail element
+} DList;
+
+void dlist_init(DList *list, void (*destroy)(void *data));
+void dlist_destroy(DList *list);
+int dlist_ins_next(DList *list, DListElmt *element, const void *data);
+int dlist_ins_prev(DList *list, DListElmt *element, const void *data);
+int dlist_remove(DList *list, DListElmt *element, void **data);
+
+#define dlist_size(list) ((list)->size)
+#define dlist_head(list) ((list)->head)
+#define dlist_tail(list) ((list)->tail)
+#define dlist_is_head(list, element) ((element) == (list)->head ? 1 : 0)
+#define dlist_is_tail(element) ((element)->next == NULL ? 1 : 0)
+#define dlist_data(element) ((element)->data)
+#define dlist_prev(element) ((element)->prev)
+#define dlist_next(element) ((element)->next)
+
+#endif
+}}}
+
+'''dlist.c'''
+
+{{{#!plain
+#include <stdlib.h>
+#include <string.h>
+
+#include "dlist.h"
+
+// DList 초기화
+void dlist_init(DList *list, void (*destroy)(void *data))
+{
+        list->size = 0;
+        list->destroy = destroy;
+        list->head = 0;
+        list->tail = 0;
+
+        return;
+}
+
+// DList 파기(메모리 해제) 
+void dlist_destroy(DList *list)
+{
+        void *data;
+
+        while (dlist_size(list) > 0)
+        {
+                if (dlist_remove(list, dlist_tail(list), (void **)&data) == 0 && list->destroy
+!= NULL)
+                {
+                        list->destroy(data);
+                }
+        }
+
+        memset(list, 0, sizeof(DList));
+
+        return;
+}
+
+// DList의 element 다음에 새로운 element 추가
+int dlist_ins_next(DList *list, DListElmt *element, const void *data)
+{
+        DListElmt *new_element;
+
+        if (element == NULL && dlist_size(list) != 0)
+                return -1;
+
+				// 새로운 element 생성
+        if ((new_element = (DListElmt *)malloc(sizeof(DListElmt))) == NULL)
+                return -1;
+
+        new_element->data = (void *)data;
+
+				// DList에 element가 한 개도 없으면
+        if (dlist_size(list) == 0) // 첫 element 추가
+        {
+                list->head = new_element; // head에 저장
+                list->head->prev = NULL;
+                list->head->next = NULL;
+                list->tail = new_element; // tail에 저장
+        }
+			  // element 다음에 새로운 element 추가
+        else
+        {
+							  // 양방향 연결이기 때문에 next, prev 값을 정확히 저장해야 링크가 끊기지 않는다.
+                new_element->next = element->next;
+                new_element->prev = element;
+
+								// element가 tail이면 새로운 element를 tail에 저장
+                if (element->next == NULL)
+                        list->tail = new_element;  
+                else
+                        element->next->prev = new_element; // element->next의 element의 prev에 새로운 element 저장
+
+								// element->next은 새로운 element를 저장
+                element->next = new_element;
+        }
+
+ 				list->size++;  // DList의 size 증가
+
+        return 0;
+}
+
+// DList의 element 이전에 새로운 element 추가
+int dlist_ins_prev(DList *list, DListElmt *element, const void *data)
+{
+        DListElmt *new_element;
+
+        if (element == NULL && dlist_size(list) != 0)
+                return -1;
+
+				// 새로운 element 생성
+        if ((new_element = (DListElmt *)malloc(sizeof(DListElmt))) == NULL)
+                return -1;
+
+        new_element->data = (void *)data;
+
+				// DList에 element가 한 개도 없으면
+        if (dlist_size(list) == 0) // 첫 element 추가
+        {
+                list->head = new_element;// head에 저장
+                list->head->prev = NULL;
+                list->head->next = NULL;
+                list->tail = new_element; // tail에 저장
+				}
+				// element 이전에 새로운 element 추가
+ 			  else
+        {
+								// 양방향 연결이기 때문에 next, prev 값을 정확히 저장해야 링크가 끊기지 않는다.
+                new_element->next = element;
+                new_element->prev = element->prev;
+
+								// element가 head이면 새로운 element를 head에 저장
+                if (element->prev== NULL)
+                        list->head = new_element;
+                else // element->prev의 element의 next에 새로운 element 저장
+                        element->prev->next = new_element;
+
+								// element->prev는 새로운 element를 저장
+                element->prev = new_element;
+        }
+
+        list->size++; // DList의 size 증가
+
+        return 0;
+}
+
+// DList의 element 삭제
+int dlist_remove(DList *list, DListElmt *element, void **data)
+{
+        DListElmt *old_element;
+
+        if (element == NULL|| dlist_size(list) == 0)
+                return -1;
+
+        *data = element->data;
+
+				// element가 head이면
+        if (element == list->head)
+        {
+                list->head = element->next; // element 다음 element를 head에 저장
+
+                if (list->head == NULL) // element가 한 개도 없는 경우
+                        list->tail = NULL; // tail도 NULL
+                else  // element->next가 있다면 그 element의 prev를 NULL로 저장
+                        element->next->prev = NULL;
+        }
+				// 그렇지 않으면
+        else
+        {
+								// 이전 element의 next는 element의 next를 저장
+                element->prev->next = element->next;
+
+								// element->next가 NULL이면 
+                if (element->next == NULL)
+                        list->tail = element->prev; // element->prev를 tail에 저장
+                else
+                        element->next->prev = element->prev;
+        }
+
+        free(element); // element 메모리 해제
+        list->size--; // DList의 size 감소
+
+        return 0;
+}
+}}}
+
+===  예 제 === 
+
+'''dlist_ex.c'''
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "dlist.h"
+
+// DList의 모든 element 출력
+static void print_list(const DList *list)
+{
+        DListElmt *element;
+        int *data, i;
+
+        fprintf(stdout, "DList size is %d\n", dlist_size(list));
+
+        i = 0;
+				// DList의 head 저장
+        element = dlist_head(list);
+
+        while (1)
+        {
+								// element의 data 저장
+                data = dlist_data(element);
+                fprintf(stdout, "list[%03d] = %03d\n", i, *data);
+
+                i++;
+
+                if (dlist_is_tail(element)) // element가 tail이면 break
+                        break;
+                else
+                        element = dlist_next(element); // 그렇지 않으면 다음 element 저장
+        }
+
+        return;
+}
+
+// 메인 함수
+int main(int argc, char *argv[])
+{
+        DList list;
+        DListElmt *element;
+        int *data, i;
+
+				// DList 초기화
+        dlist_init(&list, free);
+
+        element = dlist_head(&list);
+
+				// DList에 element 추가(10~1)
+        for (i = 10; i > 0; i--)
+        {
+                if ((data = (int *)malloc(sizeof(int))) == NULL)
+                        return 1;
+
+                *data = i;
+
+							  // DList에 element 추가
+								// 2번째 인자가 head이므로 새로운 element는 head 앞에 추가
+                if (dlist_ins_prev(&list, dlist_head(&list), data) != 0)
+                        return 1;
+        }
+
+				// DList 출력
+        print_list(&list);
+
+        element = dlist_head(&list);
+
+				// 9번째 element 삭제
+        for (i = 0; i < 8; i++)
+                element = dlist_next(element);
+
+        data = dlist_data(element);
+        fprintf(stdout, "Removing an element after the one containing %03d\n", *data);
+
+        if (dlist_remove(&list, element, (void **)&data) != 0)
+                return 1;
+
+				// DList 출력
+				print_list(&list);
+
+				// tail 다음에 새로운 element 추가
+        fprintf(stdout, "Inserting 011 at the tail of the list\n");
+
+        *data = 11;
+        if (dlist_ins_next(&list, dlist_tail(&list), data) != 0)
+                return 1;
+
+			  // DList 출력
+        print_list(&list);
+
+				// tail element 삭제
+        fprintf(stdout, "Removing an element at the tail of the list\n");
+
+        element = dlist_tail(&list);
+        if (dlist_remove(&list, element, (void **)&data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// tail 이전에 새로운 element 추가
+        fprintf(stdout, "Inserting 012 just before the tail of list\n");
+
+        *data = 12;
+        if (dlist_ins_prev(&list, dlist_tail(&list), data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// 네번째 element 삭제
+        fprintf(stdout, "Interatin and removing the fourth element\n");
+				// prev, next를 이용해서 element 이동
+        element = dlist_head(&list);
+        element = dlist_next(element);
+				element = dlist_prev(element);
+        element = dlist_next(element);
+        element = dlist_prev(element);
+        element = dlist_next(element);
+        element = dlist_next(element);
+        element = dlist_next(element);
+
+        if (dlist_remove(&list, element, (void **)&data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// 첫번째 element(head) 앞에 새로운 element 추가
+        fprintf(stdout, "Inserting 013 before the first element\n");
+
+        *data = 13;
+        if (dlist_ins_prev(&list, dlist_head(&list), data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// head element 삭제
+        fprintf(stdout, "Removing an element at the head of the list\n");
+
+        if (dlist_remove(&list, dlist_head(&list), (void **)&data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// head 다음에 새로운 element 추가
+        fprintf(stdout, "Inserting 014 just after the head of the list\n");
+
+        *data = 14;
+				if (dlist_ins_next(&list, dlist_head(&list), data) != 0)
+                return 1;
+				
+				// DList 출력
+        print_list(&list);
+
+				// 2번째 element 다음에 새로운 element 추가
+        fprintf(stdout, "Inserting 015 two element after the head of the list\n");
+
+        if ((data = (int *)malloc(sizeof(int))) == NULL)
+                return 1;
+
+        *data = 15;
+        element = dlist_head(&list);
+        element = dlist_next(element);
+
+        if (dlist_ins_next(&list, element, data) != 0)
+                return 1;
+
+				// DList 출력
+        print_list(&list);
+
+				// DList의 head, tail element가 올바른지 비교 
+        i = dlist_is_head(&list, dlist_head(&list));
+        fprintf(stdout, "Testing list is head value = %d (1=OK)\n", i);
+        i = dlist_is_head(&list, dlist_tail(&list));
+        fprintf(stdout, "Testing dlist is head value = %d (0=OK)\n", i);
+        i = dlist_is_tail(dlist_tail(&list));
+        fprintf(stdout, "Testing dlist is tail value = %d (1=OK)\n", i);
+        i = dlist_is_tail(dlist_head(&list));
+        fprintf(stdout, "Testing dlist is tail value = %d (0=OK)\n", i);
+
+				// DList 제거
+        fprintf(stdout, "Destroying the list\n");
+        dlist_destroy(&list);
+	
+				return 0;
+}
+}}}
+
+===  실 행 ===
+
+{{{#!plain
+[0120][mwyun@mwyun:~/Project/double_linked_list_ex]$ gcc -c dlist.c dlist_ex.c
+[0120][mwyun@mwyun:~/Project/double_linked_list_ex]$ gcc -o dlist_ex dlist_ex.o dlist.o
+[0120][mwyun@mwyun:~/Project/double_linked_list_ex]$ ./dlist_ex
+DList size is 10
+list[000] = 001 <=== head
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 009
+list[009] = 010 <=== tail
+Removing an element after the one containing 009
+DList size is 9
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+Inserting 011 at the tail of the list
+DList size is 10
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+list[009] = 011
+Removing an element at the tail of the list
+DList size is 9
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 010
+Inserting 012 just before the tail of list
+DList size is 10
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 004
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 012
+list[009] = 010
+Interatin and removing the fourth element
+DList size is 9
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 005
+list[004] = 006
+list[005] = 007
+list[006] = 008
+list[007] = 012
+list[008] = 010
+Inserting 013 before the first element
+DList size is 10
+list[000] = 013
+list[001] = 001
+list[002] = 002
+list[003] = 003
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 012
+list[009] = 010
+Removing an element at the head of the list
+DList size is 9
+list[000] = 001
+list[001] = 002
+list[002] = 003
+list[003] = 005
+list[004] = 006
+list[005] = 007
+list[006] = 008
+list[007] = 012
+list[008] = 010
+Inserting 014 just after the head of the list
+DList size is 10
+list[000] = 001
+list[001] = 014
+list[002] = 002
+list[003] = 003
+list[004] = 005
+list[005] = 006
+list[006] = 007
+list[007] = 008
+list[008] = 012
+list[009] = 010
+Inserting 015 two element after the head of the list
+DList size is 11
+list[000] = 001
+list[001] = 014
+list[002] = 015
+list[003] = 002
+list[004] = 003
+list[005] = 005
+list[006] = 006
+list[007] = 007
+list[008] = 008
+list[009] = 012
+list[010] = 010
+Testing list is head value = 1 (1=OK)
+Testing dlist is head value = 0 (0=OK)
+Testing dlist is tail value = 1 (1=OK)
+Testing dlist is tail value = 0 (0=OK)
+Destroying the list
+[0120][mwyun@mwyun:~/Project/double_linked_list_ex]$
+}}}
+
+===  그 림 ===
+
+그림으로 보면 더욱 이해가 빠르므로 다음 3개의 함수에 대해 도식화하였습니다.
+
+'''dlist_ins_next 함수'''
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/YSEDjEy8e09k2tSbewjglw?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/THf01Z_gohI/AAAAAAAABjY/xKbsg-zSeVA/s800/dlist_ins_next.jpg" /></a>
+}}}
+
+'''dlist_ins_prev 함수'''
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/vwzAbO66YW99vfe8veW9Aw?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/THf01jULypI/AAAAAAAABjc/gWBft3pJM40/s800/dlist_ins_prev.jpg" /></a>
+}}}
+
+'''dlist_remove 함수'''
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/-GLeADnIweEJZ8uRToa1bg?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/THf01sFvz1I/AAAAAAAABjg/cGbIx2gBHD0/s800/dlist_remove.jpg" /></a>
+}}}
+== 프로젝트 ==
+
+다음 강좌를 참조하시면 됩니다.
+
+ * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_network_calc  계산기&채팅 C/S 프로그램]
+
+== 참고문헌 ==
+ * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_calculator 다양한 계산기 알고리즘]
+ * [http://www.joinc.co.kr/search.php?query=&topic=43 joinc 자료구조 섹션]
+
+강좌로 올린 소스는 다음 서적에 실린 예제로 알고 있습니다.
+
+C로 구현한 알고리즘, 카일 루든(Kyle Loudon) 저/허욱 역, 한빛미디어 
+
+URL: http://hanbitbook.co.kr/look.php?isbn=89-7914-063-0
+
+독자서평을 보니 대체적으로 좋은 반응이군요 
+
+깊은 이해를 원하시는 분들은 서적을 구입해서 보셨으면 합니다.
+
+[[Category(3)]]

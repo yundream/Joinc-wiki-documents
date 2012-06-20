@@ -1,0 +1,85 @@
+#title linux man page : getpeername - 연결된 상대측 소켓 주소 정보를 가져온다.
+
+== getpeername ==
+연결된 상대측 소켓 주소 정보를 가져온다.
+
+=== 사용 법 ===
+{{{#!plain
+#include <sys/socket.h>
+
+int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+}}}
+
+=== 설명 ===
+getpeername함수는 소켓 지시자 sockfd에 연결한 상대의 주소 정보를 가져온다. 주소 정보는 __addr__로 넘어온다. __addrlen__는 addr구조체의 크기다. 함수가 반환된 다음에는 가져온 addr 자료구조의 크기 값을 바이트로 돌려준다.
+
+=== 반환 ===
+성공하면 0을 실패하면 -1을 반환한다. 
+
+=== 예제 ===
+{{{#!plain
+#include <sys/types.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <arpa/inet.h>
+
+int main()
+{
+    int sockfd;
+    int client_sockfd;
+    int client_len;
+    int state;
+    struct sockaddr_in clientaddr, serveraddr, myaddr,test;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(4444);
+
+
+    state = bind(sockfd , (struct sockaddr *)&serveraddr,
+            sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+
+
+    state = listen(sockfd, 5);
+    if (state == -1)
+    {
+        perror("listen error : ");
+        exit(0);
+    }
+    client_len = sizeof(clientaddr);
+    client_sockfd = accept(sockfd, (struct sockaddr *)&clientaddr,
+                            &client_len);
+
+
+    // 로컬 소켓의 정보를 얻어온다. 
+    // 언어온 정보는 myaddr 에 채워진다. 
+    getpeername(client_sockfd, (struct sockaddr *)&myaddr, &client_len);
+
+
+    // 얻어온 정보를 출력한다.
+    printf("Port    : %d\n", ntohs(myaddr.sin_port));
+    printf("address : %s\n", inet_ntoa(myaddr.sin_addr));
+
+    close(client_sockfd);
+    return 1;
+}
+}}}
+
+로컬 소켓의 주소 정보는 getsockname(2)함수로 가져올 수 있다.

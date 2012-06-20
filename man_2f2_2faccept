@@ -1,0 +1,266 @@
+#title accept - 소켓으로 부터 연결을 받아들인다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN18"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN21"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>소켓에 연결을 받아들인다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+
+#include &#60;sys/socket.h&#62;
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>(int s, struct sockaddr *addr, socklen_t *addrlen);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>() 함수는 연결지향 소켓 타입 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=
+		">
+		</a>(SOCK_STREAM, SOCK_SEQPACKET, SOCK_RDM)에 사용된다. 
+		이것은 아직 처리되지 않은 연결들이 대기하고 있는 큐에서 제일 처음 
+		연결된 연결을 가져와서 새로운 연결된 소켓을 만든다. 그리고 소켓을 
+		가르키는 파일 지정자를 할당하고 이것을 리턴한다.    
+	</P
+><P
+>		인자 <B
+CLASS="EMPHASIS"
+>s</B
+> 는 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=socket">socket</a>() 로 만들어진 
+		end-point(듣기 소켓)을 위한 파일지정자이다. 
+	</P
+><P
+>		인자 <B
+CLASS="EMPHASIS"
+>addr</B
+> 는 sockaddr 구조체에 대한 포인터이다. 
+		연결이 성공되면 이 구조체를 채워서 되돌려 주게 되고, 우리는 이구조체의 
+		정보를 이용해서 연결된 클라이언트의 인터넷 정보를 알아낼수 있다. 
+		<B
+CLASS="EMPHASIS"
+>addrlen</B
+> 인자는 <B
+CLASS="EMPHASIS"
+>addr</B
+>의 크기 
+		이다.  
+	</P
+><P
+>		만약 미결인 연결이 큐에 존재하지 않고, 소켓이 비봉쇄가 아니라면 
+		accept 는 연결이 존재할때까지 해당영역에서 봉쇄된다. 
+		비봉쇄 소켓일경우에는 errno 로 EAGAIN 을 설정하고 바로 리턴한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		에러시 -1이 반환된다. 성공한다면 받아들인 소켓을 위한 파일지정번호 
+		(0보다 큰)을 반환한다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>1.4&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+
+#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62; 
+#include &#60;stdlib.h&#62; 
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;netinet/in.h&#62;
+
+#include &#60;arpa/inet.h&#62;
+#include &#60;fcntl.h&#62;
+
+#define SA    struct sockaddr
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=main">main</a>(int argc, char **argv)
+{
+    int i, maxi, sockfd;
+    int nread;
+    int state = 0;
+    int port;
+    int n;
+    int fd;
+    int clilen;
+
+    char buf_out[1024];
+    char buf_in[1024];
+    char *header;
+
+    int server_sockfd, client_sockfd;
+
+    struct sockaddr_in clientaddr, serveraddr;
+
+    // socket 함수를 이용해서 end-point 소켓을 
+    // 만든다.
+    server_sockfd = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=socket">socket</a>(AF_INET, SOCK_STREAM, 0);    
+    bzero(&#38;serveraddr, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr));
+
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=htonl">htonl</a>(INADDR_ANY);
+    serveraddr.sin_port = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=htons">htons</a>(8080);
+
+    // 소켓특성을 묶어준다. 
+    bind (server_sockfd, (SA *)&#38;serveraddr, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr));
+    if ((state = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=listen">listen</a>(server_sockfd, 5)) == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("listen error : ");
+        exit;
+    }
+
+    header = "HTTP/1.1 200 OK\n"
+    "Date: Fri, 01 Feb 2002 01:34:56 GMT\n"
+    "Server: Apache/1.3.19 (Unix) PHP/4.0.6\n"
+    "X-Powered-By: PHP/4.0.6\n"
+    "Connection: close\n"
+    "Content-Type: text/html\n\n";
+
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+    {
+        clilen = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(clientaddr);
+
+        // <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=socket">socket</a>() 함수를 이용해서 만들어진 end-point 소켓지정번호인 
+        // server_sockfd 에 연결이 들어오는지를 기다린다.  
+        if ((client_sockfd = accept(server_sockfd, (SA *)&#38;clientaddr, &#38;clilen)) == -1)
+        {
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("accept error : ");
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(client_sockfd);
+        }
+
+        fd = open("/root/index.html", O_RDONLY);
+
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=memset">memset</a>(buf_in, 0x00, 1024);
+        while ((n = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=read">read</a>(client_sockfd, buf_in, 1024)) &#62; 0)
+        {
+            break;
+        }
+
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=printf">printf</a>("ok end\n");
+        write(client_sockfd, header, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=strlen">strlen</a>(header)); 
+
+        while ( (n = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=read">read</a>(fd, buf_out, 255)) &#62; 0)    
+        {
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=write">write</a>(client_sockfd, buf_out, n);
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=bzero">bzero</a>(buf_out, 0x00, 255);
+        }
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(client_sockfd);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위의 예제는 간단한 - 단지 text/html 페이지만 제대로 뿌려줄수 있는 - 
+		웹서버이다. 8080 포트로 조정되어 있으니, 
+		컴파일후 실행시키고 mozilla와 같은 웹브라우저를 통해서 
+		테스트 해보길 바란다. 주소창에 http://127.0.0.1:8080 을 입력하면 된다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+[[tag(네트워크프로그래밍,TCP,IP)]]

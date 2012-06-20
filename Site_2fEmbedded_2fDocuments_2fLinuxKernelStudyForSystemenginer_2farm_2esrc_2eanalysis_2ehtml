@@ -1,0 +1,1877 @@
+#title 소스분석
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>소스 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="ARM 리눅스"
+HREF="chap04.html"><LINK
+REL="PREVIOUS"
+TITLE="ARM 리눅스 Makefile 분석"
+HREF="arm.makefile.html"><LINK
+REL="NEXT"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="arm.makefile.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>4장. ARM 리눅스</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="chap05.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="ARM.SRC.ANALYSIS"
+>4.4. 소스 분석</A
+></H1
+><P
+>			$(TOPDIR)/vmlinux가 실행되기 전 까지의 소스 코드를 분석한다.
+		</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="ARM.SRC.HEAD.S"
+>4.4.1. arch/arm/boot/compressed/head.S</A
+></H2
+><P
+>				커널 이미지의 제일 처음 실행되는 부분으로 head.S, misc.S, head-sa1100.S가 같이 실행된다.
+				이 중 head.S는 메모리 초기화에 해당하는 중요한 역할을 담당한다. 아래 소스 코드를 보고 분석해보자.
+			</P
+><P
+>				커널 이미지가 메모리에 어떤 위치에 올려지고 압축 풀린 것이 어디에 위치하고 다시 어디로
+				옮겨지는지 등에 관해 도식적으로 나타내봤다. <A
+HREF="arm.src.analysis.html#FIGURE.ARM-KERNEL-MMAP"
+>그림 4-9</A
+>을
+				참조하면서 head.S를 분석한다.
+			</P
+><P
+>				<DIV
+CLASS="FIGURE"
+><A
+NAME="FIGURE.ARM-KERNEL-MMAP"
+></A
+><P
+><B
+>그림 4-9. ARM 리눅스 커널 이미지 메모리 맵</B
+></P
+><P
+>
+}}}
+attachment:arm-kernel-mmap.png
+{{{#!html
+</P
+></DIV
+>
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ *  linux/arch/arm/boot/compressed/head.S
+ *
+ *  Copyright (C) 1996-1999 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+#include &#60;linux/config.h&#62;
+#include &#60;linux/linkage.h&#62;
+
+/*
+ * Debugging stuff
+ *
+ * Note that these macros must not contain any code which is not
+ * 100% relocatable.  Any attempt to do so will result in a crash.
+ * Please select one of the following when turning on debugging.
+ */
+#ifdef DEBUG
+#if defined(CONFIG_DEBUG_DC21285_PORT)
+		.macro	loadsp,	rb
+		mov	\rb, #0x7c000000
+		.endm
+		.macro	writeb,	rb
+		strb	\rb, [r3, #0x3f8]
+		.endm
+#elif defined(CONFIG_ARCH_RPC)
+		.macro	loadsp,	rb
+		mov	\rb, #0x03000000
+		orr	\rb, \rb, #0x00010000
+		.endm
+		.macro	writeb,	rb
+		strb	\rb, [r3, #0x3f8 &#60;&#60; 2]
+		.endm
+#elif defined(CONFIG_ARCH_INTEGRATOR)
+		.macro	loadsp, rb
+		mov	\rb, #0x16000000
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0]
+		.endm
+#elif defined(CONFIG_ARCH_SA1100)
+		.macro	loadsp, rb
+		mov	\rb, #0x80000000	@ physical base address
+#  if defined(CONFIG_DEBUG_LL_SER3)
+		add	\rb, \rb, #0x00050000	@ Ser3
+#  else
+		add	\rb, \rb, #0x00010000	@ Ser1
+#  endif
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0x14]	@ UTDR
+		.endm
+#else
+#error no serial architecture defined
+#endif
+#endif
+
+		.macro	kputc,val
+		mov	r0, \val
+		bl	putc
+		.endm
+
+		.macro	kphex,val,len
+		mov	r0, \val
+		mov	r1, #\len
+		bl	phex
+		.endm
+
+		.macro	debug_reloc_start
+#ifdef DEBUG
+		kputc	#'\n'
+		kphex	r6, 8		/* processor id */
+		kputc	#':'
+		kphex	r7, 8		/* architecture id */
+		kputc	#':'
+		mrc	p15, 0, r0, c1, c0
+		kphex	r0, 8		/* control reg */
+		kputc	#'\n'
+		kphex	r5, 8		/* decompressed kernel start */
+		kputc	#'-'
+		kphex	r8, 8		/* decompressed kernel end  */
+		kputc	#'&#62;'
+		kphex	r4, 8		/* kernel execution address */
+		kputc	#'\n'
+#endif
+		.endm
+
+		.macro	debug_reloc_end
+#ifdef DEBUG
+		kphex	r5, 8		/* end of kernel */
+		kputc	#'\n'
+		mov	r0, r4
+		bl	memdump		/* dump 256 bytes at start of kernel */
+#endif
+		.endm
+
+<A
+NAME="ARM.HEAD.1"
+><B
+>(1)</B
+></A
+>
+		.section ".start", #alloc, #execinstr
+/*
+ * sort out different calling conventions
+ */
+		.align
+start:
+<A
+NAME="ARM.HEAD.2"
+><B
+>(2)</B
+></A
+>
+		.type	start,#function
+		.rept	8
+		mov	r0, r0
+		.endr
+
+<A
+NAME="ARM.HEAD.3"
+><B
+>(3)</B
+></A
+>
+		b	1f
+		.word	0x016f2818		@ Magic numbers to help the loader
+		.word	start			@ absolute load/run zImage address
+		.word	_edata			@ zImage end address
+1:		mov	r7, r1			@ save architecture ID
+		mov	r8, #0			@ save r0
+
+#ifndef __ARM_ARCH_2__
+		/*
+		 * Booting from Angel - need to enter SVC mode and disable
+		 * FIQs/IRQs (numeric definitions from angel arm.h source).
+		 * We only do this if we were in user mode on entry.
+		 */
+		mrs	r2, cpsr		@ get current mode
+		tst	r2, #3			@ not user?
+		bne	not_angel
+		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
+		swi	0x123456		@ angel_SWI_ARM
+not_angel:
+		mrs	r2, cpsr		@ turn off interrupts to
+		orr	r2, r2, #0xc0		@ prevent angel from running
+		msr	cpsr_c, r2
+#else
+		teqp	pc, #0x0c000003		@ turn off interrupts
+#endif
+
+		/*
+		 * Note that some cache flushing and other stuff may
+		 * be needed here - is there an Angel SWI call for this?
+		 */
+
+		/*
+		 * some architecture specific code can be inserted
+		 * by the linker here, but it should preserve r7 and r8.
+		 */
+
+		/*
+		 * ldmia에 의해 읽혀지는 값은 다음과 같다.
+		 * r2 : __bss_start
+		 * r3 : __end
+		 * r4 : _load_addr
+		 * r5 : _start
+		 * r6 : _usr_stack+4096
+		 */
+
+		.text
+1:		adr	r2, <A
+HREF="arm.src.analysis.html#LC0"
+>LC0</A
+>
+		ldmia	r2, {r2, r3, r4, r5, sp}
+
+		mov	r0, #0
+1:		str	r0, [r2], #4		@ clear bss
+		str	r0, [r2], #4
+		str	r0, [r2], #4
+		str	r0, [r2], #4
+		cmp	r2, r3
+		blt	1b
+
+		mrc	p15, 0, r6, c0, c0	@ get processor ID
+		bl	cache_on
+
+<A
+NAME="ARM.HEAD.9"
+><B
+>(4)</B
+></A
+>
+		mov	r1, sp			@ malloc space above stack
+		add	r2, sp, #0x10000	@ 64k max
+
+<A
+NAME="ARM.HEAD.10"
+><B
+>(5)</B
+></A
+>
+		teq	r4, r5			@ will we overwrite ourselves?
+		moveq	r5, r2			@ decompress after image
+		movne	r5, r4			@ decompress to final location
+
+<A
+NAME="ARM.HEAD.11"
+><B
+>(6)</B
+></A
+>
+		mov	r0, r5
+		mov	r3, r7
+		bl	SYMBOL_NAME(decompress_kernel)
+
+<A
+NAME="ARM.HEAD.12"
+><B
+>(7)</B
+></A
+>
+		teq	r4, r5			@ do we need to relocate
+		beq	call_kernel		@ the kernel?
+
+<A
+NAME="ARM.HEAD.13"
+><B
+>(8)</B
+></A
+>
+		add	r0, r0, #127
+		bic	r0, r0, #127		@ align the kernel length
+/*
+ * r0     = decompressed kernel length
+ * r1-r3  = unused
+ * r4     = kernel execution address
+ * r5     = decompressed kernel start
+ * r6     = processor ID
+ * r7     = architecture ID
+ * r8-r14 = unused
+ */
+		add	r1, r5, r0		@ end of decompressed kernel
+		adr	r2, <A
+HREF="arm.src.analysis.html#RELOC-START"
+>reloc_start</A
+>
+		adr	r3, <A
+HREF="arm.src.analysis.html#RELOC-END"
+>reloc_end</A
+>
+1:		ldmia	r2!, {r8 - r13}		@ copy relocation code
+		stmia	r1!, {r8 - r13}
+		ldmia	r2!, {r8 - r13}
+		stmia	r1!, {r8 - r13}
+		cmp	r2, r3
+		blt	1b
+
+<A
+NAME="ARM.HEAD.14"
+><B
+>(9)</B
+></A
+>
+		bl	cache_clean_flush
+		add	pc, r5, r0		@ call relocation code
+
+<A
+NAME="LC0"
+></A
+>
+/*
+ * _load_addr		: 0xc0008000
+ * _start		: 0xc0008000
+ * _user_stack+4096	: 총 4KB 만큼을 stack으로 할당하게 된다.
+ */
+		.type	LC0, #object
+LC0:		.word	__bss_start
+		.word	_end
+		.word	_load_addr
+		.word	_start
+		.word	<A
+HREF="arm.src.analysis.html#USER-STACK"
+>user_stack</A
+>+4096
+		.size	LC0, . - LC0
+
+/*
+ * Turn on the cache.  We need to setup some page tables so that we
+ * can have both the I and D caches on.
+ *
+ * We place the page tables 16k down from the kernel execution address,
+ * and we hope that nothing else is using it.  If we're using it, we
+ * will go pop!
+ *
+ * On entry,
+ *  r4 = kernel execution address
+ *  r6 = processor ID
+ *  r7 = architecture number
+ *  r8 = run-time address of "start"
+ * On exit,
+ *  r0, r1, r2, r3, r8, r9 corrupted
+ * This routine must preserve:
+ *  r4, r5, r6, r7
+ */
+<A
+NAME="ARM.HEAD.4"
+><B
+>(10)</B
+></A
+>
+		.align	5
+cache_on:	ldr	r1, proc_sa110_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #5		@ catch SA110 and SA1100
+		beq	1f
+		ldr     r1, proc_sa1110_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #4
+@		movne	pc, lr
+		bne	cache_off
+<A
+NAME="ARM.HEAD.5"
+><B
+>(11)</B
+></A
+>
+1:
+		sub	r3, r4, #16384		@ Page directory size
+		bic	r3, r3, #0xff		@ Align the pointer
+		bic	r3, r3, #0x3f00
+<A
+NAME="ARM.HEAD.6"
+><B
+>(12)</B
+></A
+>
+/*
+ * Initialise the page tables, turning on the cacheable and bufferable
+ * bits for the RAM area only.
+ */
+		mov	r0, r3
+		mov	r8, r0, lsr #18
+		mov	r8, r8, lsl #18		@ start of RAM
+		add	r9, r8, #0x10000000	@ a reasonable RAM size
+		mov	r1, #0x12
+		orr	r1, r1, #3 &#60;&#60; 10
+		add	r2, r3, #16384
+1:		cmp	r1, r8			@ if virt &#62; start of RAM
+		orrge	r1, r1, #0x0c		@ set cacheable, bufferable
+		cmp	r1, r9			@ if virt &#62; end of RAM
+		bicge	r1, r1, #0x0c		@ clear cacheable, bufferable
+		str	r1, [r0], #4		@ 1:1 mapping
+		add	r1, r1, #1048576
+		teq	r0, r2
+		bne	1b
+/*
+ * If ever we are running from Flash, then we surely want the cache
+ * to be enabled also for our execution instance...  We map 2MB of it
+ * so there is no map overlap problem for up to 1 MB compressed kernel.
+ * If the execution is in RAM then we would only be duplicating the above.
+ */
+		mov	r1, #0x1e
+		orr	r1, r1, #3 &#60;&#60; 10
+		mov	r2, pc, lsr #20
+		orr	r1, r1, r2, lsl #20
+		add	r0, r3, r2, lsl #2
+		str	r1, [r0], #4
+		add	r1, r1, #1048576
+		str	r1, [r0]
+
+		mov	r0, #0
+		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
+		mcr	p15, 0, r0, c8, c7	@ flush I,D TLBs
+		mcr	p15, 0, r3, c2, c0	@ load page table pointer
+		mov	r0, #-1
+		mcr	p15, 0, r0, c3, c0	@ load domain access register
+		mrc	p15, 0, r0, c1, c0
+		orr	r0, r0, #0x1000		@ I-cache enable
+#ifndef DEBUG
+		orr	r0, r0, #0x003d		@ Write buffer, mmu
+#endif
+		mcr	p15, 0, r0, c1, c0
+		mov	pc, lr
+
+<A
+NAME="RELOC-START"
+></A
+>
+/*
+ * This code is relocatable.  It is relocated by the above code to the end
+ * of the kernel and executed there.  During this time, we have no stacks.
+ *
+ * r0     = decompressed kernel length
+ * r1-r3  = unused
+ * r4     = kernel execution address
+ * r5     = decompressed kernel start
+ * r6     = processor ID
+ * r7     = architecture ID
+ * r8-r14 = unused
+ */
+		.align	5
+reloc_start:	add	r8, r5, r0
+		debug_reloc_start
+		mov	r1, r4
+1:
+		.rept	4
+		ldmia	r5!, {r0, r2, r3, r9 - r13}	@ relocate kernel
+		stmia	r1!, {r0, r2, r3, r9 - r13}
+		.endr
+
+		cmp	r5, r8
+		blt	1b
+		debug_reloc_end
+
+call_kernel:	bl	cache_clean_flush
+		bl	cache_off
+		mov	r0, #0
+		mov	r1, r7			@ restore architecture number
+		mov	pc, r4			@ call kernel
+
+/*
+ * Here follow the relocatable cache support functions for
+ * the various processors.
+ */
+
+		.type	proc_sa110_type,#object
+proc_sa110_type:
+		.word	0x4401a100
+		.size	proc_sa110_type, . - proc_sa110_type
+
+		.type	proc_sa1110_type,#object
+proc_sa1110_type:
+		.word	0x6901b110
+		.size	proc_sa1110_type, . - proc_sa1110_type
+
+/*
+ * Turn off the Cache and MMU.  ARMv3 does not support
+ * reading the control register, but ARMv4 does.
+ *
+ * On entry,  r6 = processor ID
+ * On exit,   r0, r1 corrupted
+ * This routine must preserve: r4, r6, r7
+ */
+		.align	5
+cache_off:
+#ifdef CONFIG_CPU_ARM610
+		eor	r1, r6, #0x41000000
+		eor	r1, r1, #0x00560000
+		bic	r1, r1, #0x0000001f
+		teq	r1, #0x00000600
+		mov	r0, #0x00000060		@ ARM6 control reg.
+		beq	__armv3_cache_off
+#endif
+#ifdef CONFIG_CPU_ARM710
+		eor	r1, r6, #0x41000000
+		bic	r1, r1, #0x00070000
+		bic	r1, r1, #0x000000ff
+		teq	r1, #0x00007000		@ ARM7
+		teqne	r1, #0x00007100		@ ARM710
+		mov	r0, #0x00000070		@ ARM7 control reg.
+		beq	__armv3_cache_off
+#endif
+		mrc	p15, 0, r0, c1, c0
+		bic	r0, r0, #0x000d
+		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
+		mov	r0, #0
+		mcr	p15, 0, r0, c7, c7	@ invalidate whole cache v4
+		mcr	p15, 0, r0, c8, c7	@ invalidate whole TLB v4
+		mov	pc, lr
+
+__armv3_cache_off:
+		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
+		mov	r0, #0
+		mcr	p15, 0, r0, c7, c0	@ invalidate whole cache v3
+		mcr	p15, 0, r0, c5, c0	@ invalidate whole TLB v3
+		mov	pc, lr
+
+/*
+ * Clean and flush the cache to maintain consistency.
+ *
+ * On entry,
+ *  r6 = processor ID
+ * On exit,
+ *  r1, r2, r12 corrupted
+ * This routine must preserve:
+ *  r4, r6, r7
+ */
+		.align	5
+cache_clean_flush:
+		ldr	r1, proc_sa110_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #5		@ catch SA110 and SA1100
+		beq	1f
+		ldr	r1, proc_sa1110_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #4
+		movne	pc, lr
+1:
+		bic	r1, pc, #31
+		add	r2, r1, #32768
+1:		ldr	r12, [r1], #32		@ s/w flush D cache
+		teq	r1, r2
+		bne	1b
+
+		mcr	p15, 0, r1, c7, c7, 0	@ flush I cache
+		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
+		mov	pc, lr
+
+/*
+ * Various debugging routines for printing hex characters and
+ * memory, which again must be relocatable.
+ */
+#ifdef DEBUG
+		.type	phexbuf,#object
+phexbuf:	.space	12
+		.size	phexbuf, . - phexbuf
+
+phex:		adr	r3, phexbuf
+		mov	r2, #0
+		strb	r2, [r3, r1]
+1:		subs	r1, r1, #1
+		movmi	r0, r3
+		bmi	puts
+		and	r2, r0, #15
+		mov	r0, r0, lsr #4
+		cmp	r2, #10
+		addge	r2, r2, #7
+		add	r2, r2, #'0'
+		strb	r2, [r3, r1]
+		b	1b
+
+puts:		loadsp	r3
+1:		ldrb	r2, [r0], #1
+		teq	r2, #0
+		moveq	pc, lr
+2:		writeb	r2
+		mov	r1, #0x00020000
+3:		subs	r1, r1, #1
+		bne	3b
+		teq	r2, #'\n'
+		moveq	r2, #'\r'
+		beq	2b
+		teq	r0, #0
+		bne	1b
+		mov	pc, lr
+putc:
+		mov	r2, r0
+		mov	r0, #0
+		loadsp	r3
+		b	2b
+
+memdump:	mov	r12, r0
+		mov	r10, lr
+		mov	r11, #0
+2:		mov	r0, r11, lsl #2
+		add	r0, r0, r12
+		mov	r1, #8
+		bl	phex
+		mov	r0, #':'
+		bl	putc
+1:		mov	r0, #' '
+		bl	putc
+		ldr	r0, [r12, r11, lsl #2]
+		mov	r1, #8
+		bl	phex
+		and	r0, r11, #7
+		teq	r0, #3
+		moveq	r0, #' '
+		bleq	putc
+		and	r0, r11, #7
+		add	r11, r11, #1
+		teq	r0, #7
+		bne	1b
+		mov	r0, #'\n'
+		bl	putc
+		cmp	r11, #64
+		blt	2b
+		mov	pc, r10
+#endif
+
+<A
+NAME="RELOC-END"
+></A
+>
+reloc_end:
+
+<A
+NAME="USER-STACK"
+></A
+>
+<A
+NAME="ARM.HEAD.8"
+><B
+>(13)</B
+></A
+>
+		.align
+		.section	".stack"
+user_stack:	.space	4096</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.1"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>							.section은 새로운 section을 정의하는 것이다. 어셈블러에 관계된 디렉티브 들은 모두
+							'info as'를 사용해 찾아보면 정확한 설명이 나와 있다.
+							#alloc은 allocatable을 의미하고 #execinstr은 executable을 의미한다.
+						</DD
+><DD
+><P
+>							Assabet 보드에 올린 커널은 실행될 때 angelboot에 의해 실행되는데 angelboot로부터
+							r0=0, r1=0x19가 넘어온다. 즉 r1이 아키텍쳐 넘버가 된다.
+							<A
+HREF="assabet.kernel.html"
+>4.2절</A
+> 참조.
+						</P
+></DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.2"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>							start가 function symbol 임을 나타낸다. 그리고 .rept 8은 .rept 부터 .endr 사이의
+							문장을 8번 반복하란 소리다. 즉 mov r0, r0를 8번 반복한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.3"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>							b 1f가 의미하는 것은 1이란 심볼로 점프하는 것을 의미하고 f는 forward를 의미해 현재
+							위치에서 앞으로 1이란 심볼을 찾아 점프한다. 반대 방향인 경우는 b를 사용한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.9"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>							stack 위의 메모리에 64KB를 할당하는데 stack은
+							<A
+HREF="arm.makefile.html#ARM.COMPRESSED.VMLINUX.LDS"
+>4.3.3절</A
+>에서 지정된 것 처럼 커널 이미지의 마지막에
+							위치한다. 즉, stack으로 할당한곳 뒤의 메모리는 사용하지 않는 영역이므로 여기를 할당해
+							사용한다. 새로 할당한 영역은 압축을 풀 때 사용하는 영역이다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.10"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>							_load_addr과 _start의 위치가 같다면 압축을 푸는 시작위치를 바로 위에서 할당한 64KB
+							이후에서 부터 시작하고 같지 않다면 _load_addr에 압축을 풀어 놓는다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.11"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>							decompress_kernel()은 misc.c에 정의되어 있다.  프로토 타입은
+						</DD
+><DD
+><P
+>							ulg decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p, int arch_id);
+						</P
+></DD
+><DD
+><P
+>							head.S에서 r0에 넘긴 값이 output_start가 r1은 free_mem_ptr_p, r2는 free_mem_ptr_end_p
+							그리고 r3이 arch_id가 된다.
+						</P
+></DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.12"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>							_load_addr과 _start가 서로 다른 경우는 call_kernel을 통해 커널을 실행하고 같은 경우는
+							압축 풀린 커널을 _load_addr로 옮긴다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.13"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>							압축 풀린 커널을 _load_addr로 옮기기 위해 리로케이션 하는 코드를 압축 풀린 커널의
+							뒤에 복사한다. 다시 말해 압축 풀린 커널을 그대로 _load_addr로 옮기면 현재 실행되고 있는
+							head.S를 엎어 쓰기 때문에 계속해서 제대로 실행되지 않는다. 그러므로 재배치 해주는 코드를
+							먼저 대피해 놓고 그 코드를 실행해 압축 풀린 커널을 옮긴다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.14"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>							최종적으로 재배치 코드를 실행한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.4"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>							정렬은 2<SUP
+>5</SUP
+>=32 바이트로 한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.5"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>							1레벨 페이지 테이블은 반드시 16KB 단위로 정렬되야한다. <A
+HREF="arm.mmu.html#TABLE-BASE"
+>4.1.3절</A
+>을 참조.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#ARM.HEAD.6"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>							페이지 데이블 내용을 채워 넣는다. 램의 시작 점은 0xc0000000이지만 실제 커널이 올려지는
+							위치가 0xc0008000이므로 0xc0000000 ~ 0xc0008000 사이에 페이지 테이블을 만들고 섹션
+							디스크립터로 채워 넣는다.
+						</DD
+><DD
+><P
+>							각 섹션 디스크립터는 AP=11, IMP=1, Domain=00이란 속성을 갖는다. Assabet 보드의 경우
+							0xc0004000 ~ 0xc0008000에 페이지 테이블이 만들어진다.
+						</P
+></DD
+></DL
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="ARM.SRC.HEAD-ARMV.S"
+>4.4.2. arch/arm/kernel/head-armv.S</A
+></H2
+><P
+>				<A
+HREF="arm.makefile.html#ARCH.ARM.VMLINUX.LDS"
+>4.3.2절</A
+>와 <A
+HREF="arm.src.analysis.html#ARM.SRC.HEAD.S"
+>4.4.1절</A
+>에서 살펴본 것 처럼
+				커널 이미지의 압축이 풀리고 재배치 후에 실행되는 코드는 stext로
+				$(TOPDIR)/arch/arm/kernel/head-armv.S에 정의되어 있다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ *  linux/arch/arm/kernel/head-armv.S
+ *
+ *  Copyright (C) 1994-1999 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ *  32-bit kernel startup code for all architectures
+ */
+#include &#60;linux/config.h&#62;
+#include &#60;linux/linkage.h&#62;
+
+#include &#60;asm/assembler.h&#62;
+#include &#60;asm/mach-types.h&#62;
+#include &#60;asm/mach/arch.h&#62;
+
+#define K(a,b,c)	((a) &#60;&#60; 24 | (b) &#60;&#60; 12 | (c))
+
+/*
+ * We place the page tables 16K below TEXTADDR.  Therefore, we must make sure
+ * that TEXTADDR is correctly set.  Currently, we expect the least significant
+ * "short" to be 0x8000, but we could probably relax this restriction to
+ * TEXTADDR &#62; PAGE_OFFSET + 0x4000
+ *
+ * Note that swapper_pg_dir is the virtual address of the page tables, and
+ * pgtbl gives us a position-independent reference to these tables.  We can
+ * do this because stext == TEXTADDR
+ *
+ * swapper_pg_dir, pgtbl and krnladr are all closely related.
+ */
+#if (TEXTADDR &#38; 0xffff) != 0x8000
+#error TEXTADDR must start at 0xXXXX8000
+#endif
+
+		.globl	SYMBOL_NAME(swapper_pg_dir)
+		.equ	SYMBOL_NAME(swapper_pg_dir), TEXTADDR - 0x4000
+
+		.macro	pgtbl, reg, rambase
+		adr	\reg, stext
+		sub	\reg, \reg, #0x4000
+		.endm
+
+/*
+ * Since the page table is closely related to the kernel start address, we
+ * can convert the page table base address to the base address of the section
+ * containing both.
+ */
+		.macro	krnladr, rd, pgtable, rambase
+		bic	\rd, \pgtable, #0x000ff000
+		.endm
+
+/*
+ *  Kernel startup entry point.
+ *
+ * The rules are:
+ *  r0      - should be 0
+ *  r1      - unique architecture number
+ *  MMU     - off
+ *  I-cache - on or off
+ *  D-cache - off
+ *
+ * See linux/arch/arm/tools/mach-types for the complete list of numbers
+ * for r1.
+ */
+<A
+NAME="HEAD-ARMV.S.ENTRY"
+><B
+>(1)</B
+></A
+>
+		.section ".text.init",#alloc,#execinstr
+		.type	stext, #function
+ENTRY(stext)
+		mov	r12, r0
+/*
+ * NOTE!  Any code which is placed here should be done for one of
+ * the following reasons:
+ *
+ *  1. Compatability with old production boot firmware (ie, users
+ *     actually have and are booting the kernel with the old firmware)
+ *     and therefore will be eventually removed.
+ *  2. Cover the case when there is no boot firmware.  This is not
+ *     ideal, but in this case, it should ONLY set r0 and r1 to the
+ *     appropriate value.
+ */
+#if defined(CONFIG_ARCH_NETWINDER)
+/*
+ * Compatability cruft for old NetWinder NeTTroms.  This
+ * code is currently scheduled for destruction in 2.5.xx
+ */
+		.rept	8
+		mov	r0, r0
+		.endr
+
+		adr	r2, 1f
+		ldmdb	r2, {r7, r8}
+		and	r3, r2, #0xc000
+		teq	r3, #0x8000
+		beq	__entry
+		bic	r3, r2, #0xc000
+		orr	r3, r3, #0x8000
+		mov	r0, r3
+		mov	r4, #64
+		sub	r5, r8, r7
+		b	1f
+
+		.word	_stext
+		.word	__bss_start
+
+1:
+		.rept	4
+		ldmia	r2!, {r6, r7, r8, r9}
+		stmia	r3!, {r6, r7, r8, r9}
+		.endr
+		subs	r4, r4, #64
+		bcs	1b
+		movs	r4, r5
+		mov	r5, #0
+		movne	pc, r0
+
+		mov	r1, #MACH_TYPE_NETWINDER	@ (will go in 2.5)
+		mov	r12, #2 &#60;&#60; 24			@ scheduled for removal in 2.5.xx
+		orr	r12, r12, #5 &#60;&#60; 12
+__entry:
+#endif
+#if defined(CONFIG_ARCH_L7200)
+/*
+ * FIXME - No bootloader, so manually set 'r1' with our architecture number.
+ */
+		mov	r1, #MACH_TYPE_L7200
+#endif
+
+<A
+NAME="HEAD-ARMV.S.BEGIN"
+><B
+>(2)</B
+></A
+>
+		mov	r0, #F_BIT | I_BIT | MODE_SVC	@ make sure svc mode
+		msr	cpsr_c, r0			@ and all irqs disabled
+		bl	__lookup_processor_type
+		teq	r10, #0				@ invalid processor?
+		moveq	r0, #'p'			@ yes, error 'p'
+		beq	__error
+		bl	__lookup_architecture_type
+		teq	r7, #0				@ invalid architecture?
+		moveq	r0, #'a'			@ yes, error 'a'
+		beq	__error
+		bl	__create_page_tables
+<A
+NAME="HEAD-ARMV.S.RETURN"
+><B
+>(3)</B
+></A
+>
+		adr	lr, __ret			@ return address
+		add	pc, r10, #12			@ initialise processor
+							@ (return control reg)
+
+		.type	__switch_data, %object
+__switch_data:	.long	__mmap_switched
+		.long	SYMBOL_NAME(compat)
+		.long	SYMBOL_NAME(__bss_start)
+		.long	SYMBOL_NAME(_end)
+		.long	SYMBOL_NAME(processor_id)
+		.long	SYMBOL_NAME(__machine_arch_type)
+		.long	SYMBOL_NAME(cr_alignment)
+		.long	SYMBOL_NAME(init_task_union)+8192
+
+<A
+NAME="HEAD-ARMV.S.RETURN-SWITCH"
+><B
+>(4)</B
+></A
+>
+		.type	__ret, %function
+__ret:		ldr	lr, __switch_data
+		mcr	p15, 0, r0, c1, c0
+		mov	r0, r0
+		mov	r0, r0
+		mov	r0, r0
+		mov	pc, lr
+
+		/*
+		 * This code follows on after the page
+		 * table switch and jump above.
+		 *
+		 * r0  = processor control register
+		 * r1  = machine ID
+		 * r9  = processor ID
+		 */
+		.align	5
+__mmap_switched:
+		adr	r3, __switch_data + 4
+		ldmia	r3, {r2, r4, r5, r6, r7, r8, sp}@ r2 = compat
+							@ sp = stack pointer
+		str	r12, [r2]
+
+		mov	fp, #0				@ Clear BSS (and zero fp)
+1:		cmp	r4, r5
+		strcc	fp, [r4],#4
+		bcc	1b
+
+		str	r9, [r6]			@ Save processor ID
+		str	r1, [r7]			@ Save machine type
+#ifdef CONFIG_ALIGNMENT_TRAP
+		orr	r0, r0, #2			@ ...........A.
+#endif
+		bic	r2, r0, #2			@ Clear 'A' bit
+		stmia	r8, {r0, r2}			@ Save control register values
+<A
+NAME="HEAD-ARMV.S.KERNEL-START"
+><B
+>(5)</B
+></A
+>
+		b	SYMBOL_NAME(start_kernel)
+
+
+
+<A
+NAME="HEAD-ARMV.S.CREATE-PTBL"
+><B
+>(6)</B
+></A
+>
+/*
+ * Setup the initial page tables.  We only setup the barest
+ * amount which are required to get the kernel running, which
+ * generally means mapping in the kernel code.
+ *
+ * We only map in 4MB of RAM, which should be sufficient in
+ * all cases.
+ *
+ * r5 = physical address of start of RAM
+ * r6 = physical IO address
+ * r7 = byte offset into page tables for IO
+ * r8 = page table flags
+ */
+__create_page_tables:
+<A
+NAME="HEAD-ARMV.S.PTBL-ADDR"
+><B
+>(7)</B
+></A
+>
+		pgtbl	r4, r5				@ page table address
+
+<A
+NAME="HEAD-ARMV.S.PTBL-CLEAR"
+><B
+>(8)</B
+></A
+>
+		/*
+		 * Clear the 16K level 1 swapper page table
+		 */
+		mov	r0, r4
+		mov	r3, #0
+		add	r2, r0, #0x4000
+1:		str	r3, [r0], #4
+		str	r3, [r0], #4
+		str	r3, [r0], #4
+		str	r3, [r0], #4
+		teq	r0, r2
+		bne	1b
+
+<A
+NAME="HEAD-ARMV.S.PTBL-DESCRIPTOR"
+><B
+>(9)</B
+></A
+>
+		/*
+		 * Create identity mapping for first MB of kernel to
+		 * cater for the MMU enable.  This identity mapping
+		 * will be removed by paging_init()
+		 */
+		krnladr	r2, r4, r5			@ start of kernel
+		add	r3, r8, r2			@ flags + kernel base
+		str	r3, [r4, r2, lsr #18]		@ identity mapping
+
+<A
+NAME="HEAD-ARMV.S.PTBL-INSERT"
+><B
+>(10)</B
+></A
+>
+		/*
+		 * Now setup the pagetables for our kernel direct
+		 * mapped region.  We round TEXTADDR down to the
+		 * nearest megabyte boundary.
+		 */
+		add	r0, r4, #(TEXTADDR &#38; 0xff000000) &#62;&#62; 18 @ start of kernel
+		bic	r2, r3, #0x00f00000
+		str	r2, [r0]			@ PAGE_OFFSET + 0MB
+		add	r0, r0, #(TEXTADDR &#38; 0x00f00000) &#62;&#62; 18
+		str	r3, [r0], #4			@ KERNEL + 0MB
+		add	r3, r3, #1 &#60;&#60; 20
+		str	r3, [r0], #4			@ KERNEL + 1MB
+		add	r3, r3, #1 &#60;&#60; 20
+		str	r3, [r0], #4			@ KERNEL + 2MB
+		add	r3, r3, #1 &#60;&#60; 20
+		str	r3, [r0], #4			@ KERNEL + 3MB
+
+<A
+NAME="HEAD-ARMV.S.PTBL-ENSURE"
+><B
+>(11)</B
+></A
+>
+		/*
+		 * Ensure that the first section of RAM is present.
+		 * we assume that:
+		 *  1. the RAM is aligned to a 32MB boundary
+		 *  2. the kernel is executing in the same 32MB chunk
+		 *     as the start of RAM.
+		 */
+		bic	r0, r0, #0x01f00000 &#62;&#62; 18	@ round down
+		and	r2, r5, #0xfe000000		@ round down
+		add	r3, r8, r2			@ flags + rambase
+		str	r3, [r0]
+
+		bic	r8, r8, #0x0c			@ turn off cacheable
+							@ and bufferable bits
+#ifdef CONFIG_DEBUG_LL
+		/*
+		 * Map in IO space for serial debugging.
+		 * This allows debug messages to be output
+		 * via a serial console before paging_init.
+		 */
+		add	r0, r4, r7
+		rsb	r3, r7, #0x4000	@ PTRS_PER_PGD*sizeof(long)
+		cmp	r3, #0x0800
+		addge	r2, r0, #0x0800
+		addlt	r2, r0, r3
+		orr	r3, r6, r8
+1:		str	r3, [r0], #4
+		add	r3, r3, #1 &#60;&#60; 20
+		teq	r0, r2
+		bne	1b
+#if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_CATS)
+		/*
+		 * If we're using the NetWinder, we need to map in
+		 * the 16550-type serial port for the debug messages
+		 */
+		teq	r1, #MACH_TYPE_NETWINDER
+		teqne	r1, #MACH_TYPE_CATS
+		bne	1f
+		add	r0, r4, #0x3fc0
+		mov	r3, #0x7c000000
+		orr	r3, r3, r8
+		str	r3, [r0], #4
+		add	r3, r3, #1 &#60;&#60; 20
+		str	r3, [r0], #4
+1:
+#endif
+#endif
+#ifdef CONFIG_ARCH_RPC
+		/*
+		 * Map in screen at 0x02000000 &#38; SCREEN2_BASE
+		 * Similar reasons here - for debug.  This is
+		 * only for Acorn RiscPC architectures.
+		 */
+		add	r0, r4, #0x80			@ 02000000
+		mov	r3, #0x02000000
+		orr	r3, r3, r8
+		str	r3, [r0]
+		add	r0, r4, #0x3600			@ d8000000
+		str	r3, [r0]
+#endif
+<A
+NAME="HEAD-ARMV.S.PTBL-RETURN"
+><B
+>(12)</B
+></A
+>
+		mov	pc, lr
+
+
+
+/*
+ * Exception handling.  Something went wrong and we can't
+ * proceed.  We ought to tell the user, but since we
+ * don't have any guarantee that we're even running on
+ * the right architecture, we do virtually nothing.
+ * r0 = ascii error character:
+ *	a = invalid architecture
+ *	p = invalid processor
+ *	i = invalid calling convention
+ *
+ * Generally, only serious errors cause this.
+ */
+__error:
+#ifdef CONFIG_DEBUG_LL
+		mov	r8, r0				@ preserve r0
+		adr	r0, err_str
+		bl	printascii
+		mov	r0, r8
+		bl	printch
+#endif
+#ifdef CONFIG_ARCH_RPC
+/*
+ * Turn the screen red on a error - RiscPC only.
+ */
+		mov	r0, #0x02000000
+		mov	r3, #0x11
+		orr	r3, r3, r3, lsl #8
+		orr	r3, r3, r3, lsl #16
+		str	r3, [r0], #4
+		str	r3, [r0], #4
+		str	r3, [r0], #4
+		str	r3, [r0], #4
+#endif
+1:		mov	r0, r0
+		b	1b
+
+#ifdef CONFIG_DEBUG_LL
+err_str:	.asciz	"\nError: "
+		.align
+#endif
+
+<A
+NAME="HEAD-ARMV.S.P-TYPE"
+><B
+>(13)</B
+></A
+>
+/*
+ * Read processor ID register (CP#15, CR0), and look up in the linker-built
+ * supported processor list.  Note that we can't use the absolute addresses
+ * for the __proc_info lists since we aren't running with the MMU on
+ * (and therefore, we are not in the correct address space).  We have to
+ * calculate the offset.
+ *
+ * Returns:
+ *	r5, r6, r7 corrupted
+ *	r8  = page table flags
+ *	r9  = processor ID
+ *	r10 = pointer to processor structure
+ */
+__lookup_processor_type:
+		adr	r5, 2f
+<A
+NAME="HEAD-ARMV.S.P-RVAL"
+><B
+>(14)</B
+></A
+>
+		ldmia	r5, {r7, r9, r10}
+		sub	r5, r5, r10			@ convert addresses
+		add	r7, r7, r5			@ to our address space
+		add	r10, r9, r5
+		mrc	p15, 0, r9, c0, c0		@ get processor id
+<A
+NAME="HEAD-ARMV.S.P-LOOP"
+><B
+>(15)</B
+></A
+>
+1:		ldmia	r10, {r5, r6, r8}		@ value, mask, mmuflags
+		and	r6, r6, r9			@ mask wanted bits
+		teq	r5, r6
+		moveq	pc, lr
+		add	r10, r10, #36			@ sizeof(proc_info_list)
+		cmp	r10, r7
+		blt	1b
+		mov	r10, #0				@ unknown processor
+		mov	pc, lr
+
+<A
+NAME="HEAD-ARMV.S.P-DATA"
+><B
+>(16)</B
+></A
+>
+/*
+ * Look in include/asm-arm/procinfo.h and arch/arm/kernel/arch.[ch] for
+ * more information about the __proc_info and __arch_info structures.
+ */
+2:		.long	__proc_info_end
+		.long	__proc_info_begin
+		.long	2b
+		.long	__arch_info_begin
+		.long	__arch_info_end
+
+<A
+NAME="HEAD-ARMV.S.A-TYPE"
+><B
+>(17)</B
+></A
+>
+/*
+ * Lookup machine architecture in the linker-build list of architectures.
+ * Note that we can't use the absolute addresses for the __arch_info
+ * lists since we aren't running with the MMU on (and therefore, we are
+ * not in the correct address space).  We have to calculate the offset.
+ *
+ *  r1 = machine architecture number
+ * Returns:
+ *  r2, r3, r4 corrupted
+ *  r5 = physical start address of RAM
+ *  r6 = physical address of IO
+ *  r7 = byte offset into page tables for IO
+ */
+__lookup_architecture_type:
+		adr	r4, 2b
+		ldmia	r4, {r2, r3, r5, r6, r7}	@ throw away r2, r3
+		sub	r5, r4, r5			@ convert addresses
+		add	r4, r6, r5			@ to our address space
+		add	r7, r7, r5
+1:		ldr	r5, [r4]			@ get machine type
+		teq	r5, r1
+		beq	2f
+		add	r4, r4, #SIZEOF_MACHINE_DESC
+		cmp	r4, r7
+		blt	1b
+		mov	r7, #0				@ unknown architecture
+		mov	pc, lr
+2:		ldmib	r4, {r5, r6, r7}		@ found, get results
+		mov	pc, lr</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.ENTRY"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>							압축 풀린 커널의 실행 시작 위치로 0xc0008000이 된다. 바로 밑의 #if define으로 된 두
+							부분은 Assabet 보드의 경우엔 해당 사항 없기 때문에 무시되고 넘어간다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.BEGIN"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>							Assabet 보드의 실제 실행 코드 시작점으로 인터럽트를 불가능으로 만들고 프로세서 타입
+							아키텍져 타입을 알아낸 후 필요한 페이지 테이블을 만들고 프로세서를 설정한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.RETURN"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>							페이지 테이블을 만든 후 무언가를 실행하는데 돌아오는 위치는 __ret가 되도록 한다.
+							실행되는 그 무엇은 r10 + #12로 Assabet보드의 경우 __sa1100_setup 이란 곳이된다.
+							이 곳은 <A
+HREF="arm.src.analysis.html#SA1110-PROC-INFO"
+>$(TOPDIR)/arch/arm/mm/proc-sa110.S</A
+>에
+							정의되어 있다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.RETURN-SWITCH"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>							__sa1100_setup이 실행된 후 돌아오는 곳이 이곳인데 다시 __switch_data란 곳으로 분기할
+							준비를 한다. 즉 __mmap_switched를 실행하게 된다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.KERNEL-START"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>							이제 모든 준비가 끝났다. 리눅스 커널을 시작한다. start_kernel은 $(TOPDIR)/init/main.c에
+							정의되어 있다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.CREATE-PTBL"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>							초기 페이지 테이블을 설정한다. 여기서는 커널이 실행될 만큼만 설정하고 커널이 초기화
+							되면서 설정된다. 4MB 정도면 커널이 실행되는덴 충분하므로 이정도만 설정한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-ADDR"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>							페이지 테이블의 시작 어드레스를 계산한다. r4=0xc0004000이 된다.	
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-CLEAR"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>							이미 설정되어 있던 페이지 테이블을 모두 지운다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-DESCRIPTOR"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>							페이지 테이블에 들어갈 디스크립터 값을 설정한다. krnladr은 커널의 시작이 위치한 곳을
+							1MB 단위로 끊어준 값이다. 여기선 페이지 테이블을 섹션 디스크립터로 채우기 때문에 1MB
+							단위로 끊을 필요가 있는 것이다. r2=0xc0000000이 된다(램의 시작점).
+						</DD
+><DD
+><P
+>							섹션 디스크립터의 값은 AP=11, Domain=0, IMP=0, C=1, B=1의 속성을 갖는다(0xC0E).
+						</P
+></DD
+><DD
+><P
+>							[r4, r2, lsr #18]이 의미하는 것은 r2를 18bit Left Shift하고 r4에 더한다는 뜻으로,
+							최종 값은 0xc0007000이 된다.
+						</P
+></DD
+><DD
+><P
+>							이 값이 의미하는 것은 페이지 테이블 내의 커널 시작 어드레스를 가리키는 위치가 된다.
+							섹션 디스크립터는 1MB단위로 메모리를 관리하고 32bit ARM 프로세서의 최대 가능 용량인
+							4GB를 다루기 위해선 4G/1M=4K 만큼의 디스크립터가 필요하다. 또 각 디스크립터는 4Bytes로
+							구성되므로 페이지 테이블은 4K*4Bytes=16KB 만큼의 크기가 필요하다.
+						</P
+></DD
+><DD
+><P
+>							그렇다면 커널이 시작하는 곳의 디스크립터는 16KB내의 어디에 위치하는 것일까?
+							커널의 시작이 포함된 1MB 단위의 램 시작점이 0xc0000000 이므로
+							0xc0000000/1M*4=0x3000이 된다. 페이지 테이블의 시작이 0xc0004000이므로 여기에 0x3000을
+							더한 0xc0007000에 위치한 디스크립터가 바로 커널의 시작 위치를 가리키는 디스크립터가 된다.
+						</P
+></DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-INSERT"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>							위에서 말한대로 필요한 4MB 만을 위한 디스크립터를 설정한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-ENSURE"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>							램이 32MB 로 정렬됐고 커널이 같은 32MB 내에서 실행된다고 가정하고 이에 해당하는
+							디스크립터를 조정한다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.PTBL-RETURN"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>							모든 페이지 테이블 설정을 마치고 되돌아간다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.P-TYPE"
+><B
+>(13)</B
+></A
+></DT
+><DD
+>							프로세서 타입을 알아낸다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.P-RVAL"
+><B
+>(14)</B
+></A
+></DT
+><DD
+>							첫 부분에 ldmia로 값을 읽어 내는데 r7=__proc_info_end,
+							r9=__proc_info_begin, r10=2f의 어드레스가 된다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.P-LOOP"
+><B
+>(15)</B
+></A
+></DT
+><DD
+>							프로세서에 대한 정보는 SA-110, SA-1100, SA-1110의 정보가 연속해 존재하므로 SA-110 부터
+							시작해 현재 실행되고 있는 프로세서와 비교해 맞는 것을 골라 정보를 얻는다.
+						</DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.P-DATA"
+><B
+>(16)</B
+></A
+></DT
+><DD
+>							__proc_info_end 등은 <A
+HREF="arm.makefile.html#PROC-INFO-BEGIN"
+>							$(TOPDIR)/arch/arm/vmlinux.lds</A
+>에 정의되어 있다.
+						</DD
+><DD
+><P
+>							그리고 이 값은 $(TOPDIR)/arch/arm/mm/proc-sa110.S에 다음과 같이 정의 되어 있다.
+							<A
+NAME="SA1110-PROC-INFO"
+></A
+>
+							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>__sa1110_proc_info:
+	.long	0x6901b110
+	.long	0xfffffff0
+	.long	0x00000c0e
+	b	__sa1100_setup
+	.long	cpu_arch_name
+	.long	cpu_elf_name
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
+	.long	cpu_sa1110_info
+	.long	sa1100_processor_functions
+	.size	__sa1110_proc_info, . - __sa1110_proc_info</PRE
+></TD
+></TR
+></TABLE
+>
+						</P
+></DD
+><DT
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.A-TYPE"
+><B
+>(17)</B
+></A
+></DT
+><DD
+>							아키텍쳐 타입에 대한 정보를 얻어낸다. $(TOPDIR)/arch/arm/mach-sa1100/assabet.c에
+							다음과 같이 정의 되어 있다.
+							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>MACHINE_START(ASSABET, "Intel-Assabet")
+	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
+	BOOT_PARAMS(0xc0000100)
+	FIXUP(fixup_assabet)
+	MAPIO(assabet_map_io)
+	INITIRQ(sa1100_init_irq)
+MACHINE_END</PRE
+></TD
+></TR
+></TABLE
+>
+						</DD
+><DD
+><P
+>							위 정의에 대한 매크로는 $(TOPDIR)/include/asm-arm/mach/arch.h에 다음과 같이 정의
+							되어 있다.
+							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ * Set of macros to define architecture features.  This is built into
+ * a table by the linker.
+ */
+#define MACHINE_START(_type,_name)		\
+const struct machine_desc __mach_desc_##_type	\
+ __attribute__((__section__(".arch.info"))) = {	\
+	nr:		MACH_TYPE_##_type,	\
+	name:		_name,
+
+#define MAINTAINER(n)
+
+#define BOOT_MEM(_pram,_pio,_vio)		\
+	phys_ram:	_pram,	                \
+	phys_io:	_pio,  	                \
+	io_pg_offst:	((_vio)&#62;&#62;18)&#38;0xfffc,
+
+#define BOOT_PARAMS(_params)			\
+	param_offset:	_params,
+
+#define VIDEO(_start,_end)			\
+	video_start:	_start,			\
+	video_end:	_end,
+
+#define DISABLE_PARPORT(_n)			\
+	reserve_lp##_n:	1,
+
+#define BROKEN_HLT /* unused */
+
+#define SOFT_REBOOT				\
+	soft_reboot:	1,
+
+#define FIXUP(_func)				\
+	fixup:		_func,
+
+#define MAPIO(_func)				\
+	map_io:		_func,
+
+#define INITIRQ(_func)				\
+	init_irq:	_func,
+
+#define MACHINE_END				\
+};</PRE
+></TD
+></TR
+></TABLE
+>
+						</P
+></DD
+></DL
+></DIV
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="arm.makefile.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>ARM 리눅스 Makefile 분석</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap04.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>리눅스 커널 부팅</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

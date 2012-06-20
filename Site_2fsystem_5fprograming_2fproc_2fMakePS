@@ -1,0 +1,1177 @@
+#title ps 프로그램 만들기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>나만의 ps를 만들어보자</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>나만의 ps를 만들어보자</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				yundream@joinc.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 4월 7일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN18"
+>proc 파일시스템</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>proc 파일시스템에 대하여</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN31"
+>프로세스 정보가져오기</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN38"
+>나만의 ps제작</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN63"
+>예제코드</A
+></DT
+><DD
+><DL
+><DT
+>3.1.1&#51208;. <A
+HREF="#AEN90"
+>Makefile</A
+></DT
+><DT
+>3.1.2&#51208;. <A
+HREF="#AEN94"
+>proc.h, proc.cc</A
+></DT
+><DT
+>3.1.3&#51208;. <A
+HREF="#AEN106"
+>qps.h, qps.cc</A
+></DT
+><DT
+>3.1.4&#51208;. <A
+HREF="#AEN115"
+>main.cc</A
+></DT
+></DL
+></DD
+><DT
+>3.2&#51208;. <A
+HREF="#AEN121"
+>테스트</A
+></DT
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN127"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		대부분의 Unix운영체제는 proc파일시템을 제공한다. 
+		proc는 process infomation pseudo의 줄임말이다. 
+		즉 proc파일시스템은 커널에서제공하는 프로세스정보를 저장하고 있는 
+		파일시스템이라고 정리할수 있다. 
+	</P
+><P
+>		이 문서는 proc파일시스템을 이용해서 실제 프로세스목록을 출력하는 
+		프로그램제작과 관련된 내용을 담고 있다. 
+		문서는 리눅스운영체제(kernel 2.4.x)를 기준으로 작성되었다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2&#51208;. proc 파일시스템</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. proc 파일시스템에 대하여</A
+></H2
+><P
+>			리눅스 커널의 주된임무중 하나는 프로세스를 실행시키고 이들을 
+			유지하는 일이며, 이를 위해서 커널데이타구조체를 내부적으로 
+			사용하게 된다. 그런데 이런 프로세스정보는 커널에게만 필요한게 
+			아니고 시스템 관리자혹은 프로그래머들에게도 절대적으로 필요한 
+			정보이다. 
+		</P
+><P
+>			그렇다면 필요한 정보를 얻어내기 위해서 어떻게 해야할까? 직접 
+			커널에게 커널데이타구조체를 요청해서 그걸 일일이 분석해야 할까 ?
+			물론 그렇게도 할수 있겠지만, 이것은 매우 복잡한 작업이며, 
+			또한 (커널모드에서 직접이루어지는 작업임으로)위험한작업이기도 하다. 
+			그래서 리눅스시스템은 사용자레벨에서 프로세스의 상태를 간단하게 
+			확인가능하도록 하기위해서 <B
+CLASS="EMPHASIS"
+>proc파일시스템</B
+>을 
+			제공한다.    
+		</P
+><P
+>			우리는 복잡하게 커널로부터 여러가지 커널데이타구조체를 요청할필요 
+			없이 proc파일시스템에서 제공하는 정보들을 읽어들이는 정도로 
+			간단하게 프로세스 상태를 얻어올수 있다.  
+			<DIV
+CLASS="TIP"
+><BLOCKQUOTE
+CLASS="TIP"
+><P
+><B
+>&#51089;&#51008; &#51221;&#48372;: </B
+>					proc파일시스템은 대부분의 유닉스운영체제에서 채택되어지고 
+					있지만, 데이타를 저장하는 범위와 포맷에 있어서 운영체제간 
+					차이점을 보인다. 
+					저장하는 범위의 경우 대부분의 유닉스운영체제는 단지 프로세스
+					정보만을 제공하는 반면, 리눅스는 프로세스 정보뿐만 아니라 
+					네트웍정보, 파일시스템, 디바이스 정보, 
+					메모리정보, CPU정보등 다양한 정보들을 제공한다. 
+				</P
+><P
+>					특히 리눅스의 경우 몇몇정보들에 대해서는 단지 열람만 
+					가능한 수준이 아닌 직접수정을 통해서 커널의 행동을 
+					변경시켜줄수도 있다. 이것은 다른 유닉스에 비해서 
+					매우 확장된 부분이라고 할수 있다.  
+				</P
+><P
+>					예를 들어 ICMP요청에 대한 응답을 막고 싶다면 
+					"echo 0 /proc/sys/net/ipv4/icmp_echo_ignore_all"하는 
+					정도로 간단하게 커널의 행동을 변경시켜줄수 있다. 
+					다른운영체제에서의 이러한 작업은 전용관리도구를 사용하든지 
+					리붓팅을 시키든지 해야한다.   
+				</P
+><P
+>					저장되는 포맷을 보자면 리눅스는 일반 ASCII문자로 이루어진 
+					반면 다른 유닉스들은 구조체로 정보가 이루어져 있다. 리눅스의 경우 
+					프로세스 정보가 
+					일반문자로 이루어져 있어서 직관적으로 확인하기에 좋기는 하지만
+					프로그래밍을 할경우 이를 파싱해야되기 때문에 다른 유닉스들에 비해서 
+					좀 불편한점이 되기도 한다.  
+				</P
+></BLOCKQUOTE
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>2.2&#51208;. 프로세스 정보가져오기</A
+></H2
+><P
+>			리눅스의 경우 기능이 확장되긴 했지만 
+			proc파일시스템의 가장큰 사용목적은 뭐니뭐니 해도 프로세스정보를 
+			얻어오는 일이다.  
+		</P
+><P
+>			기본적으로 proc파일시스템은 /proc디렉토리안에서 이루어지며, 
+			프로세스정보는 /proc디렉토리밑에 각 프로세스의 PID를 이름으로하는 
+			서브디렉토리 밑에 위치하게 된다. 
+			예를들어 PID가 912인 프로세스라면, 912 프로세스의 정보는 
+			/proc/912(이하 /proc/[PID])밑에 위치하게 된다. 	 
+		</P
+><P
+>			/proc/[PID] 디렉토리밑에는 다시 몇개의 디렉토리와 몇개의 
+			파일들로 이루어져 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> /proc/[PID]/ -+-- cmdline
+               |
+               +-- cwd
+               |
+               +-- environ
+               |
+               +-- exe 
+               |
+               +-- fd -------+-- 0
+               |             |
+               +-- maps      +-- 1
+               |
+               +-- root 
+               |
+               +-- stat 
+               |
+               +-- statm 
+               |
+               +-- status
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			리눅스의 경우 위와 같은 파일들로 이루어져 있다. 
+			각 파일이 가지고 있는 자세한 정보들에 대해서는 
+			proc의 man페이지를 참고하기 바란다.   
+		</P
+><P
+>			리눅스의 경우 각각의 정보들은 일반 ASCII텍스트문자로 이루어져있고, 
+			대부분의 경우 공백문자(' ')로 필드의 구분이 되어있음으로, 쉽게 
+			원하는 정보들을 얻어올수 있다.  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN38"
+>3&#51208;. 나만의 ps제작</A
+></H1
+><P
+>		프로세스정보를 확인하기 위해서 리눅스는 ps라는 도구를 제공한다. 
+		ps를 사용함으로써, 우리는 프로세스의 각종중요한 정보들을 
+		얻어오고, 얻어온 정보는 시스템관리와 프로그래밍을 위한 중요한 데이타로 
+		사용한다.   
+		<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN41"
+></A
+><P
+><B
+>&#44536;&#47548; 1. ps를 이용한 프로세스상태 확인</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/acs.gif"></P
+></DIV
+>
+	</P
+><P
+>		우리가 얻고자하는 프로세스데이타는 다음과 같다. 
+		<P
+></P
+><UL
+><LI
+><P
+>					프로세스의 실행유저	
+				</P
+></LI
+><LI
+><P
+>					프로세스 아이디(PID)
+				</P
+></LI
+><LI
+><P
+>					부모프로세스 아이디(PPID)
+				</P
+></LI
+><LI
+><P
+>					부모프로세스 상태(Zombie, Run, Sleep 등) 
+				</P
+></LI
+><LI
+><P
+>					프로세스 이름	
+				</P
+></LI
+><LI
+><P
+>				 	CPU 사용율(%)
+				</P
+></LI
+><LI
+><P
+>				 	VMEM(가상메모리) 사용율 	
+				</P
+></LI
+></UL
+>
+		ps에 비해서 몇가지 빠진것들이 있긴하지만 프로세스를 관리하는데 필요한 
+		최소한의 정보는 가져온다.  
+	</P
+><P
+>		이 ps도 기본적으로 proc파일시스템에있는 프로세스정보를 이용해서 가져온다. 
+		더 정확히 말하자면 <B
+CLASS="EMPHASIS"
+>stats</B
+>에서 필요한 정보를 가져온다. 
+		다음은 실제 stats의 파일내용이다. 원래는 하나의 행으로 되어있으나 
+		출력하기 쉽게 여러개의 행으로 분리했다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost 2489]# cat stat
+2489 (vi) T 2251 2489 2251 772 2581 0 187 0 455 0 12 4 0 0 9 0 0 0 181334 
+6950912 0 4294967295 134512640 136413760 3221223720 3221222316 
+1074893473 0 0 12288 1333808895 3222310480 0 0 17 0
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		우리가 만들고자하는 프로그램은 위의 stat 정보를 분석하게 될것이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>3.1&#51208;. 예제코드</A
+></H2
+><P
+>			프로그램의 이름은 qps로 하도록 하겠다.  
+		</P
+><P
+>			이프로그램의 쏘쓰는 몇개의 모듈로 이루어져 있으며, 쏘쓰관리를 위해서 
+			Makefile을 사용할것이다. 다음은 만들고자 하는 qps의 쏘쓰트리 구조이다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>-+-- Makefile
+ |
+ +-- main.cc
+ |
+ +-- proc.cc
+ |
+ +-- qps.cc
+ |
+ +-- include ----+-- proc.h 
+                 |
+                 +-- qps.h
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 각 파일들에 대한 설명이다. 
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN68"
+></A
+><P
+><B
+>&#54364; 1. qps 쏘쓰파일 설명</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Makefile</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>make에서 사용할 make rule 파일</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>main.cc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>main함수를 포함하는 코드, 최소한의 코드만을 가진다</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>proc.cc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>실제 proc파일시스템을 참조해서 각종 프로세스정보를 얻어온다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>qps.cc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>proc.cc에 정의된 함수를 호출하여 프로세스정보를 얻어오고 
+							   이를 화면에 보기좋게 출력한다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>include/proc.h</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>proc.cc에서 사용될 함수선언</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>include/qps.h</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>qps.cc에서 사용될 함수선언</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN90"
+>3.1.1&#51208;. Makefile</A
+></H3
+><P
+>				쏘쓰코드들을 관리하기 위한 Makefile이다. 이해하는데 별다른 어려움은 
+				없을것이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+#############################################################################
+# Makefile for building qps
+# Generated by tmake at 23:10, 2003/04/08
+#     Project: qps
+#    Template: app
+#############################################################################
+
+####### Compiler, tools and options
+
+CC  =   gcc
+CXX =   g++
+CFLAGS  =   -pipe -Wall -W -O2 -DNO_DEBUG
+CXXFLAGS=   -pipe -Wall -W -O2 -DNO_DEBUG
+INCPATH =   -I./include
+LINK    =   g++
+LFLAGS  =
+
+TAR =   tar -cf
+GZIP    =   gzip -9f
+
+####### Files
+
+HEADERS =   include/proc.h &#92;
+        include/qps.h
+SOURCES =   main.cc &#92;
+        proc.cc &#92;
+        qps.cc
+OBJECTS =   main.o &#92;
+        proc.o &#92;
+        qps.o
+
+TARGET  =   qps
+INTERFACE_DECL_PATH = .
+
+####### Implicit rules
+
+.SUFFIXES: .cpp .cxx .cc .C .c
+
+.cpp.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.cxx.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.cc.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.C.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.c.o:
+    $(CC) -c $(CFLAGS) $(INCPATH) -o $@ $&#60;
+
+####### Build rules
+all: $(TARGET)
+
+$(TARGET): $(UICDECLS) $(OBJECTS) $(OBJMOC)
+    $(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJMOC) $(LIBS)
+
+dist:
+    $(TAR) qps.tar qps.pro $(SOURCES) $(HEADERS) $(INTERFACES) $(DIST)
+    $(GZIP) qps.tar
+
+clean:
+    -rm -f $(OBJECTS) $(OBJMOC) $(SRCMOC) $(UICIMPLS) $(UICDECLS) $(TARGET)
+    -rm -f *~ core
+
+####### Compile
+
+main.o: main.cc
+
+proc.o: proc.cc
+
+qps.o: qps.cc
+				</PRE
+></TD
+></TR
+></TABLE
+>	
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN94"
+>3.1.2&#51208;. proc.h, proc.cc</A
+></H3
+><P
+>				실질적으로 stat를 분석해서 프로세스데이타를 얻어오는 함수들을 
+				포함한다. opendir(2)함수를 이용해서 /proc 디렉토리밑에 있는 
+				파일들의 목록을 얻어오고, 만약 얻어온 파일이 디렉토리이면서 
+				숫자로되어있을경우 프로세스정보 디렉토리라고 판단하고, 
+				서브디렉토리에 있는 stat 파일을 읽어들인다. 
+			</P
+><P
+>				읽어들인 stat정보는 " "를 기준으로 파싱해서 배열(vector)에 집어넣는다. 
+				더불어 우리가 만들고자하는 qps프로그램은 해당프로세스의 유저이름도 가져와야 
+				한다. /proc/[PID]/stat 파일은 프로세스소유자의 권한으로 만들어진다. 
+				우리는 stat(2)계열함수를 사용하면 해당 파일의 UID를 얻어올수 있다는걸 
+				알수있다. 또한 getpwuid(3)를 이용하면 해당 UID에 대한 유저이름도 얻어올수 
+				있다. 
+			</P
+><P
+>				이렇게 해서 하나의 프로세스에 대한정보가 만들어졌다. 그런데 우리는 프로세스의 
+				목록을 가져와야 함으로 이들 정보는 다시 배열의 원소로 들어가야 할것이다. 
+				이러한 자료구조(배열의 배열)를 위해서 필자는 (속편하게)vector를 사용했다. 
+			</P
+><P
+>				다음은 실제 코드들이다. 위의 내용들은 코드를 통해서 이해하기 바란다. 
+				그리어려운 코드들은 아님으로 주석만으로도 충분히 이해가능할것이다.   
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : include/proc.h</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _PROC_H_
+#define _PROC_H_
+
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;vector&#62;
+#include &#60;dirent.h&#62;
+#include &#60;string&#62;
+
+using namespace std;
+
+// 프로세스 데이타 저장 
+typedef struct _process_info
+{
+    char            username[32];  // 유저이름
+    vector&#60;string&#62;  process;       // stat정보들이 들어간다   	
+} process_info;
+
+// 프로세스의 리스트를 유지하기 위한 자료구조
+// 결국은 배열의 배열이다. 
+typedef vector&#60;process_info&#62; Plist;
+
+class Proc
+{
+    private:
+        int         Processnum;     // 현재 프로세스 갯수
+        Plist       ProcList;       // 프로세스정보 리스트
+
+    public:
+      
+        // 생성자및 소멸자 
+        Proc();
+        ~Proc();
+
+        void            MakeProcInfo();      // 프로세스 정보를 얻어온다.
+        vector&#60;string&#62;  ProcParser(char *);  // stat파일을 파싱한다 
+        int             ProcNum();           // 현재프로세스 갯수를 넘겨준다.
+        int             IsDigit(char *);     // 문자열이 숫자인지 확인한다. 
+        Plist           GetProcList();       // 프로세스정보 리스트를 되돌려준다.
+};
+
+#endif
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : proc.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include "proc.h"
+#include &#60;iostream&#62;
+#include &#60;pwd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+Proc::Proc()
+{
+}
+
+Proc::~Proc()
+{
+}
+
+/*
+ * 프로세스 정보를 가져온다. 
+ * 그러기 위해서 /proc/[PID]/stat파일을 읽어들이고 이를 
+ * 필드별로 파싱한다. 파싱은 " "문자를 기준으로 한다.  
+ * 또한 프로세스를 생성한 유저 이름도 얻어온다. 
+ */
+void Proc::MakeProcInfo()
+{
+    DIR *directory;
+    struct dirent *entry = NULL;
+    char proc_file[40];
+    vector&#60;string&#62; procinfo; 
+    process_info lprocess_info;
+    struct stat lstat;
+
+    ProcList.clear();
+
+    // proc 디렉토리를 열어서 파일(디렉토리포함)의 리스트를 
+    // 얻어온다.
+    if ((directory = opendir("/proc")) == NULL)
+    {
+        perror("opendir error :");
+        exit(0);
+    }
+
+    while((entry = readdir(directory)) != NULL)
+    {
+        if (strcmp(entry-&#62;d_name, ".") !=0 &#38;&#38;
+            strcmp(entry-&#62;d_name, "..") != 0)
+        {
+            sprintf(proc_file,"/proc/%s/stat", entry-&#62;d_name);
+            // stat 파일이 존재하는지 확인하고 확인하고
+            if (access(proc_file, F_OK) != 0)
+            {
+                continue;
+            }
+
+            // 디렉토리 이름이 숫자인지 확인한다. 
+            // 디렉토리 이름이 숫자라면 이를 파싱한다.  
+            // 또한 stat파일의 소유 UID를 이용해서 유저이름도 얻어온다. 
+            if (IsDigit(entry-&#62;d_name))
+            {
+                struct passwd *upasswd;
+                stat(proc_file,&#38;lstat);
+                lprocess_info.process  = ProcParser(proc_file);
+
+                upasswd = getpwuid(lstat.st_uid);
+                strncpy(lprocess_info.username, upasswd-&#62;pw_name, 32);
+                if(atoi(lprocess_info.process[0].c_str()) == atoi(entry-&#62;d_name))
+                {
+                    ProcList.push_back(lprocess_info);
+                }
+            }
+            else
+            {
+            }
+        }
+    }
+
+}
+
+/*
+ * MakeProcInfo를 통해만들어진 프로세스정보 리스트를 되돌려준다.
+ */
+Plist Proc::GetProcList()
+{
+    return ProcList;
+}
+
+/* 
+ * 프로세스의 갯수를 되돌려준다.  
+ * 갯수는 프로세스자료구조(vector)의 원소의 크기가 된다. 
+ */
+int Proc::ProcNum()
+{
+    return ProcList.size();
+}
+
+/*
+ * stat 파일을 열어서 " "문자를 기준으로 파싱해서 
+ * 배열(vector)에 집어넣는다.   
+ */
+vector&#60;string&#62; Proc::ProcParser(char *proc_file)
+{
+    FILE *fp;
+    char buf[512] = {0x00,};
+    char field[80];
+    int index = 0;
+    unsigned int i, j = 0;
+    vector&#60;string&#62; vproc;
+
+    fp = fopen(proc_file, "r");
+    if (fp == NULL)
+    {
+        perror("error : ");
+        exit(0);
+    }
+
+    memset(field, 0x00, 80);
+    fgets(buf, 511, fp);
+    for(i = 0; i &#60; strlen(buf); i++)
+    {
+        if (buf[i] != ' ' &#38;&#38; i != (strlen(buf) -1))
+        {
+            field[j++] = buf[i];
+        }
+        else
+        {
+            if (index == 1)
+            {
+                field[strlen(field)-1] = 0x00;
+                vproc.push_back(field+1);
+            }
+            else
+                vproc.push_back(field);
+            memset(field, 0x00, 80);
+            j = 0;
+            index++;
+        }
+    }
+    fclose(fp);
+    return vproc;
+}   
+
+/*
+ * 파일이름이 숫자인지 확인한다. 
+ */ 
+int Proc::IsDigit(char *str)
+{
+    int i;
+    for (i = 0; i &#60; strlen(str); i++)
+    {
+        if (isdigit(str[i])==0)
+            return 0;
+    }
+    return 1;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN106"
+>3.1.3&#51208;. qps.h, qps.cc</A
+></H3
+><P
+>				위에서 설명한 proc.cc를 통해서 stat를 분석한 프로세스데이타가 
+				만들어졌음으로 이제 이것을 가지고 와서 화면에 적당히 뿌려줘야 
+				할것이다. 다음은 이와 관련된 함수들이다. 프로세세의 CPU사용율을 
+				가져오기 위한 getcputime()함수외에는 별특별한건 없을것이다.      
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>include/qps.h</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _QPS_H_
+#define _QPS_H_
+#include "proc.h"
+
+// 프로세스 목록을 적당히 가공해서 출력한다.
+int viewProc();
+
+// 각프로세스의 CPU 사용율을 얻어온다. 
+int getcputime(ulong utime, ulong stime, ulong starttime, int seconds);
+
+// OS의 uptime(부팅후 지금까지의 가동시간)을 얻어온다.  
+int uptime();
+#endif
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>qps.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>// Local 헤더파일
+#include "qps.h"
+
+// 표준 C++ 헤더파일들
+#include &#60;iostream&#62;
+#include &#60;vector&#62;
+#include &#60;string&#62;
+
+// 표준 C 헤더파일
+#include &#60;stdio.h&#62;
+
+using namespace std;
+
+/*
+ * 프로세스정보 리스트를 얻어와서 보기좋게 출력한다.  
+ */
+int viewProc()
+{
+    Proc *mproc;
+    unsigned i;
+    int pcpu;
+    int seconds = 0;
+
+    Plist ProcList;
+    mproc = new Proc;
+    mproc-&#62;MakeProcInfo();
+
+    // 프로세스정보 리스트를 얻어온다. 
+    ProcList = mproc-&#62;GetProcList(); 
+
+    int total_cpu = 0;  
+
+    // OS의 uptime을 얻어온다. 
+    // 얻어온 정보는 프로세스의 CPU 사용율을 구하기 위한 기초정보로 
+    // 사용된다.  
+    seconds = uptime();
+    printf("%-10s %7s %7s %2s %16s %4s %9s&#92;n", "USER", "PID", "PPID",
+                                              "ST", "NAME", "CPU", "VMEM"); 
+    printf("==============================================================&#92;n");
+    for (i = 0; i &#60; mproc-&#62;ProcNum(); i++)
+    {
+        // CPU사용율을 얻어온다. 
+        pcpu = getcputime(atol(ProcList[i].process[13].c_str()),
+            atol(ProcList[i].process[14].c_str()),
+            atol(ProcList[i].process[21].c_str()), seconds);
+
+        // 보기좋게 출력한다. 
+        printf("%-10s %7s %7s %2s %16s %2d.%d %9s&#92;n", ProcList[i].username, 
+                                    ProcList[i].process[0].c_str(),
+                                    ProcList[i].process[3].c_str(),
+                                    ProcList[i].process[2].c_str(), 
+                                    ProcList[i].process[1].c_str(), pcpu/10, pcpu%10,
+                                    ProcList[i].process[22].c_str());
+    }   
+    return 1;
+}
+
+/*
+ * 프로세스의 CPU사용율을 얻기 위해서 사용한다. 
+ * utime     : 유저모드에서 프로세스가 스케쥴링되면서 사용한 jiffies 수이다. 
+ *             프로세스가 스케쥴링될때마다 증가되는 수치이다.  
+ * stime     : 커널모드에서 프로세스가 스케쥴링되면서 사용한 jiffies 수이다. 
+ * starttime : 운영체제가 시작되고나서 몇 jiffies가 지난후 
+ *             프로세스가 시작되었는지 
+ */
+int getcputime(ulong utime, ulong stime, ulong starttime, int seconds)
+{   
+    unsigned long long total_time;
+    int pcpu=0;
+
+    // 유저 jiffies 와 커널 jiffies를 더한다.
+    total_time = utime + stime;
+
+    // 100은 HZ값이다. HZ이 작아질수록 context switching가 빨라진다.  
+    // 이값은 /usr/include/asm/param.h에 선언되어 있다. 
+    // 100. 대신에 (unsigned long long)HZ 정도로 코드를 
+    // 작성하는게 좀더 안전할것이다. 여기에서는 직관적으로 설명하기 
+    // 위해서 하드코딩했다.  
+    seconds = seconds - (int)(starttime/100.);
+
+    if(seconds)
+    {
+        pcpu = (int)(total_time * 1000ULL/100.)/seconds;
+    }
+
+    return pcpu;
+}
+
+/*
+ * 운영체제가 부팅하고 나서 얼마의 시간이 지났는지
+ */
+int uptime()
+{
+    FILE *fp;
+    char buf[36];
+    double stime;
+    double idletime;
+
+    if ((fp = fopen("/proc/uptime", "r")) == NULL)
+    {
+        perror("fopen error : ");
+        exit(0);
+    }
+    fgets(buf, 36, fp);
+    sscanf(buf, "%lf %lf", &#38;stime, &#38;idletime);
+    fclose(fp);
+
+    return (int)stime;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN115"
+>3.1.4&#51208;. main.cc</A
+></H3
+><P
+>				main함수다. 더이상 설명할 필요도 없는 간단한 코드이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 main.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;iostream&#62;
+#include "qps.h"
+
+int main(int argc, char **argv)
+{
+        viewProc();
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN121"
+>3.2&#51208;. 테스트</A
+></H2
+><P
+>			컴파일은 make를 이용하면 된다. 
+			다음은 우리가 만든 프로그램을 실행시킨 화면이다.  
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN124"
+></A
+><P
+><B
+>&#44536;&#47548; 2. qps 테스트화면</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/act.gif"></P
+></DIV
+>
+			그럭저럭 잘돌아가는걸 확인할수 있을것이다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN127"
+>4&#51208;. 결론</A
+></H1
+><P
+>		이상 proc파일시스템을 이용해서 어떻게 프로세스정보를 얻어오는지에 대해서 
+		알아고, 이 얻어온정보를 가공해서 실제 관리자나, 프로그래머에게 유용한 
+		정보로 만드는 방법을 알아보았다.   
+	</P
+><P
+>		시간이 남는다면 몇가지 다른 부가적인 시스템정보까지 포함시켜서 Top와 같은 
+		좀더 강력한 프로그램을 만드는것도 재미있을것이다. 혹은 QT, GTK등을 이용해서 
+		GUI환경에서 작동하는 시스템프로세스 모니터링 프로그램을 만들수도 있을것이다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

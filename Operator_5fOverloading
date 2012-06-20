@@ -1,0 +1,1356 @@
+
+== Operator Overloading 이란? ==
+
+ C++가 제공하는 basic data type에 대해 적용되는 operator의 의미를 사용자가 정의한 data type에 대해서도 operation을 수행할 수 있도록 그 의미를 바꿀 수 있도록 하는 기법. 
+
+
+3.1.1 연산자 중복의 구문 및 특성 
+
+① operator f'n의 구문. 
+
+<반환값의 data type> operator <연산자>(argument 리스트) {/* operation을 구현 */} 
+
+
+② operator overloading이 허용되는 연산자. 
+
++ - * / % ^ & | ~ ! 
+= < > += -= *= /= %= ^= &= 
+
+|= << >> >>= <<= == != <= >= && 
+
+|| ++ -- ->* , -> [] () new delete 
+
+
+
+
+
+- !!! operator overloading이 허용되지 않는 연산자 
+
+. .* :: ?: sizeof 
+
+
+
+
+→ 이유1( . .* :: ): 사용자가 정의한 어떤 class에 대해서도 그 operation들은 첫번째 operand로 그 object를 가진다는 미리 정의된 의미를 가지기 때문. 
+
+
+→ 이유2( ?: sizeof ) : 단순히 이 두 operator에 대해서는 operator overloading을 허용할 필요가 없다고 생각했기 때문. 
+
+
+③ operator overloading에서 유의해야할 사항. (☆중요☆) 
+
+i) 우선순위를 변경할 수 없다. 
+
+
+ii) 구문은 변경할 수 없다. 즉, unary operator는 unary operator로 binary operator는 binary operator로 정의되어야. (eg. ++ ---> binary op로 변환할 수 無) 
+
+
+iii) 임의로 새로운 operator를 정의할 수 없다. 
+
+
+iv) operator+()와 operator=()를 정의했다고 해서 operator+=()가 정의되지는 않음. 
+
+
+v) new나 delete를 제외한 나머지 operator들에 대해서 operator f'n은 반드시 member f'n이거나, 아니면 적어도 하나 이상의 class object를 argument로 가져야만. → 즉, basic data type(int, char, double ……)에 대해서는 operator overloading을 허용하지 않음. 
+
+
+vi) pointer 변수에 대한 operation는 재 정의될 수 없다. 
+
+eg. class x { 
+friend operator+(X*, X*); // ERROR: pointer에 대한 operation을 정의할 수 없음. 
+
+}; 
+
+
+void f() { 
+
+X *a, *b; 
+
+a+b; // pointer 덧셈 : system이 제공하는 operator 사용. 
+
+} 
+
+
+
+
+
+vii) basic data type을 첫번째 argument로 가지는 operator f'n은 class의 member f'n이 될 수 없다. 
+
+eg. complex class의 object인 comp와 integer 2를 더하는 경우. 
+
+☞ complex complex::operator+(int)를 사용. 
+
+comp + 2; → comp.operator+(2)로 해석. 
+
+2 + comp; → 2.operator+(comp)와 같이 해석될 수 없다. 
+
+☞ 해결 : friend f'n 이용. 
+
+complex class에 friend complex operator+(int, complex);와 같이 선언. 
+
+　 
+
+④ operator f'n을 실제 호출하는 방법. (두 가지) 
+
+eg. void g(complex a, complex b) 
+{ 
+
+complex c = a + b; 
+
+
+complex d = operator+(a, b); 
+
+} 
+
+
+
+
+
+
+3.2 연산자 중복의 사용 
+
+
+- operator overloading을 사용하는 이유 : 일관적으로 operator를 사용하기 때문에 훨씬 읽기 쉽고, 이해하기 쉽다. 또한, operator precedence가 그대로 유지되고 있다. → 결론적으로, operator overloading은 C++에 새로운 기능을 추가하는 것이 아니라 위와 같은 長點을 제공하여 좀더 일반적인 programming 환경을 제공하는 것이다. 
+
+
+3.2.1 이항 연산자와 단항 연산자 
+
+① binary operator를 정의하는 두 가지 방법. 
+
++- ▷ argument를 하나만 가지는 class의 member f'n으로 정의. 
+
++- ▶ argument를 두 개 가지는 전역(global) f'n으로 정의. 
+
+eg. 임의의 이항 연산자 @가 위의 두가지 방법에서 각각 어떻게 해석되나? 
+
+a@b 
+
+▷ a.operator@(b)로 해석. 
+
+▶ operator@(a, b)로 해석. 
+
+
+② unary operator도 두가지 방법. 
+
++- ♤ argument를 가지지 않는 class의 member f'n으로 정의. 
+
++- ♠ 하나의 argument를 가지는 global f'n으로 정의. 
+
+eg. 해석. 
+
+@a 
+
+♤ a.operator@()로 해석. 
+
+♠ operator@(a)로 해석. 
+
+a@ 
+
+♤ a.operator@(int)로 해석. -+ 
+
+♠ operator@(a, int)로 해석. -+ 
+
+→ 이때, argument의 data type에 int형을 사용하는 것은 실제로 int data type을 전달받는 것이 아니라, postfix operator임을 나타내기 위한 일종의 모조 인자(dummy argument)이다. 
+
+
+③ member f'n을 사용하는 방법에서 argument수가 한개씩 적은 이유 : 어떤 object에 대한 member f'n은 암시적으로 그 object를 argument로 갖기 때문. → 이때, 그 object의 정보를 reference하는 경우에는 C++이 제공하는 this 포인터를 이용하여 접근할 수. 
+
+
+④ eg. of operator overloading. 
+
+class Type { 
+
+Type* operator&(); // 주소를 반환하는 prefix unary operator f'n. 
+
+Type operaotr-(Type); // 뺄셈 binary operator f'n. 
+
+Type operator--(int); // postfix decrement unary operator f'n. 
+
+Type operator*(Type, Type); // ERROR : 세개의 argument. 
+
+Type operator/(Type, Type); // ERROR : 세개의 argument. 
+
+}; 
+
+
+// global f'n(보통 friend f'n)을 사용한 정의. 
+
+Type operator+(Type); // argument를 원래 부호로 변경하는 prefix unary operator f'n. 
+
+Type operator+(Type, Type); // prefix binary operator f'n. 
+
+Type operator++(Type&, int); // postfix increment unary operator f'n. 
+
+Type operator+(); // ERROR : argument 無. 
+
+Type operator+(Type,Type,Type); // ERROR : 세개의 argument. 
+
+Type operator%(Type); // ERROR : argument가 하나인 modulator operator f'n. 
+
+
+void g() { 
+
+Type a; 
+
+Type b = a; 
+
+Type* ptr = &a; // a.operator&() 호출. 임의의 data type에대한 pointer는 basic data type임을 명심! 
+
+Type c = ptr--; // basic operator -- 수행! 
+
+// Type c = ptr; ptr--; 와 같은 결과. 
+
+b = a - c; // a.operator-(c) 호출. 
+
+ptr++; // basic operator ++ 수행! 
+
+c = a + b; // operator+(a,b) 호출. 
+
+} 
+
+
+3.2.2 대입 연산자 : operator=() 
+
+eg. class X { 
+
+// ..... 
+
+}; 
+
+
+void h() { 
+
+X a, b; 
+
+a = b; // system이 default로 정의한 a.operator=(b)를 호출. 
+
+} 
+
+
+X& operator=(X&, const X&) { ..... } 
+
+// 문제 발생 : 이미 default 치환 operator f'n을 사용했음. 
+
+
+void g() { 
+
+X a, b; 
+
+a = b; // 사용자 정의 a.operator=(b)호출. 
+
+} 
+
+
+
+
+3.2.3 첨자 연산자 : operator[]() 
+
+① binary operator로서 class object에 대한 첨자를 정의하는데 사용. 
+
+eg. class Vec { 
+
+int data[100]; 
+
+public : 
+
+int& operator[](unsigned i) { 
+
+if (i>99) cout << " out of range" << endl; 
+
+else return data[i]; 
+
+} 
+
+}; 
+
+
+void main(void) { 
+
+Vec v; 
+
+// ..... 
+
+v[10] = 42; // v.operator[](10)과 같이 해석. 
+
+v[12] += v[10]; 
+
+} 
+
+
+3.2.4 함수 호출 연산자 : operator()() 
+
+eg. class assoc_iterator { 
+
+assoc *cs; 
+
+int ce; 
+
+public : 
+
+assoc_iterator(const assoc& s) { cs = &s; ce = 0; } 
+
+pair* operator()() 
+
+{ return (ce < cs->free) ? &cs->[ce++] : 0; } 
+
+}; 
+
+
+void main(void) { 
+
+const MAX = 256; 
+
+char buf[MAX]; 
+
+assoc vec(16); 
+
+pair* p; 
+
+
+while (cin >> buf) vec[buf]++; // 입력을 받아들임. 
+
+assoc_iterator next(vec); 
+
+while(p = next()) // next.operator()()를 호출. 
+
+cout << p->name << " counts " << p->val << endl; 
+
+} 
+
+3.2.5 클래스 멤버 접근 연산자 : operator->() 
+
+eg. class Yptr { 
+
+Y* p; 
+
+public : 
+
+Y* operator->() { return p; } 
+
+Y& operator*() { return *p; } 
+
+Y& operator[](int i) { return p[i]; } 
+
+}; 
+
+
+
+3.2.6 증가 연산자(operator++())와 
+
+감소 연산자(operator--()) 
+
+
+① unary operator이지만, prefix operator와 postfix operator의 두가지 경우로 사용될 수 있으므로, 그 두 가지를 구분. 
+
+
+② postfix operator의 경우에는 dummy argument(모조 인자)를 두 번째 argument로 두어 구분하는 방법을 사용. 
+
+
+eg. class X { 
+
+public : 
+
+X operator++(); // prefix 
+
+X operator++(int); // postfix 
+
+X operator--(); // prefix 
+
+X operator--(int); // postfix 
+
+}; 
+
+
+
+3.3 사용자 정의 자료형 변환 
+
+
+- complex와 double data type을 argument로 가질 때, 가능한 모든 argument들의 조합에 대한 f'n을 프로그래머가 일일이 작성해야하는 단점이 있겠지? 어떻게 해결할까? 
+
+→ C++에서는 constructor나 변환 연산자를 이용하여 사용자가 data type 변환을 할 수 지정할 수 있도록 함. 
+
+
+3.3.1 생성자를 사용한 사용자 정의 자료형 변환 
+
+① programmer가 일일이 모든 가능한 argument들의 data type 조합마다 따로 f'n을 정의해야 하는 것을 피하기 위한 방법으로 constructor를 이용. 
+
+eg. data type T를 class X로 변환하고자 할 경우 ⇒ class X 내에 data type T를 argument로 하는 constructor를 정의. 
+
+class X { 
+
+// ..... 
+
+public : 
+
+X(T); // T를 argument로 갖는 constructor 선언. 
+
+}; 
+
+⇒ data type X가 필요한 경우에 data type T가 사용되었더라도, system에 의하여 자동적으로 data type T가 data type X로 data type conversion이 일어남. 
+
+
+3.3.2 변환 연산자를 사용한 사용자 정의 자료형 변환 
+
+eg. class complex { 
+
+double re, im; 
+
+public : 
+
+operator double() { 
+
+if (im) { 
+
+cout << " Can't be converted to double type ! " << endl; 
+
+} 
+
+else return re; 
+
+} 
+
+}; 
+
+
+3.3.3 사용자 정의 자료형 변환에서의 모호성 
+
+● 규칙 1 : 사용자 정의 자료형 변환은 그보다 높은 우선순위의 변환이 일어날 수 없는 상황에서만 수행됨. 
+
+● 규칙 2 : 사용자 정의 자료형 변환은 한 object에 대하여 오직 한 번만 시스템에 의해 자동적으로 수행됨. 
+
+● 규칙 3 : 생성자를 통한 자료형 변환과 변환 연산자를 통한 자료형 변환의 우선순위는 서로 같다. 
+
+
+<사용자 정의 자료형 변환>의 부연 설명 
+
+
+3.3.3 사용자 정의 자료형 변환에서의 모호성 
+
+● 규칙 1 : 사용자 정의 자료형 변환은 그보다 높은 우선 순위의 변환이 일어날 수 없는 상황에서만 수행됨. 
+
+→ system이 정의한 자료형 변환으로 해결할 수 없는 경우에만 사용자 정의 자료형 변환이 수행. 
+
+
+class complex { 
+
+private : 
+
+double re, im; 
+
+public : 
+
+complex(int r=0, int i=0) { re=r; im=i; } 
+
+// ..... 
+
+}; 
+
+
+double sqrt(double); 
+
+complex sqrt(complex); 
+
+
+void test() { sqrt{10); } 
+
+
+→ 위의 경우 sqrt(10)은 sqrt(complex(10))과 sqrt(double(10))중에서 system 제공 자료형 변환인 sqrt(double(10))가 수행되어 해결. 
+
+
+● 규칙 2 : 사용자 정의 자료형 변환은 한 object에 대하여 오직 한 번만 시스템에 의해 자동적으로 수행됨. 
+
+
+class Type1 { 
+
+// ..... 
+
+Type1(int); 
+
+Type1(char*); // 두 가지 모두 constructor를 이용한 자료형 변환. 
+
+}; 
+
+
+class Type2 { 
+
+// ..... 
+
+Type2(Type1); // Type1을 Type2로 변환하는 기능을 갖는 constructor 
+
+}; 
+
+
+Type2 test(Type2); // Type2 자료형을 인자로 받고, 반환하는 함수. 
+
+
+void sample { 
+
+① test("USUHAN"); 
+
+② test(Type1("USUHAN")); 
+
+} 
+
+
+① ERROR : test(Type2(Type1("USUHAN")) - 두 단계의 암시적인 사용자 정의 자료형 변환. 
+
+② O.K. : 한 번의 암시적 사용자 정의 자료형 변환. 
+
+
+● 규칙 3 : 생성자를 통한 자료형 변환과 변환 연산자를 통한 자료형 변환의 우선순위는 서로 같다. 
+
+→ 어떤 class의 object에 적용할 수 있는 자료형 변환으로 constructor를 이용하는 방법과 변환 연산자를 이용하는 방법을 모두 적용할 수 있는 경우에는 ERROR 발생. 
+
+
+struct strX { 
+
+operator int(); // strX 자료형으로부터 int형으로의 변환 연산자. 
+
+}; 
+
+
+struct strY { 
+
+strY(strX); // strX형으로부터 strY형으로의 constructor. 
+
+}; 
+
+
+strY operator+(strY, strY) { // 두 개의 strY 자료형의 인자를 받아 반환값으로 strY 자료형을 반환하는 f'n 
+
+// ..... 
+
+} 
+
+
+void test(strX a, strX b) { 
+
+// ..... 
+
+a+b; // ERROR : 어떤 변환 방법을 사용할 지 모호함. 
+
+} // operator+(strY(a), strY(b)) 또는 a.operator int()+b.operator int() 두 가지 모두 수행 가능. 
+
+3.4 멤버 함수와 프렌드 함수의 사용 선택 기준 
+
+
+① 함수 f()가 class X내의 member들을 사용하기 위해서는 class X의 member f'n이거나 class X내에서 friend f'n으로 선언된 외부 f'n이어야 함. → programmer는 어떤 방식을 선택할 것인지의 선택 기준은? 
+
+
+② 반드시 member f'n이어야 하는 경우. 
+
+: constructor, destructor, virtual f'n → global f'n으로는 사용할 수 無. 
+
+
+③ 일반적인 기준. 
+
+☞ member f'n 
+
+i) class object의 상태를 변경하는 operator에 사용해야. 
+
+ii) basic data type에 대한 operation에서 수식의 왼쪽값이 주소값을 갖는 object가 필요한 operator f'n을 구현할 때, 예를 들어 =, *=, +=등과 같은 operator f'n을 구현할 때. 
+
+
+☞ friend f'n 
+
+i) 암시적인 data type 변환이 필요한 operation을 구현할 때. 
+
+ii) basic data type에 대한 operation에서 수식의 왼쪽값으로 상수도 될 수 있는 operator f'n을 구현할 때, 예를 들어 +, -, &&등과 같은 operator f'n을 구현. 
+
+
+④ !!! 별다른 이유가 없으면 member f'n을 사용하는 것이 바람직. → Why? 어떤 f'n을 global f'n으로 정의하면 새로운 global name이 생성되어 그만큼 유지하는데 비용이 많이 들고, member f'n에서는 암시적으로 object를 가리키는 this라는 포인터를 사용할 수 있기 때문에 f'n을 보다 더 간단하게 작성할 수. 
+
+
+<<< Operator Overloading의 예 >>> 
+
+
+/* 다음 program은 무한대의 factorial 값을 구하는 program이다. 아무리 int, unsigned int, long int, unsigned long int, double, long double로 data를 선언해 놓아도 그 값에는 한계가 있다. strint(string을 이용한 숫자 계산)라는 class를 만들고 strint 형에 대한 각종 operator를 정의해 놓아 무한대의 숫자까지 factorial 계산이 가능하도록 만든 program이다. (p.39∼44) */ 
+
+
+/////////////////////////////////////////////////////////////////// 
+
+// Program : Factorial 
+
+// 
+
+// Dept. Computer Science 9301137(B) 
+
+// Programmer : USUHAN (Song CheolMin) 
+
+// 
+
+// last up date : 95. 5. 12 
+
+/////////////////////////////////////////////////////////////////// 
+
+
+#include // use for I/O 
+
+#include // use for I/O 
+
+#include // use for 'clrscr()', 'getch()' 
+
+#include // use for 'strlen()', 'strrev()' 
+
+#include // use for 'itoa()', 'exit()' 
+
+#include // use for 'raise()' 
+
+
+#define MAX_INPUT 100 
+
+#define SWAP(x, y, t) ( (t)=(x), (x)=(y), (y)=(t) ) 
+
+
+typedef enum { FALSE, TRUE } boolean; 
+
+
+class strint { 
+
+private : 
+
+char *num; 
+
+public : 
+
+strint(void); // constructor 
+
+strint(const int& n); 
+
+strint(const strint& n); 
+
+
+friend strint operator+(const strint& m, const strint& n); 
+
+friend strint operator+(const strint& m, const int& n); 
+
+friend char* add(char* m, char *n); 
+
+strint& operator+=(const strint& n); 
+
+
+friend strint operator-(const strint& m, const strint& n); 
+
+friend strint operator-(const strint& m, const int& n); 
+
+friend char* sub(char* m, char *n); 
+
+
+friend strint operator*(const strint &m, const strint& n); 
+
+
+strint& operator=(const strint& n); 
+
+strint& operator=(const char* n); 
+
+strint& operator=(const int& n); 
+
+
+friend boolean operator<=(const strint& m, const strint& n); 
+
+friend boolean operator<=(const strint& m, const int& n); 
+
+friend boolean operator<=(const int& m, const strint& n); 
+
+
+friend istream& operator>>(istream& stream, strint& x); 
+
+friend ostream& operator<<(ostream& stream, strint& x); 
+
+}; 
+
+
+/********************* construtor ***********************/ 
+
+strint :: strint(void) 
+
+{ 
+
+num = NULL; 
+
+} 
+
+
+strint :: strint(const int& n) 
+
+{ 
+
+int length; 
+
+char in[MAX_INPUT]; 
+
+
+itoa(n, in, 10); 
+
+
+length = strlen(in); 
+
+num = new char[length+1]; 
+
+
+num = in; 
+
+} 
+
+
+strint :: strint(const strint& n) 
+
+{ 
+
+int length; 
+
+
+length = strlen(n.num); 
+
+num = new char[length+1]; 
+
+strcpy(num, n.num); 
+
+} 
+
+
+/************ operator overloading (+, +=) ****************/ 
+
+strint operator+(const strint& m, const strint& n) 
+
+{ 
+
+strint res; 
+
+
+res.num = add(m.num, n.num); 
+
+
+return res; 
+
+} 
+
+
+strint operator+(const strint& m, const int& n) 
+
+{ 
+
+strint res, parameter; 
+
+int length; 
+
+char number[MAX_INPUT]; 
+
+
+itoa(n, number, 10); 
+
+length = strlen(number); 
+
+parameter.num = new char[length+1]; 
+
+strcpy(parameter.num, number); 
+
+
+res.num = add(m.num, parameter.num); 
+
+delete[] parameter.num; 
+
+
+return res; 
+
+} 
+
+
+char* add(char* m, char *n) 
+
+{ 
+
+char* tempchar; 
+
+int temp = 0; 
+
+int i, j, k; 
+
+int length, length1, length2; 
+
+
+length1 = strlen(m); 
+
+length2 = strlen(n); 
+
+
+if (length2 > length1) { // to modify (m > n) 
+
+SWAP(m, n, tempchar); 
+
+SWAP(length1, length2, length); 
+
+} 
+
+
+/* allocation & initialzation of character string 
+
+that will write the result */ 
+
+tempchar = new char[length1 + 2]; 
+
+tempchar[length1] = tempchar[length1+1] = '\0'; 
+
+
+// calculate as second argument 
+
+for (i=length1-1, j=length2-1, k=0; j>=0; i--, j--, k++) { 
+
+temp += (m[i] - '0') + (n[j] - '0'); 
+
+tempchar[k] = (temp%10) + '0'; 
+
+temp /= 10; 
+
+} 
+
+
+for (; i>=0; i--, k++) { 
+
+temp += m[i] - '0'; 
+
+tempchar[k] = (temp%10) + '0'; 
+
+temp /= 10; 
+
+} 
+
+
+if (temp != 0) 
+
+tempchar[k] = temp + '0'; 
+
+
+strrev(tempchar); 
+
+
+return tempchar; 
+
+} 
+
+
+strint& strint :: operator+=(const strint& n) 
+
+{ 
+
+*this = *this + n; 
+
+
+return *this; 
+
+} 
+
+
+/************** operator overloading (-) ******************/ 
+
+strint operator-(const strint& m, const strint& n) 
+
+{ 
+
+strint res; 
+
+
+res.num = sub(m.num, n.num); 
+
+
+return res; 
+
+} 
+
+
+strint operator-(const strint& m, const int& n) 
+
+{ 
+
+strint res, parameter; 
+
+int length; 
+
+char number[MAX_INPUT]; 
+
+
+itoa(n, number, 10); 
+
+length = strlen(number); 
+
+parameter.num = new char[length+1]; 
+
+strcpy(parameter.num, number); 
+
+
+res.num = sub(m.num, parameter.num); 
+
+
+return res; 
+
+} 
+
+
+char* sub(char* m, char *n) 
+
+{ 
+
+char* tempchar; 
+
+int temp = 0; 
+
+int i, j, k; 
+
+int length, length1, length2; 
+
+
+length1 = strlen(m); 
+
+length2 = strlen(n); 
+
+
+if (length2 > length1) { // to modify (m > n) 
+
+SWAP(m, n, tempchar); 
+
+SWAP(length1, length2, length); 
+
+} 
+
+
+/* allocation & initialzation of character string 
+
+that will write the result */ 
+
+tempchar = new char[length1 + 1]; 
+
+tempchar[length1] = tempchar[length1-1] = '\0'; 
+
+
+for (i=0; length2 < length1-i; i++) 
+
+tempchar[length1-1-i] = m[i]; 
+
+
+// claculate subtraction 
+
+for (j=0; i 
+temp = m[i] - n[j]; 
+
+if (temp >= 0) 
+
+tempchar[length1-1-i] = temp + '0'; 
+
+else { 
+
+tempchar[length1-1-i] = 10 + temp + '0'; 
+
+for (k=1; tempchar[length1-1-i+k] == '0'; k++) 
+
+tempchar[length1-1-i+k] = '9'; 
+
+tempchar[length1-1-i+k] -= 1; 
+
+} 
+
+} // of for 
+
+
+if (tempchar[length1-1] == '0') 
+
+tempchar[length1-1] = '\0'; 
+
+
+strrev(tempchar); 
+
+
+return tempchar; 
+
+} 
+
+
+/************** operator overloading (*) ******************/ 
+
+strint operator*(const strint &m, const strint& n) 
+
+{ 
+
+strint a; 
+
+char *tempChar; 
+
+int tempLen; 
+
+int temp; 
+
+int len1, len2, i, j, k; 
+
+
+len1 = strlen(m.num); 
+
+len2 = strlen(n.num); 
+
+
+tempLen = len1 + len2; 
+
+tempChar = new char[tempLen + 1]; 
+
+
+for (k=0; k<=tempLen+1; k++) 
+
+tempChar[k] = '\0'; 
+
+
+for (i=0; i 
+for (j=0; j 
+temp = (m.num[len1-i-1] - '0') * (n.num[len2-j-1] - '0'); 
+
+for (k=i+j; ; temp/=10, k++) { // for3 
+
+if (tempChar[k] != '\0') 
+
+temp += tempChar[k] - '0'; 
+
+tempChar[k] = (temp%10) + '0'; 
+
+
+if (temp == 0) { 
+
+int index = k; 
+
+tempChar[index] = '0'; 
+
+break; 
+
+} // of if 
+
+} // of for3 
+
+} // of for2 
+
+} // of for1 
+
+
+if (tempChar[tempLen-1] == '0') 
+
+tempChar[tempLen-1] = '\0'; 
+
+else if (tempChar[tempLen] == '0') 
+
+tempChar[tempLen] = '\0'; 
+
+
+strrev(tempChar); 
+
+
+a = tempChar; 
+
+
+return a; 
+
+} 
+
+
+/************** operator overloading (=) ******************/ 
+
+strint& strint :: operator=(const strint& n) 
+
+{ 
+
+int length; 
+
+
+length = strlen(n.num); 
+
+num = new char[length+1]; 
+
+strcpy(num, n.num); 
+
+
+return *this; 
+
+} 
+
+
+strint& strint :: operator=(const char* n) 
+
+{ 
+
+int length; 
+
+
+length = strlen(n); 
+
+num = new char[length+1]; 
+
+strcpy(num, n); 
+
+
+return *this; 
+
+} 
+
+
+strint& strint :: operator=(const int& n) 
+
+{ 
+
+int length; 
+
+char *number; 
+
+
+itoa(n, number, 10); 
+
+length = strlen(number); 
+
+num = new char[length+1]; 
+
+strcpy(num, number); 
+
+
+return *this; 
+
+} 
+
+
+/************** operator overloading (<=) *****************/ 
+
+boolean operator<=(const strint& m, const strint& n) 
+
+{ 
+
+int len1, len2, cmp; 
+
+
+len1 = strlen(m.num); 
+
+len2 = strlen(n.num); 
+
+
+if (len1 < len2) 
+
+return TRUE; 
+
+else if (len1 > len2) 
+
+return FALSE; 
+
+else { 
+
+cmp = strcmp(m.num, n.num); 
+
+
+if (cmp<=0) 
+
+return TRUE; 
+
+else 
+
+return FALSE; 
+
+} 
+
+} 
+
+
+boolean operator<=(const strint& m, const int& n) 
+
+{ 
+
+char* number; 
+
+int len1, len2, cmp; 
+
+
+itoa(n, number, 10); 
+
+
+len1 = strlen(m.num); 
+
+len2 = strlen(number); 
+
+
+if (len1 < len2) 
+
+return TRUE; 
+
+else if (len1 > len2) 
+
+return FALSE; 
+
+else { 
+
+cmp = strcmp(m.num, number); 
+
+
+if (cmp<=0) 
+
+return TRUE; 
+
+else 
+
+return FALSE; 
+
+} 
+
+} 
+
+
+boolean operator<=(const int& m, const strint& n) 
+
+{ 
+
+char* number; 
+
+int len1, len2, cmp; 
+
+
+itoa(m, number, 10); 
+
+
+len1 = strlen(number); 
+
+len2 = strlen(n.num); 
+
+
+if (len1 < len2) 
+
+return TRUE; 
+
+else if (len1 > len2) 
+
+return FALSE; 
+
+else { 
+
+cmp = strcmp(number, n.num); 
+
+
+if (cmp<=0) 
+
+return TRUE; 
+
+else 
+
+return FALSE; 
+
+} 
+
+} 
+
+
+/*************** IO stream overloading *******************/ 
+
+istream& operator>>(istream& stream, strint& x) 
+
+{ 
+
+char buf[MAX_INPUT]; 
+
+
+cin >> buf; 
+
+
+x = buf; 
+
+
+return stream; 
+
+} 
+
+
+ostream& operator<<(ostream& stream, strint& x) 
+
+{ 
+
+stream << x.num; 
+
+
+return stream; 
+
+} 
+
+
+/***************** implement factorial ********************/ 
+
+strint fact(strint& n) 
+
+{ 
+
+if (n<=1) 
+
+return 1; 
+
+else 
+
+return (n*fact(n-1)); 
+
+} 
+
+
+/************************ MAIN part ***********************/ 
+
+void main(void) 
+
+{ 
+
+clrscr(); 
+
+
+strint total, i, n, temp; 
+
+
+total = 0; 
+
+cout << endl << " <<< 0! + 1! + 2! + .... + n! >>>" << endl; 
+
+cout << endl << " Please input n ( 1<= n <=35 ) : "; 
+
+cin >> n; 
+
+
+if (n <= 0) { 
+
+cout << "\n\n !!! Input # is more than 1 !!! "; 
+
+cout << "\n\n Press any key to EXIT \n"; 
+
+getch(); 
+
+exit(1); 
+
+} 
+
+else if (36 <= n) { 
+
+cout << "\n\n !!! Input # is less than 35 !!! "; 
+
+cout << "\n\n Press any key to EXIT \n"; 
+
+getch(); 
+
+exit(1); 
+
+} 
+
+
+for (i=1; i<=n; i+=1) { 
+
+cout << i << "! = "; 
+
+temp = fact(i); 
+
+cout << temp << endl; 
+
+total += temp; 
+
+} 
+
+
+cout << "\n\n Output : " << total; 
+
+
+cout << "\n\n Press any key to EXIT \n"; 
+
+getch(); 
+
+
+raise(SIGTERM); 
+
+} 

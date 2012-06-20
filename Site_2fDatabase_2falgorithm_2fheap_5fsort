@@ -1,0 +1,97 @@
+#title Heap Sort
+
+[[tableofContents(title=목차)]]
+=== 소개 ===
+Heap Sort는 Heap 자료구조에 기반을 두는 정렬알고리즘으로, Heap 자료구조에 원소를 insert 하는 방식으로 정렬을 한다. Heap 자료구조는 이진트리 형태를 가진다. 만약 부모의 노드의 키 값이 항상 자식 노드의 키값보다 크거나 같다면 max-heap 이라고 하거, 반대로 부모 노드의 키값이 자식노드의 키값보다 항상 작거나 같다면 min-heap 이라고 한다. 
+
+힙소트는 퀵소트(:12)와 자주 비교된다. 이 둘은 다른 nearly-in-place 비교 기반의 정렬알고리즘에 비해서 매우 효율적인 것으로 알려져 있다. 보통은 퀵소트가 더 빠른 것으로 알려져 있지만, 최악의 경우 O(n2)의 시간이 걸리기 때문에, 데이터의 양이 매우 많은 경우에는 선택에 있어서 신중을 기할 필요가 있다. 
+
+힙소트는 최악의 경우O(n log n)시간이 소비된다.
+
+이 알고리즘은 특히 실시간으로 원소가 주어지는 priority queue 를 구현하는데 유리하다. 
+
+웹문서 검색엔진(:12)을 예로 들어보자. 이때, 문서는 문서의 고유번호와 가중치로 이루어진 {did, score} 자료구조를 가질 것이다. 만약 100000개의 문서가 검색되었다면 did를 key로 정렬된 리스트를 얻을 것이다. 그렇다면 이것을 다시 score를 key로 정렬해야 할 것이다. 이 경우 100000개의 결과를 quick sort를 이용해서 완전정렬하는 방법도 있겠지만, 검색결과는 top N 개만이 중요하다고 볼 수 있으므로, 이것은 큰 낭비다. 하나의 페이지에 10개의 검색결과를 출력한다고 하고, 10페이지 까지 보여준다고 하면 최대 100개의 Top Score만 유지하면 되기 때문이다. 100의 크기를 가지는 priority queue를 유지하면 된다. priority queue가 가득 찼다면, 최소값을 기억하고 있다가 새로운 문서의 score가 최소값보다 크다면 이전의 최소값을 삭제한다음에 트리를 재정렬하면 될 것이다.
+
+=== Build Heap === 
+Heap 정렬은 정렬을 시작하기 전에, Heap 자료구조(:12)로 만들어야 한다. 여기에서는 MAX heap을 선택해서 설명을 하도록 한다. 이 경우 상위 노드는 반드시 하위 노드보다 더 커야 한다는 것이 보장되어야 할 것이다.
+
+Heap은 Tree 자료구조를 따르기 때문에, 선택한 노드의 하위노드는 (n*2)+1 과 (n*2)임을 알 수 있다.
+|| UNSORTED             ||                 ||                      ||
+|| attachment:heap1.png || PercDown(5,10)  || attachment:heap2.png ||
+최초에 5번째 노드와 하위 노드인 '''5*2'''를 비교해 함을 알 수 있다. 5번째 노드의 값이 더 작으므로, swap 해준다.
+|| PercDown (4,10)      ||                 ||                      ||
+|| attachment:heap3.png || PercDown(3,10)  || attachment:heap4.png ||
+4,3번째 노드에서 동일하게, 가장 큰 값으로 swap 한다. 이후 이 과정을 몇번 수행하면, 완전한 Heap 자료구조를 만들 수 있다. 
+|| percDown (1,20)      ||                 ||                      ||
+|| attachment:heap5.png || PercDown(1,10)  || attachment:heap6.png ||
+이렇게 해서 max heap이 만들어졌다.
+
+=== 정렬 알고리즘 ===
+heap 자료구조는 1차원 배열을 이용해서 정의 된다. 2진 트리를 일차원 배열에 나열하는 것이라고 보면된다. 위의 sort 된 heap은 다음과 같은 배열 구조를 가질 것이다. 
+  || 68 || 32 || 65 || 21 || 26 || 19 || 31 || ... ||
+정렬을 위해서 각 노드는 부모노드의 위치를 알고 있어야 한다. 부모노드의 위치는 다음과 같이 계산해 낼 수 있다.
+  * 노드의 위치가 i 라면
+  * 왼쪽 자식노드 : i/2 
+  * 오른쪽 자식 노드 : (i/2) + 1
+각 노드의 위치를 알수 있게 되었으니 다음과 같은 heap 의 성질을 정의할 수 있다.
+{{{#!plain
+  * K[i] >= K[2*i]
+  * K[i] >= K[(2*i) + 1]
+}}}
+heap 정렬은 아래의 두단계를 거치게 된다.
+  * 먼저 정렬하고자 하는 리스트로 부터 heap 자료구조를 만든다. 
+  * heap 정렬을 수행한다.
+
+=== 또다른 예 ===
+출처: [http://proneer.tistory.com/entry/Sort-%ED%9E%99-%EC%A0%95%EB%A0%ACHeap-Sort 세상, 그 중심의 나!! 블로그]
+{{{#!html
+<table><tr><td height=300>
+<object type="application/x-shockwave-flash" wmode="transparent" data="http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Database/algorithm/heap_sort?action=download&value=sort_heap.swf" height="300" width="600">
+</td></tr></table>
+}}}
+
+=== 코드 ===
+{{{#!plain
+void heapSort(int numbers[], int array_size)
+{
+  int i, temp;
+ 
+  for (i = (array_size / 2)-1; i >= 0; i--)
+    siftDown(numbers, i, array_size - 1);
+ 
+  for (i = array_size-1; i >= 1; i--)
+  {
+    temp = numbers[0];
+    numbers[0] = numbers[i];
+    numbers[i] = temp;
+    siftDown(numbers, 0, i-1);
+  }
+}
+ 
+ 
+void siftDown(int numbers[], int root, int bottom)
+{
+  int done, maxChild, temp;
+ 
+  done = 0;
+  while ((root*2 <= bottom) && (!done))
+  {
+    if (root*2 == bottom)
+      maxChild = root * 2;
+    else if (numbers[root * 2] > numbers[root * 2 + 1])
+      maxChild = root * 2;
+    else
+      maxChild = root * 2 + 1;
+ 
+    if (numbers[root] < numbers[maxChild])
+    {
+      temp = numbers[root];
+      numbers[root] = numbers[maxChild];
+      numbers[maxChild] = temp;
+      root = maxChild;
+    }
+    else
+      done = 1;
+  }
+}
+}}}

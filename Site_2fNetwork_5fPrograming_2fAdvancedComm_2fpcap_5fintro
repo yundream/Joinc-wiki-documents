@@ -1,0 +1,1472 @@
+#title libpcap을 이용한 프로그래밍
+[wiki:docbook/libpcap을_이용한_프로그래밍 Docbook 원문]
+  * 성능 이슈 : 유저모드로 패킷이 전달되어야 하므로, 패킷을 놓칠 수 있다. 이에 대한 해결방안들
+      1. netflow(:12)를 이용하면 해결가능할까 ?
+      1. [http://letsme.com/2 PF_RING 을 이용한 pcap 성능 향상]
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>libpcap 를 이용한 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>libpcap 를 이용한 프로그래밍</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.5</TD
+><TD
+ALIGN="LEFT"
+>2003년 1월 28일 21시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서 작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN17"
+>Libpcap 기본</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN19"
+>Libpcap 에 대하여</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN29"
+>libpcap 의 설치</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN36"
+>패킷 캡쳐의 기본이해</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN45"
+>패킷 캡쳐의 응용</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN48"
+>libpcap 프로그래밍</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN51"
+>디바이스&#38;네트웍 정보 관련 API</A
+></DT
+><DD
+><DL
+><DT
+>3.1.1&#51208;. <A
+HREF="#AEN53"
+>int pcap_lookupnet()</A
+></DT
+><DT
+>3.1.2&#51208;. <A
+HREF="#AEN62"
+>char* pcap_lookupdev</A
+></DT
+><DT
+>3.1.3&#51208;. <A
+HREF="#AEN65"
+>pcap_datalink</A
+></DT
+><DT
+>3.1.4&#51208;. <A
+HREF="#AEN69"
+>예제</A
+></DT
+></DL
+></DD
+><DT
+>3.2&#51208;. <A
+HREF="#AEN77"
+>패킷 캡쳐 초기화 관련 API</A
+></DT
+><DD
+><DL
+><DT
+>3.2.1&#51208;. <A
+HREF="#AEN81"
+>pcatp_t *pcap_open_live</A
+></DT
+><DT
+>3.2.2&#51208;. <A
+HREF="#AEN95"
+>pcap_t *pcap_open_offline</A
+></DT
+></DL
+></DD
+><DT
+>3.3&#51208;. <A
+HREF="#AEN103"
+>패킷 캡쳐(Read) 관련 API</A
+></DT
+><DD
+><DL
+><DT
+>3.3.1&#51208;. <A
+HREF="#AEN106"
+>TCP,IP,Eternet 구조체</A
+></DT
+><DT
+>3.3.2&#51208;. <A
+HREF="#AEN122"
+>u_char *pcap_next</A
+></DT
+><DT
+>3.3.3&#51208;. <A
+HREF="#AEN127"
+>pcap_loop</A
+></DT
+><DT
+>3.3.4&#51208;. <A
+HREF="#AEN135"
+>pcap_dispatch</A
+></DT
+></DL
+></DD
+><DT
+>3.4&#51208;. <A
+HREF="#AEN139"
+>패킷 필터링 관련 API</A
+></DT
+><DD
+><DL
+><DT
+>3.4.1&#51208;. <A
+HREF="#AEN141"
+>pcap_compile</A
+></DT
+><DT
+>3.4.2&#51208;. <A
+HREF="#AEN151"
+>pcap_setfilter</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN155"
+>예제 코드</A
+></DT
+><DT
+>5&#51208;. <A
+HREF="#AEN164"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번 강좌는 libpcap 을 사용한 패킷 캡춰에 대한 내용이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2&#51208;. Libpcap 기본</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.1&#51208;. Libpcap 에 대하여</A
+></H2
+><P
+>			Libpcap(이하 pcap)은 "Portable Packet Capturing Library"의 
+			줄임말이며, 해석그대로 "간단하게 패킷을 캡쳐하기 위한 
+			함수모음(라이브러리)" 이다.  
+		</P
+><P
+>			물론 pcap 외에도 패킷캡쳐를 위한 도구들이 있기는 하지만, 
+			대부분의 경우 운영체제에 종속적이여서, 운영체제별로 코드를 다시 
+			짜야 한다는 불편함이 있다. 대표적인 도구로는  
+			SOCK_PACKET, LSF, SNOOP, SNIT 등이 있다.  
+		</P
+><P
+>			이에 비해 pcap 는 운영체제에 상관없이 범용적으로 사용가능한 
+			API를 제공해줌으로, 공용프로그램 혹은 공용라이브러리의 제작이 
+			가능하도록 도와준다. 또한 간단하게 사용가능한 
+			<B
+CLASS="EMPHASIS"
+>사용자 레벨</B
+> 라이브러리이다. 
+		</P
+><P
+>			libpcap 를 이용한 가장 대표적인 프로그램이 tcpdump 와 SAINT 와 
+			같은 프로그램들이다. 
+		</P
+><P
+>			또한 상용 IDS
+			<A
+NAME="AEN27"
+HREF="#FTN.AEN27"
+>[1]</A
+>
+			제품의 상당수가 패킷분석을 위해서 libpcap 을 
+			사용하고 있다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>2.2&#51208;. libpcap 의 설치</A
+></H2
+><P
+>			여러분이 Unix 계열 운영체제를 사용하고 있다면, 거의 대부분 
+			tcpdump 를 곧바로 사용할수 있을것이다. tcpdump 를 사용할수 
+			있다는 것은 그 기반이 되는 libpcap 역시 설치되어 있다는 말이 
+			된다.   
+		</P
+><P
+>			그러나 만약의 경우 설치가 되어 있지 않다면 <A
+HREF="www.tcpdump.org"
+TARGET="_top"
+>tcpdump.org</A
+>
+			에서 받아서 컴파일후 설치하기 바란다.  
+		</P
+><P
+>			컴파일 하기가 귀찮다면
+			그리고 레드헷이나 데비안 계열의 리눅스 사용자라면 
+			해당 패키지를 배포하는 ftp 사이트에서 다운 받아서 설치하면 된다. 
+			솔라리스 운영체제 라면 
+			<A
+HREF="www.sunfreeware.com"
+TARGET="_top"
+>www.sunfreeware.com</A
+> 
+			에서 패키지를 받아서 설치하기 바란다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>2.3&#51208;. 패킷 캡쳐의 기본이해</A
+></H2
+><P
+>			패킷 캡쳐는 네트웍 상에서 돌아다니는 패킷을 들여다 보는 걸 
+			말한다. 패킷 캡쳐라는 어감상 패킷을 "잡는"게 아닌가 라고 
+			생각할수 있지만, 패킷을 "잡지"는 않고 단지 들여다만 볼 뿐이다.  
+		</P
+><P
+>			만약 여러분의 호스트가 포함된 네트웍을 관리하는 라우터가 
+			일반적인(스위칭이 아닌) 라우터라면, 내부로 향하는 모든 
+			패킷은 브로드캐스팅(Broadcasting) 된다. 이는 스위칭 라우터가 
+			아닌한은 모든 로컬네트웍의 패킷을 들여다 볼수 있음을 
+			의미하기도 한다. 어쨋든 이경우 운영체제는 자신에게 도착된 
+			패킷중 목적지가 자신인 패킷만을 처리해서 Application Layer 까지 
+			올려 보내게 된다.  
+		</P
+><P
+>			libpcap 을 사용하면 이러한 패킷의 캡쳐가 가능해진다.   
+			인터넷 상의 패킷은 상대방에게 보낼경우 encapuslation 
+			과정을 거치고, 받은 패킷에 대해서는 demultiplexing 
+			과정을 거친다는 것을 알고 있을것이다 - 
+			<A
+HREF="/modules.php?name=News&file=article&sid=36"
+TARGET="_top"
+>TCP/IP 개요(3)</A
+> 참고 -
+			libpcap 을 사용해서 캡쳐한 패킷은 demultiplexing 과정을 
+			거치기 전의 패킷이다. 이렇게 해서 캡쳐한 패킷은 
+			각 프로토콜 단위로(구조체) 읽어서 처리하면 된다. 
+			다음은 encapuslation&#38;demultiplexing 과정이다.   
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN42"
+></A
+><P
+><B
+>&#44536;&#47548; 1. Encapuslation &#38; demultiplexing</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/abj.gif"></P
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN45"
+>2.4&#51208;. 패킷 캡쳐의 응용</A
+></H2
+><P
+>			패킷 캡쳐는 여러가지 목적으로 사용될수 있다. 
+			NIDS(Network Intrusion Detection System) 프로그램이 가장 
+			대표적인 응용이며, 네트웍 트래픽 감시, 네트웍 디버깅을 위한 
+			용도로 사용가능하다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>3&#51208;. libpcap 프로그래밍</A
+></H1
+><P
+>	
+		이번장에서는 libpcap 에서 필수적으로 사용되는 중요 
+		API 에 대해서 알아볼것이다.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN51"
+>3.1&#51208;. 디바이스&#38;네트웍 정보 관련 API</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>3.1.1&#51208;. int pcap_lookupnet()</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_lookupnet(char *device, bpf_u_int32 *netp, 
+               bpf_u_int32 *maskp, char *errbuf)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				네트웍 디바이스에 대한 네트웍 및 mask 번호를 되돌려준다. 
+				네트웍 번호는 <B
+CLASS="EMPHASIS"
+>netp</B
+>에 mask 번호는 
+				<B
+CLASS="EMPHASIS"
+>maskp</B
+>에 저장된다. 
+				<B
+CLASS="EMPHASIS"
+>device</B
+>는 pcap_lookupdev 등을 통해 
+				얻어온 네트웍 디바이스 이름이다. 
+			</P
+><P
+>				에러가 발생할경우 -1 이 리턴되며, 에러 내용이 errbuf 에 
+				저장된다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN62"
+>3.1.2&#51208;. char* pcap_lookupdev</A
+></H3
+><P
+>				pcap_open_live() 와 pcap_lookupnet() 에서 사용하기 위한 
+				네트웍 디바이스에 대한 포인터를 되돌려준다. 
+				성공할 경우 "eth0", "eth1" 과 같은 이름을 되돌려주며 
+				실패할경우 0을 되돌려준다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN65"
+>3.1.3&#51208;. pcap_datalink</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_datalink(pcap_t *p)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				link layer 타입을 되돌려준다(DLT_EN10MB 과 같은)
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN69"
+>3.1.4&#51208;. 예제</A
+></H3
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : pcap.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;pcap.h&#62;     //libpcap 헤더 포험
+#include &#60;errno.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+int main(int argc, char **argv)
+{
+    char *dev;    // 사용중인 네트웍 디바이스 이름 
+    char *net;    // 네트웍 어드레스 
+    char *mask;   // 네트웍 mask 어드레스 
+    int ret;      //  
+    char errbuf[PCAP_ERRBUF_SIZE];
+    bpf_u_int32 netp;  // ip 
+    bpf_u_int32 maskp; // submet mask
+    struct in_addr addr;
+
+    // 네트웍 디바이스 이름을 얻어온다. 
+    dev = pcap_lookupdev(errbuf);
+
+    // 에러가 발생했을경우 
+    if(dev == NULL)
+    {
+        printf("%s&#92;n",errbuf);
+        exit(1);
+    }
+
+    // 네트웍 디바이스 이름 출력 
+    printf("DEV: %s&#92;n",dev);
+
+    // 네트웍 디바이스 이름 dev 에 대한 
+    // mask, ip 정보 얻어오기   
+    ret = pcap_lookupnet(dev,&#38;netp,&#38;maskp,errbuf);
+
+    if(ret == -1)
+    {
+        printf("%s&#92;n",errbuf);
+        exit(1);
+    }
+
+    // 네트웍 어드레스를 점박이 3형제 스타일로
+    addr.s_addr = netp;
+    net = inet_ntoa(addr);
+
+    if(net == NULL)
+    {
+        perror("inet_ntoa");
+        exit(1);
+    }
+
+    printf("NET: %s&#92;n",net);
+
+    // 마찬가지로 mask 어드레스를 점박이 3형제 스타일로
+    addr.s_addr = maskp;
+    mask = inet_ntoa(addr);
+  
+    if(mask == NULL)
+    {
+        perror("inet_ntoa");
+        exit(1);
+    }
+  
+    printf("MASK: %s&#92;n",mask);
+    return 0;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음은 컴파일 방법이다. 컴파일 환경은 
+				Redhat Linux 8.x, gcc 3.x 이다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -o pcap pcap.c -lpcap -I/usr/include/pcap
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				pcap.h 의 위치는 운영체제 마다 다를수 있으니 확인후 
+				컴파일 하기 바란다. 
+			</P
+><P
+>				다음은 실행결과이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./pcap 
+DEV: eth0
+NET: 192.168.xxx.x
+MASK: 255.255.xxx.x
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN77"
+>3.2&#51208;. 패킷 캡쳐 초기화 관련 API</A
+></H2
+><P
+>			파일관련 작업을 할때 file descriptor(파일지정자)를 
+			이용해서 작업하는것과 마찬가지로, 패킷 캡쳐관련 
+			작업을 할때에도 packet capture descriptor 를 가지고 
+			작업을 한다.  
+		</P
+><P
+>			packet capture descriptor 는 pcatp_t * 형으로 선언되어 
+			있다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN81"
+>3.2.1&#51208;. pcatp_t *pcap_open_live</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>pcap_t *pcap_open_live(char *device, int snaplen,
+           int promisc, int to_ms, char *ebuf)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				첫번째 인자로 주어지는 네트웍 디바이스 
+				<B
+CLASS="EMPHASIS"
+>device</B
+>에 대한 packet capture 
+				descriptor(이하 PCD)  을 만들기 위한 함수이다. 패킷을 
+				캡춰하는 실질적인 모든일은 pcap_open_live 함수를 호출해서 
+				만들어진 PCD 를 이용해서 이루어지게 된다. 
+			</P
+><P
+>				linux 커널 2.2 이상의 경우 device 를 "any" 혹은 NULL로 
+				할경우 모든 네트웍디바이스에 대해서 패킷 캡쳐가 일어나게 
+				된다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>snaplen</B
+>은 받아들일수 있는 
+				패킷의 최대 크기(byte)이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>promisc</B
+> 는 네트웍 디바이스를 
+				promiscuous mode 로 할것인지를 결정하기 위해서 사용한다. 
+				promisc 가 1일경우 promiscuous 모드가 되며, 
+				로컬 네트웍의 모든 패킷을 캡쳐하게 된다. 0 일경우 
+				에는 자기에게만 향하는 패킷을 캡쳐하게 되는데, 몇몇 
+				경우에 있어서 promiscuous 모드로 작동하기도 한다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>to_ms</B
+> 는 읽기 시간초과(time out) 
+				지정을 위해서 사용되며 millisecond 단위이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>ebuf</B
+> 는 pcap_open_live 함수 호출에 
+				문제가 생겼을경우 에러 메시지를 저장하기 위해서 
+				사용한다. 만약 pcap_open_live 함수 호출시 에러가 
+				발생할경우 NULL 을 리턴하고 에러내용을 ebuf 에 복사한다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN95"
+>3.2.2&#51208;. pcap_t *pcap_open_offline</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+pcap_t *pcap_open_offline(char *fname, char *ebuf)
+				</PRE
+></TD
+></TR
+></TABLE
+>	
+				<B
+CLASS="EMPHASIS"
+>fname</B
+> 를 가지는 파일로 부터 
+				패킷을 읽어들인다. 만약 fname 이 "-" 일 경우 
+				<B
+CLASS="EMPHASIS"
+>stdin</B
+>으로 부터 읽어들인다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>ebuf</B
+> 는 에러메시지를 저장하기 
+				위해서 사용된다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN103"
+>3.3&#51208;. 패킷 캡쳐(Read) 관련 API</A
+></H2
+><P
+>	
+			이번장에서는 실제 패킷을 캡쳐하는 관련 API 들에 대해서 
+			알아볼것이다. 이 패킷 캡처 관련 API 를 제대로 이해하고 
+			사용하기 위해서는 TCP/IP와 이더넷 프로토콜의 구조에 
+			대해서 어느정도 이해를 해야 한다. 그럼으로 API 를 다루기 
+			전에 이들 대표적인 프로토콜들에 대한 헤더 정보에 
+			대해서 간략하게 먼저 알아보도록 하겠다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN106"
+>3.3.1&#51208;. TCP,IP,Eternet 구조체</A
+></H3
+><P
+>				패킷 Read 관련 API에서는 패킷을 읽었을때, 
+				Demultiplexing 이 되지 않은 완전한 구조의 패킷을 
+				넘겨준다. 그럼으로 최소한 이들 각 패킷의 구조체 
+				정보를 알고 있어야 각 계층(Layer)의 데이타를 
+				읽어올수 있다.  
+			</P
+><P
+>				다음은 TCP, IP, Eternet 구조체정보이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>tcp 헤더 구조체</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct tcphdr
+  {
+    u_int16_t th_sport;     /* source port */
+    u_int16_t th_dport;     /* destination port */
+    tcp_seq th_seq;     /* sequence number */
+    tcp_seq th_ack;     /* acknowledgement number */
+#  if __BYTE_ORDER == __LITTLE_ENDIAN
+    u_int8_t th_x2:4;       /* (unused) */
+    u_int8_t th_off:4;      /* data offset */
+#  endif
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    u_int8_t th_off:4;      /* data offset */
+    u_int8_t th_x2:4;       /* (unused) */
+#  endif
+    u_int8_t th_flags;
+#  define TH_FIN    0x01
+#  define TH_SYN    0x02
+#  define TH_RST    0x04
+#  define TH_PUSH   0x08
+#  define TH_ACK    0x10
+#  define TH_URG    0x20
+    u_int16_t th_win;       /* window */
+    u_int16_t th_sum;       /* checksum */
+    u_int16_t th_urp;       /* urgent pointer */
+};
+
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>IP 헤더 구조체</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct ip
+  {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    unsigned int ip_hl:4;       /* header length */
+    unsigned int ip_v:4;        /* version */
+#endif
+#if __BYTE_ORDER == __BIG_ENDIAN
+    unsigned int ip_v:4;        /* version */
+    unsigned int ip_hl:4;       /* header length */
+#endif
+    u_int8_t ip_tos;            /* type of service */
+    u_short ip_len;         /* total length */
+    u_short ip_id;          /* identification */
+    u_short ip_off;         /* fragment offset field */
+#define IP_RF 0x8000            /* reserved fragment flag */
+#define IP_DF 0x4000            /* dont fragment flag */
+#define IP_MF 0x2000            /* more fragments flag */
+#define IP_OFFMASK 0x1fff       /* mask for fragmenting bits */
+    u_int8_t ip_ttl;            /* time to live */
+    u_int8_t ip_p;          /* protocol */
+    u_short ip_sum;         /* checksum */
+    struct in_addr ip_src, ip_dst;  /* source and dest address */
+  };
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>ETHERNET 헤더 구조체</B
+>	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct ethhdr
+{
+    unsigned char   h_dest[ETH_ALEN];   /* destination eth addr */
+    unsigned char   h_source[ETH_ALEN]; /* source ether addr    */
+    unsigned short  h_proto;            /* packet type ID field */
+};
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				ip, tcp 헤더 파일은 /usr/include/netinet 밑에서 찾을수 
+				있으며, ethernet 헤더 파일은 /usr/include/linux/if_ether.h 
+				에서 찾을수 있다.  
+			</P
+><P
+>				Ethernet 헤더와 IP 헤더의 경우 demultiplexing 과정을 
+				거치기 위해서 상위 Layer 의 프로토콜 타입을 
+				지정하고 있음을 알수 있다. 
+				Ethernet 헤더의 h_proto 와 IP 헤더의 ip_p 가 
+				각 상위 Layer 의 프로토콜 타입을 알려주기 위해서 
+				사용된다. 
+			</P
+><P
+>				부연설명을 하자면 운영체제가 패킷을 받으면 가장 먼저 
+				Link 레이어를 거치는데, Link 레이어에서는 
+				Ethernet 헤더를 분석해서 패킷이 Network 레이어 로 
+				전달되는 패킷인지 확인해서 Network 레이어로 전달된다면  
+				해당 패킷이 IP 패킷인지 
+				아니면 ICMP, IGMP 와 같은 패킷인지를 검사한후 
+				Network 레이어의 알맞은 처리루틴으로 보낼것이다. 
+				Network 레이어에서는 패킷을 받은 다음 
+				자신의 프로토콜 헤더를 
+				검사해서 이 패킷이 Transport 레이어로 전달되는 
+				패킷인지 확인하고, Transport 레이어로 전달된다면 
+				UDP 인지, TCP 인지를 확인한다음에 Transport 레이어의 
+				적당한 처리루틴으로 패킷을 던질것이다. 최후에 
+				는 TCP 헤더만 남게 되는데, TCP 헤더의 PORT 를 검사해서 
+				어떤 어플리케이션에게 전달되어야 하는지를 최종 
+				결정하게 된다.    
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN122"
+>3.3.2&#51208;. u_char *pcap_next</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>u_char *pcap_next(pcap_t *p, struct pcap_pkthdr *h)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음 패킷에 대한 포인터를 리턴한다. 
+			</P
+><P
+>				우리는 이 패킷을 읽음으로써 패킷의 정보를 얻어올수 
+				있다. 실지로 이 함수를 이용해서 패킷캡쳐와 관련된 
+				모든 일을 할수 있다. 나머지 패킷캡쳐와 관련된 
+				함수들은 (pcap_loop 같은) 이 함수의 기능 
+				추가버젼 이라고 볼수 있다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN127"
+>3.3.3&#51208;. pcap_loop</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_loop(pcap_t *p, int cnt,
+        pcap_handler callback, u_char *user)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				<B
+CLASS="EMPHASIS"
+>p</B
+> 는 PCD 이며, 
+				<B
+CLASS="EMPHASIS"
+>cnt</B
+> 는 패킷 캡쳐를 몇번에 걸쳐서 
+				할것인지를 결정하기 위해서 사용한다. 
+				만약 0이 지정되면 계속 패킷을 받아들이게 된다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>callback</B
+> 는 패킷이 들어왔을때 
+				실행하는 함수의 포인터이다. 보통은 패킷필터링과 관련된 
+				함수가 실행될것이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN135"
+>3.3.4&#51208;. pcap_dispatch</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_dispatch(pcap_t *p, int cnt,
+         pcap_handler callback, u_char *user)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				pcap_loop 와 거의 비슷하다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN139"
+>3.4&#51208;. 패킷 필터링 관련 API</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN141"
+>3.4.1&#51208;. pcap_compile</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_compile(pcap_t *p, struct bpf_program *fp,
+          char *str, int optimize, bpf_u_int32 netmask)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				들어오는 패킷을 필터링 해서 받아들이기 위해서 사용한다. 
+				예를 들어 tcpdump 에서 port 80 으로 오는 패킷만을 
+				캡쳐하기 위해서 다음과 같이 사용하는걸 보았을것
+				이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco /root]# tcpdump port 80
+Kernel filter, protocol ALL, TURBO mode (575 frames), datagram packet socket
+tcpdump: listening on all devices
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				tcpdump 명령 실행시킬때 뒤에 준 옵션인 "port 80" 이 
+				filter rule 이며, <B
+CLASS="EMPHASIS"
+>str</B
+> 아규먼트를 
+				통해서 전달된다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>fp</B
+> bfp_program 구조체의 포인터이며 
+				pcap_compile 에 의해서 채워진다. 
+				<B
+CLASS="EMPHASIS"
+>netmask</B
+>는 로컬 네트의 netmask 이다.  
+			</P
+><P
+>				filter rule 에 대한 내용은 tcpdump 의 man 페이지에 
+				상세하게 나와 있으니 참고하기 바란다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN151"
+>3.4.2&#51208;. pcap_setfilter</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int pcap_setfilter(pcap_t *p, struct bpf_program *fp)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				pcap_compile 을 통해서 지정된 필터를 적용시키기 
+				위해서 사용되며, 앞으로 들어오는 패킷에 대해서는 
+				이 필터룰에 의해서 필터링 된다. 	
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN155"
+>4&#51208;. 예제 코드</A
+></H1
+><P
+>		pcap 의 기본적인 API 를 살펴봤으니 
+		직접 코드를 작성해 보도록 하겠다.  
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : pcap_test.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;net/ethernet.h&#62;
+#include &#60;pcap/pcap.h&#62;
+#include &#60;signal.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+#include &#60;errno.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;netinet/ip.h&#62;
+#include &#60;netinet/tcp.h&#62;
+#include &#60;netinet/udp.h&#62;
+#include &#60;netinet/ip_icmp.h&#62;
+
+#define PROMISCUOUS 1
+#define NONPROMISCUOUS 0
+
+// IP 헤더 구조체
+struct ip *iph;
+
+// TCP 헤더 구조체
+struct tcphdr *tcph;
+
+// 패킷을 받아들일경우 이 함수를 호출한다.  
+// packet 가 받아들인 패킷이다.
+void callback(u_char *useless, const struct pcap_pkthdr *pkthdr, 
+                const u_char *packet)
+{
+    static int count = 1;
+    struct ether_header *ep;
+    unsigned short ether_type;    
+    int chcnt =0;
+    int length=pkthdr-&#62;len;
+
+    // 이더넷 헤더를 가져온다. 
+    ep = (struct ether_header *)packet;
+
+    // IP 헤더를 가져오기 위해서 
+    // 이더넷 헤더 크기만큼 offset 한다.   
+    packet += sizeof(struct ether_header);
+
+    // 프로토콜 타입을 알아낸다. 
+    ether_type = ntohs(ep-&#62;ether_type);
+
+    // 만약 IP 패킷이라면 
+    if (ether_type == ETHERTYPE_IP)
+    {
+        // IP 헤더에서 데이타 정보를 출력한다.  
+        iph = (struct ip *)packet;
+        printf("IP 패킷&#92;n");
+        printf("Version     : %d&#92;n", iph-&#62;ip_v);
+        printf("Header Len  : %d&#92;n", iph-&#62;ip_hl);
+        printf("Ident       : %d&#92;n", ntohs(iph-&#62;ip_id));
+        printf("TTL         : %d&#92;n", iph-&#62;ip_ttl); 
+        printf("Src Address : %s&#92;n", inet_ntoa(iph-&#62;ip_src));
+        printf("Dst Address : %s&#92;n", inet_ntoa(iph-&#62;ip_dst));
+
+        // 만약 TCP 데이타 라면
+        // TCP 정보를 출력한다. 
+        if (iph-&#62;ip_p == IPPROTO_TCP)
+        {
+            tcph = (struct tcp *)(packet + iph-&#62;ip_hl * 4);
+            printf("Src Port : %d&#92;n" , ntohs(tcph-&#62;source));
+            printf("Dst Port : %d&#92;n" , ntohs(tcph-&#62;dest));
+        }
+
+        // Packet 데이타 를 출력한다. 
+        // IP 헤더 부터 출력한다.  
+        while(length--)
+        {
+            printf("%02x", *(packet++)); 
+            if ((++chcnt % 16) == 0) 
+                printf("&#92;n");
+        }
+    }
+    // IP 패킷이 아니라면 
+    else
+    {
+        printf("NONE IP 패킷&#92;n");
+    }
+    printf("&#92;n&#92;n");
+}    
+
+int main(int argc, char **argv)
+{
+    char *dev;
+    char *net;
+    char *mask;
+
+    bpf_u_int32 netp;
+    bpf_u_int32 maskp;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    int ret;
+    struct pcap_pkthdr hdr;
+    struct in_addr net_addr, mask_addr;
+    struct ether_header *eptr;
+    const u_char *packet;
+
+    struct bpf_program fp;     
+
+    pcap_t *pcd;  // packet capture descriptor
+
+    // 사용중인 디바이스 이름을 얻어온다. 
+    dev = pcap_lookupdev(errbuf);
+    if (dev == NULL)
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }
+    printf("DEV : %s&#92;n", dev);
+
+    // 디바이스 이름에 대한 네트웍/마스크 정보를 얻어온다. 
+    ret = pcap_lookupnet(dev, &#38;netp, &#38;maskp, errbuf);
+    if (ret == -1)
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }
+
+    // 네트웍/마스트 정보를 점박이 3형제 스타일로 변경한다. 
+    net_addr.s_addr = netp;
+    net = inet_ntoa(net_addr);
+    printf("NET : %s&#92;n", net);
+
+    mask_addr.s_addr = maskp;
+    mask = inet_ntoa(mask_addr);
+    printf("MSK : %s&#92;n", mask);
+    printf("=======================&#92;n");
+
+    // 디바이스 dev 에 대한 packet capture 
+    // descriptor 를얻어온다.   
+    pcd = pcap_open_live(dev, BUFSIZ,  NONPROMISCUOUS, -1, errbuf);
+    if (pcd == NULL)
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }    
+
+    // 컴파일 옵션을 준다.
+    if (pcap_compile(pcd, &#38;fp, argv[2], 0, netp) == -1)
+    {
+        printf("compile error&#92;n");    
+        exit(1);
+    }
+    // 컴파일 옵션대로 패킷필터 룰을 세팅한다. 
+    if (pcap_setfilter(pcd, &#38;fp) == -1)
+    {
+        printf("setfilter error&#92;n");
+        exit(0);    
+    }
+
+    // 지정된 횟수만큼 패킷캡쳐를 한다. 
+    // pcap_setfilter 을 통과한 패킷이 들어올경우 
+    // callback 함수를 호출하도록 한다. 
+    pcap_loop(pcd, atoi(argv[1]), callback, NULL);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		컴파일 방법은 아래와 같다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost pcap_test]# gcc -o pcap_test pcap_test.c -lpcap -I/usr/include/pcap
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		다음은 필자의 Linux 박스에서 테스트한 결과이다.   
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost pcap_test]# ./pcap_test -1 "port 80"
+DEV : eth0
+NET : 192.168.100.0
+MSK : 255.255.255.0
+=======================
+IP 패킷
+Version     : 4
+Header Len  : 5
+Ident       : 51804
+TTL         : 64
+Src Address : 192.168.100.130
+Dst Address : 218.234.19.87
+Src Port : 4996
+Dst Port : 80
+45000034ca5c400040065cfbc0a86482
+daea1357138400502e7a303b2e7cc456
+801021f0badb00000101080a0014e136
+22631d7b485454502f312e3120323030
+204f
+
+IP 패킷
+Version     : 4
+Header Len  : 5
+Ident       : 41787
+TTL         : 54
+Src Address : 218.234.19.87
+Dst Address : 192.168.100.130
+Src Port : 80
+Dst Port : 4996
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN164"
+>5&#51208;. 결론</A
+></H1
+><P
+>		이상 간단하게 libpcap 의 사용방법에 대해서 알아보았다. 
+		이번 글에서는 libpcap 의 사용법에만 초첨을 맞추고 있는데, 
+		다음번 강좌에서는 몇가지 "응용" 에 대해서 알아보도록 하겠다.  
+	</P
+></DIV
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>&#51452;&#49437;</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN27"
+HREF="#AEN27"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>					Intrusion Detection System 의 줄임말 이며, 
+					침입탐지 시스템을 말한다. 네트웍 침입탐지를 위한 
+					NIDS, 호스트 침입탐지를 위한 HIDS 로 나눌수 있다. 
+					일반적으로 IDS 라고 하면 네트웍 침입 탐지 시스템을 
+					말한다. 
+				</P
+></TD
+></TR
+></TABLE
+></BODY
+></HTML
+>
+}}}
+
+[[Category(5)]]

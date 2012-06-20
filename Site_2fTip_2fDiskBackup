@@ -1,0 +1,59 @@
+#title DiskCopy
+[[TableOfContents]]
+== 개 요 ==
+
+디스크 특히 OS 가 포함된 디스크를 통째로 다른 디스크에 백업해놓고, 유사시에 복원한다.
+여기서는 솔라리스의 경우를 설명한다.
+
+== 방 법 ==
+
+=== dd 이용 ===
+
+ * 이 방법은 디스크가 동일한 모델일때 가능하다.
+ * 원본이 깨지면 디스크의 위치를 서로 바꾸면 될 것이다.
+ {{{#!plain
+# dd if=/dev/dsk/c1t0d0s2 of=/dev/dsk/c1t1d0s2 bs=8192k }}}
+
+=== ufsdump 이용 ===
+
+ * 백업용 디스크가 /disk2 에 마운트 되어 있을때
+ {{{#!plain
+# ufsdump 0f - /dev/rdsk/c0t3d0s0 | (cd /disk2; ufsrestore xf -)  }}}
+ * 특정 디렉토리를 백업할때 - 예제에선 /usr 를 마운트된 /usr2 로 백업한다고 했을때
+ {{{#!plain
+# cd /usr
+# ufsdump 0f - /usr | (cd /usr2; ufsrestore xf -) }}}
+
+=== tar 이용 ===
+
+ * 특정 디렉토리를 백업할때 - 예제에선 /usr 를 마운트된 /usr2 으로 백업한다고 했을때
+ {{{#!plain
+# cd /usr
+# tar cvfp - . | (cd /usr2; tar xvfp -) }}}
+[[sadsense(center)]]
+== 추가 정보 ==
+
+ufsdump/ufsrestore 두 명령어에 대해서 좀 더 자세히 알아보자.
+
+ * ufsdump : ufsdump 명령어는 특정 파티션의 full 또는 incremental dump 에 주로 사용되어지는 명령이다. 
+   * Usage: ufsdump [option][arguments] file_to_dump
+   * 옵션들
+     *  0-9 : 덤프레벨을 의미하는 숫자이다. "0" 인 경우 full dump을 의미하고 "1-9"까지는 incremental dump를의미한다. 
+     *  u : /etc/dumpdates라는 파일에 백업 정보를 update한다. incremental백업을 위해 필요한 옵션이다. 
+     *  v : verify 
+     *  S : 용량을 계산하며 실제로 백업 받지는 않는다. 
+     *  f dumpfile : 파일이미지를 dumpfile에 기록한다. 일반적으로 백업 용도인 경우 dumpfile은 매체명이다. 
+   * 예제: 파일시스템 /export/home의 전체 백업을 테이프에 백업하는 명령이다. {{{#!plain
+# ufsdump 0uvf /dev/rmt/0 /export/home }}}
+ * ufsrestore : ufsdump 명령으로 백업된 자료를 다시 추출하는데 사용된다. 
+   * Usage: ufsrestore [option][argument][filename]
+   * 옵션들
+     * x : 명령어 라인에 지정된 파일만 출력 
+     * t : 백업된 목록을 출력 
+     * i : 대화형으로 restore를 실행한다. 
+     * f : 백업데이터가 있는 매체를 지정한다. 
+     * v : restore되고 있는 파일들에 대한 정보를 출력한다 
+     * r : 모든 백업을 restore 한다 
+   * 예제 : 현재 디렉토리에 테이프에 백업된 모든 내용을 재저장한다. {{{#!plain
+# ufsrestore rvf /dev/rmt/0 }}}
+ 

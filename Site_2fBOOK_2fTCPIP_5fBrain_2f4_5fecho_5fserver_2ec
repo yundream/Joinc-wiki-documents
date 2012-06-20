@@ -1,0 +1,193 @@
+#title 4장 echo_server.c 예외 처리
+
+== echo_server.c 예외 처리 ==
+코드는 프로그램 실행 인자로 포트 번호를 받아서 처리합니다. 그런데, 예외처리를 하지 않아서 실행인자 없이 실행할 경우 '''세그먼트 에러'''를 출력합니다. 
+
+다음은 책에 소개된 코드입니다. 
+{{{#!plain linenum
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[MAXBUF];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    client_len = sizeof(clientaddr);
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+}}}
+실행인자가 없을 경우 17번에서 세그먼트 에러가 발생합니다.
+
+다음처럼 실행인자를 검사하는 코드를 넣어주는 것으로 예외처리를 할 수 있습니다.  
+{{{#!plain
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[MAXBUF];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    // 프로그램 실행 인자를 검사한다.
+    // 만약 실행인자가 없으면 사용법을 출력하고 프로세스를 종료한다.
+    if(argc !=2 )
+    {
+        fprintf(stderr,"Usage : %s [port]\n", argv[0]);
+        return 1;
+    }
+    client_len = sizeof(clientaddr);
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+}}}
+
+=== echo_server.c 완전 코드 ===
+{{{#!plain echo_server.c download
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+
+#define MAXBUF 1024
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[MAXBUF];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    if(argc !=2 )
+    {
+        fprintf(stderr,"Usage : %s [port]\n", argv[0]);
+        return 1;
+    }
+    client_len = sizeof(clientaddr);
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, MAXBUF);
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr,
+            &client_len);
+        printf("New Client Connect: %s\n", inet_ntoa(clientaddr.sin_addr));
+        if ((n = read(client_sockfd, buf, MAXBUF)) <= 0)
+        {
+            close(client_sockfd);
+            continue;
+        }
+        if (write(client_sockfd, buf, MAXBUF) <=0)
+        {
+            perror("write error : ");
+            close(client_sockfd);
+        }
+        close(client_sockfd);
+    }
+    close(server_sockfd);
+    return 0;
+}
+}}}
+
+=== echo_client.c 완전 코드 ===
+  * echo_clinet가 연결 포트 번호를 실행 인자로 가져오도록 수정했습니다.
+{{{#!plain
+#include <sys/socket.h>  /* 소켓 관련 함수 */
+#include <arpa/inet.h>   /* 소켓 지원을 위한 각종 함수 */
+#include <sys/stat.h>
+#include <stdio.h>      /* 표준 입출력 관련 */
+#include <string.h>     /* 문자열 관련 */
+#include <unistd.h>     /* 각종 시스템 함수 */
+
+#define MAXLINE    1024
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in serveraddr;
+    int server_sockfd;
+    int client_len;
+    char buf[MAXLINE];
+
+    if(argc != 2)
+    {
+      fprintf(stderr, "Usage : %s [port]\n", argv[0]);
+      return 1;
+    }
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("error :");
+        return 1;
+    }
+
+    /* 연결요청할 서버의 주소와 포트번호 프로토콜등을 지정한다. */
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = inet_addr("127.0.01");
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(serveraddr);
+
+    /* 서버에 연결을 시도한다. */
+    if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len)  == -1)
+    {
+        perror("connect error :");
+        return 1;
+    }
+
+    memset(buf, 0x00, MAXLINE);
+    read(0, buf, MAXLINE);    /* 키보드 입력을 기다린다. */
+    if (write(server_sockfd, buf, MAXLINE) <= 0) /* 입력 받은 데이터를 서버로 전송한다. */
+    {
+        perror("write error : ");
+        return 1;
+    }
+    memset(buf, 0x00, MAXLINE);
+    /* 서버로 부터 데이터를 읽는다. */
+    if (read(server_sockfd, buf, MAXLINE) <= 0)
+    {
+        perror("read error : ");
+        return 1;
+    }
+    close(server_sockfd);
+    printf("read : %s", buf);
+    return 0;
+}
+}}}
+
+=== 테스트 방법 ===
+  1. echo_server.c 를 적당한 포트번호로 실행한다.
+   {{{#!plain
+# ./echo_server 3500
+}}}
+  1. echo_client.c 로 연결한다.
+    {{{#!plain
+# ./echo_client 3500
+hello world
+read : hello world
+#
+}}}
+  1. echo_server 에서는 연결 정보가 출력 됩니다.
+     {{{#!plain
+$ ./echo_server 3500
+New Client Connect: 127.0.0.1
+New Client Connect: 127.0.0.1
+}}}
+[[category(500)]]

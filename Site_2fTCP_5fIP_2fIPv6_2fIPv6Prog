@@ -1,0 +1,611 @@
+#title IPv6 프로그래밍  
+
+  * 최종 수정일 : 2011년 4월 8일
+[[TableOfContents]]
+== IPv6 프로그래밍 ==
+ * 예전 커널 2.4.x를 기준으로 작성했던 오래된 문서를 최근 경향에 맞추어 재작성 했습니다. - 2010/5/31
+
+=== 소개 ===
+이 글은 여러분이 IPv6 에 대한 기초적인 지식을 가지고 있으며 리눅스 상에 IPv6 환경을 만들수 있다는 가정하에, 실질적인 IPv6 프로그래밍 방법을 공유하려고 만들었습니다. 
+
+IPv6의 개념과 리눅스상에서의 IPv6 환경구축에 대한 내용을 아직 모르고 있다면 [wiki:Site/TCP_IP/IPv6/IPv6Intro IPv6 소개]와 [wiki:Site/TCP_IP/IPv6/IPv6Env IPv6 환경 만들기]문서를 먼저 읽어 보기 바랍니다.
+
+이 글은 여러분이 소켓:::프로그래밍(:12) 대한 기본적인 이해를 하고 있다는 가정하에 작성했습니다. 
+
+=== IPv6 Socket 프로그래밍 ===
+여기에서는 IPv6 를 위한 소켓지원사항과 관련 구조체 정보와 IPv6 를 다루기 위한 기본적인 API 에 대해서 알아 보겠습니다. 글은 Linux Kernel 2.6.x Ubuntu 10.04을 기준으로 하고 있습니다.
+
+==== 확장된 API들 ====
+기본적으로 IPv4, IPv6 모두 기본적인 프로그래밍 방법은 동일합니다. 둘다 BSD:::소켓(:12)을 기반으로 하고 있으며, 비슷한 함수를 사용하고 있습니다. 다만 IPv6의 경우 IP 주소체계의 변환과 그에 따른 몇가지 다른 API들이 제공되는 정도에 차이가 있을 뿐입니다. 예를 들어 소켓 생성시 AF_INET가 아닌 AF_INET6를 사용한다거나 bind(:12) 함수 호출시 sockaddr_in6 구조체를 사용하는 등이다.
+
+==== 인터넷 주소 관련 구조체 ====
+IPv6 는 128비트 주소체계를 가지며, 이를 지원하기 위해서 기존의 IPv4 의 주소 구조체와는 다른 정보로 구성됩니다. 이 주소 구조체는 보통 "sockaddr_in6" 를 사용하며, 각종 소켓함수에서 사용합니다.
+
+IPv4가 가지는 sockaddr_in 구조체의 경우 8byte 의 여유 저장공간을 가지고 있기는 하지만 128 bit 크기의 IPv6 타입의 주소를 저장하기에는 너무 작은 공간이기 때문이죠. 최소한 16byte 의 크기를 지정할수 있어야 하는데, 그런이유로 기존의 sockaddr_in 구조체를 확장해서 사용하지 못하고, 전혀 새로운 소켓구조체를 만들었습니다. 이렇게 작은 크기로 만든 이유는 IPv4 프로토콜을 만들때 32 bit 면 충분할것으로 생각했기 때문일겁니다.
+
+==== 인터넷 주소 와 인터넷 이름간 변환 함수들 ====
+인터넷주소/이름 간 변환을 위해서 보통 gethostbyname(:2)과 gethostbyaddr(:2) 함수를 사용합니다. 이 함수들은 IPv4와 IPv6 모두를 지원하지만, 지원하지 않는 운영체제(:12) - 엄밀히 말하자면 운영체제라기 보다는 운영체제가 지원하는 BSD 소켓 API에 의존적임 -가 있을수도 있음으로 반드시 man page 등을 통해서 확인해 주어야 합니다. 리눅스라면 고민할 필요가 없을 겁니다. 
+
+==== 인터넷 주소 변경함수들 ====
+inet_ntoa()와 inet_addr() 같은 함수들인데, IPv4 주소를 (이진 데이터와 printable스타일로)변환 하기위해서 사용된다. 이 함수들은 32bit IPv4 주소에 사용가능하도록 만들어 졌으며, IPv6 주소 변환에는 사용할 수 없습니다. 그래서 새로운 API를 사용해야 하죠.
+
+==== 그밖의 것들 ====
+이 외에도 IPv6 의 추가된 몇가지 기능들을 제공하기 위해서 소켓옵션관련 함수들을 비롯해서 몇가지 추가된 것들이 있습니다.    
+
+=== IPv6 관련 구조체 ===
+IPv4 관련 소켓 프로그래밍에서 IPv4 주소 정보를 저장하기 위한 몇 개의 구조체를 다루었는데요, 이때 IPv4 관련 구조체는 소켓연결 정보를 위해서 사용되는 sockaddr_in 구조체와 소켓주소 정보를 위해서 사용되는 in_addr구조체 입니다. 
+
+{{{#!plain
+#include <netinet/in.h>
+
+struct sockaddr_in
+{
+    in_port_t sin_port;         // Port 번호
+    struct in_addr sin_addr;    // 인터넷 주소 구조체
+}
+
+struct in_addr
+{
+    in_addr_t s_addr;            // 32bit 크기의 인터넷주소  
+}
+}}}
+in_addr 구조체의 in_addr_t 은 32 bit 크기를 가지는 unsigned long int 형이다.
+
+반면 IPv6 는 sockaddr_in6 라는 별도의 구조체를 사용하죠. 
+{{{#!plain
+#include <netinet/in.h>
+
+struct sockaddr_in6
+{
+    u_int16m_t      sin6_family;    // AF_INET6 
+    u_int16m_t      sin6_port;      // Port 번호  
+    u_int32m_t      sin6_flowinfo;  // IPv6 flow information
+    struct in6_addr sin6_addr;      // IPv6 주소 
+    u_long sin6_scope_id;           // 인터페이스 인덱스 아이디
+}
+}}}
+멤버 변수들 중 sin6_scope_id를 좀 눈여겨 볼 필요가 있습니다. 이 값은 인터페이스를 가리키는 인덱스 값입니다. 지금은 IPv4와 IPv6의 과도기인데요. 그러다 보니 하나의 컴퓨터가 다양한 인터넷 주소 환경을 가질 수 있습니다. 여러 개의 네트워크 인터페이스를 가질 수 있는데, 어떤 인터페이스는 IPv4만 혹은 IPv6만 혹은 양쪽 주소를 모두 가질 수 있습니다. 해서 소켓을 바인드 할때 어떤 인터페이스를 사용해야할지를 명시해야 합니다.   
+
+=== IPv6 지원을 위한 소켓 API ===
+==== 소켓 생성/연결관련 API ====
+API 에서 제공하는 기본적인 소켓함수들인 socket(:2), bind(:2), connect(:2), sendmsg(:12), accept(:12)등은 IPv6 에서 그대로 사용가능합니다. 다만 프로토콜지원사항과, 사용되는 구조체에 있어서 약간의 차이가 있을 뿐이죠.
+
+==== socket ====
+endpoint 소켓 지시자를 만들기 위해서 사용하는 socket() 함수의 경우 IPv4/TCP 소켓을 만들고자 할경우 다음과 같이 사용합니다.
+{{{#!plain
+s = socket(PF_INET, SOCK_STREAM, 0);
+}}}
+					
+IPv4/UDP 소켓을 만들고자 할경우에는 다음과 같이 사용하죠.
+{{{#!plain
+s = socket(PF_INET, SOCK_DGRAM, 0);
+}}}
+					
+IPv6 를 지원하는 소켓을 만들고자 할때는 PF_INET 대신에 PF_INET6를 사용하면 됩니다.
+{{{#!plain
+s = socket(PF_INET6, SOCK_STREAM, 0);
+s = socket(PF_INET6, SOCK_DGRAM, 0);
+}}}
+이렇게 해서 간단하게 IPv6 를 지원하는 endpoint 소켓을 생성할수 있습니다. 아래는 간단한 테스트 프로그램입니다. 
+
+예제 : ipv6_socket.c
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main()
+{
+    struct sockaddr_in6 sin6;
+    int fd;
+    fd = socket(PF_INET6, SOCK_STREAM, 0);
+    if (fd < 0)
+    {
+        perror("socket create error !!");
+        exit(0);
+    }
+	printf("Socket Create Success\n");
+
+    exit(0);
+}
+}}}
+					
+만약 위 프로그램을 컴파일후 실행시켰는데 아래와 같은 에러메시지가 출력된다면 ipv6 모듈을 올리지 않았기 때문입니다. 
+{{{#!plain
+[root@localhost c_source]# ./ipv6_socket
+socket create error !! : Address family not supported by protocol
+}}}
+
+이 경우에는 ipv6모듈을 올리면 됩니다.					
+{{{#!plain
+[root@localhost c_source]# modprobe ipv6
+}}}
+
+==== bind ====
+bind는 socket() 를 이용해서 생성된 endpoint 에 포트번호, 주소와 같은 소켓특성을 묶어주기 위해서 사용합니다. 또한 사용하는 구조체에 있어서도 IPv4 와 차이가 있는데, IPv4용 구조체인 sockaddr_in 대신에 IPv6 에서 사용가능한 sockaddr_in6 구조체를 사용하죠.
+
+{{{#!plain
+struct sockaddr_in6 sin6;
+.... 
+sin6.sin6_family   = AF_INET6;
+sin6.sin6_flowinfo = 0;
+sin6_sin6_port     = htons(23);
+sin6.sin6_addr     = in6addr_any;
+sin6.sin6_addr     = in6addr_any;
+sin6.sin6_scope_id = if_nametoindex("eth0"); 
+....
+if (bind(s, (struct sockaddr *)&sin6, sizeof(sin6)) == -1)
+{
+    // 에러처리
+}
+....
+}}}
+언급했듯이, IPv6는 소켓이 사용할 인터페이스를 지정해줘야 하는데요,인터페이스 인덱스는 if_nametoindex(:12) 함수로 가져올 수 있습니다.
+
+비교적 간단하게 인터페이스 인덱스를 가져올 수 있지만, 이 방식은 범용적 소프트웨어를 작성하는데 문제점을 가질 수 있죠. 컴퓨터마다 인터페이스 이름이 다를 수 있기 때문입니다. 물론 ping6 처럼 프로그램 실행 인자를 이용해서 인터페이스 이름을 명시하는 방법이 있긴 하지만, 일반 사용자가 사용하는 네트워크 프로그램에서 인터페이스 이름을 넘기도록 한다는 건 결코 좋은 방법이 아닙니다. 왠만한 하드코어 사용자가 아니라면, 누가 인터페이스 이름까지 신경쓰면서 네트워크 프로그램을 사용하려 하겠습니까. 
+
+때문에, 인터페이스 목록을 가져와서, 인터페이스의 주소 정보를 확인해서 그에 맞추어 자동으로 바인딩 해주는 식의 프로그래밍 기법이 필요합니다. 이에 대한 내용은 문서 말미에서 자세히 살펴보도록 하겠습니다. 
+
+==== 인터페이스 주소 정보 가져오기 ====
+BSD 소켓은 getaddrinfo(:2)함수를 제공하는데, 이 함수를 이용해서 네트워크 인터페이스 목록을 가져올 수 있습니다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+int getaddrinfo(const char *node, const char *service, 
+                const struct addrinfo *hints, 
+                struct addrinfo **res); 
+ 
+void freeaddrinfo(struct addrinfo *res); 
+}}}
+  * node : 도메인 이름, 인터넷 주소 (IPv4, IPv6 스타일 모두 지원)한다.
+  * server : 서비스 포트번호 혹은 서비스 이름을 지정한다.
+  * hints : getaddrinfo 함수는 addrinfo 구조체의 정보를 확인해서, 정보에 맞는 네트워크 주소 정보를 가져온다. 
+  * res : 네트워크 주소 정보 결과는 res로 넘어온다. 여러 개의 주소 정보가 있을 수 있음으로 배열로 넘어온다. 
+
+아래 예제는 서버에서 getaddrinfo 함수를 이용하는 방법을 보여줍니다. 프로그램 실행인자로 주어지는 포트번호에 대해서 사용할 수 있는 네트워크 주소 정보를 확인해서 bind 하고, 만약 IPv6와 IPv4를 모두 사용할 수 있다면 두 개의 듣기 소켓을 만듭니다.
+{{{#!plain
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <netdb.h> 
+#include <stdio.h> 
+#include <string.h> 
+#include <errno.h> 
+#include <unistd.h> 
+#include <stdlib.h> 
+#include <arpa/inet.h> 
+ 
+ 
+int main(int argc, char **argv) 
+{ 
+    struct addrinfo hints; 
+    struct addrinfo *result, *rp; 
+    struct sockaddr_in *sin; 
+    struct sockaddr_in6 *sin6; 
+    int *listen_fd; 
+    int listen_fd_num=0; 
+ 
+    char buf[80] = {0x00,}; 
+    int i = 0; 
+    if(argc != 2) 
+    { 
+        printf("Usage : %s [port]\n", argv[0]); 
+        return 1; 
+    } 
+ 
+    memset(&hints, 0x00, sizeof(struct addrinfo)); 
+ 
+    hints.ai_flags = AI_PASSIVE; 
+    hints.ai_family = AF_UNSPEC;    // IPv4, IPv6를 상관하지 않는다. 
+    hints.ai_socktype = SOCK_STREAM;    // TCP 프로토콜을 사용한다.
+ 
+    if(getaddrinfo(NULL, argv[1], &hints, &result) != 0 ) 
+    { 
+        perror("getaddrinfo"); 
+        return 1; 
+    } 
+
+    // 사용할 수 있는 네트워크 주소 자원의 개수를 확인한다. 
+    for(rp = result ; rp != NULL; rp = rp->ai_next) 
+    { 
+        listen_fd_num++; 
+    } 
+    listen_fd = malloc(sizeof(int)*listen_fd_num); 
+    printf("Num %d\n", listen_fd_num); 
+
+    // addrinfo를 순환하면서, 소켓을 바인드 한다.
+    for(rp = result, i=0 ; rp != NULL; rp = rp->ai_next, i++) 
+    { 
+        // IPv4일 경우
+        if(rp->ai_family == AF_INET) 
+        { 
+            sin = (void *)rp->ai_addr; 
+            inet_ntop(rp->ai_family, &sin->sin_addr, buf, sizeof(buf)); 
+            printf("<bind 정보 %d %d %s>\n", rp->ai_protocol, rp->ai_socktype, buf); 
+        } 
+        // IPv6일 경우
+        else if(rp->ai_family == AF_INET6) 
+        { 
+            sin6 = (void *)rp->ai_addr; 
+            inet_ntop(rp->ai_family, &sin6->sin6_addr, buf, sizeof(buf)); 
+            printf("<bind 정보 %d %d %s>\n", rp->ai_protocol, rp->ai_socktype, buf); 
+        } 
+        if((listen_fd[i] = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) < 0) 
+        { 
+            printf("Socket Create Error\n"); 
+        } 
+        // 만약 IPv6일 경우에는 getsockopt를 이용해서 IPv6 주소만 바인드 시키도록 한다. 
+        if(rp->ai_family == AF_INET6) 
+        { 
+            int opt = 1; 
+            setsockopt(listen_fd[i], IPPROTO_IPV6, IPV6_V6ONLY, (char *)&opt, sizeof(opt)); 
+        } 
+ 
+        if(bind(listen_fd[i], rp->ai_addr, rp->ai_addrlen) != 0) 
+        { 
+            if(errno != EADDRINUSE); 
+            { 
+                perror("bind error\n"); 
+                return 1; 
+            } 
+        } 
+        if(listen(listen_fd[i], 5) != 0) 
+        { 
+            perror("listen error\n"); 
+            return 1; 
+        } 
+    } 
+    freeaddrinfo(result); 
+    pause(); 
+    return 1; 
+} 
+}}}
+AF_INET6 만들어진 소켓은 IPv4와 IPv6모두를 지원합니다. 그래서 만약 IPv4 소켓을 만든다음 IPv6 소켓을 만들면 IPv6 소켓에서 IPv4까지 함께 지원하게 되므로 주소 정보가 중복되어서 bind 에러가 발생할 수 있습니다. 이러한 문제를 해결하기 위해서 setsockopt 함수로 소켓이 IPv6만 지원하도록 설정했습니다.
+
+==== listen ====
+listen 함수의 경우 ipv4 와 사용상에 있어서 전혀차이가 없습니다.
+{{{#!plain 
+if (listen(sockfd, 5) == -1)
+{
+    // 에러처리
+} 
+}}}
+					
+==== accept() ====
+accept 역시 2번째 아규먼트인 소켓구조체 가 sockaddr_in 으로 바뀐다는 점만 제외하고는 동일합니다.
+{{{#!plain
+struct sockaddr_in6 clisin6
+clisockfd = accept(sockfd, (struct sockaddr *)&clisin6,  
+            (socklen_t *)&clilen);
+}}}
+					
+=== 주소변환관련 API ===
+ipv4 에서는 문자열의 인터넷주소를 32bit 이진 데이타 주소로 변환하기 위해서 inet_addr 을, 그반대로 32bit 이진 데이타 주소를 문자열의 인터넷주소로 변환하기 위해서 inet_ntoa 함수를 사용합니다.
+
+이들 함수는 기본적으로 32bit 인터넷 주소에 최적화 된값들이기 때문에 128비트 주소체계를 가지는 IPv6 주소의 변환을 위해서는 사용할 수 없습니다.
+
+때문에 별도의 함수를 사용해야 합니다. 문자열의 IPv6 인터넷주소를 128bit 이진데이타 주소로 변경하기 위해서 inet_pton 그 반대의 변경을 위해서 inet_ntop 를 제공합니다.
+
+==== inet_pton ====
+IPv6 문자열 인터넷 주소를 128 비트 이진데이타 주소로 변경하기 위해서 사용되는 함수입니다. 이함수는 IPv6 에만 특화된 함수는 아니며, 프로토콜 범용으로 사용할수 있도록 inet_addr 함수를 확장시킨것으로 IPv4 와 IPv6 모두의 주소변환에 사용할수 있습니다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+int inet_aton(int af, const char *src, void *dst);
+}}}
+					
+첫번째 아규먼트인 af를 이용해서 프로토콜 종류를 지정할수 있으며, 두번째 아규먼트인 src가 가르키는 인터넷 문자열을 프로토콜종류에 맞도록 이진데이타로 변경해서 dst로 복사합니다.  만약 잘못된 주소이름을 변경하고자 할경우에는 0을 반환합니다.
+
+==== inet_ntop ====
+inet_pton 과 반대의 일을 합니다. 즉 128비트 이진데이타 주소를 문자열 인터넷 주소로 변경합니다. 이함수 역시 IPv6 전용의 함수는 아니며 프로토콜 범용으로 사용할수 있도록 inet_ntoa 를 확장한 함수입니다.
+
+{{{#!plain
+const char *inet_ntop(int af, const void *src, char *dst, size_t cnt);
+}}}
+					
+==== 주소변경 예제 ====
+다음은 inet_pton 과 Inet_ntop 를 이용한 간단한 주소변경 프로그램입니다. 
+
+예제 : addr_cp.c
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main()
+{
+    ulong ipv4_addr;
+    char  ipv6_addr[16];
+
+    char addr4_str[20];
+    char addr6_str[40];
+
+    struct in_addr  st_addr4;
+    struct in6_addr st_addr6;
+
+    // IPv4 인터넷 주소 변환 예제 
+    inet_pton(AF_INET, "192.168.0.224", (void *)&ipv4_addr);
+    printf("%lu\n", ipv4_addr);
+
+    st_addr4.s_addr = ipv4_addr;
+    inet_ntop(AF_INET, (void *)&st_addr4,addr4_str,sizeof(addr4_str));
+    printf("%s\n\n", addr4_str);
+
+    // IPv6 인터넷 주소 변환 예제
+    inet_pton(AF_INET6, "3ffe:ffff:0:f101::1", (void *)&ipv6_addr);
+    memcpy((void *)&st_addr6, (void *)&ipv6_addr, sizeof(st_addr6));
+    inet_ntop(AF_INET6, (void *)&st_addr6, addr6_str, sizeof(addr6_str));
+    printf("%s\n", addr6_str);
+}
+}}}
+					
+=== ipv6 네트웍 프로그래밍 예제 ===
+일단 IPv6 소켓을 만들고 연결하기 위한 기본적인 API 에 대해서 알아봤음으로 기본적인 IPv6 기반의 네트웍 프로그래밍이 가능한 상태입니다. 이제 실제 IPv6 기반의 서버/클라이언트 어플리케이션을 제작해서 제대로 작동하는지 확인하도록 하겠습니다.
+
+만들려는 어플리케이션은 echo 서버와 클라이언트입니다. 
+
+테스트를 하기전에 먼저 IPv6 환경을 만들어줘야 하는데, ifconfig 를 이용해서 수동으로 IPv6 번호를 할당했습니다. IP 번호는 3ffe:ffff:0:f101::1/128 로 세팅했습니다. ifconfig 를 통한 IPv6 할당에 관한 내용은 IPv6(2) - 환경설정 문서를 참고하시면 됩니다.
+
+다음은 ifconifg 를 통해서 확인한 결과입니다.
+{{{#!plain
+eth0      Link encap:Ethernet  HWaddr 00:50:BF:2C:7B:B2  
+          inet addr:211.244.233.145  Bcast:211.244.233.255  Mask:255.255.255.0
+          inet6 addr: 3ffe:ffff:0:f101::1/128 Scope:Global
+          UP BROADCAST NOTRAILERS RUNNING  MTU:1500  Metric:1
+          RX packets:28404 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:12580 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 
+          RX bytes:20470271 (19.5 Mb)  TX bytes:1190821 (1.1 Mb)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:337 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:337 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 
+          RX bytes:23808 (23.2 Kb)  TX bytes:23808 (23.2 Kb)
+}}}
+
+==== echo 서버 ====
+우선 서버측 프로그램을 만들어봤습니다. 에러처리 같은건 신경쓰지 않았습니다.
+
+예제 echo6_s.c
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in6 sin6, clisin6;
+    int sockfd, clisockfd;
+    int clilen = sizeof(clisin6);
+    char buf[256];
+    sockfd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("socket create error:");
+        exit(0);
+    }
+
+    // bind 를 위해서 소켓특성을 묶어준다. 
+    // IPv6 버젼으로 맞춘다.
+    sin6.sin6_family   = AF_INET6;
+    sin6.sin6_flowinfo = 0;
+    sin6.sin6_port     = htons(atoi(argv[1]));
+    // in6addr_any 는 *: 를 나타낸다.
+    // ipv4 에서의 htonl(INADDR_ANY) 와 동일하다고 볼수 있다. 
+    sin6.sin6_addr     = in6addr_any;
+
+    if (bind(sockfd, (struct sockaddr *)&sin6, sizeof(sin6)) == -1)
+    {
+        perror("Bind error:");
+        exit(0);
+    }
+
+    if (listen(sockfd, 5) == -1)
+    {
+        perror("Listen error:");
+        exit(0);
+    }
+
+    while(1)
+    {
+        clisockfd = accept(sockfd, (struct sockaddr *)&clisin6,
+                       (socklen_t *)&clilen);
+        memset(buf, 0x00, 256);
+        read(clisockfd, buf, 256);
+        write(clisockfd, buf, 256);
+
+        close(clisockfd);
+    }
+}
+}}}
+구조체가 IPv6 관련구조체가 쓰였다는것과, socket 에서 프로토콜을 AF_INET6 를 사용했다는것 외에는 IPv4 버젼의 echo 서버와 별차이를 느낄수 없군요.
+
+==== echo 클라이언트 ====
+이번에는 클라이언트측 프로그램입니다.
+
+예제 : echo_c.c
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in6 svrsin6;
+    struct hostent *hp;
+    char   ipv6_addr[16];
+
+    char    addr6_str[40];
+    char    buf[256];
+
+    int sockfd;
+    int clilen;
+
+    sockfd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("socket create error:");
+        exit(0);
+    }
+
+    svrsin6.sin6_family   = AF_INET6;
+    svrsin6.sin6_flowinfo = 0;
+    svrsin6.sin6_port     = htons(atoi(argv[1]));
+
+    inet_pton(AF_INET6, "3ffe:ffff:0:f101::1", (void *)&ipv6_addr);
+    // in6addr_loopback 는 loopback 주소로 연결하기 위해서 
+    // 사용한다.  
+    // ipv6 에서의 loopbak 주소는 "::1" 이다.  
+    // 루프백주소로 연결하길 원한다면
+    // svrsin6.sin6_addr      = in6addr_loopback;   
+    // 혹은
+    // inet_pton(AF_INET6, "::1", (void *)&ipv6_addr); 
+    // 하면된다. 
+    memcpy((void *)&svrsin6.sin6_addr, (void *)&ipv6_addr, 16);
+    inet_ntop(AF_INET6, (void *)&svrsin6.sin6_addr, addr6_str, 40);
+
+    printf("%s\n", addr6_str);
+    printf("connect...\n");
+    clilen = sizeof(svrsin6);
+    if(connect(sockfd, (struct sockaddr *)&svrsin6, clilen) < 0)
+    {
+        perror("connect error:");
+        exit(0);
+    }
+    memset(buf, 0x00, 256);
+    read(0, buf, 256);
+    write(sockfd, buf, 256);
+    read(sockfd, buf, 256);
+    printf("-->%s", buf);
+
+    printf("Connect Success\n");
+    close(sockfd);
+    exit(0);
+}
+}}}
+				
+echo 서버를 띄운다음에 위의 클라이언트 프로그램을 실행시켜서 간단하게 테스트할 수 있습니다. 서버/클라이언트를 실행하고 netstat를 이용해서 연결 상태를 확인할 수 있습니다. 
+{{{#!plain
+[root@localhost test]# netstate -a
+...
+tcp        0      0 *:1111                  *:*                     LISTEN      
+tcp        1      0 ::1:33147               3ffe:ffff:0:f101 1111 CLOSE_WAIT  
+...
+}}}
+IPv6 를 사용한 연결이 제대로 이루어졌음을 확인할수 있다.
+
+=== IPv6와 IPv4 모두에 대응하는 클라이언트 프로그램 개발 ===
+위의 에코 예제 프로그램들은 예제일 뿐, 실제 개발에 사용하기에는 무리가 있습니다. 실제 컴퓨터는 다양한 네트워크 주소 환경을 가질 수 있기 때문에, 네트워크 주소 환경을 검사해서 그에 맞는 소켓을 만들어야 하기 때문입니다 . 그러므로 getaddrinfo 함수를 이용해서 네트워크 환경을 조사해서 그에 맞는 주소 정보를 가지는 소켓을 생성하도록 프로그램을 자동화해야합니다.
+
+서버 프로그램은 getaddrinfo(:12) 예제를 통해서 활용방안이 이미 제시되었으니 넘어가도록 하겠습니다. listen 함수까지 호출했으니, accept 함수호출과 그 이후 이루어지는 클라이언트와의 통신은 일반적인 소켓 프로그래밍 기술을 이용해서 만들면 됩니다. 
+
+단 이 예제는 네트워크 인터페이스가 IPv6와 IPv4 모두를 지원할 때, 두개의 소켓을 만든다는 문제점이 있습니다. 입출력 다중화, 멀티 스레드/프로세스 등의 방법으로 해결할 수 있는 문제이긴 하지만 번거롭죠. IPv6일 때는 IPv4 주소까지 함께 사용하도록 해서 하나의 소켓으로 IPv4, IPv6를 지원하도록 하는게 낫습니다. 프로그램 실행인자로 사용할 인터넷 주소를 명시하는게 속편하겠죠.
+
+클라이언트 프로그램은 서버에 비해서 신경써야 될게 하나 더 있습니다. 서버 프로그램이야 전문적인 개발자나 관리자가 실행을 시킬 것이기 때문에, 프로그램 실행인자로 사용할 IP 프로토콜의 버전을 명시하도록 하는게 큰 문제가 되진 않겠지만, 그러나 일반유저가 사용하는 클라이언트까지 그렇게 할 수는 없겠죠. 가장 좋은 방법은 연결하고자 하는 서버측 네트워크 환경에 맞는 주소 자원을 가진 인터페이스를 선택하는 겁니다. 
+
+언뜻 생각해 보자면, getaddrinfo 함수가 있으니 크게 문제 될것 같지는 않지만, 한가지 사소한 문제가 있으니 짚고 넘어가 보도록 하겠습니다. 다음은 IPv4와 IPv6모두에 대응할 수 있는 코드 예제입니다.
+{{{#!plain
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <net/if.h>
+
+#define MAXBUF    1024
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in addr;
+    struct sockaddr_in6 *addr6;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    struct if_nameindex *ifidx;
+
+    int sockfd=-1;
+
+    if(argc != 3)
+    {
+        printf("Usage : %s [ip] [port]\n", argv[0]);
+        return 1;
+    }
+    memset(&hints, 0x00, sizeof(struct addrinfo));
+
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if( getaddrinfo(argv[1], argv[2], &hints, &result) != 0 )
+    {
+        perror("getaddrinfo");
+        return 1;
+    }   
+
+    for(rp = result ; rp != NULL; rp=rp->ai_next)
+    {   
+        if(rp->ai_family == AF_INET)
+        {       
+            if( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
+            {           
+                perror("socket error");
+                return 1;
+            }
+            printf("IPv4\n");
+            connect(sockfd, rp->ai_addr, rp->ai_addrlen);
+            break;
+        }
+        else if(rp->ai_family == AF_INET6)
+        {
+            if( (sockfd = socket(AF_INET6, SOCK_STREAM, 0)) < 0 )
+            {
+                perror("socket error");
+                return 1;
+            }
+            ifidx = if_nameindex();
+            // 바로 이부분
+            while(ifidx->if_name != NULL)
+            {
+                addr6 = (struct sockaddr_in6 *)rp->ai_addr;
+                addr6->sin6_scope_id = ifidx->if_index;
+                if((sockfd = connect(sockfd, (struct sockaddr *)addr6, rp->ai_addrlen)) >= 0)
+                {
+                    printf("socket created\n");
+                    break;
+                }
+            }
+        }
+    }
+
+    if(sockfd >=0)
+    {
+        printf("Connect Success\n");
+    }
+}
+}}}
+위의 코드에서 "바로 이부분"이라고 주석 처리된 곳을 보죠.
+
+AF_INET6에서는 인터페이스 인덱스를 지정해줘야 합니다. 그러나 버그인지는 몰라도 get_addrinfo는 sin6_scope_id를 설정해 주지 않는다. 결국은 개발자가 직접 인터페이스 인덱스를 검사해서 sin6_scope_id를 지정해줘야 합니다. 
+
+BSD 소켓은 if_nameindex라는 함수를 제공하는데, 이 함수를 이용해서 인터페이스 정보 목록을 가져올 수 있습니다. 루프를 돌면서 인터페이스 인덱스를 가져오고, 이를 sin6_scope_id에 지정해서 connect를 시도하는 식으로 이 문제를 해결 했습니다. 
+
+== 결론 ==
+이상 간단하게 IPv6 기반의네트웍 프로그래밍 기법에 대해서 알아보았습니다. 이문서에서는 모든 것을 설명하고 있지는 않으며, IPv6 네트웍 프로그래밍을 위한 가장 기본이 되는 내용들만 다루고 있습니다. 후에 라도 몇가지 빠진 API 들과, IPv6 에서 확장된 다른 기능을 다루는 방법에 대한 내용을 추가할 수도 있습니다.
+
+[[Category(5)]]

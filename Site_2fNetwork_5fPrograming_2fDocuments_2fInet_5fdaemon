@@ -1,0 +1,582 @@
+#title InetDaemon 만들기
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>inetd 데몬 제작</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>inetd 데몬 제작</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN14"
+>my_inetd 제작</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN17"
+>작동 프로세스</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>자료구조</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN31"
+>코딩</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN39"
+>테스트</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		우리는 지난번에 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=61"
+TARGET="_top"
+>inetd 프로그래밍</A
+> 를 통하엿 inetd 데몬의 작동방식과 
+		inetd 를 이용한 서버프로그래밍 방법에 대해서 알아보았다. 
+	</P
+><P
+>		이번 기사는 inetd 데몬과 비슷한 프로그램을 직접 구현하는 방법에 
+		대해서 소개하고 있다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>2&#51208;. my_inetd 제작</A
+></H1
+><P
+>		이번에 만들 프로그램의 이름은 my_inetd 라고 명명하도록 할것이다. 
+		쏘쓰파일의 이름은 my_inetd.cpp 가 될것이다.
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2.1&#51208;. 작동 프로세스</A
+></H2
+><P
+>			my_inetd 의 작동 프로세스는 기본적으로 inetd 와 같은 방식을 
+			취하게 될것이다. 
+		</P
+><P
+>			즉 설정파일을 읽어서, 해당 포트에서 accept 대기를 하다가 
+			포트에 연결이 들어오면, 포트에 연결된 프로그램을 
+			fork&#38;exec 방식으로 실행시키게 될것이다. 
+			fork 하면서  accept 시 만들어진 소켓을 stdin(0) 으로 복사(dup2) 
+			하게 된다. 그러므로 자식 프로세스는 stdin(0) 을 이용해서 
+			클라이언트와 통신을 할수 있게 된다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+>
+}}}
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/yGYXRFkfz4_xFjbijggArg?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uVLWksjDI/AAAAAAAABRE/84OUchEyCS8/s800/svWDQLBzfvj5DbTwk42fu3Q.png" /></a>
+</TD
+></TR
+></TABLE
+>
+			my_inetd 는 시작하면 우선 설정파일을 읽어들이는데, 
+			설정파일의 내용은 다음과 같은 포멧을 가진다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>4444,/usr/local/bin/zipcode
+5555,/usr/local/bin/zipcode2
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			각 필드는 ',' 로 구분되며 첫번째 필드는 port 번호, 2번째 필드는 
+			port 로 연결이 들어왔을때 실행시킬 서버프로그램의 이름이 된다.
+		</P
+><P
+>			일단 설정파일을 통해서 읽어들인 port 의 수만큼 socket 를 만들어 
+			준다. 그후 각 socket 지정번호에 대한 연결을 기다리게 된다. 이때 각 
+			소켓 지정번호의 accept 에서 block 되면 안되므로 polling 을 이용해서 
+			accept 이벤트를 검사하도록 한다. 
+		</P
+><P
+>			특정 소켓 지정번호에 연결이 들어오면 fork 시킨후 port 에 
+			지정된 서버프로그램을 exec 실행시킨다. exec 실행하기 전에, 
+			서버프로그램에 클라이언트와 통신할 소켓 지정번호를 전달 시켜줘야 
+			하므로 dup2 함수를 이용해서 소켓지정번호를 0번으로 복사하도록 
+			한다. 복사한후 기존의 소켓지정번호는 close 시키도록 한다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 자료구조</A
+></H2
+><P
+>			소켓지정번호와 poll 그리고 port 에 대한 실행서버 이름을 저장하게 되는 
+			자료구조와 연관관계는 아래와 같다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+>
+<a href="http://picasaweb.google.com/lh/photo/GYim93HcMmm8jbj-9iOHZA?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uVLYmUmBI/AAAAAAAABRA/piu1nJ_o15A/s800/s_J94B0XBMzXQpKssNH0jAQ.png" /></a>
+</TD
+></TR
+></TABLE
+>	
+			sockfd 는 소켓지정번호가 저장되는 단순한 배열이다. 설정파일에 있는 서비스 
+			리스트의 크기와 동일한 크기를 가지게 될것이다. 
+			poll 은 소켓지정번호에 대한 polling 검사를 하게될 poll 구조체의 일반 배열 
+			이다. 마지막 vector&#60;struct s_info&#62; 는 s_info 구조체를 vector 화 시킨 
+			것이다. s_info 구조체에는 해당 포트번호에 대해서 실행해야할 프로그램에 
+			관한 정보가 들어있다. 
+		</P
+><P
+>			3개의 자료구조들은 첨자번호로 서로를 참조할수 있다. 즉 sockfd 4 에 
+			대한 연결 event(POLLIN) 는 poll 0 을 이용해서 검사할수 있으며, 
+			연결 event가 발생했다면, vector&#60;struct s_info&#62; 의 0번 원소를  
+			참조해서 어떤 프로그램을 실행시켜야 하는지(proc) 
+			결정할수 있게 된다. 
+		</P
+><P
+>			위에서는 자료구조를 vector 로 사용했지만 배열을 사용해도 전혀 문제 없을 
+			것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>2.3&#51208;. 코딩</A
+></H2
+><P
+>			위의 프로세스를 보면 알겟지만, my_inetd 를 만들기 위해서 
+			어떤 특별한 기술을 필요로 하는건 아니다. 기존의 알고 있는 지식을 
+			이용한 구현이다. 그러므로 아래의 예제 프로그램을 이해하는데 
+			별 어려움은 없을것이다. 
+		</P
+><P
+>			프로그래밍 언어로 C++을 사용하였다. 이유는 vector와  string 를 
+			사용하기 위함이다. string 를 사용한 이유는, 문자열을 좀더 
+			쉽게 사용하기 위함이며, vector 를 사용한 이유는 설정파일에서 
+			읽어들인 내용을 저장하기 위한 자료구조를 좀더 쉽게 구현하기 
+			위해서이다. 다른 방법으로 구현해도 물론 상관은 없다. 
+			필자의 경우 코딩시간을 단축시키기 위해서 vector와 string 를 
+			사용했을 뿐이다. 그렇지만 string 와 vector 을 사용한 외에는 
+			C 스타일의 코딩기법을 따르고 있다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제: my_inetd.cpp</B
+>
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;string&#62;
+#include &#60;vector&#62;
+#include &#60;sys/time.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;sys/poll.h&#62;
+struct s_info
+{
+    int    port;
+    string proc;
+};
+int main(int argc, char **argv)
+{
+    FILE *fp;
+    char buf[80];
+    char port[6];
+    char exec_proc[80];
+    char comma[1];
+    int    *sockfd;
+    int state;
+    socklen_t clilen;
+    int pid;
+
+    struct sockaddr_in clientaddr, serveraddr; 
+    struct pollfd *client;
+    struct s_info service_info;
+
+    int  i; 
+    vector&#60;struct s_info&#62; info_list;
+
+    // 설정파일을 읽어들여서 info_list 자료구조에 
+    // push 한다.  
+    fp = fopen("my_inetd.cfg", "r");
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        printf("%s", buf);
+        sscanf(buf, "%[0-9]%[,]%s", port,comma,exec_proc);
+        service_info.port = atoi(port); 
+        service_info.proc = exec_proc;
+        info_list.push_back(service_info);
+    }
+
+    // 설정파일의 내용을 토대로 sockfd 의 크기와 
+    // polling 에 사용될 client poll 구조체의 크기를 결정한다. 
+    sockfd = (int *)malloc(info_list.size());
+    client = (struct pollfd *)malloc(info_list.size());
+
+    // 설정파일에 설정된 port 만큼 socket 를 만든다. 
+    for (i = 0; i &#60; info_list.size(); i++)
+    {
+        if ((sockfd[i] = socket(AF_INET, SOCK_STREAM, 0)) &#60; 0) 
+        {
+            perror("socket error : ");
+            exit(0);
+        }
+        bzero(&#38;serveraddr, sizeof(serveraddr));
+        serveraddr.sin_family = AF_INET;
+        serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serveraddr.sin_port = htons(info_list[i].port);
+        state = bind(sockfd[i], (struct sockaddr *)&amp;serveraddr, 
+                     sizeof(serveraddr));
+
+        if (state == -1)
+        {
+            perror("bind error : ");
+            exit(0);
+        }
+        state = listen(sockfd[i], 5);
+        if (state == -1)
+        {
+            perror("bind error : ");
+            exit(0);
+        }
+
+        // 만들어진 socket 지정번호는 polling 을 위해서 
+        // poll 구조체에 입력한다. 
+        client[i].fd = sockfd[i]; 
+        client[i].events = POLLIN;
+
+    }
+    clilen = sizeof(clientaddr);
+    for(;;)
+    {
+        int nread;
+        int client_sockfd;
+
+        // 만들어진 socket 에 대해서 폴링한다. 
+        // 만약 client poll 구조체에 읽기가 발생하면(POLLIN) 
+        // block 이 해제 되고 다음 코드로 넘어간다. 
+        nread = poll(client, info_list.size(),-1);
+        for (i = 0; i &#60; info_list.size(); i++)
+        {
+            // 어떤 client 멤버에서 POLLIN이 발생했는지 검사한후 
+            // fork 시키고 나서 해당 port 에 대해 실행시키려고 설정해둔 
+            // 서버 프로그램을 exec 실행시킨다. 
+            client[i].fd = sockfd[i]; 
+            client[i].events = POLLIN;
+            if (client[i].revents &#38; POLLIN) 
+            {
+                client_sockfd = accept(client[i].fd, 
+                        (struct sockaddr *)&#38;clientaddr, 
+                        &#38;clilen);
+                if (client_sockfd &#62; 0)
+                {
+                    pid = fork();
+                    if (pid == 0)
+                    {
+                        // exec 실행시키기 전에 client_sockfd 를 dup2 를 이용 표준입력으로 
+                        // 복사한다. 
+                        dup2(client_sockfd, 0);
+                        execl(info_list[i].proc.c_str(),
+                              info_list[i].proc.substr(info_list[i].proc.rfind("/")+1).c_str(), 0);
+                    }
+                }
+                // 열린 소켓이 부모 프로세스에서는 필요 없음으로 
+                // close 한다. 
+                close(client_sockfd);
+            }
+        }
+    }
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			코드는 전체적으로 정리되지 않은 모습을 보여준다. 
+			이유는 어디까지나 "이렇게 구현이 가능하다" 라는걸 보여주기 위해서 
+			코드가 만들어졌기 때문이다. 부족한 기능을 보충하는것과, 코드 
+			최적화및 에러처리는 각자의 몫으로 남겨 놓도록 하겠다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN39"
+>2.4&#51208;. 테스트</A
+></H2
+><P
+>	
+			우선 inetd 방식의 서버프로그램을 준비해야 한다. 
+			이것은 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=61"
+TARGET="_top"
+>inetd 프로그래밍</A
+>에 있는 zipcode_inetd.c 를 그대로 이용 
+			하도록 한다. 이것을 /usr/local/bin/zipcode 로 복사하도록하자. 
+			그다음 my_inetd 를 실행시키고 <A
+HREF="http://www.joinc.co.kr/article.php?sid=11"
+TARGET="_top"
+>셈플로 알아보는 소켓프로그래밍(1)</A
+>의 zipcode_cli.c 를 
+			이용해서 테스트 하면 된다. 
+		</P
+><P
+>	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# cp zipcode_inetd /usr/local/bin/zipcode 
+[root@localhost test]# ./my_inetd 
+...
+[root@localhost test]# ./zipcode_cli 4444
+지역이름 입력 : 서울
+서울시 강남구 역삼동:100-500
+서울시 강남구 삼성동:108-508
+서울시 송파구 동해동:212-789
+서울시 강북구 인천동:911-200
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>	
+			보통 telnet 서비스는 23번 포트로 이루어지며 텔넷 서비스 요청이 
+			있을경우 inetd 가 /usr/sbin/in.telnetd 를 fork&#38;exec 로 
+			실행시킨다. 이제 우리가 만든 my_inetd 가 과연 telnet 서비스도 
+			가능한지를 테스트 해보도록 하자. 
+			테스트 전에 기존에 떠있는 telnet 서비스를 disable 상태로 
+			만들도록 하자. xinetd 방식이라면 /etc/xinetd.d 밑에 있는 telnet 
+			파일을 열어서 "disable = yes" 로 바꾸면 될것이다. 만약 inetd 
+			방식이라면  /etc/inetd.conf 파일을 열어서 
+			"telnet  stream  tcp     nowait  root    /usr/sbin/tcpd  in.telnetd" 
+			부분을 주석처리 하면 된다. 
+			주석 처리후 xinetd 와 inetd 데몬을 재 실행 시키도록 한다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ps -ax | grep xinetd
+4616 ?        S      0:00 xinetd -stayalive -reuse -pidfile /var/run/xinetd.pid
+[root@localhost test]# kill -HUP 4616 </PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>	
+			이제 telnet 서비스가 disable 상태로 되어 있을것이다. 정말로 
+			disable 상태가 되어있는지 확인을 원한다면 nmap 과 같은 포트스캐너 
+			도구를 사용하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost xinetd.d]# !nmap
+nmap 127.0.0.1
+
+Starting nmap V. 2.54BETA22 ( www.insecure.org/nmap/ )
+Interesting ports on localhost (127.0.0.1):
+(The 1538 ports scanned but not shown below are in state: closed)
+Port       State       Service
+7/tcp      open        echo                    
+22/tcp     open        ssh                     
+110/tcp    open        pop-3                   
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위는 필자의 컴퓨터를 스캐너 한건데, telnet 서비스가 되고 있지 
+			않음을 알수 있다. 
+		</P
+><P
+>	
+			이제 my_inetd.cfg 에 다음과 같은 내용을 추가시키도록 하자. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>23,/usr/sbin/in.telnetd</PRE
+></TD
+></TR
+></TABLE
+>
+			그다음 my_inetd 프로그램을 다시 실행시킨후 telnet 연결을 해보도록 
+			하자.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+[root@localhost test]# ./inetd 
+4444,/usr/local/bin/zipcode
+5555,/usr/local/bin/zipcode2
+23,/usr/sbin/in.telnetd
+...
+[root@localhost test]# telnet 127.0.0.1 
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is '^]'.
+
+HancomLinux release 2.2
+Kernel 2.4.13-1hl on an i686
+login: </PRE
+></TD
+></TR
+></TABLE
+>	
+			매우 놀랍게도 telnet 서비스가 제대로 됨을 알수 있다(정말 놀랍다). 
+		</P
+><P
+>	
+			그러나 위의 my_inetd 프로그램이 모든 서비스 (smtp, pop3)와 
+			같은 서비스를 실행시킬수는 없을것이다. telnet 같은 경우에는 
+			아규먼트가 없이 실행되므로 my_inetd.c 의 코드로 문제없이 
+			exec 시킬수 있으나, pop3, smtp 같은 경우에는 아규먼트를 
+			필요로 하는경우가 있다. 그런데 우리의 코드는 이러한 것까지 
+			지원하지는 않는다. 이것은 약간만 수정하면 지원하도록 할수 있으니 
+			시간이 남으면 수정해 보도록 하자. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+[[Category(5)]]

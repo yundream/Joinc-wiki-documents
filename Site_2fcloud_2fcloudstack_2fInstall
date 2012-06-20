@@ -1,0 +1,269 @@
+#title CloudStack Install
+
+현재 작성 중임
+[[TableOfContents]]
+== cloudstack network 모델 ==
+cloudstack는 완성된 소프트웨어로 잘 정리된 문서들을 제공한다. 이들 문서들만 읽어도 큰 어려움 없이 클라우드를 구축할 수 있다. 하지만 cloudstack을 이용해서 제대로된 클라우드 환경을 구축하고 운영하려면 cloudstack에서 지원하는 클라우드 네트워크 모델과 스토리지 모델을 이해하고 있어야 한다.
+
+먼저 클라우드 스택의 network 모델을 설명할 것이다.  
+
+=== 환경 ===
+이 문서의 내용은 다음 환경을 기준으로 만들었다.
+  * 하이퍼바이저 
+     XenServer 5.3
+  * 운영체제
+     XenServer는 리눅스(:12)에서만 작동한다. 
+  * cloudstack 2.2.13
+
+=== 소규모 클라우드 구성 ===
+중소규모의 회사나 연구실에서 개발이나 테스트를위한 작은 규모의 클라우딩 환경을 구축하기 원할 경우에 참고할 수 있는 일반적인 구성이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1jnvFAIFlZhZ_JhClpnEz-YBofTuciYgptwMiBUxEwF8&amp;w=595&amp;h=575">
+}}}
+
+'''UTM'''
+    인터넷의 접점에 놓이는 네트워크 장비로 방화벽, 라우터, NAT, port forwarding 기능을 수행하는 장비. 인터넷으로 나가기 위해서는 NAT(:12), 내부로 들어오기 위해서는 port forwarding을 이용한다. port forwarding 대신 SNAT을 사용할 수도 있겠다.
+'''L2 switch'''
+    내부 네트워크를 연결한다.
+'''CNODE'''
+    Cloud node의 줄임말로 클라우드에 사용할 노드들이다. Custom VM은 CNODE에 만들어진다.  
+'''MNODE'''
+    Cloud 인프라를 관리하기 위한 소프트웨어가 설치되는 관리노드 (Management node)로 cloudstack 소프트웨어가 설치된다. 
+'''SNODE''' 
+    Storage node로 Custom VM을 만들기 위한 ISO 이미지, VHD Template, Snapshot을 저장하기 위한 저장소를 제공한다. 대규모 클라우드를 구축하려 한다면, Custom VM의 root disk를 관리하기 위한 용도로 사용할 수도 있다. 저장소에 접근하기 위해서 NFS(:12) 혹은 ISCSI(:12) 인터페이스를 사용한다. 
+
+리눅스 시스템과 NFS, ISCSI(:12)등에 대한 이해가 있다면 그리고 문서를 꼼꼼히 읽으면서 설치한다면 3-4일 이내에 회사에서 사용할 수 있는 클라우드 환경을 구축할 수 있을 것이다. 
+
+=== 대규모 클라우드 구성 ===
+바로 위에서 다루었던 클라우드 구성은 프라이빗 클라우드로 중소 규모의 회사에서 내부적으로만 사용하기에 충분하다. 그러나 대학이나 큰 규모의 기업 혹은 클라우드를 서비스 하기 위해서는 그에 맞는 클라우드 구성이 필요하다. 다음은 대규모 클라우드 구성을 위한 제안이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1NUWv7emgo0cxYJH95pHRhbuMFv8kUwojMNnORD0cznE&amp;w=822&amp;h=638">
+}}}
+
+이 구성은 몇개의 POD로 구성된다. POD는 스토리지와 Cloud node cluster로 구성된 cloud 구성단위로, 데이터 센터의 '''rack'''과 같다고 보면 된다. 
+
+Management POD에는 cloud를 관리하기 위한 소프트웨어를 구동하기 위한 노드들 그리고 SNODE가 위치한다. 
+
+SNODE를 보면 Primary storage와 Secondary storage 두 종류가 있다. Primary storage는 게스트 VM의 Root Disk와 Data volume등 동적인 데이터를 저장하기 위한 공간이고, Secondary storage는 snapshot, template 등 정적 데이터를 저장하기 위한 공간이다.  
+
+VM의 Root disk와 Data volume은 vm이 생성된 CNODE의 로컬 스토리지에 저장하는 방법이 있다. 이렇게 할 경우 Primary storage를 따로 운용할 필요가 없다는 장점이 있는 반면, vm이동 backup 기능등의 구현이 어려워지며 fault tolerant한 운영이 어려워진다는 단점이 있다. 
+
+Primary storage를 따로 운용을 하면, 스토리지까지 추상화 함으로 좀더 클라우드틱한 클라우드 환경을 구축할 수 있다는 장점이 있다. 
+
+반면 Primary storage를 구축하기 위해서는 꽤 많은 별도의 비용이 필요하다는 단점이 있다. 루트 디스크와 데이터 볼륨은 대역폭과 접근속도가 중요한데, 이를 만족하기 위해서는 고성능의 장비가 필요하기 때문이다. 대신 스토리지의 기능을 이용해서 fault tolerant한 시스템을 구축할 수 있다.  
+
+예를 들어 Primary storage로 ZFS(:12)를 사용한다면 RAIDZ, snapshot, 압축, hot-spot, mirror 등의 기능을 이용해서 안정된 스토리지자원을 제공할 수 있다. 개인적으로 ZFS 추천.. 
+Secondary storage의 경우 cloudstack의 다음 버전인 3.0에서 swift를 지원한다고 하니, 그때 swift로 갈아타면 되지 싶다.
+
+위 구성은 모든 VM이 L2로 묶이는 구성으로, 간단하게 구성할 수 있지만 동일한 브로드케스팅 영역에 있기 때문에 훌륭한 구성이라고는 할 수 없다. 클라우드로 일반 사용자에게 VM을 서비스를 한다면 유저별 Network간 isolation (격리)가 중요할 텐데, L2네트워크에서 사용할만한 방법으로는 VLAN(:12)이 유일하다. VLAN구격인 IEEE8021.q는 최대 VLAN의 크기를 4092로 정하고 있다. 이는 유저가 4096니 넘어가면, 더 격리할 수가 없기 때문에 유저를 추가할 수 없음을 의미한다. 
+
+때문에 이 구성은 데이터 센터급의 클라우드 구조로는 적합하지 않을 것 같다. 하지만 왠만한 중/대규모의 클라우드 센터 구축에는 충분하리라 생각된다. 이 구조를 설명한 이유는 현재 cloudstack 2.2.13의 두 개 네트워크 모드 중 하나인 Advanced Network mode가 이 구조를 가지고 있기 때문이다. 
+
+L2 Switch를 L3 Switch (라우터)로 바꾼다면 정말 클라우드 스러운 구성이 될텐데, 2012년 3월에 나올 cloudstack 3.0에서 지원한다고 하니 기다려 봄직하다. 
+
+=== Network 분리 ===
+외부에 클라우드를 서비스한다면, 망 분리가 필수적이다. 4개로 분리하는게 가장 좋을 것 같다. 
+  1. Public Network 
+     인터넷으로 연결하기 위한 네트워크
+  1. Guest Network
+     일반 유저를 위한 private 네트워크
+  1. Manage Network  
+     CNODE와 SNODE를 관리하기 위한 네트워크, Cloudstack API의 통로다. 
+  1. Storage Network 
+     Primary Storage는 대량의 데이터가 이동하므로 충분한 대역폭을 제공해야 한다. Primary Storage의 경우는 특정한 시간에 대량의 데이터가 이동하므로 대역폭을 크게 잡을 필요가 없다고 생각된다. Secondary storage는 서비스 규모에 따라서 Manage Network에 위치해도 괜찮을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1ixRN21fRdMh7n5BIY_d51j7-kDRjjcSdG2LLk-RiOp0&amp;w=535&amp;h=611">
+}}}
+  * 16.83.0.0/16
+    퍼블릭 네트워크다. 유저 VM은 이 네트워크를 이용해서 인터넷과 연결할 수 있다.
+  * 172.20.0.0/16
+    유저 VM의 private 네트워크다. 
+  * 10.10.1.0/24 
+    메니지먼트를 위한 네트워크다. 이 네트워크를 이용해서 클라우드 자원을 관리한다.
+  * 10.20.1.0/24 
+    CNODE는 이 네트워크를 이용해서 스토리지에 접근할 수 있다.  
+
+대략 시스템 견적이 나온다. 
+  * CNODE는 4개 정도의 1G 네트워크 카드를 가지고 있는게 좋겠다. 
+  * MNODE는 2개의 1G 네트워크 카드를 가지고 있어야 한다.
+  * SNODE는 그림 상으로 2개지만 대역폭을 확보해야 하기 때문에, 메니지먼트용으로 사용할 1G 네트워크 카드와 2개 이상의 10G 네트워크카드가 필요하겠다. 
+
+=== Storage 시스템 및 네트워크 구성 ===
+Cloudstack의 다음 버전인 cloudstack 3.0은 swift를 지원하니, secondary storage는 swift를 믿고가면 될 것 같다. swift를 지원하지 않는 지금은 NFS(:12)로 구성을 해야할 것으로 보인다. 비록 swift보다 확장, 유지/운용에 어려움이 많지만 데이터 센터급으로 확장할 생각이 아니라면 문제될건 없다 생각한다. 
+
+Primary storage는 대역폭과 속도가 중요하므로 결국 NAS를 사용해야 할 것 같다. iSCSI를 스토리지 엑세스 프로토콜로 사용하면 되겠다. 이제 스토리지를 구성할 파일시스템을 선택해야 하는데, ZFS(:12)를 추천할만 하다. 마음에 걸리는 건, 오픈솔라리스 기반이라서 통합하가기가 좀 애매모호 하다는 점. 개인적으로 리눅스(:12)를 좋아하기 때문에 더욱 망설이게 된다. 
+
+리눅스나 오픈솔라리스나 비슷한 운영체제이니 뭐 별다른 문제가 없을 거라고 생각할 수 있겠지만 모니터링, 자동화 솔류션을 도입할 때 문제가될 수 있다.    
+
+그래서 요즘 관심을 가지고 있는게 [wiki:Site/cloud/Storage/NativeZFSOnLinux linux용 native zfs 모듈]이다. 문제는 (2012년 2월 1일)버전이 0.6이라서 믿음이 가지않는 다는 것인데, 일단 사내 클라우드 환경 구축에 적용해 보면 어떨까라는 생각만 하고 있다. 
+
+마지막으로 iscsi + lvm + software raid로 직접 구축하는 것과 상용제품을 구입하는 것이다. 직접 구축하는 것은 그다지 어렵지 않겠으나 상용제품 수준으로 운용성과 신뢰도를 높이는게 관건이겠다.
+
+스토리지 네트워크 구성 두 개정도를 소개해보려 한다.
+
+'''Link Aggregation'''
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1r12yy7J9kAVoBHOkeY__8p-YB_h7gI0rhQtYibDz3aU&amp;w=313&amp;h=339">
+}}}
+
+LACP를 이용 두개 이상의 NIC를 묶어서 하나의 물리적인 NIC인 것처럼 만들 수 있다. 이렇게 해서 대역폭을 확보할 수 있으며, NIC장애에 대한 Fail Over가 가능하다.  Primary storage와 Secondary storage 모두에 적용할 수 있을 것이다.  
+
+'''Multipath I/O'''
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=15ZNziq-9ey-NDPaHaYzzspEP3PqgFoGkkUlwqaX7Pho&amp;w=576&amp;h=346">
+}}}
+
+네트워크 트래픽을 두개 이상의 스위치로 분산한다. 여러 개의 물리적 NIC을 하나의 NIC처럼 보이게 할 수 있으며, fail over도 가능하다.
+
+== cloudStack Install ==
+이제 클라우드스택을 설치한다. 쿨라우드스택은 잘 패키징됐기 때문에, 메뉴얼만 꼼꼼히 읽어본다면 어려지 않게 설치할 수 있다.
+
+=== 설치 환경 ===
+설치환경은 다음과 같다.
+ * 설치 운영체제(:12) : CentOS 5.7 x86_64
+ * 다운로드 : http://cloudstack.org/download.html
+ * 패키지이름 : CloudStack-2.2.13-1-rhel5.tar.gz
+ * Secondary Storage : NFS(:12)
+ * Primary Storage : NFS(:12)로 한다. ISCSI(:12)를 선택할 수 있으나 테스트하기 귀찮아서 NFS로 했다.
+
+=== 다운로드 ===
+다운로드한 클라우드 스택 패키지압축을 푼다.
+{{{#!plain
+# tar -xvzf CloudStack-2.2.13-1-rhel5.tar.gz
+}}}
+
+인스톨 스크립트를 이용해서 메뉴 방식으로 쉽게 설치할 수 있다.
+{{{#!plain
+# ./install.sh 
+Setting up the temporary repository...
+Cleaning Yum cache...
+Loaded plugins: fastestmirror
+0 metadata files removed
+Welcome to the Cloud.com CloudStack Installer.  What would you like to do?
+
+    M) Install the Management Server   
+    A) Install the Agent
+    B) Install BareMetal Agent
+    S) Install the Usage Monitor
+    D) Install the database server     
+    Q) Quit
+}}}
+
+=== Management Server 설치 === 
+'''M'''키를 눌러서 톰캣기반의 메니지먼트 서버를 설치한다.
+
+=== 데이터베이스 설치 ===
+'''D'''키를 눌러서 cloudstack이 사용할 mysql 데이터베이스를 설치한다. 설치 후 설정을 아래와 같이 변경한다.
+{{{#!plain
+# cat /etc/my.cnf
+[mysqld]
+...
+innodb_rollback_on_timeout=1
+innodb_lock_wait_timeout=600
+max_connections=70
+...
+}}}
+mysql 서버를 재 시작한다.
+{{{#!plain
+# service mysqld restart
+}}}
+
+이제 cloud관리를 위한 데이터베이스와 테이블을 만든다. 스크립트를 이용해서 간단히 만들 수 있다. 
+{{{#!plain
+# cloud-setup-databases cloud:password@localhost --deploy-as=root:rootpassword
+}}}
+  * cloud : 클라우드 데이터베이스의 이름
+  * dbpassword : 클라우드 데이터베이스에 접근하기 패스워드로 생략할 수 있다. 
+  * deploy-as : 데이터베이스를 설치할 계정과 패스워드 
+설치하면 2개의 데이터베이스가 만들어 진다. 
+{{{#!plain
++-------------------+
+| Database (cloud%) |
++-------------------+
+| cloud             | 
+| cloud_usage       | 
++-------------------+
+}}}
+
+=== 시스템 템플릿 설치 ===
+클라우드스택은 몇 개의 system vm을 이용해서 클라우드를 관리한다. 
+  1. console proxy vm 
+    관리자는 콘솔 vm을 이용해서, 웹 상에서 게스트 VM에 직접 접근할 수 있다. 
+  1. router vm 
+    rvm이라고 부르기도 한다. 클라우드 네트워크 운영을 위한 vm으로 L2 스위치, DHCP(:12), 로드밸런서의 역할을 한다.  
+  1. secondary vm
+    svm이라고 부르기도 한다. svm은 secondary storage를 관리하는 vm이다. 반드시 CNODE와 통신할 수 있는 네트워크로 묶여야 한다.
+
+시스템 템플릿은 클라우드 스택에서 제공하는 스크립트를 이용해서 secondary storage에 직접 설치해줘야 한다. sendary storage를 마운트 한다음 스크립트를 실행하자.
+{{{#!plain
+# mount 10.10.11.11:/srv/ss-01 /mnt/ss-0  
+# /usr/lib64/cloud/agent/scripts/storage/secondary/cloud-install-sys-tmplt -m /mnt/ss-0 -u http://download.cloud.com/releases/2.2.0/systemvm.vhd.bz2 -h xenserver -F
+}}}
+파일크기가 200메가가 넘기 때문에 네트워크 상황에 따라 꽤 많은 시간이 걸릴 수도 있다.
+
+=== 클라우드 서버 시작 ===
+이걸로 설치완료. 클라우드 스택을 실행한다.
+{{{#!plain
+# /etc/init.d/cloud-management restart
+}}}
+이제 8080포트로 접근하면 클라우드스택에 접속할 수 있다. 기본 유저/패스워드는 admin/password다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/oRCs8jHkaeP8jsI9Feqk6tMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-pVQEatrIihc/TyVdxHMQYJI/AAAAAAAAB-4/rOPmCSdJATs/s640/cloudstack01.png" height="541" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+이걸로 클라우드를 운영할 준비가 모두 끝났다. 이제 zone, pod, clustor를 만들고 cnode를 등록해서 vm을 만들면 된다. 
+
+vm이 만들어지는 나머지 과정을 대략 정리만 하고 넘어가겠다. 나중에 cloudstack 관리/운영 문서를 따로만들 생각이다.
+  1. zone, pod, cluster를 만든다.
+  1. cnode를 등록한다.
+  1. primary storage를 등록한다.
+  1. secondary storage를 등록한다.
+  1. storage와 cnode가 등록됐다면, cloudstack는 centos default template를 자동으로 다운로드 한다. 이 템플릿을 이용해서 vm을 만들 수 있다. 
+  1. system template를 이용해서 consol proxy vm과 secondary storage vm을 실행한다. 설치 중 네트워크 구성과 storage 구성에 문제가 있다면 이들 system vm이 생성되지 않을 것이다.
+  1. system vm과 default template가 생성됐다면, 비로서 vm을 실행할 준비가 끝난 것이다. 
+
+== 클라우드 스택 네트워크 모드 이해 ==
+클라우드 스택은 '''Basic Mode'''와 '''Advanced Mode''' 두개의 네트워크 모드를 지원한다.
+
+=== Basic Mode ===
+Zone생성시 basic mode를 선택했다면, 모든 게스트 vm은 하나의 untagged VLAN으로 묶인다. cnode의 네트워크 인터페이스는 반드시 '''cloud-guest'''이름의 네트워크 인터페이스로 연결되야 한다.  
+
+게스트 vm은 router vm으로 부터 IP 주소를 할당 받는다. router vm은 단지 DHCP로만 작동한다.
+
+security groups을 이용해서 게스트 vm간 네트워크를 분리한다. 명확한 모델이긴 하지만 private network, NAT 구성을 할 수 없는 좀 애매모호한 모드다.
+
+=== Advanced network 모드 ===
+Advaned network 모드로 만든 zone는 isolation Mode 방식에 따라서 다시 분리한다. VLAN은 VLAN을 이용해서 게스트 VM의 네트워크를 분리한다. Security Groups로 분리할 수도 있는데, iptables, ipset, arptable등을 이용 패킷 필터링으로 네트워크를 분리하는 것으로 아마존의 security groups와 비슷하다. security groups의 경우 모든 guest vm이 같은 브로드 케스팅 도메인을 가진다. 
+  * VLAN
+    유저 account 네트워크를 VLAN을 이용해서 분리한다. 그러므로 유저 마다 고유한 VID를 할당해야 하는데, IEEE802.1q는 VLAN의 크기를 2^12로 제한한다. 최대 4096개의 어카운트를 생성할 수 있다는 의미다. 클라우드를 서비스할 경우 문제가 될 수 있다. 어카운트 마다 rvm이 만들어지는데, 이 rvm을 이용해서 로드 밸런싱, NAT 구성을 할 수 있다. 
+  * Security Group
+    VID를 이용하지 않으므로 account 제한은 없다. 하지만 같은 브로드 케스트 도메인에 위치하므로 게스트 vm이 많아지면 네트워크 성능에 문제가 생길 수 있다. 
+
+== cloudstack zone 구성 요소 ==
+클라우드 스택은 데이터센터 개념인 zone 단위로 구성된다. zone은 rack역할을 하는 POD로 구성되며, POD는 다시 컴퓨터 호스트의 모음인 cluster로 구성된다. 여기에 secondary storage와 primary storage가 추가 된다. 물론 여러 개의 zone을 가질 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=180DCh5KQGDfFRzjjv_ANWiZGjcp0jd0MtrsQ16Q0RNs&amp;w=668&amp;h=683">
+}}}
+  * zone
+    데이터 센터에 대응한다. 하나 이상의 pod로 구성된다.
+  * pod
+    rack에 대응한다. 하나의 pod는 하나 이상의 cluster로 구성된다. pod는 secondary storage를 공유한다.
+  * cluster
+    cnode의 모음으로 하나의 cluster는 하나의 primary storage를 공유한다. 최소한 하나의 cluster를 가져야 한다. 하나의 cluster를 몇 개의 cnode로 구성해야 하는지는 성능이슈다. 
+  * cnode
+    rack을 구성하는 단위 서버 컴퓨터라고 보면 된다. cnode의 dom0는 primary storage와 secondary storage에 접근할 수 있다. 해서 cnode는 자신이 가지고 있는 cpu와 memory 그리고 storage자원을 이용해서 vm을 생성한다.  
+
+
+== 앞으로 할일 ==
+ 1. cloudstack 운용및 관리는 따로 문서를 만들어야 겠다.
+
+== 히스토리 ==
+ 1. 2012년 1월 20일 작성 시작 
+
+[[tag(cloud,cloudstack,Xen)]]

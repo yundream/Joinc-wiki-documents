@@ -1,0 +1,201 @@
+#title Designer과 Kdevelop로 만들어보는 파일 브라우저  
+
+[[TableofContents]]
+
+=== 소개 ===
+이번에 만들어 볼 프로그램은 간단한 파일 브라우저다. 프로젝트는 kdevelp를 통해서 관리를 하며, UI의 제작은 designer를 통해서 이루어지도록 하겠다. [wiki:Site_QT/Documents/designer_kdevelop designer를 이용한 소켓 프로그램 제작]을 통해서 designer과 kdevelop에 대한 응용방법에 대해서 알아보았으니 그리 어렵지 않게 만들 수 있을 것 같다.
+
+우선은 로컬에 있는 파일들만 브라우징 가능한 수준으로 만들고 웹서버에 연결해서 웹브라우징까지 가능한 수준으로 만들어 보고자 한다.
+
+=== 프로그램 개요 ===
+이 프로그램은 다음과 같은 UI를 보여준다. 역시 허접한 UI이지만 뭐라하지 말아주기 바란다.
+
+http://www.joinc.co.kr/albums/album01/akv.sized.png
+
+오른쪽에는 QListBox를 통해서 현재 경로의 파일들을 출력한다. 파일은 선택한후 더블클릭하면 파일의 내용이 왼쪽에 출력이된다. 이때 html파일같은 경우 랜더링을 거친후 출력이 된다. HTML 랜더링을 거친다고 해서 복잡한 코드가 들어가거나 하지는 않는다. QTextBrowser에서 HTML랜더링 관련 함수를 지원하기 때문이다. 
+
+아랫 부분에는 필터 입력창이 있다. 말그대로 특정한 확장자를 가지는 파일들만을 ListBox에 출력하기 위해서 사용한다. '''Close'''버튼을 누르면 프로그램은 종료되며, 제일 마지막에는 현재 열고 있는 파일의 이름을 출력하는 status bar가 놓인다.  
+
+=== 응용 만들기 ===
+==== kdevelop를 이용한 프로젝트 생성 ====
+이제 kdevelop를 이용해서 프로젝트를 생성하도록 한다. 프로젝트의 이름은 qbrowser로 하겠다. 프로젝트 생성을 하면 미리작성된 템플릿중 하나를 선택하게 될건데, 이중 '''C++ > Simple Kde Application'''을 선택하도록 한다.  
+
+==== designer를 통한 UI 생성 ====
+이제 designer를 통해서 UI를 생성할 차레다. '''File > New'''를 선택하면 파일 선택 대화창이 뜬다. 파일의 이름은 browserdlg로 하고 파일의 타입은 '''Widget (.ui)'''를 선택하도록 한다. 그리고 Add to project를 체크하도록 하고 '''OK''' 버튼을 클릭한다. 
+
+이제 src디렉토리 밑에 browserdlg.ui 파일이 생성되어 있을 것이다. designer를 이용해서 다음과 같이 UI를 만들도록 한다.  
+
+사용되는 위젯은 '''QListView''', '''QTextBrowser''', '''QLabel''', '''QTextEdit''', '''QPushButton'''이다. 위젯의 배치방법에 대해서 설명을 하진 않겠다. 몇번 노가다 뛰다보면 감이 올것이다. 다만 QListView와 QTextBrowser위젯을 배치하기 위해서 Layout중 In Splitter를 사용했음을 주목해 주길 바란다.
+
+http://www.joinc.co.kr/albums/album01/akw.png
+
+메인 윈도우의 이름은(기본 이름 Form)은 TBrowser로 했다.
+
+UI를 완성했다면 저장한후 '''uic'''를 이용해서 코드를 생성한다.
+{{{#!plain
+# uic -o browserdlg.h browserdlg.ui 
+# uic -o browserdlg.cpp -i browserdlg.h browserdlg.ui 
+}}}
+
+이제 프로젝트를 다시 불러와서 classess 브라우저를 보면 TBrowser 클래스가 추가되어 있는걸 확인할 수 있을 것이다. 
+
+http://www.joinc.co.kr/albums/album01/akx.sized.png
+
+==== 슬롯함수 및 멤버함수 작성 ====
+이제 슬롯함수와 멤버함수를 작성하면 된다. 이전의 [wiki:Site_QT/Documents/designer_kdevelop designer를 이용한 소켓 프로그램 제작]에서는 슬롯함수를 순수가상함수로 .ui에서 등록하고 .ui 클래스로 부터 상속받아서 실제 구현을 했지만, 여기에서는 모든 함수의 선언과 구현을 Qbrowser클레스에서 끝내도록 하겠다. 
+
+다음은 Qbrowser을 위한 코드다. 설명은 주석으로 대신하겠다. 
+{{{#!plain
+#ifndef QBROWSER_H
+#define QBROWSER_H
+
+#include "browserdlg.h"
+#include <qwidget.h>
+#include <qstring.h>
+
+class Qbrowser : public TBrowser
+{
+Q_OBJECT
+public:
+    Qbrowser(QWidget *parent = 0, const char *name = 0);
+    
+    void setDir(const QString &path);
+
+    ~Qbrowser();
+
+ signals:
+ 
+private slots:
+	// ListView에서 Item을 클릭했을 때 호출되는 슬롯함수 
+	void itemSelected(int index);
+	// 필터링 입력창(LineEdit)에 필터조건을 입력하고 
+	// 엔터키를 눌렀을 때 호출되는 슬롯함수
+	void setFilter();
+	
+private:
+	QString nameFilter;    // 필터 조건 저장용
+	QString basePath;      // 기본 디렉토리 이름 저장용
+	QString CurrentPath;   // 현재 디렉토리 이름 저장용
+};
+#endif
+}}}
+
+다음은 실제 구현이다. 코드는 쉽게 이해할 수 있을 것이다. 현재 디렉토리의 파일 목록을 얻기 위해서 Qdir 클래스를 사용했다. Qdir 대신 scandir()이나 opender()계열의 함수를 사용해도 되겠지만 다른 qt함수들과 유연하게 연결시키기 위해서는 qt에서 제공하는 함수들을 사용하는게 편하다.  
+{{{#!plain
+#include "qbrowser.h"
+#include "browserdlg.h"
+#include "qbrowser.moc"
+#include <qdir.h>
+#include <qlistbox.h>
+#include <qmessagebox.h>
+#include <qtextbrowser.h>
+#include <qeuckrcodec.h>
+#include <qlabel.h>
+#include <qlineedit.h>
+
+Qbrowser::Qbrowser(QWidget *parent, const char *name)
+ : TBrowser(parent, name)
+{
+    // 기본 필터 조건
+	nameFilter = "*.htm *.html *.txt *.xml";
+
+    // 현재 경로를 알아낸다.
+	setDir(QDir::currentDirPath());
+	CurrentPath = QDir::currentDirPath();
+
+    // html문서에 대해서는 euc-kr 문자셋을 적용한다. 
+    // mimeSourceFactory함수를 이용하면 여러가지 인터넷 데이터를 문서중에 출력
+    // 시킬 수 있다.
+	Browser->mimeSourceFactory()->setExtensionType("html", "text/html; charset=euc-kr");
+	Browser->mimeSourceFactory()->setExtensionType("text", "text/euc-kr");
+
+    // 필터창에 필터조건을 입력하고 엔터키를 누르면 
+    // setFilter 슬롯함수가 실행된다. 
+	connect(EditFilter, SIGNAL(returnPressed ()), SLOT(setFilter()));
+
+    // ListView에서 파일을 선택(더블 클릭)하면  
+    // itemSelected 슬롯함수가 실행된다.
+	connect(ListFile, SIGNAL(selected(int)), SLOT(itemSelected(int)));
+}
+
+void Qbrowser::setFilter()
+{
+
+    // *.[.]+에 대해서 필터를 적용한다.
+	if (strstr(EditFilter->text().ascii(), "*.") != NULL)
+	{
+		nameFilter = EditFilter->text();
+		setDir(CurrentPath);
+	}
+	else
+	{
+        // 그렇지 않다면 파일을 오픈한다.
+		if (QFileInfo(EditFilter->text()).isReadable())
+		{
+			Browser->setSource(EditFilter->text());
+			statusBar->setText(EditFilter->text());
+		}
+		else
+		{
+			QMessageBox::warning(this, "Error", "File Open Error", "Close");
+		}
+	}
+}
+
+void Qbrowser::setDir(const QString &path)
+{
+	QDir dir(path, nameFilter, QDir::DirsFirst);
+	dir.setMatchAllDirs(true);
+	if (!dir.isReadable())
+		return;
+	ListFile->clear();
+
+	QStringList entries = dir.entryList();
+	QStringList::ConstIterator it = entries.constBegin();
+    // 디렉토리 리스트를 출력한다.
+	while(it != entries.constEnd())
+	{
+		if(*it != ".")
+			ListFile->insertItem(*it);
+		++it;
+	}
+	basePath = dir.canonicalPath();
+}
+
+
+// 파일을 선택했을 경우
+// 파일의 내용을 출력한다.
+void Qbrowser::itemSelected(int index)
+{
+	QString path = basePath + "/" + ListFile->text(index);
+	if (QFileInfo(path).isDir())
+	{
+		setDir(path);
+		CurrentPath = path;
+	}
+	else
+	{
+		Browser->setSource(path);
+		statusBar->setText(ListFile->text(index));
+	}
+		
+		
+}
+
+Qbrowser::~Qbrowser()
+{
+}
+}}}
+
+==== QTextBrowser ====
+여기에서 가장 중요한 클래스는 '''QTextBrowser'''클래스 일 것이다. 이 클래스는 '''QTextEdit'''로 부터 상속되는 함수로 단지 볼수만 있는 텍스트 브라우저 위젯을 만든다. 또한 HTML랜더링 기능을 가지고 있다. 이외에도 키보드를 이용한 뒤로(backward), 앞으로(forward), 홈으로(home), 다시읽기(reload)기능까지 가티고 있다. 이전 문서로 가기 위해서는 '''alt+<-''', 앞 문서로 가기 위해서는 '''alt+->'''키를 사용하면 된다. 다시읽기와 홈으로는 찾아봐야 할것 같다. 
+
+QTextEdit의 또다른 편리한 기능이라면 일일이 파일을 오픈해서 읽어들이고 닫는등의 복잡한 작업이 필요 없이 '''setSource'''함수를 이용해서 한번에 문서를 읽어들여서 출력할 수 있다는 점이다. 단지 파일이름을 setSource함수의 인자로 넘겨주기만 하면 된다. 
+==== 소스 다운로드 받기 ====
+소스는 [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/kdevelop JCvs]에서 다운 받을 수 있다. 만약 cvs클라이언트가 설치되어 있다면 아래와 같은 방법으로 코드를 다운로드 받을 수 있다. 
+{{{#!plain
+# cvs -d :pserver:anonymous@cvs.joinc.co.kr:/home/jcvs/kdevelop co qbrowser
+}}} 
+
+=== 결론 ===
+간단하게 파일을 브라우징하고 결과를 출력해주는 프로그램을 만들어 보았다. 조금만더 수정한다면 간단한 웹브라우저 정도를 만들 수 있을 것이다. 틈틈히 만들어 볼 생각이다. 

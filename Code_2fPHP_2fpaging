@@ -1,0 +1,72 @@
+#title php 코드 : paging 네비게이션 인터페이스
+
+== 이유 ==
+PHP는 주로 내 사이트를 유지하기 위한 목적으로 사용한다. 그러다 보니 대충 대충, 즉 돌아가는 정도로만 코드를 작성할 때가 많다. 개인적인 프로그래밍 철학? 이기도 하다. '''일단 돌아가면 된다.!!!'''
+
+당연 페이징도 신경을 쓰지 않았다. 그러다보니 어느덧 페이지가 늘어져서 한 페이지를 넘어가는 경우가 발생을 한다. 이번에 귀차니즘을 넘어서서 페이징 네비게이션을만들어 보기로 했다. 인터페이스는 다음과 같다.
+{{{#!plain
+ <  1 ... 12 13 14 15 16 ... N > 
+}}}
+예컨데, 특정한 크기를 가지는 window를 이동시키는 방식이다. TCP(:12)의 window slide 방식의 응용 정도로 보면 될거 같다. 만약 윈도가 첫 페이지를 벗어나게 되면 '''1 ...'''을 표시하고, 마찬가지로 윈도가 마지막 페이지인 '''N'''을 포함하지 못하면 '''.... N'''을 표시한다.
+
+== 코드 ==
+이 함수는 3개의 매개 변수를 가진다.
+  1. total : 검색된 전체 페이지 
+  1. limit : 함 페이지가 포함하는 요소의 개수
+  1. curpage : 현재 페이지 번호 
+설명은 주석으로 대신
+{{{#!plain
+function page_nave($total, $limit, $curpage)
+{
+        $total_page = ceil($total/$limit);
+        $paging;
+        $i = 0;
+
+        // 움직일 윈도 사이즈
+        $sliding_size = 10; 
+
+        // 만약 윈도 범위가 첫 페이지를 벗어나면 1 ...을 출력한다.
+        if($curpage > $sliding_size)
+        {
+                $paging .= "<a href=?page=$curpage>1</a>... ";
+                $i = $curpage - ($curpage % $sliding_size);
+        }
+
+        // offset은 윈도의 마지막 페이지 번호다. 
+        $offset = $i + $sliding_size;
+
+        // 윈도의 시작 $i 부터, 윈도우 마지막 까지 출력한다. 
+        for($i; $i < $offset && $i < $total_page; $i++)
+        {
+                $page_name = $i+ 1;
+                // 링크는 적당히 수정
+                if($curpage != $page_name)
+                {
+                        $paging .= " <a href=url?page=$page_name>$page_name</a>";
+                }
+                else
+                        $paging .= " $page_name";
+        }
+
+        // 만약 윈도 범위가 마지막 페이지를 포함하지 못하면 ... N 을 출력한다.
+        if(($i + 10 ) < $total_page)
+        {
+                $paging .= " ... <a href=url?page=$total_page>$total_page</a>";
+        }
+
+        // 좌우 이동 화살표 <, >를 출력한다.
+        // 처음과 마지막 페이지가 아니라면 링크를 걸어주면 된다.
+        if($curpage != 1)
+        {
+                $prev_page = $curpage - 1;
+                $paging = "<a href=url?page=$prev_page>&lt;</a> $paging";
+        }
+        if($curpage != $total_page)
+        {
+                $next_page = $curpage + 1;
+                $paging = " $paging <a href=url?page=$next_page>&gt;</a>";
+        }
+        return $paging;
+}
+}}}
+[[category(201)]]

@@ -1,0 +1,76 @@
+#title TIME_WAIT 없애기
+
+[[TableOfContents]]
+=== TIME_WAIT 에 대해서 ===
+attachment:close.png
+
+만들어진 TCP(:12)연결이 종료되기 위해서는 '''FIN'''패킷 교환이 이루어진다. 이때 우아한 종료가 이루어지기 위해서는 총 4번의 패킷교환이 필요하게 된다. 우아한 종료라는 것은 연결된 호스트 양쪽이 모두 연결이 종료되었음을 알게 되는 상태다. 만약 FIN 패킷을 보냈는데, 상대 호스트에서 ACK 패킷을 보내지 않고 종료해버리는 경우 FIN을 보낸측은 우아한 종료를 위해서 일정시간 ACK를 기다리게 된다. 리눅스의 경우 대략 90초 정도를 기다린다. netstat(1)로 확인해 보면 TIME_WAIT인 상태로 나타난다.
+
+TIME_WAIT상태일 경우 해당 포트를 계속 점유하는데, 연결이 빈번한 네트워크 서비스일 경우 연결거부와 관련된 문제가 발생할 수 있다.
+
+=== TIME_WAIT 문제 발생 상황 ===
+mysql의 성능중 처리량을 측정하기 위해서 수백개의 클라이언트로 동접상황을 시뮬레이션 하는 프로그램을 만들어서 테스트하던 중 다음과 같은 문제가 발생했다.
+  1. open 파일 제한 갯수
+    이문제는 /proc/sys/fs/file-max 의 값을 조절하는 걸로 간단히 해결했다.
+  1. '''TIME_WAIT'''
+    매우 바쁜 동접테스트 환경을 만들기를 원했다. 이 경우 connect와 close가 빈번하게 발생하는데, TIME_WAIT가 계속 늘어나게 되고 결국에는 할당가능한 PORT(:12)를 모두 소비해서 더이상 연결을 할 수 없는 상황이 발생했다.  
+
+=== 소프트웨어적인 해결 ===
+==== 소켓옵션 변경 : linger ====
+직접 네트워크 프로그램을 제작한다면 가장 좋은 방법일 것이다. 그러나 애플리케이션에서 제공하는 API를 이용한 프로그래밍에는 적용할 수 없다. 
+
+예를들어 Mysql(:12) DB(:12) 성능측정을 위해서, Mysql(:12) API를 이용해서 측정 클라이언트를 개발할 경우에는 소켓옵션을 제어할 수가 없다. 
+
+다음은 socket(:12)옵션을 이용해서 TIME_WAIT이 발생하지 않도록 하는 코드다.
+{{{#!plain
+    ... 
+    int sock
+    struct linger   ling;
+
+    ling.l_onoff = 1;
+    ling.l_linger = 0;      /* 0 for abortive disconnect */
+
+    ...
+    ...
+
+    setsockopt(sock, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling))
+}}}
+==== 소켓옵션 변경 : SO_REUSEADDR ====
+SO_REUSEADDR 옵션을 사용하면, TIME_WAIT 상태에 있는 PORT를 사용할 수 있게 된다. 서버프로그램이 비정상적으로 종료되건나 클라이언트를 정리하지 않고 종료되면  TIME_WAIT 상태로 넘어가게 된다. 이때 서버 프로그램을 실행시키면 bind() 에러가 발생하는데, 이 옵션을 이용해서 bind()문제를 해결할 수 있다. 
+{{{#!plain
+setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+}}}
+
+=== 커널레벨에서의 해결 ===
+==== client Port range 변경 ====
+매우 바쁜 클라이언트 프로그램일 경우에 대량의 TIME_WAIT가 발생해서 할당해야될 PORT가 부족할 수가 있다. 클라이언트에 할당될 port의 범위를 늘리는 것으로 어느정도 조정가능하다.
+ * /proc/sys/net/ipv4/ip_local_port_range
+보통 '''32768   61000'''로 지정되어 있을 것이다. 1024 ~ 65535 로 변경하자.
+{{{#!plain
+# echo "1024 ~ 65535" > /proc/sys/net/ipv4/ip_local_port_range
+}}}
+
+이것은 어디까지나 임시적인 방법으로, 문제를 완전히 해결할 수는 없을 거다.
+==== tcp_fin_timeout ====
+소켓이 완전히 닫힐려면 마지막 FIN을 기다려야 하는데, 이 간격을 초단위로 설정할 수 있다. 아마 60초 정도로 설정되어 있을 것이다. 10초이하로 줄여보도록 하자.
+==== timewait 설정 변경 ====
+커널레벨에서 TIME-WAIT자원에 대한 사용을 변경할 수도 있다.  
+  * tcp_tw_recycle 
+      기본값은 0인데, 1로 할경우 TIME-WAIT 상태를 빠르게 recycling 하도록 도와준다. 이에 대한 명확한 정보를 얻기 힘들었다.
+  * tcp_tw_reuse
+      기본값은 0인데, 1로 할경우 TIME-WAIT 상태의 소켓을 재사용할 수 있게 해준다. TIME-WAIT 문제를 피하기 위한 가장 확실한 방법이다. setsockopt()에 '''SO_REUSEADDR'''을 사용한 것과 같은 효과.
+
+=== 참고 ===
+  1. http://www.port80software.com/200ok/archive/2004/12/07/205.aspx
+  1. TIME_WAIT state vs SO_REUSEADDR option: http://kukuta.tistory.com/17
+  1. 소켓 종료와 TIME_WAIT(Socket termination and TIME_WAIT): http://kukuta.tistory.com/27
+  1. TCP TIME_WAIT 상태: http://chocopants.tistory.com/entry/TCP-TIMEWAIT-상태
+  1. tweaking tcp/ip Sysctl.conf: http://www.hikaro.com/linux/tweaking-tcpip-syctl-conf.html
+  1. Linux Kernel Source: http://lxr.linux.no/linux+v2.6.35/net/ipv4/tcp_ipv4.c#L1335
+  1. 사례분석, Dropped connections with tcp_tw_recycle=1: http://lists.varnish-cache.org/pipermail/varnish-misc/2009-September/003108.html
+  1. 사례분석, tcp_tw_recycle broken?: http://forum.soft32.com/linux/tcp_tw_recycle-broken-ftopict470014.html
+  1. [PATCH] networking/ip-sysctl.txt tcp_tw_recycle and tcp_tw_reuse: http://markmail.org/thread/clxtvnfzdgz3cdi4
+  1. time-wait recycling vs. reuse: http://www.frameip.com/nntp/comp-protocols-tcp-ip/21912-comp-protocols-tcp-ip-time-wait-recycling-vs-reuse.htm
+  1. tcp_tw_reuse, tcp_tw_recycle 적용 사례, Tuning SUSE LINUX Enterprise Server on IBM Eserver xSeries Servers, 28 Page, Figure 1-6 Parameters reuse and recycle enabled (left) and disabled (right): http://www.redbooks.ibm.com/redpapers/pdfs/redp3862.pdf
+
+[[Category(5)]]

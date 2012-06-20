@@ -1,0 +1,180 @@
+#title 이벤트 객체
+
+윈도 네트워크 프로그래밍을 하다 보니 이벤트를 다루어야 하는 경우가 생겼다. 그래서 이벤트 객체에 대해서 공부해볼려고 위키페이지를 만들었다.
+== 이벤트 객체와 시그널 ==
+유닉스와 리눅스는 시그널을 이용해서 상태 정보를 전달하고 사건을 동기화 시킬 수 있다. 윈도는 시그널 시스템을 제공하지 않는다. 대신 이벤트 객체를 이용해서 동기화를 달성한다.
+
+이벤트 객체는 독립적인 객체로써 작동한다. 즉 관심있는 객체와 이벤트 객체를 서로 연결한다. 예를 들어 소켓에 읽기/쓰기 이벤트를 관리하길 원한다면, 이벤트 객체를 만들어서 소켓의 읽기/쓰기 이벤트와 연결한다. 이제 소켓에 읽기/쓰기 데이터가 준비되면, 커널은 이벤트 객체를 "신호 상태"로 만든다. 신호 상태의 이벤트 객체는 wait 함수로 검사할 수 있다.
+
+SetEvent 함수로 이벤트 객체를 신호 상태로 만들 수 있다.
+  1. 비 신호 상태 (non signaled stat) : 이벤트가 발생하지 않은 상태로 이벤트 객체를 만들면 비 신호 상태에 놓인다.
+  1. 신호 상태 (signaled stat) : 이벤트 객체가 기다리는 이벤트가 발생한 상태다. 신호 상태에 놓이면 wait 함수가 반환되고, 이벤트 객체를 검사해서 어떤 객체에 어떤 이벤트가 발생했는지를 검사할 수 있다.
+
+이벤트 객체는 두 가지 종류가 있다.
+  * Manual reset event : 신호 상태에 놓인 이벤트 객체를 ResetEvent 함수를 호출해서 비 신호 상태로 만들어야 하는 이벤트 객체.
+  * Auto reset Event : 신호 상태에 놓인 이벤트 객체를 자동으로 비 신호 상태로 설정한다.
+
+== 이벤트 객체의 이용 ==
+이벤트 객체는 CreateEvent(:4200)함수로 만들 수 있다. 이 함수로 만들어진 이벤트 객체는 manual reset 이벤트 객체로 비 신호 상태에 놓인다.
+
+이벤트 객체의 신호 상태는 WaitForSingleObject(:4200)함수로 기다릴 수 있다. 
+
+{{{#!plain
+#include <windows.h>
+#include <stdio.h>
+
+#define THREADCOUNT 4 
+
+HANDLE ghWriteEvent; 
+HANDLE ghThreads[THREADCOUNT];
+
+DWORD WINAPI ThreadProc(LPVOID);
+
+void CreateEventsAndThreads(void) 
+{
+    int i; 
+    DWORD dwThreadID; 
+
+    // Create a manual-reset event object. The write thread sets this
+    // object to the nonsignaled state when it finishes writing to a 
+    // shared buffer. 
+
+    ghWriteEvent = CreateEvent( 
+        NULL,               // default security attributes
+        TRUE,               // manual-reset event
+        FALSE,              // initial state is nonsignaled
+        TEXT("WriteEvent")  // object name
+        ); 
+
+    if (ghWriteEvent == NULL) 
+    { 
+        printf("CreateEvent failed (%d)\n", GetLastError());
+        return;
+    }
+
+    // Create multiple threads to read from the buffer.
+
+    for(i = 0; i < THREADCOUNT; i++) 
+    {
+        // TODO: More complex scenarios may require use of a parameter
+        //   to the thread procedure, such as an event per thread to  
+        //   be used for synchronization.
+        ghThreads[i] = CreateThread(
+            NULL,              // default security
+            0,                 // default stack size
+            ThreadProc,        // name of the thread function
+            NULL,              // no thread parameters
+            0,                 // default startup flags
+            &dwThreadID); 
+
+        if (ghThreads[i] == NULL) 
+        {
+            printf("CreateThread failed (%d)\n", GetLastError());
+            return;
+        }
+    }
+}
+
+void WriteToBuffer(VOID) 
+{
+    // TODO: Write to the shared buffer.
+    
+    printf("Main thread writing to the shared buffer...\n");
+
+    // Set ghWriteEvent to signaled
+
+    if (! SetEvent(ghWriteEvent) ) 
+    {
+        printf("SetEvent failed (%d)\n", GetLastError());
+        return;
+    }
+}
+
+void CloseEvents()
+{
+    // Close all event handles (currently, only one global handle).
+    
+    CloseHandle(ghWriteEvent);
+}
+
+void main()
+{
+    DWORD dwWaitResult;
+
+    // TODO: Create the shared buffer
+
+    // Create events and THREADCOUNT threads to read from the buffer
+
+    CreateEventsAndThreads();
+
+    // At this point, the reader threads have started and are most
+    // likely waiting for the global event to be signaled. However, 
+    // it is safe to write to the buffer because the event is a 
+    // manual-reset event.
+    
+    WriteToBuffer();
+
+    printf("Main thread waiting for threads to exit...\n");
+
+    // The handle for each thread is signaled when the thread is
+    // terminated.
+    dwWaitResult = WaitForMultipleObjects(
+        THREADCOUNT,   // number of handles in array
+        ghThreads,     // array of thread handles
+        TRUE,          // wait until all are signaled
+        INFINITE);
+
+    switch (dwWaitResult) 
+    {
+        // All thread objects were signaled
+        case WAIT_OBJECT_0: 
+            printf("All threads ended, cleaning up for application exit...\n");
+            break;
+
+        // An error occurred
+        default: 
+            printf("WaitForMultipleObjects failed (%d)\n", GetLastError());
+            return;
+    } 
+            
+    // Close the events to clean up
+
+    CloseEvents();
+}
+
+DWORD WINAPI ThreadProc(LPVOID lpParam) 
+{
+    DWORD dwWaitResult;
+
+    printf("Thread %d waiting for write event...\n", GetCurrentThreadId());
+    
+    dwWaitResult = WaitForSingleObject( 
+        ghWriteEvent, // event handle
+        INFINITE);    // indefinite wait
+
+    switch (dwWaitResult) 
+    {
+        // Event object was signaled
+        case WAIT_OBJECT_0: 
+            //
+            // TODO: Read from the shared buffer
+            //
+            printf("Thread %d reading from buffer\n", 
+                   GetCurrentThreadId());
+            break; 
+
+        // An error occurred
+        default: 
+            printf("Wait error (%d)\n", GetLastError()); 
+            return 0; 
+    }
+
+    // Now that we are done reading the buffer, we could use another
+    // event to signal that this thread is no longer reading. This
+    // example simply uses the thread handle for synchronization (the
+    // handle is signaled when the thread terminates.)
+
+    printf("Thread %d exiting\n", GetCurrentThreadId());
+    return 1;
+}
+}}}

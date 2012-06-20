@@ -1,0 +1,270 @@
+#title 리팩토링 - 매직넘버를 기호상수로 대체하라 
+
+Refactoring 의 사전적의미는 다음과 같다.
+  '''리펙토링'''은 외부에 드러나는 결과물의 변화없이 내부적인 구조를 재구성하는 기술이다. 리팩토링의 목표는 '''성능향상'''이 아닌, 코드구조의 개선으로 관리하기 쉽고 확장성이 높은 코드를 만달어내는 것이다. 
+
+간단히 말해서 깔끔한 '''코드를 만들어내자'''쯤이 될거 같다.
+
+이와 관련된 리팩토링(:12)의 지침사항만 70여가지에 이른다고 하는데, 차례대로 알아보도록 하겠다. 그렇다고 해서 모든 지침을 다 알아보진 않을 것이다. 언젠가 고급의 리팩토링기술에 대해서 공부하게 될 날이 올지도 모르지만 우선은 간단한것 부터 해치워보도록 하겠다.
+
+=== 셈플 프로그램 ===
+리펙토링과제를 위한 셈플프로그램을 준비했다. 아래의 프로그램은 간단한 HTML(:12) parser(:12)다. 그럭저럭 돌아가기는 하지만 구조적인 아름다움이라든지 그런건 전혀 신경쓰지 않은 코드다.
+{{{#!plain
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+using namespace std;
+
+enum tag_token {TAG_LT = '<', TAG_GT='>'};
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[1024] = {0x00,};
+  char wbuf[1024] = {0x00,};
+  int lt_flag = 0;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\'";
+  char *tr;
+
+
+  int tag_status = 0;
+  int offset = 0;
+
+  if (argc != 2)
+  {
+    fprintf(stderr, "Usage : %s [file]\n", argv[0]);
+    return 1;
+  }
+  if ((fd = open(argv[1], O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, 1023)) > 0)
+  {
+    ridx = 0;
+    widx = 0;
+    while(ridx < readn)
+    {
+      if (rbuf[ridx] == TAG_LT)
+      {
+        lt_flag++;
+      }
+      if (rbuf[ridx] == TAG_GT)
+      {
+        lt_flag--;
+        if (lt_flag == 0)
+        {
+          ridx++;
+          continue;
+        }
+      }
+
+      if (lt_flag == 1)
+      {
+        ridx++;
+        continue;
+      }
+
+      // Special Chracter 제거
+      if (rbuf[ridx] == '&')
+      {
+         int i =0;
+         char special[10] = {0x00,};
+         for(i = 0; i < 10; i++)
+         {
+           if (rbuf[ridx+i] == ';')
+           {
+             ridx = (ridx+i);
+             break;
+           }
+         }
+      }
+
+      if (rbuf[ridx] == '\n' || rbuf[ridx] == '\r')
+        wbuf[widx] = ' ';
+      else
+        wbuf[widx] = rbuf[ridx];
+
+      widx++;
+      ridx++;
+    }
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+        printf("%s ", tr);
+        tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, 1024);
+    memset(wbuf, 0x00, 1024);
+  }
+  return 0;
+}
+}}}
+프로그램의 원문은 [wiki:Code/C/tag_strip HTML 태그 제거코드] 페이지에서 확인할 수 있다.
+
+=== 매직넘버를 기호상수로 대체하라. ===
+위 코드는 문서를 읽어들이고 파싱한 결과를 저장하기 위해서 다음의 변수를 선언해서 사용하고 있다.
+{{{#!plain
+// 선언부
+  char rbuf[1024] = {0x00,};
+  char wbuf[1024] = {0x00,};
+// 사용
+  while ((readn = read(fd, rbuf+offset, 1023)) > 0)
+  {
+  ....
+  }
+  memset(rbuf, 0x00, 1024);
+  memset(wbuf, 0x00, 1024);
+}}}
+숫자 '''1024'''는 버퍼의 크기라는걸 쉽게 예상할 수 있을 것이다. 그러나 숫자인 관계로 의미가 쉽게 전달되지 않고, 버퍼의 크기를 변경하고자 할경우 일괄변경이 안되므로 버그가 발생할 수 있는 코드를 작성할 수 있다. 이를테면 '''직관적이지 않고''', '''관리하기 힘든''' 코드다. 
+
+이를테면 버퍼의 크기를 2048로 바꾸기로 했는데, 실수로 일부의 값만 변경할 수도 있다.
+{{{#!plain
+// 선언부
+  char rbuf[2024] = {0x00,};
+  char wbuf[2024] = {0x00,};
+// 사용
+  while ((readn = read(fd, rbuf+offset, 2023)) > 0)
+  {
+  ....
+  }
+  memset(rbuf, 0x00, 1024);
+  memset(wbuf, 0x00, 1024);
+}}}
+위 코드는 사용방법에 따라서 문제가 발생할 수도 있고, 발생하지 않을 수도 있지만 잠재적인 위험을 가진 코드임에는 분명하다.
+
+이를 '''기호상수'''로 대체 했다. '''#define''' 전처리(:12) 문을 사용할 수도 있을것이다. 일반적으로는 #define 문보다 const(:12)로 상수를 정의해서 사용하는 것을 권장하고 있다. 이유는 다음과 같다. 
+  * #define 은 타입을 지정할 수 없다. 반면 const는 타입이 분명히 존재한다. 
+  * #define 은 모든영역에 적용된다. const는 Local, Global 영역을 선택할 수 있다. 범위를 명확히 함으로써 명칭간의 충돌을 최소화할 수 있다. 
+  * #define 은 전처리기가 처리한다. const는 컴파일(:12)시간에 값이 결정된다. 이는 #define으로 치환된경우 디버깅(:12) 과정에서 값을 확인할 수 없음을 의미한다.
+
+하지만 위 사항이 '''반드시'''모든 경우에 적용되는 건 아니며, 대게의 경우에는 어느것을 사용하든지 크게 문제가 되지는 않는다. 
+
+{{{#!plain
+const int MAX_BUF_SIZE=1024;
+
+// 선언부
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+// 사용
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+  ....
+  }
+  memset(rbuf, 0x00, MAX_BUF_SIZE);
+  memset(wbuf, 0x00, MAX_BUF_SIZE);
+}}}
+
+=== 수정된 코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+using namespace std;
+
+const int MAX_BUF_SIZE=1024;
+
+enum tag_token {TAG_LT = '<', TAG_GT='>'};
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+  int lt_flag = 0;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\':`";
+  char *tr;
+
+
+  int tag_status = 0;
+  int offset = 0;
+
+  if (argc != 2)
+  {
+    fprintf(stderr, "Usage : %s [file]\n", argv[0]);
+    return 1;
+  }
+  if ((fd = open(argv[1], O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+    ridx = 0;
+    widx = 0;
+    while(ridx < readn)
+    {
+      if (rbuf[ridx] == TAG_LT)
+      {
+        lt_flag++;
+      }
+      if (rbuf[ridx] == TAG_GT)
+      {
+        lt_flag--;
+        if (lt_flag == 0)
+        {
+          ridx++;
+          continue;
+        }
+      }
+
+      if (lt_flag == 1)
+      {
+        ridx++;
+        continue;
+      }
+
+      // Special Chracter 제거
+      if (rbuf[ridx] == '&')
+      {
+         int i =0;
+         char special[10] = {0x00,};
+         for(i = 0; i < 10; i++)
+         { 
+           if (rbuf[ridx+i] == ';')
+           {
+             ridx = (ridx+i);
+             break;
+           }
+         } 
+      }
+    
+      if (rbuf[ridx] == '\n' || rbuf[ridx] == '\r')
+        wbuf[widx] = ' ';
+      else
+        wbuf[widx] = rbuf[ridx];
+
+      widx++;
+      ridx++;
+    }
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+        printf("%s\n", tr);
+        tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, MAX_BUF_SIZE);
+    memset(wbuf, 0x00, MAX_BUF_SIZE);
+  }
+  return 0;
+}
+}}}
+

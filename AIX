@@ -1,0 +1,123 @@
+#title AIX GNU 포팅 가이드 
+
+|| 만든날 	|| 2003/12/15 						||<|4> http://www.joinc.co.kr/images/myavata/2.gif	||
+|| 관리자 	|| yundream							||
+|| 홈페이지	|| http://www.joinc.co.kr			||
+|| 이메일	|| [mailto:yundream@joinc.co.kr]	||
+
+ * 중요 : monitor-2.1.9.tar.gz 코드 분석 --> 시스템 관련 정보들을 얻을 수 있음  
+'''목차'''
+[[TableOfContents]]
+
+=== 교정 과정 ===
+ 1. 2003/12/15 AIX용 포팅 가이드 시작, GNU 패키지툴 설치 가이드 
+
+=== 토론및 잡담 ===
+
+=== 소개 ===
+==== AIX에 대해서 ====
+'''IBM'''에서 개발되어지고 있는 '''Unix 운영체제'''로서 역시 IBM에서 제조판매하는 pSeries 640의 핵심 운영체제다. 최근 리눅스를 전방위에서 지원하는 업체답게 '''Linux'''와 '''Java 2'''를 포함한 오픈 표준을 유연하게 지원하는 것을 특징으로 내세우고 있다. 다음은 (2003/12/14일 현재)가장 최신 버젼인 '''AIX 5L'''에 대한 스팩이다. 이 데이터는 http://www.ibm.com의 데이터를 참고했다.  
+
+{{{#!html
+                  <table border=1 cellPadding=4 bgcolor="#808080">
+                    <tbody>
+                    <tr>
+                      <th bgcolor="#c0c0c0">Feature</th>
+                      <th bgcolor="#c0c0c0">Benefit</th></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Linux Affinity </td>
+                      <td bgcolor="#ffffff">Allows development of cross-platform solutions while 
+                        keeping your systems open to inexpensive, plentiful 
+                        applications and tools </td></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Full Java 2 Support </td>
+                      <td bgcolor="#ffffff">Makes AIX a top performer in the Java world, even as 
+                        Java takes an increasingly vital role in server-side 
+                        processes </td></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Support for POWER processors </td>
+                      <td bgcolor="#ffffff">AIX is fully compatible with IBM's advanced chips, 
+                        resulting in not only top performance but the reduced 
+                        support costs inherent in compact, cool processors 
+						</td></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Built-In Security </td>
+                      <td bgcolor="#ffffff">Included Internet and other security standards mean 
+                        less time to get a secure system up and running </td></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Workload Manager </td>
+                      <td bgcolor="#ffffff">This feature not only improves performance and 
+                        reliability, but can be managed remotely, reducing the 
+                        likelihood of a failure without immediate response&#151;
+                        even from someone working at home </td></tr>
+                    <tr>
+                      <td bgcolor="#ffffff">Web-Based System Manager </td>
+                      <td bgcolor="#ffffff">Web-based system management allows you to manage one 
+                        or many AIX servers from any Java-capable Web browser, 
+                        on any platform </td></tr></tbody></table>
+}}}
+
+=== GNU 환경 만들기 ===
+개발 환경이 GNU기반이기 때문에 쉬운 포팅과 개발을 위해서 우선적으로 AIX에 GNU환경을 만들기로 했다. 설치한 GNU패키지는 다음과 같다.  
+ 1. '''gcc'''  : 말할필요 없이 가장 기본이 되는 프로그램이다. 
+ 1. '''flex''' : 구문분석기이다. lex의 GNU버젼으로 생각할 수 있다. 패턴매칭이 필요한 애플리케이션 제작에 많은 도움을 준다. 많은 gnu 애플리케이션들이 flex라이브러리를 이용하고 있으므로 반드시 설치하도록 한다.  
+ 1. '''bison''' : '''yacc'''의 업그레이드 버젼으로 입력구문의 분석과 검색을 위해서 사용된다. flex와 함께 이용되는 경우가 많다.     
+ 1. '''libpcap''' : tcpdump등을 사용하기 위해서 필요한 패킷캡쳐 라이브러리
+ 1. '''tcpdump''' : 네트워크 디버깅을 위한 용도로 널리 사용된다. 
+ 1. '''vim''' : 오랜 역사와 전통을 자랑하는 에디터 
+ 1. '''ncurses''' : vim을 비롯한 많은 GNU 애플리케이션의 경우 전화면 제어를 위해서 ncurses를 사용한다.   
+
+==== 패키지 다운로드 ====
+IBM이 Linux를 전폭적으로 지원하고 있기 때문에 AIX용의 GNU패키지도 쉽게 구할 수 있을거라고 생각했지만 예상외로 적은 수의 패키지만 구할 수 있었다. 뭐 그렇다고 해도 '''gcc'''와 '''vim''', '''binutils''', '''make'''와 같은 필수 (개발)패키지는 구할 수 있으므로 개발에 큰문제가 생기진 않을 것이다. 나머지 GNU관련 패키지는 소스를 다운로드 받아서 컴파일하면 될것이기 때문이다.    
+
+AIX 패키지는 다음 사이트에서 다운로드 받을 수 있다.  
+
+ [http://aixpdslib.seas.ucla.edu/cgi-bin/search Public Domain Software Library for AiX]
+
+==== 패키지 설치하기 ====
+
+=== 시스템 의존적인 개발 환경 ===
+==== 프로세스 정보 ====
+AIX는 리눅스나 솔라리스와 마찬가지로 /proc파일 시스템을 지원하므로 프로세스정보가 어느 파일에 어떤 형식으로 저장되는지만 알면 프로세스 정보는 간단하게 얻어올 수 있다. 프로세스 정보는 '''/proc/pid/psinfo'''에 구조체 형식으로 저장된다. 구조체는 /usr/include/sys/procfs.h에 정의되어 있다.  
+{{{#!vim c
+#define PRFNSZ  16                  /* exec()ed filename field size */
+#define PRARGSZ 80                  /* arguments list field size */
+
+typedef struct psinfo
+{
+   uint32_t pr_flag;                /* process flags from proc struct p_flag */
+   uint32_t pr_flag2;               /* process flags from proc struct p_flag2 */
+   uint32_t pr_nlwp;                /* number of threads in process */
+   uint32_t pr__pad1;               /* reserved for future use */
+   uint64_t pr_uid;                 /* real user id */
+   uint64_t pr_euid;                /* effective user id */
+   uint64_t pr_gid;                 /* real group id */
+   uint64_t pr_egid;                /* effective group id */
+   uint64_t pr_pid;                 /* unique process id */
+   uint64_t pr_ppid;                /* process id of parent */
+   uint64_t pr_pgid;                /* pid of process group leader */
+   uint64_t pr_sid;                 /* session id */
+   uint64_t pr_ttydev;              /* controlling tty device */
+   prptr64_t   pr_addr;             /* internal address of proc struct */
+   uint64_t pr_size;                /* process image size in KB (1024) units */
+   uint64_t pr_rssize;              /* resident set size in KB (1024) units */
+   pr_timestruc64_t pr_start;       /* process start time, time since epoch */
+   pr_timestruc64_t pr_time;        /* usr+sys cpu time for this process */
+   uint32_t pr__pad2;               /* reserved for future use */
+   uint32_t pr_argc;                /* initial argument count */
+   prptr64_t   pr_argv;             /* address of initial argument vector in
+                                     * user process */
+   prptr64_t   pr_envp;             /* address of initial environment vector
+                                     * in user process */
+   char     pr_fname[PRFNSZ];       /* last component of exec()ed pathname*/
+   char     pr_psargs[PRARGSZ];     /* initial characters of arg list */
+   uint64_t pr__pad[8];             /* reserved for future use */
+   struct   lwpsinfo pr_lwp;        /* "representative" thread info */
+} psinfo_t;
+}}}
+값들을 보면 64비트 환경을 대비해서 8바이트 크기의 자료형을 사용하고 있음을 알 수 있다. 형변환 시켜서 사용하도록 하자.   
+
+=== 참고문헌 ===
+ 1. [http://www-903.ibm.com/kr/techinfo/pseries/aixnl139.html IBM RISC System/6000 AIX용 공개 소프트웨어 서버]
+ 1. [http://aixpdslib.seas.ucla.edu/cgi-bin/search Public Domain Software Library for AiX]
+ 1. http://moshkow.surgut.ru/library/koi/UNIXFAQ/unixprogrfaq.txt

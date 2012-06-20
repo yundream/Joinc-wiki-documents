@@ -1,0 +1,167 @@
+#title socketpair(2)
+[wiki:function_socketpair(2) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/02/09           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>socketpair(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	연결된 소켓 쌍을 생성한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/types.h&gt;
+#include &lt;sys/socket.h&gt;
+
+int socketpair(int d, int type, int protocol, int sv[2]);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		socketpair()은 옵션으로 <emphasis>d</emphasis>영역(domain)을 가지며
+		<emphasis>protocol</emphasis>프로토콜을 사용하는 
+		<emphasis>type</emphasis>의 소켓 쌍을 생성한다. 생성된 소켓 쌍은
+		<emphasis>sv</emphasis>를 통해서 넘어온다. 두개의 소켓은 서로 
+		구별할 수 없다.  
+	</para>
+	<para>
+		보통 부모 자식 프로세스간 내부 통신(IPC)를 위해서 사용한다. 소켓이므로
+		양방향(읽고/쓰기) 통신이 가능하다.
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공시 0을 반환하고 실패할 경우 -1을 반환한다.
+	</para>
+</section>
+
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EMFILE</term>	
+			<listitem>
+				<para>	
+					너무 많은 파일이 열려있어서 더이상 소켓을 생성할 수 없다.
+				</para>	
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term>EAFNOSUPPORT</term>
+			<listitem>
+				<para>
+					지정한 주소 지정방식이 지원되지 않는다.
+				</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EPROTONOSUPPORT</term>
+			<listitem>
+				<para>
+					지정된 프로토콜이 지원되지 않는다.
+				</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EFAULT</term>
+			<listitem>
+				<para>
+					주소 <emphasis>ev</emphasis>가 프로세스 주소 공간의 
+					유효한 부분을 가리키지 않는다.
+				</para>
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;sys/types.h&gt;
+
+int main()
+{
+    int pid;
+    char buf[256];
+    int fd;
+    int sv[2];
+    int num = 0;
+
+    socketpair(AF_UNIX, SOCK_STREAM, AF_LOCAL, sv);
+    pid = fork();
+    if (pid == 0)
+    {
+        dup2(sv[0], 0);
+        close(sv[1]);
+        close(sv[0]);
+        execl("./pipe_cl", "pipe_cl", NULL);
+    }
+    else if (pid &gt; 0)
+    {
+        close(sv[0]);
+        while(1)
+        {
+            write(sv[1], (void *)&amp;num, 4);
+            printf("write %d\n", num);
+            read(sv[1], (void *)&amp;num, 4);
+            printf("read %d\n", num);
+        }
+    }
+}
+		</screen>
+		위 프로그램은 fork()한 후 자식프로세스에서 pipe_cl을 실행시킨다.
+		자식과 부모 프로세스는 소켓을 통하여 연결되고 이것을 통해서 
+		데이터를 교환할 수 있다. 다음은 pipe_cl의 코드다.
+		<screen>
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+int main()
+{
+    int num;
+    while(1)
+    {
+        read(0, (void *)&amp;num, 4);
+        num++;
+        write(0, (void *)&amp;num, 4);
+        sleep(1);
+    }
+}
+		</screen>
+	</para>
+</section>
+</chapter>
+}}}

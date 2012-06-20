@@ -1,0 +1,965 @@
+#title HP-UX 개발환경 설정및 시스템 정보가져오기
+
+|| 만든날 	|| 2003/12/11 						||<|4> http://www.joinc.co.kr/images/myavata/2.gif	||
+|| 관리자 	|| yundream							||
+|| 홈페이지	|| http://www.joinc.co.kr			||
+|| 이메일	|| [mailto:yundream@joinc.co.kr]	||
+
+ <!> 목차에 들어가지 않은건 아직 정리되지 않은 정보들이다.
+
+{{{#!plain
+패치 방법:
+1. 필요한 패치 번호를 확이한다. PHCO_12345 의 형식을 가진다.
+2. http://devresource.hp.com 에서 해당 패치파일이 있는지 찾은 다음, 다운로드 받는다.
+3. sh PHCO_12345 를 하면, 설명파일과 depot 파일이 생성된다.
+}}}
+ * 정리해야될 내용들
+   1. unix95/98 인터페이스
+   1. NM library
+
+== Cpu Information 얻어오기 ==
+CPU model 및 clock 은 다음과 같은 쉘 명령으로도 얻어올 수 있다.
+{{{#!plain
+HPUX=/stand/vmunix
+
+MODEL=$(grep -i $(model | tr "/" " " \
+| awk '{print $NF}') \
+/usr/sam/lib/mo/sched.models \
+| awk '{print $NF}')
+
+MHZ=$(echo itick_per_tick/D \
+| adb -k $HPUX /dev/kmem \
+| tail -1 \
+| awk '{print $2/10000}')
+echo `hostname` has `ioscan -k |grep -n processor \
+|wc -l` $MODEL $MHZ "Mhz processor(s)"
+}}}
+
+그러나 나는 시스템 함수를 이용해서 위의 정보들을 얻어오길 원했다. 그래서 다음과 같은 간단한 코드를 만들어서 테스트를 해보았다.
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <nlist.h>
+#include <stdlib.h>
+#include <strings.h>
+
+int GetCpuHZ()
+{
+    int hz;
+    int kmem;
+    struct nlist64 nl[2];
+    char *nm = "itick_per_tick";
+
+    memset((void *)nl, 0x00, sizeof(nl));
+    nl[0].n_name = nm;
+
+    if ( nlist64("/stand/vmunix", nl) == -1)
+    {
+        perror("Nlist failed");
+        return -1;
+    }
+    if ((kmem = open("/dev/kmem", 0)) < 0)
+    {
+        perror("Error");
+        exit(0);
+    }
+    lseek(kmem, (long)nl[0].n_value, SEEK_SET);
+    read(kmem, &hz, sizeof(hz));
+    close(kmem);
+    printf("HZ is %d\n", hz/10000);
+}
+
+int main()
+{
+    int i;
+    i = sysconf(_SC_CPU_VERSION);
+    printf("VERSION %d : %d\n", i, CPU_PA_RISC1_0);
+    printf("VERSION %d : %d\n", i, CPU_PA_RISC1_1);
+    printf("VERSION %d : %d\n", i, CPU_PA_RISC1_2);
+    printf("VERSION %d : %d\n", i, CPU_PA_RISC2_0);
+    GetCpuHZ();
+}
+}}}
+컴파일 시켜서 실행시켜본 결과 다음과 같은 결과를 얻었다. 
+{{{#!plain
+# ./test
+VERSION 532 : 523
+VERSION 532 : 528
+VERSION 532 : 529
+VERSION 532 : 532
+HZ is 440
+}}}
+RISC2 구조를 가지며 440Mhz의 속도를 가지는 CPU임을 알 수 있다.
+
+== ioctl함수를 이용한 SCSI(:12) 장치 정보 얻기 ==
+ioctl(2)함수를 이용해서 SCSI장치의 정보를 얻는 방법이다. 이 방법은 아마도 Solaris나 Linux(:12)에서도 사용될 수 있을 것이라 생각된다. 그러나 ioctl의 flag나 구조체등에 있어서 약간의 차이가 있을 수도 있다. 기회가 된다면 다른 운영체제에서의 테스트도 해볼 생각이다. 여기에서는 HP-UX 11.xx환경에서의 예만 다루도록 한다.
+
+=== SCSCI 디스크 장치 정보 얻어오기 ===
+hpux의 디스크장치파일은 /dev/rdsk에 위치한다.
+{{{#!plain
+# ls /dev/rdsk
+c1t0d0  c1t2d0  c2t0d0  c2t2d0  c3t2d0
+}}}
+diskinfo라는 명령을 이용하면 해당 장치의 정보를 얻어올 수 있다.
+{{{#!plain
+# ./diskinfo /dev/rdsk/c1t0d0 
+SCSI describe of /dev/rdsk/c1t0d0:
+             vendor: SEAGATE 
+         product id: ST318203LC      
+               type: direct access
+               size: 17783240 Kbytes
+   bytes per sector: 512
+}}}
+우리는 ioctl함수를 이용해서 해당 장치의 vendor와 type, size, bytes per sector를 얻어오는 프로그램을 만들 것이다.
+
+ioctl함수를 이용해서 필요한 정보를 얻기 위해서는, 제어 flag와 flag를 이용했을 때 얻어오는 값의 형태를 알고 있어야 한다.  '''SIOC_CAPACITY''' 플래그를 이용하면, SCSI장치의 용량을 얻어올 수 있다. SIOC_CAPACITY 플레그의 사용에 대한 정보는 sys/scsi.h에 다음과 같이 정의되어 있다. 
+{{{#!plain
+scsi.h:#define  SIOC_CAPACITY    _IOR('S', 3, struct capacity)
+}}}
+capacity 구조체에 대한 내용 역시 같은 파일에 다음과 같이 정의되어 있다.
+{{{#!plain
+/*
+** data structure for SIOC_CAPACITY
+*/
+struct capacity {
+        int     lba;
+        int     blksz;
+};
+}}}
+
+다음 장치의 기타 부가적인 정보를 얻어와야 하는데, 다음과 같이 정의되어 있음을 확인할 수 있다.  
+{{{#!plain
+#define  SIOC_INQUIRY         _IOR('S', 2, union inquiry_data)
+}}}
+inquiry 구조체는 다음과 같이 정의되어 있다.
+{{{#!plain
+struct inquiry {
+    unsigned char       dev_type;
+    unsigned int        rmb:1;
+    unsigned int        dtq:7;
+    unsigned int        iso:2;
+    unsigned int        ecma:3;
+    unsigned int        ansi:3;
+    unsigned int        resv:4;
+    unsigned int        rdf:4;
+    unsigned char       added_len;
+    unsigned char       dev_class[3];
+             char       vendor_id[8];
+             char       product_id[16];
+             char       rev_num[4];
+    unsigned char       vendor_spec[20];
+    unsigned char       resv4[40];
+    unsigned char       vendor_parm_bytes[32];
+};
+}}}
+우리가 필요로 하는 멤버는 장치의 종류를 위한 dev_type와 제조업체/제품 정보를 가지고 있는 product_id 이다.장치의 device type은 다음과 같이 정의되어 있다. 
+{{{#!plain
+#define SCSI_DIRECT_ACCESS      0x00
+#define SCSI_SEQUENTIAL_ACCESS  0x01
+#define SCSI_PRINTER            0x02
+#define SCSI_PROCESSOR          0x03
+#define SCSI_WORM               0x04
+#define SCSI_CDROM              0x05
+#define SCSI_SCANNER            0x06
+#define SCSI_MO                 0x07
+#define SCSI_AUTOCHANGER        0x08
+#define SCSI_COMMUNICATIONS     0x09
+#define SCSI_UNKNOWN_DEV_TYPE   0x1F
+}}}
+
+위의 정보를 알았으니, 장치정보를 가져오는 프로그램을 작성하는 것은 매우 간단한 일이다. 대략 아래와 같은 흐름을 가지는 프로그램을 작성 하면 된다.
+{{{#!plain
+/dev/rdsk를 스캔해서 몇개의 장치가 있는지 확인한다.
+while(장치 갯수만큼)
+{
+   장치를 open한다.
+   ioctl함수를 이용해서, 장치의 용량과 제조정보등을 얻어온다.
+   장치를 close한다.
+}
+}}}
+
+간단코드
+{{{#!plain down:getdiskinfo.c
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/scsi.h>
+#include <sys/sysmacros.h>
+#include <sys/diskio.h>
+#include <dirent.h>
+#include <string>
+#include <vector>
+
+#define KBYTE 1024
+
+using namespace std;
+vector<string> devnumber(char *dirname)
+{
+  DIR *dp;
+  int fd;
+  int devcount = 0;
+  struct dirent *dirinfo; 
+  struct stat statbuf; 
+  char cwd[80] = {0x00,};
+  char fullpath[256];
+
+  vector<string> rtv;
+
+  getcwd(cwd, sizeof(cwd));
+  chdir(dirname); 
+  if((dp = opendir(dirname)) == NULL)
+  {
+    perror("opendir error");
+  }
+  while((dirinfo = readdir(dp)) != NULL)
+  {
+    printf("==> %s\n", dirinfo->d_name);
+    if ((fd = open(dirinfo->d_name, O_RDONLY)) < 0)
+    {
+      perror("Open Error");
+      continue;   
+    }
+
+    if (fstat(fd, &statbuf) < 0)
+    {
+      perror("fstat Error");
+      close(fd);  
+      continue;
+    }
+
+    if (S_ISCHR(statbuf.st_mode))
+    {
+      sprintf(fullpath, "%s/%s", dirname, dirinfo->d_name);
+      rtv.push_back(fullpath);
+    }
+    close(fd);
+  }
+
+  chdir(cwd);
+
+  return rtv;
+}
+
+int main(int argc, char **argv)
+{
+  int dev, i;
+  int status;
+  struct stat statbuf;
+  struct inquiry oldinquiry;
+  struct capacity old_capacity, new_capacity;
+  vector<string> devlist;
+
+  devlist = devnumber("/dev/rdsk");
+
+  printf("device number is %d\n", devlist.size());
+  for (i = 0; i < devlist.size(); i++)
+  {
+    if ((dev = open(devlist[i].c_str(), O_RDONLY)) < 0)
+    {
+      perror("Cant Open disk device");
+      return 1;
+    }
+    if (ioctl(dev, SIOC_CAPACITY, &old_capacity) < 0)
+    {
+      perror("Cant do a SIOC_CAPACITY");
+      return 1;
+    }
+    if (ioctl(dev, SIOC_INQUIRY, &oldinquiry) < 0)
+    {
+      perror("Cant do SIOC_INQUIRY");
+      return 1;
+    }
+    printf("Dev Name    : %s\n", devlist[i].c_str());
+    printf("SCSI-blocks : %d\n", old_capacity.lba);
+    printf("blocksize   : %d\n", old_capacity.blksz);
+    printf("Capacity    : %d Kbyte\n",
+          old_capacity.lba/KBYTE * old_capacity.blksz);
+    printf("type        : %d\n", oldinquiry.dev_type);
+    printf("vendor      : %s\n", oldinquiry.vendor_id);
+    printf("====================================================\n\n");
+    close(dev);
+  }
+  return 0;
+}
+}}}
+
+
+== snmp mib를 이용한 네트워크 정보 얻기 == 
+HP-UX는 네트워크 정보 수집을 위한 /dev/ip, /dev/udp와 같은 몇 가지 장치를 제공하며, NM lib를 이용해서 필요한 정보를 얻어올 수 있다. 관련되어서 제공하는 함수는 다음과 같다.
+{{{#!plain
+open_mib();
+close_mib();
+get_logical_stat();
+get_physical_stat();
+}}}
+위의 함수를 제대로 사용하기 위해서는 mib관련된 몇몇 구조체를 알고 있어야한다. 이들 구조체는 아래의 include 파일에서 확인할 수 있다.
+{{{#!plain
+sys/mib.h
+}}}
+아마도 가장 많이 쓰이는 구조체는 mib_ifEntry 와 nmapi_phystat, nmapi_logstat일 것이다. 
+
+{{{#!plain
+typedef struct {
+        int     ifIndex;
+        char    ifDescr[64];
+        int     ifType;
+        int     ifMtu;
+        gauge   ifSpeed;
+        mib_physaddr_t  ifPhysAddress;
+        int     ifAdmin;
+        int     ifOper;
+        TimeTicks ifLastChange;
+        counter ifInOctets;
+        counter ifInUcastPkts;
+        counter ifInNUcastPkts;
+        counter ifInDiscards;
+        counter ifInErrors;
+        counter ifInUnknownProtos;
+        counter ifOutOctets;
+        counter ifOutUcastPkts;
+        counter ifOutNUcastPkts;
+        counter ifOutDiscards;
+        counter ifOutErrors;
+        gauge   ifOutQlen;
+        int     ifSpecific;
+} mib_ifEntry;
+
+typedef struct {
+        char    nm_device[MAX_PHYSADDR_LEN]; /* interface name, e.g. "lo0",  */
+                                             /* "lan0", "lan1", etc.         */
+        u_int          ppa_num;        /* ppa number */
+        u_int          collisions;     /* Number of collisions  */
+        mib_ifEntry    if_entry;       /* MIB 2 Interface entry */
+} nmapi_phystat;
+
+typedef struct {
+        char    nm_device[MAX_PHYSADDR_LEN]; /* interface name, e.g. "lo0",  */
+                                             /* "lan0", "lan0:1", etc.       */
+        u_int   ifindex;        /* ifIndex assigned to this interface */
+        ip_addr netaddr;        /* IP Address */
+        u_int   in_packets;     /* Number of IP inbound packets */
+        u_int   out_packets;    /* Number of IP outbound packets */
+} nmapi_logstat;
+}}}
+
+다음은 인터페이스의 in/out 통계정보를 가져오는 간단한 예제다.
+{{{#!plain
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mib.h>
+#include <sys/types.h>
+
+int main()
+{
+   static nmapi_logstat    *if_ptr = (nmapi_logstat *) 0;
+   unsigned short          interface_id = 0;
+   unsigned short          number_of_interfaces = 3;
+   int            ulen;
+   int                     fd, ret;
+   if ((fd = open_mib("/dev/ip", O_RDWR, 0, 0)) >= 0)
+   {
+       if_ptr = (nmapi_logstat *) malloc(sizeof(nmapi_logstat)
+           * number_of_interfaces);
+       ulen = (unsigned int) number_of_interfaces *sizeof(nmapi_logstat);
+       if ((ret = get_logical_stat(if_ptr, &ulen)) < 0)
+           exit(1);
+
+      printf("Device Name : %s\n", 
+          if_ptr[interface_id].nm_device);
+      printf("Received Packets:\t%d\n",
+          if_ptr[interface_id].in_packets);
+      printf("TransmittedPackets:\t%d\n",
+          if_ptr[interface_id].out_packets);
+
+
+      free(if_ptr);
+   }
+   close_mib(fd);
+   return(0);
+}
+}}}
+컴파일 후 실행시키면 다음과 같은 결과를 볼 수 있을 것이다.
+{{{#!plain
+# ./test4 
+Device Name : lan0
+Received Packets:       16420691
+TransmittedPackets:     12770195
+}}}
+
+=== 컴파일시 주의 사항 ===
+g++로 컴파일 할경우 프리컴파일 과정과 링크과정에서 에러가 발생한다. 
+
+프리컴파일/링크 과정중에 발생하는 에러
+{{{#!plain
+# g++ -c test.c 
+test.c: In function 'int main()':
+test.c:20: error: 'get_logical_stat' was not declared in this scope
+test.c:20: error: 'get_physical_stat' was not declared in this scope
+
+# g++ -o test test.o -lnm -munix=95
+/usr/ccs/bin/ld: Unsatisfied symbols:
+   close_mib(int)(first referenced in test4.o) (code)
+   open_mib(char const*, int, unsigned int, unsigned int)(first referenced in test.o) (code)
+collect2: ld returned 1 exit status
+}}}
+문제의 발생원인은 제공되는 함수들이 extern "C"로 선언되어 있지 않기 때문이다. 문제를 해결하기 위해서 sys/mib.h에서 필요한 함수들이 extern "C"로 선언 되도록 수정을 했다. get_logical_stat와 get_physical_stat함수들은 아예 선언이 되어 있지 않은데, extern "C"로 직접 선언하는 방식으로 문제를 해결했다.
+
+굳이 C++ 컴파일러를 이용한 이유는 기존에 만들어진 프로그램이 c++로 제작되었기 때문에 c++ 오브젝트로 만들 필요 때문이였다.
+
+다음은 인터페이스의 각종 정보를 얻어오는 좀더 그럴듯한 프로그램이다. 깔끔하지 않은 코드이지만 어떻게 응용해야 할지에 대한 아이디어는 얻을 수 있을 것이다. 
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mib.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <map>
+
+
+extern "C" {int get_logical_stat(nmapi_logstat *, int *); }
+extern "C" {int get_physical_stat(nmapi_phystat *, int *); }
+
+using namespace std;
+
+typedef struct _IfInfo
+{
+  nmapi_phystat ifptr;
+  unsigned int ipaddr;
+} IfInfo;
+
+int InterfaceGetCount()
+{
+  int rtv;
+  int fd;
+  int val;
+  int ret;
+  unsigned int ulen;
+  int InterfaceCount = -1;
+
+  struct nmparms p;
+
+  if ((fd = open_mib("/dev/ip", O_RDONLY, 0, NM_ASYNC_OFF)) < 0) 
+  {
+    return -1;
+  } 
+  p.objid = ID_ifNumber;  
+  p.buffer = (void *)&val;
+  ulen = sizeof(int);
+  p.len = &ulen;
+  if((ret = get_mib_info(fd, &p)) == 0)
+    InterfaceCount = val;
+  close_mib(fd);
+
+  return InterfaceCount;
+}
+
+int GetIfAddr()
+{
+  nmapi_logstat *ifptr = (nmapi_logstat *)0;
+  int i;
+  int reg;
+  int count = InterfaceGetCount();
+  int ulen;
+  int fd;
+  struct in_addr laddr;
+
+  if ((fd = open_mib("/dev/ip", O_RDWR, 0, 0)) > 0)
+  {
+    ifptr = (nmapi_logstat *)malloc(sizeof(nmapi_logstat) * count);
+    ulen = (unsigned int) count * sizeof(nmapi_logstat);
+    if ((reg = get_logical_stat(ifptr, &ulen)) < 0)
+    {
+      close_mib(fd);
+      return -1;
+    }
+    for (i=0;i<count; i++)
+    {
+      laddr.s_addr = ifptr[i].netaddr;
+      printf("Device Name        : %s\n", ifptr[i].nm_device);
+      printf("IfIndex            : %d\n", ifptr[i].ifindex);
+      printf("Net Addr           : %s\n",  inet_ntoa(laddr));
+      printf("Received Packets   : %d\n", ifptr[i].in_packets);
+      printf("TransmittedPackets : %d\n", ifptr[i].out_packets);
+    }
+    free(ifptr);
+  }
+  close_mib(fd);
+}
+
+map<int, IfInfo>  GetIfInfo()
+{
+  nmapi_phystat buffptr, *ifptr = (nmapi_phystat *)0;
+  int ulen;
+  int ret;
+  int count = InterfaceGetCount();
+  int i;
+  IfInfo info;
+  map<int, IfInfo> InterfaceInfo;
+  map<int, IfInfo>::iterator mi;
+
+  if (!ifptr)
+  {
+    if (count)
+    {
+      ifptr = (nmapi_phystat *)malloc(sizeof(nmapi_phystat *) * count);
+    }
+    else
+    {
+      return InterfaceInfo;
+    }
+  }
+  else
+  {
+    printf("Not if_ptr\n");
+  }
+
+  ulen = (unsigned int) count * sizeof(nmapi_phystat);
+  if ((ret= get_physical_stat(ifptr, &ulen)) < 0)
+    return InterfaceInfo;
+
+  for (i = 0; i < count; i++)
+  {
+    info.ifptr = ifptr[i];
+    InterfaceInfo[ifptr[i].if_entry.ifIndex] = info;
+  }
+  free(ifptr);
+  mi = InterfaceInfo.begin();
+  while (mi != InterfaceInfo.end())
+  {
+    printf("IFIndex %d\n", mi->first);
+    printf("IFName  %s\n", mi->second.ifptr.nm_device);
+    *mi++;
+  }
+
+  GetIfAddr();
+  return InterfaceInfo;
+}
+int main()
+{
+  GetIfInfo();
+}
+}}}
+
+
+
+== nlist64를 이용한 시스템 정보 수집 ==
+nlist는 symbol table의 값을 이용해서 필요한 정보를 얻어내기 위해서 사용하는 함수다. nm등의 함수를 이용해서 symbol table을 얻어온다음 read(2)등의 함수를 이용해서 필요한 값을 얻어올 수 있다.
+
+{{{#!plain
+#include <nlist.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+  struct nlist64 nl[2]; /* pointer to the list */
+  char nm[32]; /* name of the symbol */
+  int kmem;
+  struct timeval boottime;
+
+  /* check the command line argument */
+  if ( argc != 3 ) 
+  {
+  fprintf(stderr,"Usage: %s executable_file_name symbol_name\n");
+  exit(1);
+  }
+
+  memset ( nl, 0, sizeof(nl) );
+
+  /* set the symbol name */
+  sprintf(nm,"%s\0",argv[2]);
+
+  /* set the pointer to the symbol */
+  nl[0].n_name = nm;
+
+  /* extract the value */
+  if ( -1 == nlist64(argv[1], nl) ) 
+  {
+    perror("nlist() failed");
+    exit(2);
+  }
+  printf("name %s\n",nl[0].n_name);
+  printf("qual %s\n",nl[0].n_qual);
+  printf("type %u\n",nl[0].n_type);
+  printf("scope %u\n",nl[0].n_scope);
+  printf("info %u\n",nl[0].n_info);
+  printf("value %lu\n",nl[0].n_value);
+
+  if ((kmem = open("/dev/kmem", 0)) < 0)
+  {
+    perror("Error");
+    exit(0);
+  }
+  lseek(kmem, (long)nl[0].n_value, SEEK_SET);
+  read(kmem, &boottime, sizeof(boottime));
+  close(kmem);
+  printf("%d : %d\n", boottime.tv_sec, boottime.tv_usec);
+}
+}}}
+
+위 코드는 HP-UX 11.0 에서 테스트 되었다. 시스템의 부팅시간을 알아내는 방법에 대해서 생각해보자. 부팅시간을 알아내기 위해서는 어딘가에 데이터를 요청해야 할것이다. 이러한 정보는 보통 커널에서 관리하게 되므로 커널에 물어보는게 가장 손쉬운 방법일 것이다. 많은 운영체제들은 /proc 파일 시스템, pstat등을 이용해서 커널에서 데이터를 요청할 수 있게끔 하고 있지만, 제공하지 않거나, 혹은 좀더 자세한 정보를 얻기 원할 때는 커널메모리에서 필요한 값을 직접 가져올 수도 있을 것이다.
+
+그럼 원하는 데이터가 커널메모리상의 어느 곳에 위치하고 있는지를 알고 있어야 한다. 이러한 위치는 커널이미지의 심볼테이블의 값을 읽어오는 것으로 해결 가능하다. nlist를 이용하면 심볼에티블의 값을 얻어올 수 있다. 우리가 가져오고자 하는 boot time의 심볼테이블에서의 이름은 boottime이다. 다음과 같이 nm명령으로 확인 가능하다.
+{{{#!plain
+# nm /stand/vmunix > dump
+# cat dump | boottime
+}}}
+이제 nlist함수를 이용하면 boottime심볼이 커널메모리의 어디에 위치하는지 값을 얻어올 수 있을것이다. 많은 유닉스 시스템은 커널메모리에 접근할 수 있는 /dev/kmem 장치를 제공하며 HP-UX 역시 마찬가지다. 이제 open을 이용해서 /dev/kmem을 열고 lseek(2)로 해당장소로 이동한 후 값을 얻어오기만 하면 된다.
+{{{#!plain
+# ./nlist /stand/vmunix boottime
+name boottime
+name boottime
+qual 
+type 1
+scope 1
+info 46
+value 6633
+1132124729 : 8113920
+}}}
+
+=== 인터페이스 정보 가져오기 ===
+HP-UX에서 인터페이스 관련 정보는 ifnet 구조체에 정의 된다.
+{{{#!plain
+struct ifnet {
+        char    *if_name;               /* name, e.g. ``en'' or ``lo'' */
+        short   if_unit;                /* sub-unit for lower level driver */
+        u_short if_mtu;                 /* maximum transmission unit */
+        int     if_index;
+        u_int   if_flags;               /* up/down, broadcast, etc. */
+        short   if_timer;               /* time 'til if_watchdog called */
+        short   if_pad;                 /* if_pad - unused */
+        int     if_metric;              /* routing metric (external only) */
+        struct  ifaddr *if_addrlist;    /* linked list of addresses per if */
+        struct  ifqueue {
+                struct  mbuf *ifq_head;
+                struct  mbuf *ifq_tail;
+                int     ifq_len;
+                int     ifq_maxlen;
+                int     ifq_drops;
+                lock_t  *ifq_slock;
+        } if_snd;                       /* output queue */
+        lock_t  *if_slock;
+/* procedure handles */
+        int     (*if_init)();           /* init routine */
+        int     (*if_output)();         /* output routine */
+        int     (*if_ioctl)();          /* ioctl routine */
+        int     (*if_control)();        /* kernel control routine */
+        int     (*if_watchdog)();       /* timer routine */
+/* generic interface statistics */
+        int     if_ipackets;            /* packets received on interface */
+        int     if_ierrors;             /* input errors on interface */
+        int     if_opackets;            /* packets sent on interface */
+        int     if_oerrors;             /* output errors on interface */
+        int     if_collisions;          /* collisions on csma interfaces */
+        lock_t  *if_stat_lock;
+/* end statistics */
+        struct  ifnet *if_next;
+}}}
+인터페이스에 대한 일반적인 정보들 뿐 아니라. 입출력되는 다양한 값들도 가지고 있음을 알 수 있다.
+
+위 정보를 가져오려면 /dev/kmem에 접근해서 구조체크기 만큼을 읽어 오면 될것이다. 접근 위치는 nlist함수를 이용하면 된다. nlist를 이용하기 위해서 symbol 이름을 얻어와야 하는데, 보통 symbol이름은 구조체의 이름과 동일하다. nm으로 /stand/vmunix의 symbol 테이블을 얻어오고, ifnet이 있는지 확인 해보자.  
+nlist.value 값을 얻어왔다면 /dev/kmem에 접근해서 ifnet의 값을 얻어올 수 있을 것이다. ifnet.if_next를 이용하면, 모든 인터페이스에 대한 정보를 얻어올 수 있다. 
+
+ -- 내일 코드 작성
+
+'''목차'''
+[[TableOfContents]]
+       
+컴파일 에러
+{{{#!
+g++ -o test test.cc -lpthread
+/usr/ccs/bin/ld: Unrecognized argument: +init
+/usr/ccs/bin/ld: Usage:  /usr/ccs/bin/ld flags... files...
+collect2: ld returned 1 exit status
+}}}
+위 문제를 해결하기 위해서 PHSS_30049 패치를 다운 받아서 수행함. 패치는 아래의 사이트를 이용할 수 있음
+ * http://www.hp.com/products1/unix/java/patches/g-11.11-1.4-1111.0206.html
+
+
+g++ -fPIC -c -D _INCLUDE_HPUX_SOURCE -I. -I../../include -fno-gnu-linker  trbg.cpp
+=== 소개 ===
+어찌 어찌 하다보니 솔라리스용 애플리케이션을 HP-UX로 포팅하는 일을 맡게 되었다. 그런데 왠걸 개발 환경 만들기 부터가 그리 쉽지 않다. 이 문서에는 HP-UX에 개발환경을 만들고 솔라리스 애플리케이션을 포팅하는 과정에 대한 내용을 담고 있다.  
+
+=== 개발환경 만들기 ===
+
+==== 목표 시스템의 환경 ====
+포팅하기로 결정한 HP시스템의 정보는 다음과 같다.  
+{{{#!plain
+# uname -a
+HP-UX antispam B.11.00 U 9000/800 1704907636 unlimited-user license
+}}}
+HP-UX 11버전이라는 것은 그럭저럭 알겠다. 아마도 U 9000/800이 하드웨어 모델인것 같은데 현재로써는 확실하지가 않다. uname(2)함수를 이용해서 직접 간단한 하드웨어 정보를 얻어와야 할것 같다. 이것은 gcc를 설치한 후 간단한 프로그램을 작성해서 알아보도록 하겠다. 
+
+			다음은 디스크 정보다.
+{{{#!plain
+$ df -k
+/var                   (/dev/vg00/lvol4       ) :  9926576 total allocated Kb
+                                                   9730106 free allocated Kb
+                                                    196470 used allocated Kb
+                                                         1 % allocation used
+/stand                 (/dev/vg00/lvol1       ) :   269032 total allocated Kb
+                                                    237968 free allocated Kb
+                                                     31064 used allocated Kb
+                                                        11 % allocation used
+/                      (/dev/vg00/lvol3       ) :  9965100 total allocated Kb
+                                                   8523748 free allocated Kb
+                                                   1441352 used allocated Kb
+                                                        14 % allocation used
+}}}
+출력결과물이 솔라리스나 리눅스에 비해 조악하다는 느낌이 들지만 알아 먹는데 큰 문제는 없는것 같다.  
+
+리눅스의 경우 대부분의 하드웨어 정보를 /proc의 값들을 읽는정도로 확인가능하고 솔라리스 역시 /usr/platform의 정보들과 몇가지 명령들을 통해서 어렵잖게 확인할 수 있다. 안타깝게도 HP-UX는 이번이 처음이라서 전용의 시스템도구가 있는지를 확인할 수 없었다. 그래서 간단하게 top을 이용해서 필요한 정보를 얻기로 마음먹었다.    
+
+몇몇 유닉스의 경우 top이 설치되어 있지 않는 경우도 있어서 조마조마하게 실행했는데 다행히도 설치되어 있었다. 다음은 top출력 결과다.
+
+{{{#!plain
+System: joinc                                      Fri Nov 28 14:07:44 2003
+Load averages: 0.52, 0.54, 0.54
+135 processes: 129 sleeping, 6 running
+Cpu states:
+CPU   LOAD   USER   NICE    SYS   IDLE  BLOCK  SWAIT   INTR   SSYS
+ 0    0.10   0.0%   0.0%   0.2%  99.8%   0.0%   0.0%   0.0%   0.0%
+ 1    0.94 100.0%   0.0%   0.0%   0.0%   0.0%   0.0%   0.0%   0.0%
+---   ----  -----  -----  -----  -----  -----  -----  -----  -----
+avg   0.52  50.0%   0.0%   0.2%  49.8%   0.0%   0.0%   0.0%   0.0%
+
+Memory: 708208K (679788K) real, 1015228K (985792K) virtual, 19120K free  Page# 1/13
+
+CPU TTY     PID USERNAME PRI NI   SIZE    RES STATE    TIME %WCPU  %CPU COMMAND
+ 1   ?     8105 root     236 20 23276K  4452K run     71:04 100.10 99.93 swinstall
+....
+}}}
+대부분의 필요한 정보를 모두 얻을 수 있었다.
+
+===== 패키지 설치방법 =====
+HP-UX는 depot라는 독자적인 패키징 시스템을 가지고 있다. 모든 패키지 파일들은 '''.depot'''확장자를 가진다.  
+
+depot 패키징 시스템을 지원하기 위해서 HP-UX는 swinstall이라는 프로그램을 제공한다. 설치 방법은 아래와 같이 매우 간단하다. 
+{{{#!plain
+# swinstall -s /tmp/sw/gcc-3.3.2-sd-11.00.depot
+}}}
+그러면 다음과 같은 관리 화면이 나올 것이다. 패키지 목록에서 스페이스바를 누르면 패키지를 선택할 수 있다. 그리고 나서 Actions->install을 클릭하면 패키지가 설치된다. 
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/afo.gif>
+}}}
+
+설치될 패키지는 반드시 절대경로로 지정되어져야 한다. 그렇지 않을 경우 대부분 설치에 실패 할 것이다.   
+
+패키지가 설치될 때 어떤 디렉토리로 설치되었는지를 확인해야 할건데, 이때는 위의 패키지 선택화면의 패키지 목록에서 '''엔터'''키를 누르면 된다. 그러면 아래의 그림처럼 설치될 패키지의 모든 파일과 경로명이 출력된다. 
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/afp.gif>
+}}}
+
+사실 패키징설치와 관리에 대한 자세한 내용을 알기 위해서는 swinstall소프트웨어에 대한 자세한 설명이 필요하겠지만, 여기에서는 설치방법을 깨우치는 정도로 간단히 넘어가도록 하겠다.
+
+==== GNU Package 다운로드/설치 ====
+HP-UX의 GNU 패키지들은 [http://hpux.cs.utah.edu hpux.cs.utah.edu] 에서 다운로드 받을 수 있다. 대부분의 패키지들이 준비되어 있으므로 필요한 패키지를 다운 받아서 설치하도록 하자. 
+
+중요한 패키지는 아마도 gcc, make, cvs, vim(물론 vi가 깔려있기는 하지만 vim보다는 아무래도 불편하다), texinfo,  binutil(gcc-3.x의 경우 포함되어 있으므로 별도로 설치할 필요는 없다.), bash shell 등이 될것이다.  
+
+위의 패키지외에도 gettext와 iconv 패키지를 별도로 설치해야 한다. gettext를 설치하지 않는다면 다음과 같은 에러메시지를 출력할 것이다. 
+{{{#!plain
+Can't open shared library: /usr/local/lib/libintl.sl
+}}}
+참고로 gettest 패키지는 멀티바이트 언어 메시지를 지원하기 위한 목적으로 사용되며 iconv는 문자셋 변환을 위해 사용되는 GNU툴들이다. 
+
+==== 개발환경 테스트 ====
+개발환경 테스트라고 해봤자. C/C++코드 몇개 만들어서 돌려보고 외부라이브러리들을 제대로 링크하는지, pthread는 제대로 지원되는지를 확인하는 정도다. C코드야 뭐 별로 테스트할게 없겠지만 C++의 경우 필자가 즐겨 사용하는 STL을 무리 없이 지원하고 있는지 확실히 확인해봐야 할 필요가 있었다. 다행히 매우 복잡하게 STL을 사용하는 코드들도 문제 없이 컴파일 되고 실행되는걸 확인했다.    
+
+그다음이 Makefile을 통한 프로젝트 관리가 다른 리눅스나 솔라리스와 마찬가지 인가 하는 문제인데 역시 수정없이 그대로 사용할 수 있었다. 다만 소켓을 사용하는 애플리케이션의 컴파일을 위해서 리눅스와 같이 socket 라이브러리를 링크 시킬 필요가 없었다. 솔라리스에서 소켓 라이브러리를 링크시켰던 경험으로 HP에서 그대로 make시킬경우 에러가 발생할 것이다.  물론 이문제는 '''Autoconfig'''를 이용해서 해결 가능하겠지만 우선은 논외로 하겠다.  
+
+===== 공유 라이브러리 사용의 문제 =====
+Linux와 솔라리스 운영체제에서 공유라이브러리 형태로 사용하던 코드중 일부가 HP-UX에서는 제대로 링크 되지 않는 문제가 발생했다. google를 찾아본 결과 gcc특성에 따른 문제라고 되어 있고 뚜렷한 해결방법이 제시되어 있지 않았다. 다른 여러 GNU 프로그램들이 포팅되어 있는 것으로 봐선 분명 문제 해결방법이 있을 거라고 생각된다. 그러나 우선은 정적라이브러리 형태로 만들고 이것을 '''.a'''아카이브로 묶어서 사용하기로 했다.    
+
+문제의 에러메시지와 Makefile의 내용은 테스트가 끝나는대로 제공하도록 하겠다.
+
+위의 공유라이브러리가 생성되지 않는 문제는 컴파일 옵션을 바꾸는 정도로 해결했다.
+{{{#!plain
+#g++ -shared -fPIC -W1,-soname,libesmcfg.so.1 -o libesmcfg.so.1.0.1 
+}}}
+위에서 shared 다음에 fPIC옵션을 붙여주기만 하면된다.
+
+===== 컴파일시 주의해야 할점 =====
+ 1. typedef된 타입들
+역시 '''Autoconfig'''를 이용하면 효과적으로 피해 갈 수 있는 문제인데, '''ulong''', '''ushort''','''uint''','''ushort_t'''와 같은 typedef값들이 정의되어 있지 않다. 다른 운영체제로의 포팅을 염두에 두지 않고 작성되었다면 이와 관려된 에러메시지를 자주 만날 수 있을 것이다.  
+{{{#!plain
+/main.c:27: error: 'ulong' is used as a type, but 
+   is not defined as a type.
+/main.c:28: error: 'ulong' is used as a type, but 
+   is not defined as a type.
+}}}
+
+가능하면 ulong, ushort와 같은 typedef값보다는 '''unsigned long''', '''unsigned short int'''등의 값을 직접 사용하도록 하자.  
+
+이미 만들어진 코드라서 바꾸기가 좀 힘들다면 아래와 같은 방법을 사용하면 된다.
+{{{#!plain
+#ifndef ulong
+typedef unsigned long ulong;
+/* 자신을 재 지향하는 매크로는 어떤것이든 #ifdef 에 걸릴수 있도록 하는것이 목적 */
+#define ulong ulong
+#endif
+}}}
+
+=== HP시스템 의존적인 개발환경 ===
+대부분의 유닉스 코드들은 개발환경이 달라지더라도 크게 변경되는 경우는 없다. 그러나 커널로 부터 직접 정보를 얻어야 하는 것들의 경우 크게 달라질 수 있는데 시스템 정보들이 아마도 가장 대표적인 경우일 것이다. 
+
+이번 장에서는 이러한 HP의존적인 개발환경중에서 시스템 정보쪽에 대해서 집중적으로 알아보도록 하겠다.  
+
+==== Proc 파일시스템의 지원 ====
+(필자가 자주접하는)솔라리스나 리눅스나 /proc파일시스템을 이용해서 많은 정보들을 얻어올 수 있다. 특히 리눅스의 경우는 프로세스의 정보 뿐아니라 필요한 거의 대부분의 정보를 얻어 올 수 있다.  
+
+필자가 알기로 /proc파일 시스템은 대부분의 유닉스 운영체제에서 지원하는 것으로 알고 있었기 때문에 우선 /proc의 내용확인을 시도 했다. '''허걱''' 그러나 /proc가 존재하지 않았다. 안타깝게도 HP는 /proc파일 시스템을 지원하지 않고 있었던 것이다. 그렇다는 것은 운영체제 에서 제공하는 운영체제 의존적인 시스템함수를 통해서 이러한 정보들을 얻어올 수 밖에 없다는 얘기가 된다.  
+
+==== pstat(2)를 통한 시스템 정보 수집 ====
+HP는 시스템정보의 접근을 위해서 pstat(2) 함수군을 제공한다.  이 함수군에 있는 함수들을 이요해서 기본적인 시스템정보, 프로세서(CPU), 프로세스, 가상메모리/물리적 메모리, (운영체제 전역적인)System V IPC, LWP, 열린파일.. 등에 대한 매우 상세한 정보를 얻을 수 있다. 기본적인 방법만 알고 있다면 솔라리스나 리눅스보다 오히려 손쉽게 필요한 정보들을 얻어낼 수 있다.  
+
+다음은 pstat함수군에서 제공하는 함수들이다.   
+{{{#!plain
+pstat_getstatic(), pstat_getdynamic(), pstat_getproc(),
+pstat_getlwp(), pstat_getprocvm(), pstat_getprocessor(),
+pstat_getvminfo(), pstat_getdisk(), pstat_getlv(), pstat_getswap(),
+pstat_getfile(), pstat_getipc(), pstat_getsem(), pstat_getmsg(),
+pstat_getshm(), pstat_getstable(), pstat_getcrashinfo(),
+pstat_getcrashdev(), pstat()   - get system information
+}}}
+
+이름을 보면 무슨일을 하는 함수인지 감을 잡을 수 있을 것이다. 이러한 함수들에 대한 자세한 정보는 man페이지를 활용해야 한다. [pstat(2)]man 페이지를 참고하기 바란다. 
+
+==== pstat(2)관련 구조체들 ====
+pstat에서 제공하는 함수들을 제대로 사용하려면 각 구조체에 대한 대략 적인 내용을 알고 있어야 한다. 여기에서는 중요한 구조체에 대해서 설명한다. 이것 저것 구조체에 대해서 복잡하게 설명하는 것보다. 헤더파일을 참고하는게 가장 확실한 방법일 것 같아서 헤더파일을 제공하기로 했다.   
+
+ * [wiki:pstat_h pstat.h 파일] 
+
+=== 셈플코드 ===
+다음은 시스템정보를 얻어오는 간단한 예제코드다. HP-UX에 접근할 수 있는 환경이라면 한번 테스트해 보기 바란다.
+ 
+{{{#!plain
+#include <sys/param.h>
+#include <sys/pstat.h>
+#include <sys/unistd.h>
+#include <string.h>
+#include <pwd.h>
+
+int main()
+{
+    struct pst_dynamic psd;
+    struct pst_processor *psp;
+    struct pst_status pst;
+    struct pst_static pmt;
+
+    int i, count, idx=0, j;
+    int cpu_v[PST_MAX_CPUSTATES];
+    int cpu_time = 0;
+    int total_time = 0;
+    int page_size = 0;
+    int last_cpu_time[16];
+
+    idx=0;
+    int size = 0;
+    struct passwd *pass_info = NULL;
+    char username[256] = {0x00, };
+
+    for (i = 0; i < 16; i ++)
+    {
+        last_cpu_time[i] = -1;
+    }
+
+    // 페이지 크기를 얻어온다. 
+    // 페이지 크기는 메모리와 같은 자원의 크기를 검사하는데 중요하게 사용된다. 
+    if (pstat_getstatic(&pmt, sizeof(pmt), (size_t)1, 0) != -1)
+    {
+        page_size = pmt.page_size;
+    }
+    else
+    {
+        perror("static error");
+    }
+
+    // 동적으로 변경되는(dynamic) 정보들을 얻어온다.  
+    // 메모리 크기가 가정 대표적인 정보들일 것이다. 
+    if (pstat_getdynamic(&psd, sizeof(psd), (size_t)1, 0) != -1)
+    {
+        // 프로세서의 갯수를 얻어온다. 
+        // 프로세서의 정보를 얻기 위해 필요하다. 
+        size_t nspu = psd.psd_proc_cnt;
+        psp = (struct pst_processor *)malloc(nspu * sizeof(*psp));
+
+
+        // 메모리 정보를 출력한다. 
+        printf("REAL MEM : %d(%d), VM : %d(%d)\n", 
+                psd.psd_rm*page_size,     // 리얼 메모리 공간
+                psd.psd_free*page_size,   // 남는 메모리 공간
+                psd.psd_vm*page_size,     // 가상 메모리 공간
+                psd.psd_avm*page_size);   // 남아있는 가상 메모리 공간 
+    }
+
+    // 프로세서(CPU)의 사용정보를 얻어온다.   
+    if (pstat_getprocessor(psp, sizeof(*psp), nspu, 0) != -1)
+    {
+        int i;
+        int total_execs = 0;
+        int last_time = 0;
+        // 프로세서의 갯수만큼 정보를 얻어온다. 
+        for (i = 0; i < nspu; i++)
+        {
+            total_time = 0;
+            last_time  = last_cpu_time[i];
+            if (last_time > 0)
+            {
+                last_cpu_time[i] = psp[i].psp_cpu_time[0];
+                printf("#%d processor %d\n", i,
+                    last_cpu_time[i] - last_time);
+            }
+            else
+            {
+                last_cpu_time[i] = psp[i].psp_cpu_time[0];
+                printf("JUMP\n");
+            }
+        }
+    }
+    sleep(1);
+
+    // 모든 프로세스의 상세 정보를 얻어온다. 
+    // 한번에 10개씩 프로세스의 정보를 얻어와서 pst에 저장한다.  
+    // idx는 PID와 별로로 프로세스에 부여되는 일련번호다. 
+    // pstat_getproc는 idx이상의 인덱스번호를 가지는 프로세스 정보를 얻어온다.   
+    // 아래의 경우 3번째 인자가 1인데, 하나씩 얻어와서 저장하라는 뜻이다.  
+    // 필요에 따라 한번에 여러개의 프로세스 정보를 얻어와서 pst에 저장할 수 있다. 
+    while((count = pstat_getproc(&pst, sizeof(pst), 1, idx)) > 0)
+    {
+        size =pst[i].pst_vtsize + pst[i].pst_vdsize + pst[i].pst_vssize
+             + pst[i].pst_dsize + pst[i].pst_tsize;
+
+        // 만약 pst_uid에 대해서 password 엔트리가 있다면 유저이름을 출력한다.   
+        // 때에 따라서 잘못된 UID로된 프로세스가 생길 수 있으므로 반드시 NULL 검사를
+        // 해줘야 한다.   
+        if ((pass_info = getpwuid(pst[i].pst_uid)) != NULL)
+        {
+            sprintf(username,"%s", pass_info->pw_name);
+        }      
+
+        printf("commd %s %d pst_pid %d %d %s %d %d\n",
+                    username,
+                    pst[i].pst_uid,     
+                    pst[i].pst_procnum,     
+                    pst[i].pst_pid,
+                    pst[i].pst_ucomm, pst[i].pst_cpu, size*page_size/8/1024);
+
+        // 인덱스를 1증가 시켜서 다음 프로세스 정보를 얻어오도록 한다.  
+        idx = pst.pst_idx + 1;
+    }
+}
+}}}
+=== Disk 정보 가져오기 ===
+Disk 정보는 다음과 같은 과정을 통해서 얻어오게 된다.
+ 1. /etc/mnttab 을 분석해서 마운트된 디스크 리스트를 얻어온다.
+ 1. statfs(2) 함수를 이용해서 각 디스크의 통계정보를 얻어돈다.

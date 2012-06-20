@@ -1,0 +1,432 @@
+#title Observer Pattern
+
+== 옵저버 패턴 ==
+옵저버 패턴은 '''Publish subscribe'''패턴이라고 불리우기도 한다. 컨텐츠 발행자가 컨텐츠의 변화가 생겼을 때 구독자에게 알려주는 방식과 비슷하기 때문이다.
+
+이 패턴은 객체의 상태를 관찰하는 '''Observer - 관찰자 -'''객체가 존재한다. 이 Oserver는 객체의 상태가 바뀌면 그 객체에 의존관계에 있는 다른 객체들에게도 상태가 변경되었음을 알려준다.
+
+attachment:Observer-pattern-uml.jpg
+
+=== subject class ===
+추상 클래스로 observer를 등록하고 제거하기 위한 메서드들을 제공한다. 또한 이벤트를 Publish 하기 위한 notify 메서드들을 가진다. 
+  * Attach - 새로운 observer를 등록한다.
+  * Detach - 등록되어 있는 observer를 삭제한다.
+  * Notify - observer에 발생한 이벤트의 정보를 전달하기 위해서 사용될 수 있다.
+
+=== Observer class ===
+subject의 Notify에 의해서 호출될 콜백함수 - 가상 메서드 혹은 함수포인터 -를 가진다. 이 콜백함수는 이벤트가 발생했을 때 처리할 알고리즘을 포함한다. 
+
+
+== 응용 ==
+이 패턴은 유저나 혹은 시스템으로 부터의 입력에 대한 응답을 해야 하는 '''이벤트 기반 프로그램'''에 널리 사용된다. 때때로 MVC(:12) 모델과 결합되어서 사용하는 경우도 있다. MVC 모델은 '''Model'''의 변화에 따라서 '''View'''도 변경이 되는 경우가 생기는데, 이때 Model 옵저버가 view의 내용을 바꾸는 방식이다.
+
+=== MVC 모델 ===
+웹서비스에 MVC모델이 적용된 경우라면 url 파라메터를 검사하는 model 옵저버를 두는 것으로 쉽게 이 문제를 해결할 수 있을 것이다. 
+
+=== Event 전달 ===
+QT와 같은 GUI툴킷에 사용되는 시그널/슬롯 모델과 message를 처리하는 프로그램들
+
+시그널 슬롯 모델 혹은 message를 처리해야 하는 프로그램에 있어서의 이슈는 busy wait에 놓이지 않은 상태로 Event혹은 message를 기다리는게 될 것이다. 이를 위해서 다양한 방법이 사용될 수 있을 건데, 나는 주로 파일레코드 잠금(:12)을 이용해서 이 문제를 해결하고 있다. Observer가 잠금을 푸는 것으로 Notify를 하는 방식이다. pipe(:12), 유닉스 도메인 소켓, 세마포어(:12), mutex(:12), 메시지큐(:12)를 이용하는 방법들을 생각해 볼 수 있을 것이다. 
+
+이벤트가 발생될 때 실행할 callback(콜백)함수를 등록하는 방법도 있을 수 있겠으나 계속적인 함수호출에 대한 부담감으로 (개인적으로)선호하지는 않고 있다.
+
+== 예제 ==
+=== C++ ===
+==== wikipedia 예제 ====
+{{{#!plain
+#include <list>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+using namespace std;
+ 
+// The Abstract Observer
+class ObserverBoardInterface
+{
+public:
+    virtual void update(float a,float b,float c) = 0;
+};
+ 
+// Abstract Interface for Displays
+class DisplayBoardInterface
+{
+public:
+    virtual void show() = 0;
+};
+ 
+// The Abstract Subject
+class WeatherDataInterface
+{
+public:
+    virtual void registerOb(ObserverBoardInterface* ob) = 0;
+    virtual void removeOb(ObserverBoardInterface* ob) = 0;
+    virtual void notifyOb() = 0;
+};
+ 
+// The Concrete Subject
+class ParaWeatherData: public WeatherDataInterface
+{
+public:
+    void SensorDataChange(float a,float b,float c)
+    {
+        m_humidity = a;
+        m_temperature = b;
+        m_pressure = c;
+        notifyOb();
+    }
+ 
+    void registerOb(ObserverBoardInterface* ob)
+    {
+        m_obs.push_back(ob);
+    }
+ 
+    void removeOb(ObserverBoardInterface* ob)
+    {
+        m_obs.remove(ob);
+    }
+protected:
+    void notifyOb()
+    {
+        list<ObserverBoardInterface*>::iterator pos = m_obs.begin();
+        while (pos != m_obs.end())
+        {
+            ((ObserverBoardInterface* )(*pos))->update(m_humidity,m_temperature,m_pressure);
+            (dynamic_cast<DisplayBoardInterface*>(*pos))->show();
+            ++pos;
+        }
+    }
+ 
+private:
+    float        m_humidity;
+    float        m_temperature;
+    float        m_pressure;
+    list<ObserverBoardInterface* > m_obs;
+};
+ 
+// A Concrete Observer
+class CurrentConditionBoard : public ObserverBoardInterface, public DisplayBoardInterface
+{
+public:
+    CurrentConditionBoard(ParaWeatherData& a):m_data(a)
+    {
+        m_data.registerOb(this);
+    }
+    void show()
+    {
+        cout<<"_____CurrentConditionBoard_____"<<endl;
+        cout<<"humidity: "<<m_h<<endl;
+        cout<<"temperature: "<<m_t<<endl;
+        cout<<"pressure: "<<m_p<<endl;
+        cout<<"_______________________________"<<endl;
+    }
+ 
+    void update(float h, float t, float p)
+    {
+        m_h = h;
+        m_t = t;
+        m_p = p;
+    }
+ 
+private:
+    float m_h;
+    float m_t;
+    float m_p;
+    ParaWeatherData& m_data;
+};
+ 
+// A Concrete Observer
+class StatisticBoard : public ObserverBoardInterface, public DisplayBoardInterface
+{
+public:
+    StatisticBoard(ParaWeatherData& a):m_maxt(-1000),m_mint(1000),m_avet(0),m_count(0),m_data(a)
+    {
+        m_data.registerOb(this);
+    }
+ 
+    void show()
+    {
+        cout<<"________StatisticBoard_________"<<endl;
+        cout<<"lowest  temperature: "<<m_mint<<endl;
+        cout<<"highest temperature: "<<m_maxt<<endl;
+        cout<<"average temperature: "<<m_avet<<endl;
+        cout<<"_______________________________"<<endl;
+    }
+ 
+    void update(float h, float t, float p)
+    {
+        ++m_count;
+        if (t>m_maxt)
+        {
+            m_maxt = t;
+        }
+        if (t<m_mint)
+        {
+            m_mint = t;
+        }
+        m_avet = (m_avet * (m_count-1) + t)/m_count;
+    }
+ 
+private:
+    float m_maxt;
+    float  m_mint;
+    float m_avet;
+    int m_count;
+    ParaWeatherData& m_data;
+};
+ 
+int main(int argc, char *argv[])
+{
+ 
+    ParaWeatherData * wdata = new ParaWeatherData;
+    CurrentConditionBoard* currentB = new CurrentConditionBoard(*wdata);
+    StatisticBoard* statisticB = new StatisticBoard(*wdata);
+ 
+    wdata->SensorDataChange(10.2, 28.2, 1001);
+    wdata->SensorDataChange(12, 30.12, 1003);
+    wdata->SensorDataChange(10.2, 26, 806);
+    wdata->SensorDataChange(10.3, 35.9, 900);
+ 
+    wdata->removeOb(currentB);
+ 
+    wdata->SensorDataChange(100, 40, 1900);  
+ 
+    delete statisticB;
+    delete currentB;
+    delete wdata;
+ 
+    return 0;
+}
+}}}
+
+==== joinc 예제 : 웹로그 로그분석기 ====
+개인적으로 [wiki:Site/RRD/BigLog_Analy_RRD2 RRD를 이용한 웹로그 분석 시스템]을 구축해서 사용하고 있다. 이 문서의 하단에 보이는 '''시간/일간별 방문통계'''가 이 시스템을 이용해서 만들어 졌다. 이 시스템을 위한 프로그램을 예로 해서 obsever pattern에 대해서 알아보기로 하겠다.   
+
+로그분석 프로그램에 observer 패턴을 사용한 이유는 로그를 하나의 이벤트로 보고 이를 관찰하고 있다가 이벤트를 발생시키고 이를 처리하는 방식으로 처리하기 원했기 때문이다.
+
+이 프로그램은 page별로 1시간동안 count를 하고 그 결과 값을 RRD(:12)DB에 저장하는 일을 한다. page별 카운트를 위해서 STL(:12)의 map(:12) 컨테이너를 이용했다. key는 page 이름이 되고 value는 int형의 count가 되도록 했다. 아래의 코드는 완전한 코드가 아닌 뼈대코드다.
+   1. 로그를 message로 본다. observer 클래스는 addMsg 메서드를 구현한다. 
+   1. 로그분석 알고리즘에 따라서 다양한 observer 구현을 만들게 될 것이다.
+   1. 즉 로그가 chain rule을 통과하면서 분석된다.
+   1. 일정시간이 되면, Subject 클래스는 observer 클래스의 updateDB 메서드를 실행시킨다. 
+   1. access log에 새로운 메시지의 추가를 관찰하는 것은 tail(:12)구현을 이용한다.
+
+{{{#!plain
+#include <map>
+#include <string>
+#include <list>
+using namespace std;
+
+// Abstract Observer
+class ObserverLogInterface
+{
+	public:
+		virtual void addMsg(char *msg) = 0;
+		virtual int updateDB(); 
+		virtual void setTerm(int) = 0;
+		virtual int getTerm(int) = 0;
+};
+/*
+ * Observer 구현
+ * 이 구현은 pageview를 위한 알고리즘을 포함한다.
+ */
+class PageView : public ObserverLogInterface
+{
+	map<string pagename, int count> pageCount; 
+	map<string pagename, int count>::iterator pos;
+	int term;
+	int alarmTime;
+	public:
+		void addMsg(char *msg)
+		{
+			string pagename;
+			// 들어온 로그메시지를 파싱해서 페이지 이름을 얻어와서 counting 한다. 
+			// 파싱했다고 가정하고		
+			pos = pageCount.find(pagename);
+			if(pos == pageCount.end())
+			{
+				pageCount[pagename] = 0;
+			}
+			else
+			{
+				pos->second++;
+			}
+		}
+
+		int updateDB()
+		{
+			// {pagename, count}를 RRD(:12)에 저장한다.	
+			// RRD 파일의 이름은 paganeme.rrd로 하겠다.
+			// 그냥 구현했다고 가정
+			cout << "update RRD" <<endl;
+		}
+
+		void setTerm(int aterm)
+		{
+			// update될 시간을 설정한다.
+			// 현재 시간에 + aterm을 한다.
+			term = aterm;
+			alarmTime = term+time(NULL);
+		}
+
+		int getTerm()
+		{
+			return term;
+		}
+
+		int countDown()
+		{
+			// update 남은 시간을 계산한다.
+			// 값이 0보다 작다면 subject는 updateDB를 수행하게 된다. 
+			return alarmTime - time(NULL); 
+		}
+}; 
+
+/*
+ * Observer 구현
+ * 이 구현은 유저 검색어 count를 위한 알고리즘을 포함한다. 
+ * 테스트를 위한 Dummy Observer이다.
+ */
+class KeywordCount : public ObserverLogInterface
+{
+	public:
+		void addMsg(char *msg)
+		{
+		}
+
+		int updateDB()
+		{
+		}
+
+		void setTerm(int aterm)
+		{
+			term = aterm;
+			alarmTime = term+time(NULL);
+		}
+
+		int getTerm()
+		{
+			return term;
+		}
+
+		int countDown()
+		{
+			return alarmTime - time(NULL); 
+		}
+}; 
+
+// The Abstract Subject
+class LogAnalyInterface
+{
+	public:
+		virtual void registerOb(ObserverLogInterface *ob)=0;
+		virtual void removeOb(ObserverLogInterface *ob)=0;
+		virtual void notifyOb() = 0;
+};
+
+/*
+  Subject Class의 구현
+ */
+class LogAnaly : public LoganalyInterface
+{
+	private:
+		list<ObserverLogInterface *ob> m_obs;
+
+	public:
+		void registerOb(ObserverLogInterface *ob)
+		{
+			m_obs.push_back(ob);
+		}
+		void removeOb(ObserverLogInterface *ob)
+		{
+			m_obs.remove(ob);
+		}
+
+		// 새로운 로그메시지가 들어왔을 때.
+		void addMsg(char *msg)
+		{
+			notifyMsgOb(char *msg);
+		}
+
+		// update Time을 확인
+		void checkUpdate()
+		{
+			notifyDbOb(char *msg);
+		}
+
+	protected:
+		void notifyMsgOb(char *msg)
+		{
+			list<ObserverLogInterface *ob>::iterator pos=m_obs.begin();
+			while(pos != m_obs.end())
+			{
+        ((ObserverLogInterface* )(*pos))->addMsg(msg);
+				pos++;
+			}
+		}
+		void notifyDbOb()
+		{
+			int term;
+			list<ObserverLogInterface *ob>::iterator pos=m_obs.begin();
+			while(pos != m_obs.end())
+			{
+				// 만약 update시간이 되었다면 updateDB 메서드를 실행시킨다.
+				if( ((ObserverLogInterface* )(*pos))->countDown() < 0)
+				{
+					term = (ObserverLogInterface* )(*pos))->getTerm();
+					(ObserverLogInterface* )(*pos))->updateDB();
+					// alarm Time을 reset 한다.
+					(ObserverLogInterface* )(*pos))->setTerm(term);
+				}
+				pos++;
+			}
+		}
+};
+
+int main()
+{
+	AccessLogAnaly = new LogAnlay; 
+	AccessLogAnaly->registerOb(new PageView);
+	AccessLogAnaly->registerOb(new KeywordCount);
+	while(tail(logfile))
+	{
+		// tail함수를 이용해서 새로운 로그가 들어오면  
+		// PageView와 keywordCount Observer에 메시지를 넘긴다.
+		AccessLogAnaly->addMsg();
+
+		// Update 시간을 체크한다.
+		AccessLogAnaly->checkUpdate();
+		sleep(1);
+	}
+}
+}}}
+
+=== joinc 예제 : MVC 모델 ===
+개인적으로 진행중인 간단 php 프레임워크인 dmf(:12)의 MVC 모델을 예로 설명한다. 프레임워크의 개략적인 내용은 [wiki:Site/Web/Dev_framework/php_framework dmf]문서를 참고하자. 핵심을 요약하자면 
+   1. '''model''' subject의 역할을 하고
+   1. '''view'''가 Observer의 역할을 한다. 
+이다.
+
+검색서비스를 위한 model과 view를 개발한다고 가정을 해보자. 만약 검색서비스가 포털형이라면 첫페이지의 검색결과 view에서 '''더보기'''를 클릭하면 전문검색 결과 view로 넘어가게 될 것이므로 하나의 model이 두개의 view를 제어해야하는 경우가 발생한다. 이 문제의 해결을 위해서 옵저버모델을 적용했다. 세련된 모습은 아니지만 그럭저럭 개념적으로는 구현되어 있다.
+{{{#!plain
+class MyModule extends Module
+{
+	function model()
+	{
+		$domain = $this->options['d']; // 첫페이지 검색인지 전문검색인지에 대한 uri 인자값
+		$this->registerView($this->viewFirstPage,'t');
+		$this->registerView($this->viewSearchPage,'s');
+
+		$this->runView($domain);
+	}
+
+	function viewFirstPage()
+	{
+		// 첫페이지 뷰
+	}
+
+	function viewSearchPage()
+	{
+		// 전문검색 페이지 뷰 
+	}
+}
+}}}

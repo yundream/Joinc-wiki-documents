@@ -1,0 +1,207 @@
+#title syslog 사용하기 2
+
+  * [wiki:Site/system_programing/Unix_Env/syslog_1 syslog 소개 문서에서 이어짐]
+  * wiki 스타일에 맞게 수정해야함.
+  * 내용도 너무 오래 되었음 수정해야함.
+{{{#!html
+이제 memrecver 에 소켓연결후 syslog 메시지를 전송하는 memsender 를
+제작해 보도록하자, 보통의 파일을 열어서 읽은 다음에 소켓으로 전송하는
+일반적인 루틴을 가지고 있지만, 파일의 마지막라인을 만나더라도,
+파일 연결지시자를 계속 유지하고 있다가 새로운 내용이 추가되면 다시 read 해야
+하므로(이를테면 tail 에 -f 옵션을 준것과 비슷한), select(2) 를 통해서 이를
+구현하도록 하겠다. <br>
+select 는 입출력다중화를 위한 목적으로 주로 쓰이며, 네트웍 프로그래밍에서
+다중 클라이언트를 받아들이는 서버제작 기법으로 많이 활용된다.<br><br>
+<b>예제: memsender.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/time.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt;
+<font COLOR=#00b800>#include</font> &lt;netinet/in.h&gt;
+<font COLOR=#00b800>#include</font> &lt;arpa/inet.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+
+<font COLOR=#00b800>#define</font> PORT 12345
+<font COLOR=#00b800>#define</font> PACKET_SIZE 255
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> fd;
+    <b><font COLOR=#0000ff>int</font></b> n;
+    <b><font COLOR=#0000ff>int</font></b> state;
+    <b><font COLOR=#0000ff>int</font></b> client_len;
+    <b><font COLOR=#0000ff>int</font></b> client_sockfd;
+    <b><font COLOR=#0000ff>int</font></b> i;
+    FILE *fp;
+    <b><font COLOR=#0000ff>char</font></b> *buf;
+
+    <b><font COLOR=#0000ff>char</font></b> l_buf[<font COLOR=#a900a9>1</font>];
+
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_in clientaddr;
+    <b><font COLOR=#0000ff>struct</font></b> timeval tv;
+
+    fd_set readfds;
+
+    <b><font COLOR=#0000ff>if</font></b>((fd = open(<font COLOR=#ff0000>"/var/log/meminfo"</font>, O_RDONLY)) == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"file open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    // memrecver 서버에 연결을 위한 소켓생성및 연결
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, <font COLOR=#a900a9>0</font>);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr(<font COLOR=#ff0000>"127.0.0.1"</font>);
+    clientaddr.sin_port = htons(PORT);
+
+    client_len = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+
+    <b><font COLOR=#0000ff>if</font></b> (connect(client_sockfd, (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&clientaddr, client_len) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"connect error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    fp = fdopen(fd, <font COLOR=#ff0000>"w"</font>);
+    buf = (<b><font COLOR=#0000ff>char</font></b> *)malloc(PACKET_SIZE);
+    i = <font COLOR=#a900a9>0</font>;
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        tv.tv_sec = <font COLOR=#a900a9>0</font>;
+        tv.tv_usec = <font COLOR=#a900a9>10000</font>;
+
+        state = select(<font COLOR=#a900a9>2</font>, &readfds, (fd_set *)<font COLOR=#a900a9>0</font>, (fd_set *)<font COLOR=#a900a9>0</font>, &tv);
+
+        <b><font COLOR=#0000ff>switch</font></b>(state)
+        {
+            <b><font COLOR=#0000ff>case</font></b> -<font COLOR=#a900a9>1</font>:
+                perror(<font COLOR=#ff0000>"select error : "</font>);
+                exit(<font COLOR=#a900a9>0</font>);
+
+            <b><font COLOR=#0000ff>default</font></b> :
+                memset(buf, 0x00, PACKET_SIZE);
+                <b><font COLOR=#0000ff>while</font></b> ((n = read(fd, l_buf, <font COLOR=#a900a9>1</font>)) &gt; <font COLOR=#a900a9>0</font>)
+                memset(buf, 0x00, PACKET_SIZE);
+                <b><font COLOR=#0000ff>while</font></b> ((n = read(fd, l_buf, <font COLOR=#a900a9>1</font>)) &gt; <font COLOR=#a900a9>0</font>)
+                {
+                    buf[i] = l_buf[<font COLOR=#a900a9>0</font>];
+                    <b><font COLOR=#0000ff>if</font></b> (l_buf[<font COLOR=#a900a9>0</font>] == '&#92;n')
+                    {
+                        write(client_sockfd, buf, i+<font COLOR=#a900a9>1</font>);
+                        printf(<font COLOR=#ff0000>"--&gt;%s"</font>, buf);
+                        memset(buf, 0x00, PACKET_SIZE);
+                        i = <font COLOR=#a900a9>0</font>;
+                        <b><font COLOR=#0000ff>continue</font></b>;
+                    }
+                    i++;
+                }
+                <b><font COLOR=#0000ff>break</font></b>;
+        }
+    }
+    close(fd);
+}
+</pre>
+    
+</td></tr>
+</table>
+select 가 들어간것만 빼고는 매우 일반적인 프로그램이므로 설명은 생략하도록
+하겠다.<br>
+소켓관련 프로그래밍은 <a href=http://www.joinc.co.kr/article.php?sid=11>셈플로 알아보는 소켓프로그래밍(1)</a>을 >참고하기 바란다. <br><br>
+<b>예제: memrecever.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;netinet/in.h&gt;
+<font COLOR=#00b800>#include</font> &lt;arpa/inet.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt; 
+
+<font COLOR=#00b800>#define</font> SA struct sockaddr
+<font COLOR=#00b800>#define</font> PACKET_SIZE 255 
+
+<b><font COLOR=#0000ff>const</font></b> <b><font COLOR=#0000ff>char</font></b> *needle = <font COLOR=#ff0000>": "</font>;
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>int</font></b> server_sockfd, client_sockfd;
+    <b><font COLOR=#0000ff>int</font></b> state, clilen;
+    <b><font COLOR=#0000ff>int</font></b> n;
+
+    FILE *fp;
+
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_in clientaddr, serveraddr;
+    <b><font COLOR=#0000ff>char</font></b> buf_in[PACKET_SIZE];
+    <b><font COLOR=#0000ff>char</font></b> buf_out[PACKET_SIZE];
+    <b><font COLOR=#0000ff>char</font></b> *par_buf;
+
+    // 소켓연결을 만든다.
+    server_sockfd = socket(AF_INET, SOCK_STREAM, <font COLOR=#a900a9>0</font>);
+    bzero(&amp;serveraddr, <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr));
+
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(<font COLOR=#a900a9>12345</font>);
+
+    <b><font COLOR=#0000ff>if</font></b>(bind (server_sockfd, (SA *)&amp;serveraddr, <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr)) == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"bind error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    <b><font COLOR=#0000ff>if</font></b> ((state = listen(server_sockfd, <font COLOR=#a900a9>5</font>)) == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"listen error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        clilen = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+        memset(buf_in, 0x00, PACKET_SIZE);
+
+        <b><font COLOR=#0000ff>if</font></b> ((client_sockfd = accept(server_sockfd, (SA *)&clientaddr, &amp;clilen)) == -<font COLOR=#a900a9>1</font>)
+        {
+            perror(<font COLOR=#ff0000>"Accept error : "</font>);
+            close(client_sockfd);
+            <b><font COLOR=#0000ff>continue</font></b>;
+        }
+        <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+        {
+            <b><font COLOR=#0000ff>if</font></b> ( (n = read(client_sockfd, buf_in, PACKET_SIZE)) &lt;= <font COLOR=#a900a9>0</font>)
+            {
+                perror(<font COLOR=#ff0000>"read error : "</font>);
+                close(client_sockfd);
+                <b><font COLOR=#0000ff>break</font></b>;
+            }
+            <b><font COLOR=#0000ff>if</font></b> ((par_buf = strstr(buf_in, needle)) != NULL)
+            {
+                printf(<font COLOR=#ff0000>"%s"</font>, par_buf+<font COLOR=#a900a9>2</font>);
+            }
+
+            memset(buf_in, 0x00, PACKET_SIZE);
+        }
+    }
+}
+</pre>
+
+</td></tr>
+</table>
+이 프로그램은 소켓을 통해서 메모리 상황을 받아서 출력만 해준다. <br>
+받은 문자열을 파싱해서 그럴듯하게 보여주는건 여러분들에게 맡기도록 하겠다.<br>
+프로그램의 실행은 가장먼저 memchecker 을 실행하고 다음 memrecevier 을 실행하고,
+memsender을 실행하면 된다. 
+
+}}}

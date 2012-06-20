@@ -1,0 +1,119 @@
+----
+ 1. get terminal size
+ 1. 간단한 terminal size 얻어오기 예제 
+ 1. [minzkn]
+ 1. Version 0.1 
+ 1. 2005/06/17
+----
+[[TableofContents]]
+
+=== 설명 ===
+이건 현재 터미날의 윈도우 크기를 얻는 예제입니다. 시그널 SIGWINCH 가 함께 사용하시면 좋겠습니다.
+
+=== 사용방법 ===
+
+=== 코드 ===
+{{{#!plain
+/*
+ Copyright (C) Information Equipment co.,LTD.
+ All rights reserved.
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+ CVSTAG="$Header: /usr/local/mutihost/joinc/modules/moniwiki/data/text/RCS/Code_2fC_2fterminal_5fsize,v 1.1 2007/01/09 02:46:10 root Exp root $"
+*/
+
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
+int main(void)
+{
+ int s_check, s_width = 0, s_height = 0;
+ char *s_env;
+ struct winsize s_window_size;
+ s_env = getenv("COLUMNS"); if(s_env != ((char *)0))s_width = atoi(s_env);
+ s_env = getenv("LINES");   if(s_env != ((char *)0))s_height = atoi(s_env);
+ if((s_width <= 0) || (s_height <= 0))
+ {
+  if(isatty(STDOUT_FILENO) == 1)
+  {
+   do{ s_check = ioctl(STDOUT_FILENO, TIOCGWINSZ, &s_window_size); }while((s_check == (-1)) && (errno == EINTR));
+   if(s_check == 0)s_width = s_window_size.ws_col, s_height = s_window_size.ws_row;
+  }
+  if(s_width <= 0)s_width = 80;
+  if(s_height <= 0)s_height = 24;
+ }
+ (void)fprintf(stdout, "terminal window size : %d x %d\n", s_width, s_height);
+ return(0);
+}
+
+/* End of source */
+}}}
+
+=== 다른예제 ===
+ * 터미널의 크기가 변경될 때마다 변화된 윈도우 사이즈를 검사해서 출력하는 프로그램입니다.
+{{{#!plain
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+
+// 윈도우 사이즈를 얻어온다.
+struct winsize get_winsize(int fd)
+{
+    int i;
+    struct winsize size;
+    if (ioctl(fd, TIOCGWINSZ, (char *)&size) < 0)
+    {
+        perror("size get error\n");
+    }
+    return size;
+}
+void sig_handler(int);
+
+struct winsize c_winsize;
+int main()
+{
+
+    // 표준입력이 장치에 연결되어 있는지 확인한다.
+    if (!isatty(0))
+        exit(0);
+
+    // 시그널 핸들러를 등록한다.
+    if(signal(SIGWINCH, sig_handler) == SIG_ERR)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    c_winsize = get_winsize(0);
+    printf("%d %d %d %d\n", c_winsize.ws_row, c_winsize.ws_col,
+                            c_winsize.ws_xpixel, c_winsize.ws_ypixel);
+
+    // 창이 일정 사이즈이상이 되지 않을경우 종료시킨다.
+    if (c_winsize.ws_col < 80 || c_winsize.ws_row < 20)
+    {
+        printf("윈도우 사이즈는 80, 20이상이 되어야 합니다\n");
+        exit(0);
+    }
+    while(1)
+    {
+        sleep(10);
+    }
+}
+
+void sig_handler(int signo)
+{
+    printf("WINSIZE CHANGE\n");
+    c_winsize = get_winsize(0);
+    printf("%d %d %d %d\n", c_winsize.ws_row, c_winsize.ws_col,
+                            c_winsize.ws_xpixel, c_winsize.ws_ypixel);
+}
+}}}
+
+=== 관련 게시물 ===
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=28729&forum=1)]]
+=== 변경사항 ===
+
+==== 2005/07/06 ====
+ 1. 터미널의 크기변경시 시그널을 얻어와서 터미널 크기를 알려주는 예제 프로그램 추가

@@ -1,0 +1,126 @@
+#title JDOM을 이용한 xml 데이터 처리
+
+음.. C(:12)를 이용하고 있다면, 아마도 expat(:12)를 이용해서 xml 데이터를 처리하게 되었을 것이다.
+
+그게 어쩌다보니, java를 이용해서 처리해야 하는 필요가 생겼다. 두가지 언어 모두 별로 익숙하지 않다는게 맘에 걸린다.  
+
+역시나. 일단 용어부터가 문제다. 무슨 용어가 이리 복잡하다냐. SAX , (대충 이름만 들어봤을 뿐인)DOM, Javax, XSLT.. 좀 개념도 그닥 와 닿지가 않는다. expat 처럼 좀 직관적으로 - 다른말로 절차지향적으로- 써볼만한거 없나 ? 찾아봤더니 JDOM이라는게 있고, 상당히 직관적인 것 같아서, 이걸 사용해보기로 했다.
+
+관심있는 부분은 '''XML 문서파싱''', Element와 Attribute와 값들의 추가 삭제와 관련된 것들이다. 두 부분으로 나누어서 해야 할 것 같다. 
+
+=== JDOM 패키지 얻기 ===
+다행히 공개 패키지이다. 게다가 베타버젼이 아닌 안정버전 1.1 - 2008/11/25 기준 - 이라는게 맘에든다. 
+
+패키지는 http://www.jdom.org 에서 얻을 수 있다.
+
+=== XML 문서 파싱 ===
+다행스럽게도 상당히 직관적이다. 코드는 간단하니 설명 생략.
+{{{#!plain
+package com.yundream.myparser;
+
+import org.jdom.*;
+import org.jdom.input.SAXBuilder;
+import java.io.IOException;
+import java.util.*;
+
+public class jdomParser {
+	  public static void main(String[] args) {
+		  SAXBuilder builder = new SAXBuilder();
+		  String schemType = "";
+		  try {
+			  Document doc = builder.build("entry.xml");
+			  Element root = doc.getRootElement();
+			  System.out.println("Root Node is "+root.getName());
+			  List sqlElement=root.getChildren();
+			  Iterator it = sqlElement.iterator();
+			  while(it.hasNext())
+			  {
+				Element e = (Element)it.next();
+				if (e.getName().equals("category"))
+				{
+					if (e.getAttribute("schme")!=null)
+					{
+						schemType = e.getAttribute("type").getValue();
+					}
+					else
+					{
+						System.out.println(schemType+" is "+
+							e.getAttribute(schemType).getValue());
+					}
+				}
+				//System.out.println("Element Name "+e.getName());
+			  }
+		  } 
+		  catch(JDOMException e)
+		  {
+			System.out.println("not well-formed data");  
+		  }
+		  catch(IOException e)
+		  {
+			 System.out.println(e);
+		  }
+	  }
+}
+}}}
+아래의 데이터를 테스트 했다. tag 정보를 읽어오게 될 것이다.
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8"?>
+<feed>
+<entry>
+    <category schme="type" type="tag" />
+    <category tag="apple" />
+    <category tag="computer" />
+    <category tag="Steven Jobs" />
+    <author>
+      <name>yundream</name>
+      <email>yundream@gmail.com</email>
+    </author>
+</entry>
+</feed>
+}}}
+위코드는 그냥 돌아가는 코드다. node명을 입력하면, 해당 node의 Element를 읽어오도록 하면 좀더 범용적으로 사용할 수 있을 거라 생각된다. 이 메서드는 대략 다음과 같은 모양을 하면 되지 않을까. ? nodespace는 디렉토리 표현방식을 따르면 될 것이다. 예를들어 위의 XML 데이터에서 entry의 author node를 탐험하기 위한 Element를 찾길 원한다면 "entry/author" 하면 될 것이다. 
+
+다음은 재귀호출 메서드이다.
+{{{#!plain
+static Element getElement(Element node, String namespace)
+{
+	String nodeList[] = namespace.split("/",2);
+	List ElementList=node.getChildren();
+	Iterator it = ElementList.iterator();
+	Element rtvEle = null;
+	while(it.hasNext())
+	{
+		Element e = (Element)it.next();
+		if (e.getName().equals(nodeList[0]))
+		{
+			// 더이상 탐험할 노드가 없다면 리턴
+			if (nodeList.length == 1)
+			{
+				return e;
+			}
+			rtvEle=getElement(e, nodeList[1]);
+		}
+	}
+	return rtvEle;
+}
+}}}
+이 메서드는 다음과 같이 사용할 수 있다.
+{{{#!plain
+Element root = doc.getRootElement();
+Element findEle=getElement(root,"entry/author");
+List authorInfo=findEle.getChildren();
+Iterator it = authorInfo.iterator();
+while(it.hasNext())
+{
+	Element e = (Element)it.next();
+	System.out.println("ReadInfo : "+e.getName()+"::"+e.getValue());
+}
+}}}
+여기에 몇가지 메서드를 더 추가한다면, 그럭저럭 돌아가는 파서를 만들 수 있지 않을까란 생각이 든다. 예컨데..
+  * chield node의 Element name과 Value를 얻어올 수 있는 메서드 : 걍 map으로 규현할 수 있을 듯.
+  * chield node의 Element의 attribute를 얻어올 수 있는 메서드 : 리스트로 구현하면 될듯. 
+
+=== XML 문서 가공 ===
+
+=== 참고 ===
+ * '''xerces'''도 알아봐야 겠다. 

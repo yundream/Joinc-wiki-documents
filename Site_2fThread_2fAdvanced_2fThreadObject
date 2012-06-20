@@ -1,0 +1,438 @@
+#title 쓰레드 객체의 사용
+
+[[TableOfContents]]
+== 목 적 ==
+ * C++ 에서 자바의 그것과 비슷한 thread(:12) 객체를 만들어 사용한다
+ * 객체지향개념에서 각 쓰레드란건 프로그램에서 가장 큰 객체덩어리로 볼 수 있으며, 그런 관점에서 하나의 클래스의 인스턴스 자체로 쓰레드가 된다면 개념적으로 좋을것이다
+ * 클래스의 인스턴스를 생성하는순간 클래스의 멤버변수와 메소드를 가지고 활동하는 쓰레드가 가동된다
+ * 덧붙여, 데몬 프로그램에서 stop, restart 시에 보통 발생시키는 SIGTERM 신호를 받아서 각 자식 쓰레드들을 종료시킨 후 쓰레드 객체의 소멸자를 호출되게 하여 동적으로 생성한 메모리 및 각종 정리해야할 핸들러들을 해제시킨다
+
+=== Code 1 ===
+{{{#!plain down:thclass.cc
+/* 자바의 그것과 비슷한 쓰레드 객체 클래스 또는 인터페이스 구현 */
+/* 데몬으로 실행시 stop 에 의한 SIGTERM 신호에 쓰레드객체의 소멸자 호출처리 */
+                                                                                                                             
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <iostream>
+                                                                                                                             
+using namespace std;
+                                                                                                                             
+class tClass {
+                                                                                                                             
+   private :
+      pthread_t pt;
+      int* a;
+      void prn(void) {
+         cout << "This is private method " << *a << endl;
+      }
+      // 아래는 쓰레드에서 실제 사용될 메인 함수이다. 순수가상함수로 정의하여 이 클래스를
+      // 인터페이스화하여 상속받는 클래스에서 쓰레드함수로 필요한 작업을 정의하여 사용할
+      // 수 도 있겠다. 그럴땐 protected 혹은 public 멤버로 만들어놓아야 상속받는 클래스에서
+      // 이 순수가상함수의 내용을 정의하여 사용할 수가 있겠다. 또한 pthread_create를 생성자에서
+      // 호출하면 상속받은 클래스에서 내용을 정의해놓은 tFunc 가 호출될 수 없으므로 생성자에선
+      // pthread_create를 하지 않고 따로 멤버함수를 두어 거기서 쓰레드호출을 해야한다.
+      void tFunc(void) {
+         *a = 1;
+         prn();
+         while (1) {
+            cout << "This is thread method " <<  (*a)++ << endl;
+            sleep(1);
+         }
+      }
+      static void* callThread(void* arg); // 실제 pthread_create에 사용되는 메소드
+
+   public :
+      tClass(void) {
+         cout << "This is constructor" << endl;
+         a = new int;
+         pthread_create(&pt, NULL, callThread, this);
+         // static 멤버메소드는 static멤버에만 접근가능하므로 이 클래스의 객체주소를
+         // 인자로 넘겨 private를 포함한 모든 멤버를 사용할 수 있도록 한다.
+      }
+      ~tClass(void) {
+         int i;
+         // main의 종료시 종속쓰레드를 먼저 종료시키는지 인스턴스들의 메모리해제를
+         // 먼저 시키는지 알아보기 위하여 루프를 돌림
+         for (i = 0; i < 3; i++) {
+            cout << "This is destructor" << endl;
+            sleep(1);
+         }
+         delete a;
+      }
+                                                                                                                             
+};
+                                                                                                                             
+// static 멤버변수는 클래스 선언 밖에서 정의해야함
+void* tClass :: callThread(void* arg) {
+   tClass* tp;
+   tp = (tClass*) arg;
+   tp->tFunc();   // 쓰레드작업을 할 메소드를 실행시킨다
+   // 이 곳에서 직접 쓰레드작업들을 하여도 되겠으나, 클래스멤버를 사용할때마다
+   // 포인터를 통해 접근해야 하므로 깔끔하지 못하며 이 클래스를 인터페이스화하지 못한다
+}
+                                                                                                                             
+int main () {
+   int i;
+   tClass tc;
+   for (i = 0; i <  3; i++) {
+      cout << "This is main" << endl;
+      sleep(1);
+   }
+   cout << "main exit" << endl;
+   return (1);
+}
+}}}
+ * 실행을 시켜보면 main 종료시에 객체(변수를 포함한 모든 인스턴스들)의 해제가 먼저 일어나고 - 소멸자가 실행되는 동안 객체 쓰레드가 계속 실행되고 있음 - 그 다음 각 쓰레드을 종료하고 main이 종료되는것을 알 수 있다. 이것은 보통 아무 문제도 되지 않는다. 소멸자가 실행되고 쓰레드가 종료되는건 아주 빠른 순간에 일어날것이다. 그러나, 이미 해제된 메모리나 핸들러에 어떤 엑세스가 가해질 확률이 존재한다는것은 결코 깔끔하지 못하다(적어도 나는 찝찝하다). 그리하여, 보통 데몬의 stop 스크립트에서 발생시키는 SIGTERM을 처리하는 핸들러를 두어 수동으로 먼저 쓰레드를 종료시킨 후 소멸자가 호출되게 해보자.
+
+=== Code 2 ===
+{{{#!vim cpp
+/* 자바의 그것과 비슷한 쓰레드 객체 클래스 또는 인터페이스 구현 */
+/* 데몬으로 실행시 stop 에 의한 SIGTERM 신호에 쓰레드객체의 소멸자 호출처리 */
+                                                                                                                             
+#include <signal.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <iostream>
+                                                                                                                             
+using namespace std;
+                                                                                                                             
+class tClass {
+                                                                                                                             
+   private :
+      int* a;
+      void prn(void) {
+         cout << "This is private method " << *a << endl;
+      }
+      // 쓰레드함수이다. 순수가상함수로 정의하여 이 클래스를 인터페이스화하여
+      // 상속받는 클래스에서 쓰레드함수로 필요한 작업을 정의하여 사용할 수 도 있겠다.
+      void tFunc(void) {
+         *a = 1;
+         prn();
+         while (1) {
+            cout << "This is thread method " <<  (*a)++ << endl;
+            sleep(1);
+         }
+      }
+      static void* callThread(void* arg); // 실제 pthread_create에 사용되는 메소드
+                                                                                                                             
+   public :
+      pthread_t pt;  // main 에서의 pthread_cacel 호출을 위해 public으로 함
+      tClass(void) {
+         cout << "This is constructor" << endl;
+         a = new int;
+         pthread_create(&pt, NULL, callThread, this);
+         // static 멤버메소드는 static멤버에만 접근가능하므로 이 클래스의 객체주소를
+         // 인자로 넘겨 private를 포함한 모든 멤버를 사용할 수 있도록 한다.
+      }
+      ~tClass(void) {
+         int i;
+         // main의 종료시 종속쓰레드를 먼저 종료시키는지 인스턴스들의 메모리해제를
+         // 먼저 시키는지 알아보기 위하여 루프를 돌림
+         for (i = 0; i < 3; i++) {
+            cout << "This is destructor" << endl;
+            sleep(1);
+         }
+         delete a;
+      }
+                                                                                                                             
+};
+                                                                                                                             
+// static 멤버 메소드는 클래스 선언 밖에서 정의해야함
+void* tClass :: callThread(void* arg) {
+   tClass* tp;
+   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+   pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+   tp = (tClass*) arg;
+   tp->tFunc();   // 쓰레드작업을 할 메소드를 실행시킨다
+   // 이 곳에서 직접 쓰레드작업들을 하여도 되겠으나, 클래스멤버를 사용할때마다
+   // 포인터를 통해 접근해야 하므로 깔끔하지 못하며 이 클래스를 인터페이스화하지 못한다
+}
+                                                                                                                             
+tClass tc;  // sigHandler에서의 작업을 위해 전역으로 선언
+                                                                                                                             
+void sigHandler(int sig) {
+   cout << "Got signal " << sig << endl;
+   pthread_cancel(tc.pt);        // 쓰레드 종료
+   pthread_join(tc.pt, NULL);
+   cout << "Signal Handler exit" << endl;
+   exit(EXIT_SUCCESS);
+   // 객체의 소멸자는 main이 종료되면서 자동으로 호출된다. 이것도 직접 호출할려면
+   // tClass* tc로 선언하여 new하여 사용한 후 여기서 delete 하면 된다
+}
+                                                                                                                             
+int main () {
+   signal(SIGTERM, sigHandler);
+   while (1) {
+      cout << "This is main" << endl;
+      sleep(1);
+   }
+}
+}}}
+ * ps 하여 나오는 프로세스중에 이 프로그램명의 최상위 pid를 kill 해보자 (kill pid 혹은 kill -TERM pid)
+ * 자식 쓰레드를 먼저 종료시킨 후 소멸자가 호출되는것을 알 수 있다
+
+=== 미비점 ===
+ * 신호처리기에서 쓰레드객체에 접근하기 위하여 쓰레드객체의 인스턴스를 전역으로 선언하였다. 이러한것은 객체지향개념에서는 좋지 못하다. 가능한한 전역변수는 쓰지 않는것이 좋다. 허나 전통적인 시그널은 데이터를 전달할 수 가 없다. 때문에 RTS 를 사용하여 이를 해결할 수 있을것이다. 혹은, 데몬종료시의 메모리와 쓰레드 정리를 위한 더 좋은 방법이 있으면 알려달라 (정리안해도 된다는 말은 하지말아달라. 나도 안다. -.-; 그러나 하는게 좋지 않겠는가?)
+ * 부모 쓰레드의 비동기적인 종료시, 자식 쓰레드의 처리는 pthread_cancel()함수를 이용하면 해결가능할 거 같습니다. 밑에 2장을 한번 참고해 보시길  
+
+=== 잡 담 ===
+ * 어제, 오늘 위키를 작성해보았다. 무지 힘들다 -.-; 시간 무지 잡아먹는다. 혼자 테스트할 소스는 대충 하는데 여기 올릴려니 주석도 달고 변수명도 좀 다듬고 하는일이 훨씬 많다. 세상에서 2번째로 바쁜(바빠야하는) 내가 계속 글을 올릴 수 있을련지 모르겠다. 그보다 이 글들이 누군가에게 도움이 될련지 - 아마 될것이다. 된다고 해달라 - 의문이다.
+
+ * 많은 도움이 되고 있습니다. 이기적인 얘기 지만. 힘내세요. :) (jinoos)
+
+== 쓰레드 객체의 자원 정리 ==
+쓰레드를 클래스를 이용해서 객체화 할경우, 쓰레드를 detach 상태로 실행시키는 경우가 많다. 이 경우 pthread_joinc()함수를 이용하지 않게 됨으로, 부모 쓰레드는 자식쓰레드의 상태를 정확하게 알기 힘들고, 때문에 자원정리에 문제가 발생할 수 있다. 자식 쓰레드가 자신의 종료시점을 명확히 알고 있다면, 소멸자를 이용해서 필요한 해제를 할 수 있겠지만, pthread_cancel()등 비동기적인 방법으로 종료 시킬경우 문제가 될 수 있다.
+
+여러가지 방법이 있겠으나, 필자는 pthread_cleanup_push()와 pthread_cleanpu_pop() 함수를 이용해서 이 문제를 해결했다. 
+
+=== 테스트 서버 프로그램 ===
+간단한 테스트 서버 프로그램을 만들어 보도록 하겠다. 이 프로그램은 echo 클라이언트의 thread(:12) 버젼이다. 연결이 들어오면 부모쓰레드는 새로운 자식쓰레드를 생성한다. 또한 부모쓰레드는 select()를 이용하여 표준입력을 기다린다. 이 표준입력을 통해서 특정 '''자식쓰레드 종료'''나 '''자식쓰레드 상태 정보제공'''등과 같은 일을 하게 된다.
+{{{#!plain
+                                    +--------------+
+                           +------> | child Thread |----+
+                           |        +--------------+    |   +------------------+
+ +-------------+ accept()  |        +--------------+    |   | CleanUp Function |
+ | Main Thread |-----------+------> | child Thread |----+---| + delete this    | 
+ +-------------+           |        +--------------+    |   +------------------+
+       |                   |        +--------------+    |            |
+       |                   +------> | child Thread |----+            |
+       |                            +--------------+                 |
+       |   pthread_cancel()                                          |
+       | ------------------------->  pthread_cleanup_push()----->>---+
+       |
+   ---------------------- STDIN
+   Thread Information
+}}}
+
+
+{{{#!plain
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <iostream>
+#include <signal.h>
+
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include <string.h>
+#include <map>
+
+using namespace std;
+
+#define MAXLEN  256
+
+map<int, pthread_t> Cinfo;
+class tClass {
+	private :
+		pthread_t pt;
+		int sockfd;
+		char *buf;
+
+		static void* callThread(void* arg);
+		// 쓰레드 종료함수
+		// 자신을 delete 한다.
+		static void clean_up(void *arg)
+		{
+			delete (tClass *)arg;
+		}
+
+	public :
+		// Client와 통신을 담당하는 함수로 쓰레드 함수인 callThread에서 
+		// 호출한다.
+		void tFunc(void) 
+		{
+			int readn;
+			buf = (char *)malloc(MAXLEN);
+
+			// 쓰레드 종료함수인 clean_up을 호출한다.
+			// 인자로 쓰레드 자신의 포인터를 넘긴다.
+			pthread_cleanup_push(clean_up, (void *)this);
+			while (1) 
+			{
+				memset(buf, 0x00, MAXLEN);
+				readn = read(sockfd, buf, MAXLEN);
+				if(readn <=0)
+				{
+					perror("Socket Read Error:");	
+					break;
+				}
+				write(sockfd, buf, strlen(buf));
+			}
+			pthread_exit((void *)NULL);
+			// 쓰레드 종료함수를 pop시킨다.
+			pthread_cleanup_pop(0);
+		}
+
+		tClass(int sfd) 
+		{
+			sockfd = sfd;
+			buf = NULL;
+			pt = 0;
+			pthread_attr_t attr;
+
+			// 쓰레드를 Detached 상태로 만든다.
+			pthread_attr_init(&attr);
+			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+			pthread_create(&pt, &attr, callThread, this);
+		}
+
+		// 만들어진 쓰레드객체의 pthread_id를 리턴한다. 
+		pthread_t tClassId()
+		{
+			return pt;
+		}
+
+		// 소멸자로
+		// 쓰레드 자원과 전역 자료구조를 정리한다.
+		~tClass(void) 
+		{
+			map<int, pthread_t>::iterator mi;
+			if(buf) 
+				free(buf);	
+			if (sockfd)
+			{
+				mi = Cinfo.find(sockfd);
+				if (mi!=Cinfo.end())
+				{
+					Cinfo.erase(mi);
+			}
+			close(sockfd);
+		}
+		printf("Thread Close\n");
+	}
+};
+
+
+void* tClass :: callThread(void* arg) 
+{
+   tClass* tp;
+   tp = (tClass*) arg;
+   tp->tFunc();   
+}
+
+int main (int argc, char **argv) 
+{
+	pthread_t pthread;
+	struct sockaddr_in clientaddr, serveraddr, myaddr;
+	int maxfd = 0;
+	fd_set fd_w;
+	struct timeval timeout;
+
+	class tClass *ClientClass;
+
+	int server_sockfd, client_sockfd, client_len;
+
+	if (argc != 2)
+	{
+		printf("Usage : %s [PORT]\n", argv[0]); 
+		return 1;
+	}
+
+	if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		perror("socket error:");
+		return 1;
+	}
+
+	bzero(&serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr.sin_port = htons(atoi(argv[1]));
+
+	if (bind(server_sockfd, (struct sockaddr *)&serveraddr,
+					sizeof(serveraddr)) == -1)
+	{
+		perror("bind error:");
+		return 1;
+	}
+	if (listen(server_sockfd, 5) == -1)
+	{
+		perror("listen error :");
+		return 1;
+	}
+	client_len = sizeof(clientaddr);
+
+	char buf[MAXLEN];
+
+	// Main Thread
+	// Accept 입력인 경우 새로운 쓰레드를 생성시키고
+	// 표준입력인 경우 입력된 명령을 확인해서   
+	// show일경우 쓰레드 정보를 보여주고
+	// kill일 경우 해당 쓰레드를 종료시킨다. 
+	// kill 은 하나의 인자를 가진다. 인자는 소켓지정번호다.
+	while(1)
+	{
+		FD_ZERO(&fd_w);
+		FD_SET(0,  &fd_w);
+		FD_SET(server_sockfd, &fd_w);
+
+		select(server_sockfd + 1, &fd_w, (fd_set *)0, (fd_set*)0, NULL); 
+		if(FD_ISSET(server_sockfd,&fd_w))
+		{
+			client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr,
+											(socklen_t *)&client_len);
+			ClientClass = new tClass(client_sockfd);
+			Cinfo[client_sockfd] = ClientClass->tClassId();
+		}
+		else if(FD_ISSET(0, &fd_w))
+		{
+			memset(buf, 0x00, MAXLEN);
+			read(0, buf, MAXLEN);
+			if(strncmp(buf, "show", 4) == 0)
+			{
+				map<int, pthread_t>::iterator mi;
+				mi = Cinfo.begin();
+				printf("NUM\tThread ID\tClient Address\n");
+				while(mi != Cinfo.end())
+				{
+					getsockname(mi->first, (struct sockaddr *)&myaddr, (socklen_t *)&client_len);
+					printf("%d\t%u\t%s\n", mi->first, mi->second, inet_ntoa(myaddr.sin_addr));
+					*mi++;
+				}
+				printf("=============================\n");
+			}
+			if (strncmp(buf, "kill", 4) == 0)
+			{
+				map<int, pthread_t>::iterator mi;
+				mi = Cinfo.find(atoi(buf+5));
+				if (mi == Cinfo.end())
+				{
+					printf("Not Found Thread\n");
+				}
+				else
+				{
+					printf("Kill Thread %u\n", mi->second);
+					pthread_cancel(mi->second);
+				}
+			}
+		}
+		else
+		{
+			printf("Unknown\n");
+		}
+	}
+
+}
+}}}
+다음은 테스트 결과다.
+{{{#!plain
+# ./thclass 2222
+show
+NUM     Thread ID       Client Address
+4       3083553712      127.0.0.1
+5       3075161008      10.14.20.169
+=============================
+kill 5
+Kill Thread 3075161008
+Thread Close
+show
+NUM     Thread ID       Client Address
+4       3083553712      127.0.0.1
+=============================
+}}}

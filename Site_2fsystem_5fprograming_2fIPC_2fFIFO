@@ -1,0 +1,259 @@
+#title FIFO 활용
+
+=== FIFO ===
+pipe 에 대한 내용은 [wiki:Site/system_programing/IPC/UsedPipe Pipe의 사용]과 [wiki:article/SystemvIpcConcept System V IPC 에 대해서]를 참조하기 바란다.
+
+FIFO는 PIPE와달리 명명된(이름이 있는) 파일을 통하여 통신이 이루어지게 되므로, 서로다른 세션에 있는 프로세스라도 관계없이 통신을 할수가 있으며, 다중의 클라이언트를 받아들이기 위한 서버모델을 만들수있다. 그러나 Unix Domain 소켓과는 달리, 단일의 파일지시자를 통해서 연결이 되므로, select 등을 통하여 다중의 클라이언트중 원하는 클라이언트에 선별적으로 통신할수 있는 진정한 다중 서버/클라이언트 모델을 구성하는건 쉽지가 않다. 이럴경우는 Unix Domain 소켓과 같은 다른 방법을 찾아봐야 할듯하다.
+
+어쨋든 단지 다중의 클라이언트로 부터 메시지를 받아서 처리하는 것으로 끝나는 경우에는 (READ ONLY), 매우 간단하게 이러한 모델을 구현할수 있음으로 사용하기에 매우 편할것이다.  하나의 서버와 하나의 클라이언트로 구성되어 있고, 이들이 서로 메시지를 주고 받는 서비스를 만들경우에도, 비록 FIFO 가 읽기/쓰기를 지원하지만, 제대로된 작동을 보장받기 위해서는 읽기전용의 FIFO와 쓰기전용의 FIFO를 열어야 할것이다.
+ 
+FIFO 파일의 생성은 mkfifo(3)를 사용하는데, 다음은 실제 FIFO 파일을 만들어내는 간단한 예제이다.
+
+'''예제 : fifo.c'''
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>if</font></b> (mkfifo(argv[<font COLOR=#a900a9>1</font>], <font COLOR=#a900a9>0666</font>) != <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"mkfifo failure : "</font>);
+    }
+
+    <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>0</font>;
+}
+</pre>
+</td></tr>
+</table>
+}}}
+위의 프로그램을 컴파일한후 실행하면 fifo 파일이 만들어지는데, 이를 ls -al 록 확인해보면 아래와 같이 파일의 특성을 확인해볼수 있다. 
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost test]# ./fifo /tmp/testfifo2
+[root@localhost test]# ls -al /tmp/testfifo2
+prw-r--r--    1 root     root            0  2월  7 16:26 /tmp/testfifo2
+</pre>
+</td></tr>
+</table>
+}}}
+만들어진 fifo 파일의 크기는 해당 파일에 대한 입력이 있더라 하더라도 그 크기는 언제나 0인데 이유는 입력이 파일로 쌓이지 않고, 커널에서 이를 처리하기 때문 이다. 만들어진 fifo 파일은 PIPE 와 달리, 프로세스가 종료하거나, 시스템을 리부팅 시키더라도 사라지지 않으며(파일이니 당연하다), 직접 지워줄때까지 살아있게 된다. 리눅스에서는 FIFO를 만들도록 도와주는 mkfifo(2)라는 프로그램도 있으므로, FIFO 파일을 만들기 위해서 굳이 위의 예제처럼 fifo.c 파일을 만들필요는 없을 것이다.  
+
+만들어진 FIFO 파일로의 읽기및 쓰기는 보통의 파일을 위해서 사용하는 open(2)과 fopen(3) 등 일반적인 파일 열기/엑세스 함수군을 사용하면 된다.
+
+'''예제 : testfifo.c'''
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    FILE *fp;
+
+    <b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>if</font></b>((fp = fopen(<font COLOR=#ff0000>"/tmp/testfifo"</font>, <font COLOR=#ff0000>"rw"</font>)) == NULL)
+    {
+        perror(<font COLOR=#ff0000>"open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    memset(buf, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>255</font>);
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        <b><font COLOR=#0000ff>while</font></b>(fgets(buf, <font COLOR=#a900a9>255</font>, fp) != NULL)
+        {
+            printf(<font COLOR=#ff0000>"%s"</font>, buf);
+            memset(buf, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>255</font>);
+        }
+    }
+}
+</pre>
+</td></tr>
+</table> 
+FIFO 를 위한 명명된 파일이름은 "/tmp/testfifo" 로 정했다. <br>
+위의 프로그램을 컴파일한다음에 실행시키면, read 에서 블록되는데, 이때 
+/tmp/testfifo 로 표준출력 시키면 해당 메시지를 read 해서 화면에 
+출력시켜 줄것이다. echo 를 통해서 간단하게 테스트를 해보자   
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost /tmp]# echo "hello world" > testfifo
+</pre>
+</td></tr>
+</table>
+
+<br><br>
+이번에는 좀더 복잡한 프로그램을 만들어 보도록 하자. <br> 
+위의 예제는 단지 서버측에서 받아서 뿌리기만 했었는데, 이번에는 클라이언트측 
+에서 서버측으로 메시지를 보내면 서버측에서 메시지를 받은다음 다시 클라이언트 
+측에 보내고 클라이언트측에서 이 값을 출력하는 프로그램을 만들도록 하겠다<br>
+<br> 
+읽기/쓰기를 위해서 2개의 FIFO 파일을 만들어서 통신을 
+하게 될것이며, 각각의 이름은 fifo_c, fifo_s 로 하도록 하겠다.<br> 
+프로그램이 하는 일은 fifo_c.c 에서 fifo_s.c 로 숫자를 보내면 fifo_s.c 에서는 
+받은 숫자를 "거듭제곱" 해서 fifo_c.c 로 다시 보내주고 fifo_c 에서는 
+이를 출력시켜주는 간단 프로그램이다. <br> 
+쉘에서 mkfifo 명령을 이용해서 /tmp/fifo_c, /tmp/fifo_s 두개의 FIFO 파일을 
+생성하도록 하자.
+<br><br>
+<b>fifo_s.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+
+<font COLOR=#00b800>#define</font> chop(x) x[strlen(x) - 1] = 0x00 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> fp_w;
+    <b><font COLOR=#0000ff>int</font></b> fp_r;
+
+    <b><font COLOR=#0000ff>int</font></b> n;
+    <b><font COLOR=#0000ff>char</font></b> buf_r[<font COLOR=#a900a9>11</font>];
+    <b><font COLOR=#0000ff>char</font></b> buf_w[<font COLOR=#a900a9>11</font>];
+    <b><font COLOR=#0000ff>if</font></b>((fp_r = open(<font COLOR=#ff0000>"/tmp/fifo_c"</font>, O_RDONLY)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    <b><font COLOR=#0000ff>if</font></b>((fp_w = open(<font COLOR=#ff0000>"/tmp/fifo_s"</font>, O_WRONLY)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    memset(buf_r, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+    memset(buf_w, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+
+    <b><font COLOR=#0000ff>while</font></b>((n = read(fp_r, buf_r, <font COLOR=#a900a9>11</font>)) &gt; <font COLOR=#a900a9>0</font>)
+    {
+        printf(<font COLOR=#ff0000>"%s"</font>, buf_r);
+        chop(buf_r);
+        sprintf(buf_w, <font COLOR=#ff0000>"%d&#92;n"</font>, atoi(buf_r) * atoi(buf_r));
+
+        write(fp_w, buf_w, <font COLOR=#a900a9>11</font>);
+
+        memset(buf_r, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+        memset(buf_w, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+    }
+    exit(<font COLOR=#a900a9>1</font>);
+}
+</pre>
+</td></tr>
+</table>
+프로그램이 하는일은 간단하다.<br>
+/tmp/fifo_c 에서 메시지를 읽어서 이걸 제곱해서 /tmp/fifo_s 로 쓴다.  
+<br><br>
+<b>fifo_c.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+
+<font COLOR=#00b800>#define</font> chop(x) x[strlen(x) - 1] = 0x00 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> fp_r;
+    <b><font COLOR=#0000ff>int</font></b> fp_w;
+    <b><font COLOR=#0000ff>int</font></b> n;
+    <b><font COLOR=#0000ff>int</font></b> i;
+    <b><font COLOR=#0000ff>char</font></b> buf_r[<font COLOR=#a900a9>11</font>];
+    <b><font COLOR=#0000ff>char</font></b> buf_w[<font COLOR=#a900a9>11</font>];
+
+    <b><font COLOR=#0000ff>if</font></b>((fp_w = open(<font COLOR=#ff0000>"/tmp/fifo_c"</font>, O_WRONLY)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    <b><font COLOR=#0000ff>if</font></b>((fp_r = open(<font COLOR=#ff0000>"/tmp/fifo_s"</font>, O_RDONLY)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    i = <font COLOR=#a900a9>1</font>;
+
+    memset(buf_r, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+    memset(buf_w, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+    sprintf(buf_w, <font COLOR=#ff0000>"%d&#92;n"</font>, i);
+
+    <b><font COLOR=#0000ff>while</font></b>((n = write(fp_w, buf_w, <font COLOR=#a900a9>11</font>)) &gt; <font COLOR=#a900a9>0</font>)
+    {
+        read(fp_r, buf_r, <font COLOR=#a900a9>11</font>);
+
+        printf(<font COLOR=#ff0000>"%6d^2 = %s"</font>, atoi(buf_w), buf_r);
+        memset(buf_r, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+        memset(buf_w, <font COLOR=#a900a9>0</font>x0<font COLOR=#a900a9>0</font>, <font COLOR=#a900a9>11</font>);
+        i++;
+        sprintf(buf_w, <font COLOR=#ff0000>"%d&#92;n"</font>, i);
+        sleep(<font COLOR=#a900a9>1</font>);
+    }
+}
+
+</pre>
+</td></tr>
+</table>
+}}}
+이 프로그램은 1부터 프로그램을 종료시킬때까지 순차적으로 (1씩증가) /tmp/fifo_c에 쓰고, 그 결과값(제곱)을 /tmp/fifo_s 에서 읽어오고, 그 값을 화면에 출력한다.  fifo_s 를 먼저 실행하고 그다음 fifo_c 를 실행하면 된다.  다음은 실행화면이다.
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost test]#./fifo_s
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+
+[yundream@localhost test]#./fifo_c
+     1^2 = 1
+     2^2 = 4
+     3^2 = 9
+     4^2 = 16
+     5^2 = 25
+     6^2 = 36
+     7^2 = 49
+     8^2 = 64
+     9^2 = 81
+    10^2 = 100
+    11^2 = 121
+...
+</pre>
+</td></tr>
+</table>
+}}}
+
+=== 관련문서 ===
+  * mknod(2), pipe(2), popen(3) 
+  * [wiki:Site/system_programing/Book_LSP/ch08_IPC 리눅스 시스템 프로그래밍 8장 IPC]

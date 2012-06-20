@@ -1,0 +1,144 @@
+#title htons 메뉴얼 페이지  
+[wiki:man/3/htons HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/01/03           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>htons(3)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	host byte order을 따르는 데이터를 network byte order로 변경한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;netinet.h&gt;
+
+unsigned short int htons(unsigned short int hostshort);
+unsigned long int htonl(unsigned long int hostshort);
+unsigned short int ntohs(unsigned short int hostshort);
+unsigned long int ntohl(unsigned long int hostshort);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		데이터는 바이트 단위로 저장되지만 저장되는 방식에 있어서 CPU마다 
+		차이가 발생하게 된다. 예를 들어 4바이트 크기의 int자료를 저장한다고 
+		했을 때 어떤 CPU는 가장 낮은 바이트부터 저장을 하는가 하면, 어떤 CPU는
+		가장 높은 바이트 부터 데이터를 저장하기도 한다. 
+		전자를 Little Endian방식, 후자를 Big Endian방식 이라고 한다.     
+	</para>
+	<para>
+		이런 이유로 서로 다른 데이터 저장 방식을 사용하는 시스템끼리 통신을 
+		하게 될경우 전혀 원하지 않는 값들을 서로 주고 받는 경우가 발생할 수 있다. 
+		한쪽에서는 12345를 보냈는데, 다른 한쪽에서는 엉뚱하게 365779719로 받아 들이는 
+		문제들이 발생한다.    
+	</para>
+	<para>
+		이런 문제를 해결하기 위해서 데이터 통신을 할때는 명시적으로 
+		네트워크 byte order을 따르도록 데이터의 byte order를 변경한다. 
+		네트워크 byte order는 Big Endiasn을 따른다.   
+	</para>
+	<para>
+		원격 호스트와 데이터 통신을 하길 원한다면 보낼 때 네트워크 byte order로, 
+		받았을 때는 호스트 byteorder로 변경한다.   
+	</para>
+	<para>
+		<emphasis>htonl()</emphasis>함수는 long intger(일반적으로 4byte)데이터를
+		네트워크 byte order로 변경한다.
+	</para>
+	<para>
+		<emphasis>htons()</emphasis>함수는 short intger(일반적으로 2byte)데이터를
+		네트워크 byte order로 변경한다.
+	</para>
+	<para>
+		<emphasis>ntohl()</emphasis>함수는 long intger 데이터를
+		호스트 byte order로 변경한다.
+	</para>
+	<para>
+		<emphasis>ntohs()</emphasis>함수는 short intger 데이터를
+		호스트 byte order로 변경한다.
+	</para>
+	<para>
+		Endian과 네트워크 byte order에 대한 자세한 내용은 
+		<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=79">Endian에 대해서</ulink>를 참고하기 바란다. 
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		네트워크 byte order된 2바이트 값을 넘겨준다. 
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;sys/time.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;arpa/inet.h&gt;
+
+int main(int argc, char **argv)
+{
+    int client_sockfd;
+    struct sockaddr_in clientaddr;
+    int data = 123456789;
+    int client_len;
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr("192.168.100.190");
+    clientaddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(clientaddr);
+
+    if (connect(client_sockfd, (struct sockaddr *)&amp;clientaddr, client_len) &lt; 0)
+    {
+        perror("Connect error : ");
+        exit(0);
+    }
+    
+    // 보낼 데이터 네트워크 byte order를 따르도록 변경한다. 
+    data = htonl(data);
+    write(client_sockfd, (void *)&amp;data, sizeof(int));
+
+    // 읽어들인 데이터는 호스트 byte order을 따르도록 변경한다.
+    read(client_sockfd, (void *)&amp;data, sizeof(int));
+    data = ntohl(data);
+    close(client_sockfd);
+}
+		</screen>
+	</para>
+</section>
+</chapter>
+}}}

@@ -1,0 +1,51 @@
+#title jobs - background와 foreground의 실행중인 작업목록을 보여준다. 
+
+=== 설명 ===
+background와 foreground에서 실행중인 작업의 목록을 보여준다. 만약 실행중인 작업이 없다면, 바로 프롬프트가 떨어진다.
+
+=== 사용방법 === 
+{{{#!plain
+jobs [-p | -l] [-n] [-p] [-x] [job id]
+}}}
+  * -p | -l 실행중인 작업의 상태, PID, 작업 디렉토리등의 정보를 넘겨준다. 
+  * job id  id인 작업의 정보를 보여준다. 
+
+=== 사용예 ===
+==== 일반적인 사용 ====
+{{{#!plain linenum 
+$ ./myc&
+[1] 19461
+$ ./abs 
+[2]+  Stopped                 ./abs
+$ jobs -l
+[1]- 19461 Running                 ./myc &
+[2]+ 19469 Stopped                 ./abs
+}}}
+myc는 백그라운드 상태로 실행을 시키고, abs는 포그라운드 상태로 실행시킨뒤, '''Ctrl+z'''를 이용해서, 중단을 시켰다. 그 후 jobs를 이용해서 작업목록 정보를 출력했다. 
+
+==== 작업제어 ====
+다음과 같은 작업목록이 만들어져 있다고 가정해보자.
+{{{#!plain
+$ jobs 
+[1]   Running                 ./myc &
+[2]-  Stopped                 ./abs
+[3]+  Stopped                 ./bbs
+}}}
+ * kill [%id] 을 이용해서 특정 프로세스에 signal(:12)을 전송할 수 있다. 다음과 같이 하면 id가 1인 myc에 SIGKILL이 전달된다.
+   {{{#!plain
+$ kill -9 %1 
+}}}
+ * bg [id]를 이용해서 중지된 작업을 백그라운드작업 상태로 전환할 수 있다. 
+   {{{#!plain
+$ bg 3
+[3]+ ./bbs &
+$ jobs $ jobs 
+[1]   Running                 ./myc &
+[2]-  Stopped                 ./abs
+[3]-  Running                 ./bbs &
+}}}
+ * fg [id]를 이용하면 작업을 포그라운드 상태로 전환할 수 있다.
+   {{{#!plain
+$ fg 2
+./abs
+}}}

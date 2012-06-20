@@ -1,0 +1,789 @@
+ 1. http://www.linuxassembly.org/articles/linasm.html 리눅스 어셈블리 하우투
+
+'''목차'''
+[[TableOfContents]]
+
+== HTML 문서 ==
+[[getnews(151)]]
+
+== [docbook] 원본문서 ==
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>Linux Assembler 하우투</title>
+
+	<author>
+		<surname>윤상배</surname>
+
+		<affiliation>
+			<address>
+				<email>yundream@joinc.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+    <revhistory>
+        <revision>
+            <revnumber>0.9</revnumber>
+            <date>2003년 12월 01일 23시</date>
+            <revremark><ulink url="//www.joinc.co.kr/modules/moniwiki/wiki.php/Linux_asm">linux assembley wiki</ulink>에서 joinc로 옮김</revremark>
+        </revision>
+	</revhistory>
+	<revhistory>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2003년 11월 27일 18시</date>
+			<revremark>최초 문서작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+<section>
+	<title>소개</title>
+	<para>
+		이 문서는 Linux에서의 어셈블리 언어 프로그래밍에 대한 내용을 다룬다. 리눅스에서는 
+		AT&amp;T문법을 따라는 강력한 어셈블러인 <emphasis>as</emphasis>를 제공한다. 
+		또한 리눅스의 핵심인 gcc 컴파일러는 c로된 코드에 어셈블러를 포함시킬 수 있는 
+		기능을 가지고 있다. 
+	</para>
+	<para>
+		이 문서는 여러분이 X86 어셈블리 언어와 C언어에 대한 기본적인 이해를 가지고 있을 
+		것이라는 가정하에 작성될 것이다.  
+	</para>
+</section>
+
+<section>
+	<title>인텔 문법과 AT&amp;T문법</title>
+	<para>
+		거의 하나의 표준을 지키고 있는 C언어와는 달리, 어셈블리언어는 
+		AT&amp;T와 Intel의 두가지 (표준?)문법을 가지고 있다. 또한 이들은 서로 호환되지 
+		않는 문법을 가진다. 이는 개발자를 매우 혼동시키는 요인이 되기도 하며, 
+		하나의 문법에만 익숙할 경우 동일한 일을 하는 다른 코드의 해석에 어려움을 
+		겪을 수도 있다. 이러한 혼동은 각각의 문법의 차이에 대한 기본적인 이해만 하고 
+		있다면 많이 줄일 수 있다. 그럼 우선 이들 두문법의 차이점에 대해서 간단히 
+		알아보고 넘어갇록 하겠다.  
+	</para>
+	<section>
+		<title>접두사 규칙</title>
+		<para>
+			Intel문법은 대체로 간단하며 어떠한 접두사나 접미사도 붙지 않는다. 실제 시중의 
+			많은 책들은 Intel문법을 사용한 예가 많다. 그러나 AT&amp;T의 경우 레지스터는 '%'접두사를 
+			가지며 값들은 '$'접두사가 붙는다. Intel문법의 경우 16진수와 2진데이터는 각각 'h'와 'b' 
+			접두사를 가진다. 그리고 6진수 값의 경우에는 '0'을 접두사로 사용한다.    
+			<table>
+				<title>접두사 규칙을 적용한 예</title>
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>Intel 문법</entry>
+						<entry>AT&amp;T 문법</entry>
+					</row>
+					<row>
+						<entry>mov  eax,1</entry>
+						<entry>movl #1,%eax</entry>
+					</row>
+					<row>
+						<entry>mov  ebx,0ffh</entry>
+						<entry>movl $0xff,%ebx</entry>
+					</row>
+					<row>
+						<entry>int 80h</entry>
+						<entry>int $0x80</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+		</para>
+	</section>
+	<section>
+		<title>오퍼랜드(Operansds)의 위치</title>
+		<para>
+			Intel분법과 AT&amp;T의 문범에서 오퍼랜드의 위치는 서로 정반대로 사용된다. Intel문법의 경우 
+			목적지(destination) 오퍼랜드가 먼저오고 원본(source) 오퍼랜드가 나중에 
+			오지만 AT&amp;T는 반대로 사용된다. AT&amp;T문법의 장점은 이해하기가 좀더 직관적이라는데 있다. 
+			보통 사람들은 왼쪽에서 오른쪽으로 글을 읽고 해석하는데 좀더 익숙하기 때문이다. 	
+			<table>
+				<title>오퍼랜드 위치의 차이</title>
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>Intel 문법</entry>
+						<entry>AT&amp;T 문법</entry>
+					</row>
+					<row>
+						<entry>instr  dest,source</entry>
+						<entry>instr  source,dest</entry>
+					</row>
+					<row>
+						<entry>mov eax,[ecx]</entry>
+						<entry>movl %ecx, %eax</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+		</para>
+	</section>
+	<section>
+		<title>메모리 오퍼랜드</title>
+		<para>
+			메모리 오퍼랜드의 사용도 약간의 차이점을 보인다. 인텔문법의 경우 
+			기본 레지스터(base register)는 '['와 ']'사이에 놓이지만 AT&amp;T은 
+			'('와 ')'사이에 놓인다. 		 
+			<table>
+				<title>메모리 오퍼랜드의 차이</title>
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>Intel 문법</entry>
+						<entry>AT&amp;T 문법</entry>
+					</row>
+					<row>
+						<entry>mov eax,[ebx]</entry>
+						<entry>movl (%ebx),%eax</entry>
+					</row>
+					<row>
+						<entry>mov eax,[ebx+3]</entry>
+						<entry>movl 3(%ebx),%eax</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+			AT&amp;T의 명령 (사칙연산과 같은)수행문법은 인텔문법에 비해서 
+			매우 보기힘들다는 단점을 가진다. 예를 들어 Intel문법에서는 
+			segreg:[base+index*scale+disp]로 표현되는 것이 AT&amp;T에서는 
+			%segreg:disp(base,index,scal)와 같은 식으로 표현된다. 언뜻 봐도 직관적이지 
+			않는 표현방식이다. 
+			<table>
+				<title>명령 수행 문법의 차이</title>
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>Intel 문법</entry>
+						<entry>AT&amp;T 문법</entry>
+					</row>
+					<row>
+						<entry>instr foo,segreg:[base+index*scale+disp]</entry>
+						<entry>instr %segreg:disp(base,index,scale).foo</entry>
+					</row>
+					<row>
+						<entry>mov eax,[ebx+20h]</entry>
+						<entry>movl 0x20(%ebx),%eax</entry>
+					</row>
+					<row>
+						<entry>add eax,[ebx+ecx*2h]</entry>
+						<entry>addl (%ebx,%ecx,0x2),%eax</entry>
+					</row>
+					<row>
+						<entry>lea eax,[ebx+ecx]</entry>
+						<entry>leal (%ebx,%ecx),%eax</entry>
+					</row>
+					<row>
+						<entry>sub eax,[ebx+ecx*4h-20h]</entry>
+						<entry>subl -0x20(%ebx,%ecx,0x4),%eax</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+		</para>
+	</section>
+	<section>
+		<title>접미사</title>
+		<para>
+			AT&amp;T문법의 경우 정해진 접미사규칙을 따른다. 각각의 접미사는 고유의 의미를
+			가지고 있으며, 접미사에 따라서 오퍼랜드의 크기도 정해진다. 'l'은 long, 
+			'w'는 word, 'b'는 byte를 저장하기 위해서 각각 사용한다. 반면 Inten문법의 경우
+			접미사를 사용하지 않고 의미있는 문장을 그대로 사용한다. 예를 들어 byte ptr, 
+			word ptr, dword ptr 등으로 사용한다. "dword"는 "long"와 같은 크기를 가진다. 
+			이러한 AT&amp;T의 접미사 규칙은 C문법의 캐스팅과 매우 비슷한 모습을 보여준다.  
+			<table>
+				<title>접미사 규칙</title>
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>Intel 문법</entry>
+						<entry>AT&amp;T 문법</entry>
+					</row>
+					<row>
+						<entry>mov al,bl</entry>
+						<entry>movb %bl,%al</entry>
+					</row>
+					<row>
+						<entry>mov ax,bx</entry>
+						<entry>movw %bx,%ax</entry>
+					</row>
+					<row>
+						<entry>mov eax,ebx</entry>
+						<entry>movl %ebx,%eax</entry>
+					</row>
+					<row>
+						<entry>mov eax,dword ptr[ebx]</entry>
+						<entry>movl (%ebx),%eax</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+			C문법에 익숙하다면 AT&amp;T문법이 좀더 편해 보일수도 있을 것 같다.
+		</para>
+	</section>
+</section>
+<section>
+	<title>시스템 콜(Syscalls)</title>
+	<para>
+		이번 장에서는 어셈블리어에서 리눅스 시스템콜을 이용하는 방법에 대해서 알아보도록 
+		하겠다. 리눅스에서 제공하고 있는 모든 시스템콜의 목록은 리눅스 man페이지의 섹션2에서 
+		찾아볼 수 있다. 이 man페이지들은 /usr/share/man/man2에 존재하며 
+		간단하게 ls를 한번 해보는 정도로 리눅스에서 제공하는 
+		시스템콜의 목록을 얻어올 수 있다. 이들 시스템콜의 정보는 
+		/usr/incude/sys/syscall.h에서 찾아볼 수도 있다. 이외에 
+		<ulink url="http://www.linuxassembly.org/syscall.html">리눅스 시스템 콜 정리</ulink>에서 
+		이들 시스템콜에 대한 매우 자세한 정보를 얻을 수있다(적극 추천).  
+		이러한 함수들은 리눅스 인터럽트 서비스인 <emphasis>int $0x80</emphasis>를 이용해서 
+		실행 시킬 수 있다.  
+	</para>
+	<section>
+		<title>시스템콜 인자가 6보다 작을 때</title>
+		<para>
+			모든 시스템콜은 <emphasis>시스템콜번호 %eax</emphasis>로 시작한다.
+			시스템콜의 인자가 6보다 
+			작을경우 각각의 인자는 %ebx, %ecx, %esl, %edi 순서로 입력할 수 있다. %eax는 
+			리턴값을 저장하기 위해서 사용된다.
+		</para>
+		<para>
+			시스템콜번호는 /usr/include/sys/syscall.h에서 찾을수 있다. 이 메크로들은 
+			SYS_&lt;syscall name&gt;형식으로 정의되어 있다. 
+			예를들어 SYS_exit, SYS_close등이다. 
+		</para>
+		<section>
+			<title>예제 : Hello World</title>
+			<para>
+				그럼 Hello World를 출력하는 간단한 어셈블리 코드를 만들어 보도록 하자. 
+				Hello World 프로그램에서 사용하는 시스템콜은 SYS_write와 SYS_exit의 2개다. 
+			</para>
+			<para>
+				SYS_write를 사용하기 위해서는 어떤 인자들을 필요로 하는지 알아야 하는데, 이러한 
+				정보들은 write(2)에 대한 man페이지를 참고하면 된다. man페이지를 보면 
+				<emphasis>sisze_t write(int fd, const void *buf, size_t count);</emphasis>로 
+				선언되어 있는걸 확인할 수 있다. 이걸 어셈블리방식으로 호출하고자 한다면 
+				첫번째 인자인 fd는 %ebx로, buf는 %ecx, count는 %edx로 SYS_write는 %eax에 대응되게 
+				호출하면 된다. 마지막에 $0x80을이용해서 시스템콜을 실행시키면 된다. 
+				리턴값은 %eax에 저장된다.  
+			</para>
+			<para>
+				<emphasis>예제 : write.s</emphasis>
+				<screen>
+.include "defines.h" 
+.data
+hello:
+    .ascii "hello world\n"
+
+.text
+    .globl _main
+    
+_main:
+    
+    movl $SYS_write, %eax
+    movl $STDOUT,%ebx 
+    movl $hello,%ecx
+    movl $12,%edx
+    int  $0x80
+
+    movl $SYS_exit, %eax
+    movl $3, %ebx
+    int $0x80    
+				</screen>
+				위코드를 성공적으로 실행시키기 위해서는 defines.h라는 파일을 가지고 
+				있어야 한다. 다음은 defines.h의 내용이다. 
+				<screen>
+SYS_exit        = 1
+SYS_fork        = 2
+SYS_write       = 4
+SYS_open        = 5
+SYS_close       = 6
+SYS_execve      = 11
+SYS_lseek       = 19
+SYS_dup2        = 63
+SYS_mmap        = 90
+SYS_munmap      = 91
+SYS_socketcall      = 102
+SYS_socketcall_socket   = 1
+SYS_socketcall_bind = 2
+SYS_socketcall_listen   = 4
+SYS_socketcall_accept   = 5
+
+SEEK_END        = 2
+PROT_READ       = 1
+MAP_SHARED      = 1
+
+AF_INET         = 2
+SOCK_STREAM     = 1
+IPPROTO_TCP     = 6
+
+
+STDOUT          = 1
+				</screen>
+			</para>
+			<para>
+				간단하게 시스템콜을 호출하는 프로그램을 만들어 보았는데, 위의 방식은 인자가 6보다 
+				작을 때에만 사용가능하다.  
+			</para>
+		</section>
+	</section>
+	<section>
+		<title>시스템콜 인자가 5보다 클 때</title>
+		<para>
+			시스템콜의 인자가 5보다더 크더라도 시스템콜 번호의 사용은 여전히 %eax 을  이용할 수 
+			있다. 그러나 인자의 경우에는 메모리에 준비(저장)되어 있는 값들을 이용해야 한다. 
+			예를 들어 %ebx는 첫번째 인자를 가르키게(point)하는 식으로 사용한다. 80386 CPU의 
+			경우 레지스터의 크기는 32비트이므로 4바이트씩-4(%ebx)-증가 시키는 
+			방식으로 다음의 인자값을 가져올 수 있다.    
+		</para>
+		<para>
+			이들 인자들은 스택(stack)영역을 사용하게 되므로 
+			인자들은 반드시 뒤에서 부터 집어 넣어야 한다. 
+			즉 첫번째 아규먼트는 가장 마지막에 들어가게 된다. 
+			스택의 포인터는 %ebx로부터 복사된다.   
+		</para>
+		<section>
+			<title>예제</title>
+			<para>
+				다음은 mmap()을 이용하는 C코드다. 
+			</para>
+			<para>
+				<screen>
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/mman.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+#define STDOUT  1
+
+int main()
+{
+    char *file="mmap.s";
+    char *mappedptr;
+    int fd,filelen;
+
+    if ((fd=open(file, O_RDONLY)) &lt; 0)
+    {
+        write(1, "error\n",6);
+        exit(0);
+    }
+    if ((filelen=lseek(fd,0,SEEK_END)) == -1)
+    {
+        perror("seek error");
+        exit(0);
+    }
+    printf("%d\n", filelen);
+    mappedptr=mmap(NULL,filelen,PROT_READ,MAP_SHARED,fd,0);
+    write(STDOUT, mappedptr, filelen);
+    munmap(mappedptr, filelen);
+    close(fd);
+}
+				</screen>
+				이 프로그램은 mmap.s 파일의 내용을 출력한다. 위의 프로그램에서 보면 
+				mmap(2)는 6개의 인자를 필요로 한다. 이들 인자는 메모리 상에 다음과 같이 
+				위치하게 된다.   
+				<table>
+					<title>접두사 규칙을 적용한 예</title>
+					<tgroup cols=2>
+					<tbody>
+						<row>
+							<entry>%esp</entry>
+							<entry>00000000</entry>
+						</row>
+						<row>
+							<entry>%esp+4</entry>
+							<entry>filelen</entry>
+						</row>
+						<row>
+							<entry>%esp+4</entry>
+							<entry>filelen</entry>
+						</row>
+					</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				다음은 mmap.c 코드의 어셈블리 버젼이다.  
+			</para>
+			<para>
+				<emphasis>예제 : mmap.s</emphasis>
+				<screen>
+/* mmap.s */
+.include "defines.h"
+
+.data
+fd:
+        .long   0
+fdlen:
+        .long   0
+mappedptr:
+        .long   0
+
+.text
+.globl _start
+_start:
+        subl    $24,%esp
+
+#       open(file, O_RDONLY);
+        movl    $SYS_open,%eax
+        movl    32(%esp),%ebx   # argv[1]을 가져온다. (%esp+8+24)
+        xorl    %ecx,%ecx       # O_RDONLY로 설정한다.
+        int     $0x80
+
+        test    %eax,%eax       # 리턴값을 검사해서 &lt;0 이면 종료한다.
+        js      exit
+
+        movl    %eax,fd         # open성공했다면 리턴값을 fd에 저장한다.
+
+#       lseek(fd,0,SEEK_END);
+        movl    %eax,%ebx       # fd를 첫번째 인자로
+        xorl    %ecx,%ecx       # offset을 0으로
+        movl    $SEEK_END,%edx
+        movl    $SYS_lseek,%eax
+        int     $0x80
+
+        movl    %eax,fdlen      # 리턴값(파일길이)를 저장한다.
+
+        xorl    %edx,%edx
+
+#       mmap(NULL,fdlen,PROT_READ,MAP_SHARED,fd,0);
+        movl    %edx,(%esp)
+        movl    %eax,4(%esp)
+        movl    $PROT_READ,8(%esp)
+        movl    $MAP_SHARED,12(%esp)
+        movl    fd,%eax
+        movl    %eax,16(%esp)
+        movl    %edx,20(%esp)
+
+        movl    $SYS_mmap,%eax
+        movl    %esp,%ebx
+        int     $0x80
+
+        movl    %eax,mappedptr  # save ptr
+
+#       write(STDOUT, mappedptr, fdlen);
+        movl    $STDOUT,%ebx
+        movl    %eax,%ecx
+        movl    fdlen,%edx
+        movl    $SYS_write,%eax
+        int     $0x80
+
+#       munmap(mappedptr, fdlen);
+        movl    mappedptr,%ebx
+        movl    fdlen,%ecx
+        movl    $SYS_munmap,%eax
+        int     $0x80
+
+#       close(fd);
+        movl    fd,%ebx         # load file descriptor
+        movl    $SYS_close,%eax
+        int     $0x80
+exit:
+#       exit(0);
+        movl    $SYS_exit,%eax
+        xorl    %ebx,%ebx
+        int     $0x80
+        ret
+				</screen>
+			</para>
+		</section>
+	</section>
+	<section>
+		<title>명령행 인자의 사용</title>
+		<para>
+			명령행 인자는 리눅스에서 스택에 저장된다. argc가 가장먼저오고 그뒤에 포인터의 
+			배열 형태(**argv)로 저장된다. 그다음에는 환경변수가 오는데 argv와 마찬가지로 
+			포인터의 배열(**envp)로 저장된다.  
+		</para>
+	</section>
+</section>
+
+<section>
+	<title>Inline 어셈블리</title>
+	<para>
+		이번 장에서는 GCC에서 인라인 어셈블리(이하 인라인 어셈)를 이용해서 X86 애플리케이션을 작성하는 
+		방법에 대해서 알아보겠다. 
+	</para>
+	<para>
+		gcc에서의 인라인 어셈블리사용은 매우 직관적이다. 다음은 인라인 어셈블리의 
+		일반적인 모습이다.  
+		<screen>
+    __asm__(movl %esp,%eax");	
+또는 
+    __asm__("
+                movl $1,%eax     // SYS_exit
+                xor  %ebx,%ebx
+                int  $0x80
+            "); 
+
+		</screen>
+	</para>
+	<para>
+		기본적으로 C와 어셈블리는 매우 다른 인터페이스를 가진다. 그러므로 C와 인라인 어셈간의
+		데이터 교환을 도와주는 인터페이스를 필요로 한다. gcc는 
+		<emphasis>input/output/modify</emphasis>를 이용해서 데이터를 교환할 수 있다. 
+		이것은 다음과 같은 형식을 가진다.   
+		<screen>
+__asm__("&lt;asm routine&gt;": output : input : modify);
+		</screen>
+		output과 input은 반드시 존재해야 하며 C와 데이터를 교환하기 위해서 사용된다. 
+		output 오퍼랜드의 값을 바깥으로 저장하기 위해서는 '='를 이용해서 출력이 
+		이루어질 곳을 명시해주어야 한다. 
+		여기에는 다중(multiple) outputs, inputs, modified 레지스터를 사용가능하다. 각각의 "entry"는 
+		','로 구분되며 10개 이상의 entry는 사용할 수 없다. 오퍼랜드에 사용될 문자는 
+		완전한 레지스터이름을 사용해도 되고, 이게 귀찮다면 다음과 같은 간단한 단일 문자로도 
+		사용할 수 있다. 	 
+		<table>
+			<title>inline에서의 레지스터이름</title>
+			<tgroup cols=2>
+			<tbody>
+				<row>
+					<entry>줄임말</entry>
+					<entry>레지스터이름</entry>
+				</row>
+				<row>
+					<entry>a</entry>
+					<entry>%eax/%ax/%al</entry>
+				</row>
+				<row>
+					<entry>b</entry>
+					<entry>%ebx/%bx/%bl</entry>
+				</row>
+				<row>
+					<entry>c</entry>
+					<entry>%ecx/%cx/%cl</entry>
+				</row>
+				<row>
+					<entry>d</entry>
+					<entry>%edx/%dx/%dl</entry>
+				</row>
+				<row>
+					<entry>S</entry>
+					<entry>%esx/%sx/%sl</entry>
+				</row>
+				<row>
+					<entry>D</entry>
+					<entry>%edi/%di</entry>
+				</row>
+				<row>
+					<entry>m</entry>
+					<entry>memory</entry>
+				</row>
+			</tbody>
+			</tgroup>
+		</table>
+		다음은 간단한 예다. 
+		<screen>
+__asm__("test %%eax,%%eax" : /* no output */ : "a"(foo));
+또는
+__asm__("test %%eax,%%eax" : /* no output */ : "eax"(foo));
+
+		</screen>
+	</para>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+
+int main(int argc, char **argv)
+{
+    int foo=10, bar=15;
+
+    __asm__ __volatile__("test  %%eax,%%eax" : :"a"(foo));
+    __asm__ __volatile__("addl  %%ebx,%%eax\n\t":"=a"(foo):"a"(foo), "b"(bar));
+
+    printf("foo + bar = %d\n", foo);
+    return 0;
+}
+		</screen>
+		위의 예제를 보면 레지스터의 접두사로 '%'대신 "%%"를 사용하고 있음을 알 수 있다. 
+		Input/Output/Modify clubber가 있을때는 %%를
+		사용하고 그렇지 않으면 %를 사용한다.
+	</para>
+	<para>
+		또한 __asm__과 함께 __volatile__ 키워드를 사용할수 있는데, 이것을 사용하면 
+		어셈블리 명령이 삭제되거나, 이동되거나 혼합되는 경우를 방지할 수 있다. 
+	</para>
+	<para>
+		그리고 "eax", "ax", "al" 대신 간단하게 "a"를 사용하고 있음을 주목하기 바란다. 이것은 
+		다른 레지스터에도 동일하게 적용된다. 여기에 더불어 gcc는 %0에서 %9까지 사용가능한 
+		레지스터 별칭을 제공한다.  
+	</para>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+
+int main()
+{
+    long eax;
+    short bx;
+    char cl;
+
+    __asm__("nop;nop;nop");
+    __asm__ __volatile__
+    (
+        "test %0,%0
+         test %1,%1
+         test %2,%2"
+        : /* no outputs */
+        : "a"((long)eax), "b"((short)bx), "c"((char)cl)
+     );
+    __asm__("nop;nop;nop");
+
+    return 0;
+}
+		</screen>
+		위의 코드를 컴파일한후 gdb를 이용해서 disassemble를 해보도록 하자.		
+		<screen>
+# gcc -o inline2 inline2.c
+# gdb ./inline2
+[root@localhost root]# !gd
+gdb ./inline2
+GNU gdb Red Hat Linux (5.2.1-4)
+Copyright 2002 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB.  Type "show warranty" for details.
+This GDB was configured as "i386-redhat-linux"...
+(gdb) disassemble main
+Dump of assembler code for function main:
+0x80482f4 &lt;main&gt;:       push   %ebp
+0x80482f5 &lt;main+1&gt;:     mov    %esp,%ebp
+0x80482f7 &lt;main+3&gt;:     push   %ebx
+0x80482f8 &lt;main+4&gt;:     sub    $0x14,%esp
+0x80482fb &lt;main+7&gt;:     and    $0xfffffff0,%esp
+0x80482fe &lt;main+10&gt;:    mov    $0x0,%eax
+0x8048303 &lt;main+15&gt;:    sub    %eax,%esp
+0x8048305 &lt;main+17&gt;:    nop    
+0x8048306 &lt;main+18&gt;:    nop    
+0x8048307 &lt;main+19&gt;:    nop    
+0x8048308 &lt;main+20&gt;:    mov    0xfffffff8(%ebp),%eax
+0x804830b &lt;main+23&gt;:    mov    0xfffffff6(%ebp),%bx
+0x804830f &lt;main+27&gt;:    mov    0xfffffff5(%ebp),%cl
+0x8048312 &lt;main+30&gt;:    test   %eax,%eax
+0x8048314 &lt;main+32&gt;:    test   %bx,%bx
+0x8048317 &lt;main+35&gt;:    test   %cl,%cl
+0x8048319 &lt;main+37&gt;:    nop    
+0x804831a &lt;main+38&gt;:    nop    
+0x804831b &lt;main+39&gt;:    nop    
+...
+		</screen>
+		위의 결과를 보면 인라인 어셈으로 부터 코드가 생성될때 
+		컴파일러가 자동적으로 오퍼랜드의 크기를 찾아내서 
+		%0, %1, %2에 대응되는 레지스터로 대응시키고 있음을 알 수 있다. 
+	</para>
+	<para>
+	</para>
+</section>
+
+<section>
+	<title>Compiling</title>
+	<para>
+		어셈블리 어로된 프로그램을 컴파일하는 것은 일반적인 C프로그램을 컴파일하는 것과 
+		비슷하다. 컴파일은 아래와 같이 2가지 방법으로 가능하다. 1번 방법처럼 
+		C 프로그램과 비슷하게 만들수도 있고, main대신 _start를 써서 컴파일할 수도 
+		있다. 단지 main와 _start만 바꿨을 뿐이라고 생각하겠지만 컴파일방법과 
+		컴파일한 결과에 있어서는 약간의 차이를 가진다.    
+		<orderedlist>
+		<listitem>
+			<para>
+				<screen>
+# cat write.s
+.include "defines.h"
+
+.data
+hw:
+    .string "hello world\n"
+.text
+.global main
+
+main:
+    movl $SYS_write,%eax
+    movl $1,%ebx
+    movl $hw,%ecx
+    movl $12,%edx
+    int  $0x80
+    movl $SYS_exit,%eax
+    xorl %ebx,%ebx
+    int  $0x80
+    ret
+# gcc -o write write.s
+# wc -c ./write
+   11822 ./write
+# strip ./write
+# wc -c ./write
+    2580 ./write
+				</screen>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<screen>
+# cat write.s 
+.include "defines.h"
+
+.data
+hw:
+    .string "hello world\n"
+.text
+.global _start
+
+_start:
+    movl $SYS_write,%eax
+    movl $1,%ebx
+    movl $hw,%ecx
+    movl $12,%edx
+    int  $0x80
+    movl $SYS_exit,%eax
+    xorl %ebx,%ebx
+    int  $0x80
+
+# gcc -c write2.s 
+# ld -s -o write write.o
+# wc -c ./write
+    392 ./write
+				</screen>
+			</para>
+		</listitem>
+		</orderedlist>
+		<emphasis>-s</emphasis>는 옵션으로 ELF실행파일을 strip시킨 상태로 생성한다. -s옵션을 
+		주지 않을경우 실행파일의 크기가 상당히 커진다. 1번과 2번 모두 비슷한 코드이지만 
+		2번 코드의 경우 실행파일의 크기가 획기적으로 작아져 있음을 확인할 수 있다.   
+	</para>
+</section>
+
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink url="http://www.linuxassembly.org/articles/linasm.html">Using Assembly Language in Linux</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/assembly docbook">어셈블리 기초문서 (위키버젼)</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=150">어셈블리 기초문서 (JOINC 버젼)</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</article>
+}}}
+
+== 변경 사항 == 
+ 1. 2003/12/01 JOINC 기사로 옮김[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=151 리눅스와 어셈블리어]  - yundream 
+
+

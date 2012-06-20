@@ -1,0 +1,33 @@
+#title 프로세스 타임을 얻어온다. 
+
+== 사용법 ==
+{{{#!plain
+#include <sys/times.h>
+clock_t times(struct tms*buf);
+}}}
+=== 설명 ===
+times() 함수는 현재 프로세스 타임을 '''tms'''구조체에 되돌려준다. '''struct tms'''는 <sys/times.h>에 정의되어 있다.
+{{{#!plain
+struct tms {
+       clock_t tms_utime;  /* user time */
+       clock_t tms_stime;  /* system time */
+       clock_t tms_cutime; /* user time of children */
+       clock_t tms_cstime; /* system time of children */
+};
+}}}
+'''tms_utime'''는 프로세스가 호출한 명령을 수행하기 위해서 소비된 시간이다. '''tms_stime'''는 프로세스의 명령을 시스템차원에서 실행하는데 소비된 시간이다. '''tms_cutime'''은 종료된 모든 자식프로세스가 소비한 '''tms_utime'''이다. '''tms_cstime'''은 종료된 모든 자식프로세스가 소비한 '''tms_stime'''이다.
+
+tms_cutime과 tms_cstime은 wait(2)나 waitpid(2)에 의해서 프로세스가 되돌려 졌을때, 해당 자식프로세스의 tms_ctime과 tms_stime을 더하게 된다.
+
+=== 리턴 값 ===
+'''times'''함수는 clock ticks를 리턴한다. 이 값은 리눅스가 부팅된시간부터 지금까지 경과된 시간값을 가진다. 에러가 발생할 경우 (clock_t)-1을 리턴한다. 
+
+=== Note ===
+초당 사용되는 clock ticks의 크기는 sysconf(_SC_CLK_TCK)로 가져올 수 있다. POSIX-1996에 의해서 이 값은 <time.h>에 '''CLK_TCK'''로 정의되어 있다.  
+
+=== 참고 ===
+{{{#!plain
+ time(1), getrusage(2), wait(2), clock(3), sysconf(3)
+}}}
+
+[[comment]]

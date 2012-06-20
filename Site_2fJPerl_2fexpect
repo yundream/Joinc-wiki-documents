@@ -1,0 +1,560 @@
+#title expect를 이용한 자동화 프로그래밍
+
+[wiki:docbook/expect_프로그래밍 Docbook 원문]
+
+expect 에서 지원하는 멤버함수
+{{{#!plain
+  Expect->new()
+  Expect::interconnect(@objects_to_be_read_from)
+  Expect::test_handles($timeout, @objects_to_test)
+  Expect::version($version_requested | undef);
+  $object->spawn(@command)
+  $object->clear_accum()
+  $object->set_accum($value)
+  $object->debug($debug_level)
+  $object->exp_internal(0 | 1)
+  $object->notransfer(0 | 1)
+  $object->raw_pty(0 | 1)
+  $object->stty(@stty_modes) # See the IO::Stty docs
+  $object->slave()
+  $object->before();
+  $object->match();
+  $object->after();
+  $object->matchlist();
+  $object->match_number();
+  $object->error();
+  $object->command();
+  $object->exitstatus();
+  $object->pty_handle();
+  $object->do_soft_close();
+  $object->restart_timeout_upon_receive(0 | 1);
+  $object->interact($other_object, $escape_sequence)
+  $object->log_group(0 | 1 | undef)
+  $object->log_user(0 | 1 | undef)
+  $object->log_file("filename" | $filehandle | \&coderef | undef)
+  $object->manual_stty(0 | 1 | undef)
+  $object->match_max($max_buffersize or undef)
+  $object->pid();
+  $object->send_slow($delay, @strings_to_send)
+  $object->set_group(@listen_group_objects | undef)
+  $object->set_seq($sequence,\&function,\@parameters);
+}}}
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>expect 를 이용한 자동화 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>expect 를 이용한 자동화 프로그래밍</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>expect 란</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN21"
+>expect 를 이용한 자동화 프로그래밍</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN24"
+>expect + tcl 또는 expect + perl</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1&#51208;. <A
+HREF="#AEN29"
+>perl expect 모듈 설치하기</A
+></DT
+><DT
+>2.1.2&#51208;. <A
+HREF="#AEN38"
+>expect 를 이용한 ssh 자동로그인 프로그램</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN57"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. expect 란</A
+></H1
+><P
+>		expect 는 다른 <B
+CLASS="EMPHASIS"
+>응용 어플리케이션과</B
+> 
+		상호대화(interactive)하는 프로그램을 만들기 위해 만들어진 
+		프로그램이다. 나중에 expect 를 보면 알겠지만, 
+		간단한 프로그래밍 언어 형식을 취하고 있음을 알수 잇다.   
+	</P
+><P
+>		expect 를 이용하면 다른 어플리케이션과 상호대화를 할수 있게 
+		됨으로 자동화된 프로그램을 만들수가 있다. 
+		telnet 를 예로 들어보자면, expect 를 이용해서 telnet 와 
+		상호작용하게 함으로 써, 자동로그인 하는 프로그램을 
+		만들수도 있으며, 약간 응용해서 원격지의 서버를 자동으로 
+		관리하는 프로그램을 만들수도 있다.   
+	</P
+><P
+>		이러한 어플리케이션과의 상호대화는 어플리케이션의 
+		<B
+CLASS="EMPHASIS"
+>표준출력</B
+> 를 분석함으로써 이루어진다. 
+		간단한 예로 telnet 을 써서 어떤 호스트에 연결하면 
+		로그인 하기 위해서 수동으로 "아이디" 와 "패스워드"를 입력
+		해야 할것이다. 이경우 telnet 어플리케이션은 
+		<B
+CLASS="EMPHASIS"
+>사람</B
+>과 상호대화하는데, 사람은 
+		"login :" 과  "password :"와 같은 표준출력되는 
+		문자열을 통해서 자신의 아이디와 패스워드를 입력하는 
+		형식으로 telnet 과 상호대화 하게 된다. 
+		expect 역시 "login :"과 같은 특정한 문자열을 만나면 아이디를 
+		입력하도록 하는 방식으로 telnet 와 상호작용할수 있다. 
+		사람이 하는 일을 expect 를 이용해서 대신하도록 하는 케이스라고 
+		보면 된다.  
+	</P
+><P
+>		이러한 expect 의 상호대화 어플리케이션 제작 기능을 이용하면 
+		중앙서버에서 여러대의 호스트를 원격지에서 자동으로 관리하는 
+		어플리케이션의 손쉬운 제작이 가능하다. 
+		<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN18"
+></A
+><P
+><B
+>&#44536;&#47548; 1. expect 를 이용한 원격지 자동화된 서버관리</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/abw.gif"></P
+></DIV
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>2&#51208;. expect 를 이용한 자동화 프로그래밍</A
+></H1
+><P
+>		여기에 있는 내용들은 Linux 운영체제와, Perl 5.6.0 상에서 
+		태스트되어 있다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>2.1&#51208;. expect + tcl 또는 expect + perl</A
+></H2
+><P
+>			expect 는 기본적으로 tcl 과 함께 작동되는 어플리케이션이다. 
+			그럼으로 expect 를 제대로 활용하기 위해서는 tcl 문법을 
+			알고 있어야 한다. 그러나 안타깝게도 tcl 은 
+			그리 대중적인 언어가 아니다(특히 우리나라에서는). 
+			그리고 expect 는 그 특성상 시스템관리를 위한 보조도구로 
+			사용되는데, 아무래도 tcl 은 시스템관리를 위한 언어로 
+			사용하기에는 애매모호하다. 
+		</P
+><P
+>			tcl 자체가 강력하지 못해서가 아니라, 시스템관리용이라면 
+			아무래도 많은 관리자(혹은 개발자가) 쉽게 접할수 있는 언어로 
+			짜여져있는게 유지/보수를 위해서 좋을것이기 때문이다. 
+		</P
+><P
+>			시스템관리를 위한 최고의 언어라면 역시 PERL 이다. 
+			역사도 오래되었고, 비교적 널리알려진 문법을 사용하고 있으며, 
+			매우 성공한 언어이다. Unix 개발자라면 대부분 Perl을 사용하고 
+			있을것이다.  
+			또한 PERL은 모든게 모듈로 존재하는 언어로도 유명하다. 
+			당연히 expect 관련된 확장모듈도 존재하며, 이것을 이용해서 
+			좀더 쉽게 perl 을이용해서 expect 플밍을 할수 잇다.     
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>2.1.1&#51208;. perl expect 모듈 설치하기</A
+></H3
+><P
+>				perl expect 모듈은 확장 모듈임으로 별도로 
+				다운받아서 설치해야 한다.
+				<A
+HREF="http://theoryx5.uwinnipeg.ca/cpan/authors/id/R/RG/RGIERSIG/Expect-1.15.tar.gz"
+TARGET="_top"
+>Expect-1.1.5.tar.gz</A
+>을 다운 받도록 하자.  
+			</P
+><P
+>				expect 는 기본적으로 터미널을 통해서 상호대화 하는 
+				프로그램임으로 터미널 관련 모듈도 필요로 한다. 
+				<A
+HREF="http://www.joinc.co.kr/modules.php?name=Downloads&d_op=getit&lid=18"
+TARGET="_top"
+>IO-Tty-1.02.tar.gz</A
+>도 다운받도록 하자. 
+			</P
+><P
+>				2개의 파일을 다운받았다면 먼저 IO-Tty 모듈을 
+				설치하고 다음 Expect 모듈을 설치하면 된다. 
+				우선 IO-Tty를 먼저 설치한다. 적당한 디렉토리에 
+				서 압축을 푼다음에 다음과 같은 방법으로 컴파일후 
+				설치 하면된다. 	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost IO-Tty-1.02]# perl Makefile.PL 
+...
+[root@localhost IO-Tty-1.02]# make
+...
+[root@localhost IO-Tty-1.02]# make install
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음 Expect 를 역시 적당한 디렉토리에서 압축을 
+				푼다음 다음과 같은 방법으로 컴파일후 설치하도록 한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost Expect-1.15]# perl Makefile.PL 
+...
+[root@localhost Expect-1.15]# make
+...
+[root@localhost Expect-1.15]# make install
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이로써 expect 펄모듈을 사용하기 위한 모든 
+				준비작업이 끝났다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN38"
+>2.1.2&#51208;. expect 를 이용한 ssh 자동로그인 프로그램</A
+></H3
+><P
+>				그럼 expect 를 이용한 간단한 응용 프로그램을 
+				하나 만들어 보도록 하겠다. 
+			</P
+><P
+>				만들고자 하는 응용프로그램은 일정시간마다 ssh 를 
+				이용해서 해당 서버에 접근해서 몇개의 http 데몬이 떠있는 
+				지를 확인하고 사용중인 디스크를 체크하는 
+				프로그램으로 cron tab 을 이용해서 10분단위로 원격호스트에 
+				접근해서 정보를 얻어오고 이것을 파일로 기록하는 
+				일을 한다.    
+			</P
+><P
+>				테스트 호스트는 www.joinc.co.kr 로 할것이다. 
+				다음은 예제이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : expect.pl</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#!/usr/bin/perl
+use Expect;
+
+my $exp = Expect-&#62;spawn("ssh -l mercy4u 218.234.19.87");
+my $timeout = 100;
+$retry = 0;
+
+$exp-&#62;expect($timeout,
+             [qr 'password: $' =&#62; &#92;&#38;inputpassword],
+             [qr '[#&#62;&#92;$] $' =&#62; &#92;&#38;gethttpnum],
+             [timeout =&#62; &#92;&#38;timeouterr],);
+
+sub timeouterr
+{
+    die "NO Login&#92;n";
+}
+
+sub inputpassword
+{
+    my $lexp = shift;
+    if ($retry &#62; 0)
+    {
+        die "Login Error&#92;n";
+    }
+    $lexp-&#62;send("******&#92;n");
+    $retry++;
+    exp_continue;
+}
+
+sub gethttpnum
+{
+    my $lexp = shift;
+    $lexp-&#62;send("ps -aux | grep httpd | grep -v grep&#92;n");
+    $exp-&#62;log_file("dumpfile", "w");
+    $lexp-&#62;send("exit&#92;n");
+    $exp-&#62;log_file();
+    exp_continue;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>spawn()</B
+> 함수는 상호대화할 
+				프로그램을 띄우기 위한 목적으로 사용되며, 
+				실행된 프로그램과 표준출력/입력을 통해서 상호대화하게 된다. 
+				정말 중요한 부분은 바로 <B
+CLASS="EMPHASIS"
+>expect()</B
+> 함수이다. 
+				expect 라는 단어의 뜻에서와 같이, 이 함수는 특정한 
+				문자열을 기다리고, 해당 문자열을 발견하게 되면, 어떤 행동을 
+				취할수 있도록 인터페이스를 제공해준다. 
+			</P
+><P
+>				자동로그인을 하기 위해서는 우리는 'password:' 라는 
+				문자열을 발견했을경우 패스워드를 전송하면 될것이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>$exp-&#62;expect($timeout,
+             [qr 'password: $' =&#62; &#92;&#38;inputpassword],
+             [qr '[#&#62;&#92;$] $' =&#62; &#92;&#38;gethttpnum],
+             [timeout =&#62; &#92;&#38;timeouterr],);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 코드를 보면 password: 문자열을 만났을경우 
+				inputpassword 함수를 호출해서 로그인을 시도하고, 
+				프롬프트('#' '&#62;' '$')를 만났을때 gethttpnum 함수를 
+				호출해서 http 데몬의 상태를 얻어오도록 코딩되어 
+				있음을 알수 있다. perl 을 처음다루어 보았다면, 
+				코드가 약간 애매모호하게 보일수도 있겠으나, 이해하기가 
+				어렵지는 않을것이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>$timeout</B
+> 는 눈치챘겠지만, 
+				timeout 을 결정하기 위해 사용된 값이다. 
+				잘못된 코드 혹은 ssh 서버의 이상으로 인하여 
+				장기간 동안 원하는 문자열을 만나지 못해서 프로그램이 
+				계속 block 된 상태에서 머무를수도 있기 때문에 일정시간 
+				후에 행동을 결정하기 위해서 사용한다. 
+				위의 프로그램에서는 지정된 시간동안 어떠한 기다리는 
+				문자를 찾지 못했을경우 timeouterr 함수를 실행하도록 
+				되어있다.   
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>sub inputpassword
+{
+    my $lexp = shift;
+    if ($retry &#62; 0)
+    {
+        die "Login Error&#92;n";
+    }
+    $lexp-&#62;send("******&#92;n");
+    $retry++;
+    exp_continue;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수는 위에서 설명했듯이 'password: '라는 문자열을 
+				만났을경우 호출되는 함수로써, send() 함수를 이용해서 
+				패스워드 문자열을 전송한다. $retry 변수는 패스워드 입력의 
+				잘못등으로 몇번이상 로그인 실패가 발생했을경우 
+				이를 처리하기 위해서 사용되는 전역변수이다. 
+				여기에서는 한번이상 로긴에 실패하면 프로그램을 종료하도록 
+				해놓았다. 만약 잘못된 패스워드를 입력했을경우 
+				ssh 서버는 패스워드 재입력을 위해서 다시 'password: ' 문자
+				열을 출력할것이고 expect() 는 출력된 password: 문자열을 
+				검색할것임으로, inputpassword 가 몇번 호출되었는지를 
+				통해서 패스워드 입력이 재대로 이루어졌는지를 쉽게 
+				확인할수 있다.   
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>sub gethttpnum
+{
+    my $lexp = shift;
+    $lexp-&#62;send("ps -aux | grep httpd | grep -v grep&#92;n");
+    $exp-&#62;log_file("dumpfile", "w");
+    $lexp-&#62;send("exit&#92;n");
+    $exp-&#62;log_file();
+    exp_continue;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수는 프롬프트를 만났을때 실행되는 함수이다. 
+				프롬프트를 만났을경우 우리는 'ps -aux | ...' command 를 
+				실행하면 될것이다. 마찬가지로 send()를 이용해서 
+				command 를 실행한다. 그리고 실행된 결과는 
+				파일로 남겨야 할것이다. 이를 위해서 log_file() 함수를 
+				사용하고 있다.    
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN57"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 간단하게 expect 펄모듈 의 사용방법에 대해서 
+		알아보았다. 여기에서는 ssh 를 이용한 자동로그인과 
+		명령실행에 관한 아주 간단한 예만을 들어서 설명을 했는데, 
+		expect 는 이보다 훨씬더 복잡하고 지능화된 일들을 할수 있도록 
+		설계되어 있다. 
+		시스템의 정책값을 저장하거나, 데이타를 복사하거나 백업,
+		시스템에 이상유무가 있는지 판단해서 이를 복구하기 위한 용도등 
+		매우 폭넓게 사용할수 있을것이다.  
+	</P
+><P
+>		여기에 있는 내용들은 expect 모듈의 기능중 가장 기본적인 
+		내용들이다. 
+		perl expect 모듈의 좀더 자세한 내용은 
+		<A
+HREF="http://theoryx5.uwinnipeg.ca/CPAN/data/Expect/Expect.html"
+TARGET="_top"
+>perl expect 모듀 메뉴얼</A
+>을 참고하기 바란다.
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,685 @@
+''' JOINC FAQ ''' 
+
+[mailto:yundream@joinc.co.kr]
+
+반복적으로 자주 올라오는 질문들에 대한 FAQ를 작성하려 합니다. Q&A게시판과 joinc의 기사들을 
+차고로해서 만들어 나갈 생각입니다. 많이 참여해 주세요..
+||참고 사이트 																						||
+||[http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewforum&forum=1 JOINC 게시판]	||
+||[http://bbs.kldp.org/ KLDP BBS]																	||
+|| [http://www.faqs.org/faqs/linux/faq 리눅스 FAQ 아카이브]	||
+----
+[[TableOfContents]]
+=== 리눅스 시스템 프로그래밍 FAQ ===
+==== 컴파일 날짜 출력하기 ====
+ * 디버깅용도 등으로 사용하기 위해서 실행 프로그램의 컴파일 날짜를 출력하도록 하고 싶습니다. 하드코딩은 좋은 방법이 아닌것 같은데... 
+
+{{{#!plain
+int main(void)
+{
+    fprintf(stdout, "%s %s\n", __DATE__, __TIME__);
+    return 1;
+}
+}}}
+==== 모든 자식 프로세스를 종료 시키기 ====
+ * 부모프로세스에서 여러개의 자식 프로세스를 생성시켰습니다. 부모 프로세스가 죽었을 때, 모든 자식 프로세스도 종료하도록 하고픈데, 어떡해야 할까요. 
+
+프로세스는 보통 signal을 받고 종료될겁니다. 그렇다면 해당 종료 시그널에 대해서 모든 자식 프로세스에게 시그널을 보내는 시그널 핸들러를 설치하면 됩니다. kill(2)시스템 함수를 이용하면 됩니다. 자식 프로세스는 물론 해당 시그널을 받았을 때 종료하도록 코딩 되어 있어야 겠죠 ?  
+
+==== 일반유저 실행으로 슈퍼유저작업의 수행 ====
+ * 일반유저로 프로그램을 실행시켰지만, 슈퍼유저권한으로 파일을 수정해야 할경우 어떻게 해야 하나요 ? (일반유저가 장치를 마운트 시킬 수 있는 프로그램을 만들려고 합니다.) 
+
+chown(1)을 이용해서 해당 실행 프로그램에 SID를 주면 됩니다. 예를 들어 myprg라는 프로그램에 SID를 주길 원한다면 
+{{{#!plain
+# chown +s myprg 
+# ls -al
+-r-sr-xr-x    1 root    root        16336  2월 14  2003 myprg 
+}}}  
+그러면 일반사용자가 myprg를 실행시키더라도 프로그램의 사용자권한인 root권한을 가질 수 있게 됩니다. 편하게 사용할 수 있지만 일반유저가 루트권한을 가질 수 있다는 것 때문에 보안 취약점이 생길확률이 큽니다. 가능하면 사용을 피해야 하고 반드시 사용해야할 경우라면 주의를 기울여서 코드를 만들어야 합니다.  
+
+ 1. [wiki:article_안전한_프로그래밍 안전한 프로그래밍]
+
+==== 프로그램이 사용하는 라이브러리 목록 얻기 ====
+ * 특정 프로그램이 어떤 라이브러리를 사용하는지 알 수 있는 방법이 있나요?
+
+'''ldd'''를 이용하시면 됩니다. 예를 들어서 /bin/ls가 사용하는 라이브러리를 알고 싶다면 아래와 같이 확인할 수 있습니다. 
+{{{#!plain
+# ldd /bin/ls
+  libtermcap.so.2 => /lib/libtermcap.so.2 (0x4002b000)
+  libc.so.6 => /lib/tls/libc.so.6 (0x42000000)
+  /lib/ld-linux.so.2 => /lib/ld-linux.so.2 (0x40000000)
+}}}
+
+==== open()으로 열 수 있는 최대 파일의 갯수 ====
+ * 프로세스가 열수 있는 최대의 파일 갯수를 알아 보려면 어떻게 해야 할까요 ? 그리고 최대 파일 갯수를 늘리는 방법은 없을까요 ? 
+
+ulimit를 이용하면 오픈가능한 파일의 갯수를 알아낼 수 있습니다. 보통은 1024가 제한인데 이중 0,1,2는 기본적으로 생성되므로 실제 오픈 가능한 갯수는 1021개 가 됩니다.  
+{{{#!plain
+[root@yundream root]# ulimit -a
+core file size        (blocks, -c) 0
+data seg size         (kbytes, -d) unlimited
+file size             (blocks, -f) unlimited
+max locked memory     (kbytes, -l) unlimited
+max memory size       (kbytes, -m) unlimited
+...
+}}}
+
+==== 쓰레드간 공유 데이터 보호 ====
+ * 3개의 쓰레드가 전역으로 선언되어 있는 메모리 공간(정확하게는 구조체)를 공유합니다. 공유되는 데이터 영역을 보호해야할 필요가 있는데 어떻게 해야 할런지요.    
+
+보통은 mutex와 조건 변수를 사용합니다. 세마포어를 사용할 수도 있지만 논외로 하겠습니다. 다음 내용들을 참고하시기 바랍니다. 
+ 1. http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_pthread_mutex_조건변수
+ 1. http://www.joinc.co.kr/modules/moniwiki/wiki.php/pthread_API
+ 1. http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_pthread%202
+
+
+==== 자식 프로세스의 종료값 알아오기 ====
+ * fork()로 자식 프로세스를 생성한후 자식 프로세스의 종료값을 알고자 합니다. 쉘에서는 echo $?로 하면 종전 실행한 프로세스의 종료값을 알 수 있는데, 프로그램 상에서 가능한지요.
+
+wait(2)를 이용하면 됩니다. wait()는 자식 프로세스의 종료를 기다리는 함수로 자식 프로세스의 종료값을 가져옵니다.
+ 1. [wiki:article_Zombie에_대한_고찰 Zombie에 대한 고찰]
+ 1. [wiki:function_wait(2) wait(2)]
+
+
+==== 논블럭(none block)상태로 파일 관련 작업하기 ====
+ * 소켓프로그래밍을 하는데 write(2), read(2)는 응답이 올때 까지 기다리잖아요. 이걸 블럭되지 않고 바로 리턴하도록 하고 싶습니다.  
+
+fcntl(2)을 이용하면 됩니다. 
+{{{#!plain
+// 기존 파일의 값을 얻어온다음
+// NONBLOCK을 추가시킨다음 이를 적용시키는 코드.
+int value = fcntl(0, F_SETFL, 0) 
+value != O_NONBLOCK; 
+fcntl (0, F_SETFL, value);
+}}}
+
+ 1. http://www.joinc.co.kr/modules.php?name=News&file=article&sid=80 
+
+==== 입력 문자열이 화면에 표시되지 않도록 ====
+ * 만드는 프로그램에서 인증을 위해서 아이디와 패스워드를 입력하는 부분이 있습니다. 문제는 패스워드가 화면에 그대로 출력된다는 건데, 이걸 출력되지 않도록 하거나 '''*'''과 같은 문자열로 대치되어서 나오도록 할 수 없는 건지요.
+
+터미널을 입력을 반향(echo)하지 않도록 변경하면 됩니다. '''termios'''에서 제공하는 tcgetattr(3), tcsetattr(3)함수를 이용하면 됩니다. 
+
+ 1. [Code_C_inputpass] 
+ 1. [http:www.joinc.co.kr/modules.php?name=News&file=article&sid=101 터미널 제어]
+
+==== 리눅스 콘솔의 화면보호기 끄거나 설정하기 ====
+ * 리눅스 콘솔에서 입력이 전혀 없을때 특정 시간만 흐르면 화면이 검은색이 됩니다. 물론 다시 키보드 입력을 하면 돌아오지만 이 설정을 끄거나 시간을 설정하고 싶습니다. 이럴땐 어찌 하오리까?
+  1. 우선 특정 시간이 지나도 화면이 Blank 상태가 되지 않도록 하려면 다음과 같이 명령을 입력합니다.
+  {{{#!plain
+bash# setterm -blank 0
+}}}
+  2. 특정시간이 되면 Blank가 되도록 하려면 분단위로 1 ~ 60분까지 지정가능합니다. 예를 들어 10분동안 입력이 없을때 Blank상태로 진입하도록 하려면 다음과 같이 명령을 입력합니다.
+  {{{#!plain
+bash# setterm -blank 10
+}}}
+  3. 즉, setterm 명령을 이용하면 여러가지 콘솔상의 설정을 변경할수 있으며 blank기능은 {{{-blank}}}옵션을 사용하여 설정가능합니다. 여기서 0은 off를 의미하며 1 ~ 60까지의 숫자는 분을 의미합니다. 그 이상의 값은 정의되지 않거나 해당 메뉴얼을 따로 참조하세요.
+==== 문자열 암호화 하기 ====
+ * 아이디/패스워드 방식의 인증을 사용하고 있습니다. 이들 정도는 파일에 저장되고 인증 요청이 들어오면 비교하는 방식을 사용하는데, 파일에 저장되는 패스워드를 암호화 해서 저장해야 할것 같습니다. 적당한 방법 부탁드립니다.  
+   
+crypt(3)함수를 이용하면 됩니다. DES 단방향 해쉬알고리즘을 사용해서 복호화가 불가능 하도록 암호화됩니다. 이런 특성으로 패스워드 암호화등에 유용하게 사용됩니다. 
+ 1. [wiki:article_used_crypt crypt의 사용] 
+
+==== 파일 잠그기 ====
+ * 파일에 로그를 남기는 서버 프로그램입니다. 서버 프로그램은 fork()로 만들어져 있고 fork()된 자식프로세스들이 동일한 파일에 내용을 씁니다. 그런데 이렇게 몇번 돌다 보니 파일의 내용이 서로 꼬여 버리더군요.. 아마 하나의 프로세스가 파일을 쓰고 있는 중에 다른 프로세스가 써서 그런것 같은데 한번에 하나의 프로세스만 파일에 접근하도록 할 수 없는지요. 
+
+파일을 잠그는 방법은 여러가지인데 IPC를 이용한것은 논외로 하고 설명을 하겠습니다. 보통 '''flock(2)'''과 '''fcntl(2)'''을 사용합니다. 둘다 비슷하게 사용할 수 있지만 flock(2)의 경우 '''NFS'''등에는 적용할 수 없기 때문에 fcntl을 추천합니다. fcntl에 대한 내용은 [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=44 fcntl을 이용한 레코드잠금]을 참조하면 됩니다. 다음은 flock()를 이용한 파일 잠금 예제 입니다.  
+{{{#!plain
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int main()
+{
+    int fd;
+    char *file_name = "lock.file";
+
+    fd = open(file_name, O_RDONLY);
+    if (flock(fd, LOCK_EX) != 0)
+    {
+        printf("flock error\n");
+        exit(0);
+    }
+
+    while(1)
+    {
+        printf("OK File FD\n");
+        sleep(1);
+    }
+    close(fd);
+}
+}}}
+컴파일후 2개의 프로세스를 이용해서 테스트할 수 있습니다.  
+ 
+==== 외부 프로그램의 실행 ==== 
+ * 외부 프로그램을 실행하는 프로그램을 작성 중에 있습니다. exec를 사용해서 외부 프로그램을 실행시켰습니다. 그런데 실행까지는 잘되었는데 외부프로그램이 종료되었을 때 원래 프로그램까지 종료되어 버리더군요 ? 다시 원래 프로그램으로 되돌아오게 해야 되거든요.. 해결방법좀 알려주세요.  
+
+'''exec()'''계열 함수를 이용해서 외부 프로그램을 실행시켰을 경우 새로운 프로세스가 수행되는게 아닙니다. 지금 현재의 프로세스를 새로운 프로그램의 프로세스가 그대로 덮어 버리는 방식으로 수행됩니다. 한마디로 기존 프로세스는 사라지는 거죠. 그러니 프로그램이 종료하면 그걸로 끝나버리는 겁니다. 이럴 경우에는 '''fork()'''시킨 다음 exec를 시켜줘야 합니다. 자세한 내용은 [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=28 프로세스 관계]를 참고하세요. 
+
+==== 외부 프로그램과의 양방향 통신 ====
+ * 위의 fork&exec 기법을 이용해서 외부 프로그램을 실행 시켰습니다. 이들 부모와 자식 프로세스간의 통신이 이루어져야 합니다. 그런데 이걸 양방향으로 하고 싶습니다. pipe()를 써도 되겠지만 기본적으로 단방향이라서 너무 복잡합니다. 이왕이면 자식 프로세스(프로그램)의 수정은 최소화 하는 쪽으로 가고 싶거든요.. 
+
+sockpair(2)을 이용하시면 됩니다. sockpair()은 연결된 소켓 쌍을 만들며 이것을 이용해서 양방향 통신이 가능해 집니다. 
+{{{#!plain
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+int main()
+{
+    int pid;
+    char buf[256];
+    int fd;
+    int sv[2];
+    int num = 0;
+
+    socketpair(AF_UNIX, SOCK_STREAM, AF_LOCAL, sv);
+    pid = fork();
+    if (pid == 0)
+    {
+        dup2(sv[0], 0);
+        execl("./pipe_cl", "pipe_cl", NULL);
+    }
+    else if (pid > 0)
+    {
+        while(1)
+        {
+            write(sv[1], (void *)&num, 4);
+            printf("write %d\n", num);
+            read(sv[1], (void *)&num, 4);
+            printf("read %d\n", num);
+        }
+    }
+}
+}}}
+
+다음은 pipe_cl의 코드 입니다.
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+
+int main()
+{
+    char buf[256], buf2[256];
+    int num;
+    while(1)
+    {
+        memset(buf, 0x00, 256);
+        memset(buf2, 0x00, 256);
+        read(0, (void *)&num, 4);
+        num++;
+        write(0, (void *)&num, 4);
+        sleep(1);
+    }
+}
+}}}
+
+==== 프로그램의 종료상태 알아보기 ====
+ * 위의 fork&exec방법으로 외부프로그램을 성공적으로 실행시켰습니다. 프로그램이 종료된 후 부모프로세스는 종료된 자식프로세스의 리턴값을 확인해서 작업의 내용이 분기 되도록하고 싶습니다. 자식프로세스의 리턴값을 알아오는 방법이 있는지요.  
+
+==== 모듈별 분할 컴파일 ====
+ * a.c, b.c, c.c 의 3개의 파일이 있습니다. a.c에 main함수가 있고 b.c와 c.c의 함수를 호출해서 사용합니다. 이것들을 gcc를 이용해서 컴파일해서 3개의 오브젝트를 만들었는데, 이것들을 합쳐서 실행파일로 만드는 법을 모르겠습니다.
+
+gcc의 -o옵션을 이용하면 됩니다. 
+{{{#!plain
+# gcc -o test a.o b.o c.o
+}}}
+위와 같이 하면 '''test'''이름의 실행파일이 만들어집니다. 
+
+==== 프로그래머를 위한 리눅스 배포판 추천해 주세요 ==== 
+ * 여기 저기 배포판이 참 많은것 같습니다. 각각의 배포판이 모두 특징이 있는것 같은데 특별히 개발자를 위한 좋은 배포판있으면 추천 바랍니다.  
+
+레드햇 배포판이 널리 쓰이기는 하지만 이 배포판은 개발자를 위한 배포판이라기 보다는 관리자를 위한 배포판이라는 성격이 좀 강합니다. 슬랙웨어는 설치/유지/관리가 너무 어렵고 자료 구하기도 쉽지 않구요. 개인적으로 gentoo를 추천합니다. 
+
+|| [mz_gentoo] 		|| [minzkn]님의 gentoo 설치 메뉴얼		||
+
+==== 메모리의 재할당 ====
+ * malloc을 이용해서 동적으로 메모리를 할당해서 사용하고 있습니다. 그런데 중간에 이 할당된 메모리 공간이 부족해져서 늘려야 하는 일이 발생했습니다. 이미 만들어진 메모리 공간을 늘릴 수 있는지요.   
+
+단순히 생각하자면 malloc를 이용해서 공간을 새로 잡고 기존의 공간에 있던 데이터를 복사한후 기존 메모리 공간을 해제(free)하는 방법이 있습니다. 그러나 굳이 저렇게 할필요는 없고 '''realloc(3)'''시스템 함수를 이용하면 됩니다. 
+ 1. [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=89#AEN55 동적 메모리할당] 
+ 
+==== 연결을 종료한 후에도 계속 남아있는 프로그램을 만들고 싶습니다 ====
+ * 제가 작성한 프로그램에 문제가 있습니다. 특성상 원격에 연결해서 작동하는 프로그램인데, 작동은 문제가 없는데 터미널이 끊어지면 프로그램도 함께 종료되어 버립니다 -.-. 터미널이 종료되더라도 계속 작동하는 프로그램을 만들어야 하거든요. 
+
+터미널이 종료되면 터미널에서 실행시킨 프로세스도 모두 종료됩니다. 이유는 터미널 종료시 터미널에서 실행된 모든 자식 프로세스로 SIGTERM이 전달되는데, SIGTERM시그널에 대한 프로세스의 기본행동이 종료이기 때문입니다. 그러므로 SIGTERM시그널을 무시하거나 핸들러를 등록시키는 등의 방법으로 터미널이 종료되더라도 자식프로세스는 계속 동작할 수 있도록 할 수 있습니다. 
+
+그러나 위의 방법은 그리 좋은 방법은 아닙니다. 시그널을 핸드링 하는 것 보다는 데몬(Daemon) 프로그램을 만드는게 좋은 방법입니다. 
+  
+
+==== 데몬(Daemon) 프로세스란게 뭐죠? ====
+
+==== Linux에서 만든 프로그램의 Unix로의 포팅 ====
+ * 리눅스에서 만들어진 프로그램을 솔라리스로 포팅해야 할 일이 생겼습니다. 리눅스에서 만든 코드가 솔라리스에서 수정없이 사용가능한지 만약 그렇지 않다면 얼마나 코드가 달라질 수 있는지 궁금합니다. 
+  
+
+==== link(2)함수를 이용해서 파일을 복사하려고 하는데 복사가 안됩니다. ====
+ * 파일 복사 프로그램을 만들고 있습니다. 이것을 간단하게 구현할려고 link(2)함수를 이용하고 있는데, 이상하게도 복사가 안되는 경우가 있습니다. 언제나 안되는게 아니고 가끔 안되는 경우가 발생합니다. 부디 문제를 해결해 주세요.
+
+link(2)함수는 정확하게 말하자면 파일을 복사하는 함수가 아니라 "하드 링크(hard link)"를 생성하는 함수입니다. 일반적으로 생각하는 복사의 경우 파일의 inode가 전혀다른 새로운 파일이 만들어지는 거지만 하드링크는 원본 파일의 inode를 가지고 파일을 연결하는 방식을 사용합니다. 그러므로 같은 파티션내에서는 문제가 없지만 다른 파티션으로 하드링크를 걸고자 할때 문제가 발생합니다. 왜냐하면 inode는 파티션(장치)단위로 만들어지는데 A파티션에서 96번이였다고 했을 때 B 파티션으로 하드링크를 만들려고 하면 이미 B파티션에 96번 아이노드를 사용하는 파일이 있을 수 있기 때문입니다.  
+
+파일일 복사하고자 한다면 link(2)를 사용하지 않고 직접 파일의 내용을 읽어서 복사하는 사용자 정의 함수를 만들어 써야 합니다.
+|| [http://www.joinc.co.kr/modules.php?name=Encyclopedia&op=content&tid=56 link(2) man 페이지]		||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=17 Unix 파일 다루기(2)			||
+
+==== 프로세스의 메모리 사용량, CPU점유율과 같은 정보를 얻어오고 싶습니다. ====
+ * 이전에는 ps -ef등의 정보를 system이나 popen()을 통해서 얻어 왔는데, 좀더 효율적이고 범용적인 방법을 찾고싶습니다.  
+
+유닉스의 /proc 파일시스템을 이용하는게 가장 좋은 방법입니다. 이 파일 시스템 밑에는 
+모든 프로세스의 실행정보 (메모리, CPU점유율, PID, 실행경로, 실행파일)를 담고 있는 파일이 있으며, 
+이것을 적당히 분석해서 뿌려주기만 하면 됩니다. 
+
+리눅스의 경우 /proc/[PID] 밑에 프로세스의 정보가 기록됩니다. 만약 pid가 2345라면 이 프로세스의 
+정보는 /proc/2345 밑에 저장됩니다. 자세한 내용은 proc의 man 페이지를 참고 하시거나 아래의 
+문서를 참고하시기 바랍니다.
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=123 프로세스 정보 얻어오기]	||
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=97 시스템 정보 수집]			||
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=76 proc파일 시스템을 이용한 프로세스 관리] ||
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=130 proc파일 시스템을 이용한 sms프로그램 제작]||
+
+==== 터미널의 창크기를 알아오는 방법이 없을까요 ? ====
+ * 터미널 기반의 프로그램을 만들고 있습니다. 그런데 X서버에서 한텀과 같은 터미널 애뮬레이터의 크기를 변경하면 화면이 깨지더군요. 창의 크기변화를 감지해서 이결 화면에 적용시키고 싶은데 방법이 궁금합니다. 
+
+터미널의 크기를 얻어오는 함수 입니다.  
+{{{#!plain
+int MZ_GetTerminalSize(int *s_col, int *s_row)
+{ 
+ struct winsize s_WinSize = {0, }; 
+ if(ioctl(fileno(stdout), TIOCGWINSZ, &s_WinSize) == 0) 
+ { 
+  if(s_col)*s_col = s_WinSize.ws_col; 
+  if(s_row)*s_row = s_WinSize.ws_row; 
+  return(1); 
+ } 
+ return(0); 
+}
+}}}
+
+그런데 보통 터미널 창을 변경하는건 비동기적인 사건이므로 (실행 중간 중간에 유저가 창을 변경 
+시킬수가 있죠) 이러한 창의 변경을 알아내기 위해서는 시그널을 사용해야 합니다. 
+창이 변경될때는 SIGWINCH시그널이 발생하니, 이 시그널에 대한 핸들러를 설치하면 됩니다. 
+아래의 페이지들을 참고하시기 바랍니다. 
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=101 터미널 제어]	||
+||[http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=28729&forum=1&9 터미널의 크기 알아내는 방법]	||
+ 
+==== 프로그램이 받을 수 있는 인자의 최대 길이는 ====
+ * 매우 긴 인자를 받아야 되는 프로그램을 작성 중입니다. 아마도 받을 수 있는 인자의 길이에 제한이 있을 것으로 생각되는데, Linux시스템에서 어느정도의 제한을 가지고 이는지 궁금합니다. 
+
+gcc version 2.95.3 커널 2.4.18에서의 테스트 결과입니다. 
+linux/limits.h 를 보면 다음과 같이 정의된 내용을 볼 수 있습니다. 
+{{{#!plain
+#define ARG_MAX 131072
+}}}
+혹은 다음과 같은 코드를 통해서 확인하실 수 있습니다.
+{{{#!plain
+#include <stdio.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+    printf("%ld\n", sysconf(_SC_ARG_MAX));
+    return 0;
+}
+}}}
+
+
+==== 외부 프로그램을 실행시키고 출력결과를 가져오려면 ? ====
+ * 제가 만든 프로그램에서 'ls'등을 실행시키고 화면에 출력되는 값들을 받아 오려면 어떻게 해야 하는지 궁금합니다. 이 값들을 읽어들이고 분석해서 어떤 일을 하는 프로그램을 짜고 싶습니다. 
+
+fork()시킨후에 execl를 이용해서 외부 명령어를 실행시키고 이것을 pipe로 연결하는 방법이 있습니다. 그러나 이것은 복잡한 방법이고 간단하게 popen()을 사용하면 됩니다.  
+{{{#!plain
+#include <stdio.h>
+int main()
+{
+    FILE *fp = NULL;
+    char buff[256];
+    if ((fp = popen("ls -al", "r")) == NULL)
+    {
+        perror("popen error ");
+        exit(0);
+    }
+    while(fgets(buff, 255, fp))
+    {
+        printf("%s", buff);
+    }
+    fclose(fp);
+}
+}}}
+
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=16 pipe의 사용] ||
+
+
+==== 하나의 프로세스가 생성시킬 수 있는 자식 프로세스의 갯수 ==== 
+ * 클라이언트가 접속하면 fork()를 통해서 프로세스를 실행시켜서 요청을 처리하는 네트워크 프로그램을 작성하고 있습니다. 문제는 클라이언트가 상당히 많이 연결 될 수도 있다는 점입니다. 일반적으로 fork()로 생성가능한 
+프로세스의 갯수는 얼마나 되는지 궁금합니다. 
+
+linux시스템일 경우 보통 1023개이며 이 값은 getrlimit(2)함수를 이용해서 가져올 수 있습니다.      
+메뉴얼 페이지를 보면 sysconf(2)를 통해서도 가져올 수 있는 것으로 되어 있는데, 코드를 만들어서 
+테스트해본 결과 결과가 약간 다르게 나왔습니다.   
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <unistd.h>
+
+int main()
+{
+    struct rlimit myrl;
+    printf("%d\n", sysconf(_SC_CHILD_MAX));
+    getrlimit(RLIMIT_NPROC, &myrl);
+
+    printf("%d\n", myrl.rlim_max);
+}
+}}}
+테스트 해본결과 sysconf는 999, getrlimit로는 1023이 나왔습니다. 
+ulimia -a로 확인해보면 1023으로 나오는 걸로 봐서 getrlimit가 정확한 값을 보여주는 것 같습니다. 
+둘간의 차이점을 아시는 분은 답변 바랍니다.  
+
+==== 프로그램 인자를 처리하는 좋은 방법이 있는지요 ====
+ * -d -f /etc/test.cfg 와 같은 인자를 효과적으로 처리하고 싶습니다. argv로 받아서 처리하려고 하니 보통 어려운게 아닙니다. 관련 함수가 있을 법도 한데.. 
+
+보통 getopt(3)을 이용합니다. 이 함수를 이용하면 프로그램인자를 매우 간단하게 처리 할 수 있습니다. getopt(3)함수의 최신버젼인 getopt_long(3)를 사용하는 것도 좋은 방법입니다. 
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=9 getopt를 이용한 인자처리]	||
+
+==== 리눅스에도 윈도우즈의 dll 같은게 있나요 ? ==== 
+ * 윈도우즈는 라이브러리를 dll형식으로 만들어서 필요할 때만 불러쓰는 편리한 프로그래밍 기법이 사용되고 있는데 리눅스에도 그러한 dll같은 것이 있는지 궁금합니다. 있다면 어떻게 써야 하는지에 대해서도 알려주세요.   
+
+물론 리눅스(유닉스)에도 dll과 같이 동적으로 라이브러리를 적재 하시는 방법이 있습니다. 보통 동적 라이브러리 라고 불리우는데, 프로그램 실행 도중에 필요할 때 적재해서 사용할 수 있습니다. dll과 매우 비슷합니다. 동적 라이브러리를 만들고 프로그램에서 사용하는 방법은 아래의 기사를 참고하시기 바랍니다. 
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=66 library의 사용]	||
+
+==== 시스템 프로그래밍이란 ====
+==== 어셈블리로 인자(argc, argv라고 불리우는 것)를 받으려면 ====
+ || ''' DOS ''' || ''' Linux ''' ||
+ || [mz_asm_dos_argument] || [mz_asm_linux_argument] ||
+
+==== 시스템 콜이 무엇이죠? ==== 
+ * 프로그래밍 관련 문서들을 보면 이러이러 한때 이러한 시스템 콜을 사용해야 한다라는 내용이 자주 눈에 띄더군요. 다른 프로그래머와 대화할 때도 시스템 콜이란 용어가 자주 사용되더군요. write, read등을 시스템콜 이라고 하는것 같든데, 이들은 함수가 아니던가요? 함수와 시스템콜간의 차이점이 있는지 궁금합니다. 
+ * 시스템콜이란 Interrupt또는 특정 메모리를 통해서 호출되는 커널의 한 부분을 말합니다. 일반적으로 Kernel과 Application간의 실행영역은 접근속성이 다릅니다. 하지만 커널의 기능을 사용할수 있게 해야 할것이므로 일반적인 방법으로는 커널의 코드를 Application에서 수행할수 없습니다. 그래서 Call gate, Interrupt gate라는 용어가 존재하는데 일종의 Software interrupt를 발생하도록 하여 커널의 코드를 수행하는 것을 시스템콜의 일반적인 모습이라고 하겠습니다. 그리고 함수는 이를 한번 감싸서 C언어로 쉽게 호출하도록 인자를 처리하도 오류코드를 errno에 저장하는등의 역할을 수행하게 됩니다. 시스템콜 자체를 함수처럼 꾸밀수도 있으나 커널의 메모리 공간이 그대로 드러나므로 그것을 감추고 Interupt를 통해서 호출하게 되는겁니다. 또한 C에서는 Interrupt를 직접 호출하는 명령이 존재하지 않습니다. - [minzkn]
+==== 현재디렉토리의 하부에서 같은 파일명의 파일들을 찾아볼때 ====
+ {{{#!plain
+bash# find . -type f -printf "%p %f\n" | sort -k 2 | uniq -D -f 1 | cut -d' ' -f1
+}}}
+
+==== 다른 함수로의 goto? ====
+ * 보통 함수내에서 다른 루틴으로 가려고 할때 goto를 사용하면 되는데, 다른 함수의 루틴으로는 goto가 되질 않는군요 ? 가능하긴 한건지요. 
+
+longjmp(), setjmp()를 이용하면 됩니다.
+{{{#!plain
+#include <setjmp.h>
+#include <stdio.h>
+
+jmp_buf env;
+
+int jmp(void)
+{
+    printf("Long Jmp\n");
+    longjmp(env, 14);
+}
+
+int main()
+{
+
+    int ret_val;
+    ret_val = setjmp(env);
+    if (ret_val == 0)
+    {
+        printf("after jmp(): %d\n", ret_val);
+        jmp();
+        printf("back from jmp(): %d\n", ret_val);
+    }
+    else
+    {
+        printf("back from longjmp(): %d\n", ret_val);
+    }
+}
+}}}
+
+==== 좀비 프로세스 퇴치하기 ====
+ * fork()를 이용해서 자식 프로세스를 생성하고 여러가지 작업을 하는 프로그램을 작성하고 있습니다. 그런데 자꾸만 좀비 프로세스가 생성됩니다. 좀비 프로세스가 왜 생기는 건지 어떡해야 없앨 수 있는건지 알고 싶습니다.   
+
+프로세스의 각종 정보는 커널에서 링크드 리스트로 관리하게 된다. 이때 관리되는 프로세스의 정보를 보면 프로세스의 종료 상태등을 나타내는 값들도 있다. 부모 프로세스등에서 종료된 자식 프로세스의 상태(정상적으로 종료했는지 아닌지)등을 확인할 수 있어야 하기 때문이다.
+
+그렇다면 프로세스가 종료했다고 해서 커널에서 관리하는 이러한 정보까지 삭제해 버리면 부모 프로세스는 자식프로세스의 종료 상태를 확인할 수 없을 것이다. 그래서 프로세스가 종료하면 프로세스의 모든 자원은 해제되지만 커널은 프로세스의 데이터를 그대로 유지한다. 프로세스가 종료되었지만 여전히 커널에 의해서 프로세스의 정보가 유지되는 상태의 프로세스를 좀비 프로세스라고 한다.
+
+좀비 프로세스를 막는 가장 쉬운 방법은 wait(2)함수를 호출해서 종료된 프로세스의 종료 상태를 받아오고 커널에서 프로세서 정보 데이터를 삭제하는 것이다. wait(2)수와 좀비 프로세스의 대한 자세한 내용은 다음을 참고하기 바란다.
+
+||[http://www.joinc.co.kr/modules.php?name=News&file=article&sid=122 좀비프로세스에 대한 고찰		||
+
+==== 프로세스간 데이터 교환 ====
+ * 부모프로세스와 자식프로세스, 혹은 프로세스와 프로세스간 데이터를 교환해야될 일이 생겼습니다. 파일을 이용하는 건 너무 신경써야 할게 많은것 같아서요.. 좋은 방법이 없을런지요. 
+
+프로세스간 데이터 교환을 위해서는 IPC를 사용합니다. IPC는 Inter Procress Communcation의 줄임말로써 내부 프로세스간 데이터 교환과 프로세스 동기화를 위해서 제공하는 함수의 모음입니다. BSD스타일의 IPC와 SYSTEM V 스타일 IPC가 있습니다. IPC활용에 대한 자세한 내용은 다음 URL을 참고하시기 바랍니다. 
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=13 System V IPC에 대해서]		||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=16 PIPE의 사용]				||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=21 FIFO활용]					||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=40 세마포어의 사용]			||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=34 Unix Domain Socket을 이용한 IPC]		||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=59 IPC 성능 테스트]						||
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=78 Unix Comain Socket (UDP)]				||
+
+==== 동기와 비동기에 대해서 ====
+ * 파일 관련작업을 하다보면 "동기", "비동기"란 얘기가 자주 나오는데 상당히 헷갈립니다.  
+
+==== 동시에 여러개의 입/출력을 다루고 싶을때 ==== 
+ * FIFO를 통해서 유닉스 도메인 영역에서 프로세스간 통신을 하는 프로그램을 만들었습니다. 일종의 서버/클라이언트 모델을 따르는 프로그램으로 하나의 서버가 여러개의 클라이언트와 통신하기 위해서 동시에 여러개의 FIFO로 부터의 입력을 다룰 수 있어야 합니다. 효과적인 방법이 있는지요.  
+
+==== 프로세스와 스레드의 차이 ====
+ * 프로세스와 스레드의 차이점에 대해서 설명해 주세요.
+
+==== 리눅스에서의 스레드 지원 ====
+ * 리눅스에서 pthread를 이용해서 쓰레드 프로그램을 작성했는데 ps로 확인해 보면 생성시킨 스레드의 갯수만큼의 프로세스가 생성되어 있습니다. 쓰레드라면 단일 프로세스에서 서로다른 문맥사이의 교환만 일어나는것 아니던가요 ?
+
+==== BSD IPC와 System V IPC와의 차이점은 ? ====
+ * IPC쪽을 하다 보니 BSD IPC와 System V IPC라는 용어가 나오더군요. 다 같은 IPC이긴 한데 서로 이름이 다른 이유가 무언지 궁금합니다. 어떤 버젼 차이인건지..
+
+버젼의 차이라기 보다는 어디에서 개발했느냐의 차이로 보는게 옳을 듯 합니다. BSD IPC는 Berkeley UNIX의 
+BSD 4.4에저 제공하는 IPC이며 System V IPC는 AT&T사에서 개발해서 제공한 IPC입니다. BSD보다 좀더 최근에 개발된 IPC입니다. BSD IPC에서는 PIPE, Socketpairs, Unix Domain Socket(UDP/TCP)등을 제공하며 특징적으로 write, read, sendmsg, recvmsg등의 시스템 함수들을 사용할 수 있다. 
+
+System V IPC는 message queues, semaphores, shared memory등을 제공하며 데이터 공유를 위한 저장 공간이 운영체제 전역(커널에서 관리)적으로 관리된다는 특징을 가지며, read, write대신 msget, msgsnd, msgctl..과 같은 전용의 시스템 콜을 사용한다.
+|| [http://www.cis.temple.edu/~ingargio/old/cis307s96/readings/docs/ipctut.html Introductory 4.4BSD]||
+|| [http://www.tldp.org/LDP/lpg/node21.html System V IPC]		||
+|| [http://www.joinc.co.kr joinc에서 IPC로 검색해보기 바란다.	||
+
+==== 유닉스 도메인 소켓이 무엇이죠 ? ====
+ * 프로세스간 내부통신에 유닉스 도메인 소켓을 쓰면 편하다는 말을 하더군요. 소켓은 원격 프로세스간 데이터 통신을 위한 도구 아니던가요 ? 
+
+==== 현재 유닉스 시스템 시간 알아오는 방법 ====
+ * 유닉스 시스템의 현재 시간을 알아오고 싶습니다. 
+
+가장 간단한 방법은 time(2)함수를 이용하는 겁니다. 이 함수를 사용하면 초로 환산된 유닉스 시간을 얻어 올 수 있습니다. 유닉스 시간은 1970년 1월 1일 00:00부터 지금까지의 흐른 시간을 초로 환산한 겁니다. 
+{{{#!plain
+#include <time.h>
+int main()
+{
+    time_t this_time;
+    this_time = time((time_t *)NULL);
+}
+}}}
+그러나 time(2)은 시간을 얻어오는 오래된 방법이며 초단위로만 시간을 얻어 올 수 있다는 단점을 가지고 있습니다. time(2)대신에 gettimeofday(2)를 사용하는걸 권합니다. gettimeofday(2)에 대한 자세한 설명은 [http://www.joinc.co.kr/modules.php?name=Encyclopedia&op=content&tid=125 함수사전]을 참고하세요. 
+
+==== 파일의 정보 얻어오기 ====
+ * 파일의 이름, 권한, 크기등을 얻어오고 싶습니다.
+
+파일과 관련된 정보는 stat(2), fstat(2)등의 함수를 통해서 얻어올 수 있습니다. 이들 함수를 사용하면 stat구조체에 해당 파일의 정보를 채워서 되돌려줍니다. inode, mode, uid, gid, size는 물론이고 파일의 생성시간, 수정시간, 변경시간 등에 대한 정보도 얻어올 수 있습니다.
+
+|| [http://www.joinc.co.kr/modules.php?name=Encyclopedia&op=content&tid=76 stat(2)]	||
+
+==== 사용자 로그인 정보 얻어오기 ====
+ * 텔넷으로 유닉스 서버에 접근하면 현재 접근한유저로 마지막 언제 접근했는지 등에 대한 로그인 기록이 나옵니다. 이런 사용자 로그인 정보를 어떻게 얻어올 수 있는지 궁금합니다.   
+
+유닉스에서는 사용자 정보를 utmp파일에 기록합니다. utmp는 현재 누가 시스템을 사용하고 있으며 어떤 터미널(tty)를 사용하고 있는지 어떤 IP에서 접근했는지 등에 대한 정보를 저장하고 있습니다.
+utmp정보의 취득을 위해서 리눅스(유닉스 포함)는 getutent(3)라는 함수를 제공합니다. getutent(3)를 사용하면 사용자 로그인 정보를 utmp구조체(struct utmp)에 넣어서 되돌려 줍니다. utmp에 대한 자세한 내용은 아래의 사이트를 참고하기 바랍니다.  
+
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=18 utmp를 이용한 사용자 로그인 정보 관리]		||
+
+==== select와 poll의 차이점 ==== 
+ * 개인적으로 공부를 해본결과 select와 poll은 거의 비슷해 보이던데, 어떤점이 다른지요. 그리고 입출력다중화의 구현에 어떤것을 사용하는게 더 좋은지 궁금합니다. 
+
+==== 간단한 DB 시스템에 대해서 ====
+ * 주소록, 몇몇 파일 정보와 같은 간단한 정보를 저장할 수 있는 표준적인 DB시스템이 있는지요. mysql, pgsql, oracle은 너무 크고 별도의 프로그램을 설치해야 하므로 제외 시키렵니다. 별도의 프로그램 설치필요없이 간단하고 범용적으로 사용할 수 있는 DB를 찾고 있습니다. 
+
+dbm의 gnu버젼인 gdbm을 추천합니다. dbm은 관계형 데이타 구조 모델을 가지지 않는 키 -> 값의 간단한 구조를 가집니다. 당연히 가볍고 빠르며 거의 표준이므로 별도의 프로그램 설치없이 db시스템을 만들 수 있습니다. 
+
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=14 gdbm메뉴얼]	||
+
+==== Segmentation fault ====
+ * 프로그래밍 초보입니다. 코드를 하나 짜서 돌리고 있는데, Segmentation fault (core dumped)라는 메시지가 뜨면서 프로그램이 종료해 버립니다. 왜 이런 메시지가 뜨는지 이 문제를 해결하려면 어떡해야 하는지 궁금합니다. 
+
+==== Oracle DB프로그래밍 ====
+
+==== signal을 보낸 프로세스의 PID가져오기 ====
+ * 프로세스가 시그널을 받았을 때 어떤 프로세스로 부터 시그널이 전달되었는지 확인할 수 있을까요 ?  
+
+물론 확인 가능합니다. sigaction을 이용할경우 시그널 플래그(sa_flags)를 SA_SIGINFO로 설정하는 정도로 시그널을 보낸 프로세스의 PID를 얻어올 수 있습니다. 아 시그널 핸들러도 약간 달라집니다. 인자로 siginfo_t *를 받아오도록 설정해야 합니다. siginfo_t는 다음과 같습니다.
+{{{#!plain
+siginfo_t 
+{
+    int      si_signo;  /* 시그널 넘버 */
+    int      si_errno;  /* errno 값 */
+    int      si_code;   /* 시그널 코드 */
+    pid_t    si_pid;    /* 프로세스 ID 보내기 */
+    uid_t    si_uid;    /* 프로세스를 전송하는 실제 사용자 ID */
+    int      si_status; /* Exit 값 또는 시그널 */
+    clock_t  si_utime;  /* 소모된 사용자 시간 */
+    clock_t  si_stime;  /* 소모된 시스템 시간 */
+    sigval_t si_value;  /* 시그널 값 */
+    int      si_int;    /* POSIX.1b 시그널 */
+    void *   si_ptr;    /* POSIX.1b 시그널 */
+    void *   si_addr;   /* 실패를 초래한 메모리 위치 */
+    int      si_band;   /* 밴드 이벤트 */
+    int      si_fd;     /* 파일 기술자 */
+}
+}}}
+다음은 간단한 테스트 코드입니다.
+{{{#!plain
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+void sig_int(int signo, siginfo_t *siginfo)
+{
+    printf("%d : %d\n", getpid(), siginfo->si_pid);
+}
+
+int main()
+{
+    struct sigaction intsig;
+    intsig.sa_sigaction = sig_int;
+
+    sigemptyset(&intsig.sa_mask);
+    intsig.sa_flags = SA_SIGINFO;
+
+    if (sigaction(SIGINT, &intsig, 0) == -1)
+    {
+        perror("signal error : ");
+        return 1;
+    }
+    while(1)
+    {
+        sleep(1);
+    }
+}
+}}}
+==== 동기 입출력과 비동기 입출력의 차이 ====
+ * 파일입출력을 다루다 보니 동기/비동기 라는 말이 자주 등장합니다. 이둘의 차이점이 궁금합니다. 
+
+==== 시그널(signal)이 무엇인가요 ? ====
+ * 이제 막 리눅스 프로그래밍에 입문한 초보입니다. 시그널을 사용하면 된다라는 말이 많이 나오더군요. 이럴땐 이런 시그널이 전달된다.. 저럴땐 저런 시그널이 전달된다. 그런데 아무래도 시그널이 정확히 무언지 아직 모르겠습니다.
+
+[http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_signal%20%B4%D9%B7%E7%B1%E2%202 시그널 다루기]을 참고하시기 바랍니다.
+
+==== 시그널을 잃어버리는 것 같습니다.? ==== 
+ * 시그널이 전달되어서 시그널 핸들러가 처리되고 있는데, 동일한 시그널이 또 전달되면 블럭된다고 알고 있습니다. 그런데 여기에 시그널이 다시 전달되면 이전 시그널은 사라져 버리더군요. 이렇게 시그널을 잃어버리면 프로그램이 좀 이상해질것 같은데, 여러개의 시그널이 전달되더라도 잃어버리지 않고 사용할 수 있는 방법이 없는지요. 
+
+시그널은 대기열을 가지지 않습니다. 시그널 핸들러가 종료되지 않은 상태에서 다른 시그널이 들어온다면 이 시그널은 블럭되고(signal관련 함수로 블럭시킬 수 있다) 핸들러 종료후 블럭된 시그널에 대한 핸들러를 실행할 수 있습니다. 그러나 시그널이 블럭되어 있는 상태에서 또다시 시그널이 들어온다면 시그널을 버려지게 됩니다. 
+
+해결방법은 시그널의 대기열을 유지하는 방법으로 [RTS](RealTime Signal)을 사용하면 됩니다.
+  
+==== 파일 변경 검사 ====
+ * 파일의 목록을 만들고 이 파일에 대한 어떤 변경이 있는지 확인하는 프로그램을 만들고 싶습니다. 어떤 방법을 사용해야 할런지요. 
+
+간단하게 stat(2)계열의 함수를 이용해서 파일의 사이즈와 변경날짜등을 주기적으로 검사하는 방법을 사용할 수 있습니다. 그러나 이러한 값들은 쉽게 임의로 변경할 수 있기 때문에 중요파일의 검사를 위해서는 부적절한 면이 있습니다. 이럴 때는 파일의 Hash값을 얻어내어서 비교하는 방법이 있습니다. Hash는 MD5(12)를 사용하면 무난합니다.
+
+|| [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=102 MD5를 이용한 파일변조 검사]	||
+
+==== 시스템프로그래밍을 하는데 assembly어도 공부해야 하나요? ====
+
+==== 간단한 운영체제 정보를 얻어오고 싶습니다 ==== 
+ * uname명령을 이용하면 커널버젼과 설치날짜와 간단한 CPU정보등을 얻어올 수 있는데, C를 통해서 구현하고 싶습니다. 
+
+uname(2)이라는 시스템함수를 이용해서 얻어올 수 있습니다. 얻어오는 정보는 아래와 같습니다.    
+{{{#!plain
+struct utsname {
+    char sysname[SYS_NMLN];   // 운영체제 이름
+    char nodename[SYS_NMLN];  // 호스트이름
+    char release[SYS_NMLN];   // 버젼 
+    char version[SYS_NMLN];   // 패치버젼
+    char machine[SYS_NMLN];   // 시스템 종류 
+#ifdef _GNU_SOURCE
+    char domainname[SYS_NMLN];
+#endif
+}}}
+
+다음의 예제를 참고하시면 쉽게 이해하실 수 있을겁니다.
+|| [http://www.joinc.co.kr/modules.php?name=Encyclopedia&op=content&tid=137 uname(2)]	||
+
+==== 정적 라이브러리와 동적라이브러리의 차이점 ====
+ * 라이브러리 종류도 여러가지 군요. 정적라이브러리와 동적라이브러리라는게 나오던데 둘의 차이점에 대해서 알고 싶습니다. 가능하면 만드는 법도 알려주세요. 
+
+[wiki:article_library_만들기 라이브러리 만들기]를 참고하시기 바랍니다.
+
+==== 라이브러리 아카이브(archive) 만들기 ====
+ * 간단하게 오브젝트를 만들어서 필요한 프로그램에 그때 그때 링크 시켜서 사용하고 있습니다. 그런데 오브젝트가 많아지니까.. 이거 관리하기도 장난아니네요.. 편리하게 관리할 수 있는 방법이 없을까요 ?    
+
+'''ar'''이라는 프로그램을 사용하면 됩니다. 오브젝트들을 하나의 아카이브로 만들어서 관리할 수 있도록 도와 줍니다. 예를 들어 1.o, 2.o, 3.o 라는 3개의 오브젝트가 있다면 아래와 같은 방법으로 하나의 아카이브 파일로 만들 수 있습니다. 
+{{{#!plain
+# ar cru libmy.a 1.o 2.o 3.o
+}}}
+다음은 자주 사용하는 기본 옵션들 입니다.
+|| 옵션			|| 설명									||
+|| c			|| 아카이브 파일이 없으면 생성			||
+|| r			|| 오브젝트를 아카이브에 추가			||
+|| u			|| 동일한 오브젝트가 있다면 업데이트	||
+|| t			|| 아카이브에 포함된 오브젝트 목록		||
+ 
+==== 동적 라이브러리 만드는 법 ====
+ * 프로그램 실행 도중에 불러올 수 있는 동적 라이브러리를 만들고 싶습니다. 어떻게 해야 하는지요.
+
+==== beep(비프)음 울리게 하기 ====
+ * 프로그램실행중 어떤 이벤트가 발생하면 주의를 환기시키는 비프음이 울리도록 하고 싶습니다.
+
+가장 간단한 방법은 printf("\a")를 이용한 방법입니다. 혹은 ncurses의 beep()함수를 이용하는 방법도 있습니다.
+{{{#!plain
+#include <ncurses.h>
+
+int main()
+{
+    initscr();
+    beep();
+    endwin();
+}
+}}}
+
+==== 환경변수에 대해서 ====
+ * 환경변수라는게 무엇인지 어떨 때 사용되는 것인지 알고 싶습니다. 
+
+==== C 코드에서 전체 환경변수 얻어오기 ====
+ * getenv()등을 통해서 환경변수를 얻어오는건 알겠는데, 전체 환경변수를 얻어오는건 잘모르겠습니다. getenv()를 사용하려면 반드시 환경변수의 이름을 알아야 하는데, 그럴수도 없을것 같구요.
+
+main()함수의 3번째 인자로 환경변수의 포인터를 얻어올 수 있습니다.
+{{{#!plain
+int main(int argc, char ** argv, char **env)
+{
+    while(*env)
+    {
+        printf("%s\n", *env);
+        *env++;
+    }
+}
+}}}
+ 
+=== 최근 변동 사항 ===
+ 1. 라이브러리 아카이브(archive) 만들기 03/12/02  - [yundream]

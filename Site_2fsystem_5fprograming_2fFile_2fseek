@@ -1,0 +1,1027 @@
+#title seek를 이용한 파일 위치변경
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>seek 를이용한 파일내 위치변경</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>seek 를이용한 파일조작</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN13"
+>seek 에 대해서</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN15"
+>파일의 위치지정의 필요성</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN21"
+>lseek() 함수</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN49"
+>lseek 응용</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN53"
+>DB 명세 및 파일구조</A
+></DT
+><DT
+>2.3.2&#51208;. <A
+HREF="#AEN63"
+>기능</A
+></DT
+><DT
+>2.3.3&#51208;. <A
+HREF="#AEN83"
+>인터페이스</A
+></DT
+><DT
+>2.3.4&#51208;. <A
+HREF="#AEN87"
+>예제코드</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN93"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번장에서는 파일내에서의 위치이동을 위해서 쓰이는 
+		seek 계열의 함수에 대해서 알아본다. 
+		원래는 lseek와 fseek 2개 모두에 대해서 다루어야 하겠으나. 
+		사용법이 거의 동일함으로 저수준 함수인 lseek 만을 다루도록 한다. 
+	 	fseek 는 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=43"
+TARGET="_top"
+>stdio.h 사용하기</A
+>에서 잠깐 다루었음으로 참고하도록 
+		하자.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>2&#51208;. seek 에 대해서</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2.1&#51208;. 파일의 위치지정의 필요성</A
+></H2
+><P
+>			지금까지의 파일관련 작업은 처음부터 읽어서 순서대로 출력하거나 
+			혹은 파일의 마지막에 데이타를 쓰는 일이였다. 
+			그러나 이러한 작업만으로는 파일관련된 모든 작업을 효율적으로 
+			수행하기가 힘들다.  	
+		</P
+><P
+>			예를 들어 간단한 DB 파일을 만든다고 가정해보자. 
+			이럴경우에는 단지 끝에 내용을 추가하는것 외에도, 
+			특정 위치에 있는 데이타를 가져오거나, 특정위치에 있는 
+			데이타를 삭제하는 등의 일을 해야 할것이다. 
+			물론 꽤 무식한 방법을 사용할수 있다. DB 파일의 데이타가 
+			구조체로 들어간다면, 구조체의 크기만큼 계속읽어들어서 
+			원하는 레코드까지 찾아가는 것이다. 즉 데이타가 100 
+			개 있고, 99 번째 데이타를 찾기를 원한다면 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct recode
+{
+    ...
+};
+int main()
+{
+    struct recode mydata;
+    int fd, i;
+    char buff[255];
+    ....
+    fd = open(...);
+    for (i = 0; i &#60; 99; i++)
+        read(fd, (void *)&#38;buff, sizeof(recode)); 
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>    
+			대충 위와 같은 식으로 데이타를 찾아가는 방법이다. 
+			굉장히 심플하지만 상당히 무식한 방법이다. 
+			어쨋든 그렇게 해서 99 번째 데이타를 찾았는데, 이번에 
+			다시 97번째 데이타를 찾아야 한다면? 다시 파일을 open 해서 
+			97번 데이타를 읽어들여야 하는가?  
+		</P
+><P
+>			당연히 그럴필요 없다. 다행히도 유닉스에서는 seek 계열의 
+			함수인 lseek(2)와 fseek(3) 을 제공해서 파일의 위치를 
+			자유롭게 변경할수 있도록 해주기 때문이다. 
+			lseek 와 fseek 의 차이점은 lseek 가 저수준의 파일지정자 
+			를 통해서 작업을 하는 반면 fseek 는 고수준의 파일스트림을 
+			이용해서 작업을 한다는 것이다. 일단적인 text 라면 
+			fseek 를 이용해도 관계없겠으나, 구조체와 같은 binary 데이타를 
+			다루고자 한다면 아무래도 저수준함수인 lseek 를 사용하는게 
+			좋을것이다.    
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>2.2&#51208;. lseek() 함수</A
+></H2
+><P
+>			파일에서 위치를 자유자재로 옮겨다니기 위해서 필요한것은 
+			무엇일까 생각해 보자. 유저 입장에서 
+			보면 파일은 1차원으로 디스크에 연속해서 위치해 있는 
+			데이타의 모음이다(물론 OS 입장에서 보면 파일의 데이타가 
+			반드시 연속되어서 위치하는건 아니다). 
+		</P
+><P
+>			1차원에서 어떤 물체의 규모를 나타내는 요소는 
+			길이가 될것이다 - 2차원이라면 면적, 3차원이라면 체적 -. 
+			보통 1차원에서 길이의 크기를 나타내기 위해서 우리는 
+			km, m 와 같은 1차원 단위를 사용한다. 컴퓨터에서 
+			데이타 크기의 단위는 기본적으로 byte 이다. 그럼으로 
+			만약 16 byte 의 데이타가 저장되어 있다면, 
+			유저 입장에서 이 데이타는 다음과 같이 Disk 상에 
+			존재하는 것으로 보일것이다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6                        
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+--------------+
+  | |                               | 다른 디스크 영역 
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+--------------+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그렇다면 내가 9번째 byte 위치로 이동하고 싶다면 어떡해야 
+			할까 ? 보통 어떤 위치를 나타낼때 우리는 좌표를 사용한다. 
+			이 좌표에는 2가지 종류가 있으니, 상대 좌표와 절대 
+			좌표가 바로 그것이다. 절대좌표란 어떤 절대적인 위치를 
+			기준으로 하여 임의의 위치를 알아내기 위해서 사용하는 좌표며, 
+			상대좌표란 임의의 위치를 기준으로 해서 특정위치를 알아내기 
+			위해서 사용하는 좌표이다.     
+		</P
+><P
+>			서울과 부산사이에 나의 위치를 절대좌표를 이용해서 
+			표시하고자 한다면 "나는 지금 서울에서 몇 Km 떨어진지점에 
+			있음" 이런식으로 표현이 가능할것이다. 서울이 0km 지점이 
+			되는 것이다. 그러나 상대좌표일경우 나의 위치가 0km 지점이 
+			되며 나를 기준으로 어떤 위치를 지정하게 될것이다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 서울                   나        마산                 부산
+  +----------------------+----------+--------------------+
+  |                      |          |
+  +--------- 180 km -----+-- 20km --+ 
+  |                                 | 
+  +------------- 200 km ------------+
+  마산까지의 거리 
+  절대좌표 상에서 : 200 km 
+  상대좌표 상에서 : 20  km (기준 "나")  
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이러한 위치를 알아내기 위해서 현실에서 사용되는 
+			기법이 DISK 상에서도 그대로 적용된다. 
+			즉 파일의 처음 시작지점인 0 을 위치로 시작지점에서 떨어진 
+			byte 수만큼으로 계산하는 방법과, 현재 파일지정자가 
+			위치하고 있는 위치에서 byte 수만큼을 계산하는 방법이 있다.     
+		</P
+><P
+>			예를 들자면 현재 파일지정자가 가르키는 곳이 7 이고 
+			이동하고자 하는 곳이 12 일때, 처음부터 시작해서 12 만큼 
+			파일지정자를 이동시키는 방법과 현재 위치에서 시작해서 
+			5만큼을 이동시키는 방법이 있을것이다. 
+		</P
+><P
+>			lseek 를 설명하기 위해서 이런저런 얘기를 많이 했는데, 
+			lseek 는 다음과 같이 선언되어 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+
+off_t lseek(int fd, off_t offset, int whence);  
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			fd 는 파일지정자이다. 바로 2 번째 offset 이 거리를 
+			나타내기 위해서 사용된다. 그렇다면 기준점은 ? 
+			당연하겠지만(--;) whence 를 이용하게 된다. whence 값이 
+			이 whence 는 다음과 같은 값을 사용할수 있다. 
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>SEEK_SET</DT
+><DD
+><P
+>	
+					파일의 시작점이다. 이를테면 절대위치를
+					계산하기 위함이다. 
+				</P
+></DD
+><DT
+>SEEK_CUR</DT
+><DD
+><P
+>	
+					파일지정자 fd 가 위치하고 있는 지점을 기준으로 
+					계산된다. 이를테면 상대위치를 계산하기 위함이다.  
+				</P
+></DD
+><DT
+>SEEK_END</DT
+><DD
+><P
+>	
+					파일의 마지막위치이다. SEEK_SET 와 마찬가지로 
+					절대값이라고 할수 있다 다만 기준점이 파일의 
+					마지막이라는 것만 다르다.  
+				</P
+></DD
+></DL
+></DIV
+>	
+			lseek 를 통한 위치 이동은 whence 에서의 offset 을 더함으로써 
+			이루어 지게 된다. 예를들어서 파일의 처음 위치로 
+			이동하고 싶다면 lseek(fd, 0, SEEK_SET) 하면 된다. 
+			마지막은 lseek(fd, 0, SEEK_END) 이다.   
+			당연히 offset 은 음수값이 들어갈수도 있다. 
+			다음의 예를 보자.      
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : seek.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    int fd ;
+    char buff[255];
+    memset(buff, 0x00, 255);
+
+    fd = open("test.txt", O_RDONLY);
+    if (fd &#60; 0)
+    {
+        perror("error : ");
+        exit(0);
+    }
+
+    lseek(fd, -3, SEEK_END);
+    read(fd, buff, 255);
+    printf("%s", buff);
+
+    close(fd);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			test.txt 파일에는 "01234567890&#92;n" 이 들어 있다고 
+			가정하면 위의 프로그램 실행결과로 "90&#92;n" 이 찍힐것이다.  
+		</P
+><P
+>			참고로 실수로 파일의 마지막을 초과 해서 
+			lseek 를 사용했을경우 - lseek(fd, 10, SEEK_END)과 같이 - 
+			lseek 에서 에러가 발생하진 않지만 write 혹은 read 할경우 
+			에러가 발생하게 되므로 주의 해야 한다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR>
+}}}
+[[sadsense(center)]]
+{{{#!html
+<H2
+CLASS="SECTION"
+><A
+NAME="AEN49"
+>2.3&#51208;. lseek 응용</A
+></H2
+><P
+>			위의 lseek 를 이용해서 간단한 응용 어플리케이션을 만들어 
+			보자.  
+		</P
+><P
+>			만들고자 하는 프로그램은 간단한 형식의 DB 어플리케이션이다. 
+			이 어플리케이션이 가 관리하는 DB 는 이름과 전화번호이다. 
+			DB 에는 이름과 전화번호를 멤버변수로 하는 
+			구조체가 저장되는 형식을 
+			취하게 될것이다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>2.3.1&#51208;. DB 명세 및 파일구조</A
+></H3
+><P
+>				DB 관리 어플리케이션을 만들적에 가장중요한건 
+				DB 명세와 이 DB 명세를 지원할수 있는 파일구조일 
+				것이다. DB 는 단일구조체가 하나의 레코드단위가 
+				되어서 연석되게 저장될 것이다. 
+				이 구조체는 다음과 같다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct _data
+{
+    int  num;
+    char name[16];
+    char tel_num[16];
+} Data;
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				name 은 이름이고 tel_num 은 전화번호이다. num 은 
+				일련번호인데, 어플리케이션에서 자동적으로 부여하게 될것이다.  
+			</P
+><P
+>				다음은 DB 파일 명세이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 단위 : byte
+  0 1 2 3 4 5 6 7 8 9 0 1  .......
+ +-+-+-+-+-+-+-+-+-+-+-+-+-------------+-------------+
+ |DBINFO |R_NUM  |INC_NUM| RECODE 1... | RECODE 2... |
+ +-+-+-+-+-+-+-+-+-+-+-+-+-------------+-------------+
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				DBINFO 는 DB 어플리케이션이 이 파일이 자신이 관리하는 
+				포맷을 지원하는 파일인지를 알려주기 위해서 사용한다. 
+				제대로 하려면 버젼정보와 같은 부가적인 정보도 들어가면 
+				좋겠지만 여기에서는 단지 파일의 가장앞에 "MYDB"라는 
+				문자를 써주고 어플리케이션은 파일을 읽어들일때 MYDB 문자열을 
+				확인하는 정도로 DB파일을 판별하는 것으로 하겠다.   
+			</P
+><P
+>				R_NUM 은 현재 이 DB 파일이 몇개의 Recode 를 포함하고 
+				있는지를 나타낸다. insert 가 있을경우 증가하고 delete 가 
+				있을경우 감소할 것이다.  
+			</P
+><P
+>				INC_NUM 은 Recode 에 일련번호를 주기 위해서 사용되며, 
+				증가만 하며 감소하지는 않는다. Data.num 에 값을 줄때 
+				INC_NUM 을 주게 된다.
+			</P
+><P
+>				Recode 의 삭제의 경우 실제 데이타 삭제가 일어나지는 
+				않으며 단지 해당 레코드의 Data.num 의 값에 (-1) 을 
+				곱해주는 것으로 "삭제표시"만 할것이다.  
+				이렇게 하는 이유는 나중에 데이타를 복구할수 있는 여지를 
+				남겨주는것 외에도(단지 Data.num*(-1)만 해주면 복구된다) 
+				전체적인 어플리케이션의 성능을 향상시킬수 있기 때문이다. 
+				만약에 레코드를 실제로 지우게 된다면, 비워진 곳을 채우기 
+				위해서 그뒤에 있는 모든 레코드를 앞당겨서 빈레코드 
+				공간을 채워줘야 할것이다. 이것은 많은 성능의 손실을 
+				가져다 준다. 특히 여러명이 동시에 작업을 하는 것을 
+				염두에 두고 어플리케이션이 개발될경우 레코드 잠금과 파일잠금 
+				그리고 레코드의 위치를 사용자간에 모두 동기시켜줘야 하는 
+				매우 까다로운 문제를 해결해야 한다. 그러나 "표시"만 
+				해놓을경우에는 어플리케이션이 이 "표시"만 읽고 판단하면 
+				됨으로 구현하기가 매우 간단해 진다.   
+			</P
+><P
+>				실제 Oracle 같은경우도 DB 삭제등이 일어났을때, 
+				곧바로 지우지 않고 단지 "표시" 만 해두고 
+				정리해야될 일이 있을때 DBA가 정리를 해주며, 
+				(삭제 표시된 레코드를 직접 지워주고 빈레코드 공간을 
+				없애주는) 
+				만약의 경우 복구할수 있는 여지를 남겨둔다. 
+				공개 RDBMS 인 Postgresl 역시 delete 등이 내려졌을때 
+				물리적으로 데이타를 삭제하지 않으며, "삭제표시" 된 
+				체로 공간을 차지하며 남아 있게 된다. 
+				이게 점점 쌓일경우 파일의 크기가 커지고, 전체적인 성능이 
+				떨어짐으로 vacuum 등의 도구를 써서 정리해준다.   	 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>2.3.2&#51208;. 기능</A
+></H3
+><P
+>				lseek 의 사용방법 외에도 몇가지 부수적인 정보를 얻을수 
+				있겠지만 어디까지나 주 목적은 lseek 의 사용법에 대한 
+				내용이다. 그러므로 교과에서 봄직한 진짜 그럴듯한 
+				DB 어플리케이션을 만들지는 않을것이다. 가장 간단한 
+				수준의 DB 어플리케이션이 될것이다.  
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>리스트보기</DT
+><DD
+><P
+>	
+						모든 레코드의 리스트와 정보를 보여준다.
+					</P
+></DD
+><DT
+>리스트추가</DT
+><DD
+><P
+>	
+						새로운 레코드를 추가한다. 
+						레코드 추가는 Data 구조체를 write 함으로써 
+						이루어지며 이때 R_NUM, INC_NUM 이 1씩 증가하게 된다. 
+						Data.num 은 INC_NUM 이 들어가게 된다. 
+					</P
+></DD
+><DT
+>리스트삭제</DT
+><DD
+><P
+>	
+						지정된 레코드를 삭제한다. 
+						R_NUM은 1 감소된다. 그러나 INC_NUM은 감소되지 않는다.  
+					</P
+></DD
+><DT
+>리스트업데이트</DT
+><DD
+><P
+>	
+						내용을 업데이트 한다. 
+						여기에서는 구현하지 않을것이다. 직접 
+						구현해 보기 바란다.  
+					</P
+></DD
+></DL
+></DIV
+>	
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN83"
+>2.3.3&#51208;. 인터페이스</A
+></H3
+><P
+>				ncurses 를 사용하는건 너무 많은 시간이 걸릴것 같아서 
+				그냥 간단하게 ANSI 를 사용하기로 했다. 
+				ANSI 에 대한 자세한 내용은 <A
+HREF="http://ansi.sarang.net"
+TARGET="_top"
+>				안시 사랑넷</A
+>를 참고하기 바란다. 
+				ANSI 코드의 입력은 CTRL+V,CTRL+[ 한다음에 "[안시번호" 이다. 
+				예를들자면 화면을 지우기 위한 안시 번호는 2J 인데, 
+				이 번호를 이용해서 안시코드를 만들려면 
+				CTRL+V,CTRL+[ 키입력후 [2J 하면 된다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN87"
+>2.3.4&#51208;. 예제코드</A
+></H3
+><P
+>				다음은 실제 작동되는 예제 코드이다. 어려운 내용은 
+				없음으로 주석으로 대신하도록 하겠다. 
+				아래코드는 학습목적으로 연습삼아 만든 코드이다. 
+				에러처리, 입출력검사, 코드 효율성, 인터페이스 등은 
+				염두에 두지 않은 코드이다. 숨어있는 버그를 잡거나 
+				깨끗하게 코드를 다시 만들어 보는것도 많은 도움이 될것이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : seek_db.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+
+// DB 포맷 확인용
+#define APPNAME "MYDB"
+
+// ANSI 코드 
+// 스크린 지우기
+#define SCR_CLEAR printf("^[[2J")
+// x,y 좌표로 커서이동하기
+#define MOVE_CURSOR(x, y) printf("^[[%d;%dH", x, y)
+
+// 메시지를 출력하고 사용자 입력을 기다린다. 
+// 스크린 지우기 전에 메시지를 확인할 목적으로 
+// 사용된다. 
+#define WAIT_INPUT(x) printf("%s", x);getchar() 
+
+// 개행문자 제거
+#define chop(str) str[strlen(str)-1] = '&#92;0'; 
+
+// 헤더의 크기 정의  
+// 헤더는 recode 를 제외한 파일의 가장앞에 있는 
+// 정보이다. 
+
+// DB 포맷 정보 크기 
+#define DBINFO_SIZE strlen(APPNAME) 
+// R_NUM,INC_NUM 크기
+#define INDEX_SIZE sizeof(int)*2 
+// 전체 헤더 크기
+#define HEADER_SIZE INDEX_SIZE + DBINFO_SIZE
+
+// 메인메뉴 
+char *menu =
+"
+데이타수 : %d 
+====================
+1. 리스트 보기
+2. 리스트 추가
+3. 리스트 삭제 
+4. 종료
+==================== 
+input : ";
+
+// 레코드 입력 메뉴
+char *input_menu = 
+"
+번   호  :
+이   름  :
+전화번호 : 
+";
+
+// 레코드 구조체
+typedef struct _data
+{
+    int  num;          // 일련번호
+    char name[16];       // 이름
+    char tel_num[16];  // 전화번호
+} Data;
+
+//  R_NUM, INC_NUM
+typedef struct _index_num
+{
+    int datanum;    // R_NUM   : 데이타 총갯수
+    int incnum;     // INC_NUM : 데이타 일련번호 
+} Index_num; 
+
+
+// Index_num 값 즉 R_NUM 과 INC_NUM 
+// 을 얻어온다.  
+Index_num get_indexnum(int fd)
+{
+    Index_num index_num;
+    lseek(fd, DBINFO_SIZE, SEEK_SET);
+    read(fd, (void *)&#38;index_num, HEADER_SIZE);
+    return index_num;
+}
+
+// DB 파일을 체크한다. 
+// 파일의 처음 4바이트 문자가 APPNAME 과 같으면 참 
+int dbcheck(fd)
+{
+    char dbname[8];
+    memset(dbname,0x00,8); 
+    read(fd, dbname, 8);
+    if (strncmp(dbname, APPNAME, DBINFO_SIZE) ==0) 
+        return 1;
+    else
+        return -1;
+}
+
+// 최초에 DB파일이 생성되지 
+// 않았을때 DB 파일을 초기화 시켜준다. 
+// DB 포멧정보(APPNAME)이 들어가고 R_NUM, INC_NUM
+// 은 0으로 초기화 된다. 
+int init_datanum(int fd)
+{
+    Index_num index_num;
+    write(fd, APPNAME, DBINFO_SIZE);
+    memset((void *)&#38;index_num, 0x00, INDEX_SIZE);
+    write(fd, (void *)&#38;index_num, INDEX_SIZE); 
+}
+
+// 레코드가 insert 되었을 경우
+// R_NUM과 INC_NUM 을 증가시킨다. 
+int inc_indexnum(int fd)
+{
+    int datanum;
+    Index_num index_num;
+    index_num = get_indexnum(fd);
+    index_num.datanum++;
+    index_num.incnum++;
+    lseek(fd, DBINFO_SIZE, SEEK_SET);
+    write(fd, (void *)&#38;index_num, INDEX_SIZE);
+    return 1;
+}
+
+// 메인 메뉴를 출력한다. 
+void print_main_menu(fd)
+{
+    Index_num index_num;
+
+    index_num = get_indexnum(fd);
+    printf(menu,index_num.datanum);
+}
+
+// 서브메뉴를 출력한다. 
+void print_menu(char *sub_menu)
+{
+    printf(sub_menu);
+}
+
+// 레코드를 삽입한다. 
+// 레코드 삽입위치는 파일의 마지막이다. 
+void input_data(Data mydata, int fd)
+{
+    // 파일의 마지막으로 이동 
+    lseek(fd, 0, SEEK_END);
+    write(fd, (void *)&#38;mydata, sizeof(Data));
+    inc_indexnum(fd);
+}
+
+// 레코드 리스트를 출력한다. 
+void print_data(int fd)
+{
+    int i;
+    int offset = 0;
+    Data list;
+    Index_num index_num;
+    index_num = get_indexnum(fd);
+
+    // 레코드의 시작위치로 이동한다. 
+    lseek(fd, HEADER_SIZE, SEEK_SET);
+    for (i = 0; i &#60; index_num.datanum; )
+    {
+        read(fd, (void *)&#38;list, sizeof(Data));
+        if (list.num &#62; 0) 
+        {
+            i++;
+            printf("%3d %16s %16s&#92;n", list.num, list.name, list.tel_num); 
+        }
+    }    
+}
+
+// 레코드를 삭제한다. 
+// 실제로 데이타를 삭제하지는 않으며 
+// Data.num 에 (-1)을 곱해준다. 
+int del_data(int fd,int num)
+{
+    int offset;
+    int del_flag;
+    Data list;
+    Index_num index_num;
+
+    index_num = get_indexnum(fd);
+    printf("delete num is %d&#92;n", num);
+
+    // 입력된 번호가 1 보다 작거나 레코드 수보다 클경우
+    if ((index_num.incnum-1) &#62; index_num.incnum || num &#60; 1)
+        return -1;
+
+    // 삭제하고자 하는 레코드의 위치로 이동한다. 
+    offset = (sizeof(Data)*(num-1)) + HEADER_SIZE;
+    lseek(fd, offset, SEEK_SET);
+
+    read(fd, (void *)&#38;list, sizeof(Data));
+    if (list.num &#60; 0) 
+    {
+        printf("list.num is : %d&#92;n", list.num);
+        return -2;
+    }
+
+    del_flag = list.num*(-1);    
+
+    // 삭제하고자 하는 레코드의 위치로 이동해서 
+    // list.num*(-1) 값을 입력한다. 
+    lseek(fd, offset, SEEK_SET);
+    write(fd, (void *)&#38;(del_flag), sizeof(int));
+
+    // R_NUM 을 1 감소시킨다. 
+    lseek(fd, DBINFO_SIZE, SEEK_SET);
+    index_num.datanum--;
+    write(fd, (void *)&#38;(index_num), INDEX_SIZE);
+    return 1;
+}
+
+// 메뉴선택에 대한 처리
+void sel_menu(fd)
+{
+    char menu_num; 
+    Index_num index_num;
+
+    // R_NUM과 INC_NUM 을 구해온다. 
+    index_num = get_indexnum(fd);
+
+    while(1)
+    {
+        Data mydata;
+        char buf[11];
+        char num[11];
+        int  state;
+        char data[16];
+
+        SCR_CLEAR;            // 화면 clear    
+        MOVE_CURSOR(1,1);     // 커서이동
+        print_main_menu(fd);  // Main 메뉴출력
+        fgets(num, 11, stdin);
+
+        // 입력번호에 따라 분기한다. 
+        switch(atoi(num))
+        {
+            // 리스트 출력
+            case 1 :
+                print_data(fd);
+                WAIT_INPUT("Press any key!!");
+                break;
+            // 입력 
+            case 2 :
+                SCR_CLEAR;
+
+                MOVE_CURSOR(1,1);
+                print_menu(input_menu);
+
+                MOVE_CURSOR(2,12);
+                printf("%d", ++index_num.incnum);
+                mydata.num = index_num.incnum;
+
+                MOVE_CURSOR(3,12);
+                fgets(mydata.name, 16, stdin);
+                chop(mydata.name);
+
+                MOVE_CURSOR(4,12);
+                fgets(mydata.tel_num, 16, stdin);
+                chop(mydata.tel_num);
+                input_data(mydata, fd);
+
+                WAIT_INPUT("Press any key!!");
+                break;
+
+            // 삭제 
+            case 3 :
+                MOVE_CURSOR(10,1);
+                printf("삭제번호 ");
+                fgets(buf, 11, stdin);
+                state = del_data(fd, atoi(buf));
+                if (state &#60; 0)
+                {
+                    printf("잘못된번호 선택&#92;n");
+                }
+                WAIT_INPUT("Press any key!!");
+                break;
+            case 4 :
+                printf("bye bye&#92;n");    
+                exit(0);
+            default :
+                break;
+        }
+    }
+}
+
+
+
+int main(int argc, char **argv)
+{
+    int data_num = 0;
+    int is_fileok = 0;
+    int fd;
+    Data mydata;
+
+    if (argc != 2)
+    {
+        printf("Usage : ./seek_db dbfile&#92;n");
+        exit(0);
+    } 
+
+    if ((access(argv[1], F_OK) == 0))
+    {
+        is_fileok = 1;
+    }
+
+    fd = open(argv[1], O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+    if (fd &#60; 0)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    if (is_fileok == 0)
+    {
+        printf("FILE INIT&#92;n");
+        init_datanum(fd);
+    }
+    else
+    {
+        if (dbcheck(fd) != 1)
+        {
+            fprintf(stderr, "%s 는 잘못된 DB 파일입니다&#92;n", argv[1]);  
+            exit(0);
+        }
+    }
+
+    sel_menu(fd);
+
+    close(fd);
+    return 1;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN93"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 간단하게 lseek 에 대해서 알아보고, lseek 를 사용한 
+		응용 어플의 개발을 해보았다. 위의 응용 어플의 경우 
+		recode 삭제후 비어있는 recode 공간을 제거해주는 기능을 
+		구현하고 있지 않은데, 별도의 어플리케이션으로 
+		한번 제작해 보기 바란다. lseek 를 써주고 truncate 정도만 
+		써주면 어렵지 않게 작성할수 있을 것이다.      
+	</P
+><P
+>		그리고 여러유저가 동시에 사용가능하도록 레코드잠금등을 
+		구현하면 더 그럴듯한 어플리케이션이 될것이다. 	
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

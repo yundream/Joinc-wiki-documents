@@ -1,0 +1,47 @@
+#title system call : mknod - 특수 및 일반 파일의 생성 
+
+== mknod ==
+mknod - 특수 및 일반 파일을 생성한다.
+
+== 사용법 ==
+{{{#!plain
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int mknod(const char *pathname, mode_t mode, dev_t dev);
+}}}
+
+== 설명 ==
+mknod()는 '''pathname'''을 이름으로 가지는 파일시스템 노드 - file, 장치파일 혹은 named:::pipe(:12) - 를 생성한다. ''mode''와 ''dev'' 파일의 모드와 성질을 결정하기 위해서 사용한다.
+
+'''mode'''는 생성되는 파일의 권한을 결정한다. 이 권한은 chmod()의 표기형식을 사용할 수 있다.
+
+파일의 형식은 '''S_IFREG, S_IFCHR, S_IFBLK, S_IFIFO, S_IFSOCK'''중 하나가 되어야 한다. 
+   * S_IFREG : 일반파일
+   * S_IFCHR : 문자파일
+   * S_IFBLK : 블럭파일
+   * S_IFSOCK : Unix Domain Socket(:12) 파일 
+
+만약 S_IFCHR 이나 S_IFBLK를 생성하고자 한다면 '''dev'''를 명시해줘야 한다. dev는 새로 생성될 파일이 생성될 장치의 major number와 minor number를 가진다. '''dev'''값은 다음과 같이 결정할 수 있다.
+  * (major number << 8) | (minor &0xff)
+
+다음과 같이 파티션이 구성되어 있다고 가정해보자.
+{{{#!plain
+# cat /proc/partitions
+major minor  #blocks  name
+
+   8        0  195360984 sda
+   8        1  180193041 sda1
+   8        2    1020127 sda2
+   8        3   14145232 sda3
+}}}
+여기에서 '''sda3'''의 '''dev'''번호는 다음과 같이 계산될 것이다. macro 로 만들어두면 편하게 사용할 수 있다.
+{{{#!plain
+ (8 << 8) | (3 & 0xff) = 2051
+}}}
+만약 sda3 에 myblk 라는 블럭파일을 만들기 원한다면 다음과 같이 mknod 함수를 사용할 수 있을 것이다. 
+{{{#!plain
+mknod("myblk", 0660, (8 << 8) | (3 & 0xff));
+}}}

@@ -1,0 +1,91 @@
+#title Tmake를 이용해서 간단하게 makefile 생성하기
+
+{{{#!html
+tmake 는 QT를 제작한 회사로 유명한 <a href=http://www.troll.no>troll</a>
+이라는 회사에서 배포하는 프로그램이다.
+원래 tmake 는 QT프로그램을 위한 Makefile 를 생성하지만, 약간만 수정하면
+쉽게 자신의 프로젝트에 맞는 Makefile 를 만들수 있다.<br>
+우선 프로그램을 <a href=http://www.joinc.co.kr/modules.php?name=Downloads>
+다운로드</a>받는다.<br>
+다운로드 받은 파일은 적당한 디렉토리에 옮겨서 압축을 
+풀면 bin 디렉토리가 생성되는데, 여기에 있는 파일들중
+progen 과 tmake 2개의 실행파일을 적당한 실행 디렉토리로(/usr/local/bin 과 같은)
+복사해 준다. 그다음에 lib 디렉토리 역시 적당한 디렉토리(/usr/local/tmake/lib)
+로 복사해준다. <br>
+이로써 tmake 를 사용하기 위해서 필요한 모든 파일의 설치가 끝이 났다. 
+이제 tmake 를 사용하기 위한 환경설정을 해주어야 하는데, 
+만약에 bash 쉘이라면 .bash_profile 에 아래의 내용을 포함시키도록 한다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+TMAKEPATH=/usr/local/tmake/lib/linux-g++
+expotr TMAKEPATH
+</pre>
+</td></tr>
+</table>
+c 쉘이라면 .cshrc 파일을 수정하면 된다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+setenv TMAKEPATH /usr/local/tmake/lib/linux-g++
+</pre>
+</td></tr>
+</table>
+이로써 tmake 를 사용하기 위한 모든 환경설정이 끝났다.
+이제 직접 tmake 를 이용해서 Make 파일을 생성시켜보도록 하겠다.
+<br><br>
+우선 Makefile 를 생성할 프로그램 쏘스가 있는 디렉토리로 이동한다.
+그후 progen 을 이용해서 project 파일을 생성한다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream @localhost test]$ progen -o test.pro
+</pre>
+</td></tr>
+</table>
+progen 을 실행하면 test.pro 란 파일이 생성되었음을 알수 있을것이다.
+test.pro 는 프로젝트 파일로, 현재 디렉토리에 어떤 쏘쓰파일(.c .cc) 이있는지
+어떤 헤더파일이 있는지에 대한 정보를 가지고 있다. tmake 는 이 파일을 참조
+하여 Makefile 을 만들어낸다.<br>
+이제 tmake 파일을 실행해서 Makefile 를 만들면 된다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream @localhost test]$ tmake -o Makefile test.pro
+</pre>
+</td></tr>
+</table>
+위의 명령을 실행하면 tmake 는 test.pro 파일을 참조해서 Makefile 를 생성하게
+된다.
+<br><br>
+이렇게 해서 Makefile 를 매우 쉽게 만들긴 했지만 tmake 가 모든것을 알아서
+해주는 만능은 아니다. 게다가 서문에서 미리 말했듯이 tmake 프로그램이 원래
+QT 응용 프로그램에 최적화되어 있기 때문에 약간 손을 봐줄 필요가 있다. <br>
+tmake 를 이용해서 생성된 Makefile 에서 LIBS 라인을 자신의 프로그램에
+맞게 수정하면 된다. <br>
+그리고 MOC 와 UIC 는 필요 없는 라인이므로 삭제하면 된다. <br>
+<b>수정전</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+LIBS  =   $(SUBLIBS) -L$(QTDIR)/lib -L/usr/X11R6/lib -lqt -lXext -lX11 -lm
+MOC   =   $(QTDIR)/bin/moc
+UIC   =   $(QTDIR)/bin/uic
+</pre>
+</td></tr>
+</table>
+<b>수정후</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+LIBS  =   -lcrypt -lm
+</pre>
+</td></tr>
+</table>
+물론 LIBS 부분은 사용자마다 달라진다.<br><br>
+이제 make 를 실행하기만 하면 test 라는 실행파일이 만들어진다.
+이로써 tmake 의 사용방법을 알아보았다. tmake 가 완벽한 프로그램은 아니지만 
+프로젝트 관리를 위한 시간을 대폭 줄여줄것이다. 다음번엔 
+make 의 좀더 고급 사용방법에 대해서 알아보도록 하겠다. <br>
+그럼 다음 시간까지 빠이~~~
+}}}

@@ -1,0 +1,97 @@
+#title 네트워크 프로그래밍 6 - Advanced 소켓 프로그래밍
+
+  6.  Advanced Socket Programming
+
+  6.1.  How would I put my socket in non-blocking mode?
+
+  From Andrew Gierth (andrew@erlenstar.demon.co.uk):
+
+  Technically, fcntl(soc, F_SETFL, O_NONBLOCK) is incorrect since it
+  clobbers all other file flags. Generally one gets away with it since
+  the other flags (O_APPEND for example) don't really apply much to
+  sockets. In a similarly rough vein, you would use fcntl(soc, F_SETFL,
+  0) to go back to blocking mode.
+
+  To do it right, use F_GETFL to get the current flags, set or clear the
+  O_NONBLOCK flag, then use F_SETFL to set the flags.
+
+  And yes, the flag can be changed either way at will.
+
+  6.2.  How can I put a timeout on connect()?
+
+  Andrew Gierth (andrew@erlenstar.demon.co.uk) has outlined the
+  following procedure for using select() with connect(), which will
+  allow you to put a timeout on the connect() call:
+
+  First, create the socket and put it into non-blocking mode, then call
+  connect(). There are three possibilities:
+
+  o  connect succeeds: the connection has been successfully made (this
+     usually only happens when connecting to the same machine)
+
+  o  connect fails: obvious
+
+  o  connect returns -1/EINPROGRESS. The connection attempt has begun,
+     but not yet completed.
+
+  If the connection succeeds:
+
+  o  the socket will select() as writable (and will also select as
+     readable if data arrives)
+
+  If the connection fails:
+
+  o  the socket will select as readable *and* writable, but either a
+     read or write will return the error code from the connection
+     attempt. Also, you can use getsockopt(SO_ERROR) to get the error
+     status - but be careful; some systems return the error code in the
+     result parameter of getsockopt(), but others (incorrectly) cause
+     the getsockopt call itself to fail with the stored value as the
+     error.
+
+  Sample code that illustrates this can be found in the socket-faq
+  examples, in the file connect.c.
+
+  7.  Sample Source Code
+
+  The sample source code is no longer included in the faq.  To get it,
+  please download it from one of the unix-socket-faq www pages:
+
+       http://www.ibrado.com/sock-faq
+       http://kipper.york.ac.uk/~vic/sock-faq
+  http://www.ntua.gr/sock-faq
+
+  If you don't have web access, you can ftp it with ftpmail by following
+  the following instructions.  Please do not use the ftp server if you
+  have access to the web, since computain.com is connected only by a
+  28.8 modem, and you'd be amazed how much traffic this faq generates.
+
+  To get the sample source by mail, send mail to ftpmail@decwrl.dec.com,
+  with no subject line and a body like this:
+
+         reply <put your email address here>
+         connect ftp.computain.com
+         binary
+         uuencode
+         get pub/sockets/examples.tar.gz
+         quit
+
+  Save the reply as examples.uu, and type:
+
+         % uudecode examples.uu
+         % gunzip examples.tar.gz
+         % tar xf examples.tar
+
+  This will create a directory called socket-faq-examples which contains
+  the sample code from this faq, plus a sample client and server for
+  both tcp and udp.
+
+  Note that this package requires the gnu unzip program to be installed
+  on your system.  It is very common, but if you don't have it you can
+  get the source for it from:
+
+       ftp://prep.ai.mit.edu/pub/gnu/
+
+  If you don't have ftp access, you can obtain it in a way similar to
+  obtaining the sample source.  I'll leave the exact changes to the body
+  of the message as an excersise for the reader.

@@ -1,0 +1,197 @@
+#title yum repository 만들기
+
+== yum에 대해서 ==
+yum은 '''Yello dog Updater, Modified''' RPM 기반의 시스템을 위한 자동 패키지 설치 / 업데이트 도구다. 중앙서버에서 패키지를 관리해 주므로 일관된 버전 관리가 가능하다. yum이 사용되기 전 rpm으로 패키지를 설치해 본 시스템 관리자라면, yum 없이 관리하는게 얼마나 힘든일인지를 알고 있을 것이다.  
+
+Red Hat Enterprise Linux, Fedora, CentOS 등 RPM 기반의 배포판들은 모두 yum을 사용하고 있다.
+
+== yum repository를 만든 이유 ==
+cloud automatic 구성을 위해서 yum repository를 만들어 보기로 했다. 자동화 프레임워크로 chef를 사용하고 있는데, 자동화 과정에서 설치할 패키지등을 저장하기 위한 용도다.  
+== 환경 ==
+내가 사용하는 Ubuntu 노트북을 yum repository 서버로 사용한다. Ubuntu는 RPM 기반의 배포판이 아니지만 저장소로 꾸미는데 아무런 제한이 없다. repository 테스트는 는 Virtualbox(:12)를 이용, centos 운영체제를 guest vm을 만들어서 테스트 하기로 했다.
+
+== 만들어 보자 ==
+ubuntu에 yum repo를 만들기 위해서 아래의 패키지 설치한다.
+{{{#!plain
+# apt-get install createrepo
+# apt-get install python-urlgrabber
+}}}
+
+repository directory 생성
+{{{#!plain
+# mkdir /srv/repo
+}}}
+
+저장소에 rpm을 복사한다. centos6.2의 rpm들을 복사하기로 했다.   
+{{{#!plain
+# mount -o loop /srv/iso/CentOS-6.2-x86_64-minimal.iso /mnt/centos
+mount: warning: centos seems to be mounted read-only.
+# rsync -avzH /mnt/centos/Packages /srv/repo/
+}}}
+
+createrepo로 저장소를 설정한다. 프로그램을 실행하고 나면, 저장소 정보파일을 담은 repodata 디렉토리가가 만들어진다. 
+{{{#!plain
+# createrepo /srv/repo/
+211/211 - Packages/zlib-1.2.3-27.el6.x86_64.rpm                                 
+Saving Primary metadata
+Saving file lists metadata
+Saving other metadata
+}}}
+
+== 웹서버 설치 ==
+ftp 혹은 http로 저장소에 접근할 수 있다. apache 웹 서버를 설치하기로 했다.
+{{{#!plain
+# apt-get install apache2 
+}}}
+
+설정파일
+{{{#!plain
+<VirtualHost *:80>
+        ServerAdmin webmaster@localhost
+
+        DocumentRoot /srv/repo
+        <Directory />
+                Options FollowSymLinks
+                AllowOverride None
+        </Directory>
+        <Directory /srv/repo/>
+                Options Indexes FollowSymLinks MultiViews
+                AllowOverride None
+                Order allow,deny
+                allow from all
+        </Directory>
+....
+}}}
+
+== 테스트 ==
+centos vm으로 테스트 진행. 현재 상황
+{{{#!plain
+# yum repolist 
+repo id                                repo name                                         status
+base                                   CentOS-6 - Base                                   6,294
+extras                                 CentOS-6 - Extras                                     4
+rbel6                                  RBEL 6 Repo                                         183
+updates                                CentOS-6 - Updates                                  388
+repolist: 6,869
+}}}
+
+repo 추가
+{{{#!plain
+# cat yundream.repo 
+[yundream]
+name = yundream centos6.2 Repo 
+baseurl = http://192.168.56.1
+gpgcheck = 1
+enabled = 1
+}}}
+
+추가 됐는지 확인
+{{{#!plain
+# yum repolist 
+repo id                                repo name                                         status
+base                                   CentOS-6 - Base                                   6,294
+extras                                 CentOS-6 - Extras                                     4
+rbel6                                  RBEL 6 Repo                                         183
+updates                                CentOS-6 - Updates                                  388
+yundream                               yundream centos6.2 Repo                             211
+repolist: 7,080 
+}}}
+
+제대로 작동 하는지 테스트.
+{{{#!plain
+[base]
+name=CentOS-$releasever - Base
+mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os
+#baseurl=http://mirror.centos.org/centos/$releasever/os/$basearch/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+enabled=0    # 추가해서 비활성 한다.
+}}}
+
+다시 확인
+{{{#!plain
+# yum repolist
+Loaded plugins: fastestmirror, presto
+Loading mirror speeds from cached hostfile
+repo id                              repo name                                           status
+yundream                             yundream centos6.2 Repo                             211
+repolist: 211
+}}}
+
+테스트 
+{{{#!plain
+# yum install vim-minimal
+Loaded plugins: fastestmirror, presto
+Loading mirror speeds from cached hostfile
+Setting up Install Process
+Resolving Dependencies
+--> Running transaction check
+---> Package vim-minimal.x86_64 2:7.2.411-1.6.el6 will be installed
+--> Finished Dependency Resolution
+
+Dependencies Resolved
+
+===============================================================================================
+ Package               Arch             Version                       Repository          Size
+===============================================================================================
+Installing:
+ vim-minimal           x86_64           2:7.2.411-1.6.el6             yundream           365 k
+
+Transaction Summary
+===============================================================================================
+Install       1 Package(s)
+
+Total download size: 365 k
+Installed size: 750 k
+Is this ok [y/N]: 
+}}}
+OK
+
+== yum client 설정 ==
+클라이언트의 yum 설정 파일은  /etc/yum.conf다. 여기에서는 yum repository를 이용하기 위한 최소한의 옵션만 설명한다. 
+
+'''cachedir'''
+패키지를 설치하기 위해서는 패키지 정보를 가져와야 하는데, 매번 수천개의 패키지를 다운로드 하는 건 낭비다. yum 클라이언트는 yum repository와 사용할 수 있는 패키지 정보를 cache 디렉토리에 저장해서 빠르게 패키지를 관리할 수 있도록 한다. 기본 경로는 /var/cache/yum이다. cache 정보는 sqlite(:12) db에 보관한다.  
+
+yum 저장소와 패키지 정보를 삭제한다.
+{{{#!plain
+# yum clean metadata
+}}}
+
+cache에 있는 package를 삭제한다.
+{{{#!plain
+# yum clean package
+}}}
+
+{{{#!plain
+# yum clean headers
+}}}
+
+'''logfile'''
+yum 사용 정보를 로그파일에 저장한다. 기본 경로는 /var/log/yum.log이다.
+
+'''tolerant'''
+
+'''gpgcheck'''
+
+'''metadata_expire'''
+
+'''keepcache'''
+
+
+yum.conf 설정 예
+{{{#!plain
+[main]
+cachedir=/var/cache/yum/$basearch/$releasever
+keepcache=0
+debuglevel=2
+logfile=/var/log/yum.log
+exactarch=1
+obsoletes=1
+gpgcheck=1
+plugins=1
+installonly_limit=5
+distroverpkg=centos-release
+}}}
+
+[[tag(yum,rpm,linux)]]

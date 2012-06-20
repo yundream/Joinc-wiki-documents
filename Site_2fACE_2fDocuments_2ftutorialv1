@@ -1,0 +1,1475 @@
+ * 원문 : [http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site_ACE/Documents/tutorialv1?action=download&value=C%2B%2BNPv1.ppt C++NPv1.ppt]
+
+[[TableOfContents]]
+=== 네트워크 프로그램을 작성하는건 어려운 일이다.  ===
+견고하고 효율적이며, 확장 용이하고 게다가 다중의 클라이언트의 요구를 처리해야 하는 네트워크 애플리케이션을 작성하는 것은 매우 힘든 일이다. 모든 이런 프로그램을 만들기 위해서는 네트워크에 대한 지식뿐만 아니라 시스템 프로그래밍에 대한 깊은 지식을 필요로 한다. 혹시나 다양한 플랫폼을 지원해야 하는경우는 더욱 그러하다. 
+
+이렇게 프로그램의 작성이 복잡해지는 것은 다음과 같은 이유들 때문이다.
+ * 종속적인 문제들
+   1. 운영체제별로 제어해야 하는 낮은 수준의 API(:12)들
+   1. 쓸만하지 못한(혹은 쓰기 어려운) 디버깅툴
+   1. 매번 재작성해야 하는 컴포넌트화 되지 못한 알고리즘들
+   1. 매번 재작성해야 하는 비슷한 일을 하는 비슷한 컴포넌트들과 사용자 정의 함수들 
+ * 독립적인 문제들
+   1. 로드밸런싱 
+   1. 확장성
+   1. 스케쥴링 & 동기화 
+   1. Deadlock 
+위와 같은 복잡한 문제들 때문에 적당한 품질을 가지는 소프트웨어를 작성하기 위해서는 상당한 시간과 노력이 투자되어야 한다. 특히 다중 플렛폼을 지원하는 소프트웨어를 작성할 경우 품질향상을 기대하기는 여간 어려운 문제가 아니다. 다중 플렛폼에 대해서 해박한 지식을 가진 고급기술자가 투입되어야 그나마 품질을 보증할 수 있다(다중 플렛폼에 걸쳐서 소프트웨어를 포팅해본 개발자라면 그 고충을 이해할 것이다). 
+
+=== 객체지향을 통한 소프트웨어 품질 향상 ===
+ * 패턴을 통한 소프트웨어 구조와 디자인의 재사용 
+ * OS 시스템 API와 네트워크 API의 캡슐화 
+   많은 다중 플렛폼지원 소프트웨어 개발자들은 자주 사용되는 시스템/네트워크 API들을 여러가지 방법을 이용해서 캡슐화 해서 사용한다. ACE는 매우 높은 수준에서 캡슐화 시킨다.   
+ * 객체지향 언어의 특징인 classes, dynamic binding, 상속, parameterized types등을 사용해서 생산성 향상
+
+객체지향과 관련된 내용들은 서점의 전문서적들을 참고하기 바란다.
+
+=== 정보처리 기술의 진화 ===
+정보처리를 위한 기본 자원인 CPU와 네트워크는 매년 3-7배 정도가 더 빨라지고 있으며, 2010년 경에는 대략 아래와 같은 수준까지 발전할 것으로 예상되고 있다. 
+ * 100 GigaHz PC
+ * 100 Gigabits/sec Lan
+ * 100 Megabis/sec 무선환경
+ * 10 Terabits/sec internet(12) backbone(12)
+
+이들 하드웨어 자원의 지원을 위해서는 아래와 같은 하드웨어와 소프트웨어 API, 프로토콜들의 지원이 이루어져야 할것이다. 
+ * Intel X86 & Power PC chipset
+ * TCP/IP, ATM(12)
+ * POSIX(12), & JVMs(12)
+ * Middleware & components
+
+=== ACE의 특징 === 
+http://www.cs.wustl.edu/~schmidt/gifs/layer3.gif
+
+ACE는 다음과 같이 개발되어지고 있다.
+ * Open Source
+ * 200,000 라인정도의 C++
+ * 연인원 40명이상의 개발인력
+ * 다양한 OS 플렛폼의 지원
+==== ACE가 지원하는 플렛폼 ====
+ * 32/64bit Windows, Win CE 
+ * Redhat, Debian, SuSe Linux
+ * macintosh OS X
+ * SunOS4.x, Solaris, SGI IRIX, HP-UX, Digital Unix, AIX, DG/UX, SCO OpenServer, UnixWare, NetBSD, FreeBSD 등 대부분의 Unix들
+ * VxWorks, OS/9, Chorus, LynxOS, Pharlap TNT, QNX Neutrino, RTP, RTEMS, pSoS 등의 리얼타임 운영체제
+ * OpenVMS, MVS OpenEdition, Tandem NonStop-Ux, Cray UNICOS등의 엔터프라이즈 시스템
+
+ACE는 위의 플렛폼에서 사용하는 모든 C++ 컴파일러에서 사용이 가능.
+
+=== ACE 프레임워크 ===
+{{{#!plain
++------------+        +------------+         +------------+
+| Acceptor   |------->| Reactor    |<--------| Proactor   | 
+| Connector  |        |            |         |            | 
++------------+        +------------+         +------------+
+
++--------------+      +------------+         +------------+
+| Service      |----->| Streams    |-------->| Task       |
+| Configurator |      |            |         |            |
++--------------+      +------------+         +------------+
+}}}
+|| ACE Framework			|| Inversion of Control				||
+|| Reactor & Proactor		|| 동기/비동기로 발생하는 이벤트들의 처리를 위한 프로세스 호출 || 
+|| Service Configurator		|| 서비스 객체의 초기화, 중지, 재가동, 종료등을 위한 프로세스 호출 ||
+|| Acceptor-Connector		|| 연결을 위한 서비스 초기화 프로세스 호출		||
+|| Stream					|| stream으로 부터의 데이터 입출력과 초기화를 위한 프로세스 호출 ||
+
+=== 연결지향 프로토콜과 비연결지향 프로토콜의 비교 ===
+많은 프로토콜들은 본격적으로 데이터를 입출력하기 전에 연결을 맺는 작업을 한다. 가장 대표적인 경우는 전화를 하는 경우다. 전화를 해서 본격적으로 대화를 나누기 전에 보통 대화의 상대가 올바른지 확인하기 위한 작업이 이루어진다.
+{{{#!plain
+ Connector              Accoptor
+    |                       |
+    |  1. SYN               |
+    | --------------------> |
+    | <-------------------- |
+    |            2. SYN/ACK |
+    |  3. ACK               |
+    | --------------------> |
+    |  4.                   |
+    | <-------------------> |
+    |                       |
+ TCP/IP 3-Way handshake
+
+
+ 1. 저는 누구입니다. 아무개씨 맞습니까 ?
+ 2. 내 누구누구 맞습니다.
+ 3. 하고 싶은 얘기가 있어서 전화 드렸습니다.
+ 4. 이런 저런 대화
+}}}
+네트워크 상의 데이터교환 역시 위에서 처럼 연결을 맺는 과정을 거치는 프로토콜이 있지만 그렇지 않은 경우도 있다. 어떤 프로토콜을 사용할지는 만들고자 하는 네트워크 서비스에 따라서 달라질 수 있다.
+
+==== 연결지향 프로토콜 ====
+ 1. 신뢰할수 있으며, 서비스는 중복되지 않으며, 연속적으로 이루어질 수 있다. 데이터 누락을 허락할 없는 중요한 서비스에 사용한다.
+ 1. TCP, ATM과 같은 프로토콜이 있다. 
+
+==== 비연결지향 프로토콜 ====
+ 1. 메시지 지향 서비스에 주로 사용된다. 메시지들은 독립적으로 경로가 할당되어서 전달된다.
+ 1. UDP, IP 같은 프로토콜이 있다. 
+
+=== 다중 처리 ===
+다수의 클라이언트를 처리하는 방법으로 '''MULTIPLEXED CONNECTION''' 과 '''NONMULTIPLEXED CONNECTIONS''' 두가지가 있다. 
+==== MULTIPLEXED CONNECTION =====
+다수의 클라이언트에서 들어오는 연결 요구를 하나의 프로세스에서 다수의 쓰레드를 동시에 제어하는 방식으로 처리한다. 
+{{{#!plain
+  +---------------+             +---------------+
+  | CLIENT THREAD |             | SERVER THREAD |
+  |               |             |               |
+  | CL1->CL2->CL3 |             | SR1->SR2->SR3 |
+  |  |         |  |             |  |         |  |
+  +--|---------|--+             +--|---------|--+
+     +---------+                   +---------+
+          |                             |
+          +-----------------------------+ 
+                 TCP/IP Connection
+}}}
+
+대체적으로 리소스를 적게 잡아먹고, 효율적으로 작동하기는 하지만 프로그래밍 하기 힘들다라는 단점을 가진다.
+
+==== NONMULTIPLEXED CONNECTIONS ====
+각각의 클라이언트는 독립된 서비스를 위해서 다른 연결을 유지한다. 다중 프로세스 방식으로 구현되는 경우가 많다.
+{{{#!plain
+  +---------------+             +---------------+
+  | CLIENT THREAD |             | SERVER THREAD |
+  |               |             |               |
+  | CL1->CL2->CL3 |             | SR1->SR2->SR3 |
+  |  |    |    |  |             |  |    |    |  |
+  +--|----|----|--+             +--|----|----|--+
+     +----|----|-------------------+    |    |
+          +----|------------------------+    |
+               +-----------------------------+
+                   TCP/IP Connection
+}}}
+프로세스가 명확해서 제어하기 쉽고, 동기화 기술을 위한 메모리/파일 잠금등이 필요하지 않아서 프로그램을 작성하기 쉽다라는 장점을 가지지만, 많은 자원을 소모한다는 단점을 가진다. 다수의 연결과 많은 데이터를 처리하기 위해서는 좋은 방법이 아니다.
+
+=== Synchronous VS Asynchronous 데이터 교환 ===
+Synchronous/Asynchronous 소켓과 혼동하지 말기 바란다.
+
+ 1. Synchronous 
+   {{{#!plain
+  Server                   Client 
+     |          Request 1   |
+     | <------------------- |
+     |  Response 1          |
+     | -------------------> |
+    ---                     |
+     |          Request 2   |
+     | <------------------- |
+     |  Response 2          |
+     | -------------------> |
+    ---                     |
+     |          Request 3   |
+     | <------------------- |
+     |  Response 3          |
+     | -------------------> |
+}}}
+   요청과 응답이 프로토콜쌍으로 처리된다. 하나의 쌍이므로 하나의 요청이 끝나기 전에는 다음 프로세스로 진행되지 않는다. 직관적으로 데이터를 처리할 수 있으며, 쉽게 구현가능하다. 요청과 응답을 통해서 서버/프로세스간 Sync를 맞추어야 다음으로 진행이 가능하다. 
+
+ 1. Asynchronous
+  {{{#!plain
+  Server                   Client 
+     |          Request 1   |
+     | <------------------- |
+     |          Request 2   |
+     | <------------------- |
+     |  Response 1          |
+     | -------------------> |
+     |          Request 3   |
+     | <------------------- |
+     |  Response 2          |
+     | -------------------> |
+     |  Response 3          |
+     | -------------------> |
+}}}
+요청과 요청에 대한 응답을 동기화 시키기 위해서 기다리지 않는다. 동시에 다수의 클라이언트로 부터의 요청을 대기시간 없이 효율적으로 처리할 수 있다. 그렇지만 처리결과를 제어하기가 까다롭다는 단점을 가진다. 일을 받아들이는 사람과 처리하는 사람이 따로 있다고 생각할 수 있겠다.
+
+==== 메시지 전달과 공유 메모리 ====
+{{{#!plain
+   +-------------+                  +-------------+
+   | CLIENT      |                  | SERVER      | 
+   |             |                  |             |
+   |             |                  |             |
+   +-------------+                  +-------------+
+        |                                   |
+        | MSG --->                          |
+        +-----------------------------------+
+                       IPC(12)
+}}}
+메시지 전달(Message Passing)는 IPC 설비를 이용해서 데이터를 전달한다. 개발자들은 처리해야할 데이터를 명확히 하기 위해서 프로토콜을 정의해서 사용하게 된다.
+ 1. 데이터 포맷과 데이터에 포함될 내용
+ 1. 데이터의 시작과 종료를 알려주기 위한 방법(세션 유지)
+ 1. 데이터 전달 방식(unicast(12), multicast(12), boradcast(12))
+
+{{{#!plain
+   +-------------+                  +-------------+
+   | CLIENT      |                  | SERVER      | 
+   |             |                  |             |
+   |      +--------------------------------+      | 
+   |      |      |                  |      |      |
+   +------|------+                  +------|------+
+          |    공유 메모리 영역            | 
+          |                                |
+          +--------------------------------+
+}}}
+공유메모리는 다수의 프로세스가 하나의 메모리 영역을 통해서 데이터를 교환할 수 있도록 허용한다. 다수의 프로세스가 메시지 전달 방식을 이용할 경우 동일한 데이터가 여러번 복사된다는 단점이 있는데, 공유메모리를 이용할 경우 하나의 메시지만 사용하면 되므로 효율이 높아지게 된다. 그러나 제어하기 까다롭다는 단점을 가진다.
+
+=== Socket 살펴보기 ===
+Socket(:12)는 운영체제에 상관없이 네트워크 통신 프로그래밍이 가능하도록 일반적인 API를 제공한다. Socket는 다음과 같은 특징을 가진다. 
+
+ * Socket는 TCP/IP 프로토콜을 기반으로 BSD Unix 사에서 C언어를 통해서 개발되었다.
+ * 5개의 카테고리에 약 20개 정도의 함수들로 구성되어 있다.
+ * remote 뿐만 아니라 local 영역에서의 통신도 지원한다. local영역에서의 통신을 지원할경우 process간 내부통신(IPC(12))을 위한 용도로 사용할 수 있다.
+ * Unix(:12)에서 소켓은 일반 파일처럼 다루어지며 파일과 동일한 I/O 제어가 가능하다. 그러나 윈도우의 경우는 예외다.
+==== Socket Dimensions ====
+attachment:socketd.gif
+
+ 1. 통신타입에 따른 분류
+   * stream 과 datagrams 방식이 있다. stream 방식의 경우 세션을 맺고 흐름을 제어하는 반면(세션단위 처리), datagrams 방식은 데이터그램 단위로 데이터를 처리한다. TCP는 stream방식, UDP는 datagrams 방식 프로토콜이다. 
+ 1. 통신및 연결 규칙
+   * 일반적으로 클라이언트가 능동적으로 연결을 요청하고, 서버는 수동적인 입장에서 기다린다.
+ 1. 통신 영역(domain) 
+   * 로컬영역에서의 통신과 원격영역에서의 통신으로 나뉜다. 로컬영역에서라면 프로세스간 통신(IPC(12))가 될 것이다. 
+
+==== Socket API ==== 
+[wiki:article_socket_layer socket layer 소개]문서를 참고하기 바란다.
+
+==== Socket 의 한계 ====
+ * 구조화 되어 있지 않으며, 형식이 없고, 사용하기 쉽지 않다.
+   우선 API(12)는 상속의 개념이 없는 함수의 선형적인 나열로 되어 있다. 개발자는 낮은 수준에서 API의 각 함수들에 대해서 명확히 이해를 하고 있어야 한다. 클래스화 되어 있는 다른 API를 이용해서 프로그램을 만들경우 보통 70점 이상의 일정한 수준의 품질을 유지할 수 있지만, 구조화 되어 있지 않은 Socket과 같은 API를 가지고 프로그램을 작성할 경우 개발자의 역량에 따라서 100-10 까지의 품질의 차이를 보여준다. 
+ * 함수 이름들간의 연관성을 찾기가 쉽지 않다. 조각조각 쪼개져 있다. 다음 함수들 간의 연관성을 찾아보기 바란다.
+   socket(), bind(), connect(), listen(), accept(), read(), write(), recv(), send(), gethostbyname(), getservbyname(), getpeername(), setsockopt(), getsockopt()
+ * 윈도우의 경우 원격통신을 위한 I/O와 파일 I/O가 분리가 된다. 예를 들자면 파일을 읽고자 할경우 윈도우는 ReadFile와 WriteFile 같은 함수를 사용할 것이다. 그러나 유닉스는 파일 I/O와 통신 I/O를 위한 함수의 이름이 동일하다. 이것은 장점이 될 수도 있지만 단점이 될 수도 있다. 
+   {{{#!plain
+// 소켓에서 읽어서 파일로 쓰는 코드, 충분히 헛갈릴 수 있을 것이다.
+n = read(s_handle, buf, len);
+write(f_handle, buf, n);
+}}}
+ * 같은 함수가 운영체제에 따라 다른 리턴값을 보여준다.
+ * 너무 낮은 수준에서 다루어야 한다. 
+   1. 낮은 수준에서 다룬 다는 것은, 경험이 충분하지 않을 경우 실수를 할 수 있음을 의미한다. 가장 흔한 실수는 byte order과 관련된 문제일 것이다.
+   1. 함수를 잘못 사용할 수 있다.
+   1. sockaddr 구조체를 완전히 머리에 담아두고 있기란 쉽지 않다. 함수를 사용하기 위해서 매번 메뉴얼을 뒤적거려야 한다.
+ * 복잡성의 증가
+   1. 다양한 프로토콜들에 대해서 지식을 가지고 있어야 한다.
+   1. broadcasting, async I/O, non blocking I/O, urgent data delivery와 같은 다양한 옵션들에 대해서 알고 있어야 한다. 
+
+==== 예제로 보는 Socket API의 문제점 ====
+{{{#!plain
+// 인클루드 시켜야 하는 헤더파일의 이름은 운영체제마다 다를 수 있다.
+// 제대로 처리할려면 때로는 중첩되기 까지 하는 ifdef를 사용해야 한다.
+#include <sys/types.h>
+#include <sys/socket.h>
+
+const int PORT_NUM = 10000;
+
+int echo_server()
+{
+	struct sockaddr_in addr;
+	
+	// 자주 addr_len에 sizeof(sockaddr_in)을 해줘야 한다는 걸 빼먹곤 한다. 
+	int addr_len;
+
+	char buf[BUGSIZE];
+
+	// 소켓이 int형이다. 인지하기 쉽지 않다.
+	int n_handle;
+
+	int s_handle = socket(PF_UNIX, SOCK_DGRAM, 0);
+	
+	// 리턴값 역시 직관적이지 않다.
+	if (s_handle == -1) return -1;
+
+	addr.sin_family = AF_INET;       // 프로토콜과 family를 잘못 사용하고 있다.
+	addr.sin_port = PORT_NUM;        // 잘못된 byte order
+	addr.sin_addr.addr = INADDR_ANY; // 사용하지 않은 구조체 멤버.
+
+	if (bind (s_handle, (struct sockaddr *) &addr, sizeof addr) == -1)
+		return -1;
+
+	// listen() 함수를 빼먹었군요.	
+
+	// s_handle는 SOCK_DGRAM 이다. 미스매치다. 
+	if (n_handle = accept(s_handle, (struct sockaddr *)&addr,
+			&addr_len) != -1)
+	{
+		int n;
+		while((n = read(s_handle, buf, sizeof(buf)) > 0)
+		{
+			// n byte에서 어떤일이 일어날지 보증할 수 없다.
+			write(n_handle, buf, n); 
+		}
+		close(n_handle);
+	}
+	return 0;
+}}}
+100라인도 안되는 짧은 코드에서 10개가 넘는 오류가 발생되었다. 위의 오류들은 소켓 프로그래밍 하면서 (비록 경험많은 개발자라 하더라도) 흔히 겪을 수 있을 것이다. 
+
+==== ACE Socket Wrapper Facade(12) Classes ====
+ACE는 C++의 클래스의 모음이며, Socket API의 문제들을 해결하고 있다.
+ * 증가된 type-safety
+ * portability 
+ * 일반적인 목적에 간단하게 사용할 수 있다. 
+ * 높은 수준에서 블럭단위의 개발이 가능하다.
+
+|| ACE 클래스			|| 설명										||
+|| ACE_Addr				|| ACE 네트워크 어드레싱 계층의 최상위 루트	||
+|| ACE_INET_Addr		|| 인터넷영역 주소 family					||
+|| ACE_IPC_SAP			|| IPC Wrapper 계층의 최상위 루트			|| 
+|| ACE_SOCK				|| Socket관련 계층의 최상위 루트			||
+|| ACE_SOCK_Connector	|| acceptor에 연결요청을 하고 새로운 통신채널을 생성 ||
+|| ACE_SOCK_IO			|| 데이터 전송 메커니즘 제공				||
+|| ACE_SOCK_Acceptor	|| connector로부터의 연결요청에 대해 응답을 하고 새로운 통신채널을 생성 ||
+
+attachment:ace_class.gif
+
+==== Wrapper Facade Pattern ====
+네트워크 어플리케이션을 만들기 위해서는 Socket 뿐만 아니라 file, thread, process, IPC와 같은 운영체제에서 제공하는 다양한 서비스를 활용해야만한다. 운영체제는 낮은 수준의 C로 접근가능한 API를 제공할 뿐이다.
+
+이러한 낮은 수준의 API는 견고하고, 효율적인 어플리케이션의 개발을 어렵게 만든다.
+
+위의 문제를 해결하기 위해서 Wrapper Facade Design Pattern(이하 P2)을 사용할 수 있다. P2는 낮은 수준의 API를 직접 호출하지 않고 포장시킴으로써 문제를 회피한다.
+
+P2는 객체지향적이지 않은 API의 함수와 데이터들을 캡슐화하고 객체지향 클래스를 인터페이스로 개발자에게 제공하게 된다. 이로써 개발자는 견고하고 유지보수가 용이한 어플리케이션을 개발할 수 있게 된다. 
+
+==== ACE Socket Wrapper Facades 구조 ====
+다음은 ACE Socket Wrapper facades의 구조이다. 인터넷 영역과 IPC영역으로 나누어서 보여주고 있다. 
+attachment:acewrapperclass.gif
+
+ACE Socket wrapper facade class는 다음과 같은 기능들을 제공한다.
+ * ACE_SOCK_*
+   인터넷 영역 소켓 API함수들을 캡슐화 시킨 클래스
+ * ACE_L_SOCK_*
+   Unix 영역('''L'''ocal) 소켓 API함수들을 캡슐화 시킨 클래스
+
+==== ACE Socket Wrapper Facades의 규칙 ====
+Socket API에서 능동적으로 연결하기 위한 connect()함수와 능동적으로 연결하기 위해서 accept()함수를, 마지막으로 통신을 위해서 read(), write()함수를  사용하는 것과 마찬가지로, '''active connection role''' 과 '''passive connection role''', '''communication role'''을 가지고 있다.
+ 1. '''active connection role'''(ACE_SOCK_Connector)은 원격지로 연결을 초기화하는 규칙을 가진다. 
+ 1. '''passive connection role'''(ACE_SOCK_Acceptor)은 원격지의 연결을 받아들이는 규칙을 가진다. 
+ 1. '''communication role'''(ACE_SOCK_Stream)은 연결이 된후 어플리케이션관 데이터를 교환하기 위한 규칙을 가진다.
+{{{#!plain
+ +----------------------------+                      +----------------------------+
+ | SERVER                     |                      | CLIENT                     | 
+ | PASSIVE CONNECTION ROLE    |                      | PASSIVE CONNECTION ROLE    |
+ |                            |                      |                            |
+ | SOCK_Acceptor              |                      | SOCK_Acceptor              |
+ | SOCK_Stream                |                      | SOCK_Stream                |
+ | accept()     <-------------|----------------------|-connect()                  |
+ | send()/recv()  <-----------|----------------------|>send()/recv()              |
+ | close()                    |          ^           | close()                    |
+ +----------------------------+          |           +----------------------------+
+                                         |
+                                 communication role
+}}}
+
+==== ACE Socket Addressing Classes ==== 
+Addressing 클래스는 Socket가 다양한 Addressing 영역을 다루어야 함으로써 발생할 수 있는 문제점을 해결하고 있다. 저수준의 (굳이 알필요는 없지만 복잡한) 부분을 숨기고, 계층화 시킴으로써 운영체제에 관계없이 동일한 인터페이스를 사용할 수 있도록 해준다. 
+{{{#!plain
+                           +----------+
+                           | ACE_Addr |
+                           +----------+
+                                ^
+                                |
+      +-------------------------------------------------------+
+      |          |          |          |          |           |
+      |          |          |          |          |           |
+  +-------+  +-------+  +-------+  +-------+  +-------+   +-------+
+  | ACE   |  | ACE   |  | ACE   |  | ACE   |  | ACE   |   | ACE   |
+  | SPIPE |  | INET  |  | DEV   |  | UNIX  |  | FILE  |   | MEM   |
+  | Addr  |  | Addr  |  | Addr  |  | Addr  |  | Addr  |   | Addr  |
+  +-------+  +-------+  +-------+  +-------+  +-------+   +-------+
+
+}}}
+
+클래스는 다음과 같은 기능을 제공한다.
+ * ACE_Addr 클래스는 ACE Network addressing 계층의 최상위에 존재한다.
+ * ACE_INET_Addr 은 TCP(12)/IP(12)와 UDP(12)/IP addressing 정보를 처리한다. 이 클래스는  addressing 하면서 발생할 수 있는 많은 미묘한 문제들을 제거하였다.
+{{{#!plain
+             +--------------------------------------------------+
+             | ACE_ADDR                                         |
+             |--------------------------------------------------|
+             | + sp_any : ACE_Addr                              |
+             | # addr_type_ : int                               |
+             | # addr_size_ : int                               |
+             |--------------------------------------------------|
+             | + ACE_Addr (type : int = -1, size : int = -1)    |
+             | + operator == (sap : const ACE_Addr&) : int      |
+             | + operator != (sap : const ACE_Addr&) : int      |
+             | + hash() : int                                   |
+             +--------------------------------------------------+
+                                      ^
+                                      |
+                                      |
+   +----------------------------------------------------------------------+
+   | ACE_INET_Addr                                                        |
+   |----------------------------------------------------------------------|
+   | - inet_addr_ : sockaddr_in                                           |
+   |----------------------------------------------------------------------|
+   | + ACE_INET_Addr (port:unsigned short, host : const char *)           |
+   | + set (port:unsigned short, host:const char *) : int                 |
+   | + string_to_addr (address:const char *) : int                        |
+   | + addr_to_string (s : char *, max : size_t, ipfmt: int = 1) : int    |
+   | + get_port_number () : u_short                                       |
+   | + get_host_name (buff : char *, max : size_t) : int                  |
+   +----------------------------------------------------------------------+
+}}}
+
+==== ACE I/O Handle Class ====
+저수준의 C 함수를 이용해서 입출력을 다루는 것은 반드시 필요한 작업이자 가장 빈번히 발생하는 작업이다. 유닉스 프로그램은 "파일 여는 것에서 시작해서", "파일 닫는 것으로 끝난다" 라고 말해도 과함이 없다.  
+
+그러나 안타깝게도 저수준의 C함수를 이용해서 파일의 입출력을 다루는 것은 짜증나고도 힘든일이다 - 어려운 일이 아니다. 짜증나고 힘들 뿐이다 -. 아래의 코드를 확인하기 바란다.
+{{{#!plain
+int buggy_echo_server(u_short port_num)
+{
+	sockaddr_in s_addr;
+
+	// 윈도우즈 환경에서는 파일지시자로 int를 사용하지 않는다.
+	int acceptor = socket(PF_UNIX, SOCK_DGRAM, 0);
+
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = port_num;
+	s_addr.sin_addr.s_addr = INADDR_ANY;
+	bind (acceptor, (sockaddr *)&s_addr, sizeof s_addr);
+	int handle = accept (acceptor, 0,0 );
+	for (;;)
+	{
+		char buf[BUFSIZ];
+		// 잘못된 파일지시자로 부터 읽어들이고 있다.
+		ssize_t n = read (acceptor, buf, sizeof(buf));
+		if (n <= 0) break;
+			write(handle, buf, n);
+	}
+}
+}}}
+
+ACE에서 제공하는 클래스는 위의 문제들을 해결하고 있다.
+ * ACE_IPC_SAP 는 IPC wrapper facades 클래스 계층의 최상위에 위치한다. 이 클래스는 I/O를 제어하기 위한 다른 기본적인 기능들을 제공한다. 
+ * ACE_SOCK 는 ACE Socket wrapper facades 클래스 계층의 최상위에 위치한다.
+   1. 소켓을 생성하거나 닫는다.
+   1. 로컬 혹은 원격지의 주소를 얻는다.
+   1. 소켓 큐의 크기등을 변경하거나 얻기 위한 소켓옵션을 제어한다.
+   1. boradcast(12)/multicast(12) 통신과 관련된 제어
+   1. Nagle's 알고리즘의 제어
+{{{#!plain
+           +-----------------------------+
+           | ACE_IPC_SAP                 |
+           +-----------------------------+
+           | - handle_ : ACE_HANDLE      |
+           +-----------------------------+
+           | + enable(value : int)       |
+           | + disable(value : int)      |
+           | + get_handle() : ACE_HANDLE |
+           | + set_handle (h:ACE_HANDLE) |
+           +-----------------------------+
+                          ^
+                          | 
+                          | 
+  +----------------------------------------------------+
+  | ACE_SOCK                                           |
+  +----------------------------------------------------+
+  +----------------------------------------------------+
+  | + open (type : int, proto_family: int,             |
+  |         protocol : int, reuse_addr : int) : int    |
+  | + close () : int                                   |
+  | + get_option (level : int, optins : int,           |
+  |            optval : void *, optlen : int *): int   |
+  | + set_option (level : int, options : int,          |
+  |            optval : void *, optlen : int) : int    |
+  | + get_local_addr (addr : ACE_Addr &) : int         |
+  | + get_remote_addr (addr : ACE_Addr &) : int        |
+  +----------------------------------------------------+
+}}}
+
+==== ACE_SOCK_Connector 클래스 ==== 
+소켓은 데이터 통신을 위한 recv() 혹은 send() 함수를 사용하기 전에 연결하는 과정을 거친다(언제나 그런건 아니지만). 이 클래스는 통신 연결과 관련된 기능들을 제공한다. 
+
+C에서 제공하는 소켓 함수를 사용할 경우 다음과 같은 과정을 거칠건데, 만은 문제점을 가지고 있음을 알 수 있다.
+{{{#!plain
+int buggy_echo_client (u_short port_num, const char *s)
+{
+	int handle = socket(PF_UNIX, SOCK_DGRAM, 0);
+
+	write(handle, s, strlen (s) + 1);     // 함수의 위치가 잘못 되었다. 
+
+	sockaddr_in s_addr;	
+	memset(&s_addr, 0, sizeof s_addr);
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = htons(port_num);	
+	connect(handle, (sockaddr *)&s_addr, sizeof s_addr);
+}
+}}}
+
+ACE_Sock_Connector 클래스는 통신을 위한 새로운 접점(endpoint)를 생성하는 일을 하며, 위의 문제들을 해결하고 있다. 
+ * 연결을 요청하고 연결이 성공적으로 생성되었을 경우 데이터 통신을 위해 사용할 ACE_SOCK_Stream 을 초기화 한다. 
+ * blocking, nonblocking를 결정하며, 타임아웃을 제어한다. 
+{{{#!plain
+                +-----------------+      +----------------+
+                | ACE_SOCK_Stream |      | ACE_INET_Addr  |
+                +-----------------+      +----------------+
+                        ^                        ^
+                        |                        |
+                +-----------------\      +----------------\
+                | PEER_STREAM     |      | PEER_ADDR      | 
+                +-----------------+      +----------------+
+                        |                        |
+   +---------------------------------------------------------------------+
+   | ACE_SOCK_Connector                                                  |
+   +---------------------------------------------------------------------+
+   +---------------------------------------------------------------------+
+   | + connect (stream : ACE_SOCK_Stream&, remote_addr : ACE_Addr &,     |
+   |            timeout : ACE_Time_Value *= 0) : int                     |
+   | + complete (stream : ACE_SOCK_Stream&, remote_addr : ACE_Addr *=0,  |
+   |            timeout : ACE_Time_Value *= 0) : int                     |
+   +---------------------------------------------------------------------+
+}}}                                                                      
+
+==== ACE Wrapper Facades 의 특징 ====
+ * ACE uses the C++ generic programming idiom to define & combine a set of characteristics to alter the behavior of a template class
+ * In C++, the typedef & typename language feature is used to define a trait
+   1. A trait provides a convenient way to associate related types, values, & functions with template parameter type without requiring that they be defined as members of the type
+   1. Traits are used extensively in the C++ Standard Template Library (STL)
+
+ * ACE Socket wrapper facades use traits to define the following associations
+   1. PEER_ADDR : this trait defines the ACE_INET_Addr class associated with the ACE Socket Wrapper Facade
+   1. PEER_STREAM : this trait defines the ACE_SOCK_Stream data transfer class associated with the ACE_SOCK_Acceptor & ACE_SOCK_Connector factories
+{{{#!plain
+class ACE_SOCK_Connector {
+public:
+  typedef ACE_INET_Addr 
+          PEER_ADDR;
+  typedef ACE_SOCK_Stream 
+          PEER_STREAM;
+  // ...
+
+}
+
+class ACE_TLI_Connector {
+public:
+  typedef ACE_INET_Addr 
+          PEER_ADDR;
+  typedef ACE_TLI_Stream 
+          PEER_STREAM;
+  // ...
+
+}
+}}}
+
+==== ACE_SOCK_Connector 이용하기 ====
+웹서버에 연결하는 클라이언트 애플리케이션의 예제를 통해서 ACE_SOCK_Connector의 사용방법에 대해서 소개한다.
+{{{#!plain
+int main(int argc, char **argv)
+{
+	const char *pathname = argc > 1 ? argv[1] : "index.html";
+	const char *server_hostname = argc > 2 ? argv[2] : "www.joinc.co.kr";
+
+	typedef ACE_SOCK_Connector CONNECTOR;
+	CONNECTOR connector;
+	
+	typename CONNECTOR::PEER_STREAM peer;
+	typename CONNECTOR::PEER_ADDR peer_addr;
+
+	if (peer_addr.set (80, server_hostname) == -1)
+		return 1;
+
+	// blocking 모드
+	else if (connector.connect (peer, peer_addr) == -1)
+		return 1;
+
+	// nonblocking 모드
+	if (connector.connect(peer, peer_addr, &ACE_TIME_Value::zero) == -1)
+	{
+		if(errno = EWOULDBLOCK)
+		{
+		}
+	}
+	if (connector.complete (peer, 0, &ACE_TIME_Value::zero) == -1)
+	{
+		// 에러처리 
+	}
+
+	// 연결에 Timeout를 설정한다.
+	ACE_Time_Value timeout (5);    // 5초의 타임아웃
+	if (connector.connect (peer, peer_addr, &timeout) == -1
+	{
+		if (errno == ETIME)
+		{
+			// 에러처리
+		}
+	}
+}
+}}}
+
+ACE_SOCK_Connector 입력되는 ACE_Time_Value에 따라서 다음과 같은 행동을 한다.
+|| 값				|| 설명										||
+|| NULL Pointer		|| 연결이 이루어질 때까지 무한정 기다린다.	||
+|| Non-NULL 이고 sec()와 usec()가 0일경우	|| nonblocking 연결을 시도한다.	|| 
+|| Non-NULL이고 sec()또는 usec()가 0보다 클 경우 || 해당 시간동안 연결이 되기를 기다린다. 주어진 시간동안 연결이 되지 않는다면 -1을 리턴하고 errno로 ETIME을 설정한다.	||
+
+==== ACE_SOCK_Stream 클래스 ====
+개발자가 소켓을 잘못 이용하더라도 보통의 경우 컴파일 과정에서 에러가 발생하지 않는다. 이것은 프로그램에 심각한 문제를 발생시킬 수 있다.
+{{{#!plain
+int buggy_echo_server(u_short port_num)
+{
+	sockaddr_in s_addr;
+	int acceptor = sock(PF_UNIX, SOCK_DGRAM, 0);
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = port_num;
+	s_addr.sin_addr.s_addr = INADDR_ANY;
+	bind(acceptor, (sockaddr *)&s_addr, sizeof(s_addr0);
+	int handle = accept(acceptor, 0, 0);
+	for (;;)
+	{
+		char buf[BUFSIZ];
+		
+		// 잘못된 파일지시자로 부터 읽고 있다.
+		ssize_t n = read(acceptor, buf, sizeof(buf));
+		if(n <= 0) break;
+		write(handle, buf, n);
+	}
+}
+}}}
+
+ACE_SOCK_Stream은 statically type-checked 인터페이스를 이용하게 함으로써 데이터 교환에 있어서 잘못된 데이터 입력자체를 하지 못하도록 하고 있다. 
+
+ACE_SOCK_Stream 클래스는 다음과 같은 기능을 제공한다.
+ * 소켓에서 발생하는 데이터 전달과정을 캡슐화 한다.
+ * 정확한 n byte 통신을 지원한다. 
+ * blocking, nonblocking 및 타임아웃을 지원한다.
+ * 하나의 연속된 버퍼를 사용하지 않고 호출당 버퍼를 사용할 수 있도록 지원한다. 
+ * Support for ``gather-write'' operations, which transmit the contents of multiple noncontiguous data buffers in a single operation
+ * Support for generic programming techniques that enable the wholesale replacement of functionality via C++ parameterized types
+{{{#!plain
+ +---------------+         +------------------------------------------------+
+ | ACE_SOCK      |<--------| ACE_SOCK_IO                                    |
+ +---------------+         +------------------------------------------------+
+                           | + recv (buf : void *, n : size_t               |
+ +---------------+         |         timeout : ACE_Time_Value * = 0) : int  |
+ | ACE_INET_Addr |         | + send (buf : void *, n : size_t,              |
+ +---------------+         |         timeout : ACE_Time_Value * = 0) : int  |
+        ^                  +------------------------------------------------+
+        |                            ^
+ +---------------\                   |
+ | PEER_ADDR     |                   |
+ +---------------+                   |
+                                     |
+ +-----------------------------------------------------------------------+
+ | ACE_SOCK_Stream                                                       |
+ +-----------------------------------------------------------------------+
+ +-----------------------------------------------------------------------+
+ | + recv_n (buf : void *, len : size_t, timeout : ACE_Time_Value * = 0, |
+ |           bytes_recvd : size_t * = 0) : ssize_t                       |
+ | + send_n (buf : void *, len : size_t, timeout : ACE_Time_Value * = 0, |
+ |           bytes_recvd : size_t * = 0) : ssize_t                       |
+ | + send_n (mblk : ACE_Message_Block *, timeout : ACE_Time_Value * = 0, |
+ |           bytes_send : size_t * = 0) : ssize_t                        |
+ | + recvv_n (v : iovec[], cnt : size_t, timeout : ACE_Time_Value * = 0, |
+ |           bytes_recvd : size_t * = 0) : ssize_t                       |
+ | + sendv_n (v : iovec[], cnt : size_t, timeout : ACE_Time_Value * = 0, |
+ |           bytes_recvd : size_t * = 0) : ssize_t                       |
+ +-----------------------------------------------------------------------+
+}}}
+
+다음은 ACE_SOCK_Stream을 이용해서 웹서버로 부터 데이터를 주고 받는 프로그램 예제이다.
+{{{#!plain
+// ACE_SOCK_Connector를 통해서 연결이 된상태에서 부터 시작한다.
+char buf[BUFSIZ];
+iovec iov[3];
+iov[0].iov_base = (char *)"GET";
+iov[0].iov_len = 4;    // "GET"의 길이
+iov[1].iov_base = (char *)pathname;
+iov[1].iov_len = strlen(pathname);
+iov[2].iov_bas = (char *)"HTTP/1.0\n\n";
+iov[2].iov_len = 13;   // "HTTP/1.0\n\n"의 길이
+
+// blocking 모드로 ACE_SOCK_Stream에 쓰기
+if (peer.sendv_n (iov, 3) == -1)
+	return 1;
+
+// blocking 모드로 ACE_SOCK_Stream으로 부터 읽기
+for (ssize_t n; (n = peer.recv(buf, sizeof(buf)) > 0;)
+	ACE::write_n (ACE_STDOUT, buf, n);
+return peer.close() == -1 ? 1 : 0;
+}}}
+ * enable(), disable() 메서드를 통한 blocking및 nonblocking 제어 
+   * peer.enable(ACE_NONBLOCK);   // nonblocking 활성화 
+   * peer.disable(ACE_NONBLOCK);   // nonblocking 비 활성화 
+ * 타임아웃 설정
+   {{{#!plain
+ACE_Time_Value timeout (10);
+if (peer.sendv_n (iov, 3, &timeout) == -1)
+{
+	// 에러처리
+}
+}}}
+
+==== Nagle(12) 알고리즘 제어 ====
+[[include(Term_Nagle)]]
+
+ACE는 간단하게 Nagle 알고리즘을 활성화시키거나 비활성화 시킬 수 있다.
+{{{#!plain
+peer.enable(TCP_NODELAY);    // Nagle 알고리즘 비활성화
+peer.disable(TCP_NODELAY);   // Nagle 알고리즘 활성화
+}}}
+
+==== ACE_SOCK_Acceptor 클래스 ====
+C에서 제공하는 저수준의 Socket API(12)를 사용할 경우 개발자는 여러가지 원인으로 잘못된 코드를 생성할 수 있다. 더 큰문제는 이러한 잘못된 코드들이 문제없이 컴파일 된다는 점이다. ACE_SOCK_Acceptor 클래스는 이러한 문제를 해결하고 있다.
+{{{#!plain
+int buggy_echo_server (u_short port_num) 
+{ 
+	sockaddr_in s_addr;
+	int acceptor = socket (PF_UNIX, SOCK_DGRAM, 0);
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = port_num;
+	s_addr.sin_addr.s_addr = INADDR_ANY;
+	bind (acceptor, (sockaddr *) &s_addr, sizeof s_addr);
+	int handle = accept (acceptor, 0, 0);
+	for (;;) 
+	{
+		char buf[BUFSIZ];
+
+		// 잘못된 소켓 지시자로 부터 읽어들이고 있다.
+		ssize_t n = read (acceptor, buf, sizeof buf);
+		if (n <= 0) break;
+		write (handle, buf, n);
+	}
+}
+}}}
+
+ACE_SOCK_Acceptor 클래스는 위의 문제를 해결할 수 있는 다음과 같은 기능들을 제공한다.
+
+ * 원격지의 connector로 부터 연결을 기다리고, 연결이 맺어지면 ACE_SOCK_Stream 객체를 초기화 한다. 
+ * blocking 혹은 nonblocking 상태로 연결을 기다릴 수 있으며, 타임아웃을 검사할 수도 있다.
+ * generic 프로그래밍 기술을 지원한다.
+{{{#!plain
+   +---------------+    +---------------+    +-----------------+
+   | ACE_INET_Addr |    | ACE_SOCK      |    | ACE_SOCK_Stream |
+   +---------------+    +---------------+    +-----------------+
+          ^                    ^                    ^
+          |                    |                    | 
+   +---------------+           |             +---------------+
+   | PEER_ADDR     |           |             | PEER_STREAM   |
+   +---------------+           |             +---------------+
+          |                    |                    |
+   +-----------------------------------------------------------+
+   | ACE_SOCK_Acceptor                                         |
+   +-----------------------------------------------------------+
+   +-----------------------------------------------------------+
+   | + open (local_addr : ACE_Addr &): int                     |
+   | + accept (stream : ACE_SOCK_Stream &) : int               |
+   +-----------------------------------------------------------+
+}}}
+
+==== ACE_SOCK_Acceptor 클래스를 사용하자 ====
+아래의 코드는 ACE_SOCK_Acceptor 과 ACE_SOCK_Stream을 이용해서 만들어진 예제이다. 웹클라이언트로 부터 연결을 기다리고 데이터를 주고받는 웹서버로써의 역할을 하는 프로그램이다. 
+{{{#!plain
+extern char *get_url_pathname (ACE_SOCK_Stream *);
+int main()
+{
+	ACE_INET_Addr server_addr;
+	ACE_SOCK_Acceptor acceptor;
+	ACE_SOCK_Stream peer;
+
+	if (server_addr.set(80) == -1) return 1;
+	if (acceptor.open(server_addr) == -1) return 1;
+
+	for (;;)
+	{
+		if (acceptor.accept(peer) == -1) return 1;
+		peer.disable (ACE_NONBLOCK);
+
+		ACE_Auto_Array_Ptr<char *> pathname (get_url_pathname (peer));
+		ACE_Mem_Map mapped_file (pathname.get());
+
+		if (peer.send_n (mapped_file.addr(),
+						mapped_file.size()) == -1) return 1;
+		peer.close();	
+	}
+	return acceptor.close() == -1 ? 1: 0;
+}
+}}}
+
+==== ACE_Mem_Map 클래스 ====
+많은 현대적인 운영체제의 대부분은 프로세스의 가상메모리 영역을 파일에 대응 시킬 수 있는 Memory Map 기술을 제공하고 있다. [wiki:mmap mmap 위키]를 참고하기 바란다.
+
+Memory-mapped 파일은 가상메모리 영역의 데이터를 파일에 대응시킴으로써 (다른 프로세스라고 할지라도)직접 읽거나 쓸수 있게 도와준다. 이러한 특성은 IPC(12)용도로 사용가능하며, 때때로 메모리내용을 (파일에 남기 때문에)백업하기 위한용도로도 사용할 수 있게 한다. 
+
+메모리맵은 운영체제마다 서로 다른 방식으로 작동하는데, ACE는 이들을 캡슐화시켜서 개발자가 고민없이 사용하도록 도와준다. ACE는 ACE_Mem_Map 클래스를 제공한다.
+
+==== ACE_Message_Block 클래스 ====
+{{{#!plain
+전달하고자 하는                                                                        처리를 위해 기다리고있는
+메시지 버퍼                                                                            메시지 버퍼
+ +----+     +-------------------+   +----+          +----+     +-------------------+     +----+
+ |++++|     | SOCK_Connector    |   |++++|          |++++|     | SOCK_Acceptor     |     |++++|
+ +----+     | SOCK_Stream       |   +----+          +----+     | SOCK_Stream       |     +----+
+   |        | connect()     ----|------------------------------|>accept()          |       |   
+ +----+     | send() / recv()   |                              | send()/recv()     |     +----+
+ |++++|     | close()           |                              | close()           |     |++++|
+ +----+     +-------------------+                              +-------------------+     +----+
+   |                                                                                       |
+ +----+                                                                                  +----+
+ |++++|                                                                                  |++++|
+ +----+                                                                                  +----+
+}}}
+네트워크 애플리케이션에서의 핵심은 결국 요청과 응답이고, 요청과 응답은 메시지를 주고 받음으로써 이루어진다는 점에서 메시지를 어떻게 효과적으로 잘 처리하느냐가 가장 중요한 핵심이라고 할 수 있다. 메시지를 제대로 처리하기 위해서는 다음과 같은 사항들이 충족되어야 한다.
+ 1. 네트워크 애플리케이션을 작성하게 되면 응용 수준의 프로토콜들을 정의 한다. 그러기 위해서는 메시지에서 헤더,데이터등을 분리할 수 있어야 한다.
+ 1. MTU(12)등에 의해서 메시지는 분리되거나 혹은 붙어서 들어올 수 있다. 이경우 단위 메시지로 만들기 위한 루틴이 필요하게 된다.
+ 1. 받아들인 메시지는 다른 프로세스나 쓰레드로 넘기기 위해서 버퍼형태로 관리 될 수 있어야 한다.
+
+ACE_Message_Block 클래스는 메시지를 효과적으로 처리하도록 다음과 같은 기능들을 제공한다.
+ 1. 각각의 ACE_Message_Block는 실제 다루어야할 데이터를 포함하고 있는 '''ACE_Data_Block'''에 대한 포인트 정보를 가지고 있다.
+ 1. 다중의 메시지를 chain 형태로 관리할 수 있다.
+ 1. 다중의 메시지를 ACE_Message_Queue를 통해서 동시 관리 가능하다.
+ 1. 자동으로 동기화와 메모리 관리가 이루어진다. 
+{{{#!plain
+ +-----------------------------------------------+
+ | ACE_Message_Block                             |
+ +-----------------------------------------------+
+ | # rd_ptr_ : size_t                            |
+ | # wr_ptr_ : size_t                            |
+ | # cont_ : ACE_Message_Block *                 |
+ | # next_ : ACE_Message_Block *                 |
+ | # prev_ : ACE_Message_Block *                 |
+ | # data_block_ : ACE_Data_Block *              |
+ | + init (size: size_t) : int                   |
+ | + msg_type (type : ACE_Message_Type)          |            +------------------+
+ | + msg_type () : ACE_message_Type              |            | ACE_Data_Block   |
+ | + msg_priority (prio : u_long)                |<>--------> +------------------+
+ | + clone () : ACE_Message_Block *              |*         1 | # base_ : char * |
+ | + duplicate () : ACE_Message_Block *          |            | # refcnt_ : int  |
+ | + release () : ACE_Message_Block *            |            +------------------+
+ | + set_flags (flags : u_long) : u_long         |            +------------------+
+ | + clr_flags (flags : u_long) : u_long         |
+ | + copy (buf : const char *, n : size_t) : int |
+ | + rd_ptr (n : size_t)                         |
+ | + rd_ptr () : char *                          |
+ | + wr_ptr (n : size_t)                         |
+ | + wr_ptr () : char *                          |
+ | + length () : size_t                          |
+ | + total_length () : size_t                    |
+ | + size () : size_t                            |
+ +-----------------------------------------------+
+}}}
+===== 2종류의 ACE_Message_Block 클래스 =====
+간단한 메시지와(Simple Message Structure) 여러형태의 메시지를 포함한 (Composite message contain) 형태를 처리할 수 있도록 지원되고 있다.
+
+attachment:ACE_Message_Block_Type.gif
+
+간단한 메시지를 지원하는 ACE_Message_Block는 하나의 단일한 형식을 가지는 데이터를 포인트한다.
+
+반면 두개이상의 ACE_Message_Block가 서로다른 형태를 가지는 데이터를 사용해야 하는 경우가 있을 것이다. 이러한 경우는 여러종류의 메시지를 처리해야 하는 미들웨어를 작성하고자 할경우 종종발생한다. ACE_Message_Block는 이러한 복잡한 형태의 데이터구조를 관리하도록 지원한다.
+
+==== ACE_Message_Block의 이용 ====
+다음은 ACE_Message_Blocks를 이용해서 어떻게 데이터의 목록을 만들고 유지하는지를 보여준다.
+
+{{{#!plain
+int main (int argc, char *argv[])
+{
+  // BUFSIZ의 크기를 가지는 ACE_Message_Block를 생성한다.
+  ACE_Message_Block *head = new ACE_Message_Block (BUFSIZ);
+  ACE_Message_Block *mblk = head;
+
+  for (;;) {
+    // wr_ptr ()을 이용해서 표준입력으로 부터 읽어들인 데이터를 
+    // 쓴다.
+    ssize_t nbytes = ACE::read_n (ACE_STDIN, 
+                                  mblk->wr_ptr (), 
+                                  mblk->size ());
+    if (nbytes <= 0)
+      break; // Break out at EOF or error.
+
+    // 읽어들인 메시지의 끝을 명확히 하기 위해서 크기를 명시한다.
+    mblk->wr_ptr (nbytes); 
+
+    mblk->cont (new ACE_Message_Block (BUFSIZ));
+    mblk = mblk->cont ();
+  }
+
+  // Print the contents of the list to the standard output.
+  for (mblk = head; mblk != 0; mblk = mblk->cont ()) 
+    ACE::write_n (ACE_STDOUT, mblk->rd_ptr (), mblk->length ());
+  
+  head->release (); // Release all the memory in the chain.
+  return 0;
+}
+}}}
+
+=== Client Application 작성 ===
+==== Logging Client ====
+그럼 ACE C++ Socket Wrapper facades를 이용해서 작성된 클라이언트 프로그램의 형태에 대해서 알아보도록 한다.
+
+{{{#!plain down:Logging_Client.h
+class Logging_Client {
+public:
+  // Send <log_record> to the server.
+  int send (const ACE_Log_Record &log_record);
+  // Accessor method.
+  ACE_SOCK_Stream &peer () { return logging_peer_; }
+  // Close the connection to the server.
+  ~Logging_Client () { logging_peer_.close (); }
+private:
+  ACE_SOCK_Stream logging_peer_; // Connected to server.
+};
+}}}
+
+다음은 Logging_Client::send() 메서드에 대한 설명이다.
+ 1. 데이터의 크기를 계산한다. (2-8)
+ 1. 데이터에서 헤더와 body부분을 분리해낸다. (10-16)
+ 1. 분리된 정보는 logging server 로 보낸다.(18-24)
+{{{#!plain down:Logging_Client.cc 
+ 1 int Logging_Client::send (const ACE_Log_Record &log_record) {
+ 2   const size_t max_payload_size =
+ 3       4 // type()
+ 4     + 8 // timestamp
+ 5     + 4 // process id
+ 6     + 4 // data length
+ 7     + ACE_Log_Record::ACE_MAXLOGMSGLEN // data
+ 8     + ACE_CDR::MAX_ALIGNMENT; // padding;
+ 9 
+10   ACE_OutputCDR payload (max_payload_size);
+11   payload << log_record;
+12   ACE_CDR::ULong length = payload.total_length ();
+13 
+14   ACE_OutputCDR header (ACE_CDR::MAX_ALIGNMENT + 8);
+15   header << ACE_OutputCDR::from_boolean (ACE_CDR_BYTE_ORDER);
+16   header << ACE_CDR::ULong (length);
+17 
+18   iovec iov[2];
+19   iov[0].iov_base = header.begin ()->rd_ptr ();
+20   iov[0].iov_len  = 8;
+21   iov[1].iov_base = payload.begin ()->rd_ptr ();
+22   iov[1].iov_len  = length;
+23 
+24   return logging_peer_.sendv_n (iov, 2);
+25 }
+}}}
+
+다음은 main함수다.
+{{{#!plain down:Logging_Cli_main.cc
+ 1 int main (int argc, char *argv[]) 
+ 2 {
+ 3   u_short logger_port =
+ 4     argc > 1 ? atoi (argv[1]) : 0;
+ 5   const char *logger_host =
+ 6     argc > 2 ? argv[2] : ACE_DEFAULT_SERVER_HOST;
+ 7   int result;
+ 8 
+ 9   ACE_INET_Addr server_addr;
+10   
+11   if (logger_port != 0)
+12     result = server_addr.set (logger_port, logger_host);
+13   else
+14     result = server_addr.set ("ace_logger", logger_host);
+15   if (result == -1) 
+16     ACE_ERROR_RETURN((LM_ERROR,
+17                      "lookup %s, %p\n",
+18                      logger_port == 0 ? "ace_logger" : argv[1],
+19                      logger_host), 1);
+20
+21   ACE_SOCK_Connector connector;
+22   Logging_Client logging_client;
+23 
+24   if (connector.connect (logging_client.peer (),
+25                          server_addr) < 0)
+26     ACE_ERROR_RETURN ((LM_ERROR,
+27                       "%p\n",
+28                       "connect()"),
+29                       1);
+30
+31   // Limit the number of characters read on each record.
+32   cin.width (ACE_Log_Record::MAXLOGMSGLEN);
+33   for (;;) {
+34     std::string user_input;
+35     getline (cin, user_input, '\n');
+36 
+37     if (!cin || cin.eof ()) break;
+38 
+39     ACE_Time_Value now (ACE_OS::gettimeofday ());
+40     ACE_Log_Record log_record (LM_INFO, now,
+41                                ACE_OS::getpid ());
+42     log_record.msg_data (user_input.c_str ());
+43 
+44     if (logging_client.send (log_record) == -1)
+45       ACE_ERROR_RETURN ((LM_ERROR,
+46                          "%p\n", "logging_client.send()"), 1);
+47   }
+48 
+49   return 0; // Logging_Client destructor 
+50             // closes TCP connection.
+51 }
+
+}}}
+
+=== Logging Server 작성 ===
+다음은 작성할 Logging_Server의 클래스 계층이다. Logging_Handler class는 간단하게 정의 할 수 있을 것이다. 계층을 이루고 있는 각각의 클래스는 별도로 설명을 하도록 하겠다.
+{{{#!plain
+ +----------------------------------------------------------------------+
+ | Logging_Server                                                       | 
+ +----------------------------------------------------------------------+
+ | - acceptor_ : ACE_SOCK_Acceptor                                      | 
+ +----------------------------------------------------------------------+
+ | + run(argc, : int, argv : char **) : int                             |
+ | # open (port : w_short = 0) : int                                    |
+ | # wait_for_multiple_events () : int                                  |
+ | # handle_connections () : int                                        |
+ | # handle_data (s : ACE_SOCK_Stream *) : int                          |
+ | # make_log_file (f : ACE_FILE_IO&, s, ACE_SOCK_Stream *= 0): int     |
+ | # acceptor() : ACE_SOCK_Acceptor&                                    |
+ +----------------------------------------------------------------------+
+                                 ^
+                                 |
+       +------------------------------------------------------+
+       |                |                 |                   |
+ +-----------+    +-----------+    +-------------+     +-------------+
+ | Iterative |    | Reactive  |    | Process Per |     | Thread Per  |
+ | Logging   |    | Logging   |    | Connection  |     | Connection  |
+ | Server    |    | Server    |    | Logging     |     | Logging     |
+ +-----------+    +-----------+    | Server      |     | Server      |
+       |                |          +-------------+     +-------------+
+       |                |                 |                |  ^
+       |                |   +-------------+                |  |
+       |                |   |                              |  |
+       |        +-----------------+                        |  |
+       +------<>| Logging_Handler |<-----------------------+  |
+                +-----------------+                           |
+                                                        +---------------+
+                                                        | RT Thread Per |
+                                                        | Connection    |
+                                                        | Logging       |
+                                                        | Server        |
+                                                        +---------------+
+}}}
+
+==== Logging Server 코드 ====
+이 예제는 ACE_Message_Block와 ACE CDR 클래스를 이용해서 만든 간단한 로깅 서버다.
+
+{{{#!plain down:Logging_Server.h
+// Forward declaration.
+class ACE_SOCK_Stream;
+
+class Logging_Server
+{
+public:
+  // Template Method that runs logging server's event loop.
+  virtual int run (int argc, char *argv[]);
+
+protected:
+  // The following four methods are ``hooks'' that can be
+  // overridden by subclasses. 
+  virtual int open (u_short logger_port = 0);
+  virtual int wait_for_multiple_events () { return 0; }
+  virtual int handle_connections () = 0;
+  virtual int handle_data (ACE_SOCK_Stream * = 0) = 0;
+  // This helper method can be used by the hook methods.
+  int make_log_file (ACE_FILE_IO &, ACE_SOCK_Stream * = 0);
+
+  // Close the socket endpoint and shutdown ACE.
+  virtual ~Logging_Server () { 
+    acceptor_.close (); 
+  }
+
+  // Accessor.
+  ACE_SOCK_Acceptor &acceptor () { 
+    return acceptor_; 
+  }
+
+private:
+  // Socket acceptor endpoint. 
+  ACE_SOCK_Acceptor acceptor_; 
+};
+}}}
+
+{{{#!plain down:Logging_Server.cpp
+#include "ace/FILE_Addr.h"
+#include "ace/FILE_Connector.h"
+#include "ace/FILE_IO.h"
+#include "ace/INET_Addr.h"
+#include "ace/SOCK_Stream.h"
+#include "Logging_Server.h"
+
+int Logging_Server::run (int argc, char *argv[])
+{
+  if (open (argc > 1 ? atoi (argv[1]) : 0) == -1)
+    return -1;
+
+  for (;;) {
+    if (wait_for_multiple_events () == -1) return -1;
+    if (handle_connections () == -1) return -1;
+    if (handle_data () == -1) return -1;
+  }
+  return 0;
+}
+int Logging_Server::open (u_short logger_port)
+{
+  // Raises the number of available socket handles to 
+  // the maximum supported by the OS platform.
+  ACE::set_handle_limit ();
+    
+  ACE_INET_Addr server_addr;
+  int result;
+
+  if (logger_port != 0)
+    result = server_addr.set (logger_port, INADDR_ANY);
+  else
+    result = server_addr.set ("ace_logger", INADDR_ANY);
+  if (result == -1) return -1;
+
+  // Start listening and enable reuse of listen address 
+  // for quick restarts.
+  return acceptor_.open (server_addr, 1);
+}
+int Logging_Server::make_log_file (ACE_FILE_IO &logging_file,
+                                   ACE_SOCK_Stream *logging_peer)
+{ 
+  std::string filename (MAXHOSTNAMELEN, ’\0’);
+
+  if (logging_peer != 0) { // Use client host name as file name.
+    ACE_INET_Addr logging_peer_addr;
+    logging_peer->get_remote_addr (logging_peer_addr);
+    logging_peer_addr.get_host_name (filename.c_str (), 
+                                     filename.size ());
+    filename += ".log";
+  } else filename = "logging_server.log";
+
+  ACE_FILE_Connector connector;
+  return connector.connect (logging_file, 
+                            ACE_FILE_Addr (filename.c_str ()),
+                            0, // No time-out.
+                            ACE_Addr::sap_any, // Ignored.
+                            0, // Don't try to reuse the addr.
+                            O_RDWR|O_CREAT|O_APPEND,
+                            ACE_DEFAULT_FILE_PERMS);
+}
+}}}
+
+==== Logging_Handler 작성 ====
+{{{#!plain down:Logging_Handler.h
+#include "ace/FILE_IO.h"
+#include "ace/SOCK_Stream.h"
+
+class ACE_Message_Block; // Forward declaration.
+
+class Logging_Handler
+{
+protected:
+  // Reference to a log file.
+  ACE_FILE_IO &log_file_; 
+
+  // Connected to the client.
+  ACE_SOCK_Stream logging_peer_; 
+  // Receive one log record from a connected client.  <mblk> 
+  // contains the hostname, <mblk->cont()> contains the log 
+  // record header (the byte order and the length) and the data. 
+  int recv_log_record (ACE_Message_Block *&mblk);
+
+  // Write one record to the log file. The <mblk> contains the 
+  // hostname and the <mblk->cont> contains the log record. 
+  int write_log_record (ACE_Message_Block *mblk);
+
+  // Log one record by calling <recv_log_record> and
+  // <write_log_record>. 
+  int log_record (); 
+}
+
+// 데이터를 받아들이고, 받아들인 데이터는 CDR클래스를 이용해서 해더파싱을 해서
+// 필요한 정보를 얻어온다.
+// 최종적으로는 ACE_Message_Block chain을 저장한다.
+int Logging_Handler::recv_log_record (ACE_Message_Block *&mblk)
+{
+  ACE_INET_Addr peer_addr;
+  logging_peer_.get_remote_addr (peer_addr);
+  mblk = new ACE_Message_Block (MAXHOSTNAMELEN + 1);
+  peer_addr.get_host_name (mblk->wr_ptr (), MAXHOSTNAMELEN);
+  mblk->wr_ptr (strlen (mblk->wr_ptr ()) + 1); // Go past name.
+
+  ACE_Message_Block *payload =
+    new ACE_Message_Block (ACE_DEFAULT_CDR_BUFSIZE);
+  // Align Message Block for a CDR stream.
+  ACE_CDR::mb_align (payload);
+
+  if (logging_peer_.recv_n (payload->wr_ptr (), 8) == 8) {
+    payload->wr_ptr (8);     // Reflect addition of 8 bytes.
+
+    ACE_InputCDR cdr (payload);
+
+    ACE_CDR::Boolean byte_order;
+    // Use helper method to disambiguate booleans from chars.
+    cdr >> ACE_InputCDR::to_boolean (byte_order);
+    cdr.reset_byte_order (byte_order);
+
+    ACE_CDR::ULong length;
+    cdr >> length;
+
+    payload->size (8 + ACE_CDR::MAX_ALIGNMENT + length);
+
+    if (logging_peer_.recv_n (payload->wr_ptr(), length) > 0) {
+      payload->wr_ptr (length);   // Reflect additional bytes.
+      mblk->cont (payload); // Chain the header and payload.
+      return length; // Return length of the log record.
+    }
+  }
+  payload->release ();
+  mblk->release ();
+  payload = mblk = 0;
+  return -1;
+}
+
+// 로그 파일에 메시지를 저장한다. 만약 디버깅 flag가 설정되어 있다면 
+// 메시지의 내용을 표준출력한다.
+int Logging_Handler::write_log_record (ACE_Message_Block *mblk)
+{
+  if (log_file_->send_n (mblk) == -1) return -1;
+
+  if (ACE::debug ()) {
+    ACE_InputCDR cdr (mblk->cont ()); 
+    ACE_CDR::Boolean byte_order;
+    ACE_CDR::ULong length;
+    cdr >> ACE_InputCDR::to_boolean (byte_order);
+    cdr.reset_byte_order (byte_order);
+    cdr >> length;
+    ACE_Log_Record log_record;
+    cdr >> log_record;  // Extract the <ACE_log_record>.
+    log_record.print (mblk->rd_ptr (), 1, cerr);
+  }
+
+  return mblk->total_length ();
+}
+
+int Logging_Handler::log_record ()
+{
+  ACE_Message_Block *mblk = 0;
+  if (recv_log_record (mblk) == -1)
+    return -1;
+  else {
+    int result = write_log_record (mblk);
+    mblk->release (); // Free up the entire contents.
+    return result == -1 ? -1 : 0;
+  }
+}
+
+
+}}}
+
+{{{#!plain
+ +-------------------+           +-------------------+
+ | ACE_Message_Block |           | ACE_Message_Block |
+ +-------------------+           +-------------------+
+ | cont() -----------|---------->| cont()            |
+ +-------------------+           +-------------------+
+         |                                     |
+         |                                     |
+  +----------------+                      +----------------+   
+  | ACE_Data_Block |                      | ACE_Data_Block |
+  +----------------+                      +----------------+
+  | base() --------|----> HOSTNAME        | base() --------|--> LOGRECORD DATA
+  +----------------+                      +----------------+
+    
+}}}
+
+
+==== Iterative Logging Server ====
+가장 단순한 형태의 로깅 서버다.
+
+iterative server는 한번에 하나의 client만 받아들여서 처리하는 간단한 형태를 가진다. 만약 처리도중에 새로운 client의 연결요청이 들어온다면, 새로운 client는 이전의 client에 대한 작업을 끝내기전까지 대기해야 한다. 
+
+이러한 방식의 server는 학습용으로는 쓸만할지 모르지만 개발할 필요가 없을 것이다. 
+{{{#!plain down:Iterative_Logging_Server.h
+#include "ace/FILE_IO.h"
+#include "ace/INET_Addr.h"
+#include "ace/Log_Msg.h"
+#include "Logging_Server.h"
+#include "Logging_Handler.h"
+
+class Iterative_Logging_Server : public Logging_Server 
+{
+public:
+  Iterative_Logging_Server (): logging_handler_ (log_file_) {}
+
+  Logging_Handler &logging_handler () {
+    return logging_handler_; 
+  }
+
+protected:
+  ACE_FILE_IO log_file_;
+  Logging_Handler logging_handler_;
+ virtual int open (u_short logger_port) { 
+    if (make_log_file (log_file_) == -1)
+      ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "make_log_file()"),
+                        -1);
+    return Logging_Server::open (logger_port);
+  }
+
+  virtual int handle_connections () {
+    ACE_INET_Addr logging_peer_addr;
+
+    if (acceptor ().accept (logging_handler_.peer (),
+                            &logging_peer_addr) == -1)
+      ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "accept()"), -1);
+    ACE_DEBUG ((LM_DEBUG, "Accepted connection from %s\n",
+               logging_peer_addr.get_host_name ()));
+    return 0;
+  }
+ virtual int handle_data (ACE_SOCK_Stream *) {
+    while (logging_handler_.log_record () != -1)
+      continue;
+
+    logging_handler_.close (); // Close the socket handle.
+    return 0;
+  }
+}
+}}}
+
+{{{#!plain down:iterative_main.cc
+#include "ace/Log_Msg.h"
+#include "Iterative_Logging_Server.h"
+
+int main (int argc, char *argv[])
+{
+  Iterative_Logging_Server server;
+
+  if (server.run (argc, argv) == -1) 
+    ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "server.run()"), 1);
+  return 0;
+}
+}}}
+
+==== 동시처리를 위해서 고려해야 할 사항 ====
+동시처리는 네트워크 프로그램의 안정성과 성능적 측면에서 필수적으로 고려되어야 하는 사항이다. 일반적으로 서버 프로그램의 경우 고려되어야 하는 것들이 많다.
+
+동시처리와 관련되어서 많은 이슈가 제기되는 원인은, 프로세스/쓰레드의 제어(동기화, 통신, 운용), 클라이언트 정보의 유지와 분석등에 있어서 서버의 목적과 규모에 따라 다양한 방법들이 시도되어야 하기 때문이다. 
+
+여기에서는 다음과 같은 다양한 모델의 동시처리 방식에 대해서 살펴보도록 할 것이다.
+ 1. 순차적 처리 vs 동시처리
+ 1. 다중 프로세스 방식 vs 다중 쓰레드 방식
+ 1. 프로세스/쓰레드 처리 
+ 1. User 쓰레드 vs Kernel(12) 쓰레드 vs hybrid 쓰레드 방식 
+ 1. 시분할 vs 실시간 스케쥴링
+ 1. Task 구조 vs 메시지 기반 구조
+===== Iterative(순차적 처리) 대 동시 처리 =====
+attachment:iterative_concurrent.gif
+
+ 1. Iteratvie는 말그대로 클라이언트의 요청을 순차적으로 처리하는 방식이다. 하나의 클라이언트의 요청이 끝나야지만 다음 클라이언트의 요청이 처리될 수 있다. 처리에 걸리는 시간이 짧거나, 요청자체가 적은 경우에 간단하게 구현해서 사용할 수 있다. 
+ 1. 동시 처리는 동시에 여러개의 클라이언트의 요청을 받아들여서 이를 처리한다. 요청을 처리하는데 있어서 시간이 많이 걸리는 I/O 작업(DB혹은 파일 접근)이 필요할 경우 사용될 수 있다. 대부분의 바쁜 서버에서 채택되어지고 있는 방법이다. 
+
+===== 다중 프로세스 대 다중 쓰레드 =====
+ * 다중 프로세스 방식은 요청의 처리를 위한 클라이언트당 별개의 프로세스가 생성되는 방식이다. 생성된 프로세스는 독립적으로 작동한다. - 가상의 메모리와 입출력제어, 시그널 제어를 한다. -  또한 OS에 의해서 보호된다. 프로세스간 통신을 위해서 IPC(12)를 이용한다.
+
+ * 다중 쓰레드는 하나의 프로세스에서 여러개의 쓰레드가 병렬적으로 문맥을 교환하면서 요청을 처리하는 방식이다. 각각의 쓰레드는 프로세스에 종속적이며, 많은 자원이 프로세스에 의해서 전역적으로 관리된다 - Stack, registers, 시그널 마스크, TSD -. 쓰레드는 다른 쓰레드로 부터 보호되지 않는다. 쓰레드간 통신을 위해서 IPC를 사용할 수도 있지만, 쓰레드간 시그널과 전역변수를 이용해서 관리되기도 한다. 
+
+==== 쓰레드풀 (Thread Pool)의 운용 전략 ====
+많은 쓰레드 응용 프로그램들은 어떠한 일이 발생할 경우 해당 일을 처리하기 위해서 새로운 쓰레드를 생성한다. 직관적인 방식이긴 하지만 새로운 쓰레드를 생성하기 위해서는 많은 비용이 발생 하다는 단점을 가진다. 이러한 문제의 해결을 위해서 쓰레드를 미리 만들어 놓고, 요청이 들어올경우 특정 쓰레드에 작업을 맡기기 위해서 쓰레드풀을 구성한다.  
+
+쓰레드풀은 아래와 같은 일반적인 두가지 방법중 하나의 방법을 선택한다.
+attachment:prevents
+
+===== Half-Sync/Half-Async Pattern =====
+동기화와 비동기화 패턴 모두를 포함한다. 비동기 계층은 I/O 이벤트와 같은 비동기적인 사건을 다룬다. 데이터의 처리는 동기계층의 쓰레드들이 담당하게 된다. 동기계층과 비동기계층간의 데이터 전달을 위해서 완충영역인 Queueing 계층이 필요하다.    
+
+attachment:halfsync_async.gif
+
+이 패턴은 다음과 같은 잇점을 가진다.
+ * Threads can be mapped to separate CPUs to scale up server performance via multi-processing
+ * Each thread blocks independently, which prevents a flow-controlled connection from degrading the QoS that other clients receive
+
+===== Half-Sync/Half-Async Pattern의 단점 =====
+Half-Sync/Half-Async 쓰레드 모델은 일반적인 쓰레드방식(요청당 쓰레드 생성)에 비해서 효율적이며 좋은 성능을 보여주긴 하지만 다음과 같은 해결해야할 문제점들을 가지고 있다. 이러한 문제들은 동기계층과 비동기계층이라는 전혀다른 성격의 계층을 하나의 시스템에 유지함으로 주로 발생한다.
+
+ 1. 동적 메모리 할당및 해제 
+ 1. 각 기능의 동기화
+ 1. 문맥교환
+ 1. CPU cache update
+이는 잠재적인 문제들로 서버에 overhead를 주고 성능을 떨어트릴 수 있으며, 누적될 경우 서비스 자체가 불가하게 될 수도 있다.
+
+위의 문제는 Leader/Followers architectural pattern을 이용함으로써 최소화 시킬 수 있다. 
+
+===== Leader/Followers architectural pattern =====
+이 패턴은 Half-Sync/Half-Async 의 향상된 패턴이다. 다중 쓰레드는 이벤트소스를 공유하며, 이벤트소스로 부터터 이벤트가 발생하는 지를 기다리게 된다.  이 Half-sync/Half-Async패턴에서 Reactor 쓰레드가 분리되고, 분리된 쓰레드의 동기화를 위한 오베헤드를 제거한다.   
+{{{#!plain
+       +------------------------+   demultiplexes
+       | Thread Poll            |<>---------------+
+       +------------------------+                 |
+  +--<>| join()                 |                 |
+  |    | promote_new_leader()   |                 |
+  |    +------------------------+          +------------------+
+  |          |                             | Event Handler    |    
+  |          |  +--------+  uses           +------------------+
+  |          +->| Handle | ----------------| handle_event()   |
+  |             +--------+ --------+       | get_handle()     |<|--+
+  |                                |       +------------------+    |
+  |    +----------------------+    |                               |
+  +----| Handle Set           |<>--+                               |
+       +----------------------+            +------------------+    |
+       | handle_events()      |            | Concrete Event   |----+
+       | deactivate_handle()  |            | Handler B        |
+       | reactivate_handle()  |            +------------------+
+       | select()             |            | handle_event()   |
+       +----------------------+            | get_handle()     |
+                                           +------------------+
+                                           +------------------+
+                                           | Concrete Event   |
+                                           | Handler B        |
+                                           +------------------+
+                                           | handle_event()   |
+                                           | get_handle()     |
+                                           +------------------+
+}}}
+
+==== Thread-perRequest On-demand Spawning Strategy ====
+요청을 받는 쓰레드를 따로 분리해서, 클라이언트 연결이나, 데이터 요청이 들어왔을 때, 요청을 처리할 새로운 프로세스나 쓸레드를 생성하는 방식이다. 보통 thread-per-request와 thread-per-connection형식으로 널리 사용되고 있다.
+
+필요할 때만 쓰레드를 생성시키면 되므로 자원의 소비를 줄일 수 있다는 장점을 가지지만, 쓰레드와 프로세스를 매번 새로 생성시켜야 하기 때문에, 실시간성을 중요하시 하거나, 많은 수의 연결/요청이 있는 서비스에는 사용하기 힘들다는 단점을 가진다. 
+
+=== N:1 와 1:1 쓰레드 모델 ===
+최근에는 컴퓨팅파워를 높이기 위해서 2개 이상의 CPU가 장착되는 경우를 흔히 볼 수 있다. 이럴경우 운영체제는 다수의 CPU를 효율적으로 관리하기 위해서 프로세스를 각 CPU에 할당시켜서 가능한 필요한 일을 빠르게 처리할 수 있도록 스케쥴링을 해주어야 한다. 쓰레드역시 마찬가지로 다수의 CPU가 있다면, 쓰레드를 효과적으로 스케쥴링할 수 있도록 OS에서 지원할 수 있어야 한다. 최근의 OS는 쓰레드를 스케쥴링하기 위한 다양한 방식을 제공하고 있다. 
+
+이러한 쓰케쥴링 방식은 크게 N:1 방식와 1:1방식 두가지가 존재한다. 
+
+attachment:thread_model.gif
+
+ 1. Process contention scope : 하나의 쓰레드는 동일한 CPU에서 처리하는 방식으로 user threading 모델이라고 불리우기도 한다. 
+ 1. System contention scope : CPU가 몇개든 관계없이, System 영역에서 쓰레드가 처리된다. 단일의 CPU처럼 보고 처리하는 방식이라고 보면 된다. kernel threading 모델이라고 불리우기도 한다.
+
+몇몇 운영체제(Solaris와 같은)는 N:1과 1:1 방식을 함께 지원하는 N:M 방식의 hybrid-threading model을 지원하기도 한다. 운영체제의 쓰레드 라이브러리는 기본적으로 user-space 쓰레드를 생성시키고, 요구될 때에만 system contention 쓰레드를 생성시킨다.  
+
+=== Task- vs. Message-based Concurrency Architectures ===
+concurrency architecture(구조)는 다음과 같은 요소들로 구성된다.
+ 1. '''CPUs''' : 애플리케이션의 실행코드
+ 1. '''Data & control message''' : 네트워크 장치로 부터 주고 받는 데이터들 
+ 1. '''Service processing task''' : 메시지나 데이터를 받아서 수행하는 서비스
+
+ * Task base concurrency 구조는 서비스 단위로 다수의 '''CPUs'''를 수행하는 방식이다.
+ * Message base concurrency 구조는 어플리케이션 혹은 네트워크 장치를 통해서 전달되는 메시지 단위로 '''CPUs'''를 할당하는 방식이다.  
+
+=== Overview of OS Concurrency(협력) Mechanisms ===
+많은 경우 네트워크 애플리케이션들은 서비스 요청을 해결하기 위해서 다수의 프로세스를 생성시켜야 하며, 이들 프로세스간에 협력을 유지할 수 있어야 한다. 이번 장에서는 이러한 협력의 유지를 위한 아래의 주제들에 대해서 다룰 것이다.  
+ 1. Synchronous event demultiplexing
+ 1. Multiprocessing
+ 1. Multi threading &
+ 1. Synchronization
+또한 C에서 제공하는 concurrency API(:12)를 이용해서 네트워크 애플리케이션을 만드는 방법과 발생할 수 있는 여러가지 문제점/해결방안 등에 대해서 토론하도록 하겠다.
+
+==== Synchronous Event Demultiplexing ====
+다수의 메시지를 처리하는 가장 손쉬운 방식은 메시지가 들어오면 이를 버퍼에 담아두고, 이벤트를 발생시킨다음 일정시간 간격(즉 동기적)으로 이벤트가 도착했는지를 확인해서, 이벤트가 있다면 버퍼에 있는 메시지를 읽어들여서 처리하는 방식일 것이다. 
+
+이러한 이벤트 동기화를 이용한 메시지처리를 위해서 Unix(:12) 시스템은 poll()과 select(), windows는 WaitForMultipleObjects()와 같은 함수를 제공한다. 이중 select()가 이벤트 기반의 다중 입출력 데이터를 처리하기 위한 가장 일반적인 함수로 사용된다.
+
+select()에 대한 내용은 [wiki:man/2/select select man page]를 참고하기 바란다.
+
+==== 멀티 Processing 방식 ====
+멀티 Processing는 다수의 프로세스를 생성시켜서 요청을 처리하는 방식이다. Unix의 경우 fork()와 exec()함수를 이용해서 프로세스를 생성시킬 수 있으며, windows의 경우 CreateProcess()함수를 이용해서 새로운 프로세스를 생성시킬 수 있다. 
+
+멀티 프로세싱방식을 이용할 경우, 프로세스 동기화가 중요한 이슈가 되는데 유닉스의 경우 wait(), waitpid() 윈도우즈의 경우 WaitForSignalObject(), WaitForMultipleObjects()와 같은 프로세스 동기함수를 지원한다.
+
+==== 멀티 쓰레드 방식 ====
+운영체제는 멀티 쓰레드를 지원하기 위해서 '''쓰레드 생성/종료''', '''쓰레드 동기화''', '''쓰레드 특성''', '''쓰레드 메모리관리'''를 위한 함수들을 제공한다. 
+
+이들 함수에 대한 내용은 [wiki:article/Pthread_API_Reference Pthread API]를 참고하기 바란다. 
+
+==== 쓰레드 동기화 ====
+쓰레드는 파일, 네트워크 장치, 데이타베이스, 공유메모리등의 자원을 공유해서 접근하는 경우가 자주 발생한다. 그러므로 이들 공유된 자원에 대한 동기화가 필요하게 된다. 다음은 동기화를 위해서 사용할 수 있는 도구들이다. 
+ 1. [wiki:article/pthread_mutex_조건변수 Mutex] 
+ 1. [wiki:article/세마포어의 사용 semaphore]
+ 1. [wiki:article/pthread_mutex_조건변수 조건변수] 
+ 1. [wiki:article/fcntl을_이용한_파일_레코드잠금 Read/Write lock]
+   * [wiki:article/공유메모리와_세마포어를_이용한_프로세스간_데이터처리 파일레코드 잠금 응용]
+
+=== ACE Event Demuxing Wrapper Facades ===
+

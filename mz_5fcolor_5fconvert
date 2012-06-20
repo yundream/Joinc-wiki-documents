@@ -1,0 +1,40 @@
+== 색상변환 ==
+ * RGB와 YUV간의 비율계산공식과 예제소스입니다. 예제소스는 계산공식에서 소수점 계산을 없애기 위해서 최적화된 코드입니다.
+=== RGB(8:8:8) to YUV(YCbCr, 8:8:8) ===
+ * 공식
+  1. Y  =  0.29900Red + 0.58700Green + 0.11400Blue =   ( 77Red/256) + (150Green/256) + ( 29Blue/256)
+  1. Cb = -0.16874Red - 0.33126Green + 0.50000Blue = - ( 44Red/256) - ( 87Green/256) + (131Blue/256) {+128}
+  1. Cr =  0.50000Red - 0.41869Green - 0.08131Blue =   (131Red/256) - (110Green/256) + ( 21Blue/256) {+128}
+ * 구현
+ {{{#!plain
+void RGB_YCbCr(int s_Red, int s_Green, int s_Blue, int *s_Y, int *s_Cb, int *s_Cr)
+{ /* 변환과정에서 색감 손실이 약 5% 까지 발생 */
+ s_Red &= 0xff, s_Green &= 0xff, s_Blue  &= 0xff;
+ *s_Y  = (int)(  ((19595 * s_Red) >> 16) + ((38470 * s_Green) >> 16) + ((7471  * s_Blue) >> 16)       );
+ *s_Cb = (int)( -((11059 * s_Red) >> 16) - ((21709 * s_Green) >> 16) + ((32768 * s_Blue) >> 16) + 128 );
+ *s_Cr = (int)(  ((32768 * s_Red) >> 16) - ((27439 * s_Green) >> 16) - ((5329  * s_Blue) >> 16) + 128 );
+ *s_Y  = (int)(  (*s_Y  > 0) ? *s_Y  : 0);  *s_Y  = (int)((*s_Y  < 255) ? *s_Y  : 255        );
+ *s_Cb = (int)(  (*s_Cb > 0) ? *s_Cb : 0);  *s_Cb = (int)((*s_Cb < 255) ? *s_Cb : 255        );
+ *s_Cr = (int)(  (*s_Cr > 0) ? *s_Cr : 0);  *s_Cr = (int)((*s_Cr < 255) ? *s_Cr : 255        );
+}
+}}}
+
+=== YUV(YCbCr, 8:8:8) to RGB(8:8:8) ===
+ * 공식
+  1. Red   = 1.00000Y + 1.40200Cr             = s_Y + (359s_Cr{-128}/256)   
+  1. Green = 1.00000Y - 0.34414Cb - 0.71414Cr = s_Y - ( 88s_Cb{-128}/256) - (183s_Cr{-128}/256)
+  1. Blue  = 1.00000Y + 1.77200Cb             = s_Y + (454s_Cb{-128}/256)
+ * 구현
+ {{{#!plain
+void YCbCr_RGB(int s_Y, int s_Cb, int s_Cr, int *s_Red, int *s_Green, int *s_Blue)
+{ /* 변환과정에서 색감 손실이 약 5% 까지 발생 */
+ s_Y &= 0xff, s_Cb &= 0xff, s_Cr &= 0xff;
+ s_Cb -= 128;
+ s_Cr -= 128;
+ *(s_Red)   = (int)( s_Y + ((91881 *s_Cr)/65536) );
+ *(s_Green) = (int)( s_Y - ((22554 *s_Cb)/65536) - ((46802*s_Cr)/65536) );
+ *(s_Blue)  = (int)( s_Y + ((116130*s_Cb)/65536) );
+}
+}}}
+== 마지막으로 ==
+ * 작성자 : 조재혁 ([minzkn])

@@ -1,0 +1,291 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>디바이스 번호</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="디바이스 드라이버"
+HREF="chap06.html"><LINK
+REL="PREVIOUS"
+TITLE="디바이스 드라이버"
+HREF="chap06.html"><LINK
+REL="NEXT"
+TITLE="샘플 디바이스 드라이버"
+HREF="device-sample.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="chap06.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>6장. 디바이스 드라이버</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="device-sample.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="DEVICE-DEVICENUM"
+>6.1. 디바이스 번호</A
+></H1
+><P
+>			처음 유닉스접했을 때(사실 유닉스라기 보다는 리눅스가 맞겠다) /dev 디렉토리에 들어 있는 것들이
+			무엇인지 궁금한 적이 있었다. 사운드 블래스터 카드에 붙이는 CD-ROM 드라이브를 사용하기 위해
+			How-to 문서를 뒤적여 mknod란 것도 처음 사용해 보곤 했지만 /dev 디렉토리 내의 파일이 갖는 정확
+			한 의미를 알지는 못했다.
+		</P
+><P
+>			나중에 리눅스에서 프로그래밍을 하면서 깨닫게 됐지만 /dev 디렉토리가 의미하는 것은 device의 약
+			자이고 여기에 들어있는 것들은 어떤 물리적인 디바이스를 나타낸다는 것을 알았다.
+		</P
+><P
+>			예를 들어o/dev/ttyS0와 /dev/fd0는 다음과 같다. 참고로 ttyS0는 시리얼 포트 1번을 의미하고(일반
+			적으로 PC에서 COM1으로 불린다) fd0는 플로피 디스크 드라이브 첫 번째 것으로 a:를 의미한다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>crw-rw----    1 root     uucp       4,  64  4월 30 11:23 /dev/ttyS0
+brw-rw----    1 root     floppy     2,   0  4월 30 11:23 /dev/fd0</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			ttyS0는 속성에 보면 'c'가 처음에 시작하는데 이 문자가 의미하는 것은 'character device' 즉 문자
+			디바이스를 의미한다. 이에 반해 fd0는 'b'로 시작하고 'block device' 즉 블럭 디바이스를 의미한다.
+			문자/블럭 디바이스에 대한 내용은 다음을 참조 하라.
+		</P
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>문자 디바이스</DT
+><DD
+><P
+>						문자 디바이스는 하나 혹은 수십 내지 수백 개의 가변 크기의 버퍼를 사용해 디바이스에
+						일고 쓰기를 한다.
+					</P
+></DD
+><DT
+>블럭 디바이스</DT
+><DD
+><P
+>						블럭이라 불리는 일정 크기의 버퍼(512, 1K Bytes등, 장치 의존적)단위로 데이터의 읽기
+						쓰기가 행해진다.
+					</P
+></DD
+></DL
+></DIV
+><P
+>			그리고 나오는 것이 owner, group인데 이 것은 각 디바이스에 따라 다르므로 각 디바이스의 속석을
+			참조하기 바란다.
+		</P
+><P
+>			그리고 여기서 얘기해야할 가장 중요한 부분이 나오는데 일반적인 파일의 경우 'ls -l'로 보면 그룹을
+			나타내는 곳 뒤에 파일의 크기가 나오지만 /dev 내의 것은 크기가 아니라 두 개의 숫자가 나온다.
+		</P
+><P
+>			이 숫자가 의미하는 것은 디바이스의 번호로 리눅스 시스템에서 혹은 유닉스 시스템에서는 정해진
+			유일한 번호를 갖는다. 즉 ttyS0는 무조건 4, 64의 번호를 가져야 이 디바이스가 첫번째 시리얼 포
+			트를 나타내게 된다. 번호를 4, 64를 갖고 이름이 다른 경우라도 상관 없이 첫번째 시리얼 포트를
+			나타낸다.
+		</P
+><P
+>			4, 64에서 첫번째 것은 주(major) 디바이스 번호고 두번째 것은 부(minor) 디바이스 번호다.
+			주 번호가 의미하는 것은 이 디바이스가 무엇인지를 나타내고 부 번호가 나타내는 것은 이 디바이스의
+			몇 번째 것 혹은 여러 종류 중의 구분을 의미한다. 예를 들어 PC엔 시리얼 포트가 적어도 2개가 있고
+			많게는 4개 까지도 존재한다. 이런 경우라면 여러개 모두 시리얼 포트이기 때문에 주 번호는 시리얼
+			포트란 것을 나태내도록 통일해주고(4번이 시리얼 포트를 의미한다) 부 번호를 사용해 각각의 시리얼
+			포트를 구분해 주게된다(64번이 COM1, 65번이 COM2).
+		</P
+><P
+>			리눅스 내의 모든 디바이스는 반드시 주/부 디바이스 번호를 사용해 구분되야한다. 번호가 같은 디
+			바이스는 이름이 다를지라도 같은 디바이스를 의미한다. 아래는 필자의 PC에 사용 중인 다비이스들
+			을 나열한 것이다. 이 정보는 /proc/device를 읽어 보면 알 수 있다. 각 디바이스의 이름 앞 번호는
+			디바이스의 주 번호를 의미한다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>Character devices:
+  1 mem
+  2 pty
+  3 ttyp
+  4 ttyS
+  5 cua
+  7 vcs
+ 10 misc
+ 13 input
+ 14 sound
+ 29 fb
+116 alsa
+119 vmnet
+128 ptm
+136 pts
+162 raw
+180 usb
+226 drm
+
+Block devices:
+  2 fd
+  3 ide0
+  8 sd
+  9 md
+ 11 sr
+ 22 ide1
+ 65 sd
+ 66 sd</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			리눅스에 등록된 디바이스 리스트는 커널 소스 디렉토리의 Documents/devices.txt에 있거나
+			<A
+HREF="http://www.lanana.org/docs/device-list/"
+TARGET="_top"
+>			<I
+CLASS="CITETITLE"
+>http://www.lanana.org/docs/device-list/</I
+></A
+>에서 확인할 수 있다.
+		</P
+><P
+>			주/부 번호 모두 255까지 가능하다. 위의 리스트에 등록됐다고 하지만 실제 많이 쓰이지 않는
+			디바이스에 대한 것은 /dev에 존재하지 않는 경우도 있고 새로 필요해 만든 디바이스 드라이버에게
+			번호를 할당하기 위해선 필요 없는 것에서 번호를 선택하거나 아니면 현재 시스템을 검색해 사용하지
+			않는 번호를 할당할 수도 있다.
+		</P
+><P
+>			리눅스에서 사용 가능한 주번호는 60~63, 120~127, 240~254 까지고 여기엔 아무런 것도 할당되어
+			있지 않은 상태다.
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="chap06.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="device-sample.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>디바이스 드라이버</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap06.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>샘플 디바이스 드라이버</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

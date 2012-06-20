@@ -1,0 +1,172 @@
+----
+ 1. reboot/poweroff
+ 1. 간략화한 reboot 코드
+ 1. [minzkn]
+ 1. Version 0.1
+ 1. 2005/08/13 
+----
+
+=== 설명 ===
+이것은 간략한 reboot/poweroff 의 예제를 만든겁니다. [[BR]]
+꽤 간략하게 구현한것인데 [[BR]]
+실제로 완전한 구현은 생각보다 깊은 이해를 필요로 합니다. [[BR]]
+[[BR]]
+swapoff와 unmount filesystem 부분은 귀찮아서 구현하지 않았습니다. [[BR]]
+그밖에 콘솔관련 정리하는 부분도 넣지 않았습니다. [[BR]]
+해당 미구현된 부분이 없어도 기능상 문제가 거의 없지만 [[BR]]
+완전한 구현을 위해서는 필요합니다. [[BR]]
+[[BR]]
+i386/ppc/arm/mips 모두에서 사용가능할겁니다. [[BR]]
+[[BR]]
+원문: http://minzkn.wowdns.com:2744/phpBB2/viewtopic.php?t=412
+=== 사용방법 ===
+Makefile
+{{{#!plain
+# Copyright (C) Information Equipment co.,LTD
+# All rights reserved.
+# Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+# CVSTAG="$Header: /usr/local/mutihost/joinc/modules/moniwiki/data/text/RCS/Code_2fC_2freboot,v 1.1 2007/01/09 02:46:10 root Exp root $"
+
+# bash$ make TARGET_ARCH=i386 all
+# bash$ make TARGET_ARCH=mips all
+# bash$ make TARGET_ARCH=ppc all
+# bash$ make TARGET_ARCH=arm all
+
+TARGET_ARCH                  :=i386
+# TARGET_ARCH                  :=mips
+# TARGET_ARCH                  :=ppc
+# TARGET_ARCH                  :=arm
+
+ifeq ($(findstring mips,$(TARGET_ARCH)),mips)
+ CROSS_COMPILE               :=/opt/kenati/bin/lx4189-uclibc-#
+else
+ ifeq ($(findstring ppc,$(TARGET_ARCH)),ppc)
+  CROSS_COMPILE              :=/opt/hardhat/devkit/ppc/405/bin/ppc_405-#
+ else
+  ifeq ($(findstring arm,$(TARGET_ARCH)),arm)
+   CROSS_COMPILE             :=/usr/local/arm-linux/bin/arm-linux-#
+  else
+   ifeq ($(findstring i386,$(TARGET_ARCH)),i386)
+    CROSS_COMPILE            :=#
+   else
+    CROSS_COMPILE            :=#
+   endif
+  endif
+ endif
+endif
+
+CC                           := $(CROSS_COMPILE)gcc
+RM                           := rm -f
+
+CFLAGS                       := -O2 -Wall -Werror -fomit-frame-pointer -pipe -I. -D_REENTRANT
+LDFLAGS                      := -s
+
+TARGET                       := mzreboot mzpoweroff
+
+OBJECT_mzreboot              := reboot.o
+OBJECT_mzpoweroff            := poweroff.o
+
+OBJECTS                      := $(OBJECT_mzreboot) $(OBJECT_mzpoweroff)
+
+.PHONY: all clean
+
+all: $(TARGET)
+clean: ; $(RM) *.o $(TARGET)
+
+$(OBJECTS): Makefile shutdown.h
+
+mzreboot: $(OBJECT_mzreboot) ; $(CC) $(LDFLAGS) -o $(@) $(^)
+mzpoweroff: $(OBJECT_mzpoweroff) ; $(CC) $(LDFLAGS) -o $(@) $(^)
+
+%.o: %.c ; $(CC) $(CFLAGS) -c -o $(@) $(<)
+
+# End of Makefile
+}}}
+
+=== 코드 ===
+{{{#!plain
+/* 
+  Copyright (C) Information Equipment co.,LTD 
+  All rights reserved. 
+  Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> 
+  CVSTAG="$Header: /usr/local/mutihost/joinc/modules/moniwiki/data/text/RCS/Code_2fC_2freboot,v 1.1 2007/01/09 02:46:10 root Exp root $" 
+*/ 
+
+#if !defined(__def_mz_shutdown_h__) 
+#define __def_mz_shutdown_h__ "shutdown.h" 
+
+#include <sys/reboot.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <unistd.h> 
+#include <signal.h> 
+
+#if (__GNU_LIBRARY__ > 5) || defined(__dietlibc__) 
+# define __mz_reboot_syscall__(m_flag) do{ (void)reboot(m_flag); }while(0) 
+#else 
+# define __mz_reboot_syscall__(m_flag) do{ (void)reboot(0xfee1dead,672274793,m_flag); }while(0) 
+#endif 
+
+#define __mz_reboot_block_signal__() do{\ 
+ (void)signal(SIGINT, SIG_IGN);\ 
+ (void)signal(SIGTERM, SIG_IGN);\ 
+ (void)signal(SIGHUP, SIG_IGN);\ 
+}while(0) 
+
+#define __mz_reboot_stop_process__() do{\ 
+ (void)setpgrp();\ 
+ __mz_reboot_syscall__(RB_ENABLE_CAD);\ 
+ (void)sync();\ 
+ (void)kill((pid_t)1, SIGTERM);\ 
+ (void)sleep(1u);\ 
+ (void)system("/sbin/initctl -r");\ 
+ (void)sync();\ 
+ (void)fputs("Sending SIGTERM to all processes.\n", stderr);\ 
+ (void)kill((pid_t)(-1), SIGTERM);\ 
+ (void)sleep(2u);\ 
+ (void)kill((pid_t)(-1), SIGKILL);\ 
+ (void)kill((pid_t)1, SIGQUIT);\ 
+ (void)sleep((unsigned int)1);\ 
+ (void)sync();\ 
+}while(0) 
+
+#define __mz_reboot_swap_off__() do{ /* TODO */ }while(0) 
+#define __mz_reboot_unmount__() do{ /* TODO */ }while(0) 
+
+#define __mz_reboot__() do{\ 
+ __mz_reboot_block_signal__();\ 
+ __mz_reboot_stop_process__();\ 
+ __mz_reboot_swap_off__();\ 
+ __mz_reboot_unmount__();\ 
+ __mz_reboot_syscall__(RB_AUTOBOOT);\ 
+ (void)fputs("ERROR: reboot systemcall !\n", stderr);\ 
+}while(0) 
+
+#define __mz_poweroff__() do{\ 
+ __mz_reboot_block_signal__();\ 
+ __mz_reboot_stop_process__();\ 
+ __mz_reboot_swap_off__();\ 
+ __mz_reboot_unmount__();\ 
+ __mz_reboot_syscall__(RB_POWER_OFF);\ 
+ (void)fputs("ERROR: reboot systemcall !\n", stderr);\ 
+}while(0) 
+
+int main(void) 
+{ 
+#if 0
+ __mz_poweroff__();
+#else
+ __mz_reboot__(); 
+#endif
+ return(1); 
+} 
+
+#endif 
+
+/* vim: set expandtab: */ 
+/* End of source */
+}}}
+
+=== 변경사항 ===
+
+==== 2005/08/13 ====

@@ -1,0 +1,115 @@
+#title linux man page : pthread_cancel - 쓰레드에 종료 요청을 보낸다.
+
+== pthread_cancel ==
+=== 사용법 ===
+{{{#!plain
+#include <pthread.h>
+
+int pthread_cancel(pthread_t thread);
+int pthread_setcancelstate(int state, int *oldstate);
+int pthread_setcanceltype(int type, int *oldtype);
+void pthread_testcancel(void);
+}}}
+		
+=== 설명 ===
+이들 함수는 하나의 쓰레드에서 실행중인 다른 쓰레드를 종료하기 위한 목적으로 사용된다. 좀더 그럴듯하게 말하자면 다른 쓰레드에게 쓰레드 취소를 요청하는 것과 관련된 작어을 위해 사용된다. 쓰레드 취소 요청을 받은 쓰레드가 어떻게 작동할런지는 설정에 의존적이다. 요청을 받은 쓰레드는 곧바로 종료할 수도 있고 취소 지점(cancellation point)을 벗어난후 종료할 수도 있다.
+
+쓰레드가 종료 요청을 받았다면, 해당 쓰레드는 pthread_exit(PTHREAD_CANCELED)를 수행한다. 또한 모든 cleanup handler도 수행하며, thread-specific 데이터를 호출하고 쓰레드가 종료된다. 종료시 리턴되는 값은 PTHREAD_CANCELED이다. 쓰레드 종료와 관련된 자세한 내용은 pthread_exit(3)을 참고하기 바란다.
+
+pthread_cancel()은 인자로 주어진 쓰레드 식별자 thread를 가지는 쓰레드에게 종료 요청을 보낸다.
+
+pthread_setcancelstate()는 이 함수를 호출한 쓰레디의 취소 상태를 변경하기 위해서 사용된다. 취소상태는 PTHREAD_CANCEL_ENABLE, PTHREAD_CANCEL_DISABLE둘중 하나가 지정될 수 있다. 전자는 취소 상태를 활성화 시키기 위해서 후자는 취소 상태를 비활성화 시키기 위해서 사용한다. 취소상태는 state를 통해서 설정된다. 이전의 취소상태는 oldstate를 통해서 받아올 수 있다. NULL일 경우 받아오지 않게 된다.
+
+pthread_setcanceltype()는 취소 요청을 받은 쓰레드가 어떻게 반응 할건지(취소타입)를 결정하기 위해서 사용된다. 반응의 종류는 type를 통해서 설정할수 있다. PTHREAD_CANCEL_ASYNCHRONOUS와 PTHREAD_CANCEL_DEFERRED 둘 중 하나를 선택할 수 있다. 전자일 경우 바로 종료하며, 후자의 경우 취소지점을 벗어날 때까지 기다리게 된다. oldtype를 이용해서 이전 취소타입을 얻어 올 수 있다. NULL이라면 받아오지 않는다. 이 함수는 당연하지만 취소상태가 PTHREAD_CANCEL_DISABLE 라면 의미 없는 함수다.
+
+별다른 설정이 없을 경우 pthread_create()로 만들어 지는 쓰레드는 PTHREAD_CANCEL_ENABLE, PTHREAD_CANCEL_DEFERRED로 상태로 생성된다.
+
+취소지점은 다음과 같은 함수들이다. 취소 요청을 받은 쓰레드는 취소지점에 대기하고 있다가 벗어나면 종료하게 된다.
+  * pthread_join(3)
+  * pthread_cond_wait(3)
+  * pthread_cond_timedwait(3)
+  * pthread_testcancel(3)
+  * sem_wait(3)
+  * sigwait(3)
+		
+=== 에러 ===
+pthread_cancel
+  * ESRCH
+    쓰레드 식별자 thread를 가지는 쓰레드가 존재하지 않는다.
+
+pthread_setcancelstate
+  * EINVAL
+    PTHREAD_CANCEL_ENABLE, PTHREAD_CANCEL_DISABLE 외의 잘못된 인자가 지정되었다.
+
+pthread_setcanceltype
+  * EINVAL
+    PTHREAD_CANCEL_DEFERRED, PTHREAD_CANCEL_ASYNCHRONOUS 외의 잘못된 인자가 지정되었다.
+
+=== 예제 ===
+{{{#!plain
+#include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
+
+// 쓰레드 종료시 호출될 함수
+void clean_up(void *);
+
+// 쓰레드 함수
+void *thread_func(void *);
+
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t lmu = PTHREAD_MUTEX_INITIALIZER;
+
+int main(int argc, char **argv)
+{
+    pthread_t pt;
+    pthread_create(&pt, NULL, thread_func, NULL);
+    
+    // 생성된 쓰레드 pt에 취소 요청을 보낸다.
+    pthread_cancel(pt);
+
+    // 5초를 쉰 후에 시그널을 보낸다.
+    sleep(5);
+    pthread_cond_signal(&cond);
+    
+    // join후 종료한다.
+    pthread_join(pt, NULL);
+    printf("exit\n");
+    exit(1);
+}   
+    
+// 쓰레드 종료시 효출될 함수
+// 여기에 자원해제루틴을 입력할 수 있을 것이다.
+void clean_up(void *arg)
+{
+    printf("Thread cancel Clean_up function\n");
+}
+    
+void *thread_func(void *arg)
+{
+    // DISABLE 상태다. 
+    // 쓰레드에 대한 취소요청을 무시한다. 
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+    
+    // 쓰레드 종료시 호출될 함수 등록
+    pthread_cleanup_push(clean_up, (void *)NULL);
+
+    pthread_mutex_lock(&lmu);
+
+    printf("THREAD cond wait\n");
+    pthread_cond_wait(&cond, &lmu);
+    printf("GET COND SIGNAL\n");
+
+    pthread_mutex_unlock(&lmu);
+
+    printf("EXIT\n");
+    pthread_cleanup_pop(0);
+}
+}}}
+
+DISABLE 상태이므로 pthrad_cancel을 무시하고 계속 진행된다. 또한 cleanup함수도 실행되지 않는다. ENABLE상태로 하면 cancel요청을 받아들이고 cleanup함수도 실행하는 걸 확인할 수 있을 것이다.
+=== 참고문헌 ===
+ * [wiki:Site/Thread/Advanced/ThreadCancle 쓰레드 종료와 취소]
+ * [wiki:Site/Thread/Beginning/PthreadApiReference Pthread API 레퍼런스]

@@ -1,0 +1,67 @@
+#title 코드크기와 성능 관계 
+
+출처 : http://gmarceau.qc.ca/blog/2009/05/speed-size-and-dependability-of.html
+ 
+The speed, size and dependability of programming languages
+The Computer Language Benchmarks Game is a collection of 1368 programs, consisting of 19 benchmark reimplemented across 72 programming languages. It is a fantastic resource if you are trying to compare programming languages quantitatively. Which, oddly, very few people seems to be interested in doing.
+
+The Benchmark Game spends a lot of efforts justifying itself against claims that the benchmarks are always flawed and that the whole exercise is pointless. I don't think it is. In fact, I've found that The Game is remarkably effective at predicting which forum hosts programmers annoyed at the slowness of their language, and that's good enough for me.
+
+I was happy to find that in addition to speed The Game also publishes a source-code-size metric for each benchmark programs in each language. Thanks to this The Game let us at explore a fascinating aspect of programming language design: the tension that exist between expressiveness and performance. It is this tension that gives the expression "higher-level programming language" a pejorative connotation. When you are coding this high, you might be writing beautiful code, but you are so far away from the hardware you can't possibly get good performance, right?
+
+
+
+If you drew the benchmark results on an XY chart you could name the four corners. The fast but verbose languages would cluster at the top left. Let's call them system languages. The elegantly concise but sluggish languages would cluster at the bottom right. Let's call them script languages. On the top right you would find the obsolete languages. That is, languages which have since been outclassed by newer languages, unless they offer some quirky attraction that is not captured by the data here. And finally, in the bottom left corner you would find probably nothing, since this is the space of the ideal language, the one which is at the same time fast and short and a joy to use.
+
+Each pinkish dot in this chart comes from one language implementing one benchmark solution, so there are 1368 dots, minus a few missing implementations. Both axes show multipliers of worsening from best. That is, if a particular solution is not the best one, the axis show how many times worse it is when compared to the best. The barrier of dots on the left side means that it is common to have many solutions near the best performer (The best performer is usually one of a handful of C compilers.) On the right side and beyond it, there are a number of distant points which are clipped out of view by the edge. As it stands, the right edge represents 8-fold worse performance than the best solution.
+
+The distribution of pink points is more uniform along the Y axis (verbosity) than along the X (slowness), suggesting that the world has not hit a wall in the progression of the expressiveness of programming languages the way it has with performance.
+
+Like many scientific datasets, the data coming from The Computer Language Benchmark Game is rich in shapes, insight and stories. In order to retain as much of the shape as possible, it is critical to avoid calculating averages, as averages tend to smooth over the data and hide interesting sources of variation. The average function does to numbers what Gaussian blur does to pictures. Avoid it if you want to see the edges.
+
+One such source of variation that attracted my curiosity was dependability: how well does the language performs across a variety of tasks, such as those composing the benchmark suite? A language might be concise most of the time, but if once a month a quirk of the language forces the code to be five times as large as what it ought to be, it's a problem.
+
+In order to show dependability, and to avoid relying on averages and standard deviations, I drew star charts in the following manner. Take, for example, the Java benchmarks. Starting with the previous chart and its 1368 dots, I added a gray line from the XY position of each Java benchmark to the position of the overall average of all the Java programs.
+
+
+
+The center of the star is Java's average performance, and the branches shoot out to the individual benchmarks. The resulting shape says something about Java. On the X axis (slowness), we see that the performance is impressive, often brushing near the "wall of best performance" of C on the left. But on a few occasions the performance breaks down and the star shoots to the right. On the Y axis (code size), the star spreads across the chart, twice brushing near the top. Also the center of the star is slightly above the centroid of the background cloud. In other words, Java is not a particularly concise language, and in fact it is sometime depressingly convoluted, but its performance is excellent except when it's not.
+
+The next chart arranges the entire collection of the 72 programming languages available at The Computer Language Benchmark Game into a 8x9 grid. The chart is a so-called 'small multiples' design: each swatch in the grid has the same axes in the same scales as each other. It's the same setup as the one for Java that we just saw. The 1368 dots in the background are the same throughout. The intent is to make it easy to compare the shape of the star between languages (across the page), and against the general trend (in the background).
+
+The swatch of the languages are grouped into columns according to their overall performance. Thus the fastest languages are in the first column on the left and the slowest are on the right. Within each column the swatches are sorted by average code size, with the best one at the bottom. In this way, the disposition of the grid mimics the axes within the swatches.
+
+
+
+This chart is a treasure of narratives.
+
+The languages in the first column all have tall thin pogo-stick stars. They show strikingly consistent performance, maxing out the CPU times after times. Their code sizes, on the other hand, are spread all over. The bottom left three languages, Cmucl, Regina and Stalin are outliers. These languages do not have enough benchmark implementations in the database to generate fully fleshed stars.
+
+In the rightmost three columns we find many bushy stars, flat and wide. These are the scripting languages whose communities have not invested as much effort into building optimizing compilers for their language as they have spent tweaking its expressiveness. There are, however, a few spectacular exceptions. Lua, which has always been noted for its good performance among scripting languages, shows a beautiful round star in the swatch at (5, 2), counting from the bottom left. Even better, the star of Luajit (3, 1) seems to squeeze itself in the coveted bottom left corner, amongst academic Juggernauts such as Mlton (2, 1), Ocaml (3, 2), Gambit (4, 1), and Haskell (4, 2).
+
+There is a Basic implementation at (2, 2), which I suppose few people would expect to see there. The open-source group behind the FreeBASIC compiler deserve much more recognition than they are getting.
+
+The shape of the Haskell star, specifically the way that it bends up, suggest to me that writing high-performance programs in Haskell is a bit of a black art, and that some of the benchmarks submissions could be improved if someone got around to it. It also suggests that the tweaks introduced to boost the performance occupy a lot of code space. (I hope someone from the Haskell community will be able to confirm whether this is the case)
+
+I find the swatch for the language Clean at (1, 8) quite interesting, in light of the oddly shaped Haskell star. Clean is a lazy language just like Haskell. Its star looks like the result of smashing Haskell star against the left wall, as if a huge effort of optimization had paid off.
+
+Psyco (5, 1) is a decent improvement on the standard Python (7, 1) evaluator but it is still rather bushy. On the plus side, both versions of Python can claim many of the smallest programs in the collection. Ruby (8, 1) might also compete for titles, but unfortunately its performance is so bad its star falls off the performance chart. If you use Ruby, you probably want to switch to the Yarv implementation, at (6, 2).
+
+C# (3, 4) has the same shape as Java (3, 7), merely 1, 2, or three rows down, depending on how you count. The arrival of Scala (6, 7) in the Java world is a mixed blessing. While it fixes the worse convolutions (it has no top-of-the-square points) it also introduces terrible performance hiccups (the points which shoots out to the right.)
+
+Is interesting to see Groovy (7, 5) right next to MzScheme (6, 5). Both languages have similarities in terms of the features that would impact the performance of the evaluator. You would expect Groovy to display better performance since it uses the Java virtual machine and all its optimizations, but the reverse is true.
+
+Finally, the top right corner is occupied by specialty languages, with their momentous stars which reach across the performance spectrum along both axes, from the very best to the very worst.
+
+Does introducing functional features kill performance?
+
+No, it does not. In the following chart, the ordering is the same as in the large chart. Languages which include functional features such as lambda, map, and tail call optimization are highlighted in green. C compilers, C++ and C-derivatives are in blue. The blues dominate the first column. The greens occupy the main diagonal, from the oddball corner to the "ideal" corner. Ultimately the first factor of performance is the maturity of the implementation.
+
+
+Source code
+
+The code to generate these charts runs in PLT Scheme (MzScheme) v4.1.5. You will need the data file from The Game's cvs repository. This file is from 2005, which is the one I used for the charts above. Update: I rerun the generation using the 2009 data. Here are the updated big chart and colored chart. There are fewer languages in the 2009 roundup, unfortunately. Some languages moved in interesting ways, both most of the trends are the same.
+
+Despite it not having a particularly remarkable spot on this performance chart, I code in PLT Scheme because it has a fantastic macro system. I also have wrists problems, so coding in Scheme lets me use my ergonomic editor DivaScheme.
+
+ posted by Guillaume Marceau @ 9:16 AM 

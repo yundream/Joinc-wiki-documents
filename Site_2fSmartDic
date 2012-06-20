@@ -1,0 +1,71 @@
+#title SmartDic
+
+[[minisite(SmartDic)]]
+
+== 소개 ==
+windows, linux, Mac os에서 사용가능한 영어단어 번역 프로그램
+
+
+== 개발일정 ==
+
+ * ~  8/10 : 요구분석 명세서, 개발환경 준비(필요한 플러긴 확정), 공동개발 방식 및 Rule 논의(commit, versioning, documents, 업무 분담/협업..),  개발/테스트 사이클링 의논
+ * 8/11 ~ 8/31 : UML 설계(클래스 속성, 메소드까지 포함한), Abstract Layer 구현방안과 API Specification Document, JNI부분에 대한 설계/테스트,  텍스트 추출에 관한 아이디어 정립, GUI 설계
+ * 9/1 ~ 9/21 : 코딩. 1주일 단위로 프로그램 실행가능한 미니 플젝들을 수행/테스트하며 조립, 확장해 나간다.
+ * 9/22 ~ 10/10 : SmartDic 테스트/디버깅
+
+== 개발 환경 ==
+ * 운영체제 : Windows98, Windows2000, Linux, Mac
+ * 개발툴 : SWT, CVS, Bugzilla(12), eclipse (CDT, JDT, UML, ANT), JDK1.5
+
+=== SWT ===
+SWT(12)(Standad Widget Toolkit)는 Swing(12)와 함께 Java에서의 그래픽 유저 인터페이스를 구현하기 위서 사용되는 라이브러리다. SWT는 IBM의 통한 개발환경인 Eclipse(12)를 개발하는 도중에 개발되어서 사용되어 지고 있으며, Java의 GUI는 촌스럽다는 이미지를 한번에 불식시켰다. 다음은 SWT를 통해서 만들어진 eclipse의 GUI화면이다. eclipse는 IBM에서 밀고 있는 오픈소스 IDE개발환경으로 자바와 SWT만을 이용해서 만들었다.  
+
+{{{#!html
+<a href=http://www.joinc.co.kr/modules.php?op=modload&name=gallery&file=index&set_albumName=album01&id=ajy&include=view_photo.php&full=1><img src=http://www.joinc.co.kr/albums/album01/ajy.sized.png border=0></a>
+}}}
+
+SWT와 관련된 별도의 [wiki:article_SWT_Study SWT 스터디페이지]를 운영하고 있으니 참고하기 바란다.
+
+=== CVS ===
+소스의 공동개발 / 관리를 위해서 사용한다. CVS관리는  [wiki:JCvs]를 통해서 이루어지도록 한다. 
+웹에서의 CVS저장소 브라우징은 [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/ joinc webcvs]를 이용한다.
+
+
+=== 요구분석 ===
+
+여기는 SmartDic의 요구분석 명세서를 적는란이다.
+
+지금 좀 바빠서 우선 다른 카테고리로 분류해야할 항목들도 일단 여기에 적어둔다.  또한 수정할 가능성이 있다. (7/27 산하)
+ 
+ * SmartDic은 OS independent한 팝업 영어사전이다.
+ * 컴퓨터를 사용하면서 영어 단어해석에 있어서 쉽고, 빠르고, 강력하며, 실리적인것을 추구한다. (실리적이라 함은 효율적인 GUI 및 효과적인 영단어 암기가 가능함을 일컫는다)
+ * SmartDic의 아키텍처는 크게 4개로 이루어진다
+
+ 1. 어플리케이션의 마우스와 키보드 이벤트를 받아 텍스트를 추출해내는 HAL과 (Hardware Abstract Layer), 클립보드 복사가 불가능한 어플리케이션이나 윈도우상에서의 텍스트도 추출해내는 AAL (Application Abstract Layer)를 둔다.
+
+ 1. HAL, AAL 에서 텍스트를 받아  웹사전과 Http 통신을 하며 SWT를 통해 Frond end로 보내주는 Back end를 둔다 (Java)
+   
+ 1. 각 OS별, Application별로 HAL, AAL을 구현하는 Native Section 이 있으며 C++로 구현하고 JNI를 통해 Java와 교신한다.
+
+ 1. Java의 SWT를 이용하여 구현하는 OS independent 한 GUI Front end가 있다.
+  * 텍스트 추출은 클립보드 복사가 되는 어플리케이션을 비롯하여 그러하지 못한 모든 텍스트들의 추출도 가능함을 목표로 한다.
+  * 텍스트 선택은 단축키와 조합되는 마우스 블럭을 비롯하여 마우스 위치 단어 선택 등을 포함한다.
+  * GCJ를 통한 OS별 바이너리 생성의 가능성도 가지고 있다.
+  * 각 클래스별로 JUnit, CppUnit 등을 통한 Test 및 eXtrem Programming을 한다.
+  * 전체 프로그램의 설계, 수정, 보완작업에 UML을 활용하며 디자인패턴과 리팩토링도 염두에 둔다.
+  * C++ 코드에서도 Hans Bohem의 GC 와 Thrad safe Smart Pointer 의 성능테스트를 통해 적당한 GC를 사용한다.
+  * GC에 관련된 내용은 [wiki:smartpointer smart pointer]페이지를 참고한다.
+  * 가끔 단어를 찾더라도 팝업창이 신속하게 뜰 수있게 자바 VM에서의 Memory Standby 상태를 구현한다.
+   (미리 창을 띄워놓고 화면에서만 가려놓는 기법을 사용해볼수도 있겟음, paint and flush)
+  * 효과적인 단어장 기능을 포함한다. (단어장에 따른 별도 요구분석이 필요하다)
+  * 검색된 단어는 로컬 하드디스크에 캐쉬해서 검색 속도를 높이도록 한다. [wiki:Site_SQLite sqlite]와 같은 간단한 dbms를 이용하면 편하게 개발할 수 있을 것 같다.
+      * dbms이용에 따른 장단점이 있을 것 같다. 장점은 DBMS의 기능을 활용하여 웹사전에 의존적인 기능에서 로컬데이터를 통해 추가적인 기능을 구현할 수 있을것 같으며 단점으론, 기존의 웹사전 정도의 역할만 한다고 봤을땐 단어매칭(혹은 유사단어, regex) 정도만 하면 되므로 아무리 lightweight 한 sqlite하더라도 불필요하다고 볼 수 도 있을것이다. 
+	  허나, 컨셉이 강력하고 실리적인 사전구현이므로 sqlite를 통하여 로컬에 저장되었던 단어를 통해 smartDic만의 기능을 가미해 갈 것이다. 일례로, 웹사전에서 한/영 검색을 하면 뜻에서는 검색을 하지 않는것을 볼 수 있다(특히 동사, 형용사 매칭에 약하다) 일례로 빠르다 라고 치면 fast가 나오겠지만 fast의 해석에 분명히 '빠른' 이라는 단어가 있음에도 불구하고 '빠른' 을 검색어로 넣으면 해당하는 단어가 없다고 나온다. 
+	  물론, 전혀 '빠르다'와 연관없는 단어의 해석에서도 예제를 통해 '빠른' 이라는 단어가 나올 수도 있으므로 모든 해석에서 다 찾아서 뿌려준다면 원하지 않는 결과가 나올 확률도 높을것이다. 때문에 이러한 한/영 검색에서의 인공지능이 (현재 웹에서는 미약한) SmartDic에서는 필요하다고 볼 수 있겠다.
+  * 원어민 발음을 지원하며 향 후 발음따라하기에서 점수가 매겨지도록 하여 90점 이하면 다시 반복하고, 이상이면 통과할 수 있도록 하는 기능을 넣는다.
+     * 음 파형의 일치도를 분석하여 점수를 매기는 방식인가요 ? 
+        * 음, 그렇게하면 화자독립이 안되기때문에 그 무슨 이론에 의해(이름은 생각이 잘..) 음운학적으로 점수가 매겨져야합니다. 즉, 음성의 특징을(억양, 강세, ...) 추출해서 하는 방법인데요 이를테면 wma나 cdma의 음성압축기법(아 이것도 용어가 잇는데.음.. 퀄컴에 저작권이 아마 있을거임) 같은데 사용되는 방법이죠. 화자독립형말을 글자로 바꾸는기술은 훨씬 더 복잡고 어렵지만 적어도 두개의 발음을 비교하는것은 그래도 조금 나을것입니다. 그렇지만 역시 꽤나 복잡하므로 기존의 오픈소스나 자료를 확보하며 스터디 해야할것입니다.
+
+  * 한번 검색한 단어와 발음은 로컬에 저장하며 최대 저장량(혹은 갯수)를 config할 수 있게한다. 또한 몇번째로 같은 단어를 찾은건지 카운트를 세어주어 스스로 암기할 수 있도록 자극한다.
+  * 자바소스엔 javadoc으로 Html API Spec., Documents를 C++소스에도javadoc스타일로 주석을 달고 Doxygen으로 Html API Spec., Documents를 자동 생성하고 그 페이지를 링킹한다.
+ 

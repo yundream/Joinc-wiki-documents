@@ -1,0 +1,130 @@
+#title 파일 스트림과와 파일 지시자 비교
+
+  * 문서 대폭 수정 작업 중 : 10/04/01
+  * 네트워크 프로그래밍에서의 표준 입출력 함수의 사용에 대한 내용을 추가할 필요가 있음 
+== 파일 스트림과 파일 지시자 ==
+시스템 프로그램 파일관련 작업을 할때, 우리는 int 형의 파일 지정 번호를 돌려주 는 open(:2) 계열 함수와 파일 스트림인 '''FILE'''을  돌려주는 fopen(:3) 계열 함수 중 선택해서 입출력 작업을 할 수 있다. 
+
+이 문서는 fopen 계열 함수와 open 계열 함수와의 차이점과 어떠한 장정과 단점을 가지는지에 대해서 알아보도록 하겠다. 
+
+기본적으로 유닉스(:2)에서는 모든 것을 파일로 처리한다. 이는 모든 표준입출(:12),표준출력(:12),표준에러(:12),파일(:12), 소켓(:12)에 동일하게 적용된다. 
+
+다음은 zipcode의 fork 버젼을 4444 번 port 로 실행시키고, zipcode 의 프로세스 상황을 출력한 결과 이다. zipcode 의 fork 버젼은 [wiki:Site/Network_Programing/Documents/multi_process 다중연결서버 만들기]의 서버프로그램이다.
+{{{#!plain
+[yundream@coco test]$ ./zipcode_m 
+Usage : ./zipcode [port]
+예    : ./zipcode 4444
+[yundream@coco test]$ ./zipcode_m 4444
+}}}
+
+위와 같이 서버프로그램을 실행시키고 /proc 파일시스템을 이용해서 zipcode_m 의 프로세스 정보중 fd 정보를 출력해 보았다.
+{{{#!plain
+[yundream@hum test]$ ps -aux | grep zipcode_m | grep -v grep 
+yundream 14987  0.0  0.2  1340  376 ttyq1    S    15:02   0:00 ./zipcode_m 4444
+[yundream@hum test]$ cd /proc/14987/fd ; ls -al
+합계 0
+dr-x------    2 yundream 500             0  3월 18 15:15 .
+dr-xr-xr-x    3 yundream 500             0  3월 18 15:15 ..
+lrwx------    1 yundream 500            64  3월 18 15:15 0 -> /dev/ttyq1
+lrwx------    1 yundream 500            64  3월 18 15:15 1 -> /dev/ttyq1
+lrwx------    1 yundream 500            64  3월 18 15:15 2 -> /dev/ttyq1
+lr-x------    1 yundream 500            64  3월 18 15:15 3 -> /home/mycvs/test/zipcode.txt
+lrwx------    1 yundream 500            64  3월 18 15:15 4 -> socket:[587641]
+}}}
+위위 화면을 보면 알겠지만, 표준입력(0), 표준출력(1), 표준에러(2), 열린파일(3), 열린 소켓(4) 에 대해서 일련의 숫자로된 link(:12) 파일이 만들어지는걸 볼수 있을것이다. 표준입력,출력,에러는 자신의 터미널을 링크하고 있으며 열린파일은 파일, 소켓은 고유의 소켓번호를 링크하고 있음을 알수 있다. 
+
+INET(인터넷) 소켓의 경우에는 소켓통신을 위해서 파일을 생성하지 않고 커널에서 직접관리 하므로, 파일로 연결되지 않고, 커널의 소켓 번호에 연결된다.
+
+테스트도 할겸 0 번파일에 쓰기를 한번해보자.
+{{{#!plain
+[yundream@hum fd]$  echo "111" > 0
+[yundream@coco test]$ ./zipcode_m 4444
+111
+}}}
+그러면 ./zipcode_m 을 실행한곳에 111 이 출력 됨을 볼수 있을것이다. 
+
+=== open 계열 ===
+open 계열의 함수는 사용하면 바로 /proc/pid/fd 밑에 있는 링크파일의 이름을 int 형으로 변환시켜서 되돌려주며, 이값을 이용해서 우리는 여러가지 입출력 작업을 할수 있게 되는것이다.
+
+open 계열의 함수들은 시스템 호출로 운영체제(:12)에 직접 요청을 하므로 '''저 수준 입출력 함수'''라고 부른다. 저 수준 입출력 함수들을 정리해 보았다.
+ || open(:2)   || 파일을 연다.     ||
+ || write(:2)  || 파일에 쓴다.     ||
+ || read(:2)   || 파일에서 읽는다. ||
+ || close(:2)   || 파일을 닫는다.  ||
+
+이들 함수는 단순하며, 하는 일이 명확하고 빠르고 강력하다.
+
+이처럼 open 계열을 사용하면 각각의 입출력 파일을 직접 엑세스 할수 있으므로, 저수준의 작업, 예를들면 select, polling, 파일잠금, 레코드잠금, 파일속성변경등의 파일을 다루기 위한 세세한 일들을 할수 있는 장점을 얻게 된다.
+
+반면 단점을 가지는데, 저수준으로 파일을 다루다 보니 간단한 일을 할기에는 너무 잔손이 많이 간다라는 점이다. 
+
+간단한 행입력을 받는 프로그램을 만든다고 생각해보자, open 을 사용하게 되면 개행문자 검사를 위해서 입력받은 문자를 바이트단위로 비교를 해주는 수고스러움을 감수해야 하며, 별도로 버퍼 관리를 해주어야 할것이다. 
+
+=== fopen 계열 ===
+이러한 문제를 해결하기 위해서(반드시 위의 문제때문에 나온것 만은 아니지만), f계열 의 좀더 고수준의 함수들을 제공한다. 이 함수들은 '''고 수준 입출력 함수'''혹은 '''표준 입출력 함수'''라고 부른다.
+
+표준 입출력 함수들은 파일을 스트림 (흐름)으로 다룬다. FILE 데이터 형은 fopen 함수를 이용해서 파일열기에 성공했을때 해당 파일을 스트림을 가리킨다. 
+/usr/include/stdio.h 를 열어보면 다음과 같이 선언되어 있다.
+{{{#!plain
+/* The opaque type of streams.  This is the definition used elsewhere.  */
+typedef struct _IO_FILE FILE;
+}}}
+struct _IO_FILE 는 liblo.h 에 선언되어 있는데, 멤버변수가 꽤 많으니 직접 살펴 보기바란다. _IO_FILE 구조체를 보면 파일지시자와 함께, 파일 입출력을 위한 많은 버퍼를 별도로 관리하고 있음을 알수 있는데 fopen 계열함수를 이용하면, 이러한 구조체의 제어를 알아서 해준다.
+
+결론적으로 파일을 객체로 다루게 됨으로 잔손질을 덜수 있게 된다. 
+
+예제 : fopen.c
+{{{#!plain
+#include <unistd.h> 
+#include <stdlib.h> 
+#include <stdio.h> 
+
+int main()
+{
+	FILE *fp;
+	char buf[256];
+
+	printf("끝낼려면 ^D\n");
+	while(fgets(buf, 256, stdin) != NULL)
+	{
+		printf("%s", buf);
+	}
+}
+}}}
+
+=== FILE 과 파일지시자 사이의 변환 ===
+최초에 저 수준 함수로 파일을 다룰 필요가 있어서 open함수를 이용했다고 하더라도,  제어는 표준 입출력 함수를 사용하고 싶을 때가 있을 것이다. 
+
+네트워크 프로그램을 생각해 보자. 소켓(:12)은 socket(2)함수로 만드는데, 이 함수는 소켓 지정 번호를 반환한다. 이때 문자열 데이터를 서로 주고 받는다고 하면 저 수준 입출력 함수 보다는 표준 입출력 함수를 사용하고 싶을 때가 있을 것이다. 훨씬 쉽게 처리할 수 있기 때문이다.
+
+또는 그 반대의 경우도 있을수 있는데, 당연히 이에 대한 해법도 존재한다.
+
+fdopen(3)과 fileno(3) 가 그것으로 fdopen 가 파일지시자를 받아서 FILE 객체를 되돌려주는 함수이고, fileno(3) 가 FILE 객체를 받아서 파일 지정 번호를 돌려주는 함수다.
+
+아래는 fdopen 의 간단한 예이다. 
+
+예제 : fdopen.c
+{{{#!plain
+#include <stdio.h> 
+#include <string.h> 
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+
+int main()
+{
+	int		fd;
+	FILE*	fp;
+	char	buf[256];
+
+	printf("끝내기 : ^D\n");
+	fd = open(0, O_RDONLY);
+	fp = fdopen(0, "r");
+	while(fgets(buf, 256, fp) != NULL)
+	{
+		printf("%s", buf);
+	}
+	
+}
+}}}
+

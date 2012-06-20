@@ -1,0 +1,283 @@
+#title GNU Compiler Collection 사용하기
+[[TableOfContents]]
+
+== GCC 에 대해서 ==
+GNU C compiler는 GNU(:12) system을 이루고 있는 중요한 부분중 하나이며 Richard:::Stallman(:12)에 의해서 만들어졌다. 최초에는 단지 C(:12)코드만을 컴파일 할 수 있었기 때문에 '''G'''NU '''C''' '''C'''ompiler로 불리웠었다. 그러던 것이 다른 많은 지원자들에 의해서 C++, Fortran, Ada, Java 등의 컴파일도 지원할 수 있게 되면서 GNU Compiler Collection으로 이름을 변경하게 된다. 이 문서는 단지 C언어코드에 대한 컴파이러로써의 GCC의 사용법에 대해서 다룬다. 
+
+GCC는 Linux(:12)뿐만 아니라 FreeBSD, NetBSD, OpenBSD, SunOS, HP-UX, AIX등의 *Nix운영체제 그리고 Cygwin, MingW32의 윈도우환경에서도 사용할 수 있다. 플렛폼 역시 Intel x86, AMD x86-64, Alpha, SPARC 등에서 사용가능 하다. 이러한 다양한 환경에서의 운용가능성 때문에 다양한 플렛폼에서 작동을 해야 하는 프로그램을 만들기 위한 목적으로 유용하게 사용할 수 있다.
+
+== GCC의 기본 옵션들 ==
+GCC가 여러분의 시스템에 설치되어 있다고 가정하고 글을 쓰도록 하겠다. 
+=== GCC 특징과 지원 환경 확인 ===
+{{{#!plain
+[root@localhost include]# gcc -v
+Reading specs from /usr/lib/gcc/i386-redhat-linux/3.4.4/specs
+Configured with: ../configure --prefix=/usr --mandir=/usr/share/man 
+--infodir=/usr/share/info --enable-shared --enable-threads=posix --disable-checking 
+--with-system-zlib --enable-__cxa_atexit 
+--disable-libunwind-exceptions --enable-java-awt=gtk --host=i386-redhat-linux
+Thread model: posix
+gcc version 3.4.4 20050721 (Red Hat 3.4.4-2)
+}}}
+'''-v'''옵션을 이용하면 GCC와 관련된 다양한 정보들을 확인할 수 있다. 위의 정보에서 현재 설치된 gcc는 POSIX(12) 쓰레드 모델을 지원하고 있음을 알 수 있다. 이는 다중쓰레드를 지원하는 애플리케이션의 작성이 가능하다는 것을 의미한다.
+
+이제 하나의 헤더파일과 하나의 소스코드파일로 이루어진 간단한 프로그램을 만들고 컴파일을 해보면서 GCC에서 지원하는 다양한 컴파일 옵션들에 대해서 알아보도록 하겠다.
+{{{#!plain
+// helloworld.h
+#define COUNT 2
+
+static char hello[] = "hello world";
+}}}
+{{{#!plain
+// helloworld.c
+#include <stdio.h>
+#include "helloworld.h"
+
+int main()
+{
+  int i;
+  for (i =0; i <= COUNT; i++)
+  {
+    printf("%s - %d\n", hello, i);
+  }
+  return 0;
+}
+}}}
+=== Object 파일의 생성 ===
+{{{#!plain
+[root@localhost ~]# gcc -v -c helloworld.c 
+Reading specs from /usr/lib/gcc/i386-redhat-linux/3.4.4/specs
+Configured with: ../configure --prefix=/usr --mandir=/usr/share/man --infodir=/u
+sr/share/info --enable-shared --enable-threads=posix --disable-checking --with-s
+ystem-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-java-aw
+t=gtk --host=i386-redhat-linux
+Thread model: posix
+gcc version 3.4.4 20050721 (Red Hat 3.4.4-2)
+ /usr/libexec/gcc/i386-redhat-linux/3.4.4/cc1 -quiet -v helloworld.c -quiet -dum
+pbase helloworld.c -auxbase helloworld -version -o /tmp/ccs8066J.s
+ignoring nonexistent directory "/usr/lib/gcc/i386-redhat-linux/3.4.4/../../../..
+/i386-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /usr/local/include
+ /usr/lib/gcc/i386-redhat-linux/3.4.4/include
+ /usr/include
+End of search list.
+GNU C version 3.4.4 20050721 (Red Hat 3.4.4-2) (i386-redhat-linux)
+        compiled by GNU C version 3.4.4 20050721 (Red Hat 3.4.4-2).
+GGC heuristics: --param ggc-min-expand=64 --param ggc-min-heapsize=64407
+ as -V -Qy -o helloworld.o /tmp/ccs8066J.s
+GNU assembler version 2.15.92.0.2 (i386-redhat-linux) using BFD version 2.15.92.
+0.2 20040927
+}}}
+위 결과에서 오브젝트:::파일(:12)을 만들기 위해서 include 경로를 찾는 과정과 GNU assembler를 이용해서 컴파일을 하고 있음을 확인할 수 있다. 컴파일러는 원본파일로 부터 /tmp/ccs8066J.s 라는 어셈블리(:12)코드를 만들고, 이것을 as를 이용해서 helloworld.o라는 이름의 오브젝트 파일을 만들었다.
+
+=== 실행파일 생성 ===
+{{{#!plain
+[root@localhost ~]# gcc -v -o helloworld helloworld.c 
+...[생략]...
+GNU C version 3.4.4 20050721 (Red Hat 3.4.4-2) (i386-redhat-linux)
+        compiled by GNU C version 3.4.4 20050721 (Red Hat 3.4.4-2).
+GGC heuristics: --param ggc-min-expand=64 --param ggc-min-heapsize=64407
+ as -V -Qy -o /tmp/ccj9GxKi.o /tmp/ccGzRoCh.s
+GNU assembler version 2.15.92.0.2 (i386-redhat-linux) using BFD version 2.15.92.0.2 20040927
+ /usr/libexec/gcc/i386-redhat-linux/3.4.4/collect2 --eh-frame-hdr -m elf_i386 -dynamic-linker 
+/lib/ld-linux.so.2 -o helloworld /usr/lib/gcc/i386-redhat-linux/3.4.4/../../../crt1.o /usr/lib/gcc/i386-redhat-linux/3.4.4/../../../crti.o 
+/usr/lib/gcc/i386-redhat-linux/3.4.4/crtbegin.o -L/usr/lib/gcc/i386-redhat-linux/3.4.4 -L/usr/lib/gcc/i386-redhat-linux/3.4.4 
+-L/usr/lib/gcc/i386-redhat-linux/3.4.4/../../.. /tmp/ccj9GxKi.o -lgcc 
+--as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s
+--no-as-needed /usr/lib/gcc/i386-redhat-linux/3.4.4/crtend.o /usr/lib/gcc/i386-redhat-linux/3.4.4/../../../crtn.o
+}}}
+-L 옵션을 이용해서 링크(:12)할 라이브러리(:12)의 경로를 찾고 있음을 알 수 있다. 여기에서는 기본적으로 지정된 경로에서만 라이브러리를 찾고 있는데, 별도로 -L 옵션을 줘서 다른 경로에서 라이브러리(:12)를 찾도록 할 수도 있다. 그리고 -l옵션을 이용해서 링크할 라이브러리를 지정하고 있음을 알 수 있다. -l로 지정된 라이브러리는 -L에 의해 지정된 경로에서 동일한 이름의 라이브러리(:12)가 있는지를 찾아서 링크하게 된다.
+
+필요한 라이브러리들을 링크 시키고 나면, 완전한 실행파일이 만들어진다.
+
+== PreProcess 에 대해서 ==
+전처리기로 불리우기도 하는 preprocessor(:12)는 C컴파일러에서 매우 중요한 역할을 담당한다. preprocessor은 #include, #ifdef, #pragma등 '#'으로 시작되는 코드를 분리해 낸다. 이들 코드는 컴파일이 이루어지기 전에, 매크로 치환, 조건부 컴파일 확인, 파일 첨가(include)등의 업무를 처리한다. 예를 들어 '''#define COUNT 2''' 라는 코드라인이 있다면, 이부분을 해석해서 소스코드에 있는 모든 COUNT를 2로 치환하는 일을 한다. preprocessor은 줄단위로 처리한다.
+=== proprocessed 출력 ===
+{{{#!plain
+# gcc -E helloworld.c > helloworld.preprocess
+}}}
+파일첨가, 매크로치환(:12)등을 포함한 모든 preprocess 과정을 파일로 저장하고 있다. 편집기를 이용해서 파일을 열어보면 preprocess가 담당하는 일이 어떤건지를 대략적으로 이해할 수 있을 것이다. 실질적으로 C컴파일러는 preprocess가 완전히 끝난 상태인 '''helloworld.preprocess'''를 소스코드로 해서 컴파일을 수행한다.
+
+=== 매크로 치환 (#define) ===
+{{{#!plain
+# gcc -E helloworld.c -dM | sort | less
+}}}
+모든 define 문을 처리하고 이를 sort 해서 보여주고 있다. 여기에서 __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__ 등등 GCC버전과 관련된 정보들도 확인할 수 있다.
+
+== Assembly 코드 생성 ==
+GCC는 이진코드를 만들기전에 C코드를 assembly 코드로 변환되고, 변환된 assembly가 해석되어서 이진코드가 만들어진다. -S 옵션을 이용하면, C코드가 어떤 assembly코드로 변환되는지를 확인할 수 있다.
+{{{#!plain
+# gcc -S helloworld.c
+}}}
+다음은 만들어진 assembly 코드다.
+{{{#!plain
+  .file "helloworld.c"
+  .data
+  .type hello, @object
+  .size hello, 12
+hello:
+  .string "hello world"
+  .section  .rodata
+.LC0:
+  .string "%s - %d\n"
+  .text
+.globl main
+  .type main, @function
+main:
+  pushl %ebp
+  movl  %esp, %ebp
+  subl  $8, %esp
+  andl  $-16, %esp
+  movl  $0, %eax
+  addl  $15, %eax
+  addl  $15, %eax
+  shrl  $4, %eax
+  sall  $4, %eax
+  subl  %eax, %esp
+  movl  $0, -4(%ebp)
+.L2:
+  cmpl  $2, -4(%ebp)
+  jg  .L3
+  subl  $4, %esp
+  pushl -4(%ebp)
+  pushl $hello
+  pushl $.LC0
+  call  printf
+  addl  $16, %esp
+  leal  -4(%ebp), %eax
+  incl  (%eax)
+  jmp .L2
+.L3:
+  movl  $0, %eax
+  leave
+  ret
+  .size main, .-main
+  .section  .note.GNU-stack,"",@progbits
+  .ident  "GCC: (GNU) 3.4.4 20050721 (Red Hat 3.4.4-2)"
+}}}
+위의 어셈블리 코드에서 우리는 "hello world" 문자열이 읽기전용 데이터로 static하게 정의되어 있는걸 확인할 수 있다. .LC0 섹션은 printf의 인자를 보여주고 있다. 이 값들은 스택에 넣어지며 printf()가 호출될 때 읽어온다. .L2 섹션에 loop를 위한 상태검사 코드가 들어갔다. .L3 섹션은 함수가 끝난후 필요한 값을 리턴하고 종료하기 위한 코드가 들어갔다. 이 어셈블리코드는 컴파일되어서 기계가 해석할 수 있는 이진코드로 변경되며, 이러한 컴파일 작업은 as가 담당한다.
+== 라이브러리 사용하기 ==
+만든 코드를 다른 프로그램에서 사용할 수 있도록 라이브러리 형태로 만들기를 원한다면 -fpic 옵션을 주면된다. fpic 옵션은 코드를 Position Independent Code (PIC) 로 만들어 준다. 라이브러리에 대한 자세한 내용은 [wiki:article/library_만들기 library 만들기]를 참고하기 바란다.
+
+== profiling 및 디버깅 ==
+profiling 는 프로그램의 실행시간시 코드의 어떤 부분이 가장 많은 자원을 차지하고 있는지 알아내기 위해서 사용하는 방법이다. profiling은 기본적으로 프로그램의 특정한 지점에 모니터링 코드를 입력하는 방식으로 이루어지며 GCC의 -pg옵션을 이용해서 모니터링 코드를 입력할 수 있다. profiling에 대한 자세한 내용은 [wiki:article/c_cpp_profile Gprof를 이용한 프로그램 최적화]를 참고하기 바란다. 
+
+일반적으로 프로그램을 디버깅 하기 위해서는 당연히 프로그램 실행 코드 외의 다른 코드가 삽입돼야 한다. -g 옵션을 이용하면, gdb(:12)를 통해서 사용할 수 있는 여분의 디버깅 정보가 코드에 삽입된다. 여분의 코드가 삽입되기 때문에 실행파일의 크기가 커진다는 단점이 있지만, 어차피 디버깅이 끝난다음에는 디버깅코드를 제거하고 다시 컴파일하면 되므로 크게 문제될건 없다. 일단 디버깅 모드로 컴파일이 되면 모든 최적화(optimization) 플래그가 무효화 된다.
+{{{#!plain
+$ gcc -g -o helloworld helloworld.c #for adding debugging information
+$ gcc -pg -o helloworld helloworld.c #for profiling
+}}}
+
+== 컴파일 시간 모니터링 ==
+완전한 하나의 실행파일을 만들기 위해서는 몇개의 단계를 거쳐한다. 그렇다면 각각의 단계에 어느정도의 시간이 소모되는지에 대한 정보를 알고 싶을 때가 있을 것이다. -time 옵션을 사용하면 각 단계별 소모시간을 알 수 있다.
+{{{#!plain
+[root@localhost ~]# gcc -time helloworld.c 
+# cc1 0.07 0.01
+# as 0.00 0.00
+# collect2 0.06 0.01
+}}}
+-Q 옵션을 이용하면 좀더 자세한 소모시간을 확인할 수 있다. 더불어 컴파일이 어떠한 과정으로 이루어지는지도 확인 가능하다.
+{{{#!plain
+[root@localhost ~]# gcc -Q helloworld.c 
+ main
+
+Execution times (seconds)
+ preprocessing         :   0.02 (25%) usr   0.00 ( 0%) sys   0.05 (26%) wall
+ lexical analysis      :   0.01 (12%) usr   0.01 (50%) sys   0.01 ( 5%) wall
+ parser                :   0.01 (13%) usr   0.00 ( 0%) sys   0.04 (21%) wall
+ global alloc          :   0.00 ( 0%) usr   0.00 ( 0%) sys   0.01 ( 5%) wall
+ TOTAL                 :   0.08             0.02             0.19
+}}}
+
+== GCC 최적화 ==
+최적화에 대해서 설명하기 전에, 어떻게 컴파일러가 서로다른 플렛폼과 다른 언어에서 사용가능한 코드를 생성해내는지에 대해서 알아보도록 하겠다. 컴파일 프로세스는 다음의 3가지 컴포넌트들로 이루어진다.  
+
+ * Front End : 최초에 입력된 코드는 인간이 이해하기 쉬운 문자열로 이루어지는데, 이를 컴퓨터가 능률적으로 해석할 수 형식으로 만들어 줘야 한다. 일반적으로 컴파일러는 주어진 코드를 파싱을 해서 Tree 형식의 데이터 구조로 재구성한다. 이 단계는 최적화할 만한 여지가 거의 없으며, GCC가 지원하는 언어에 따라서 다른 방법으로 Tree를 구성하게 될 것이다.
+
+ * Middle End : 코드생성을 위해서 구성된 트리구조에서 적절한 값들을 가지고 와서 재 배치시킨다. 이 단계는 모든 언어와 플렛폼에서 일반적인 과정을 거치게 되므로 역시 최적화의 요소는 거의 없다고 볼 수 있다. 이러한 과정들이 어떻게 일어나는지를 확인하기 원한다면 컴파일러와 관련된 문서를 읽어야 한다. 
+
+ * Back End : 실제 이진코드를 만들어 내기 위한 마지막 전 단계로, 플렛폼의 특성을 따르게 된다. 이 단계에서 플랫폼의 특성에 따른 최적화의 대부분이 이루어지게 된다. 컴파일러는 MMX/SSE2/3DNow와 같은 확장되거나 독특한 instruction셋에 대한 정보를 이용해서 거기에 맞는 바이너리 코드를 생성하려고 한다. CPU의 종류에 따라서 register의 갯수, 캐쉬와 파이프라인의 구조가 다르기 때문에, 컴파일러는 이들 구조간의 차이점을 고려해서 가능한 빠른 코드를 만든다.
+
+최적화에는 속도:::우선:::최적화(:12)와 공간 우선 최적화의 두가지가 있다. 이상적으로 보자면 속도와 공간을 모두 고려해서 최상의 균형조건을 찾는게 좋을 것이다. 최근에는 메모리의 가격이 내려간 관계로 메모리의 소비를 증가하고 속도를 우선적으로 높이는 방법을 많이 사용하게 된다. 인라인 함수가 가장 대표적인 경우가 될것이다. 인라인 함수를 사용하게 되면 실행파일의 크기가 커지지만, 대신 좀더 빠른 함수의 호출이 가능해지므로 전체적으로 실행속도가 향상될 것이다. 
+
+GCC는 4단계의 최적화 정도를 제공한다. 단계는 -O 옵션뒤에 단계를 나타내는 숫자를 명시하는 식으로 이루어진다. 기본적으로는 "최적화를 안함"인데 -O0와 동일하다. -O1, -O2, -O3은 아래와 같은 최적화 수준을 가진다. 
+ * -O1 는 컴파일 시간의 특별한 증가 없이 코드의 크기와 실행 시간을 줄여준다. 
+ * -O2 는 코드의 크기와 실행 시간을 절충한 최적화 코드를 만든다. 
+ * -O3 는 가능한 모든 최적화를 한다. 대신 컴파일 시간이 늘어나게 된다.
+{{{#!plain
+[root@localhost ~]# gcc -O3 -o hello3 helloworld.c 
+[root@localhost ~]# gcc -O0 -o hello0 helloworld.c 
+
+[root@localhost ~]# ls -al hello*
+-rwxr-xr-x  1 root root  4754  1월  3 19:12 hello3
+-rwxr-xr-x  1 root root  4782  1월  3 19:12 hello0
+
+[root@localhost ~]# time ./hello3 > /dev/null 
+
+real    0m0.003s
+user    0m0.001s
+sys     0m0.001s
+[root@localhost ~]# time ./hello0 > /dev/null 
+
+real    0m0.002s
+user    0m0.000s
+sys     0m0.002s
+}}}
+위의 결과를 보면 -O3 최적화를 했을 경우 실행파일의 크기가 더 작아졌음을 알 수 있다.
+
+-O 최적화 옵션은 gcc의 다양한 컴파일 옵션을 단계별로 조합한 것으로 레벨별로 다음의 옵션을 가진다.
+|| 최적화 레벨 ||  -O1   || -O2   || -Os  || -O3   ||
+|| defer-pop ||	 O	|| O ||	 O ||	 O  ||
+|| thread-jumps ||	 O	|| O ||	 O ||	 O  ||
+|| branch-probabilities	|| O ||	 O ||	 O ||	 O  ||
+|| cprop-registers	|| O ||	 O ||	 O	|| O  ||
+|| guess-branch-probability	|| O ||	 O || O || O  ||
+|| omit-frame-pointer ||	 O ||	 O ||	 O	 || O  ||
+|| merge-constants ||	 O	 || O ||	 O ||	 O  ||
+|| loop-optimize ||	 O ||	 O ||	 O	 || O  ||
+|| if-conversion ||	 O ||	 O ||	 O ||	 O  ||
+|| if-conversion2 ||	 O	 || O ||	 O ||	 O  ||
+|| align-loops	 || X	|| O ||	 X || O  ||
+|| align-jumps ||	 X ||	 O ||	 X	 || O  ||
+|| align-labels	 || X	 || O ||	 X	 || O  ||
+|| align-functions	|| X	 || O ||	 X	|| O  ||
+|| crossjumping	|| X ||	 O ||	 O	|| O  ||
+|| prefetch-loop-array ||	 ? ||	 ?	 || X ||	 ?  ||
+|| optimize-sibling-calls ||	 X	 || O ||	 O ||	 O  ||
+|| cse-follow-jumps	|| X ||	 O ||	 O ||	 O  ||
+|| cse-skip-blocks	 || X ||	 O  ||	 O ||	 O  ||
+|| gcse	|| X	|| O	 || O	|| O  ||
+|| gcse-lm	|| X	|| O	 || O ||	 O  ||
+|| gcse-sm	|| X	|| O	 || O ||	 O  ||
+|| gcse-las	|| X	|| O	 || O ||	 O  ||
+|| expensive-optimizations ||	 X	|| O ||	 O ||	 O  ||
+|| strength-reduce	|| X ||	 O ||	O ||	 O  ||
+|| rerun-cse-after-loop	 || X ||	 O ||	 O ||	 O  ||
+|| rerun-loop-opt	 || X ||	 O	 || O ||	 O  ||
+|| caller-saves	 || X ||	 O ||	 O	 || O  ||
+|| force-mem ||	 X ||	 O ||	 O	 || O  ||
+|| peephole2 ||	 X	 || O ||	 O ||	 O  ||
+|| regmove	|| X ||	 O ||	 O ||	 O  ||
+|| strict-aliasing ||	 X	||  O ||	 O ||	 O  ||
+|| delete-null-pointer-checks ||	 X ||	 O ||	 O ||	 O  ||
+|| reorder-blocks	 || X ||	 O ||	 O ||	 O  ||
+|| reorder-functions	|| X ||	 O ||	 O	|| O  ||
+|| unit-at-a-time	|| X ||	 O ||	 ? ||	 O  ||
+|| schedule-insns	|| X ||	 O ||	 O	 || O  ||
+|| schedule-insns2	||  X ||	 X ||	 X ||	 O  ||
+|| schedule-interblock ||	 X ||	 O	 || ? ||	 O  ||
+|| sched-spec	 || X ||	 O ||	 ? ||	 O  ||
+|| inline-functions	 || X ||	 X	 || X ||	 O  ||
+|| rename-registers	 || X ||	 X	 || X ||	 O  ||
+|| web	 || X ||	 X ||	 X ||	 O  ||
+|| unswitch-loops || X ||	 X ||	 ?	 || O  ||
+
+
+또한 CPU와 architecture에 따른 최적화도 가능하다. 예를 들어 architecture(:12)에 따라서 가질 수 있는 레지스터(:12)의 수가 달라질 수 있는데, 이를 잘 이용하면 좀더 최적화된 실행파일을 만들 수 있다. 
+
+CPU의 종류는 -mcpu=<CPU name>, architecture는 -march=<architecture 타입> 으로 지정할 수 있다. architecture에는 ix86(i386, i486, i586), Pentiumx(pentium, pentium-mmx, pentiumpro, pentium2, pentium3, pentium4), athlon(athlon, athlon-tbird, athlon-xp, opteron)등이 올 수 있다. architecture를 지정해 줄경우 좀더 세밀한 최적화가 가능하겠지만, 비교적 최신의 아키텍처 타입입을 지정할 경우 주의 해야 한다. -march=i386 으로 최적화한 코드의 경우 i686 에서도 문제없이 돌아가겠지만, -march=i686으로 최적화환 코드는 오래된 CPU에서 작동하지 않을 수도 있기 때문이다.  
+
+=== 관련문서 ===
+ * [wiki:Site/SoftWare_engineering/Refactoring/Refactoring03 GCC 를 이용한 코드 경고메시지 제거]

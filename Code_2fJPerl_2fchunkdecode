@@ -1,0 +1,132 @@
+----
+ 1. chunkdecode
+ 1. chunkencoding 된것을 디코딩한다   
+ 1. [acidd15]
+ 1. Version 0.1
+ 1. 2004/12/27 
+----
+
+=== 설명 ===
+Transfer-Encoding: chunked
+위와같이 엔코딩된 바디의 데이터를 디코딩 한다.
+=== 사용방법 ===
+
+=== 코드 ===
+{{{#!plain
+#!/usr/bin/perl
+
+use Socket;
+
+sub parseURL{
+
+    my ($url)=@_;
+
+    return $url=~m/(https?):\/\/([^\/]*)(.*)/;
+
+}
+
+sub chunkDecode{
+
+    my ($chunkdata)=@_;
+    my $chunk_header=0;
+    my $unchunk="";
+
+    while(1){
+
+        if($chunk_header==0){
+
+            if($chunkdata=~/([0-9a-fA-F]+)[ \t]*\n/g){
+
+                $offset=pos($chunkdata);
+                $chunksize=hex($1);
+
+                if($chunksize==0){
+
+                    goto end_of_chunk_data;
+
+                }
+
+                $unchunk.=substr($chunkdata,$offset,$chunksize);
+
+                $chunkdata=substr($chunkdata,$offset+$chunksize);
+                $chunkheader=1;
+
+            }else{
+
+                goto end_of_chunk_data;
+
+            }
+
+        }else{
+
+            if($chunkdata=~/\n([0-9a-fA-F]+)[ \t]*\n/g){
+
+                $offset=pos($chunkdata);
+                $chunksize=hex($1);
+
+                if($chunksize==0){
+
+                    goto end_of_chunk_data;
+
+                }
+
+                $unchunk.=substr($chunkdata,$offset,$chunksize);
+
+                $chunkdata=substr($chunkdata,$offset+$chunksize);
+
+            }else{
+
+                goto end_of_chunk_data;
+
+            }
+
+        }
+
+    }
+
+    end_of_chunk_data:
+
+    return $unchunk;
+
+}
+
+$url="http://phpschool.com/zbbs/zboard.php?id=talkbox&page=1&sn1=&divpage=4&sn=off&ss=on&sc=on&select_arrange=headnum&desc=asc&no=22860";
+
+($protocol,$host,$uri)=parseURL($url);
+
+$port="80";
+
+#create socket descriptor
+socket(SH,PF_INET,SOCK_STREAM,getprotobyname('tcp')) || die $!;
+
+#connecting to server
+my $sin=sockaddr_in($port,inet_aton($host));
+connect(SH,$sin) || die $!;
+
+my $fh = select SH;
+$| = 1;
+select $fh;
+
+$body="GET ".$uri." HTTP/1.1\nConnection: close\nHost: ".$host."\n\n";
+
+syswrite(SH,$body,length($body));
+
+while(($len=sysread(SH,$read_buffer,256)>0)){
+
+        $content.=$read_buffer;
+
+}
+
+$content=~/\n\n/g;
+$offset=pos($content);
+
+$body=substr($content,$offset);
+
+print chunkDecode($body);
+
+close(SH);
+}}}
+
+=== 변경사항 ===
+
+==== 2004/01/08 ====

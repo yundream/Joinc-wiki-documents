@@ -1,0 +1,175 @@
+#title Mysql 품질 관리 - Alive 체크
+
+=== 소개 ===
+QOS 에는 애플리케이션 품질의 측정도 포함된다. 대부분의 애플리케이션이 품질을 관리할 수 있는 API를 제공하기 때문에, 호출방법만 알고 있다면 문제 없이 정보를 얻어낼 수 있다. 여기에서는 Mysql(:12)의 관리정보를 얻는 방법에 대해서 알아보도록 하겠다. 여기에서는 Mysql의 Alive 상태를 체크하는 방법에 대해서 알아보도록 하겠다.
+
+=== Alive ===
+서버 프로그램으로 데몬(:12) 상태로 실행되고 있다면, 가장 중요한건 서버 프로그램이 떠 있는지, 클라이언트의 응답을 받아는 들이는지 하는 것이다. 연결속도, 응답속도는 그 다음의 문제다. mysql(:12)은 mysqladmin이라는 프로그램을 이용해서 Alive 체크를 할 수 있게 하고 있다.
+{{{#!plain
+# mysqladmin -u root -p ping
+mysqld is alive
+}}}
+
+물론 C API를 통해서도 접근할 수 있다. 여기에서는 mysql C API 에서 제공하는 mysql_ping 을 통해서 mysql 서버데몬의 Alive를 체크하는 방법에 대해서 알아보도록 하겠다. 
+
+==== Mysql Alive Check ====
+mysql_ping는 서버가 살아 있을 경우 0을, 그렇지 않은 경우 1을 리턴한다. 서버의 Alive 체크는 mysql 서버와의 연결이 이루어진 상태에서 행해지게 된다. 그러므로 mysql_ping이 1을 리턴했다면, 연결을 끊은 다음, 연결을 시도하는 과정을 거쳐야 한다. 
+
+이 코드는 [wiki:Site/SoftWare_engineering/Extensible_Agent_Manager 확장성을 고려한 Agent Manager]의 방식으로 만들어질 것이다. 또한 설정라이브러리도 포함하고 있는데, 이것은 [http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code/C++/Simple_Config_Reader 간단한 설정파일 읽기 함수]를 이용할 것이다.
+{{{#!plain
+// Standard C++ Library
+#include <iostream>
+#include <string>
+
+// Standard C Library
+#include <stdlib.h>
+#include <mysql.h>
+#include <stdio.h>
+
+// Agent Library
+#include <cinterface.h>
+#include <common.h>
+#include <qosconfig.h>
+
+using namespace std;
+/*
+ * Global Variable
+ */
+MYSQL *connection = NULL, conn;
+MYSQL_RES *sql_result;
+MYSQL_ROW *sql_row;
+
+struct QosFile myFile;
+
+char *SndData = NULL;
+
+// 초기화 함수
+int Init()
+{
+  int rtv = 0;
+  char *rootDir;
+  rootDir = getenv("QOS_HOME");
+  if (rootDir == NULL)
+    return rtv;
+  sprintf(myFile.rootDir, "%s", rootDir);
+  sprintf(myFile.logDir,  "%s/log", rootDir);
+  sprintf(myFile.tmpDir,  "%s/tmp", rootDir);
+  sprintf(myFile.binDir,  "%s/bin", rootDir);
+  sprintf(myFile.cfgDir,  "%s/cfg", rootDir);
+
+  Config *moduleCfg;
+  string uname;
+  string passwd;
+  string host;
+  const char *mysqlinfo;
+  int port;
+
+  char sqlValue[5][10];
+  moduleCfg = new Config();
+
+  // 설정값을 읽어온다.
+  rtv = moduleCfg->openCfg("config.cfg");
+  host = moduleCfg->getValue("MSA", "host");
+  uname = moduleCfg->getValue("MSA", "user");
+  passwd = moduleCfg->getValue("MSA", "password");
+  port = atoi(moduleCfg->getValue("MSA", "port"));
+
+  mysql_init(&conn);
+  connection = mysql_real_connect(&conn, host.c_str(),
+                                uname.c_str(), passwd.c_str(),
+                                "mysql", port,
+                                NULL, 0);
+  if (connection == NULL)
+  {
+    printf("Mysql connection error : %s\n", mysql_error(&conn));
+    return 0;
+  }
+
+  if (SndData == NULL)
+    SndData = (char *)malloc(256);
+  return 1;
+}
+
+// 재시도 함수,
+int Retry()
+{
+  if (connection != NULL)
+  {
+    mysql_close(connection);
+    connection = NULL;
+  }
+  printf("INIT Start\n");
+  mysql_init(&conn);
+  printf("INIT End\n");
+  connection = mysql_real_connect(&conn, "localhost",
+                                "root", "rnffjrksek",
+                                "mysql", 3306,
+                                NULL, 0);
+  if (connection == NULL)
+  {
+    printf("Mysql connection error : %s\n", mysql_error(&conn));
+    return 0;
+  }
+  return 1;
+}
+
+// Alive 데이터 요청함수
+char *Read()
+{
+  int rtv;
+  rtv = 0;
+  if (connection != NULL)
+    rtv =  mysql_ping(connection);
+  if (rtv != 0)
+  {
+    Retry();
+  }
+  sprintf(SndData, "MSA=%d", rtv);
+  return SndData;
+}
+
+int Clean()
+{
+  if (connection != NULL)
+  {
+    mysql_close(connection);
+    connection = NULL;
+  }
+  if (SndData != NULL)
+  {
+    free(SndData);
+    SndData = NULL;
+  }
+  return 1;
+}
+}}}
+간단한 테스트를 위해서 다음과 같은 main 함수를 가지는 프로그램을 만들었다.
+{{{#!plain
+int main(int argc, char *argv[])
+{
+    int rtv;
+    char *rdata;
+    rtv = Init();
+    if (rtv == 0)
+    {
+        printf("Init Error");
+        return 0;
+    }
+
+    while(1)
+    {
+        rdata = Read();
+        printf("PING : %s\n", rdata);
+        sleep(1);
+    }
+    Clean();
+
+}
+}}}
+
+MySql이 설치되어 있다면, Alive 상황을 제대로 체크해 내는지 테스트해보기 바란다.
+
+=== 참고문헌 ===
+  * [wiki:Site/Database/dbms_programing/Mysql MySql 프로그래밍]
+  * [wiki:MySQL Mysql 간단 사용기]
+  * [wiki:APM Apache+PHP+Mysql 설치하기]

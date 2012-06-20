@@ -1,0 +1,79 @@
+#title memcpy:Sanha 의 답
+
+색다르게 함 만들어봤습니다.
+long long - long - int - short - char 순으로 복사합니다.
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+
+struct Char
+{
+   typedef char type, *ptr;
+   typedef Char next;
+};
+
+
+struct Short
+{
+   typedef short type, *ptr;
+   typedef Char next;
+};
+
+
+struct Int
+{
+   typedef int type, *ptr;
+   typedef Short next;
+};
+
+
+struct Long
+{
+   typedef long type, *ptr;
+   typedef Int next;
+};
+
+
+struct LongLong
+{
+   typedef long long type, *ptr;
+   typedef Long next;
+};
+
+template<class T>
+void
+typeCpy(void* dst, void* src, size_t size)
+{
+   div_t v = div(size, sizeof(typename T::type));
+   for (int i = 0; i < v.quot; i++)
+   {
+      *((typename T::ptr) dst) = *((typename T::ptr) src);
+      dst = (typename T::ptr) dst + 1;
+      src = (typename T::ptr) src + 1;
+   }
+   if (v.rem > 0)
+   {
+      typeCpy<typename T::next>(dst, src, v.rem);
+   }
+}
+
+
+void*
+memCpy(void* dst, void* src, size_t size)
+{
+   typeCpy<LongLong>(dst, src, size);
+   return dst;
+}
+
+
+int main()
+{
+   char a[32], b[32];
+   strcpy(a, "0123456701234567");
+   char* dst = (char*) memCpy(b, a, strlen(a) + 1);
+   printf("%x: %s\n", dst, b);
+   return 0;
+} }}}

@@ -1,0 +1,1030 @@
+#title 서버 클라언트 모델 기반의 계산기 프로그램 제작
+
+[[TableOfContents]]
+
+== 채팅&계산기 C/S 프로그램 ==
+
+'''작성자:''' mwyun([멍])
+
+본 강좌에서는 네트웍을 통해 접속한 클라이언트가 전송한 수식데이터를 받아서 서버에서 연산후 그 결과를 다시 클라이언트로 전송하는 C/S 프로그램 예제이다.
+지금까지 익한 자료구조와 네트워크 프로그래밍 기법, 계산기 알고리즘을 이용하여 직접해보도록 한다. 
+
+=== 클라이언트 ===
+
+==== calc_clent.c ====
+
+{{{#!plain
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/time.h>
+#include <string.h>
+
+#define MAXLINE 512
+#define MAX_SOCK 128
+
+char *escapechar = "exit";
+char name[10];
+
+void print_packet(char *buf, int n)
+{
+	int i;
+	int offset;
+	
+	for (offset = 0; offset < n; offset += 16)
+	{
+		printf("%07d  ", offset);
+		for (i = offset; i <= offset + 15 && i < n; i++)
+		{	
+			if 	(buf[i] == '\n') printf(" \\n");
+			else if (buf[i] == '\r') printf(" \\r");
+			else if (buf[i] == '\t') printf(" \\t");
+			else if (buf[i] == '\0') printf(" \\0");
+			else if (buf[i] == ' ')  printf("   ");
+			else 
+			{
+				if (buf[i] < '!' || buf[i] >= 127) 
+					printf("%03x", buf[i]);
+				else 
+					printf("%3c", buf[i]);	
+			}
+			printf(" ");
+		}
+		printf("\n");
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	char line[MAXLINE], message[MAXLINE+1];
+	int n,pid;
+	struct sockaddr_in server_addr;
+	int maxfdp1;
+	int s;
+	fd_set read_fds;
+
+	if (argc != 4)
+	{
+		printf("사용법: %s <calc_server_ip> <port> <user name>\n", argv[0]);
+		exit(0);
+	}
+
+	sprintf(name, "[%s]", argv[3]);
+	
+	if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) 
+	{
+		printf("Client: Can't open stream socket.\n");
+		exit(0);
+	}
+
+	bzero((char *)&server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = inet_addr(argv[1]);
+	server_addr.sin_port = htons(atoi(argv[2]));
+
+	if (connect(s, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+	{
+		printf("Client: Can't connect to server.\n");
+		exit(0);
+	}
+	else
+		printf("서버에 접속하였습니다.");
+
+	maxfdp1 = s + 1;
+	FD_ZERO(&read_fds);
+
+	while (1)
+	{
+		FD_SET(0, &read_fds);
+		FD_SET(s, &read_fds);
+
+		if (select(maxfdp1, &read_fds, (fd_set*)0, (fd_set*)0, (struct timeval *)0) < 0) 
+		{
+			printf("select error\n");
+			exit(0);
+		}
+
+		if (FD_ISSET(s, &read_fds))
+		{
+			int size;
+
+			if ((size = recv(s, message, MAXLINE, 0)) > 0)
+			{
+				print_packet(message, size);
+				message[size] = '\0';
+				printf("%s", message);
+				printf("%s ", name);
+				fflush(stdout);
+			}
+			else
+			{
+					printf("Good bye.\n");
+					close(s);
+					exit(0);			
+			}
+		}
+
+		if (FD_ISSET(0, &read_fds))
+		{
+			printf("%s ", name);
+			if (fgets(message, MAXLINE, stdin)) 
+			{
+				if (message[0] == '#')
+					sprintf(line, "%s", message);
+				else
+					sprintf(line, "%s %s", name, message);
+
+				if (send(s, line, strlen(line), 0) < 0)
+					printf("Error: Write error on socket.\n");
+
+				if (strstr(message, escapechar) != NULL)
+				{
+					printf("Good bye.\n");
+					close(s);
+					exit(0);			
+				}
+	//			fflush(stdin);
+			}
+		}
+	}
+	
+	return 0;
+}
+}}}
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc_client]$ make
+gcc -c -g calc_client.c
+gcc -o calc_client calc_client.o
+}}}
+
+==== 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc_client]$ ./calc_client
+사용법: ./calc_client <calc_server_ip> <port> <user name>
+}}}
+
+=== 서버 ===
+
+==== calc_server.c ==== 
+
+{{{#!plain
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/time.h>
+#include <string.h>
+
+#define MAXLINE 512
+#define MAX_SOCK 128
+
+#include "list.h"
+#include "stack.h"
+
+int getmax(int);
+void removeClient(int);
+int maxfdp1;
+int num_chat = 0;
+int client_s[MAX_SOCK];
+
+char *escapechar = "exit";
+
+extern int get_expr(List *, char *);
+extern int infix_to_postfix(List *, List *);
+extern double calc_expr(List *);
+
+void print_packet(char *buf, int n)
+{
+	int i;
+	int offset;
+	
+	for (offset = 0; offset < n; offset += 16)
+	{
+		printf("%07d  ", offset);
+		for (i = offset; i <= offset + 15 && i < n; i++)
+		{	
+			if 	(buf[i] == '\n') printf(" \\n");
+			else if (buf[i] == '\r') printf(" \\r");
+			else if (buf[i] == '\t') printf(" \\t");
+			else if (buf[i] == '\0') printf(" \\0");
+			else if (buf[i] == ' ')  printf("   ");
+			else 
+			{
+				if (buf[i] < '!' || buf[i] >= 127) 
+					printf("%03x", buf[i]);
+				else 
+					printf("%3c", buf[i]);	
+			}
+			printf(" ");
+		}
+		printf("\n");
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	char rline[MAXLINE], sline[MAXLINE], my_msg[MAXLINE];
+	char *start = "Connected to calc_server\n";
+	int i, j, n;
+	int s, client_fd, clilen;
+	List infixexpr, postfixexpr;
+	fd_set read_fds;
+	struct sockaddr_in client_addr, server_addr;
+	
+	if (argc != 2)
+	{
+		printf("사용법: %s <port>\n", argv[0]);
+		exit(0);
+	}
+
+	if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) 
+	{
+		printf("Server: Can't open stream socket.\n");
+		exit(0);
+	}
+
+	bzero((char *)&server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	server_addr.sin_port = htons(atoi(argv[1]));
+
+	if (bind(s, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+	{
+		printf("Server: Can't bind local address.\n");
+		exit(0);
+	}
+
+	listen(s, 5);
+
+	maxfdp1 = s + 1;
+	
+	while (1)
+	{
+		printf("수신 대기중...\n");
+		FD_ZERO(&read_fds);
+		FD_SET(s, &read_fds);
+
+		for (i = 0; i < num_chat; i++)
+			FD_SET(client_s[i], &read_fds);
+		maxfdp1 = getmax(s) + 1;
+
+		if (select(maxfdp1, &read_fds, (fd_set*)0, (fd_set*)0, (struct timeval *)0) < 0) 
+		{
+			printf("select error\n");
+			exit(0);
+		}
+
+		if (FD_ISSET(s, &read_fds))
+		{
+			clilen = sizeof(client_addr);
+			client_fd = accept(s, (struct sockaddr*)&client_addr, &clilen);
+			if (client_fd == -1)
+			{
+				printf("accept error\n");
+				exit(0);	
+			}
+		
+			client_s[num_chat] = client_fd;
+			num_chat++;
+			send(client_fd, start, strlen(start), 0);
+			printf("%d 번째 계산기 사용자 추가.\n", num_chat);
+		}
+
+		for (i = 0; i < num_chat; i++)
+		{
+			if (FD_ISSET(client_s[i], &read_fds))
+			{
+				if ((n = recv(client_s[i], rline, MAXLINE, 0)) <= 0)
+				{
+					removeClient(i);
+					continue;
+				}
+
+				rline[n] = '\0';
+				//printf("%s\n", rline);
+				print_packet(rline, strlen(rline));
+
+				if (strstr(rline, escapechar) != NULL)
+				{
+					removeClient(i);
+					continue;
+				}
+
+				if (rline[0] == '#') // 수식계산
+				{
+					list_init(&infixexpr, free);
+					if (get_expr(&infixexpr, rline+1))
+					{
+						printf("infix expr: ");
+						print_list(&infixexpr);
+						list_init(&postfixexpr, free);
+						if (infix_to_postfix(&infixexpr, &postfixexpr)) 
+						{
+								printf("postfix expr: ");
+								print_list(&postfixexpr);
+								sprintf(sline, "= %lf\n", calc_expr(&postfixexpr));
+						}
+						else
+							strcpy(sline, "Wrong Input!\n");
+					}
+					else
+						strcpy(sline, "Wrong Input!\n");
+					list_destroy(&infixexpr);	
+					list_destroy(&postfixexpr);
+
+					printf("%s\n", sline);
+
+					send(client_s[i], sline, strlen(sline), 0);
+				}
+				else // 채팅
+				{
+					sprintf(sline, "%s", rline);
+
+					for (j = 0; j < num_chat; j++)
+					{
+							if (j != i)
+								send(client_s[j], sline, strlen(sline), 0);
+					}
+				}
+
+				printf("%s", sline);
+			}
+		}
+	}
+
+	return 0;
+}
+
+void removeClient(int i)
+{
+	close(client_s[i]);
+	if (i != num_chat - 1) 
+		client_s[i] = client_s[num_chat - 1];
+	num_chat--;
+
+	printf("계산기 사용자 1명 탈퇴. 현재 접속자 수 = %d\n", num_chat);
+}
+
+int getmax(int k)
+{
+	int max = k;
+	int r;
+
+	for (r = 0; r < num_chat; r++)
+	{
+		if (client_s[r] > max)
+			max = client_s[r];
+	}
+
+	return max;
+}
+}}}
+
+==== calc_module.c ====
+
+calc_module.c는 calc5.c를 그대로 재활용한 소스이며 main함수는 삭제하였으며 '''get_expr'''함수를 약간 수정하였다.
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "list.h"
+#include "stack.h"
+
+#define MAX 100 // 수식 문자열 저장 최대 크기
+
+// node 타입 정의
+typedef struct {
+	int select; // 0: int, operator, 1: float
+	double value;
+	char op;
+} node;
+
+int isp(char op)
+{
+	switch (op)
+	{
+		case '#': return 0; 
+		case '(': return 0;
+		case ')': return 19;
+		case '+': return 12;
+		case '-': return 12;
+		case '*': return 13;
+		case '/': return 13;
+	}
+}
+
+int icp(char op)
+{
+	switch (op)
+	{
+		case '#': return 0; 
+		case '(': return 20;
+		case ')': return 19;
+		case '+': return 12;
+		case '-': return 12;
+		case '*': return 13;
+		case '/': return 13;
+	}
+}
+
+// 실수값인가 검사
+int is_float(char *buf)
+{
+	int i;
+
+	for (i = 0; buf[i] != '\0'; i++)
+		if (buf[i] == '.') // dot(.)이 있으면
+			return i; // 인덱스 리턴
+
+	return -1;
+}
+
+// 정수부 합산
+// 예) 123.45이면 정수부가 3자리이므로 3번 10을 곱하여(10*3) 100을 리턴
+double get_ten(int dot_index)
+{
+	int i;
+	double value = 1;
+	
+	for (i = 0; i < dot_index; i++)
+		value *= 10;
+
+	return value;
+}
+
+// 소수부 합산
+// 예) 123.45이면 소수부가 2자리이므로 2번 0.1을 곱하여 0.01을 리턴
+double get_decimal(int dot_index)
+{
+	int i;
+	double value = 0.1;
+	for(i = 0; i < dot_index; i++)
+		value *= 0.1;
+
+	return value;
+}
+
+// node 추가
+int add_node(List *list, int select, double value, char op)
+{
+	node *p;
+
+	// 메모리 할당
+	if ((p = (node *)malloc(sizeof(node))) == NULL)
+		return 0;
+
+	p->select = select; // 값 또는 연산자 선택
+	p->value = value; // 값=피연산자(operand)
+	p->op = op; // 연산자(operator)
+
+
+#ifdef __DEBUG__
+	printf("p->select = %d\t", p->select);
+	printf("p->value = %lf\t", p->value);
+	printf("p->op = %c\n", p->op);
+#endif
+
+	// list에 저장
+	if (list_ins_next(list, list_tail(list), p) != 0)
+		return 0;
+
+	return 1;
+}
+
+// 피연산자 list에 추가
+void print_operand(List *list, char *buf, int i)
+{
+	double sum1, sum2, real;
+	int dot_index;
+	int digit;
+	int sum;
+	int k;
+
+				// 실수인가 검사
+				dot_index = is_float(buf);
+
+				if (dot_index > -1) // float value
+				{
+					// 정수부 계산(문자열을 숫자로 변환)
+					sum1 = 0.0;
+					for (k = 0; k < dot_index; k++)
+					{
+						digit = buf[k] - '0';
+						sum1 = sum1 + (digit * get_ten(dot_index-k-1)); 
+					}
+
+					// 소수부 계산(문자열을 숫자로 변환)
+					sum2 = 0.0;
+					for(k = dot_index + 1; k < i; k++)
+					{
+						digit = buf[k] - '0';
+						sum2 = sum2 + (digit * get_decimal(k-dot_index-1));
+					}
+
+					// 정수부와 소수부 합산
+					real = sum1 + sum2;
+					// list에 float value 추가
+					if (!add_node(list, 1, real, '\0'))
+						return;
+
+#ifdef __DEBUG__
+					printf("%f", real);
+#endif
+				}
+				else // integer value
+				{
+					// 정수 계산
+					sum = 0;
+					for (k = 0; k < i; k++)
+					{
+						digit = buf[k] - '0';
+						sum  = sum + (digit * get_ten(i-k-1)); 
+					}
+					// list에 integer value 추가
+					if (!add_node(list, 1, sum, '\0'))
+						return;
+
+#ifdef __DEBUG__
+					printf("%d", sum);
+#endif
+				}
+}
+
+// infix 방식으로 수식 입력
+int get_expr(List *list, char *rline) // --> infix input
+{
+	int i, j, k, ch;
+	char buf[MAX];
+
+	k = 0;
+	i = 0;
+	memset(buf, 0, MAX); // 초기화
+
+	while((ch = rline[k]) != '\n') // Enter칠 때까지 한 문자씩 입력
+	{
+		if (('0' <= ch && ch <= '9') || (ch == '.')) 
+				buf[i++] = ch; // 피연산자: 숫자(0~9)거나 dot(.)이면 buf에 저장
+		else // 연산자: '+', '-', '*', '/'
+		{
+			if (i != 0) // buf에 입력한 문자들이 있으면
+			{
+				print_operand(list, buf, i); // list에 buf 추가: 피연산자
+				
+				i = 0;
+				memset(buf, 0, MAX); // 초기화
+			}
+	
+			if (!add_node(list, 0, 0, ch)) // list에 operator 추가
+				return 0;
+
+#ifdef __DEBUG__
+			printf(" %c ", ch);
+#endif
+		}
+		k++;
+	}
+
+	// buf에 입력한 문자들이 있으면
+	if (strlen(buf) > 0)
+	{
+		print_operand(list, buf, i); // list에 buf 추가: 피연산자
+	}
+
+	return 1;
+}
+
+// statck 출력
+void print_stack(const Stack *stack, int select)
+{
+    ListElmt *element;
+	int size, i;
+
+    fprintf(stdout, "print_stack: Stack size is %d\n", size = stack_size(stack));
+
+    i = 0;
+    element = list_head(stack);
+
+    while (i < size)
+    {
+			if (select) // 피연산자(값) 출력
+			{
+				double *data = list_data(element);
+				printf("val = stack[%03d]  = %lf\n", i, *data);
+			}
+			else // 연산자 출력
+			{
+				char *data = list_data(element);
+				printf("op = stack[%03d]  = %c\n", i, *data);
+			}
+            element = list_next(element);
+            i++;
+    }
+	
+	printf("\n\n");
+}
+
+// list 출력
+void print_list(const List *list)
+{
+	int i;
+	ListElmt *element;
+	node *data;
+
+#ifdef __DEBUG__
+	printf("list size = %d\n", list_size(list));
+#endif
+	i = 0;
+	element = list_head(list);
+
+	while (1)
+	{
+		data = list_data(element);
+	
+#ifdef __DEBUG__
+		printf("%d :\t", i++);
+		printf("data->select = %d\t", data->select);
+		printf("data->value = %lf\t", data->value);
+		printf("data->op = %c\n", data->op);
+#endif
+		if (data->select)
+			printf("%lf ", data->value);
+		else	
+			printf("%c ", data->op);
+		if (list_is_tail(element)) // list의 tail이면 break
+			break;
+		else // 그렇지 않으면
+			element = list_next(element); // 다음 element로 이동
+	}
+
+	printf("\n");
+}
+
+// infix방식의 수식을 postfix방식으로 변경
+int infix_to_postfix(List *ie_list, List *pe_list)
+{
+	Stack opstack;
+	ListElmt *element;
+	node *data;
+	node *p;
+	char *op;
+
+	element = list_head(ie_list);
+
+	stack_init(&opstack, free);
+
+	if ((op = (char *)malloc(sizeof(char))) == NULL)
+		return 0;
+	*op = '#';
+	if (stack_push(&opstack, op) != 0)
+		return 0;
+
+	while (1)
+	{
+		
+		data = list_data(element);
+	
+		switch (data->select)
+		{
+			case 0: // operator
+			{
+
+				if ((op = (char *)malloc(sizeof(char))) == NULL)
+                       			return 0;
+				*op = -1;
+
+				if (data->op == ')')
+				{
+					    // operator => statck pop
+						while (stack_pop(&opstack, (void **)&op) == 0) // success
+						{	
+							if (*op == '(')	// not operation
+							{
+								free(op);	
+								break;
+							}
+							else
+							{
+								if ((p = (node *)malloc(sizeof(node))) == NULL)
+									return 0;
+								
+								p->select = 0;
+								p->value = 0;	
+								p->op = *op;
+
+#ifdef __DEBUG__
+								printf("[2] p->select = %d\t", p->select);
+								printf("p->value = %lf\t", p->value);
+								printf("p->op = %c\n", p->op);
+#endif
+
+								if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+									return 0;
+							}
+						}
+				}
+
+				else 
+				{	
+					    // operator => statck pop
+						while (stack_pop(&opstack, (void **)&op) == 0) // success
+						{	
+#ifdef __DEBUG__
+							printf("stack_pop: %c\n", *op);
+#endif
+							if (isp(*op) < icp(data->op))
+								break;
+
+							if ((p = (node *)malloc(sizeof(node))) == NULL)	
+								return 0;
+
+							p->select = 0; // operator
+							p->value = 0;
+							p->op = *op;	
+					
+							if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+								return 0;
+						}
+
+#ifdef __DEBUG__
+						printf("1. op=%c,%x\n", *op, *op); 
+						printf("2. op=%x\n", *op);
+#endif
+						// operator => stack push
+						if (stack_push(&opstack, op) != 0)
+							return 0; 
+#ifdef __DEBUG__
+						printf("data->op=%c\n", data->op);
+#endif					
+						if ((op = (char *)malloc(sizeof(char))) == NULL)
+							return 0;
+						*op = data->op;
+
+						// operator => stack push
+						if (stack_push(&opstack, op) != 0) // stack push
+							return 0;
+				}
+				break;
+			}
+					
+			case 1: // int, value value
+			{
+				if ((p = (node *)malloc(sizeof(node))) == NULL)
+					return 0;
+
+				p->select = data->select;
+				p->value = data->value;
+				p->op = data->op;
+
+#ifdef __DEBUG__
+				printf("[3] p->select = %d\t", p->select);
+				printf("p->value = %lf\t", p->value);
+				printf("p->op = %c\n", p->op);
+#endif
+
+				if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+					return 0;
+
+				break;
+			}
+
+			default:
+			{
+				printf("Wrong Input!\n"); // 입력한 수식이 틀린 경우
+				break;
+			}
+		}
+
+		if (list_is_tail(element)) // list의 tail이면 break
+			break;
+		else // 그렇지 않으면
+			element = list_next(element); // 다음 element로 이동
+
+#ifdef __DEBUG__
+		printf("%03d\n", __LINE__); 
+		print_stack(&opstack, 0);
+#endif
+	}
+
+	// opstack에 남아있는 operator pop => postfix 수식 list
+	if ((op = (char *)malloc(sizeof(char))) == NULL) 
+    		return 0;
+	while (stack_pop(&opstack, (void **)&op) == 0) // success
+	{
+		if (*op == '#')
+		{
+			free(op);
+			break;
+		}
+
+		if ((p = (node *)malloc(sizeof(node))) == NULL)
+			return 0;
+
+		p->select = 0;
+		p->value = 0;	
+		p->op = *op;
+
+#ifdef __DEBUG__
+		printf("[4] p->select = %d\t", p->select);
+		printf("p->value = %lf\t", p->value);
+		printf("p->op = %c\n", p->op);
+#endif
+
+		if (list_ins_next(pe_list, list_tail(pe_list), p) != 0)
+			return 0;
+	}
+
+	stack_destroy(&opstack);
+
+	return 1;
+}
+
+// 수식 계산
+double calc_expr(List *list)
+{
+	double result;
+	double *val1;
+	double *val2;
+	ListElmt *element;
+	node *data;
+	double *db;
+	Stack valstack;
+
+	stack_init(&valstack, free);
+
+	element = list_head(list);
+
+	while (1)
+	{
+		data = list_data(element);
+		
+		//printf("data->select = %d\tdata->value = %lf\tdata->op = %c\n", data->select, data->value, data->op);
+		if (data->select) // int, float
+		{
+			if ((db = (double *)malloc(sizeof(double))) == NULL)
+				return 0;
+		
+			*db = data->value;
+#ifdef __DEBUG__
+			printf("*db = %lf\n", *db);
+#endif
+			if (stack_push(&valstack, db) != 0)
+				return 0;
+
+#ifdef __DEBUG__
+			printf("added number\n");
+			print_stack(&valstack, 1);
+#endif
+		}
+		else  // operator
+		{
+			// 두개의 값을 statk에서 pop
+			if (stack_pop(&valstack, (void **)&val2) != 0) // success
+				return 0;
+			if (stack_pop(&valstack, (void **)&val1) != 0) // success
+				return 0;
+
+			// operator에 따라 두개값 연산
+			switch (data->op)
+			{
+				case '+':
+					result = *val1 + *val2;
+#ifdef __DEBUG__
+					printf("%lf + %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '-':
+					result = *val1 - *val2;
+#ifdef __DEBUG__
+					printf("%lf - %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '*':
+					result = *val1 * *val2;
+
+#ifdef __DEBUG__
+					printf("%lf * %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				case '/':
+					result = *val1 / *val2;
+#ifdef __DEBUG__
+					printf("%lf / %lf = %lf\n", *val1, *val2, result);
+#endif
+					break;
+
+				default:
+					printf("Wrong Input!\n");
+					exit(0);
+			}
+		
+			free(val1);
+			free(val2);
+			
+			// 계산한 결과를 stack에 저장			
+	        if ((db = (double *)malloc(sizeof(double))) == NULL)
+				return 0;
+		
+			*db = result;
+
+			if (stack_push(&valstack, db) != 0)
+				return 0;
+
+#ifdef __DEBUG__
+			printf("added result\n");
+			print_stack(&valstack, 1);
+#endif
+		}
+
+		if (list_is_tail(element))
+			break;
+		else
+			element = list_next(element);
+	}
+
+	// 모든 계산이 끝난 후 스택에 남아있는 값(최종결과값)을 pop
+	if (stack_pop(&valstack, (void **)&db) != 0) // success
+		return 0;
+
+	result = *db;
+
+#ifdef __DEBUG__
+	printf("result=%lf\n", result);
+#endif
+	stack_destroy(&valstack);
+
+	return result;
+}
+}}}
+
+==== 컴파일 ====
+
+{{{#!plain
+[mwyun@iokorea calc_server]$ make
+gcc -c -g calc_server.c calc_module.c ./linkedlist/list.c ./stack/stack.c -I./linkedlist -I./stack
+gcc -o calc_server calc_server.o calc_module.o list.o stack.o
+[mwyun@iokorea calc_server]$
+}}}
+
+==== 실행 ====
+
+{{{#!plain
+[mwyun@iokorea calc_server]$ ./calc_server
+사용법: ./calc_server <port>
+[mwyun@iokorea calc_server]$
+}}}
+
+
+=== 데모 ===
+
+==== 서버 실행화면 ====
+{{{#!plain
+[mwyun@iokorea calc_server]$ ./calc_server 10000
+수신 대기중...
+1 번째 계산기 사용자 추가.
+수신 대기중...
+0000000    [   m   w   y   u   n   ]       h   e   l   l   o  \n
+[mwyun] hello
+수신 대기중...
+0000000    #   1   0   -   (   4   /   2   )   +   3  \n
+infix expr: 10.000000 - ( 4.000000 / 2.000000 ) + 3.000000
+postfix expr: 10.000000 4.000000 2.000000 / - 3.000000 +
+= 11.000000
+
+= 11.000000
+수신 대기중...
+0000000    [   m   w   y   u   n   ]       e   x   i   t  \n
+계산기 사용자 1명 탈퇴. 현재 접속자 수 = 0
+수신 대기중...
+
+}}}
+
+==== 클라이언트 실행화면 ====
+{{{#!plain
+[mwyun@iokorea calc_client]$ ./calc_client 127.0.0.1 10000 mwyun
+서버에 접속하였습니다.0000000    C   o   n   n   e   c   t   e   d       t   o       c   a   l
+0000016    c   _   s   e   r   v   e   r  \n
+Connected to calc_server
+[mwyun] hello
+[mwyun] #10-(4/2)+3
+[mwyun] 0000000    =       1   1   .   0   0   0   0   0   0  \n
+= 11.000000
+[mwyun] exit
+[mwyun] Good bye.
+[mwyun@iokorea calc_client]$
+}}}
+
+=== 참조 ===
+ * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/datastructure 자료구조]
+ * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/calculator 다양한 계산기 예제]

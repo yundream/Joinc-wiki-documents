@@ -1,0 +1,161 @@
+#title SQLite Windows
+
+[[TableOfContents]]
+
+
+== SQLite Windows ==
+
+'''작성자:''' mwyun([멍])
+
+SQLite의 윈도우용 버전에 대한 사용법이다.
+
+자세한 사용법은 링크의 사이트를 참조한다.
+
+== 준비사항 ==
+
+=== 컴파일러 환경 ===
+ 1. VC++
+ 1. MinGW
+ 1. Cygwin
+
+현재는 VC++로만 테스트한다
+
+== 다운로드 ==
+ * [http://www.sqlite.org/download.html 다운로드 홈페이지]
+ * [http://www.sqlite.org/sqlite.zip command-line program]
+ * [http://www.sqlite.org/sqlitedll.zip SQLite dynamic link library]
+ * [http://www.sqlite.org/sqlite_source.zip sqlite source]
+
+라이브러리는 만들거나 테스트 프로그램을 컴파일할려면 소스가 필요하다.[[br]]
+sqlite 프로그램은 명령행라인 프로그램으로써 그 파일 하나만으로도 sqlite database의 모든 기능을 이용할 수 있다.[[br]]
+다른 라이브러리를 필요로 하지 않는다.[[br]]
+C 드라이브 밑에 SQLite 디렉토리를 만들어서 sqlite.zip, sqlitedll.zip, sqlite_source.zip을 다운받고 압축 푼다.[[br]]
+그러면 다음과 같이 디렉토리가 생성된다.[[br]]
+
+=== 디렉토리 ===
+ 1. C:\SQLite\sqlite : 명령행라인 프로그램
+ 1. C:\SQLite\sqlitedll : SQLite dll, def 파일
+ 1. C:\SQLite\sqlite_source : 소스 파일
+
+== 라이브러리 컴파일 ==
+ 1. VC++ IDE를 실행한다.
+ 1. 프로젝트 만들기
+     1. File > New 메뉴를 선택하고 Projects 탭에서 "Win32 Dynamic-Link Library"를 선택한다.
+     1. Project name : sqlite
+     1. Location : C:\msdn\SQLite\sqlite_source\sqlite <- 프로젝트 이름으로 디렉토리가 만들어진다.
+     1. OK 버튼을 클릭한다.
+     1. 다음페이지에서 "An empty DLL project"가 기본으로 선택되어있다.
+     1. Finish 버튼을 클릭하여 비어있는 DLL 프로젝트 파일을 만든다.
+ 1. 소스 파일 등록
+     1. 비어있는 DLL 프로젝트이므로 컴파일에 필요한 파일들을 프로젝트에 등록한다.
+     1. Workspace 윈도우에서 Source Files을 선택하고 "Add Files to Folder"를 선택한다.
+     1. 창이 뜨면 C:\SQLite\sqlite_source로 이동하여 모든 .c로 끝나는 파일을 선택하고 OK 버튼을 클릭한다.
+     1. 그러면 자동으로 C:\SQLite\sqlite_source의 모든 c 소스 파일이 등록된다.
+     1. Workspace 윈도우에서 Header Files을 선택하고 "Add Files to Folder"를 선택한다.
+     1. 창이 뜨면 C:\SQLite\sqlite_source로 이동하여 모든 .h로 끝나는 파일을 선택하고 OK 버튼을 클릭한다.
+     1. 그러면 자동으로 C:\SQLite\sqlite_source의 모든 헤더 파일이 등록된다.
+     1. 마지막으로 C:\SQLite\sqlitedll\sqlite.def 파일을 등록한다. 
+ 1. 프로젝트 셋팅   
+     1. Project > Settings를 선택하고 C/C++ 탭을 선택한다.
+     1. Preprocessor definitions에 NO_TCL(매크로 정의)를 추가한다. (",NO_TCL"을 입력) 
+        NO_TCL 매크로를 추가하지 않으면 tcl과 바인딩하는 코드(tclsqlite.c)가 컴파일시 에러를 발생한다.[[br]]
+        ''C:\SQLite\sqlite_source\tclsqlite.c(19) : fatal error C1083: Cannot open include file: 'tcl.h': No such file or directory''[[br]]
+        현재는 tcl을 이용하지 않을 것이므로 tclsqlite.c를 컴파일을 하지 않기 위해 NO_TCL 매크로를 정의하면 된다.[[br]]
+     1. OK 버튼을 클릭한다.
+  1. 컴파일
+     1. Build > "build sqlite.dll"을 선택하여 라이브러리를 컴파일하여 dll 파일을 만든다.
+     
+== 테스트 프로그램 작성 ==
+ 다음 사이트에서 데모 프로그램 C 소스코드를 이용한다.
+ * [http://www.sqlite.org/quickstart.html Qukck Start]
+ 
+
+ 1. VC++ IDE를 실행한다.
+ 1. 프로젝트 만들기
+     1. File > New 메뉴를 선택하고 Projects 탭에서 "Win32 Console Application"를 선택한다.
+     1. Project name : test
+     1. Location : C:\SQLite\test <- 프로젝트 이름으로 디렉토리가 만들어진다.
+     1. OK 버튼을 클릭한다.
+     1. 다음페이지에서 "An empty project"가 기본으로 선택되어있다.
+     1. Finish 버튼을 클릭하여 비어있는 프로젝트 파일을 만든다.
+ 1. 소스 파일 작성
+     1. File > New 메뉴를 선택하고 Files 탭에서 "C++ Source File"을 선택하고 File 항목에 test.c를 입력한다.
+     1. OK 버튼을 클릭한다.
+     1. Workspace 윈도우를 보면 test.c가 추가된 것을 확인할 수 있다.
+     1. 위의 "Quick Start"에 있는 C 소스 코드를 복사해서 붙인다.
+     1. 저장한다.
+ 1. 프로젝트 셋팅 
+     1. 헤더 파일 경로 등록
+        1. Project > Settings를 선택하고 C/C++ 탭을 선택한다.  
+        1. Preprocessor를 선택하고 "Additional include directories"에 "C:\SQLite\sqlite_source"를 추가한다.
+     1. 라이브러리 파일 경로 등록
+        1. Project > Settings를 선택하고 Link 탭을 선택한다.
+        1. Input을 선택하고 "Object/library modules"에 "sqlite.lib"을 입력한다.
+        1. "Additional library path"에 "C:\SQLite\sqlite_source\sqlite\debug"를 추가한다.
+           1. sqlite 라이브러리를 컴파일하여 생성한 디렉토리를 적어준다.
+  1. 컴파일
+     1. exit 함수를 못찾는다는 에러가 발생하면 "#include <stdlib.h>"를 추가한다.
+
+== 테스트 ==
+  1. sqlite.dll이 test 프로그램 디렉토리에 있던지 아니면 윈도우 시스템 디렉토리에 위치해야한다.
+  1. 쉽게 sqlite.dll 파일을 test 프로그램 디렉토리에 복사한다.
+  1. 명령창을 연다.
+  1. test 프로그램 디렉토리로 이동한다. -> C:\SQLite\test\Debug
+  1. 실행
+{{{#!vim cpp
+C:\SQLite\test\Debug>test
+Usage: test DATABASE SQL-STATEMENT
+
+C:\SQLite\test\Debug>test ex1 "create table tbl1(one varchar(10), two smallint)"
+
+C:\SQLite\test\Debug>test ex1 "insert into tbl1 values('hello!',10)"
+
+C:\SQLite\test\Debug>test ex1 "insert into tbl1 values('goodbye', 20)"
+
+C:\SQLite\test\Debug>test ex1 "select * from tbl1"
+one = hello!
+two = 10
+
+one = goodbye
+two = 20
+
+
+C:\SQLite\test\Debug>
+}}}
+  1. 생성된 db 파일을 확인해보자.
+{{{#!vim cpp
+C:\msdn\SQLite\test\Debug>dir
+ C 드라이브의 볼륨: 로컬 디스크
+ 볼륨 일련 번호: 2954-140B
+
+ C:\SQLite\test\Debug 디렉터리
+
+2004-02-15  05:01a      <DIR>          .
+2004-02-15  05:01a      <DIR>          ..
+2004-02-15  02:35p              41,984 vc60.idb
+2004-02-15  02:35p             203,764 test.pch
+2004-02-15  02:35p              53,248 vc60.pdb
+2004-02-15  02:35p               1,875 StdAfx.obj
+2004-02-15  02:35p               4,240 test.obj
+2004-02-15  02:35p             166,728 test.ilk
+2004-02-15  02:35p             155,699 test.exe
+2004-02-15  02:35p             320,512 test.pdb
+2004-02-15  02:33p             843,845 sqlite.dll
+2004-02-15  04:34p               3,072 ex1        <- db 파일이 생성되었다.
+              10개 파일       1,794,967 바이트
+               2 디렉터리     743,096,320 바이트 남음
+
+C:\SQLite\test\Debug>
+}}}
+  1. sqlite 프로그램으로 ex1을 로딩하여 테스트해볼 수 있다.
+
+== 결론 ==
+ * 윈도우에서도 쉽게 컴파일하여 사용할 수 있음을 확인하였다.[[br]]
+ * sqlite를 이용하여 윈도우에서 db 프로그램을 만든 경우 dll 파일만 같이 배포하면 된다.[[br]]
+ * 단순한 gdbm 보다는 sql을 지원하므로 좀더 기능이 막강하며 쉽게 접근하여 사용할 수 있다.[[br]]
+ * pda에 포팅하여 경량급 db로 활용하여도 손색이 없다.[[br]]
+
+== 관련 링크 ==
+ * [http://www.sqlite.org/ sqlite 공식 홈페이지]
+ * [article_docbook_SQLite_프로그래밍]
+

@@ -1,0 +1,134 @@
+* 자바->c++로 자동변환시키는 프로그램의 제작에 있어서.
+
+
+* 자바에서 객체멤버의 참조는 타입에 의존하지 않고 메모리를 참조한다. 
+
+
+C++에선 속도를 위해 다운캐스팅된 객체의 오버로딩된 메소드를 호출하더라도 ISOF 클래스의 타입을 따라서 super클래스의 메소드를 호출하게 된다. 이걸 실제 메모리의 객체형을 참조하게 할려면 virtual을 쓴다. 물론 virtual 된 메소드들은 따로 테이블을 관리하게 되며 약간의 오버헤드가 있다. 그러나 자바는 모든 메소드가 C++의 virtual처럼 동작한다. 자바에서 C로 포팅을 하게된다면 다운캐스팅된 객체의 오버로딩된 메소드가 있을시엔 virtual로 선언해야한다는것을 잊지말자. 간단한 예제를 아래 보인다. 
+
+
+<C++> 
+
+
+class A { public: void prn() { cout << "A" << endl; } }; 
+
+
+class B : public A { public: void prn() { cout << "B" << endl; } }; 
+
+
+int main() { A* a = new A; B* b = new B; a = b; a->prn(); } 
+
+
+출력 : A 
+
+
+<Java> 
+
+
+public class A { public void prn() { System.out.println("A"); } } 
+
+
+public class B extends A { public void prn() { System.out.println("B"); } } 
+
+
+public class Main { public static void main() { A a = new A(); B b = new B(); a = b; a.prn(); } } 
+
+
+출력 : B 
+
+
+
+그렇다면, 자바소스에서 C++소스로 변환시킬때 모든 메소드앞에 virtual을 붙일것인가? c++에서 실시간 타입참조는 rtti를 통해 이루어진다. 이것은 가상함수가 하나라도 존재하는 객체엔 따로 가상함수 테이블을 두어, 실시간으로 객체타입을 참조해나가게 한다. 때문에 dynamic_cast같은것이 자바의 instanceof 와같은 역할을 할수있게되는것이다. 하지만 이것은 약간의 오버헤드가 잇으므로. 자체구현을 해볼려고한다.
+
+이 프로그램에선 2가지만 가능하면된다. 1. instanceof 의 구현, 2. virtual와같은 기능의 구현.
+
+이프로그램에서 gc는 smart pointer로 이루어져 있다 . 간단히 구조를 본다면. 모든 클래스는 Object클래스를 상속받고 있으며, 실제 소스상에서는 SmartPointer속에 객체포인터로서 캡술화되어 사용된다.
+
+template<class T>
+class SmartPointer {
+
+public:
+
+T* ptr;
+
+SmartPointer(Object*o = NULL) : t(o) {}
+
+template<class Y>
+SmartPointer& oeprator=(SmartPointer<Y>& const p) {
+ptr = o.ptr;
+return *this;
+}
+
+T* operator->() {
+return t;
+}
+
+
+};
+
+
+필요한부분의모양만본다면 머 대략 이렇게 된다. ...thread-safe한 gc가 되기위해선 훨씬 더 복잡한 부분이 있지만.
+
+그럼 이렇게된다.
+
+class A { public: void prn() { cout << "A" << endl; };
+class B : public A {public: void prn() { cout << "B" << endl; };
+
+SmartPointer<A> a = new A();
+SmartPointer<B> b = new B();
+
+a = b;
+a->prn();
+
+하면 A가 찍힌다. 실제 포인터는 B객체를 가리키고 있지만, prn()이 virtual이 아니므로 이렇게되는것이다. 자바는 B가찍힌다. 
+
+여기서,, C++의 RTTI를 사용안하고, (모바일이므로 최ㅏ대한 오버헤드를 줄여야한다. 가능하면 컴파일옵션에서 rtti를 사용안함으로 할려고하는것이다)
+자바의 instanceof와 객체참조를 구현을 해볼려고하는데 뭔가 될것같기도하면서 안된다..
+
+instanceof는 뒤에것이 앞에것의 수퍼클래스가되면 참이다. 즉.저기서
+a instanceof b 는 거짓이된다. b instanceof a는 참이된다. 이걸 c++에서 rtti로 하면 걍 쉽다.
+
+#define instanceof >
+
+ template<class Y>
+ bool operator>(Sp<Y>& obj) {
+         return dynamic_cast<Y*>(t);
+ }
+
+
+int main() {
+        Sp<A> a = new A();
+        Sp<C> c = new C();
+        if (c   instanceof a) cout << "true" << endl;
+        else cout << "false" << endl;
+
+}
+
+
+머 일케된다.
+여튼, 이런 기능과, virtual 같은 기능을 rtt이 없이 자체해결할 방법을 없을까?
+키 포인트는..
+
+스마트포인터 클래스에서 operator= 이 호출될때. 즉 assign이일어날때 뭔가를 해놓고,
+operator->이 호출될때 객체를 따라가게 뭔갈 해주면 될듯한데...
+
+instanceof는 각 클래스마다 static int id =  값을 컨버터프로그램이 자동으로 유니크한 값을 넣어놓고, 
+클래스 정의에서 상속받는 클래스명을 미리 명시해놓고.음..즉,
+tempalte<class Y>
+virtual bool operator<(SmartPointer<Y>& a) {
+if (id == Y::id) return true;
+else return 상위클래스::operator<(id);
+}
+ 
+머 대략 이런식으로..음 대충 적은거다, 딴지걸기말기를..
+
+여튼 머 이건 별거아니고. virtual구현에 좋은 아이디어 있으신분. 답좀 달아주세요.
+
+
+
+
+
+
+
+
+

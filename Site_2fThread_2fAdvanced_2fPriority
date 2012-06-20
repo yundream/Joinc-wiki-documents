@@ -1,0 +1,332 @@
+#title Pthread : Thread 우선순위 문제
+[wiki:docbook/쓰레드_우선순위_문제 Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>쓰레드 우선순위 문제 해결</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>쓰레드 우선순위 문제 해결</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>			dreamyun@yahoo.co.kr<br>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 8월 3일 18시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN19"
+>문제 발생</A
+></DT
+><DT
+>3&#51208;. <A
+HREF="#AEN31"
+>문제 해결</A
+></DT
+><DT
+>4&#51208;. <A
+HREF="#AEN36"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>	프로그래밍(:12)을 하다보면 "분명 이러한 상황에서는 이러한 문제가 발생하지 
+	않아야 하는데", "코드 상으론 아무런 문제가 없는데" 프로그램의 실행에 
+	문제가 생기는 경우가 있다.  </P
+><P
+>	pthread(:12)를 이용해서 쓰레드:::프로그래밍(:12)을 할때도 이런 일이 간혹 발생한다. 
+	이중 "쓰레드 우선순위"에 따라서 발생하는 문제점에 대해서 알아보겠다. 
+	이 문제는 주의해서 프로그래밍 하지 않을 경우 간혹 발생하기도 한다.  </P
+><P
+>	이 글은 여러분이 pthread를 이용한 쓰레드 프로그래밍에 대한 기본적인 
+	이해를 가지고 있다는 가정하에 씌여져 있다. 예제로 제시된 코드의 
+	테스트는 리눅스(kernel-2.4.x)와 솔라리스 5.7환경에서 이루어 졌다. </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2&#51208;. 문제 발생</A
+></H1
+><P
+>		다음은 이번 테스트에 사용될 예제코드다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : thread_test.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;sys/wait.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+
+void *threadfunc(void *arg);
+
+main()
+{
+    int n, i, j;
+    pthread_t threadid;
+
+    if ((n = pthread_create(&#38;threadid, NULL, threadfunc, NULL)) != 0 )
+    {
+        perror("Thread create error ");
+        exit(0);
+    }
+    printf("Main Thread START&#92;n");
+    for (i = 0; i &#60; 100000000; i++)
+    {
+        j = i*5;
+    }
+    printf("Main Thread END&#92;n");
+    pthread_join(threadid, NULL);
+}
+
+void *threadfunc(void *arg)
+{
+    int i, j;
+    printf("Thread Start&#92;n");
+
+    for (i = 0; i &#60; 100000000; i++)
+    {
+        j = i*5;
+    }
+
+    printf("Thread:end&#92;n");
+    return ;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		코드는 최소한의 테스트가 가능한 수준에서 작성되었다. 위의 코드는 언뜻 보기에 
+		아무 문제가 없을 것 같고, 실제 특정 플랫폼에서는 문제 없이 작동하지만 플랫폼을 
+		이동했을 경우 상당히 심각한 문제가 발생한다.    
+	</P
+><P
+>		위의 코드를 리눅스(:12)에서 컴파일 시켜서 실행 시켜보면 아래와 같은 출력 결과
+		물을 보이면서 정상적으로 작동하는걸 확인 할 수 있을 것이다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./thread_test 
+Main Thread START
+Thread Start
+Main Thread END
+Thread:end
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		그러나 위의 예제를 솔라리스(:12)에서 컴파일 시키면 다음과 같은 결과물을 보여준다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@sun5.7 /]$ ./thread_test 
+Main Thread Start
+Main Thread END
+Thread Start
+Thread:end
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		리눅스에서 처럼 2개의 쓰레드가 동시에(정확히는 동시가 아니지만 이해하기 쉽게)수행 
+		되는게 아니고 메인 쓰레드가 끝날 때까지 쓰레드 생성이 되지 않음을 알 수 있다. 
+		코드에 따라서는 특정 쓰레드가 영원히 실행되지 않는 문제가 발생할 수도 있다.  
+		리눅스에서 개발되는 많은 프로그램들이 다른 유닉스(:12)로도 배포 되는 것을 감안한다면 
+		이는 매우 심각한 문제이다.  
+	</P
+><P
+>		솔라리스에서 이러한 문제가  발생하는 이유는 쓰레드라 할지라도 
+		개별적인 프로세스로 실행되는 리눅스와 달리 하나의 LWP를 나눠서 사용하기 때문에 
+		하나의 쓰레드에서 매우 바쁘게 작동할경우 다음 쓰레드 생성을 위한 스케쥴링에 
+		문제가 생기기 때문이다. 
+		<DIV
+CLASS="TIP"
+><BLOCKQUOTE
+CLASS="TIP"
+><P
+><B
+>&#51089;&#51008; &#51221;&#48372;: </B
+>			리눅스에서의 쓰레드는 fork()와 유사한 clone()호출을 
+			통한 개별 프로세스로 생성된다. 아직까진(2.4.x) 
+			완전한 쓰레드라고 볼 수 없으며 
+			완전한 쓰레드의 지원은 아마도 커널 2.6.x를 기다려봐야 할것 같다. 
+		</P
+></BLOCKQUOTE
+></DIV
+></P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>3&#51208;. 문제 해결</A
+></H1
+><P
+>		비록 위의 문제가 리눅스에서 발생하진 않지만 많은 리눅스에서 개발되는 
+		프로그램이 솔라리스등의 다른 유닉스로 포팅되고 있다는 것을 감안한다면 
+		반드시 잡아줘야 할 문제다.   
+		</P
+><P
+>		문제의 해결방법은 비교적 간단한데, sleep(3)계열의 함수를 이용해서 
+		쓰레드와 쓰레드 사이에 약간의 시간간격을 두어서 쓰레드 스케쥴링을 
+		할 수 있도록 시간을 벌여주면 된다. 
+		다음은 문제를 해결한 코드이다.   
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  if ((n = pthread_create(&#38;threadid, NULL, threadfunc, NULL)) != 0 )
+  {
+      perror("Thread create error ");
+      exit(0);
+  }
+  usleep(100);
+  printf("Main Thread START&#92;n");
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>4&#51208;. 결론</A
+></H1
+><P
+>	어떻게 보면 팁수준의 매우 간단한 내용인것 같지만 이런 문제일수록 
+	문제의 원인이 애매 모호해서 해결책을 찾기 어려운 경우가 많다. 
+	이런 경우도 마찬가지다. 아마도 pthread:::라이브러리(:12)의 
+	(그리 심각하지 않은?)문제라고 생각되는데 막상 문제가 발생했을 때는 
+	정말 사람을 짜증나게 할 수 있는 문제다.    
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

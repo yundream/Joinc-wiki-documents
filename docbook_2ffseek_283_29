@@ -1,0 +1,209 @@
+#title fseek(3)
+[wiki:function_fseek(3) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/09/10           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>fseek(3)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	시트림위치의 재지정
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+
+int fseek(FILE *stream, long offset, int whence);
+long ftell(FILE *stream);
+void rewind(FILE *stream);
+int fgetpos(FILE *stream, fpos_t *pos);
+int fsetpos(FILE *stream, fpos_t *pos);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		fseek()함수는 <emphasis>stream</emphasis>에서의 위치를 변경하기 위해서 
+		사용한다. 새로운 위치는 <emphasis>offset</emphasis>을 통해서 
+		바이트 단위로 지정할 수 있다. 위치 변경을 위해서는 기준점이 있어야 할건데, 
+		이는 <emphasis>whence</emphasis>를 이용해서 결정할 수 있다. 
+		whence는 위치변경을 위한 기준점에 따라서 <emphasis>SEEK_SET</emphasis>
+		<emphasis>SEEK_CUR</emphasis>, <emphasis>SEEK_END</emphasis>가 있다. 
+		SEEK_SET는 시작점을, SEEK_CUR은 현재 스트림에서의 위치를, SEEK_END는 
+		스트림의 마지막점을 기준으로 한다. 
+	</para>
+	<para>
+		ftell()함수는 <emphasis>stream</emphasis>에서의 현재 위치를 구하기 
+		위해서 사용한다.	
+	</para>
+	<para>
+		rewind()함수는 <emphasis>stream</emphasis>에서의 위치를 처음으로 되돌리기
+		위해서 사용한다. rewind()는 fseek()를 이용해서 동일하게 구현할 수 있다.
+		<screen>
+(void)fseek(stream, 0L, SEEK_SET)
+		</screen>
+		fgetpos()와 fsetpos()는 ftell()과 fseek()의 조합(whence는 SEEK_SET)이다. 
+		즉 위치를 변경하고 현재의 위치값을 fpost_t 객체에 되돌려준다. 
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		rewind()함수는 아무것도 되돌려주지 않는다. fgetpos(), fseek(), fsetpos()는
+		0을 ftell()는 현재 위치를 되돌려준다. 실패했을 경우에는 -1을 리턴한다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EBADF</term>	
+			<listitem>
+				<para>	
+					<emphasis>stream</emphasis>이 위치를 정할 수 없는 스트림이다. 
+					STDOUT, STDIN이 대표적인 위치를 정할 수 없는 스트림이다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					<emphasis>whence</emphasis>인자가 SEEK_SET, SEEK_END, SEEK_CUR이 아닌
+					값을 사용했다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINTR</term>	
+			<listitem>
+				<para>	
+					시스템 호출이 인터럽트 되었다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;stdio.h>
+#include &lt;unistd.h>
+#include &lt;stdlib.h>
+
+int main(int argc, char **argv)
+{
+    FILE *fp;
+    char buf[256];
+    char gline[12];
+    int linenum = 0;
+    int inputline;
+    int *line_index;
+
+    fp = fopen(argv[1], "r");
+    if (fp == NULL)
+    {
+        perror("open error");
+        return 1;
+    }
+
+    // 라인의 갯수를 계산한다. 
+    while(fgets(buf, 255, fp) != NULL)
+    {
+        if (buf[strlen(buf)-1] == '\n')
+            linenum++;
+    }
+    // 라인의 갯수만큼 메모리를 할당한다. 
+    // line_index 배열에는 각 라인의 위치가 들어간다. 
+    line_index = (int *)malloc(sizeof(int) * linenum +1);
+
+    // 스트림을 처음으로 되돌린다. 
+    rewind(fp);
+
+    linenum = 0;
+
+    // 파일의 처음부터 돌면서 
+    // ftell()을 이용 각 라인의 위치(offset)를 저장한다.
+    line_index[0] = 0;
+    while(fgets(buf, 255, fp) != NULL)
+    {
+        // 사실은 라인의 크기가 255를 초과할 경우 이에 대한 
+        // 대책을 마련해야 하지만 귀찮은 관계로 넘어간다.
+        if (buf[strlen(buf)-1] == '\n')
+        {
+            line_index[linenum+1] = ftell(fp);
+            linenum ++;
+        }
+    }
+
+    printf("Line num is %d\n", linenum);
+    // 라인 번호를 입력하면 해당 라인으로 
+    // fseek()함수를 이용해서 점프하고 라인의 내용을 출력한다.
+    while(1)
+    {
+        printf("Goto Line : ");
+        fgets(gline, 11, stdin);
+        gline[strlen(gline) - 1] = '\0';
+        inputline = atoi(gline);
+        if (inputline &lt; linenum && inputline > -1)
+        {
+            fseek(fp, line_index[inputline], SEEK_SET);
+            fgets(buf, 255, fp);
+            printf("%d(%d) : %s", inputline, line_index[inputline],buf);
+        }
+        else
+        {
+            printf("input num Error (0 - %d)\n", linenum-1);
+        }
+        printf("\n");
+    }
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+    			lseek(2)	
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_seek">seek를 이용한 파일 위치 변경</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

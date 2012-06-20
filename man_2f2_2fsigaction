@@ -1,0 +1,553 @@
+#title linux man page : sigaction - 시그널을 처리한다.
+[wiki:docbook/sigaction(2) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>sigaction(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. sigaction(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN80"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN83"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN99"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN103"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	시그널 처리관련 함수</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+int sigaction(int signum,  const  struct  sigaction  *act,
+	struct sigaction *oldact);
+int  sigprocmask(int  how,  const  sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigsuspend(const sigset_t *mask);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		sigaction() 시스템 호출은 특정 시그널(:12)의 수신에 대해서 취할 액션을 
+		설정하거나 변경하기 위해서 사용된다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>signum</B
+>는 시그널을 명시한다. SIGKILL(:12)과 SIGSTOP(:12)를 
+		제외한 모든 시그널이 타당한 시그널이 될 수 있다. 
+	</P
+><P
+>		만약 <B
+CLASS="EMPHASIS"
+>act</B
+>가 <B
+CLASS="EMPHASIS"
+>null</B
+>이 아니라면 
+		signum번호를 가지는 시그널에 대해서 act함수가 설치된다. 
+		만약 <B
+CLASS="EMPHASIS"
+>oldact</B
+>가 null이 아니라면 이전의 액션은 
+		<B
+CLASS="EMPHASIS"
+>oldact</B
+>에 저장된다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>sigaction</B
+>구조체는 다음과 같이 정의되어 있다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct sigaction 
+{
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, siginfo_t *, void *);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer)(void);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>sa_handler</DT
+><DD
+><P
+>	
+					signum번호를 가지는 시그널이 발생했을 때 실행된 함수를 
+					설치한다. 함수외에도 SIG_DFL과 SIG_IGN을 지정할 수 있다.
+					전자는 시그널에 대한 기본행동을 후자는 시그널을 무시하기 
+					위해서 사용한다.  
+				</P
+></DD
+><DT
+>sa_mask</DT
+><DD
+><P
+>	
+					sa_handler에 등록된 시그널 핸들러 함수가 실행되는 동안 
+					블럭되어야 하는 시그널의 마스크를 제공한다. SA_NOMASK가 
+					적용되어 있지 않다면  
+				</P
+></DD
+><DT
+>sa_flags</DT
+><DD
+><P
+>	
+					시그널 처리 프로세스의 행위를 수정하는 일련의 플래그들을 
+					명시한다. 다음중 하나 이상의 것들에 의해서 만들어 진다.   
+					<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>SA_NOCLDSTOP</DT
+><DD
+><P
+>						만약 signum이 SIGCHLD라면, 자식 프로세스가 SIGSTOP, 
+						SIGTSTP, SIGTTIN, SIGTTOU등을 받아서 중단되었을 때 
+						이를 통지 받을 수 없게 된다. 
+						</P
+></DD
+><DT
+>SA_ONESHOT, SA_RESETHAND</DT
+><DD
+><P
+>						일단 시그널 처리기가 호출되면, 기본 상태에 대한 
+						시그널 액션을 재 저장한다. 이는 signal(2)호출에 대한 
+						기본 행위이다. 
+						</P
+></DD
+><DT
+>SA_RESTART</DT
+><DD
+><P
+>						일부 시스템 호출들이 시그널을 통해 재시작할 수 있도록 
+						함으로서 BSD 시그널과 호환되도록 한다.
+						</P
+></DD
+><DT
+>SA_NOMASK, SA_NODEFER</DT
+><DD
+><P
+>						시그널이 자체 시그널 처리기로부터 수신 받지 않도록 한다.
+						</P
+></DD
+><DT
+>SA_SIGINFO</DT
+><DD
+><P
+>						시그널 처리기가 하나가 아닌 3개의 인자를 취할경우 
+						sa_handler대신 sigaction의 siginfo_t를 이용할 수 
+						있다. siginto_t는 다음과 같이 정의된 구조체이다.  		
+						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>siginfo_t {
+    int      si_signo;  /* 시그널 넘버 */
+    int      si_errno;  /* errno 값 */
+    int      si_code;   /* 시그널 코드 */
+    pid_t    si_pid;    /* 프로세스 ID 보내기 */
+    uid_t    si_uid;    /* 프로세스를 전송하는 실제 사용자 ID */
+    int      si_status; /* Exit 값 또는 시그널 */
+    clock_t  si_utime;  /* 소모된 사용자 시간 */
+    clock_t  si_stime;  /* 소모된 시스템 시간 */
+    sigval_t si_value;  /* 시그널 값 */
+    int      si_int;    /* POSIX.1b 시그널 */
+    void *   si_ptr;    /* POSIX.1b 시그널 */
+    void *   si_addr;   /* 실패를 초래한 메모리 위치 */
+    int      si_band;   /* 밴드 이벤트 */
+    int      si_fd;     /* 파일 기술자 */
+}
+						</PRE
+></TD
+></TR
+></TABLE
+>
+						SIGCHLD 시그널은 si_pid, si_uid, si_status, si_utime,
+						si_stime를 채운다. si_int, si_ptr은 시그널의 송신자에 
+						의해서 명시될 수 있다.  
+						</P
+><P
+>						si_code는 왜 시그널이 보내졌는지를 지시한다. 
+						</P
+></DD
+></DL
+></DIV
+>	
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+><P
+>		sigprocmask()는 현재 블록된 시그널들을 변경시키기 위해서 사용한다. 
+		호출의 행위는 <B
+CLASS="EMPHASIS"
+>how</B
+> 값들에 대해서 의존적이 된다. 
+		how는 다음중 하나를 선택할 수 있다.  
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>SIG_BLOCK</DT
+><DD
+><P
+>				<B
+CLASS="EMPHASIS"
+>set</B
+>에 설정된 시그널을 블럭 시그널셋에 
+				추가시킨다. 
+			</P
+></DD
+><DT
+>SIG_UNBLOCK</DT
+><DD
+><P
+>				시그널 셋<B
+CLASS="EMPHASIS"
+>set</B
+>의 시그널을 현재의 블럭된 
+				시그널에서 삭제한다. 
+			</P
+></DD
+><DT
+>SIG_SETMASK</DT
+><DD
+><P
+>				시그널 셋<B
+CLASS="EMPHASIS"
+>set</B
+>의 시그널을 블럭화된 시그널로
+				지정한다.
+			</P
+></DD
+></DL
+></DIV
+>	
+		<B
+CLASS="EMPHASIS"
+>oldset</B
+>이 null이 아니면, 시그널:::마스크(:12)의 이전 값은
+		oldset에 저장된다.	
+	</P
+><P
+>		sigpending()함수는 전달 시그널들에 대한 검사를 허용한다. 전달 시그널들의
+		마스크는 <B
+CLASS="EMPHASIS"
+>set</B
+>에 저장된다. 
+	</P
+><P
+>		sigsuspend()는 프로세스의 시그널 마스크를 일시적으로 
+		<B
+CLASS="EMPHASIS"
+>mask</B
+>로 대체하고, 시그널이 수신될때까지 프로세스를
+		중지시킨다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN80"
+></A
+>1.3. 반환값</H1
+><P
+>		성공하면 0을 실패하면 -1을 리턴한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN83"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					부적절한 시그널이 지정되거나. 무시할 수 없는 SIGKILL
+					SIGSTOP에 대한 액션을 변경하고자 할 경우
+				</P
+></DD
+><DT
+>EFAULT</DT
+><DD
+><P
+>	
+					act, oldact, set, oldset 이 타당하지 않은 메모리 영역을 
+					가리킬 경우
+				</P
+></DD
+><DT
+>EINTR</DT
+><DD
+><P
+>	
+					시스템 호출이 인터럽트(:12) 되었다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN99"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62; 
+#include &#60;unistd.h&#62; 
+#include &#60;string.h&#62; 
+#include &#60;stdio.h&#62; 
+
+void sig_int(int signo);
+void sig_usr(int signo);
+
+int main()
+{
+    int i = 0;
+    struct sigaction intsig, usrsig;
+
+    usrsig.sa_handler = sig_usr;
+    sigemptyset(&#38;usrsig.sa_mask);
+    usrsig.sa_flags = 0;
+
+    intsig.sa_handler = sig_int;
+    sigemptyset(&#38;intsig.sa_mask);
+    intsig.sa_flags = 0;
+
+	// SIGINT에 대해서 sig_int를 등록한다. 
+    if (sigaction(SIGINT, &#38;intsig, 0) == -1)
+    {
+        printf ("signal(SIGINT) error");
+        return -1;
+    }    
+
+	// SIGUSR2에 대해서 usrsig를 등록한다. 
+    if (sigaction(SIGUSR2, &#38;usrsig, 0) == -1)
+    {
+        printf ("signal(SIGUSR2) error");
+        return -1;
+    }    
+
+    while(1)
+    {
+        printf("%d\n", i);
+        i++;
+        sleep(1);
+    }
+}
+
+void sig_int(int signo)
+{
+    sigset_t sigset, oldset;
+
+	// 핸들러가 수행되는 동안 수신되는 모든 시그널에 대해서
+	// 블럭한다.  
+    sigfillset(&#38;sigset);
+    if (sigprocmask(SIG_BLOCK, &#38;sigset, &#38;oldset) &#60; 0)
+    {
+        printf("sigprocmask %d error \n", signo);
+    }
+    fprintf(stderr, "SIGINT !!!!\n");
+    sleep(5);
+}
+
+void sig_usr(int signo)
+{
+    printf("sig_usr2\n");
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN103"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>    			sigsetops(3);
+			</P
+></LI
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/system_programing/Signal/SignalHow"
+TARGET="_top"
+>시그널 다루기 2</A
+>
+			</P
+></LI
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/signal%20%B4%D9%B7%E7%B1%E2%203"
+TARGET="_top"
+>시그널 다루기 3</A
+>
+			</P
+></LI
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/%BE%B2%B7%B9%B5%E5%BF%CD_%BD%C3%B1%D7%B3%CE"
+TARGET="_top"
+>쓰레드와 시그널</A
+>
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

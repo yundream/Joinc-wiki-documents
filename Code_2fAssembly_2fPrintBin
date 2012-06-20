@@ -1,0 +1,64 @@
+----
+ 1. 숫자출력
+ 1. 숫자출력(진법에 따른 고려까지)  
+ 1. [minzkn]
+ 1. Version 0.1
+ 1. 2005/05/14 
+----
+
+=== 설명 ===
+설명: 어셈블리로 숫자를 어떻게 출력하는가를 제시하는 예제 (실행환경: DOS, MASM)
+
+=== 사용방법 ===
+이 함수는 AX값을 문자열로 출력하고 초기 BX값을 바꾸면 그에 해당하는 진수표기법으로 바뀝니다.
+주석으로 처리되어 있는 부분을 풀면 0으로 자리수만큼 채워지게 됩니다.
+
+=== 코드 ===
+{{{#!plain
+; 이 함수는 AX값을 문자열로 출력하는이고 초기 BX값을 바꾸면 그에 해당하는 진수표기법으로 바뀜 
+P_PRINT_BIN     PROC NEAR ; void near pascal P_PRINT_BIN(AX) 
+                MOV BX, 16 ; 16진수 출력 (여기를 바꾸면 진수표기법이 바뀜 2는 2진법, 4는 4진법, 8은 8진법, ...) 
+                XOR CX, CX 
+L_PRINT_BIN_0: 
+                XOR DX, DX 
+                DIV BX 
+                CMP DX, 10 
+                JL L_PRINT_BIN_LESS_0 
+                SUB DX, 10 
+                ADD DX, 'A' 
+                JMP L_PRINT_BIN_LESS_1 
+L_PRINT_BIN_LESS_0: 
+                ADD DX, '0' 
+L_PRINT_BIN_LESS_1: 
+                PUSH DX 
+                INC CX 
+                OR AX, AX 
+                JNZ L_PRINT_BIN_0 
+
+;                PUSH CX 
+;                MOV AX, CX 
+;                MOV CX, 8 
+;                SUB CX, AX 
+;L_PRINT_BIN_ZERO_0: 
+;                JCXZ L_PRINT_BIN_ZERO_1 
+;                DEC CX 
+;                MOV AH, 02H 
+;                MOV DL, '0' 
+;                INT 21H 
+;                JMP SHORT L_PRINT_BIN_ZERO_0 
+;L_PRINT_BIN_ZERO_1: 
+;                POP CX 
+
+
+L_PRINT_BIN_1: 
+                POP DX 
+                MOV AH, 02H 
+                INT 21H 
+                LOOP L_PRINT_BIN_1 
+                RETN 
+P_PRINT_BIN     ENDP
+}}}
+
+=== 변경사항 ===
+
+==== 2005/05/14 ====

@@ -1,0 +1,111 @@
+#title crypt(3)를 이요한 암호화
+{{{#!html
+소개글에서 발혔듯이 crypt 는 단방향 해쉬 함수를 사용하므로, 데이타를 복호화
+하는방법은 쉽지가 않다. 그러므로 보통 데이타를 복호화할 필요가 없는 "인증"
+분야에 주로 쓰인다.
+그런 이유로 암호화와 동시에 복호화 까지 신경서야 한다면, RSA 같은
+공개키 기반의 알고리즘을
+사용해야 할것이다. 여기에 대해서는 나중에? 얘기를 해보도록 하겠다.
+<br><br>
+
+어쨋든 위에서 말했듯이, 암호화된 데이타를 크랙해내는 계산이 어렵다 뿐이지
+불가능한것은 아니므로 충분한 시간과 시스템의 성능만 뒷바침해 둔다면,
+패스워드 크랙이 가능하다. 그런 이유로 최신의 Unix(Linux 포함)는 crypt 에
+MD5 까지 사용해서 크랙이 더욱 어렵게 만들고 있다.
+<br>
+
+crypt 의 함수원형은 다음과 같다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+char *crypt (const char *key, const char *salt)
+</td></tr>
+</table>
+key 값은 암호화 시키고자 하는 문자열이다. 여기서 주목할께 salt 이다.
+salt 값은 2개의 문자열로 이루어지는데 [a-zA-Z0-9./] 의 문자들로 구성된다.
+그러므로 계산을 해보면 하나의 문자열은 4096((26*2+10+2) ^ 2)
+가지의 각자 다른 salt 값을 가질수 있게 된다. crypt 함수는 이 salt 값을 이용해서
+문자열을 암호화 한다.<br>
+salt 값을 이용한 암호화 방법에 대해서는 crypt(3) 의 man page 를 참고하기
+바란다.<br>
+그럼 예제를 통해서 crypt 함수의 사용법에 대해서 알아보겠다.
+랜덤한 salt 값을 사용하기 위해서 random(3), srandom(3)을 사용했다.
+<br><br>
+<b>예제</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+<font COLOR=#00b800>#include</font> &lt;time.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+
+<b><font COLOR=#0000ff>void</font></b> get_salt(<b><font COLOR=#0000ff>char</font></b> **seed);
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>char</font></b> *seed;
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font>)
+    {
+        printf(<font COLOR=#ff0000>"Usage : ./crypt [passwd]&#92;n"</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    seed = (<b><font COLOR=#0000ff>char</font></b> *)malloc(<font COLOR=#a900a9>3</font>);
+    memset(seed, '<font COLOR=#a900a9>&#92;0</font>', <font COLOR=#a900a9>3</font>);
+    get_salt(&seed);
+
+    printf(<font COLOR=#ff0000>"원  문 : %s&#92;n"</font>, argv[<font COLOR=#a900a9>1</font>]);
+    printf(<font COLOR=#ff0000>"암호문 : %s&#92;n"</font>, crypt(argv[<font COLOR=#a900a9>1</font>], seed));
+
+    free(seed);
+}
+
+<b><font COLOR=#0000ff>void</font></b> get_salt(<b><font COLOR=#0000ff>char</font></b> **seed)
+{
+    time_t now_time;
+
+    <b><font COLOR=#0000ff>char</font></b> first_seed[<font COLOR=#a900a9>3</font>];
+    <b><font COLOR=#0000ff>char</font></b> *salt_set=<font COLOR=#ff0000>"./abcdefghijklmnopqrstuvwxyz"</font>
+                   <font COLOR=#ff0000>"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</font>
+                   <font COLOR=#ff0000>"0123456789"</font>;
+    memset(first_seed, '<font COLOR=#a900a9>&#92;0</font>', <font COLOR=#a900a9>3</font>);
+    time(&now_time);
+
+    srandom((<b><font COLOR=#0000ff>unsigned</font></b> <b><font COLOR=#0000ff>int</font></b>)now_time);
+    first_seed[<font COLOR=#a900a9>0</font>] = salt_set[random() % <font COLOR=#a900a9>64</font>];
+    first_seed[<font COLOR=#a900a9>1</font>] = salt_set[random() % <font COLOR=#a900a9>64</font>];
+
+    memcpy(*seed, first_seed, <font COLOR=#a900a9>3</font>);
+}
+
+</pre>
+
+</td></tr>
+</table>
+random 함수는 random seed 값에 의해서 돌려지는 값이 결정된다.
+즉 같은 random seed 값을 가지게 된다면 같은 값을 돌려준다.
+이러한 random seed 는 srandom(3) 함수를 통해서 만들어 주게 된다.
+srandom 을 사용하지 않을경우 random seed 값은 기본적으로 1로 세팅되게 된다.
+그러므로 srandom 을 사용하지 않는다면 random 을 사용한다고 하더라도
+언제나 같은 값만을 돌려주게 된다. 위에서는 random seed 값을 다르게 주기 위해서
+time(2) 함수를 사용하였다. 이렇게 되면 프로그램을 실행할때마다. 유일한
+random seed 값을 사용할수 있게 된다. <br>
+단, time 함수의 경우 시간을 "초" 단위로 계산하기 때문에 1초 시간안에 프로그램을
+다시 실행시키면 random 한 값을 얻을수 없게 될것이다. <br>
+위의 소스를 컴파일시키기 위해서는 crypt 라이브러 를 포함시켜줘야 한다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+[yundream@localhost test]$ gcc -o crypt crypt.c -lcrypt
+</td></tr>
+</table>
+위의 프로그램을 실행시키면 아래와 같은 결과를 얻을수 있을것이다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost test]# ./crypt school
+원  문 : school
+암호문 : f9okROpUA9F0c
+</pre>
+</td></tr>
+</table>
+}}}

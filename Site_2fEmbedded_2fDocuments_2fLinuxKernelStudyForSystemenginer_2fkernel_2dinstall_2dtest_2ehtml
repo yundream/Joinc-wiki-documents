@@ -1,0 +1,271 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>커널 테스트 및 설치</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 컴파일하기"
+HREF="chap01.html"><LINK
+REL="PREVIOUS"
+TITLE="커널 컴파일"
+HREF="kernel-compile.html"><LINK
+REL="NEXT"
+TITLE="Makefile 분석"
+HREF="chap02.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="kernel-compile.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>1장. 리눅스 커널 컴파일하기</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="chap02.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="KERNEL-INSTALL-TEST"
+>1.8. 커널 테스트 및 설치</A
+></H1
+><P
+>			커널 컴파일이 끝난 후 만들어진 커널이 제대로 동작하는지 확인해본 후 기본 커널로
+			설치해 사용해야한다. 그렇지 않고 무턱대고 원래의 잘돌아가던 커널을 대체해버리면
+			혹시라도 에러있는 커널인 경우엔 부팅이 안되는 위급한 사태가 발생하게 된다.
+			그러므로 만들어진 커널을 먼저 테스트 후 사용하기 바란다.
+		</P
+><P
+>			테스트 방법엔 2가지 정도를 추천한다. 하나는 플로피를 사용하는 것이고
+			나머지 하나는 LILO를 사용하는 것이다.
+		</P
+><P
+>			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+><B
+CLASS="EMPHASIS"
+>플로피를 사용하는 방법</B
+></DT
+><DD
+><P
+>							플로피를 사용하기 위해 make zdisk를 사용해 만들어진 커널을 플로피에 담는다.
+							복사가 끝나면 플로피를 사용해 부팅해 정상적으로 동작하는지 확인한다.
+							가장 안전한 방법 중 하나로 생각되고 문제가 있으면 플로피를 제거하고 다시 부팅해
+							커널 설정 등을 다시 하고 테스트를 하면 된다.
+						</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>LILO를 사용하는 방법</B
+></DT
+><DD
+><P
+>							LILO를 사용해 하는 방법은 아래와 같이 /etc/lilo.conf를 우선 수정한다.
+							먼저 염두에 둬야할 것은 만들어진 커널 이미지를 어디에 무슨 이름으로 복사할 것인지
+							결정해 두고 일을 진행해야한다는 것이다.
+							필자의 경우 보통은 $(TOPDIR)/arch/i386/boot/bzImage<A
+NAME="AEN441"
+HREF="#FTN.AEN441"
+>[1]</A
+>를
+							/boot/test_img로 복사하고 테스트 한다.
+						</P
+><P
+>							아래는 필자의 lilo.conf다. 기본 부팅용 항목을 그대로 복사하고 image와 label 만을
+							바꿔 하나더 등록해 부팅한다. 부팅 후엔 LILO에 test라 입력해 새로 만든 테스트 커널을
+							실험해 보면 된다.
+						</P
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>prompt
+timeout=50
+default=linux
+boot=/dev/hda
+map=/boot/map
+install=/boot/boot.b
+#message=/boot/message
+lba32
+vga=0x030a
+
+image=/boot/bzImage-2.4.16
+label=linux
+initrd=/boot/initrd-2.4.16.img
+read-only
+root=/dev/hda1
+append="mem=nopentium hdd=ide-scsi"
+
+image=/boot/test_img
+label=test
+initrd=/boot/initrd-2.4.16.img
+read-only
+root=/dev/hda1
+append="mem=nopentium hdd=ide-scsi"</PRE
+></TD
+></TR
+></TABLE
+>
+						</P
+><P
+>							커널의 설치는 간단하다. 커널 이미지와 맵 파일을 복사하고 lilo.conf를 수정해주면 된다.
+							복사할 파일은 $(TOPDIR)/arch/i386/boot/bzImage와 $(TOPDIR)/System.map 두 개다.
+						</P
+><P
+>							필자는 bzImage를 /boot/bzImage-2.4.16과 같이 버전 이름을 사용해 복사하고 System.map을
+							/boot/Sysstem.map-2.4.16과 같이 복사한다. 그리고 /boot/System.map-2.4.16을 /boot/System.map
+							으로 심볼릭 링크를 만들어 준다. 커널은 /boot/System.map을 찾아 사용하기 때문이다.
+						</P
+></DD
+></DL
+></DIV
+>
+		</P
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>주석</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN441"
+HREF="kernel-install-test.html#AEN441"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>$(TOPDIR)은
+							커널 소스 디렉토리를 가리킨다. 즉 /usr/src/linux.</P
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="kernel-compile.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>커널 컴파일</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap01.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>Makefile 분석</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

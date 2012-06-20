@@ -1,0 +1,348 @@
+#title QOS - CPU 사용율 모니터링
+[[TableOfContents]]
+=== 소개 ===
+이 문서는 리눅스(:12) 운영체제(:12)를 기준으로 작성될 것이다.
+
+리눅스 운영체제에서 시스템정보를 얻는 방법은 아래의 문서를 통해서 여러번 설명되었다. 아래의 proc 파일시스템 분석관련 문서를 읽었다면, 어렵지 않게 CPU 사용율을 측정하는 프로그램을 만들 수 있을 것이다.
+
+[[subindex(Site/system_programing/proc)]]
+
+=== 모듈화 ===
+이 프로그램은  [wiki:Site/SoftWare_engineering/Extensible_Agent_Manager 확장성을 고려한 Agent, Manager 시스템]에서 소개한 방식으로 작성될 것이다. 즉
+  1. 공통 인터페이스를 가지며,
+  2. 공유:::라이브러리(:12) 형태로 만들어진다.
+  3. 만들어진 모듈은 PlugIn 방식으로 동적으로 로딩될 수 있다.
+
+Cpu 사용율은 '''/proc/stat''' 파일을 분석해서 얻어올 수 있다. 분석을 통해서 얻어올 수 있는 정보는 kernel(:12) 2.4와 2.6에 약간의 차이가 있다. 여기에서는 커널 2.4를 기준으로 설명할 것이다. 커널 2.6이라고 해도, 필드 하나가 더 추가된 것일 뿐이니, 코드를 수정하는데에는 전혀 문제가 없을 것이다. 약간의 시간을 더 투자한다면, 커널 2.4와 2.6 모두에서 작동할 수 있는 코드를 만들 수도 있을 것이다.
+
+복잡하지 않은 코드이니 주석으로 설명을 대신하겠다.
+
+{{{#!plain
+// Standard C++ Library
+#include <iostream>
+
+// Common Library
+#include <cinterface.h>
+
+// Standard C Library
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <ctype.h>
+
+#define K4 0
+#define K6 1
+
+using namespace std;
+
+int isTotal=0;
+int findCpu=0;
+
+int GetCpuNum();
+int Type = 0;
+
+struct _CpuStat
+{
+    unsigned int User;
+    unsigned int System;
+    unsigned int Idle;
+};
+
+struct _CpuStat CpuStat[2];
+
+char *rtvstr;
+
+int Init()
+{
+    GetCpuNum();
+    rtvstr = (char *)malloc(80);
+    return 1;
+}
+
+int cidx = 0;
+
+// CPU 갯수를 얻어온다.
+int GetCpuNum()
+{
+    FILE *fp;
+    fp = fopen("/proc/stat", "r");
+    char buf[80];
+    isTotal=0;
+    findCpu=0;
+    if (fp == NULL)
+    {
+        return 0;
+    }
+    while(fgets(buf, 80, fp))
+    {
+        if (strncmp(buf, "cpu", 3) != 0)
+        {
+            continue;
+        }
+        if (isdigit(buf[3]))
+        {
+            findCpu++;
+        }
+        else
+        {
+            isTotal = 1;
+        }
+    }
+    fclose(fp);
+    return 1;
+}
+
+// Cpu 갯수를 리턴한다.
+int NumRows()
+{
+    return findCpu;
+}
+
+// proc 파일시스템을 분석해서 Cpu 사용율 정보를 얻어온다.
+// /proc/stat 의 사용율 총합라인만 읽어올 것이다.
+char *Read()
+{
+    FILE *fp;
+    char buf[80];
+    fp = fopen("/proc/stat", "r");
+    char cpuid[8];
+    int nused;
+    if (fp == NULL)
+    {
+        return NULL;
+    }
+    while(fgets(buf, 80, fp))
+    {
+        if (!strncmp(buf, "cpu", 3))
+        {
+            sscanf(buf, "%s %d %d %d %d",
+                    cpuid,
+                    &CpuStat[cidx%2].User,
+                    &nused,
+                    &CpuStat[cidx%2].System,
+                    &CpuStat[cidx%2].Idle
+                    );
+            break;
+        }
+    }
+    // 처음실행했다면, 1초를 쉰다음 재귀호출 한다.
+    if (!cidx)
+    {
+        sleep(1);
+        cidx++;
+        *Read();
+    }
+    cidx++;
+    int diff1;
+    int diff2;
+    int diff3;
+    int Idle, System, User;
+    diff1 = CpuStat[(cidx+1)%2].User - CpuStat[(cidx)%2].User;
+    diff2 = CpuStat[(cidx+1)%2].System - CpuStat[(cidx)%2].System;
+    diff3 = CpuStat[(cidx+1)%2].Idle - CpuStat[(cidx)%2].Idle;
+
+    Idle = (diff3*100)/(diff1+diff2+diff3);
+    System = (diff2*100)/(diff1+diff2+diff3);
+    User = (diff1*100)/(diff1+diff2+diff3);
+
+    sprintf(rtvstr,"CPU=%d,%d,%d\n", User,System,Idle);
+    return rtvstr;
+}
+int Clean()
+{
+    if (rtvstr != NULL)
+        free(rtvstr);
+    rtvstr = NULL;
+    return 1;
+}
+}}}
+
+최종목적은 PlugIn 형태로 Agent에서 로딩하고, 그 결과를 Manager에게 보내는 것이겠지만, 그건 나중일이고 일단 main 함수를 포함한 간단한 코드를 만들어서 테스트를 해보기로 했다. 얻어낸 Cpu 정보는 RRD(:12) 형태로 저장해서, 그래프로 출력할 것이다. 이를 위해서 다음과 같이 RRD 데이터베이스를 생성했다.
+{{{#!plain
+# rrdtool create cpuusage.rrd --start 1185174483 --step 300 \
+DS:user:GAUGE:600:U:U \
+DS:system:GAUGE:600:U:U \
+DS:usage:GAUGE:600:U:U \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797
+}}}
+
+다음은 C 코드다. RRD가 설치되어 있다면, RRD에서 제공하는 C(:12) API를 이용해서 CPU 사용율 데이터를 Update 할 수도 있겠지만, 간단하게 system() 함수를 이용해서 Update 시키도록 했다.
+{{{#!plain
+#include <qoscpu.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+
+// Read 로 읽어온, Cpu Usage 정보는 배열에 저장한다.
+// 저장은 5초단위로 5분동안이며, 배열의 크기는 60이 된다.
+// 저장된 값은 5분단위로 평균을 내기 위해서 사용된다.
+class CircleQueue
+{
+  private:
+    int User[60];
+    int System[60];
+    int Idle[60];
+    int idx;
+    int size;
+  public:
+    CircleQueue()
+    {
+      idx = 0;
+      size = 0;
+      memset((void *)User, 0x00, sizeof(int)*60);
+      memset((void *)System, 0x00, sizeof(int)*60);
+      memset((void *)Idle, 0x00, sizeof(int)*60);
+    }
+    void Push(int aUser, int aSystem, int aIdle)
+    {
+      User[idx] = aUser;
+      System[idx] = aSystem;
+      Idle[idx] = aIdle;
+      idx++;
+      if (idx == 60)
+        idx = 0;
+      size++;
+    }
+    int Length()
+    {
+      if (size > 59)
+        return 60;
+      else
+        return size;
+    }
+    int GetSystem(int index)
+    {
+      return System[index];
+    }
+    int GetUser(int index)
+    {
+      return User[index];
+    }
+    int GetIdle(int index)
+    {
+      return Idle[index];
+    }
+};
+
+// Daemon(:12) 프로세스로 만든다.
+int MakeDaemon()
+{
+  pid_t pid;
+  if ((pid = fork()) < 0)
+  {
+    exit(0);
+  }
+  else if (pid != 0)
+    exit(0);
+  setsid();
+  return 1;
+}
+
+int main()
+{
+  char *str;
+  char *sp;
+  CircleQueue *Cqueue;
+  int sum;
+  int User, System, Idle;
+  Cqueue = new CircleQueue();
+  int idx = 1;
+  char command[256];
+
+  MakeDaemon();
+  if (!Init())
+    perror("Error");
+  while(1)
+  {
+    str = Read();
+
+    sp = strstr(str, "=");
+    User = atoi(sp+1);
+
+    sp = strstr(sp+1, ",");
+    System = atoi(sp+1);
+
+    sp = strstr(sp+1, ",");
+    Idle = atoi(sp+1);
+
+    Cqueue->Push(User, System, Idle);
+    sleep(5);
+    idx++;
+
+    User = 0;
+    System = 0;
+    Idle = 0;
+
+    if (!(idx % 60))
+    {
+      printf("Size %d\n", Cqueue->Length());
+      sum = 0;
+      for(int i = 0; i < Cqueue->Length(); i++)
+      {
+        User += Cqueue->GetUser(i);
+        System += Cqueue->GetSystem(i);
+            }
+            Idle = User+System;
+            sprintf(command, "rrdtool update /rrd/cpuusage.rrd %d:%d:%d:%d", 
+                        time((time_t *)NULL), 
+                        User/Cqueue->Length(), 
+                        System/Cqueue->Length(), Idle);
+            system(command);
+
+        }
+    }
+    return 0;
+}
+
+}}}
+
+[[adsense]]
+=== RRD를 이용한 데이터 관리 ===
+이제 RRD(:12)를 이용해서, 저장된 데이터로 부터 그래프를 만들어 보도록 하자. 그래프를 위해서 다음과 같은 간단한 스크립트를 만들었다. 6시간과 24시간 그래프를 만들도록 했다. 약간 수정하면, 주간/월간/년간 데이터도 만들 수 있을 것이다.
+{{{#!plain
+#!/bin/sh
+CUTIME=`date +%s`
+# 6 hour
+FROM=`echo "$CUTIME - (3600*6)" | bc`
+
+rrdtool graph cpuusage.png \
+-s $FROM --vertical-label Usage \
+DEF:linea=cpuusage.rrd:user:AVERAGE \
+STACK:linea#0000FF:"user" \
+"GPRINT:linea:AVERAGE:%3.2lf Avg" \
+"GPRINT:linea:MAX:%3.2lf MAX" \
+"GPRINT:linea:MIN:%3.2lf MIN\n" \
+DEF:lineb=cpuusage.rrd:system:AVERAGE \
+STACK:lineb#00FF00:"system" \
+"GPRINT:lineb:AVERAGE:%3.2lf Avg" \
+"GPRINT:lineb:MAX:%3.2lf MAX" \
+"GPRINT:lineb:MIN:%3.2lf MIN\n" \
+HRULE:100000#FF0000:"Maximum allowed"
+
+# 24 hour
+FROM=`echo "$CUTIME - (3600*24)" | bc`
+rrdtool graph cpuusage24h.png \
+-s $FROM --vertical-label Usage \
+DEF:linea=cpuusage.rrd:user:AVERAGE \
+STACK:linea#0000FF:"user" \
+"GPRINT:linea:AVERAGE:%3.2lf Avg" \
+"GPRINT:linea:MAX:%3.2lf MAX" \
+"GPRINT:linea:MIN:%3.2lf MIN\n" \
+DEF:lineb=cpuusage.rrd:system:AVERAGE \
+STACK:lineb#00FF00:"system" \
+"GPRINT:lineb:AVERAGE:%3.2lf Avg" \
+"GPRINT:lineb:MAX:%3.2lf MAX" \
+"GPRINT:lineb:MIN:%3.2lf MIN\n" \
+HRULE:100000#FF0000:"Maximum allowed"
+}}}
+
+==== 6 시간 통계 ====
+http://www.joinc.co.kr/modules/rrd/cpuusage.png
+
+==== 24시간 통계 ====
+http://www.joinc.co.kr/modules/rrd/cpuusage24h.png

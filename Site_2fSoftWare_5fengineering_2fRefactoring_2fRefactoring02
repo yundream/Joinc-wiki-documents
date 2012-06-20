@@ -1,0 +1,298 @@
+#title 리팩토링 - 모듈화
+
+처음에 주어진 지저분한 모습의 [wiki:Code/C/tag_strip HTML 태그제거기]코드에 대한 1차 리펙토링이 끝났습니다. 1차 리팩토링은 [wiki:Site/C/Documents/Refactoring01 매직넘버를 기호상수로 대체하라]였습니다. 처음코드보다는 약간 더 좋아진 코드가 만들어졌습니다.
+
+이번에는 '''모듈화(:12)'''와 관련된 내용을 다루어볼까 합니다.
+
+''''좋은 코드는 가능한 모듈화 되어야 한다.'''는 얘기는 소프트웨어 공학 입문단계에서 들을 수 있는 격언입니다. 소스코드가 길어지면 보기도 힘들고, 보기 힘든만큼 에러가 발생할 확률도 많습니다. 많은 부분에서 코드의 중복이 발생할 수도 있겠죠.
+
+컴퓨터(:12)는 '''빠른 연산속도'''를 장점으로 '''깊이우선 계산'''을 특히나 잘하는 기계입니다. 이러한 류의 계산을 하다보면 아무래도 '''중복된 연산작업'''이 많아지게 되는데요, 모듈화는 이러한 연산작업을 위한 중복된 코드의 생산을 막아주게 됩니다. 코드의 양도 줄어들게 될 뿐더러, 모듈단위로 테스트와 디버깅(:12)이 가능하니 유지보수 역시 쉽게 되겠죠. 
+
+모듈화된 단위 코드는 다른 부분에 재사용될 수 있기 때문에 생산성역시 높아지는 효과를 노릴 수 있습니다. 이러한 모듈화된 코드를 모아서 재사용할 수 있게 만든 코드모음을 라이브러리(:12)라고 합니다. 
+
+모듈화는 이를테면 '''공정의 세분화'''정도로 보시면 될거 같습니다. 
+
+아래는 첫번째 리펙토링 과정을 거친 HTML(:12) 태그(:12)제거 프로그램입니다.
+{{{#!plain
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+using namespace std;
+
+const int MAX_BUF_SIZE=1024;
+
+enum tag_token {TAG_LT = '<', TAG_GT='>'};
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+  int lt_flag = 0;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\':`";
+  char *tr;
+
+
+  int tag_status = 0;
+  int offset = 0;
+
+  if (argc != 2)
+  {
+    fprintf(stderr, "Usage : %s [file]\n", argv[0]);
+    return 1;
+  }
+  if ((fd = open(argv[1], O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+    ridx = 0;
+    widx = 0;
+    while(ridx < readn)
+    {
+      if (rbuf[ridx] == TAG_LT)
+      {
+        lt_flag++;
+      }
+      if (rbuf[ridx] == TAG_GT)
+      {
+        lt_flag--;
+        if (lt_flag == 0)
+        {
+          ridx++;
+          continue;
+        }
+      }
+
+      if (lt_flag == 1)
+      {
+        ridx++;
+        continue;
+      }
+
+      // Special Chracter 제거
+      if (rbuf[ridx] == '&')
+      {
+         int i =0;
+         char special[10] = {0x00,};
+         for(i = 0; i < 10; i++)
+         { 
+           if (rbuf[ridx+i] == ';')
+           {
+             ridx = (ridx+i);
+             break;
+           }
+         } 
+      }
+    
+      if (rbuf[ridx] == '\n' || rbuf[ridx] == '\r')
+        wbuf[widx] = ' ';
+      else
+        wbuf[widx] = rbuf[ridx];
+
+      widx++;
+      ridx++;
+    }
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+        printf("%s\n", tr);
+        tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, MAX_BUF_SIZE);
+    memset(wbuf, 0x00, MAX_BUF_SIZE);
+  }
+  return 0;
+}
+}}}
+
+흔히 말하는 통짜쏘스로 하나의 함수(main 함수)내에서 모든 작업을 처리하고 있습니다. 이것을 여러개의 단위 모듈로 분리하도록 하겠습니다.
+
+이 프로그램은 다음의 3개의 단위로 구성되어 있습니다.
+  * 인자처리 : 프로그램의 실행인자(:12)를 분석하고 처리하는 부분
+  * 파일읽기 : 처리하는 파일(:12)을 읽는 부분  
+  * HTML 태그제거 : 입력된 문자열에서 HTML 태그를 제거하는 부분 
+  * 출력부분 : HTML(:12)태그를 제거하고 tokenizing(:12)된 문자열 데이터를 출력한다.  
+
+=== 인자처리 모듈 ===
+사용자의 인자(:12)를 검사해서 필요한 액션을 취합니다. 독립된 프로세스라고 볼 수 있겠지만 main()함수에 매우 크게 종속이 되므로 따로 모듈로 분리하는 것은 오히려 프로그램의 가독성을 해칠 수 있습니다. 이 프로그램의 경우 단지 하나의 인자만 주어지므로, 굳이 모듈화 할 필요는 없을 거라고 생각됩니다. 해서 if 문을 switch 문으로 변경하고, getopt()를 이용해서 인자의 처리를 좀 더 유연하게 하는 정도로 수정을 하겠습니다.
+
+{{{#!plain
+void help()
+{
+  printf("Usage : ./parse [-h] [-f FILENAME]\n");
+  printf("-f : Input Source File\n");
+  printf("-h : This Message\n");
+};
+
+int main()
+{
+  ...
+  ...
+  int test_argv = 0;
+  while((c = getopt(argc, argv, "hf:")) != -1)
+  {
+    switch(c)
+    {
+      case 'h':
+        break;
+      case 'f':
+        src_file = optarg;
+        test_argv = 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!test_argv)
+  {
+    help();
+    return 1;
+  }
+  ...
+  ...
+}
+}}}
+
+=== HTML 제거 ===
+만약 C++(:12)을 사용하고 있다면, 파일작업관련 클래스를 하나 만들어서 동일한 클래스네임으로 메서드만 달리해서 호출하는 방식을 사용하면 편할겁니다. 그렇지만 C(:12)스타일로 코딩된 이 프로그램은 이러한 방법을 사용하지 않을 생각입니다. 물론 구조체와 함수포인터(:12)를 사용해서 비슷하게 구현할 수는 있겠지만, 오히려 리펙토링 입장에서 나쁠 수도 있겠구요. C든 C++에서든 객체화를 통한 은닉은 다음 기회에 다루도록 하겠습니다. 
+
+여기에서 파일관련 작업은 수정하지 않고, 읽어들인 문서에서 HTML(:12)을 제거하는 부분만 모듈화 하도록 하겠습니다. 
+
+다음은 만들어진 함수입니다.
+{{{#!plain
+int lt_flag = 0;
+char *html_trim(char *src, char *dst, int size)
+{
+  int ridx = 0;
+  int widx = 0;
+
+  while(ridx < size)
+  {
+    if (src[ridx] == TAG_LT)
+    {
+      lt_flag++;
+    }
+    if (src[ridx] == TAG_GT)
+    {
+      lt_flag--;
+      if (lt_flag == 0)
+      {
+        ridx++;
+        continue;
+      }
+    }
+
+    if (lt_flag == 1)
+    {
+      ridx++;
+      continue;
+    }
+
+    if(src[ridx] == '&')
+    {
+      int i = 0;
+      char specia[10] = {0x00,};
+      for (i = 0; i < 10; i++)
+      {
+        if (src[ridx+i] == ';')
+        {
+          ridx= (ridx+i);
+          break;
+        }
+      }
+    }
+
+    if (src[ridx] == '\n' || src[ridx] =='\r')
+    {
+      dst[widx] = ' ';
+    }
+    else
+    {
+      dst[widx] = src[ridx];
+    }
+    widx++;
+    ridx++;
+  }
+  return dst;
+}
+}}}
+
+이제 main() 함수는 아래와 같이 단순해졌습니다.
+{{{#!plain
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+  int lt_flag = 0;
+  int test_argv=0;
+  int c;
+  char *src_file;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\':`+#=";
+  char *tr;
+
+  int tag_status = 0;
+  int offset = 0;
+
+  while((c = getopt(argc, argv, "hf:")) != -1)
+  {
+    switch(c)
+    {
+      case 'h':
+        break;
+      case 'f':
+        src_file = optarg;
+        test_argv = 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!test_argv)
+  {
+    help();
+    return 1;
+  }
+
+
+  if ((fd = open(src_file, O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+    html_trim(rbuf, wbuf, readn);
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+      printf("%s ", tr);
+      tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, MAX_BUF_SIZE);
+    memset(wbuf, 0x00, MAX_BUF_SIZE);
+  }
+  return 0;
+}
+}}}
+
+=== make를 통한 모듈별 분할 컴파일 ===
+이렇게 모듈을 분할시켜 놓으면, 각각의 모듈을 포함하는 소스파일을 따로 만들어서 관리할 수 있습니다. 이럴 경우 수정된 부분만 컴파일이 되기 때문에, 컴파일 시간을 줄일 수 있다는 잇점을 얻을 수도있습니다. 이에 대한 자세한 내용은 make(:12) 관련문서를 참고하시기 바랍니다.

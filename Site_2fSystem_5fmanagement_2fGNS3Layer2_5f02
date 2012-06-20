@@ -1,0 +1,173 @@
+#title gns3를 이용한 L2 테스트 서브넷 연결 
+
+
+[[TableOfContents]]
+==  2개의 L2 네트워크를 연결 ==
+[wiki:Site/System_management/GNS3 GNS3 설치],[wiki:Site/System_management/GNS3Layer2 GNS로 알아보는 OSI7 - L2]에 이은 문서입니다. 이전 문서에서는 스위치 하나로 구성된 단일 서브넷을 테스트 했습니다. 이걸 한 단계 확장해볼 생각입니다. 2개의 스위치로 구성된 2개의 서로 다른 네트워크를 구성할 생각입니다. 
+
+
+=== 구성도 ===
+네트워크를 구성해 보겠습니다. 이해하기 쉽게 실제 네트워크 구성 예를 들어보겠습니다. 영업팀과 개발팀이 있습니다. 이들은 서로 다른 네트워크를 사용하고 있습니다. 보안상의 이유로 혹은 트래픽을 나누기 위해서 네트워크를 나눕니다.   
+
+영업팀은 192.168.105.0/24, 개발팀은 192.168.110.0/24 네트워크를 사용합니다. 이들 네트워크는 L2 switch로 연결되고요. L2 switch들은 라우터에 연결됩니다. 드디어 라우터가 등장했군요. 영업팀과 개발팀에 있는 컴퓨터들은 라우터를 이용해서 인터넷에 진입할 겁니다. 여기에서는 아직 인터넷으로 연결하진 않을 겁니다.
+
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/3Kmf1yOPxg4x2vwwZlAKl9MTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-TobAJ-smrGc/TwMK9W8OdUI/AAAAAAAAB74/KojDt9m-dLU/s400/gns07.png" height="337" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+그림 처럼 구성을 합니다. 라우터로는 Cisco C2600을 사용했습니다. 영업팀과 개발팀에는 여러 노드가 있을 수 있겠지만, 어디까지나 테스트 이므로 하나의 노드로 대체하기로 했습니다. 각 노드는 virtualbox VM으로 만들었습니다. 자연스럽게 cisco router 공부를 하게 되겠네요. 이왕 공부한김에 CCNA 자격증이나 따볼까.
+
+=== Gateway ===
+개밭팀과 영업팀이루 이루어진 각각의 네트워크가 외부로 연결이 되려면, 외부로의 연결을 이어주는 관문이 필요합니다. 여기에서는 R1 라우터가 관문의 역할을 하고 있습니다. 이 관문 역할을 하는 장비를 Gateway라고 합니다. 
+
+=== 라우터 설정 ===
+L2 스위치는 깡통입니다. MAC 주소만 이용해서 패킷을 지정된 포트로 보내는 일만 합니다. 하지만 라우터는 다릅니다. 라우터는 L3이상을 다루는 장비로 IP, ICMP, TCP, UDP 등의 프로토콜을 다뤄야 합니다. 또한 RIP, OSPF, BGP 등의 라우팅 프로토콜을 이용해서 라우팅 테이블을 유지해야 합니다. 로드밸런싱, VPN, 방화벽 등의 부가 기능도 제공합니다. 매우 복잡하고 비싼 장비입니다. 따라서 엄연한 운영체제가 올라가며, 상당히 복잡한 설정도 필요합니다. 
+
+먼저 R1에 네트워크 테스트용 모듈을 붙입니다. (Cisco 장비들은 모듈 형태의 네트워크 인터페이스를 장치할 수 있습니다.) R1을 선택하고 마우스 오른클릭해서 slot1에 NM-4E 모듈을 추가했습니다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/8RYodx6warP_jn14fiLLoNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-UJs1v2Rk1QU/TwMK7mGpXUI/AAAAAAAAB7w/AFVmWH01rfM/s640/gns06.png" height="475" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+모듈을 추가 했다면 R1을 start 합니다. start 한 뒤에 '''console'''명령을 이용해서 R1 라우터에 접속할 수 있습니다. 접속하면 다음과 같이 프롬프트가 떨어질 겁니다. 이제 Cisco명령을 이용해서 네트워크를 설정하면 됩니다.  
+
+R1에 마우스를 잠시 올려 놓으면, R1에 연결된 네트워크 정보가 나올 겁니다. 제 R1의 정보는 다음과 같습니다. 
+  1. slot 1 hardware NM-4E 
+     * Ethernet 1/0 connected ethernet switch SW1
+     * Ethernet 1/1 connected ethernet switch SW2 
+NM-4E 모듈의 0번 인터페이스는 SW1, 1번 인터페이스는 SW2와 연결되 있군요. 이제 이들 라우터 인터페이스의 네트워크를 설정하면 됩니다. 설정은 아래와 같이 하면 되겠죠.
+  * Ethernet 1/0
+    * 192.168.105.0/24와 연결
+    * netmask : 255.255.255.0  
+    * interface 주소 : 192.168.105.254 
+  * Ethernet 1/1
+    * 192.168.110.0/24와 연결
+    * netmask : 255.255.255.0  
+    * interface 주소 : 192.168.110.254 
+
+이제 cisco router 설정을 하겠습니다. 먼저 Ethernet 1/0 설정입니다. 
+{{{#!plain
+Router> en
+Router# config t 
+Router(config)# int ethernet 1/0
+Router(config-if)# ip address 192.168.105.254 255.255.255.0 
+Router(config-if)# no shutdown 
+*Mar  1 01:13:13.511: %LINK-3-UPDOWN: Interface Ethernet1/0, changed state to up
+*Mar  1 01:13:14.511: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/0, changed state to up
+}}}
+Ehter 1/1이 up 상태가 됐습니다.
+
+Ethernet 1/1도 같은 방법으로 설정합니다.
+{{{#!plain
+Router(config-if)#exit
+Router(config)#
+Router(config)#int ethernet 1/1                        
+Router(config-if)#ip address 192.168.110.254 255.255.255.0
+Router(config-if)#no shut
+Router(config-if)#no shutdown 
+Router(config-if)#
+*Mar  1 01:15:06.027: %LINK-3-UPDOWN: Interface Ethernet1/1, changed state to up
+*Mar  1 01:15:07.027: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/1, changed state to up
+}}}
+Ethernet 1/1도 up상태가 됐습니다.
+
+인터페이스의 상세 정보는 show interfaces로 확인할 수 있습니다.
+{{{#!plain
+Router# show interfaces ethernet 1/0
+Ethernet1/0 is up, line protocol is up 
+  Hardware is AmdP2, address is c800.1f96.0010 (bia c800.1f96.0010)
+  Internet address is 192.168.105.254/24
+  MTU 1500 bytes, BW 10000 Kbit, DLY 1000 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+...
+}}}
+
+=== VM 네트워크 설정 ===
+영업팀과 개발팀의 VM을 실행하고 네트워크를 설정합니다.
+  * 영업팀 노드
+    * ip 주소 : 192.168.105.1
+    * netmask : 255.255.255.0
+    * gateway : 192.168.105.254
+  * 개발팀 노드
+    * ip 주소 : 192.168.110.1
+    * netmask : 255.255.255.0
+    * gateway : 192.168.110.254
+영업팀 노드 network 설정
+{{{#!plain
+# cat /etc/network/interfaces 
+iface eth2 inet static
+address 192.168.105.1
+netmask 255.255.255.0
+gateway 192.168.105.254
+}}}
+
+개발팀팀 노드 network 설정
+{{{#!plain
+# cat /etc/network/interfaces 
+iface eth1 inet static
+address 192.168.110.1
+netmask 255.255.255.0
+gateway 192.168.110.254
+}}}
+각각의 노드에서 게이트웨이 (192.168.105.254, 192.168.110.254)로 ping이 되는지를 테스트 해봅니다. 제대로 설정했다면 ping이 잘 될겁니다.
+
+R1에서 arp 정보를 확인해 봅니다. 
+{{{#!plain
+Router#show arp 
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  192.168.105.1           2   0800.272f.b464  ARPA   Ethernet1/0
+Internet  192.168.110.1           1   0800.276c.b073  ARPA   Ethernet1/1
+Internet  192.168.110.254         -   c800.1f96.0011  ARPA   Ethernet1/1
+Internet  192.168.105.254         -   c800.1f96.0010  ARPA   Ethernet1/0
+}}}
+Router 인터페이스의 MAC 주소와 VM 인터페이스의 모든 MAC 주소를 확인할 수 있습니다. 
+
+=== gateway를 통한 통신 ===
+영업팀 노드에서 개발팀 노드 즉 192.168.105.1 과 192.168.110.1 통신이 가능할까요 ? 주소영역이 달라서 통신이 안될 거라고 생각할 수도 있는데요. ping을 해보면
+{{{#!plain
+192.168.110.1 # ping 192.168.105.1 
+PING 192.168.110.254 (192.168.110.254) 56(84) bytes of data.
+64 bytes from 192.168.105.1: icmp_req=1 ttl=63 time=4.25 ms
+64 bytes from 192.168.105.1: icmp_req=2 ttl=63 time=2.63 ms
+64 bytes from 192.168.105.1: icmp_req=3 ttl=63 time=2.63 ms
+}}}
+
+통신이 됩니다. 왜 통신이 되는지 패킷이 처리되는 과정으로 알아보겠습니다. 
+  1. 192.168.105.1로 향하는 '''패킷A'''가 만들어졌습니다. 
+  1. '''패킷A'''는 192.168.110.0/24로 향하는 패킷이 아닙니다. 
+  1. 따라서 '''패킷A'''는 default gateway인 '''192.168.110.254'''로 향합니다. 이쯤에서 영업팀 노드의 static route 테이블을 확인해 보겠습니다. 192.168.110.0/24 이외의 패킷은 192.168.110.254로 보내라고 설정되있는 걸 확인할 수 있습니다.   
+     {{{#!plain
+192.168.110.1 # route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref  Use Iface
+0.0.0.0         192.168.110.254 0.0.0.0         UG    100    0      0 eth1
+192.168.110.0   0.0.0.0         255.255.255.0   U     0      0      0 eth1
+}}}
+  1. '''패킷A'''는 switch로 향합니다. 
+  1. 스위치는 '''패킷A'''를 라우터로 보냅니다. 스위치의 MAC 주소 테이블을 보면 라우터와 노드의 MAC 주소를 확인할 수 있을 겁니다. 즉 라우터와 스위치, 노드는 L2로 연결돼있습니다.  
+  1. 라우터에 패킷이 도착했습니다. 앞서 라우터의 arp 테이블을 확인해 보면, '''패킷A'''의 목적지인 192.168.110.1의 MAC 주소가 있는 걸 확인했습니다. 따라서, 라우터는 '''패킷A'''를 SW1으로 바로 보낼 수가 있습니다. 라우터의 static routing 정보를 확인해 보겠습니다. static 라우팅 정보가 없는데도 라우팅이 되는 군요 ? 라우팅 테이블은 IP를 가지고 경로를 정합니다. L3죠. 하지만 현재 구성에서는 라우터가 모든 노드와 L2로 연결돼 있기 때문에 라우팅 테이블을 참고할 필요 없이 패킷 경로 설정이 가능합니다   
+     {{{#!plain
+Router#show ip route
+Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route
+
+Gateway of last resort is not set
+
+C    192.168.105.0/24 is directly connected, Ethernet1/0
+C    192.168.110.0/24 is directly connected, Ethernet1/1
+}}}
+  1. 해서 최종적으로 192.168.110.1에 '''패킷A'''가 도착합니다.
+
+192.168.105.1 node는 192.168.110.1 node의 MAC 정보를 가지고 있을 까요 ? 
+
+가지고 있지 않습니다. MAC은 L2 프로토콜이며 L2는 같은 subnet의 node의 연결에만 관여하기 때문입니다. 같은 subnet이 아닐 경우에는 라우터를 거쳐야만 합니다. 이 구성에서는 R1이 중간에서 패킷을 포워딩 해 주기 때문에 통신이 가능한 거죠. 
+
+
+== 참고 문헌 ==
+  1. [wiki:Site/System_management/GNS3 GNS3 설치]
+  1. [wiki:Site/System_management/GNS3Layer2 GNS3를 이용한 L2 테스트]
+[[tag(OSI7,gns3,L2,cisco)]]

@@ -1,0 +1,926 @@
+#title Cloudstack3.0 admin guide 
+
+[[TableOfContents]]
+
+== 문서에 대해서 ==
+만약 당신이 Cloudstack 인스톨 경험이 있다면, 클라우드스택을 이용해서 완전한 클라우드 환경을 구축하기 위한 정보를 얻기를 원할 것이다. 이 문서는 클라우드 설정과 관리하고 운영하기 위한 정보를 제공한다. 
+
+== 클라우드 스택은 무엇인가 ==
+클라우드스택은 IaaS 솔류션으로 public 클라우드와 private 그리고 hybride 클라우드 인프라 스트럭처를 관리하기 위한 오픈소스 소프트웨어다. 클라우드 스택은 클라우드 인프라스트럭쳐를 구성하는 네트워크, 스토리지, compute 노드를 관리한다. 클라우드 스택을 이용해서 클라우드 환경을 구성하는 자원을 배치하고 관리하고 설정할 수 있다. 
+
+클라우드 스택을 이용해서 할 수 있는 일들이다.
+  * 사용자의 요구사항을 탄력있게 수용하기 위한 클라우드 컴퓨팅 서비스를 제공할 수 있다. 서비스 제공자는 가상 머신과, 스토리지 볼륨, 인터넷을 네트워크 설정을 판매할 수 있다. 
+  * 특정 고객을 위한 프라이빗 클라우드를 구축할 수 있다. 
+
+== 클라우드 스택으로 할 수 있는 것들 ==
+=== Multiple Hypervisor support ===
+클라우드 스택은 다양한 하이퍼 바이저를 지원한다. 하나의 클라우드 환경에 하나 이상의 hypervisor를 이용해서 VM을 만들 수 있다. 클라우드 스택은 오픈 소스 Xen, KVM, VMware vSphere, Citrix Xenserver등의 하이퍼바이저를 지원한다. 
+
+=== Massively Scable Infrastructure Management ===
+클라우드 스택은 수만대의 서버를 포함한 지역적으로 분산된 여러 데이터 센터를 관리할 수 있게 설계되었다. 클라우드 스택은 분산된 자원을 중앙관리할 수 있도록 함으로써 클러스터 레벨에서의 관리 필요성을 제거한다. single component failure가 클라우드 전체에 영향을 미치는 것을 막아준다. 또한 클라우드 시스템 가동중에 이루어지는 유지보수와 관리 작업은 전체 클라우드에 영향을 최소화 하면서 진행할 수 있다.
+
+=== Automatic Configuration Management ===
+클라우드스택은 각 게스트 VM의 네트워크와 스토리지 세팅을 자동으로 진행한다.
+
+클라우드스택은 클라우드 환경을 설정하기 위한 virtual appliances 풀을 관리한다. 이 가상 어플라이언스들은 방화벽, 라우팅, DHCP, VPN Access, console proy, storage access, storage replacation를 자동화 한다. 관리자는 가상 어플라이언스들을 사용함으로써 클라우드 자원의 배치와 관리를 단순화 할 수 있다. 
+
+=== Graphical User Interface ===
+클라우드 스택은 클라우드를 관리하고 자원을 배치하기 위한 웹 기반의 인터페이스를 제공한다. 이 웹인터페이스를 이용해서 vm을 실행하고 vm template, 전체 cloud 운용 상황등을 모니터링할 수 있다. 웹 인터페이스는 기업에서 사용하기 충분한 수준의 기능들을 제공한다. 
+
+=== API and Extensibility ===
+클라우드 스택은 클라우드 자원을 관리하기 위한 광범위한 API를 지원한다. 또한 API의 사용을 도와주기 위한 상세한 문서를 제공한다. 당신은 API를 이용해서 새로운 클라우드 관리 애플리케이션을 개발할 수 있으며, 웹 UI에서 제공하지 않는 새로운 기능을 개발할 수도 있다.
+
+클라우드 스택은 사용자가 새로운 타입의 allocator를 개발할 수 있도록 지원한다. 사용자는 HostAllocators와 StoragePoolAllocator를 이용해서 VM이 배치될 호스트와 스토리지 풀을 할당하기 위한 새로운 규칙을 만들 수 있다. 
+
+=== High Availability ===
+
+== Deployment Architecture Overview ==
+클라우드스택 설치는 두 부분으로 이루어진다. 관리 서버와 관리서버가 관리하는 클라우드 인프라스트럭쳐가 그것이다. 
+
+최소한의 구성은 CloudStack 관리 서버와 클라우드 인프라스트럭쳐를 구성하는 다른 server로 이루어진다. 아래의 그림은 단지 하이퍼바이저를 포함한 하나의 cnode를 가진 간단한 구성을 보여준다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1fEQlQacCaxa9hwk2FJZI8Pwi-cCTTWp-epFUzqq4UV0&amp;w=355&amp;h=175">
+}}}
+
+완전한 구성에서는 수천대의 호스트와 이를 관리하기 위한 복잡한 네트워크, 이들을 관리하기 위한 2개 이상의 HA로 구성된 관리 서버가 필요할 것이다. 이러한 구성은 Advanced Installtion Guide에서 소개하겠다.
+
+=== Management Server Overview ===
+관리 서버에서 제공하는 기능들이다.
+  * 관리자와 엔드 유저를 위한 웹 인터페이스 
+  * 클라우드스택 플랫폼을 제어하기 위한 API  
+  * 호스트에 게스트 VM을 할당하고 관리  
+  * 어카운트에게 public ip와 private ip를 할당  
+  * 게스트 운영체제가 사용할 가상디스크의 할당
+multi-node 관리서버를 인스톨하는 방법은 Advanced Installation Guid에서 다룬다.
+
+클라우드 인프라 스트럭쳐는 아래의 요소로 구성된다.
+  * Zone : 일반적으로 zone은 하나의 데이터 센터에 대응하는 개념이다. Zone는 하나 이상의 Pod와 secondary storage로 구성된다. 
+  * Pod : 일반적으로 L2스위치와 하나 이상의 cluster로 구성되는 '''rack'''에 대응한다.
+  * Cluster : Cluster는 하나 이상의 호스트와 primary storage로 구성된다. 
+  * Host : 클러스터를 구성하는 단일 컴퓨터. VM은 이 호스트에 생성된다. cnode라고 부르기도 한다.
+  * Primary storage : cluster의 구성요소로 모든 VM의 디스크 볼륨이 저장되는 공간이다. 
+  * Secondary storage : zone의 구성요소로 template, ISO images, snapshot 등이 저장된다.   
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1p7ZuCYsX3mQekbjz_RfBpe1nlxSGfJ05gZFqOBiOlpM&amp;w=510&amp;h=362">
+}}}
+
+=== Networking Overview ===
+클라우드 스택은 두가지 타입의 네트워킹 시나리오를 가지고 있다.
+  * '''Basic''' : AWS 스타일의 네트워킹을 지원한다. IP address를 기반으로 각 VM이 배치된다. L3 영역에 VM이 놓이며, 때문에 IP address를 필터링 하는 것으로 VM을 isolation 한다. 클라우드 스택에서는 '''security group'''이라고 부른다.
+  * '''Advanced''' : 좀저 정교한 네트워크를 구성할 수 있다. account는 switch를 할당 받으며, switch를 이용해서 private network를 구성할 수 있다. 
+
+== User Service Overview ==
+클라우드스택은 물리적, 논리적인 클라우드 인프라스트럭쳐와 클라우드스택 소프트웨어와 서버들외에 다양한 유저서비스를 제공한다. 유저는 자신의 가상머신과 볼륨 스토리지를 사용할 때 자신의 환경에 맞게 다양한 설정을 할 수 있다. 예를 들어 상업적인 서비스를 한다면 고성능의 VM과 대용량의 Storage를 제공할 수 있다. 
+
+=== Service Offering, Disk Offerings, Network Offerings 그리고 Templates ===
+유저가 새로운 VM 인스턴스를 만들 때, 유저는 VM의 특성과 용량을 설정할 수 있다. 클라우드 스택은 이를 위해서 유저에게 아래의 방법들을 제공한다. 
+  * Service Offerings
+    클라우드스택 관리자는 CPU 속도, CPU 갯수, 루트 디스크의 RAM 크기 등의 정보를 가진 '''Service Offering'''를 만들 수 있다. 클라우드스택은 여러개의 Service Offering를 가질 수 있으며, VM을 만들 때 Service Offering를 선택할 수 있다. 
+  * Disk Offerings
+    클라우드스택 관리자는 primary data storage의 크기를 정의할 수 있다. 
+  * Network Offerings  
+    클라우드스택 관리자는 end user가 사용할 virtual router와 networking device의 사양을 정의할 수 있다. 예컨데 일반 유저는 VM 형식의 virtual router를 제공하고, 고성능의 네트워크 성능을 요구하는 유저에게는 하드웨어 기반의 외부 네트워크 장비를 제공할 수 있다. 
+  * Template
+    클라우드스택 관리자는 VM 인스턴스를 만들기 위한 다양한 종류의 Template를 제공할 수 있다. 예컨데 윈도우 7 템플릿, Centos 6.2 템플릿, Ubuntu 11.10 템플릿 등 고객의 요청에 따른 템플릿을 미리 준비해서 제공할 수 있다. 혹은 Mysql Server 어플라이언스 템플릿, 웹서버 어플라이언스 템플릿등의 템플릿도 준비할 수 있다. 템플릿은 vhd 파일과 메타정보 파일로 구성된다.   
+
+=== Accounts, Users 그리고 Domain ===
+보통 Account는 서비스 제공자의 개념을 가지는 여러 Users를 포함하는 큰 조직에 대응된다. 하나의 어카운트는 여러 유저를 포함할 수 있다. 같은 어카운트에 포함되는 유저는 다른 유저와 서로 구분되지 않는다. 즉 유저는 어카운트의 별칭이나 마찬가지다. 하지만 다른 어카운트의 유저와는 완전히 독립된다. 때문에 대부분의 경우 유저의 개념은 사실상 필요가 없다. 즉 하나의 어카운트에 하나의 유저만 가지는게 일반적이다. 
+
+Domain은 여러 어카운트를 포함한다. 보통 Domain에 포함된 어카운트들은 서로 연관관계를 가진다. 예컨데 Domain은 reseller의 개념이고 Account는 고객의 개념이 될 수 있다.  
+
+Administrators는 시스템에 대해서 특수한 권한을 가지는 유저다. 하나의 시스템은 여러 administrators (이하 관리자)를 가질 수 있다. 관리자는 다른 관리자를 생성하거나 삭제할 수 있으며 시스템에 어카운트를 추가하고 패스워드를 변경하는 등의 일을 할 수 있다. 루트 관리자는  템플릿리, 서비스 오퍼링, 도메인 시스템 관리등의 작업을 할 수 있다. Domain 관리자는 도메인에 포함된 유저를 관리할 수 있다. 도메인 관리자는 물리적인 서버와 다른 도메인에 대한 관리 권한을 가지지 않는다. 
+
+== Using and LDAP Server for User Authentication ==
+LDAP 서비스는 경험이 없는 관계로 번역을 건너뛴다.
+
+== CloudStack UI를 이용해서 로그인 하기 ==
+클라우드스택 관리서버 소프트웨어를 설치하고 실행하면, 클라우드스택 유저 인터페이스를 사용할 수 있다. 이 UI를 이용해서 자원을 provision하고 클라우드 를 관리할 수 있다.  
+
+웹브라우저를 이용해서 아래의 URL 주소로 접근할 수 있다.
+{{{#!plain
+http://<management-server-ip-address>:8080/client
+}}}
+
+
+== Provisioning Cloud Infrastructure == 
+메니저 서버를 실행하고 나면, 관리할 컴퓨터 자원을 추가할 수 있다.
+
+클라우드 인프라스트럭쳐 관리는 대략 다음과 같은 과정을 거친다.
+  1. Zone과 Pod 추가 
+  1. 물리적 네트워크 설정 
+  1. Cluster 추가
+  1. 호스트 추가
+  1. Primary storage 추가
+  1. Secondary storage 추가
+이 과정을 거치면 대략 다음과 같은 기본적인 클라우드 환경을 구축할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1B7JiEMCs4ZvHhoEGYZVT5foucbh_a4sp-s9u239MZsg&amp;w=688&amp;h=369">
+}}}
+
+실제 환경은 2개 이상의 관리서버로 구성될 것이다.
+
+=== Zone에 대해서 ===
+Zone은 클라우드스택에서 가장 큰 규모의 클라우드 조직 구성으로, 일반적으로 하나의 데이터센터에 대응한다. 만약 여러개의 데이터 센터를 가지고 있다면, 여러개의 zone을 구성하게 된다. 일반적으로 zone은 물리적인 환경을 근거로 구성이 된다. 예컨데 전원공급장치, aggregation switch 장비, IP 영역, 물리적인 위치등에 따라서 서로 다른 zone으로 구성한다. 
+
+zone은 아래의 요소로 이루어진다.
+  * 하나 이상의 pod. 각 pod는 하나 이상의 cluster를 포함하며, 하나이상의 primary storage를 가진다.
+  * secondary storage를 가진다. secondary storage는 zone의 모든 pod이 공유한다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1p7ZuCYsX3mQekbjz_RfBpe1nlxSGfJ05gZFqOBiOlpM&amp;w=510&amp;h=362">
+}}}
+
+유저가 guest VM을 만들기 위해서는 반드시 zone을 선택해야 한다. 또한 VM을 만들기 위한 private template가 필요하다. 유저의 guest VM 선택한 zone에서 template를 이용해서 만들어진다. 클라우드스택 관리자는 public template를 미리 준비할 수도 있는데, 이 경우 유저는 public template를 이용해서 VM을 만들 수도 있다. 
+
+public zone 혹은 private zone의 구성이 가능하다. public zone은 모든 유저가 사용가능 하다. 이는 zone내에서 유저는 자유롭게 vm을 만들 수 있음을 의미한다. private zone는 domain 단위로 지정할 수 있는데, 도메인과 서브도메인에 포함된 유저만 zone에 vm을 만들 수 있다.  
+
+같은 zone에 있는 호스트들은 서로 직접 접근할 수 있다. 다른 zone에 있는 호스트들이 서로 접근하도록 하려면 VPN 터널을 뚫어야 한다.  
+
+zone을 만들 때, 관리자는 아래의 사항을 반드시 결정해야 한다.
+  * zone에 얼마나 많은 pod를 만들 것인가.
+  * 하나의 pod에 몇 개의 cluster를 둘 것인가.
+  * 각 cluster 마다 몇 개의 host를 할당할 것인가.
+  * 각 clusster안에 몇 개의 primary storage를 둘 것이며, 크기는 얼마로 할 것인가.
+  * zone에 몇 개의 secondary storage를 둘 것인가.
+
+=== pod에 대해서 ===
+pod는 하나의 랙에 대응하며, 같은 pod에 있는 호스트들은 같은 subnet에 놓인다. 랙에 있는 호스트들이 같은 subnet에 놓이는 것을 생각하면 된다.
+
+pod는 cloudstack에서 두번째로 큰 구조다. 각각의 zone은 하나이상의 pod로 구성된다.  
+
+각 pod는 하나 이상의 cluster와 하나 이상의 primary storage server로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1B7JiEMCs4ZvHhoEGYZVT5foucbh_a4sp-s9u239MZsg&amp;w=351&amp;h=251">
+}}}
+
+pod은 앤드 유저에게는 보이지 않는다. 즉 앤드 유저는 자신의 vm이 배치되는 zone을 확인할 수는 있지만, vm이 어느 pod에 놓이는지는 알 수가 없다.  
+
+=== Cluster에 대해서 ===
+cluster는 hosts의 그룹이다. 정확하게 말하자면 cluster는 Xenserver server pool, KVM의 server set 이며 VMWare일 경우 vCenter cluster이다. 클러스터의 호스트들은 모두 동일한 장비와 동일한 하이퍼바이저, 동일한 subnet 그리고 같은 primary storage를 사용한다. 스토리지를 공유하기 때문에 cluster내에서는 다른 호스트로 vm을 실시간으로 마이그레이션 할 수 있다.
+
+클러스터는 클라우드 스택에서 3번째로 큰 구조다. 각 pod은 하나 이상의 클러스트로 구성된다. 클러스터의 크기는 hypervisor에따라서 제한폭이 결정된다. 클라우드스택은 하이퍼바이저에 따른 적당한 cluster의 크기를 권장한다. 
+
+cluster은 하나 이상의 host, 하나 이상의 primary storage로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1yse4q9_V0o6y1OkKU5pzdOwWI8Nen7W19bLutiq_W7w&amp;w=276&amp;h=194">
+}}}
+
+VMWare경우 cluster는 vCenter server가 관리한다. 따라서 관리자는 클라우드스택과 함께 vCenter server를 등록해야만 한다. 각 zone에는 하나 이상의 vCenter server를 배치할 수 있다. 각 vCenter server는 역시 하나 이상의 VMware clusters를 관리한다.
+
+경우에 따라서 외부 primary storage 대신에 local storage를 사용할 수 있는데 이 경우에도 클러스터는 여전히 필요하다. 이 경우 하나의 클러스터에 하나의 host가 배치된다. 
+
+== 물리적 네트워크에 대해서 ==
+zone을 운영하기 위해서는 물리적인 네트워크가 설정돼 있어야 한다. 각 존은 하나 이상의 물리적 네트워크 장비가 배치된다. 이들 네트워크는 하이퍼바이저 호스트의 NIC에 대응한다. 각 물리적 네트워크는 하나 이상의 네트워크 트래픽의 흐름을 담당한다. zone의 네트워크 트래픽 흐름은 zone을 생성시 basic network 모드를 선택했는지 혹은 advanced networking를 선택했는지에 따라 달라진다. 
+
+=== Basic zone network traffic types ===
+basic 네트워크를 이용한다면, zone은 단지 하나의 물리적인 네트워크만을 가지게 된다. 즉 L2 모드로 작동하게 된다. 물리적인 네트워크는 다음 3가지의 트래픽을 전송한다.
+  * Guest Traffic
+    앤드 유저의 VM은 guest traffic을 만든다. 
+  * Management 
+    클라우드스택이 내부 리소스를 관리하기 위해서 사용하는 네트워크다. 클라우드스택은 이 네트워크를 통해서 host와 system VM, 클라우드스택 management 서버와 직접 통신을 한다. 당신은 system VM들이 사용할 IP 범위를 지정해야만 한다. 
+  * Storage.
+    Template와 snapshot같은 Primary와 secondary 서버들 사이의 트래픽이 흐르는 네트워크
+basic network는 물리적인 네트워크 환경과 거의 일치한다. 호스트들이 물리적인 네트워크 장비에 직접 붙는 방식으로 네트워크 환경 설정이 비교적 간단한 편이다. 물리적인 네트워크 설정을 끝내면, 여기에 맞게 VM의 네트워크 환경만 설정해 주면 되기 때문이다.  
+
+=== Basic zone guest IP address ===
+basic 네트워크를 이용할 때, 클라우드 스택은 pod 단위로 guest가 사용할 IP를 '''CIDR'''내에서 할당한다. 그러므로 관리자는 반드시 POD의 ip 범위를 설정해야 한다.
+
+만약 관리자가 '''CIDR'''를 변경한다면, 새로 만들어지는 VM만 새로운 CIDR이 적용되고 기존에 운영중이던 VM은 오래된 CIDR을 그대로 사용한다. 
+
+=== Advanced Zone network traffic types ===
+advanced 네트워크를 이용하면, 하나의 zone안에 여러 물리적 네트워크를 포함할 수 있다. 각각의 물리적인 네트워크는 하나 이상의 트래픽 타입을 전송할 수 있으며, 당신은 각 네트워크에 원하는 트래픽 타입을 지정할 수 있다. advanced zone의 트래픽 타입은 다음과 같은 것들이 있다. 
+  * Guest
+    앤드 유저 VM의 트래픽의 수송 경로다. 이 네트워크는 분리 (isolated) 하거나 혹은 공유 (shared)할 수 있다. guest 네트워크의 isolation을 위해서는 VLAN을 사용하게 되는데, 때문에 관리자는 클라우드스택의 어카운트 네트워크에 할당할 VLAN(:12)을 미리 할당해야 한다. shared guest 네트워크에서는 모든 guest vm이 네트워크를 공유한다. 이 경우 당신은 security group와 같은 L3 네트워크 isolation 기술을 이용해야 한다.
+  * management 
+    클라우드스택이 내부 리소스를 관리하기 위해서 사용하는 네트워크다. 클라우드스택은 이 네트워크를 통해서 host와 system VM, 클라우드스택 management 서버와 직접 통신을 한다. 당신은 system VM들이 사용할 IP 범위를 지정해야만 한다. 
+  * public
+    VM들이 인터넷을 엑세스하기 위해서 사용하는 네트워크다. 엔드 유저는 NAT를 통해서 public 네트워크와 통신을 한다.    
+  * storage
+    Template와 snapshot같은 Primary와 secondary 서버들 사이의 트래픽이 흐르는 네트워크
+
+=== Advanced Zone Guest IP Addresses ===
+Advanced 네트워크를 사용할 경우 관리자는 guest가 사용할 네트워크를 추가할 수 있다. 이 네트워크는 네트워크 영역에 있는 모든 어카운트가 사용할 수 있다. 이 네트워크는 VLAN ID, IP 범위, gateway로 설정된다. 
+
+만약 관리자가 운영중에 guest 네트워크의 CIDR을 변경하면, 변경된 내용은 새로운 guest 네트워크에만 적용되고 기존의 CIDR은 변경되지 않는다.
+
+=== Advanced Zone public IP Address ===
+클라우드 스택은 각 어카운트 source NAT를 위한 하나의 public IP를 할당한다. 만약 Juniper SRX 방화벽을 이용할 경우 모든 어카운트가 하나의 공통 public IP 주소를 사용하도록 할 수 있다. 이렇게 하면 IP 주소 소비를 줄일 수 있다. 유저는 추가저인 public ip 주소를 추가할 수도 있다. 관리자는 zone을 만들 때, 반드시 하나이상의 public IP 주소 범위를 설정해야 한다.
+
+=== System Reseved IP Address ===
+각 zone에는 management 네트워크를 위한 IP주소를 남겨야 하다. 이 네트워크 영역으로 클라우드스택 management Server과 Secondary Storage VM과 Console Proxy VM등의 system vm간 통신이 이루어진다. 
+
+이 IP주소는 클라우드 전체에서 유일해야 한다.
+
+pod의 호스트에는 RFC1918에 따라서 private ip 주소를 할당한다. Console proxy와 Secondary Storage system VM은 이들이 생성되는 pod의 private 주소를 할당한다.
+
+management 네트워크 IP주소는 하이퍼바이저가 설치된 cnode, management 서버와 같은 subnet에 위치해야 한다. 그러므로 cnode와 management 서버가 사용하는 IP 주소는 system reserved ip 범위의 겹치면 안된다. 예를 들어서 System reserved IP range가 192.168.154.2에서 192.168.154.7이라면 management 서버와 cnode는 .8과 .254에 위치하게 네트워크를 설계해야 한다.   
+
+==== In all zones ====
+각 pod에 있는 시스템들이 사용할 private IP를 설정한다.
+
+KVM과 Xenserver의 경우 pod의 host들이 사용할 private IP를 결정해야 한다. 만약 pod를 확장하려 한다면, 충분한 private IP가 있는지를 고려해야 한다. 
+
+==== In a zone that used advanced networking ====
+어카운트와 클라우드 스택의 system VM들을 위한 충분한 private IP가 있는지 확인해야 한다. 일반적으로 system vm을 위해서 10개의 추가적인 IP가 필요하다.   
+
+Advanced 네트워크 모드에서 각 pod 당 사용할 수 있는 private IP 주소의 숫자는 pod의 노드에 실행되고 있는 하이퍼바이저의 종류에 따라서 달라진다. Citrix XenServer와 KVM은 link-local 주소를 사용하는데, 이론적으로 65,000 정도의 private IP 주소를 사용할 수 있다. 이 주소는 충분히 큰 숫자라서 문제되는 경우가 생기진 않을 것이다. VMWare ESXi는 pod당 255개의 IP 주소를 관리할 수 있다. 그러므로 virtual router와 물리적인 서버들이 자원을 공유해야 한다. virtual router의 갯수에 따라서 사용할 수 있는 IP 자원이 제한 될 수 있으므로 신경써서 IP 주소를 관리해야 한다.
+
+
+Advanced 네트워크 모드에서 ESXi pod에 충분한 크기의 private IP 공간을 확보하기 위해서는 아래의 기술들을 이용해야 한다. (필요하다면 다른 기술들을 응용해야 할 것이다.)
+  * subnet의 CIDR를 크게 한다. /24 대신 /20을 사용한다면, 4000개의 IP 공간을 확보할 수 있다.  
+  * multiple pod을 만들고 그 자신의 서브넷을 가지게 한다. 하나의 pod이 255개의 IP를 사용할 수 있다면, 10개의 pod를 운용할 경우 2,550개의 IP 공간을 확보할 수 있다.  
+
+== 유저 서비스들 ==
+클라우드 인프라스트럭쳐를 사용려는 사람들은 다양한 요구를 가지고 있으며, 요구에 따라서 선호하는 네트워크 모드도 달라질 수 있다. 클라우드스택 관리자로서 당신은 유저를 위해서 다음과 같은 네트워크 설정을 할 수 있다.
+  * zone의 물리적 네트워크
+  * 하나의 물리적인 네트워크에서 제공하고자 하는 서비스를 위해서 다양한 제공방법의 선택.
+  * 다양한 network offering를 만들어서 유저로 하여금 선택하게 할 수 있다.
+  * 유저가 원할 경우 새로운 network offering를 추가해서, 유저로 하여금 더 나은 네트워크 서비스를 받도록 한다.
+  * Project로 유저 멤버를 관리함으로써, 유저로 하여금 네트워크 환경에 접근하기 위한 다양한 방법들을 제공할 수 있다. 
+=== 물리적 네트워크에 대하여 === 
+물리적인 네트워크는 zone에 있는 네트워크 장비와 물리적인 배선을 포함한다. 하나의 zone은 하나 이상의 물리적 네트워크를 가질 수 있다. 관리자는 다음과 같은 일을 할 수 있다. 
+  * zone의 물리적 네트워크를 추가/삭제/업데이트 한다.
+  * 물리적 네트워크의 VLAN을 설정한다. 
+  * 하이퍼바이저가 인식할 수 있도록 네트워크 이름을 설정할 수 있다.
+  * firewall, load balancers 등의 서비스 제공자를 설정할 수 있다. 
+  * IP address trunked 설정 
+  * 물리적 네트워크의 트래픽 유형과 네트워크 속도등을 설정할 수 있다.  
+
+==== 물리적 네트워크의 설정 특성들 ==== 
+클라우드스택은 아래의 설정 값들을 변경함으로써 zone에서 사용할 물리적 네트워크를 설정할 수 있다.  
+  * 어떤 종류의 네트워크 트래픽을 수송할 것인가. (guest, public, management, storage) 
+  * VLAN
+  * 하이퍼바이저가 사용할 네트워크에 유일한 이름을 줄 수 있다.   
+  * 관리자는 물리적 네트워크를 활성화 하거나 비활성화 할 수 있다. 
+  * 네트워크 속도
+  * Tags
+  * Isolation
+=== Virtual network에 대하여 ===
+Virtual 네트워크를 이용하면 하나의 네트워크 위에 multi-tenancy 한 논리적 네트워크를 구성할 수 있다. 클라우드 스택은 shared 혹은 isolated한 virtual 네트워크를 만들 수 있다. 
+==== Isolated networks ====
+Isolated network로 구성하면, 어카운트 마다 가상의 네트워크 장비를 할당할 수 있다. Isolated 네트워크는 다음과 같은 특징을 가진다.  
+  * VLAN과 같은 자원을 동적으로 할당할 수 있다. 
+  * Network offering에 따라서 네트워크를 할당 할 수 있다.
+  * Network offering를 이용해서 네트워크를 upgrade 혹은 downgrade 할 수 있다. 
+
+==== Shared Networks ====
+Shared 네트워크모드에서는 L2에서 VLAN을 이용하지 않으며, 따라서 어카운트들의 가상머신은 서로 엑세스할 수 있다. Shared 네트워크에서는 VLAN 대신에 security groups와 같은 기술을 이용해서 네트워크를 isolation 한다. 
+  * 관리자는 shared 네트워크를 만들 수 있다.
+  * shared 네트워크는 도메인 별로 지정할 수 있다. 
+  * shared 네트워크는 security groups를 이용해서 isolated 한다.
+
+==== Runtime Allocation of Virtual Network Resources ====
+새로운 virtual 네트워크를 정의하면, 모든 네트워크 설정은 클라우드스택 안에 저장된다. 하지만 실제 네트워크 자원은 네트워크 안에 첫번째 가상머신이 만들어질 때 활성화 된다. 해당 네트워크에서 가상머신을 삭제하면, 가상머신이 삭제함으로써 남겨진 네트워크 자원들은 클라우드스택이 자동으로 수집한다. 
+
+=== Network Service Providers ===
+Service provider는 네트워크 서비스를 위한 하드웨어와 virtual appliance를 의미한다. 예를들어 firewall appliance는 방화벽 서비스를 제공하기 위해서 클라우드 안에 설치할 수 있다. 단일 네트워크에 같은 네트워크 서비스를 위해서 multifle provider를 설치할 수도 있다. 예를 들어 하나의 물리적 네트워크 안에 Cisco나 Juniper와 같은 디바이스를 설치할 수 있다. 
+
+또한 네트워크 안에 동일한 서비스 provider를 여러개 설치할 수도 있다. (다시 말해서 하나 이상의 Juniper SRX 장비를 설치할 수 있다.)  
+
+만약 하나의 네트워크 안에 같은 서비스를 하는 서로 다른 provider이 있다면, 관리자는 network offering를 만들어서, 유저로 하여금 네트워크 서비스 provider를 선택하도록 할 수 있다.    
+
+==== Supported Network Service Providers ====
+클라우드스택은 지원하는 서비스 provider의 목록을 유지하고 있으며, network offering를 만들 때 서비스 provider를 선택할 수 있다.
+
+=== Network Offerings ===
+네트워크 offering는 다음과 같은 네트워크 서비스의 모음이다.
+  * DHCP
+  * DNS
+  * Source NAT
+  * Static NAT
+  * Port Forwarding
+  * Load Balancing
+  * Firewall
+  * VPN
+  * Juniper같은 방화벽 장비들
+  * 물리적 네트워크를 사용하기 위한 Network tag
+유저가 새로운 VM을 만들면 유저는 network offering를 선택할 수 있다. 그러면 해당 네트워크 서비스를 이용할 수 있게 된다.
+
+클라우드스택 관리자는 클라우드스택에서 기본적으로 제공하는 network offering외에 필요한 만큼 network offerings를 만들 수 있다. 다양한 network offering를 만듦으로 인해서 하나의 물리적 네트워크 상에서 다양한 수준의 네트워크를 서비스 할 수 있다. 예를들어서 A고객은 웹 사이트를 위해서 간단한 방화벽만 필요로 한다. 반면 B고객은 web server farm을 위해서 scalabel한 방화벽 솔류션과 로드 밸런서, 그리고 데이터베이스를 위한 별도의 네트워크를 필요로 할 수 있을 것이다.   
+
+새로운 virtual network를 만들 때, 클라우드스택 관리자는 네트워크에서 사용할 수 있는 network offering 목록을 선택할 수 있다. 각각의 virtual network는 하나의 network offering로 구성된다. virtual network는 network offering를 변경하는 것으로 upgrade 혹은 downgrad할 수 있다.  
+
+또한 관리자는 클라우드스택의 system VM의 network offering도 변경할 수 있다.
+
+==== Creating a New Network Offering ====
+  1. CloudStack UI에서 admin권한으로 로그인 한다.
+  1. 왼쪽 네비게이션 바에, service offering를 클릭한다.  
+  1. Network offering를 선택한다.
+  1. Add Network offering를 선택한다.
+  1. 다이얼로그에서 아래의 사항을 선택한다. 
+     * '''Name'''. 네트워크 오퍼링의 이름 
+     * '''Description'''. 유저에게 보여줄 설명
+     * '''Network Rate'''. 네트워크 트래픽을 MB 단위로 설정한다.  
+     * '''Traffic Type'''. 네트워크 트래픽 타입
+     * '''Guest Type'''. 게스트 네트워크를 isolated로 할건지 shared로 할 건지  
+     * '''Specify VLAN'''. 게스트 네트워크가 Isolated일 경우 사용한다.
+     * '''Supported Services'''. 하나 이상의 네트워크 서비스를 선택한다.
+     * '''Conserv mode'''. 
+     * '''Tags'''. 물리적 네트워크에서 사용할 네트워크 태그
+  1. Add한다.
+
+=== Compute and Disk Service Offerings ===
+Service offerings를 이용해서 CPU core 개수나 속도, 메모리와 디스크 크기 같은 VM 하드웨어의 속성을 정할 수 있다. 클라우드스택 관리자는 다양한 offering를 만들어서 유저로 하여금 그들의 VM을 만들 때 선택하도록 할 수 있다. 
+
+Service offering는 다음의 설정 요소를 가지고 있다.
+  * CPU, 메모리, 네트워크 리소스 
+  * 자원의 측정 방법 
+  * 자원의 사용에 대한 비용 산정 방식 
+  * How often the charges are generated.
+예를 들어서, 1GHz, 2 core cpu, 1GB 메모리를 가지는 VM 인스턴스에 대해서 $0.20/hour의 비용정책을 정할 수 있다. 여기에 대해서 $0.10/GB의 추가적인 비용을 추가할 수도 있다. 유저가 선택한 service offering를 이용해서 클라우드 스택은 빌링 시스템과 통합할 수 있다.
+
+클라우드스택은 service offering에 compute offering와 disk offerings이 따로 분리돼 있다. 컴퓨팅 서비스 오퍼링의 관리 요소는 다음과 같다.
+  * Guest CPU
+  * Guest RAM
+  * Guest Networking type (virtual or direct)
+  * root disk를 위한 tag
+디스크 오퍼링의 관리 요소는 다음과 같다.
+  * 디스크 크기.
+  * data disk를 위한 tag
+
+==== 새로운 compute offering 만들기 ====
+  1. 클라우드스택 UI를 이용해서 관리자 권한으로 접속한다. 
+  1. 왼쪽 네비게이션 바에서 Service Offerings를 클릭한다. 
+  1. Compute Offering를 선택한다.
+  1. Add Compute Offering를 클릭한다.
+  1. 대화상자에서 다음의 값들을 채워 넣는다.
+     * '''NAME''' : 서비스 오퍼링의 이름
+     * '''Description''' : 서비스 오퍼링에 대한 간단한 설명 
+     * '''Storage type''' : 게스트에게 할당할 디스크의 타입. Local allocate를 선택하면, VM은 로컬 디스크에 root volume를 만든다. shared allocated를 선택하면 NFS 등를 사용할 수 있다. 
+     * '''# of CPU cores''' : VM 인스턴스에 할당할 core 개수 
+     * '''Memory (in MB)''' : VM 인스턴스에 할당할 메모리 크기 
+     * '''Network Rate''' : VM 인스턴스의 데이터 전송 한계 
+     * '''Offer HA''' : VM에 대한 HA. 
+     * '''Storage Tag''' : volume을 제공할 primary storage를 선택한다. tag를 명시하면, tagging 된 primary storage에 volume을 요청한다. 
+     * '''Host Tag''' : Host tag를 명시하면, tagging된 Host에 vm이 만들어진다.  
+     * '''CPU cap''' :
+     * '''public''' : 이 offering를 모든 domain에서 사용하게 할지, 특정 도메인에서만 사용하게 할지 결정할 수 있다.
+  1. Add를 클릭한다. 
+
+==== Creating a New Disk Offering ====
+  1. 클라우드스택 UI를 이용해서 관리자 권한으로 접속한다. 
+  1. Service Offering를 클릭한다.
+  1. Disk Offerings를 선택한다.
+  1. Add Disk Offering를 클릭한다.
+  1. 대화상자에서 다음의 값들을 채워 넣는다.
+     * '''Name and Description''' : Offering의 이름과 설명 
+     * '''Custom Disk Size''' : 만약 체크를 하면, 유저가 자신의 디스크 크기를 결정할 수 있다. 체크하지 않으면 관리자가 정한 디스크 크기만 사용할 수 있다.
+     * '''Disk Size''' : Custom Disk Size가 체크되지 않았을 때만 사용할 수 있다. GB 단위로 볼륨의 크기를 정할 수 있다.
+     * '''Storage Tags''' : Tagging된 Primary storage에 볼륨을 만든다. 
+     * '''Public''' : 모든 도메인에서 사용할지, 특정 도메인에서만 사용할지 정한다.
+
+==== Service Offering의 수정과 삭제 ====
+comput offering와 disk offering와 같은 service offering는 생성 후 변경할 수 없다. 
+
+만약 service offering를 사용하는 vm이 없을 경우, service offering를 삭제하면 즉시 영구적으로 삭제된다. 그렇지 않고 service offering를 사용하는 vm이 있다면 해당 service offering를 사용하는 vm이 더 이상 존재하지 않을 때까지 데이터베이스에 남는다. 일단 service offering를 관리자가 삭제하면, 일반 유저는 이 servier offering를 사용할 수 없다.
+
+== Working with Virtual Machines ==
+=== About Working With Virtual Machines ===
+클라우드스택 관리자는 클라우드에 있는 모든 게스트 VM의 life cycle를 관리할 수 있다. 
+
+클라우드스택은 관리자와 일반유저를 위해서 VM의 stop, start, reboot, destroy와 같은 다양한 관리 방법을 제공한다.
+
+각각의 VM은 3가지의 서로다른 목적의 이름을 가지고 있다. 이중 일반 유저는 두 개의 이름만 수정할 수 있다.
+  * Instance name - 클라우드스택에서 유일한 이름으로 클라우드스택이 VM에 할당한다. 유저가 변경할 수 없다. 
+  * Display name - 클라우드스택의 웹 UI에서 출력되는 이름이다. 유저가 수정할 수 있다. 기본 이름은 Instance name이다.  
+  * Name - DHCP 서버가 VM에 할당한 호스트 이름이다. 기본 이름은 Instance name이며, 유저가 수정할 수 있다. 
+
+게스트 VM들은 HA (Highly Available)설정을 할 수 있다. HA 설정된 VM은 시스템에 의해서 모니터링 되는데, 만약 VM이 down될 경우 다른 호스트에서 VM을 재 실행 한다.  
+
+
+새로운 VM에는 하나의 public IP 주소가 할당된다. 클라우드 스택은 VM이 시작될때 VM의 private IP와 public IP를 static NAT을 이용해서 연결한다.  
+
+클라우드 스택은 게스트 VM이 유저에 의해서 shutdown 됐는지 아니면 다른 문제로 shutdown 됐는지 구분하지 못한다. 만약 HA 설정된 VM을 유저가 shutdown 하면, 클라우드 스택이 restart 시켜버린다. 따라서 클라우드스택 UI나 API를 이용해서 shutdown 해야 한다. 
+
+=== Best Practices for Virtual Machines ===
+클라우드스택 관리자는 각 클러스터에 있는 VM 인스턴스의 총 개수를 모니터링 할 수 있다. 또한 클러스터의 자원이 거의 차면, 클러스터에 더 이상 VM 인스턴스를 만들 수 없도록 관리할 수 있다. 가능하면 하나의 호스트에 문제가 생겨도 다른 호스트에서 VM을 deploy할 수 있을 정도의 공간을 남겨 두는게 좋다. 하나의 호스트에 허용하는 VM의 개수는 사용하는 하이퍼바이저에 따라서 달라질 수 있으며, 이 정보는 각 하이퍼바이저에서 제공하는 문서로 확인할 수 있다.   
+
+=== VM Lifecycle ===
+VM의 lifecycle는 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1sRAkhEUwYIGqK385gRXtAJQVsTwlimKR704-MuLhhjY&amp;w=572&amp;h=258">
+}}}
+
+Destroyped된 virtual machine는 복구할 수 없다. VM에서 사용하던 (IP 주소를 포함한)모든 리소스는 시스템이 회수한다.  
+
+Stop상태는 운영체제가 shutdown한 상태와 같다. 운영체제에서 shutdown 명령을 이용하면 VM은 sto 상태가 된다. 만약 웹 UI에서 stop 명령을 내리면 VM은 강제로 종료된다. 이것은 물리적인 기계의 전원 코드를 뽑은 것과 마찬가지다. 
+
+reboot은 stop후 start는 과정이다.
+
+만약 하드웨어나 네트워크 문제로 VM에 문제가 생기면, 문제가 생긴 VM은 down 상태가 된다. 클라우드스택은 하이퍼바이저로부터 주기적으로 heartbeat를 수신하는데, 3분동안 heartbeat를 받지 못하면 down상태로 처리한다. 
+
+유저는 메뉴얼하게 down 상태의 virtual machine을 재시작할 수 있다. 
+
+HA 활성화가 되어 있는 virtual machine이 down 상태가 되면, 자동으로 virtual machine을 실행한다.  
+
+=== VM 만들기 ===
+일반적으로 Virtual machine은 template을 이용해서 만든다. 필요할 경우 blank virtual machine를 만들 수도 있다. blank virtual machine는 OS 템플릿 없이 만들 수 있는데, 나중에 CD나 DVD-ROM을 이용해서 운영체제를 설치할 수 있다.
+
+템플릿을 이용해서 VM을 만드는 방법이다.
+  1. 클라우드스택 UI로 접속한다. 
+  1. 왼쪽 네비게이션 바에서 '''Instances'''를 클릭한다. 
+  1. '''Add Instance'''를 클릭한다. 
+  1. Wizard에서 Template를 선택한다.
+  1. Service offering를 선택한다.
+  1. submit 버튼을 클릭하면 VM이 만들어져서 실행된다.
+
+ISO로 부터 VM 만들기
+  1. 클라우드스택 UI로 접속한다. 
+  1. 왼쪽 네비게이션 바에서 '''Instances'''를 클릭한다. 
+  1. '''Add Instance'''를 클릭한다.
+  1. Wizard에서 ISO Boot를 선택한다.
+  1. submit 버튼을 클릭하면 VM이 만들어져서 실행된다. 
+
+=== VM에 접근하기 ===
+유저는 자신의 VM에 접근할 수 있으며, 관리자는 모든 VM에 접근할 수 있다.
+
+클라우드스택 UI를 이용해서 VM에 접근하는 방법은 다음과 같다.
+  1. 유저나 관리자 권한으로 클라우드스택에 접근한다.
+  1. 실행중인 VM을 클릭한다. 
+  1. '''View Console''' 버튼을 클릭한다.
+
+네트워크를 이용해서 직접 접근하기
+  1. 접근하려는 VM의 port에 대한 입력 트래픽이 열려있어야 한다. 예를 들어 basic zone이라면 VM의 security group에 입력 트래픽에 대한 정책이 열려있는지 확인해야 한다. Port forwarding 정책을 이용하는 방법도 있다. 나중에 다루도록 하겠다.  
+  1. 포트가 열려있다고 하더라도 항상 ssh(:12)로 접근가능한 건 아니다. VM을 설치한 템플릿에 ssh 서버가 포함되어 있지 않을 수 있기 때문이다. 혹은 ssh 서버를 설치했더라도 활성화 시키지 않았을 수도 있다. 이 경우에는 클라우드스택 UI로 접속해서 ssh 서버 설정을 바꿔줘야 한다. 
+  1. 만약 네트워크에 외부 방화벽 장치가 있다면, 방화벽 룰을 수정해야 한다. 나중에 다루도록 하겠다.  
+
+=== Stopping and Starting VMs ===
+VM 인스턴스는 stop, restart, delete할 수 있다. 클라우드스택 UI에서 Instances를 클릭한 다음 VM을 선택해서 Stop, Start, Reboot, Destroy 할 수 있다.  
+
+
+=== Hosts 간에 VM 이동 (Manual Live Migration) ===
+클라우드스택 관리자는 실행중인 VM을 서비스 중단없이 다른 호스트로 옮기거나 maintenance 모드로 전환할 수 있다. 이것을 manual live migration이라고 한다. 이를 위해서는 아래의 조건이 충족되야 한다.   
+  * 루트 관리자로 로그인해야 한다. 도메인 관리자나 유저는 live migration을 할 수 없다. 
+  * VM이 실행중이어야 한다. stop 상태의 VM은 live migration할 수 없다.  
+  * 옮기고자 하는 호스트가 반드시 같은 cluster내에 있어야 한다. 
+  * local disk storage를 이용하는 VM은 live migration할 수 없다.
+  * 목적지 host에 용량이 충분해야 한다. 그렇지 않을 경우 VM은 메모리 용량이 확보될 때까지 "migration" 상태로 남게 된다.
+
+메뉴얼하게 live migration 하는 방법이다.
+  1. 루트 관리자로 로그인한다. 
+  1. Instance로 간다.
+  1. migration할 VM을 선택한다.
+  1. Migrate Instance 버튼을 선택한다.
+  1. 호스트의 목록이 나오면, 마이그레이션할 호스트를 선택한다.
+  1. OK를 클릭한다.
+
+=== VM 삭제 ===
+유저는 자신의 virtual machine를 삭제할 수 있다. 실행중인 virtual machine을 delete하면, virtual machine는 즉시 중단된 후 삭제 된다. 관리자는 어떤 VM이라도 삭제할 수 있다>
+
+Virtual machine을 삭제하는 방법이다.
+  1. 관리자나 유저로 클라우드스택에 접속한다. 
+  1. Instacne로 간다. 
+  1. 삭제할 VM을 선택하고 
+  1. Destroy Instance 버튼을 클릭한다. 
+
+== Using Projects to Organize Users and Resources ==
+사용해 본 후 정리
+
+== Working with Hosts ==
+이번 장에서 클라우드스택의 호스트에 대한 기술적인 내용을 살펴볼 것이다. 클라우드스택 UI를 이용해서 호스트를 설치하고 설정하는 법을 알아보겠다.
+
+=== 호스트에 대해서 ===
+호스트는 단일 컴퓨터로 게스트 virtual machine을 실행하기 위한 컴퓨팅 리소스를 제공한다. 각각의 호스트에는 VM을 관리하기 위한 하이퍼바이저(:12) 소프트웨어가 설치돼 있다. 예를 들어 KVM 서버나 Citrix Xenserver ESXi 서버들이다. 
+
+클라우드스택에서 호스트는 클라우드를 구성하는 최소 단위다. 호스트들이 모여서 클러스터를 구성하고 다시 클러스트들이 pod를 구성한다. 이 pod들이 모여서 zone을 구성한다.
+
+클라우드 스택에서 호스트
+  * 호스트의 virtual machine이 필요로하는 CPU, 메모리, storage, 네트워크 자원을 제공한다. 
+  * TCP/IP 네트워크와 인터넷 연결
+  * 물리적으로 떨어져 있는 여러 데이터 센터에 위치할 수 있다.
+
+클라우드스택은 호스트의 CPU와 메모리 자원을 자동으로 검사한다. 
+
+호스트는 앤드유저에게는 외지 않는다. 그러므로 앤드유저는 guest vm을 어느 호스트에서 실행할지를 선택할 수 없다.
+
+클라우드스택을 이용해서 클라우드 환경에 편입되려면, 호스트는 아래의 사항을 만족해야 한다.
+  * 호스트에는 하이퍼바이저 소프트웨어가 설치돼 있어야 한다. 
+  * IP 주조가 할당돼 있어야 한다. 
+  * 호스트는 네트워크를 통해서 클라우드스택 관리 서버와 연결되야 한다.   
+
+=== Adding Hosts ===
+호스트를 추가하면 게스트 VM에 더 많은 자원을 할당할 수 있다. 쟈세한 사항은 Advanced Installation Guide를 참고하기 바란다.
+
+=== Schedule Maintenance and Maintenace Mode for Hosts ===
+운영 중인 Host를 maintenance 모드로 바꿀 수 있다. Host가 maintenance 모드가 되면 새로운 게스트 VM을 만들 수 없게 된다. 호스트에 이미 실행중인 VM은 다른 host로 마이그레이션 할 수 있는 상태가 된다.  
+
+==== vCenter and Maintenance Mode ====
+vCenter는 아직 경험이 없어서 나중에 번역하련다.
+
+==== XenServer and Maintenance Mode ====
+XenServer의 경우 XenCenter의 기능을 이용해서 Maintenance모드에서 여러가지 기능을 수행할 수 있다. 예를 들어 server를 maintenance 모드로 하면, 호스트에서 실행 중인 모든 VM은 자동으로 같은 pool에 있는 다른 호스트로 migration 된다. 만약 서버가 pool master이라면 pool에서 새로운 master가 생성된다. Maintenance 모드에서는 VM을 만들거나 시작할 수 없다. 
+
+==== To place a server in Maintenance Mode ====
+  1. Resources 판넬에서 server를 선택하고 아래의 방식중 하나를 선택해서 진행한다.
+     * 오른쪽 클릭 하면 shutcout 메뉴가 뜬다. 여기에서 '''Enter Maintenance Mode'''를 클릭한다. 
+     * 서버 메뉴에서 '''Enter Maintenance Mode'''를 클릭한다.
+  1. '''Enter Maintenance Mode'''를 클릭한다. 
+
+==== To take a server out of Maintenance Mode ====
+
+=== Disabling and Enabling Zones, Pods, and Clusters ===
+클라우드스택 관리자는 zone, pod, cludster을 (disable)비활성화 할 수 있다. 이 작업은 클라우드 인프라를 관리하거나 혹은 어떤 문제가 생겨서 문제를 해결하기 위한 용도로 사용할 수 있다. 일단 zone, pod, cluster이 비활성화가 되면 Enable상태가 될때까지는 어떠한 자원도 할당할 수 없다. Zone, pod, cluster가 처음 만들어지면 기본적으로 disable 상태가 된다. 
+
+zone, pod, cluster을 활성 혹은 비활성으로 만드는 법
+  1. 클라우드스택 UI에 관리자로 로그인 한다.
+  1. 왼쪽 네비게이션 바에서 Infrastructure를 클릭한다.
+  1. Zone에서 View more를 클릭한다.
+  1. 원하는 Zone을 선택한 다음 Enable/Disable 버튼을 클릭한다.
+  1. 만약 pod나 cluster를 enable 혹은 disable 하기를 원한다면, zone에서 pod, cluster를 클릭한다. 
+  1. Compute tab을 클릭한다.
+  1. Pod와 cluser 노드 다이어그램에서 View All을 클릭한다. 
+  1. Pod와 cluster 이름의 목록이 출력된다.
+  1. Enable/Disable 버튼을 클릭한다.
+
+=== Removing Hosts ===
+클라우드스택 관리자는 cloud에서 호스트를 없앨 수 있다.  호스트를 없애는 방법은 하이퍼바이저에 따라 차이가 있다. 
+
+==== XenServer와 KVM 호스트에서 없애기 ====
+클러스터로 부터 노드를 제거하려면 노드는 반드시 maintenance mode가 되어야 한다. 노드가 maintenance 모드가 되면, VM들이 다른 호스트로 마이그레이션 된다. 모든 VM들이 마이그레이션 되면 클라우드로 부터 호스트를 없앨 수 있다. 
+  1. 노드를 maintenance 모드로 바꾼다. 
+  1. KVM의 경우 cloud-agent server가 멈춘다. 
+  1. UI 옵션에서 node를 제거한다.
+
+==== vSphere 호스트 없애기 ====
+
+=== Re-Installing Hosts ===
+maintenance 상태에서 제거한 노드는 다시 설치할 수 있다. 만약 호스트가 down된 상태라면 maintenance 모드로 바꿀 수 없을 것이다. 
+
+=== Maintaining Hypervisors on Hosts ===
+
+
+=== Changing Host Password ===
+
+=== Host Allocation ===
+
+=== VLAN Provisioning ===
+
+== Managing Networks and Traffic ==
+클라우드스택 cloud에서 게스트는 Private LAN을 가지는데, 이 Private LAN을 이용해서 VM간 통신을 할 수 있다. 
+
+클라우드스택 virtual router는 게스트 트래픽 네트워크 기능을 제공하기 위한 주요 컴포넌트다. 
+
+=== Guest Traffic ===
+게스트 트래픽은 단지 같은 zone에 있는 VM사이에서만 흐른다. 다른 zone에 있는 가상 머신들은 서로 통신을 할 수가 없다. 다른 zone에 있는 VM과 통신하려면 public IP 주소를 이용해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=11LAr34vs2v3dl5Tb8QaQZW9YWBsPVhhOX_4X3OHZFes&amp;w=925&amp;h=618">
+}}}
+
+Management Server는 각 네트워크를 위해서 자동으로 virtual router를 만든다. Virtual router는 네트워크 서비스를 위해 특화된 virtual machine으로 호스트위에 실행된다. 각 virtual router는 3개의 인터페이스를 가지고 있다. eth0은 guest traffic을 위한 gateway 인터페이스로 10.1.1.1 주소를 가진다. eth1은 virtual router 설정을 위해서 사용하는 link local 인터페이스다. eth2는 public traffic을 위한 인터페이스로 public ip가 할당된다.   
+
+virtual router는 DHCP(:12)를 서비스한다. 네트워크에 연결되어 있는 각 VM은 dhcp 서버로 부터 자동으로 ip 주소를 할당 받는다.
+
+또한 guest vm의 트래픽을 인터넷으로 보내기 위해서 자동으로 Source NAT 설정을 한다. 
+
+=== POD에서의 네트워킹 ===
+아래 그림은 pod에서의 네트워크 설정을 묘사하고 있다. 호스트는 pod switch로 연결되 있다. 스위치는 적어도 하나의 물리적인 uplink를 가지고 있다. pod switch는 여분의 기가비트 포트와 uplink를 위한 10G 포트를 가진다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1t3G8-miCaI6AZOmGSKyVgqJHCevz3RQk3LEnMnrWSd8&amp;w=637&amp;h=677">
+}}}
+
+서버들은 다음과 같이 연결된다.
+  * storage device는 management network와 연결된다. management network는 클라우드스택의 명령이 이동하는 경로이기도 하다.  
+  * 호스트는 management network와 public network 모두에 연결된다. 
+  * 또한 호스트는 guest traffic을 위해서 하나 이상의 network와 연결된다. 
+
+이 네트워크 구성을 위해서 호스트는 2개 이상의 물리적인 Ethernet 카드를 꼽을 것을 권장한다. Storage의 경우 대량의 데이터를 처리해야 한다면 때에 한개 이상의 10G Ethernet 카드로 구성할 수 있다.  
+=== Zone 네트워킹 ===
+아래는 단일 zone에서의 네트워크 설정이다.
+
+가장 위에는 트래픽을 제어하기 위한 L3 스위치가 놓인다. 네트워크는 일반적으로 192.168.0.0/16 과 같은 B 클래스의 private address를 사용한다. 각 POD는 192.168.1.0/24와 같은 C 클래스의 private address를 할당해서 사용한다. 
+
+각 zone은 public ip 주소를 관리한다. 이 public ip 주소는 다른 zone과 겹치지 않는다.
+
+=== Basic Zone Physical Network Configuration ===
+Basic 네트워크에서 물리적인 네트워크는 비교적 간단하게 설정할 수 있다. 관리자는 guest 트래픽이 전송될 하나의 guest 네트워크만 설정하면 된다. 처음 클라우드스택에 zone을 추가할때, guest 네트워크를 설정하면 된다.
+
+==== About Guest IP Addresses in a Basic Zone ====
+Basic 네트워크에서 클라우드스택은 pod의 CIDR안에서 guest network를 할당한다. 그러므로 관리자는 guest에 할당할 IP 범위를 지정해야만 한다. 결국 guest IP는 host와 같은 VLAN에 위치할 것이다.
+
+=== Advanced Zone Physical Network Configuration ===
+Advanced 네트워크를 이용한다면, 관리자는 서로 다른 종류의 트래픽을 (isolation)분리하기 위한 설정을 해야 한다.  
+
+==== Configure Guest Traffic in an Advanced Zone ====
+Advanced 네트워크 zone에서 관리자는 게스트 VM들이 사용할 적어도 하나 이상의 게스트 네트워크설정이 필요하다. 
+
+===== About Guest IP Addresses in an Advanced Zone =====
+Advanced 네트워크 모드를 이용할 때, 관리자는 게스트가 사용할 추가적인 네트워크의 생성이 가능하다. 이 네트워크는 zone에 있는 모든 account가 사용할 수 있게 할 수 있다. 혹은 하나의 acoount만 사용하도록 설정할 수 있다. 이 네트워크는 네트워크를 소유한 account의 VM들만 사용할 수 있다. 이들 네트워크는 VLAN과 IP range, gateway에 의해서 만들어진다.
+
+관리자는 이들 네트워크 구성요소를 이용해서 수천개의 네트워크를 만들 수 있다.  
+
+===== Configuring Guest Traffic in an Advanced Zone =====
+네트워크를 설정하는 방법은 아래와 같다. 
+  1. 왼쪽 네비게이션 바에서 Infrastructure를 선택한다. 
+  1. Network tab을 클릭한다.
+  1. Add network를 클릭한다.
+  1. 설정값을 채워넣는다. 
+     * '''Name'''. 네트워크의 이름
+     * '''Description'''. 네트워크에 대한 설명
+     * '''VLAN ID''' : Zone 네트워크에서 이 네트워크를 위해서 할당할 VLAN ID. 
+     * '''scope''' : 이 네트워크가 적용될 범위를 지정한다. account 혹은 domain 단위로 지정할 수 있다. zone-wide를 선택하면, 모든 account가 이 네트워크에 접근할 수 있다.
+     * '''Domain/Account''' : scope를 domain이나 account로 했을 경우 domain id나 account id를 지정할 수 있다. 
+     * '''Network offering''' : 관리자는 여러개의 네트워크 오퍼링을 가질 수 있는데, 이 중 하나를 선택해서 네트워크에 할당할 수 있다.  
+     * '''Gateway''' : 게스트가 사용할 gateway 
+     * '''Netmask''' : 게스트 서브넷을 위한 netmask
+     * '''Start IP/End IP''' : 게스트가 사용할 네트워크 IP 범위를 설정한다. 만약 하나의 NIC을 사용한다면, 이 IP는 pod CIDR과 같은 CIDR에 위치할 것이다. 만약 여러 개의 NIC을 가지고 있다면, 다른 subnet에 위치할 수 있다. 
+     * '''Network Domain''' : (옵션) 이 네트워크에서 특별한 도메인 이름을 사용하길 원한다면..
+  1. OK 클릭
+
+==== Configure Public Traffic in an Advanced Zone ====
+Advanced 네트워크를 사용할 때, 관리자는 인터넷에 연결하기 위한 IP 주소 영역을 설정할 수 있다.
+
+===== About Public IP Addresses =====
+클라우드스택은 각 account가 Source NAT을 위해서 사용할 public IP 주소를 할당할 수 있다. 만약 Juniper SRX firewall을 사용한다면, 모든 account가 공통으로 사용할 하나의 NAT IP 주소를 할당할 수 있다. 유저가 추가적인 IP addresses를 요구하면, 관리자는 하나 이상의 public IP address 범위를 설정해야 한다.  
+
+===== Adding IP Addresses for the Public Network =====
+클라우드스택 UI로 로그인 한다음 아래와 과정을 거치면 된다.
+  1. 왼쪽 네비게이션 에서 Infrastructure를 선택한다. zone에서 View More를 클릭한다.
+  1. Network 탭을 클릭한다.
+  1. 다이아 그램의 Public 노드에서 configure 을 클릭한다.
+  1. IP Ranges 탭을 클릭한다. 
+  1. 아래 사항을 설정한다. 
+     * '''Gateway''' : IP 주소들이 사용할 gateway 
+     * '''Netmask''' : IP range를 위한 netmask
+     * '''VLAN''' : public traffic이 사용할 VLAN 
+     * start IP/End IP : 게스트 네트워크에 할당할 IP 범위
+
+=== Using Multiple Guest Networks ===
+Advanced 네트워크 모드를 사용한다면, 관리자는 초기 zone 설정 뒤에도 게스트 트래픽을 위한 네트워크를 추가할 수 있다. 또한 각 네트워크를 위한 DNS를 설정할 수도 있다. 
+ 
+VM이 사용할 네트워크는 VM이 만들어질 때 결정된다. 일단 VM이 만들어지면 그 후에는 네트워크 변겨이 불가능하다.
+
+각 VM은 단지 하나의 기본 네트워크만 가질 수 있다. Virtual router의 DHCP는 게스트 네트워크의 gateway 정보를 VM에 전송한다. 
+
+추가적인 네트워크는 특정 account에 할당 하거나 혹은 모든 account가 사용할 수 있도록 할당할 수 있다. 
+
+==== Adding an Additional Guest Network ====
+  1. 클라우드스택 UI에 관리자로 로그인한다. 
+  1. 왼쪽 네비게이션에서 Network를 선택한다.
+  1. Add Guest network를 클릭하고 아래의 정보를 설정한다.
+     * '''Name''' : 네트워크의 이름
+     * '''Description''' : 네트워크에 대한 설명
+     * '''Network offering''' : 관리자는 여러개의 네트워크 오퍼링 중 이 네트워크에 적용할 네트워크 오퍼링을 지정할 수 있다. 
+     * '''Pod''' : 이 네트워크를 적용할 Pod의 이름. 
+     * '''VLAN ID''' : 이 네트워크가 사용할 VLAN ID
+     * '''Gateway''' : 게스트가 이용할 gateway
+     * '''Netmask''' : 게스트 서브넷을 위한 Netmask
+     * '''Start IP/End IP''' : 이 네트워크내에서 게스트에게 할당할 IP의 범위
+  1. Create 클릭
+
+==== Changing the Network Offering on a Guest Network ====
+유저나 관리자는 존재하는 게스트 네트워크에 적용된 network offering를 변경할 수 있다.
+  1. 클라우드스택 UI에 관리자나 유저로 로그인한다.
+  1. 
+
+
+=== Security Groups ===
+==== About Security Groups ====
+Security groups를 이용하면 VM의 traffic를 (isolate)분리할 수 있다. Security group은 Security group에 포함된 VM들의 입력과 출력 트래픽을 필터링하는 룰을 가지고 있다. 이 룰들은 ingress 룰과 egress 룰이 있다. 이 룰들은 IP 주소를 기준으로 VM들간의 네트워크 트래픽을 필터링한다. 일반적으로 Security group는 단지 하나의 guest network만을 가지는 basic networking zone에서 이용한다. Advanced 네트워크도 Security group를 이용할 수 있기는 하지만, 보통은 VLAN을 이용해서 네트워크 트래픽을 분리한다.  
+
+클라우드스택의 account는 '''모든 입력 트래픽을 거부하고 모든 출력 트래픽은 허용하는'''룰을 포함한 default security group를 가진다. 이 기본 시큐리티그룹은 account가 만드는 모든 vm에 공통 적용된다. 
+
+클라우드스택 유저는 두개 이상의 시큐리티그룹을 만들 수 있다. 새로운 VM을 만들면, 이 VM에 적용할 security group를 선택할 수 있다. 또한 VM은 여러 개 이상의 시큐리티그룹에 포함될 수 있다. 일단 VM에 security group이 적용되면, VM의 운용중에는 다른 security group으로 변경할 수 없다.
+
+유저는 security group에 ingress rule과 egress rules을 언제든 추가하거나 삭제할 수 있다. 수정된 룰은 security group에 포함된 모든 VM에 즉시 적용된다. 
+
+만약 어떤 ingress 룰도 정하지 않는다면, egress 룰에 의해 허용된 트래픽의 응답 패킷을 제외한 모든 트래픽이 필터링 된다. 
+
+zone에서 security group를 사용하려면 먼저 security group 기능을 활성화 해야 한다. 관리자는 새로운 존을 만들 때, security group이 설정된 network 오퍼링을 선택할 수 있다. 
+
+==== Adding a Security Group ====
+  1. 클라우드스택에 유저나 관리자로 로그인한다.
+  1. 왼쪽 네비게이션에서 Network를 선택한다.
+  1. Select view에서 Security Groups를 선택한다. 
+  1. Add Security Group를 클릭한다.
+  1. 이름과 설명을 적는다.
+  1. OK를 클릭한다.
+  1. Security Group Details 탭에 새로운 security group이 보인다. 
+  1. Ingress 와 Egress 룰을 추가한다. 
+
+==== Adding Ingress and Egress Rules to a Security Group ====
+  1. 클라우드스택에 유저나 관리자로 로그인한다.  
+  1. 왼쪽 네비게이션에서 Network를 선택한다.
+  1. Select view에서 작업하기 원하는 Security Group를 선택한다. 
+  1. ingress는 VM에 입력되는 트래픽을 허용하기 위한 룰을 설정한다. 만약 ingress rules이 없다면, 어떤 트래픽도 허용되지 않는다. 예컨데 기본정책은 모든 트래픽을 막으며, ingress 룰에 추가된 패킷만 허용한다고 보면 된다. 
+     * '''Add by CIDR/Account''' : 허용할 IP 주소를 정한다. CIDR을 이용해서 소스 ip별로 허용 룰을 정할 수 있다. Account를 선택하면, Account에 포함된 VM에서 출발하는 트래픽을 허용할 수 있다. 
+     * '''Protocol''' : 출발지 트래픽의 프로토콜을 명시할 수 있다. 일반적으로 TCP(:12)나 UDP(:12)를 선택하며, 네트워크 모니터링을 위해서 '''ICMP'''를 선택할 수 있다.
+     * '''Start Port and Port''' : TCP 혹은 UCP를 선택했을 경우 설정할 수 있다. 허용할 출발지 포트번호를 지정할 수 있다. 단일 포트 혹은 포트 범위를 지정할 수 있다.
+     * '''ICMP Type, ICMP Code''' : ICMP를 선택했을 때 사용할 수 있다. 허용할 ICMP(:12)타입과 코드를 명시할 수 있다.
+     * '''CIDR''' : CIDR을 선택했을 때 사용할 수 있다. 허용할 트래픽의 IP 주소를 CIDR 타입으로 지정할 수 있다. 예를들어 192.168.0.0/16과 같은 형식이다. 모든 입력 트래픽을 허용하려면 0.0.0.0/0으로 설정하면 된다.
+     * '''Account, Security Group''' : Account를 선택했을 경우 사용할 수 있다. 허용할 트래픽의 주소를 Account단위로 지정할 수 있다. 만약 자신의 Account에 있는 모든 VM으로 부터의 입력을 허용하려면 자신의 Account 이름을 입력하면 된다.  
+
+아래는 웹 서비스를 위해서 모든 HTTP 접속을 허용한 예이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1LkYwlAPjaxfE5-VzLbhJPwSc7ctOYSnSOQDe6114cdE&amp;w=597&amp;h=215">
+}}}
+  1. egress는 VM에서 밖으로 나가는 트래픽을 필터링하기 위해서 사용한다. 어떤 egress룰도 설정하지 않았다면, 모든 트래픽을 허용한다. 
+
+=== External Firewalls and Load Balancers ===
+클라우드스택은 Virtual Router 대신 외부 Juniper SRX 장비를 사용할 수 있다. 그리고 NetScaler이나 F5 로드밸런서를 사용할 수 있다. 이 경우 VM들은 이들 외부장비를 gateway로 사용한다. 
+
+==== About Using a NetScaler Load Balancer ====
+Citrix NetScaler는 Advanced 네트워크 모드에서 외부 네트워크 장비로 사용할 수 있다. 관리자는 클라우드스택이 제공하는 virtual router 대신에 로드밸런서로 사용할 수 있다. 
+
+NetScaler는 direct mode에서 사용할 수 있다. Netscaler는 게스트 VM이 zone에 만들어지기 전에 추가해야 한다. 
+
+NetScaler 대신에 F5를 로드밸런서로 사용할 수 있다. 다른 점이라면 F5는 routing domains를 지원하고 NetScaler는 그렇지 않다는 거다. NetScaler는 방화벽으로도 사용할 수 없다. 
+
+|| NetScaler ADC Type  || Description of Capabilities || CloudStack 3.0 Supported Features ||
+|| MPX                 || 물리 appliance.             || Advanced zone에서 로드 밸런서의 모든 기능을 수행한다. basic zone에서는 Static NAT과 elastic load balancing 기능을 수행한다. || 
+|| VPX                 || 가상 appliance. Xenserver, ESXi, Hyper-V 하이퍼바이저 위에서 실행된다. 기능은 MPX와 같다. || ESXi만 지원한다. MPX와 같은 기능을한다. 클라우드 스택은 VPX와 MPX를 같은 장비로 취급한다. || 
+|| SDX                 || 물리 appliance. multi-tenant를 지원하는 다수의 VPX 인스턴스를 만들 수 있다. ||   ||
+
+==== Initial Setup of External Firewall and Load Balancers ====
+
+==== Ongoing Configuration of External Firewalls and Load Balancers ====
+
+=== Load Balancer Rules ===
+클라우드스택 유저와 관리자는 하나의 public IP로 두개 이상의 VM에 트래픽을 분산하는 로드밸런싱 룰을 추가할 수 있다. 유저는 VM에 대해서 로드밸런싱 룰을 만들고 알고리즘을 지정할 수 있다. 
+
+==== Adding a Load Balancer Rule ====
+  1. 클라우드스택에 관리자나 유저로 로그인 한다.
+  1. 왼쪽 네비게이션 바의 Network를 클릭한다.
+  1. 로드밸런서를 추가할 네트워크의 이름을 클릭한다.
+  1. View IP Addresses를 클릭한다.
+  1. 로드밸런싱 룰을 만들기 원하는 IP 주소를 클릭한다.
+  1. 다이어그램의 로드밸런싱 노드에서 View All을 클릭한다. 
+  1. 아래 내용을 설정한다.
+     * '''Name''' : 로드 밸런서 룰의 이름
+     * '''Public Port''' : 로드 밸런싱에 사용할 입력 포트 
+     * '''Private Port''' : VM의 포트 번호
+     * '''Algorithm''' : 로드밸런싱에 사용할 알고리즘.   
+     * '''stickiness'''
+  1. 트래픽을 분산할 두개 이상의 VM을 선택한다음, Apply 버튼을 클릭한다. 
+
+==== Sticky Session Policies for Load Balancer Rules ====
+Sticky sessions은 웹 기반 애플리케이션에서 여러 유저의 세션 정보를 유지 함으로써, 정보의 가용성을 높이기 위해서 사용한다. 보통 로드밸런싱을 하면 n대 중의 서비스에 랜덤하게 분배된다. 그러므로 같은 서비스에 접속할 확률은 1/n이 되는데, sticky session을 사용하면 처음 접속했던 서버에 계속 연결할 수 있다.
+
+=== Guest IP Ranges ===
+
+=== Acquiring a New IP Address === 
+관리자는 게스트 VM이 public network에 접근할 수 있도록 public ip를 설정할 수 있다. 관리자나 일반 유저는 클라우드스택 UI의 NAT 기능을 이용해서 게스트 network와 public network를 연결할 수 이싸다.    
+  1. 관리자나 유저로 클라우드스택에 로그인한다. 
+  1. 왼쪽 네비게이션 바에서 Network를 클릭한다. 
+  1. 작업을 원하는 게스트 네트워크를 클릭한다. 
+  1. View IP Addresses를 클릭한다.
+  1. Acquire New IP를 클릭한다. 
+
+=== Releasing an IP Address ===
+
+=== Static NAT ===
+Static NAT 룰은 private IP 주소를 public IP 주소와 맵핑해서, VM의 트래픽이 인터넷으로 나가는 것을 허용한다. 이때 맵핑 되는 public ip가 항상 같은 값으로 고정되기 대문에 static NAT 이라고 보른다. 이번 장에서는 NAT를 이용하는 방법을 알아볼 것이다. 
+
+==== Enabling or Disabling Static NAT ====
+만약 port forwarding 룰이 이미 사용중이라면, static NAT을 사용할 수 없다. 만약 게스트 VM이 하나 이상의 네트워크에 포함되 있을 경우 static NAT 룰은 default network에 대해서만 적용될 것이다.
+  1. 관리자나 유저로 클라우드스택에 로그인한다. 
+  1. 왼쪽 네비게이션 바에서 '''Network'''를 클릭한다. 
+  1. 작업하기 원하는 게스트 네트워크를 클릭한다. 
+  1. '''View IP Addresses'''를 클릭한다.
+  1. 작업하기 원하는 IP address를 클릭한다.
+  1. Static NAT 버턴을 클릭한다. 버튼을 클릭하면 Enable과 Disable 상태로 변경된다. 
+  1. 만약 enabling static NAT 상태라면, NAT를 적용할 VM을 선택할 수 있다. 
+
+=== IP forwarding and Firewalling ===
+기본적으로 public ip에서 VM으로 항햐는 모든 입력 트래픽은 막히고, vm에서 public으로 향하는 모든 출력 트래픽은 허용한다. 
+
+입력 트래픽을 허용하기 위해서, 유저는 firewall 룰과 port forwarding룰을 변경해야 한다. 예를 들어 유저는 firewall룰을 이용해서 접근 가능한 port의 범위를 설정할 수 있다. port forwarding룰을 이용하면, public ip의 특정 포트로 향하는 패킷을 VM의 특정 포트로 보낼 수가 있다. 예를 들어 3412 포트를 vm의 22 포트로 포워등하면, public ip의 3412 포트에 접근하는 것으로 vm의 22번 포트 (ssh)로 접근할 수 있다. 
+
+===== FireWall rules =====
+기본적으로 public ip 주소로 향하는 입력 트래픽은 방화벽에 의해서 막힌다. 외부 트래픽의 접근을 허용하려면 방화벽 룰을 바꿔야 한다. 유저는 CIDR이나 source ip를 기준으로 방화벽 룰을 만들 수 있다. 이 룰은 주로 특정 IP 주소로 부터의 입력 트래픽을 허용하기 위한 목적으로 사용된다. 
+
+유저는 elastic ip 주소에 대한 방화벽룰은 만들수가 없다. elastic IP를 사용할 경우에는 security group을 이용한다.   
+
+방화벽 룰은 Management Server UI의 Firewall tab을 이용해서 만들 수 있다. 이 탭은 클라우드스택을 설치하더라도 UI에 표시되지는 않는다. Firewall 탭을 표시하려면, 클라우드스택 관리자가 global configuration에서 '''firewall.rule.ui.enabled'''를 true로 설정해줘야 한다.    
+
+firewall 룰 만들기
+   1. 관리자나 유저로 클라우드스택에 로그인한다. 
+   1. 왼쪽 네비게이션 바에서 Network를 클릭한다.
+   1. 작업할 네트워크 이름을 클릭한다.
+   1. View IP Addresses를 클릭한다.
+   1. 작업하기 원하는 IP Address를 클릭한다.
+   1. 아래의 값을 채운다.
+     * '''Source CIDR''' : 트래픽을 허용할 주소를 지정한다. CIDR 형식으로 정할 수 있다. 예) 192.168.0.0/22
+     * '''Protocol''' : 허용할 프로토콜 형식 
+     * '''Start Port, End Port''' : 트래픽을 허용할 포트 주소 범위
+     * '''ICMP Type, ICMP Code''' : Protocol을 ICMP로 했을 경우 사용할 수 있다. 허용할 ICMP 타입과 코드를 명시한다. 
+   1. Add를 클릭한다.
+
+===== Port Forwarding =====
+포트 포워드 서비스를 위한 룰을 설정할 수 있다. 포트 포워딩 서비스는 하나 이상의 guest VMs에 적용할 수 있다. 게스트 VM의 특정 포트에 대해서 입력을 허용하는 방식의 서비스다. 옵션으로 업력을 허용할 source IP를 CIDR 형식으로 정할 수도 있다. 이 둘을 조합해서 특정한 범위의 IP의 트래픽을 원하는 VM으로 포워딩할 수 있다.
+
+게스트 VM은 하나 이상의 네트워크를 가질 수 있는데, 포트포워딩 룰은 default 네트워크에만 적용이 된다. 
+또한 elastic IP 주소에 대해서는 포트포워딩룰을 설정할 수 없다. Elastic IP를 사용 할 때는 포트포워딩 대신 security group를 이용해서 트래픽을 제어한다.
+
+포트 포워딩 룰 설정
+  1. 클라우드스택에 로그인
+  1. 아직 zone이 준비돼지 않았다면, zone에 public IP 주소를 추가해야 한다.  
+  1. 하나 이상의 VM 인스턴스를추가한다.
+  1. 왼쪽 네비게이션 바에서 Network를 클릭한다. 
+  1. 작업할 VM이 있는 게스트 네트워크의 이름을 클릭한다. 
+  1. View IP Addresses를 클릭한다. 
+  1. IP 주소를 선택한다. 
+  1. Configuration tab을 클릭한다. 
+  1. 다이아그램의 포트포워딩 노드에서 View All을 클릭한다.
+  1. 아래 내용을 채운다.
+     * '''Public Port''' : 트래픽을 받을 port를 지정한다. 
+     * '''Private Port''' : 트래픽을 VM 인스턴스의 포워딩할 port를 지정한다.
+     * '''Protocol''' : 두 포트사이에 사용할 프로토콜  
+  1. '''Add VM'''을 클릭한다. 룰을 적용할 인스턴스를 선택한다.  
+  1. 룰이 제대로 적용되었는지 이를테면 ssh 등 으로 테스트 한다.
+
+=== IP Load Balancing ===
+유저는 하나의 public IP로 입력되는 트래픽을 여러 vm으로 분산 시킬 수 있다. 이를 위해서 클라우드스택은 L4(TCP)레벨의 로드밸런서를 제공한다. 이 로드밸런서는 다음과 같은 기능을 가지고 있다.
+  * Round-robin
+  * Least connection
+  * Source IP
+LB는 포트포워딩과 매우 비슷하지만 하나의 IP 주소만 사용할 수 있는 포트포워딩과는 달리 다수의 IP 주소로 트래픽을 분산할 수 있다.
+
+=== DNS and DHCP ===
+Virtual Router는 게스트를 위한 DNS와 DHCP(:12)서비스를 제공한다. It proxies DNS requests to the DNS server configured on the Availability zone.
+
+=== VPN ===
+클라우드스택 어카운트는 virtual machine에 연결하기 위해서 virtual private network를 구성할 수 있다. 만약 네트워크 오퍼링에서 Remote Access VPN service를 추가했다면, virtual router를 이용해서 vpn 서비스를 받을 수 있다. 클라우드스택은 L2TP-over-IPsec 기반의 access VPN 서비스를 제공한다. 각 어카운트는 자신만의 virtual router를 가진다. 유저는 Windows, Mac OSX에서 제공하는 VPN 클라이언트를 이용해서 게스트 네트워크에 접근할 수 있다. 어카운트 소유자는 VPN을 위한 유저를 만들고 관리할 수 있다.  
+  * Road Warrior /Remote Access.
+  * '''Site to Site.''' : site to site vpn을 이용하면, public 인터넷을 사이에 두고 있는 두개의 private network을 보안 채널로 연결할 수 있다. 
+
+
+== Working With Storage ==
+클라우드스택은 primary storage와 secondary storate의 두가지 타입의 스토리지를 이용한다. Primary storage는 ISCSI(:12) 나 NFS(:12)를 이용해서 접근할 수 있다. 또는 로컬디스크를 직접 attach해서 사용할 수도 있다.    
+
+=== Primary Storage ===
+이번 장에서는 Primary storage의 기술적인 내용을 다룰 것이다. Primary storage의 설치와 설정은 Advanced Installation Guide를 참고하기 바란다. 
+
+==== About Primary Storage ====
+프라이머리 스토리지는 cluster의 구성요소로 cluster의 호스트에서 실행되는 모든 VM에 volume을 제공한다. Cluster는 최소한 하나의 프라이머리 스토리지를 가지고 있어야 한다. 성능상의 이유로 가능하면 프라이머리 스토리는 cluster의 호스트와 물리적으로 가까이에 놓도록 한다.
+
+NFS와 iSCSI를 지원한다면, 어떤 서버라도 Primary storage로 사용할 수 있다> 
+
+==== System Requirements for Primary Storage ====
+하드웨어 요구사항은 다음과 같다.
+  * 표준적인 iSCSI와 NFS 서버 
+  * 스토리지 서버는 많은 수의 디스크를 관리할 수 있어야 한다. Hardware RAID controller를 지원하거나 혹은 software RAID를 이용한 volume 구성이 가능해야 한다.  
+
+프라이머리 스토리를 추가할 때는 아래의 사항을 따라야 한다. 
+  * Primary storage를 추가하려면 클러스터에 적어도 하나 이상의 호스트가 있어야 한다. 
+  * Primary storage를 shared storage로 provision 하지 않았다면, 볼륨을 만들 수 없다. 
+  * 만약 shared primary storage를 사용하지 않을 거라면, 클로벌 설정에서 system.vm.local.storage.required을 true로 해야 한다.  
+
+==== Best Practices for Pirmary Storage ====
+  * 프라이머리 스토리지의 속도는 게스트에게는 매우 중요한 문제다. 그러므로 가능하면, 더 빠른 RPM의 disk로 sotrage를 구성해야 한다. 
+
+==== Runtime Behavior of Primary Storage ====
+Root 볼륨은 virtual machine이 만들어 질때 자동으로 생성되고, VM이 삭제될 때 함께 삭제된다. Data volume은 자유롭게 만들어서 필요할 때 VM에 attach 할 수 있다.  
+
+관리자는 클라우드스택 스토리지 풀을 만들 때 프라이머리 스토리지를 추가할 수 있다. 각 스토리지 풀은 cluster에서 사용한다.  
+
+
+==== Hypervisor Sypport for Primary Storage ====
+하이퍼바이저의 종류에 따라 지원되는 스토리지의 형태를 정리했다.
+||                                          || VMware vSphere     || Citrix XenServer || KVM     || Oracle VM    ||
+|| Format for Disk, Templates and Snapshots || VMDK               || VHD              || QCOW2   || RAW          ||
+|| iSCSI support                            || VMFS               || Clustered LVM    || shared Mountpoint  || OCFS2 ||
+|| Fiber Channel support                    || VMFS               || Existing SR      || Shared Mountpoint  || NO    ||
+|| NFS Sypport                              || Y                  || Y                || Y                  || Y     ||
+|| Local storage support                    || Y                  || Y                || Y                  || N     ||
+|| Storage over-provisioning                || NFS and iSCSI      || NFS              || NFS                || NO    ||
+XenServer는 VM inage를 저장하기 위해서 clustered LVM 시스템을 사용하며 iSCSI(:12)와 Fiber 채널을 이용해서 볼륨서비스를 제공한다. 반면 하이퍼바이저에서의 over-provisioning (어떤 기능인지 확인 필요) 기능은 지원하지 않는다.  
+
+KVM은 shared Mountpoint 스토리지를 지원한다. shared mountpoint는 각 서버에서 파일시스템의 path를 지정하는 방식으로 사용한다. 클러스터에 있는 모든 호스트들은 반드시 같은 path를 (예를 들어 /mnt/primary1 같은) 사용해야 한다. 이 shared mountpoint는 OCFS2와 같은 클러스트 파일 시스템처럼 사용된다. 
+
+Oracle VM은 iSCSI와 NFS 모두를 지원한다. iSCSI를 이용할려면 클라우드스택 관리자는 iSCSI 호스트를 설정해야 하며, iSCSI 호스트의 네트워크 문제 발생시 이를 복구하기 위한 re-mounting 등도 관리를 해야 한다. 
+
+==== Storage Tags ====
+Storage에는 Tagging을 할 수 있다. Tag는 프라이머리 스토리지에 부여되는 문자열 정보로, 디스크 오퍼링이나 서비스 오퍼링등에서 사용할 수 있다. Tag는 관리자가 storage에 부가적인 정보를 주기위해서 사용한다. 예를 들어 "SSD"나 "slow" 같은 것들이다. 디스크 오퍼링이나 서비스 오퍼링에서 Tag를 사용하면, 해당 오퍼링을 사용하는 VM들은 tag 이름이 일치하는 스토리지에 볼륨을 생성한다. 예를들어 높은 성능의 디스크 볼륨을 제공하기 원한다면 SSD로 스토리지를 구성한 다음에 "SSD"등으로 tag를 붙인다. 그 다음 SSD tag된 서비스 오퍼링을 만들고, 이 서비스 오퍼링을 이용해서 VM을 생성하면 SSD 스토리지에 VM이 생성이 된다. 예컨데, 자원을 dedicate 하기 위한 용도로의 사용이 가능하다. 
+
+
+==== Maintenance Mode for Primary Storage ====
+프라이머리 스토리지는 maintenance mode로 상태를 변경할 수 있다. 이 모드는 스토리지 장비에 발생한 문제를 (RAM faule 같은) 해결하기 위해서 사용한다. Maintenance 모드가 되면, 더 이 이상 이 스토리지에는 VM이 생성될 수 없으며, 모든 볼륨의 사용이 중단된다. 모드 변경은 온라인에서 가능하다. 온라인에서 maintenance 모드를 cancle 하면 모든 게스트 VM을 실행한다.    
+
+
+=== Secondary Storage ===
+여기에서는 클라우드 스택의 세컨드 스토리지에 대한 세부 기술적인 내용을 다룬다. 설치와 설정에 대한 내용은 Advanced Installation Guide 문서를 참고한다.
+
+==== Aboud Secondary Storatge ====
+Secondary storage는 zone 영역의 자원으로 아래의 정보를 저장한다. 
+  * Templates : Boot VM을 위해서 사용하는 OS 이미지로 서비스 용도에 맞는 애플리케이션이 설치 되어 있는 경우가 많다. 예를 들어 APM을 위한 Template, WAS를 위한 Template등을 만들 수 있다. 
+  * ISO images : 부팅 가능한 운영체제를 포함한 disk 이미지  
+  * Disk volume snapshots : 클라우드 스택은 볼륨에 대한 snapshot 기능을 제공한다. 이 snapshot은 세컨더리 스토리지에 저장되며, 볼륨 복구를 위해서 사용할 수 있다.  
+이 아이템들은 zone에 있는 모든 호스트에서 사용할 수 있다. 
+
+==== System Requirements for Secondary Storage ====
+
+== 이슈정리 ==
+문서내용 중 개인적으로 확인해야 할 것들을 정리 
+  1. 각 pod의 효과적인 cnode의 크기를 고민한다. 하이퍼바이저에 따라서 달라질 수 있다.
+  1. cloudstack3에 Network Offerings가 추가 돼었다. 테스트 해봐야 한다.
+  1. project기능을 확인. 
+  1. basic network의 경우 global setting에 네트워크 이름을 설정하는 옵션이 사라졌다. 이렇게 되면 하이퍼바이저가 인식할 수 있는 네트워크 이름을 설정할 수 없다. API를 통해서 가능한지, 설정을 옮긴건지 확인이 필요하다.
+
+

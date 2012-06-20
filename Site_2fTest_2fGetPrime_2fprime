@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+int print_prime(int n)
+{	
+	clock_t start;
+	int* pArray = NULL;
+	int i, j;
+
+	start = clock();
+
+	pArray = (int*)malloc( (n+1) * sizeof(int) );
+	
+	if(pArray == NULL) {
+		printf("Error: memory allocation failed\n");
+		return -1;
+	}
+	
+	memset(pArray, 0, sizeof(int)*(n+1));
+
+	// 소수 계산 0: 소수   1: 소수X
+	for(i = 2; i <= n; i++) {		
+		if(pArray[i] == 0) {
+			j = i * 2;
+			
+			while(j <= n) { // 한 수(소수)의 배수는 모두 소수가 아님
+				pArray[j] = 1;
+				j += i;
+			}
+		}
+	}		
+	
+	// 소수 출력
+	printf("2 ~ %d's prime number: \n", n);
+	for(i = 2; i <= n; i++) {
+		if(pArray[i] == 0) {
+			printf("%d ", i);
+		}
+	}
+	printf("\n");
+
+	free(pArray);
+	
+	printf("\ntime: %.3fs\n", (double)(clock() - start) / CLOCKS_PER_SEC );
+
+	return 0;	
+}
+
+int main(int argc, char* argv[])
+{
+	int n;
+
+	if(argc < 2) {
+		printf("Usage: prime [integer]\n");
+		return 0;
+	}
+
+	n = atoi(argv[1]);
+
+	if(n < 2) {
+		printf("Error: integer must be greater than 1\n");
+		return 0;
+	}
+	
+	print_prime(n);
+
+	return 0;	
+}
+/* 
+ * test result
+ * 100만  :   0.210s  
+ * 1000만:   2.260s 
+ * 1억      : 27.910s
+*/

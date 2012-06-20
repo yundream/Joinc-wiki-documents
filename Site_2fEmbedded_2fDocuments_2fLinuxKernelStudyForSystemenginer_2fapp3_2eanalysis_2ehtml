@@ -1,0 +1,498 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>사례 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Inline Assembly"
+HREF="app3.html"><LINK
+REL="PREVIOUS"
+TITLE="인라인 어셈블리 기초"
+HREF="app3.basic.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="app3.basic.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>부록 C. Inline Assembly</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+>&nbsp;</TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="APP3.ANALYSIS"
+>C.2. 사례 분석</A
+></H1
+><P
+>			리눅스 커널에 이미 사용된 수 많은 예를 통해 어떤 식으로 인라인 어셈블리가 사용됐는지 알아보자.
+		</P
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="APP3.ANALYSIS.STRCPY"
+>C.2.1. strcpy()</A
+></H2
+><P
+>				아래 소스 코드는 include/asm-i386/string.h에 있는 strcpy() 함수를 가져와 컴파일 해보기 위해
+				조금 추가한 코드다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>	/* test.c */
+	static inline char * strcpy(char * dest,const char *src)
+	{
+	int d0, d1, d2;
+	__asm__ __volatile__(
+		"1:\tlodsb\n\t"
+		"stosb\n\t"
+		"testb %%al,%%al\n\t"
+		"jne 1b"
+		: "=&#38;S" (d0), "=&#38;D" (d1), "=&#38;a" (d2)
+		:"0" (src),"1" (dest) : "memory");
+	return dest;
+	}
+
+	int main()
+	{
+		char a[] = "1234";
+		char b[] = "4567";
+
+		strcpy(a, b);
+
+		return 0;
+	}
+	</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				컴파일은 'gcc -S -c test.c'라고 한다. 그러면 test.s가 생길 것이다. test.s는 다음과 같다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>		.file	"test.c"
+		.version	"01.01"
+	gcc2_compiled.:
+	.section	.rodata
+	.LC0:
+		.string	"1234"
+	.LC1:
+		.string	"5678"
+	.text
+		.align 4
+	.globl main
+		.type	 main,@function
+	main:
+		pushl %ebp
+		movl %esp,%ebp
+		subl $24,%esp
+		leal -8(%ebp),%eax
+		movl .LC0,%edx
+		movl %edx,-8(%ebp)
+		movb .LC0+4,%al
+		movb %al,-4(%ebp)
+		leal -16(%ebp),%eax
+		movl .LC1,%edx
+		movl %edx,-16(%ebp)
+		movb .LC1+4,%al
+		movb %al,-12(%ebp)
+		addl $-8,%esp
+		leal -16(%ebp),%eax
+		pushl %eax
+		leal -8(%ebp),%eax
+		pushl %eax
+		call strcpy
+		addl $16,%esp
+		xorl %eax,%eax
+		jmp .L3
+		.p2align 4,,7
+	.L3:
+		movl %ebp,%esp
+		popl %ebp
+		ret
+	.Lfe1:
+		.size	 main,.Lfe1-main
+		.align 4
+		.type	 strcpy,@function
+	strcpy:
+		pushl %ebp
+		movl %esp,%ebp
+		subl $28,%esp
+		pushl %edi
+		pushl %esi
+		pushl %ebx
+		movl 12(%ebp),%esi
+		movl 8(%ebp),%edi
+#APP
+		1:	lodsb
+		stosb
+		testb %al,%al
+		jne 1b
+#NO_APP
+		movl %esi,%ecx
+		movl %edi,%edx
+		movl %ecx,%ebx
+		movl %ebx,-4(%ebp)
+		movl %edx,%edx
+		movl %edx,-8(%ebp)
+		movl %eax,%eax
+		movl %eax,-12(%ebp)
+		movl 8(%ebp),%eax
+		jmp .L2
+	.L2:
+		leal -40(%ebp),%esp
+		popl %ebx
+		popl %esi
+		popl %edi
+		movl %ebp,%esp
+		popl %ebp
+		ret
+	.Lfe2:
+		.size	 strcpy,.Lfe2-strcpy
+		.ident	"GCC: (GNU) 2.95.3 20010315 (release)"
+	</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				인라인 어셈블리는 #APP와 #NO_APP사이에 존재한다.
+			</P
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>: "=&#38;S" (d0), "=&#38;D" (d1), "=&#38;a" (d2)</DT
+><DD
+><P
+>							output의 구성을 나타낸다. "=&#38;S" (d0)는 d0를 'si' 레지스터에 저장하는 것이고
+							"=&#38;D" (d1)은 d1을 'di' 레지스터에 저장하란 것이고 "=&#38;a" (d2)는 d2를 'a'
+							레지스터에 저장하란 것이다.
+						</P
+><P
+>							test.s에 의하면 어셈블리 코드가 실행된 후 output으로 d0, d1, d2가 있는데
+							#NO_APP 바로 밑의 3줄이 이 역할을 한다. d2는 %ebx에 할당됐음을 알 수 있다.
+						</P
+></DD
+><DT
+>:"0" (src),"1" (dest)</DT
+><DD
+><P
+>							input의 구성을 나타낸다. "0" (src)는 src가 0번째 오퍼랜드와 같은 위치를 점유하란 말로
+							%0인 d0를 의미한다. 또 d0가 si를 사용하므로 결국 si의 초기 값이 src가된다. dest는 %1인
+							di에 입력된다.
+						</P
+><P
+>							test.s에 의하면 #APP 바로 전의 두줄이 input에 해당하고 %esi와 %edi에 src, dest를
+							입력해 준다.
+						</P
+></DD
+><DT
+>: "memory"</DT
+><DD
+><P
+>							clobber에 지정된 "memory"는 컴파일러에게 어셈블리코드가 메모리의 어딘가를 변경한다고
+							가르쳐 주는 것이다. 이 것을 사용하지 않으면 어셈블리코드에서 메모리의 내용을 변경하는
+							것을 컴파일러는 전혀 알 수 없다. 잘 못하면 어셈블리에서 고친 값과 다른 값을 컴파일러
+							는 사용하고 있을 가능성도 있다. "memory"를 명시해 주면 컴파일러는 어셈블리 코드를 실
+							행하기 전/후에 레지스터에 저장되어 있는 모든 변수의 값을 갱신하도록 한다.
+						</P
+></DD
+><DT
+>"1:\tlodsb\n\t"</DT
+><DD
+><P
+>							1:은 label을 의미한다. loadsb 명령으로 al 레지스터에 es:esi의 내용을 읽어 온다.
+							여기서 src의 내용을 읽어 온다. 명령 실행후 esi는 자동으로 1이 증가한다(바이트 단위로
+							읽기 때문).
+						</P
+></DD
+><DT
+>"stosb\n\t"</DT
+><DD
+><P
+>							al의 값을 es:edi에 저장한다. edi도 명령 실행 후 1 증가한다.
+						</P
+></DD
+><DT
+>"testb %%al,%%al\n\t"</DT
+><DD
+><P
+>							al의 내용이 0인지 테스트한다. 스트링을 복사할 땐 NULL 캐릭터가 나올 때 까지 복사하기
+							때문에 0인지 판별한다.
+						</P
+></DD
+><DT
+>"jne 1b"</DT
+><DD
+><P
+>							0이 아닌 경우, 즉 NULL 캐릭터가 아닌 경우 계속해서 복사한다.
+						</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="APP3.ANALYSIS.SETGATE"
+>C.2.2. _set_gate()</A
+></H2
+><P
+>				arch/i386/kernel/trap.c에 있는 _set_gate()의 내용을 가져다 컴파일 하기 위해 약간 변경한 것이다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/* sg.c */
+
+#define __KERNEL_CS 0x10
+
+#define _set_gate(gate_addr,type,dpl,addr) \
+do { \
+  int __d0, __d1; \
+  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
+	"movw %4,%%dx\n\t" \
+	"movl %%eax,%0\n\t" \
+	"movl %%edx,%1" \
+	:"=m" (*((long *) (gate_addr))), \
+	 "=m" (*(1+(long *) (gate_addr))), "=&#38;a" (__d0), "=&#38;d" (__d1) \
+	:"i" ((short) (0x8000+(dpl&#60;&#60;13)+(type&#60;&#60;8))), \
+	 "3" ((char *) (addr)),"2" (__KERNEL_CS &#60;&#60; 16)); \
+} while (0)
+
+int main()
+{
+	_set_gate(0, 1, 2, 3);
+	return 0;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				'gcc -S -c sg.c'로 컴파일한 것은 다음과 같다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>	.file	"sg.c"
+	.version	"01.01"
+gcc2_compiled.:
+.text
+	.align 4
+.globl main
+	.type	 main,@function
+main:
+	pushl %ebp
+	movl %esp,%ebp
+	subl $24,%esp
+	nop
+	.p2align 4,,7
+.L3:
+	movl $3,%edx
+	movl $1048576,%ecx
+	movl %ecx,%eax
+#APP
+	movw %dx,%ax
+	movw $-16128,%dx
+	movl %eax,0
+	movl %edx,4
+#NO_APP
+	movl %eax,%ecx
+	movl %ecx,-4(%ebp)
+	movl %edx,%eax
+	movl %eax,-8(%ebp)
+.L5:
+	jmp .L4
+	.p2align 4,,7
+.L6:
+	jmp .L3
+	.p2align 4,,7
+.L4:
+	xorl %eax,%eax
+	jmp .L2
+	.p2align 4,,7
+.L2:
+	movl %ebp,%esp
+	popl %ebp
+	ret
+.Lfe1:
+	.size	 main,.Lfe1-main
+	.ident	"GCC: (GNU) 2.95.3 20010315 (release)"</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>:"i" ((short) (0x8000+(dpl&#60;&#60;13)+(type&#60;&#60;8))), "3" ((char *) (addr)),"2" (__KERNEL_CS &#60;&#60; 16));</DT
+><DD
+><P
+>								input으로 정의된 것 들이다. "3", "2"는 각각 %3(__d0), %2(__d1)로 대응되도록 한다.
+								$APP 전의 3줄 중 윗 2줄이 "3", "2"에 해당하는 것들이다.
+							</P
+></DD
+><DT
+>:"=m" (*((long *) (gate_addr))), "=m" (*(1+(long *) (gate_addr))), "=&#38;a" (__d0), "=&#38;d" (__d1)</DT
+><DD
+><P
+>								output으로 정의된 것 들. %0은 값이 0이되고(main에서
+								_set_gate(0, 1, 2, 3)으로 했기 때문에) %1은 4가 된다.
+							</P
+></DD
+></DL
+></DIV
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="app3.basic.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>&nbsp;</TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>인라인 어셈블리 기초</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="app3.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>&nbsp;</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

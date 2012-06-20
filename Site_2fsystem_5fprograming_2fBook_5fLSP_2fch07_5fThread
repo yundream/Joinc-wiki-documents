@@ -1,0 +1,370 @@
+#title 리눅스 시스템 프로그램밍 7장 쓰레드
+
+[[TableOfContents]]
+
+ <!> 문서는 완성된게 아니며, 틀린 내용이 있을 수 있습니다. 수정해야 할 부분이 있음 알려주세요. 확인 후 반영하도록 하겠습니다. 
+
+== Thread에 대해서 ==
+프로그램을 병렬로 실행시키는 방법으로 fork()에 대해서 알아보았다. fork()는 매우 이해하기 쉬운 프로그래밍 방법이긴 하지만 자원효율성에서 몇가지 문제점을 가지고 있다. 프로세스는 기본적으로 '''code''', '''data''', '''stack''', file I/O, 그리고 signal table의 5가지 요소로 구성이 된다. fork()를 이용해서 새로운 프로세스를 생성하게 되면, 이러한 5가지 구성요소가 모두 복사가 된다. 그러하다 보니 프로세스를 생성하는데 많은 비용이 소비될 것이다. 대게의 경우에는 프로세스를 새로 생성시킬때 발생하는 성능저하가 문제가 되지는 않겠지만 웹서비스처럼 대량의 접근이 발생하는 영역에서는 문제가 될 수 있다. 
+
+fork의 이러한 방식은 상당히 효율이 떨어지는 측면이 있다. 어떤 프로그램을 병렬로 실행시킨다고 했을 때, 실제 우리가 병렬로 실행되기를 원하는 영역은 '''코드의 일부분'''이지 프로그램 전체는 아니기 때문이다.
+{{{#!plain
+// ...
+pid = fork();
+if (pid > 0)
+{
+	// 실제는 이 부분의 코드만 병렬로 실행되면 된다.
+	// fork()는 다른 모든영역의 코드가 복사되어 버린다.
+}
+}}}
+
+게다가 전혀다른 프로세스를 생성시킴으로써, 프로세스간 통신이라는 상당히 복잡한 문제까지를 해결해야 한다. 병렬로 작동하는 프로그램은 특성상 데이터를 공유하거나 서로 통신을 해야 하는 경우가 많다. 그런데 프로세스는 서로 독립된 객체이므로 일반적인 방법으로는 데이터를 공유할 수가 없다. 이러한 프로세스간 데이터 통신을 위해서  리눅스는 IPC(:12)라는 설비를 제공하는데, IPC라는게 사용하기가 여간 까다롭지가 않다. IPC(:12)에 대해서는 별도의 장을 할애해서 다룰 계획이다.  
+
+'''Thread'''를 이용하면 fork()를 이용한 프로세스 기반의 병렬처리의 문제점의 많은 부분을 해결할 수 있다. '''Thread'''는 새로운 프로세스를 생성시키지 않고, 특정 문맥(코드)만을 병렬로 실행할 수 있도록 허용한다. 새로운 프로세스를 생성시키지 않기 때문에 그만큼 자원을 아낄 수 있으며, 더 효율적으로 빠르게 움직일 수 있다. 또한 같은 프로세스이기 때문에, 데이터를 공유하기가 쉽다는 장점도 가진다.
+=== Thread vs Process ===
+Thread는 프로세스와 다음과 같은 차이점을 가진다.
+  * 프로세스는 독립적이다. 쓰레드는 프로세스의 서브셋이다. 
+  * 프로세스는 각각 독립적인 자원을 가진다. 쓰레드는 stat, memory 기타 다른 자원들을 공유한다.  
+  * 프로세스는 자신만의 '''주소영역'''을 가진다. 쓰레드는 '''주소영역'''을 공유한다.
+  * 프로세스는 IPC(:12)를 이용해서만 통신이 가능하다. 
+  * 일반적으로 쓰레드의 문맥교환(context switching)는 프로세스의 문맥교환보다 빠르다. 
+
+=== Multi Thread 프로그램의 단점 ===
+모든 도구가 그러하듯이 Multi Thread 프로그램이라고 해서 장점만 가진 것은 아니다. Multi Thread 프로그램은 Multi Process 프로그래밍 방식에 비해서 다음과 같은 단점을 가진다.
+ * 하나의 쓰레드에서 발생된 문제가 전체 프로세스에 영향을 미친다.
+   멀티 프로세스의 경우에는 프로세스하나가 문제가 생기더라도 단일 프로세스로 문제가 제한된다. 그러나 멀티쓰레드 프로그램의 경우 하나의 쓰레드에 생긴 문제가 다른 쓰레드에까지 영향을 줄 수 있다. 예를 들어 쓰레드 하나가 다른 프로세스의 메모리 영역을 침범할 경우 프로세스 자체가 죽어버림으로써, 프로세스에 생성된 다른 모든 쓰레드도 프로세스와 함께 죽어버리게 된다. - 이 문제는 해결 가능하지만 여기에서는 다루지 않도록 하겠다. 시그널(:12)을 잘 활용하면 된다. 관심있으면 한번 고민해 보기 바란다. -
+ * 디버깅이 어렵다. 문맥이 서로 교환되므로 추적하기가 까다롭다. 
+
+이러한 단점이 있음에도 불구하고 멀티쓰레딩 프로그래밍 기법을 선호하고 있다. 
+=== PThread ===
+'''Thread'''는 운영체제(:12)에서 제공하는 '''병렬처리''' 메커니즘으로, 실제 이 메커니즘을 이용하기 위해서는 Thread의 구현체가 필요하다.
+
+리눅스(:12)에서는 '''pthread'''라는 thread 구현 라이브러리(:12)가 사용되고 있다. pthread는 '''P'''OSIX thread 의 줄임말로 POSIX 표준을 따르고 있다. pthread는 리눅스 뿐만 아니라 다른 거의 대부분의 유닉스(:12)에서도 사용할 수 있다. 이외에도 BSD 계열에서 사용하는 ''''Light Weight Kernel Threads''' , Apple 에서 사용하는 '''Multiprocessing Services'''등의 구현체가 있다. 이 문서는 '''pthread'''구현만을 설명하도록 할 것이다.
+
+pthread는 리눅스 운영체제에서 제공하는 thread 를 제어하기 위한 함수들을 모아 놓은 C 라이브러리(:12)로, 다음과 같은 기능의 함수군을 제공한다.
+   * 쓰레드 생성과 종료 관련 함수들
+   * 쓰레드 동기화 관련 함수들 
+     쓰레드는 많은 데이터를 공유한다. 그러므로 데이터에 대한 동기화 문제를 해결해야할 필요가 있다. 
+   * 쓰레드 시그널 제어 함수들 
+     signal(:12)은 프로세스단위로 작동한다. 그러나 쓰레드 프로그램의 경우, 각 쓰레드 마다 다른 시그널 정책이 필요하므로, 쓰레드 전용의 시그널 제어 함수가 필요하다. 
+
+=== Multi Thread 프로그램 ===
+병렬로 작동하지 않는 하나의 문맥흐름만을 가지는 프로그램을 '''단일 쓰레드 프로그램이라고 한다. 반대로 아래와 같이 문맥이 나뉘어서, 동시에 두개 이상의 쓰레드가 실행되면, 이를 '''멀티 쓰레드 프로그램'''이라고 한다. 
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/ptiKhFtgo6dv_xoxeatgWQ?feat=embedwebsite"><img src="http://lh3.ggpht.com/_Os5qf5urx_A/S6uXsRWyOII/AAAAAAAABRo/BHMxaNa41O4/s800/33697.png" /></a>
+}}}
+
+=== Process, Kernel Thread, User Thread ===
+'''프로세스'''는 가장 무거운 커널의 스케쥴링 단위이다. 프로세스는 운영체제(:12)에게 할당받은 자원들 - 파일 핸들러,소켓,장치 핸들러 - 을 할당받게 된다. 프로세스는 독립된 단위로써 파일이나 주소영역 등을 공유하지 않는다.
+
+'''kernel thread'''는 가장 가벼운 커널 스케쥴링 단위다. 하나의 프로세스는 적어도 하나의 커널 쓰레드를 가지게 된다. 만약에 프로세스가 하나이상의 쓰레드를 가지고 있다면,  이들 쓰레드는 같은 메모리와 파일자원등을 공유하게 된다. 만약 커널의 프로세스 스케쥴러가 선점형이라면 쓰레드의 스케쥴러도 선점형인 경우가 많다. 참고삼아서 선점형과 비선점형에 대해서 간략하게 설명하도록 하겠다.
+  * 비선점형 : 특정 프로세스가 CPU를 독점하는 것이 가능하다.
+  * 선점형 : 특정 프로세스가 CPU를 독점하는게 불가능하다.
+특정 프로세스가 CPU를 독점하는게 불가능하게 하는 것은 프로세스가 인터럽트를 무시하기 못하게 하는 것으로 구현한다. 선점형은 어떤 프로세스가 시스템콜을 수행중이더라도 커널이 인터럽트를 보내면, 즉시 빠져 나와야 한다. 즉 운영체제가 CPU를 선점한다는 얘기가 된다. 시스템콜이 수행중이더라도 인터럽트를 걸고 다른 일을 수행하도록 할 수 있으므로 보다 빠른 반응성을 보여준다. 
+
+때때로 쓰레드가 '''유저영역''' 라이브러리(:12)로 구현되는 경우가 있는데, 이를 user Thread 라고 부른다.
+
+=== 쓰레드의 생성과 종료 ===
+멀티 쓰레드 프로그램이라고 하더라도, 처음 시작되었을 때는 main()에서 시작되는 단일 쓰레드 상태로 작동이 된다. 이 상태에서 pthread_create(3) 함수를 호출함으로써, 새로운 쓰레드를 생성할 수 있다. '''pthread_create'''를 이용해서 생성된 새로운 쓰레드를 worker 쓰레드라고 하자. 
+
+멀티 쓰레드 프로그램은 다음과 같은 흐름을 가진다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/Rey0xVwHnI3o9KAWgzW65Q?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uXsONqVNI/AAAAAAAABRg/WHMC013wceA/s800/6d797.png" /></a>
+}}}
+
+생성된 worker thread는 언젠가 종료가 될 것이다. Master Thread (이하 부모 쓰레드)는 pthread_join()을 이용해서 worker thread들의 종료를 기다린다. pthread_join()는 종료된 worker thread의 자원을 정리하는 일을 한다. fork()를 이용한 멀티 프로세스 프로그램에서, 부모 프로세스가 wait()를 이용해서 자식 프로세스를 기다리는 것과 같은 이유라고 보면 된다. 
+
+==== pthread_create : 쓰레드 생성 ====
+pthread_create(3)함수를 이용하면 새로운 쓰레드를 생성할 수 있다. 이 함수는 다음과 같이 사용할 수 있다.
+{{{#!plain
+#include <pthread.h>
+
+int  pthread_create(pthread_t  *  thread, pthread_attr_t *attr, 
+     void * (*start_routine)(void *), void * arg);
+}}}
+  1. '''thread''' : 쓰레드가 성공적으로 생성되었을 때, 넘겨주는 쓰레드 식별 번호. 
+  1. '''attr''' : 쓰레드의 특성을 설정하기 위해서 사용한다. NULL(:12)일 경우 기본 특성
+  1. '''start_routine''' : 쓰레드가 수행할 함수로 함수포인터(:12)를 넘겨준다. 
+  1. '''arg''' : 쓰레드 함수 start_routine를 실행시킬 때, 넘겨줄 인자
+이 함수는 성공적으로 수행되었다면, 0을 리턴한다. 그렇지 않을 경우 1을 리턴한다.
+
+==== pthread_join : 쓰레드 정리 ====
+쓰레드가 실행시키는 것은 함수 이다. 그러므로 return이나 exit(0)등을 이용해서 쓰레드를 종료시킬 수 있게 된다. 그러나 쓰레드 함수가 종료되었다고 해서 곧바로 쓰레드의 모든자원이 종료되지 않는다. fork()기반의 멀티프로세스 프로그램에서 종료된 자식프로세스를 정리하기 위해서 wait()로 기다리듯이, 종료된 쓰레드를 기다려서 정리를 해주어아만 한다. 그렇지 않을 경우 쓰레드의 자원이 되돌려지지 않아서 메모리 누수현상이 발생하게 된다. 
+
+pthread_create()로 생성시킨 쓰레드는 pthread_join()을 통해서 기다리면 된다. pthread_join 함수는 다음과 같이 사용할 수 있다.
+{{{#!plain
+#include <pthread.h>
+
+int pthread_join(pthread_t th, void **thread_return);
+}}}
+  1. '''th''' : pthread_create에 의해서 생성된, 식별번호 '''th'''를 가진 쓰레드를 기다리겠다는 얘기다.
+  1. '''thread_return''' : 식별번호 '''th'''인 쓰레드의 종료시 리턴값이다.  
+
+'''pthread_join'''이 하는 일은 명확하다. 다만 주의 할것은 pthread_join은 반드시 joinable 한 상태로 생성된 쓰레드만을 기다릴 수 있다는 점이다. pthread_create로 쓰레드를 생성시킬 때, 나중에 join되지 않을 것으로 생각하고 생성시킬 수 있는데, 이렇게 되면 이 쓰레드는 종료하자마자 모든 자원을 해제하며, pthread_join으로 기다릴 수가 없다. 부모쓰레드와 '''떨어져서''' 완전히 독립적으로 작용한다고 하여, 이를 detach 한다고 한다. 쓰레드를 detach하는 방법은 아래에서 다룰 것이다.
+
+==== 쓰레드 생성 예제 ====
+pthread_create와 pthread_join을 알고 있다면, 이제 thread를 생성시킬 수 있다.
+{{{#!plain
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+// 쓰레드 함수
+void *t_function(void *data)
+{
+    int id;
+    int i = 0;
+    id = *((int *)data);
+
+    while(1)
+    {
+        printf("%d : %d\n", id, i);
+        i++;
+        sleep(1);
+    }
+}
+
+int main()
+{
+    pthread_t p_thread[2];
+    int thr_id;
+    int status;
+    int a = 1;
+    int b = 2;
+
+    // 쓰레드 생성 아규먼트로 1 을 넘긴다.  
+    thr_id = pthread_create(&p_thread[0], NULL, t_function, (void *)&a);
+    if (thr_id < 0)
+    {
+        perror("thread create error : ");
+        exit(0);
+    }
+
+    // 쓰레드 생성 아규먼트로 2 를 넘긴다. 
+    thr_id = pthread_create(&p_thread[1], NULL, t_function, (void *)&b);
+    if (thr_id < 0)
+    {
+        perror("thread create error : ");
+        exit(0);
+    }
+
+    // 쓰레드 종료를 기다린다. 
+    pthread_join(p_thread[0], (void **)&status);
+    pthread_join(p_thread[1], (void **)&status);
+
+    return 0;
+}
+}}}
+아주 전형적인 프로그램이긴 하지만 '''pthread_join'''부분에 문제가 있다. '''pthread_join'''은 쓰레드가 종료될 때까지 블럭되기 때문이다. 이래서는 쓰레드를 두개이상 생성시키지 못할 것이다. 그렇다고 pthread_join을 이용하지 않는다면, 메모리 누수가 생기게 되니, 생략할 수도 없는 노릇이다.
+
+==== 자식쓰레드를 부모쓰레드로 부터 분리하기 ====
+pthread_join의 사용으로 발생할 수 있는 문제점을 해결하기 위한, 가장 좋은 방법중의 하나는 pthread_detach 를 이용해서, 자식 쓰레드를 부모쓰레드와 완전히 분리해 버리는 방법이다. 이 경우 자식 쓰레드가 종료되면, 모든 자원이 즉시 반환된다. 반면, 자식 쓰레드의 종료상태를 알 수 없다는 문제가 발생한다. 대게의 경우 자식 쓰레드의 종료상태가 중요한 문제가 되지는 않을 것이다. 
+
+만약 자식 쓰레드의 종료상태를 알아내는게 중요하다면, 종료상태를 저장할 전역변수를 두고, 여기에 종료상태를 기록하는 방식을 사용할 수 있을 것이다. 자식 쓰레드가 종료할때, 변수의 값을 바꾸고, 부모쓰레드에 시그널을 전송하는 방법이다. 이 방법은 이 문서의 뒤에서 따로 다루도록 하겠다.  
+{{{#!plain
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+// 쓰레드 함수
+// 1초를 기다린후 아규먼트^2 을 리턴한다.
+void *t_function(void *data)
+{
+    char a[100000];
+    int num = *((int *)data);
+	printf("Thread Start\n");
+    sleep(5);
+	printf("Thread end\n");
+}
+
+int main()
+{
+    pthread_t p_thread;
+    int thr_id;
+    int status;
+    int a = 100;
+
+    printf("Before Thread\n"); 
+    thr_id = pthread_create(&p_thread, NULL, t_function, (void *)&a);
+    if (thr_id < 0)
+    {
+        perror("thread create error : ");
+        exit(0);
+    }
+
+    // 식별번호 p_thread 를 가지는 쓰레드를 detach 
+    // 시켜준다.
+    pthread_detach(p_thread);
+    pause();
+    return 0;
+}
+}}}
+
+=== 쓰레드 동기화 ===
+이제 우리는 간단한 다중쓰레드 프로그램을 만들 수 있게 되었다. 그러나 이들 쓰레드 생성 함수만 가지고는 복잡한 쓰레드 프로그램을 만들 수가 없다. 쓰레드간 '''동기화'''라고 하는 문제가 놓여있기 때문이다. 아주 간단한 프로그램이 아닌한은 반드시 '''동기화'''문제를 고민해야만한다.
+
+동기화란 여러가지 의미로 사용될 수 있는데, 이 경우에 있어서 '''동기화'''는 '''서로의 시간을 맞춘다'''를 의미한다. 멀티쓰레드 프로그램은 하나의 시간에 여러개의 프로세스가 돌아가는 형태를 취한다. 또한 멀티쓰레드 프로그램은 자원의 상당부분을 서로 공유하는 경우가 많다.  만약 단지 자원을 읽어들이는 거라면 상관없지만 읽고/쓰는 것이라면 동기화와 관련된 문제가 발생할 수 있다.
+
+예컨데 다음과 같은 경우다.
+  1. A와 B 두개의 프로세스가 있다. 이 프로세스는 int count=1 이라는 자원을 공유한다.
+  1. A가 count를 읽어들이고 1을 더한다.
+  1. B가 count를 읽어들인다. 아직 A가 count에 쓰지 않았기 때문에, B도 1을 읽어들인다. 
+  1. A가 count에 2를 쓴다.
+  1. B도 count에 2를 쓴다.
+  1. count에는 2가 저장되었다.
+우리가 원하는 값은 2가 아닌 3이다. 그러나 쓰레드가 동기화 되지 않음으로써, 원치않은 잘못된 연산을 하게 되었다. 우리는 이 문제를 해결해야 한다. 
+
+=== 접근제어 ===
+동기화 문제는 현실세계에서도 자주 발생한다. 화장실을 생각하면 된다. 화장실은 공유자원이며, 여러명이 사용한다. 누군가 화장실을 사용하고 있다면, 다른 사람은 화장실을 사용하면 안된다. 이 문제를 우리는 '''접근을 제어'''하는 방식으로 해결한다. 문을 걸어 잠궈서 한번에 한사람만 화장실에 들어가도록 하는 방법이다. 매우 이해하기 쉬운 방식이다.
+
+다중쓰레드 프로그램에서도 마찬가지로 '''접근제어'''를 이용해서 이 문제를 해결한다. 이를 위해서 pthread는 mutex(:12)라는 '''잠금 메커니즘'''을 제공한다.
+
+==== mutex 잠금 ====
+동시에 여러개의 쓰레드가 하나의 자원에 접근하려고 할때 발생하는 문제를 pthread는 '''임계영역'''을 두는 것으로 해결하고 있다. '''임계영역'''안에는 접근하고자 하는 '''자원'''이 놓여있고, 오직 하나의 쓰레드만 임계영역안으로 진입할 수 있도록 제한한다. pthread는 이를 위해서 '''mutex'''를 제공한다. mutex는 그 자체가 가지는 '''잠금'''의 특성 때문에 '''mutex 잠금'''이라고 불리워지기도 한다. 
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/5u8va1SZjgRTPzUYySaTRA?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uXsE4dllI/AAAAAAAABRk/D0887kM07xY/s800/26b97.png" /></a>
+}}}
+
+위 그림은 mutex가 작동하는 방식을 보여준다. thread 1이 자원에 접근하면 mutex 잠금을 얻게 된다. 이 잠금은 단지 하나만 존재하기 때문에 thread 2는 잠금을 얻지 못하고 임계영역 밖에서 대기하게 된다. thread 1이 자원을 모두 사용하고 임계영역을 벗어나면 thread 2는 잠금을 얻게 되고 임계영역에 진입해서 자원을 사용할 수 있게 된다. 
+
+==== mutex의 사용 ====
+mutex를 사용하기 위해서는 다음의 4가지 함수가 필요하다. 
+  * '''mutex 잠금객체'''을 만드는 함수 
+  * '''mutex 잠금'''을 얻는 함수
+  * '''mutex 잠금'''을 되돌려주는 함수
+  * '''mutex 잠금객체'''를 제거하는 함수
+
+==== pthread_mutex_init ====
+mutex를 사용하기 위해서는 먼저 pthread_mutex_init() 함수를 이용해서, mutex 잠금 객체를 만들어줘야 한다.
+{{{#!plain
+pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutex_attr *attr);
+}}}
+이 함수는 두개의 인자를 필요로 한다.
+  1. mutex : mutex 잠금객체
+  1. mutex_attr : mutex는 '''fast''', ''''recursive''', '''error checking'''의 3종류가 있다. 이 값을 이용해서 mutex 타입을 결정할 수 있다. NULL 일경우 기본값이 '''fast'''가 설정된다. 
+     * fast : 하나의 쓰레드가 하나의 잠금만을 얻을 수 있는 일반적인 형태
+     * recursive : 잠금을 얻은 쓰레드가 다시 잠금을 얻을 수 있다. 이 경우 잠금에 대한 카운드가 증가하게 된다.
+mutex_attr을 위해서 다음의 상수값이 예약되어 있다.
+  * fast : PTHREAD_MUTEX_INITIALIZER 
+  * recursive : PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+  * error checking : PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+
+==== pthread_mutex_lock ====
+mutex 잠금을 얻기 위한 함수다.
+{{{#!plain
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+}}}
+'''mutex 잠금을 얻는다'''라는 표현보다는 '''mutex 잠금을 요청한다'''라는 표현이 더 정확할 것 같다. 만약 mutex 잠금을 선점한 쓰레드가 있다면, 선점한 쓰레드가 mutex 잠금을 되돌려주기 전까지 이 코드에서 대기하게 된다. 
+
+때때로 잠금을 얻을 수 있는지만 체크하고 대기(블럭)되지 않은 상태로 다음 코드로 넘어가야할 필요가 있을 수 있을 것이다. 이 경우에는 아래의 함수를 사용하면 된다.
+{{{#!plain
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
+}}}
+==== pthread_mutex_unlock ====
+mutex 잠금을 되돌려주는 함수다.
+{{{#!plain
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+}}}
+
+==== mutex 잠금 예제 ====
+count 프로그램을 예제로 할 것이다. 임계영역안에서 보호되어야할 자원은 '''count'''이고, 여러개의 쓰레드가 count에 접근해서 '''+1'''을 시도하려고 한다. 이때 제대로된 count를 위해서는 한번에 하나의 쓰레드만이 counting을 하도록 해야할 것이다. mutex를 이용해서 임계영역을 보호하도록 할 것이다. 
+
+임계영역을 보호하지 않을 경우 다음과 같은 문제가 발생할 수도 있을 것을 예상할 수 있다. 
+{{{#!plain
+int a = 1; 
+Thread A 에서 a를 읽어들인다. 
+Thread B 에서 a를 읽어들인다. 
+Thread A 에서 a = a+1를 한다. 
+{ 
+    a = a+1; 
+    결과는 2; 
+} 
+Thread B 에서 a++를 한다. 
+{ 
+   a = a + 1; // 읽어들인 값이 1이기 때문에 
+   역시 결과는 2가 된다. 
+} 
+}}}
+두번의 count가 발생했기 때문에 3이되어야 하겠지만 임계영역이 보호되지 않음으로써 '''2'''가 되어 버렸다.
+
+mutex는 임계영역을 잠금으로서 이러한 문제를 해결한다. 이러한 문제를 해결하기 위해서는 임계영역에 단지 하나의 쓰레드만 접근하는걸 보장해줘야 할 것이다. mutex는 아래의 요소들을 보장함으로써 이를 보장한다.  
+  * Atomicity - mutex 잠금은 최소단위 연적 - '''atomic operation''' - 을 보장한다. atomic operation에 대해서 간단히 설명하고 넘어간다. 자세한 내용은 [http://devnote.net/wiki/index.php/Atomic_Operations Atomic Operation]을 참고하기 바란다.
+    1. aotomic operation은 일련의 연산 즉 mutex 잠금 연산이 끝날때 까지 다른 프로세스가 그 연산의 변화를 알 수 없는 상태가 되는 연산을 의미한다. (일반적으로 연산은 이전의 연산의 결과를 관찰한 후에서야 이루어질 수 있게다) 
+    2. 전체연산중 하나라도 실패할 경우 모든 연산이 실패하며 시스템은 전체 연산이 시작하기 전의 상태로 복구된다. 
+  * Singularity : 한 쓰레드가 뮤택스 잠금을 얻었다면, 이 쓰레드가 뮤택스 잠금을 내어놓기 전까지는 다른 쓰레드가 뮤택스 잠금을 얻을 수 없도록 한다. 
+  * None Busy Wait : 이것은 성능과 관련된 것이다. 바쁜대기상태에 놓이지 않는다는 뜻이다. 뮤택스 잠금을 얻을 수 있는지를 확인하기 위한 연산이 필요하지 않는 다는 의미로 받아들이면 될 것이다. 
+
+이상 mutex는 위의 3가지를 지원하는 것으로 공유되는 자원을 충돌없이 그리고 효율적으로 사용할 수 있도록 보장해준다. 
+
+다음은 mutex를 사용한 count 예제프로그램이다. 
+{{{#!plain linenum
+#include <stdio.h> 
+#include <unistd.h> 
+#include <pthread.h> 
+
+int ncount;    // 쓰레드간 공유되는 자원
+pthread_mutex_t  mutex = PTHREAD_MUTEX_INITIALIZER; // 쓰레드 초기화
+
+// 쓰레드 함 수 1
+void* do_loop(void *data)
+{
+    int i;
+
+    pthread_mutex_lock(&mutex); // 잠금을 생성한다.
+    for (i = 0; i < 10; i++)
+    {
+        printf("loop1 : %d", ncount);
+        ncount ++;
+        sleep(1);
+    }
+    pthread_mutex_unlock(&mutex); // 잠금을 해제한다.
+}
+
+// 쓰레드 함수 2
+void* do_loop2(void *data)
+{
+    int i;
+
+    // 잠금을 얻으려고 하지만 do_loop 에서 이미 잠금을 
+    // 얻었음으로 잠금이 해제될때까지 기다린다.  
+    pthread_mutex_lock(&mutex); // 잠금을 생성한다.
+    for (i = 0; i < 10; i++)
+    {
+        printf("loop2 : %d", ncount);
+        ncount ++;
+        sleep(1);
+    }
+    pthread_mutex_unlock(&mutex); // 잠금을 해제한다.
+}    
+
+int main()
+{
+    int thr_id;
+    pthread_t p_thread[2];
+    int status;
+    int a = 1;
+
+    ncount = 0;
+    thr_id = pthread_create(&p_thread[0], NULL, do_loop, (void *)&a);
+    sleep(1);
+    thr_id = pthread_create(&p_thread[1], NULL, do_loop2, (void *)&a);
+
+    pthread_join(p_thread[0], (void *) &status);
+    pthread_join(p_thread[1], (void *) &status);
+
+    status = pthread_mutex_destroy(&mutex);
+    printf("code  =  %d", status);
+    printf("programing is end");
+    return 0;
+}
+}}}
+
+=== 앞으로 할 것 ===
+쓰레드는 매우 광범위한 주제로 여기에서는 쓰레드를 사용하기 위한 가장 기본적인 내용만 다루었다. 쓰레드에 대한 좀더 자세한 내용은 별도의 장을 할애해서 다룰 생각이다. 
+
+[[tag(linux,시스템 프로그래밍,pthread)]]

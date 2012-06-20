@@ -1,0 +1,191 @@
+#title PIPE의 사용
+
+{{{#!html
+유닉스관리자 매우 일상적으로 pipe 를 사용한다. 아래의 예제를 보라
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost test]# ls -al | less
+[yundream@localhost test]# ps -aux | grep httpd | grep -v grep
+</pre>
+</td></tr>
+</table>
+유닉스의 철학은 "작은것이 아름답다" 이다. 자신이 할수 있는 한두가지 일만을
+명확하게 실행해주며, 이러한 자기 일만 "확실히" 전담하는 수많은 프로그램들이
+마치 레고 블럭처럼 서로서로 연결되어서 강력한 힘을 발휘하게 된다.<br>
+PIPE 는 이러한 각각의 프로그램들을 서로 연결시키기 위해 존재하는 IPC 설비중의
+하나이며, 서문에서 밝혔듯이, 가장 널리 사용되고 있으며, 역사도 오래되었다.<br>
+다음은 pipe 를 이용한간단한 예제이다.<br><br>
+<b>예제 : pipe.c</b><br>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt;
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    FILE *fp;
+    <b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>256</font>];
+
+    printf(<font COLOR=#ff0000>"명령어 실행 쉘 : %s&#92;n"</font>, getenv(<font COLOR=#ff0000>"SHELL"</font>));
+    fp = popen(<font COLOR=#ff0000>"ls -al"</font>, <font COLOR=#ff0000>"r"</font>);
+
+    <b><font COLOR=#0000ff>while</font></b>(fgets(buf, <font COLOR=#a900a9>256</font>, fp))
+    {
+        printf(<font COLOR=#ff0000>"%s&#92;n"</font>, buf);
+    }
+
+    pclose(fp);
+}
+</pre>
+</td></tr>
+</table>
+파이프는 popen(3)을 통해서 만들어지며, 읽기나, 쓰기 전용의 파일스트림을
+돌려준다. popen 은 단지 read-only 나 write-only 로 열수 있으며,
+read and write 로는 열수가 없는 반이중(단방향)데이타 흐름만을 제공한다.
+전이중(양방향)의 데이타흐름을 지원받고 싶다면 pipe 의 또다른 형태인 FIFO를
+사용해야 할것이다. - pipe 는 동일한 PPID를 가진 프로세스사이에서만
+데이타 전송이 가능하다. FIFO 는 이러한 문제역시 해결시켜준다 -<br>
+pipe.c 예제 에서 우리는 "ls -al" 을 읽기 전용으로 열었다. <br>
+popen 을 이용해서 실행되는 명령어는 환경변수에 SHELL 에 등록되어 있는
+명령어 해석기를 통해서 실행된다. 즉 위의 ls -al 은 실제로
+"/bin/bash -c ls -al" 의 형식으로 실행되게 된다. <br>
+ls -al 을 실행해서 얻어진 값은 표준출력 형식으로 파이프를 통해서 전달되며,
+이것은 파일스트림을 위해 제공하는 fgets, fputs 등의 함수를 통해서,
+읽거나 쓸수 있게 된다. <br>
+위의 명령을 실행하면 ls -al 을 실행해서 얻어진 결과를 출력하게 된다.<br>
+
+<img src=/albums/album01/abp.gif alt="ls -al">
+<br><br>
+
+<b>메일발송 프로그램</b><br>
+이번에는 메일발송 프로그램을 만들어 보도록 하자.<br>
+이 프로그램은 mysql 의 user(고객 db)에 접근해서 등록된 user 의 email 주소로
+관리자가 작성한 메일을 보내주는 일을하며, 메일내용역시 mail 테이블에 등록되어
+있다. <br>
+다음은 User table 와 mail 테이블의 구조이다.<br>
+<b>user 테이블</b><br>
+<img src=/albums/album01/abq.gif alt="테이블구조">
+<br><br>
+메일을 발송하기 위해서 우리는 sendmail 을 이용할것이며, popen 을 통해서
+write 모드로 열고 mail 테이블의 내용을 토대로 메일을 만들고, 이것을 sendmail
+로 write 하게 될것이다.<br>
+sendmail 에서 -v 옵션을 사용하게 되면, 메일발송과정을 확인할수 있어,
+디버그모드로 사용될수 있다. <br>
+-t 옵션의 경우에는 sendmail 이 메일 헤더의 "To, Cc, Bcc" 를 파싱해서,
+해당 메일주소로 메일을 발송하게 된다. <br> 
+프로그램은 여러개의 모듈을 가진 여러개의 파일로 구성될수 있겠지만, 
+쏘쓰 파일 설명의 편리함을 이유로 단일 파일을 가진 쏘쓰로 만들게 될것이며,  
+중요치 않다고 생각되는 부분의 에러처리등 과 같은 부분은 생략할 것이다.<br>
+mysql 테이블의 내용은 각자 환경에 맞게 개인적으로 작성하기 바라며,
+mysql 환경을 구축하기 어려울경우 파일시스템을 이용하도록 한다. <br>
+mysql 프로그래밍에 관한 내용은
+<a href=http://www.joinc.co.kr/article.php?sid=10>mysql 프로그래밍</a> 을
+참조하기 바란다.
+<br><br>
+<b>send_mail.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;mysql.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+
+<font COLOR=#00b800>#define</font> DB_HOST <font COLOR=#ff0000>"127.0.0.1"</font> 
+<font COLOR=#00b800>#define</font> DB_USER <font COLOR=#ff0000>"root"</font>
+<font COLOR=#00b800>#define</font> DB_PASS <font COLOR=#ff0000>"1111"</font>
+<font COLOR=#00b800>#define</font> DB_NAME <font COLOR=#ff0000>"user"</font>
+
+// 메일내용을 저장하기 위한 구조체
+<b><font COLOR=#0000ff>struct</font></b> mail_con
+{
+    <b><font COLOR=#0000ff>char</font></b> subject[<font COLOR=#a900a9>80</font>];
+    <b><font COLOR=#0000ff>char</font></b> sender[<font COLOR=#a900a9>40</font>];
+    <b><font COLOR=#0000ff>char</font></b> content_type[<font COLOR=#a900a9>80</font>];
+    <b><font COLOR=#0000ff>char</font></b> body[<font COLOR=#a900a9>1024</font>];
+};
+
+<b><font COLOR=#0000ff>int</font></b> main (<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    MYSQL       *connection = NULL, conn;
+    MYSQL_RES   *sql_result;
+    MYSQL_ROW   sql_row;
+    FILE        *fp;
+    <b><font COLOR=#0000ff>int</font></b>           query_stat;
+    <b><font COLOR=#0000ff>struct</font></b> mail_con user_mail;
+
+    // MYSQL DB 에 연결을 한다.
+    mysql_init(&conn);
+    connection = mysql_real_connect(&conn, DB_HOST, DB_USER,
+                                        DB_PASS, DB_NAME,
+                                        <font COLOR=#a900a9>3306</font>,
+                                        (<b><font COLOR=#0000ff>char</font></b> *)NULL, <font COLOR=#a900a9>0</font>);
+
+    <b><font COLOR=#0000ff>if</font></b> (connection == NULL)
+    {
+        fprintf(stderr, <font COLOR=#ff0000>"Mysql connection error : %s"</font>, 
+                        mysql_error(&conn));
+        <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>1</font>;
+    }
+
+    // 메일 내용을 가져온다.
+    query_stat = mysql_query(connection, <font COLOR=#ff0000>"select * from mail"</font>);
+    <b><font COLOR=#0000ff>if</font></b> (query_stat != <font COLOR=#a900a9>0</font>)
+    {
+        fprintf(stderr, <font COLOR=#ff0000>"Mysql query error : %s"</font>, mysql_error(&conn));
+        <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>1</font>;
+    }
+    
+    sql_result = mysql_store_result(connection);
+    sql_row = mysql_fetch_row(sql_result); 
+    memcpy(user_mail.subject, sql_row[<font COLOR=#a900a9>0</font>], <font COLOR=#a900a9>80</font>);
+    memcpy(user_mail.sender, sql_row[<font COLOR=#a900a9>1</font>], <font COLOR=#a900a9>40</font>);
+    memcpy(user_mail.content_type, sql_row[<font COLOR=#a900a9>2</font>], <font COLOR=#a900a9>80</font>);
+    memcpy(user_mail.body, sql_row[<font COLOR=#a900a9>3</font>], <font COLOR=#a900a9>1024</font>);
+    mysql_free_result(sql_result);
+    
+    // 메일주소를 가져온다.
+    query_stat = mysql_query(connection, <font COLOR=#ff0000>"select * from user"</font>);
+    <b><font COLOR=#0000ff>if</font></b> (query_stat != <font COLOR=#a900a9>0</font>)
+    {
+        fprintf(stderr, <font COLOR=#ff0000>"Mysql query error : %s/n"</font>, mysql_error(&conn));
+        <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>1</font>;
+    }
+
+    sql_result = mysql_store_result(connection);
+    // 메일 유저에게 메일을 발송한다.
+    <b><font COLOR=#0000ff>while</font></b>((sql_row = mysql_fetch_row(sql_result)) != NULL)
+    {
+<font COLOR=#00b800>#ifdef</font> __DEBUG__
+        fp = popen(<font COLOR=#ff0000>"/usr/sbin/sendmail -v -t "</font>, <font COLOR=#ff0000>"w"</font>);
+<font COLOR=#00b800>#else</font>
+        fp = popen(<font COLOR=#ff0000>"/usr/sbin/sendmail -t "</font>, <font COLOR=#ff0000>"w"</font>);
+<font COLOR=#00b800>#endif</font>
+        fprintf(fp, <font COLOR=#ff0000>"Subject: %s&#92;n"</font>, user_mail.subject);
+        fprintf(fp, <font COLOR=#ff0000>"To: %s&#92;n"</font>, sql_row[<font COLOR=#a900a9>1</font>]);
+        fprintf(fp, <font COLOR=#ff0000>"From: %s&#92;n"</font>, user_mail.sender);
+        fprintf(fp, <font COLOR=#ff0000>"Content-Type: %s&#92;n"</font>, user_mail.content_type);
+        fprintf(fp, <font COLOR=#ff0000>"&#92;n%s&#92;n"</font>, user_mail.body);
+
+        pclose(fp);
+    }
+    mysql_free_result(sql_result);
+    mysql_close(connection);
+}
+</pre>
+
+</td></tr>
+</table>
+위의 프로그램은 잘 작동을 하긴 하지만, 한번에 한명씩에게만 메일을 발송한다.
+발송하고자 하는 유저가 수백명 정도라면 그럭저럭 보낼만 하겠지만,
+수천, 수만명 이라면 상당한 시간이 걸릴것이다. 그리고 메일을 보내기전에,
+실제로 메일서버가 존재하는지 확인하는것도 좋을것이다. 보통 메일전송이
+늦어지는 경우는 서버가 존재하지 않거나, 문제가 발생해서 그걸 확인하는
+과정에서 시간이 오래 걸리기 때문이다. <br>
+이러한 문제를 해결하기 위해서는 프로세스를 한번에 여러번 띄워서
+작업을 하도록 수정하고, 받는쪽 메일서버가 실지로 존재하는지 확인하는
+루틴을 추가하면 될것이다.
+이러한 방법에 대해서는 연구해볼 필요가 있을것
+이고 이문서는 이쯤에서 마치도록 하겠다. <br>
+}}}

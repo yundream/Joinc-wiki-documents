@@ -1,0 +1,69 @@
+#title cloudstack api
+
+== cloudstack api ==
+cloudstack은 모든 기능을 web api로 제공한다. cloudstack webui를 이용해도 대부분의 필요한 작업을 할 수 있지만 모든 기능을 webui로 제공하지는 않는다. 또한 고급 응용을 위해서는 web api의 사용이 필수적이기도 하다.
+
+'''3.0을 기준으로 한다.'''
+기본 web api 포트번호는 8086이며, 사용방법은 다음과 같다. vm을 만들기 위한 api 호출이다.
+{{{#!plain
+# wget http://mycloudstack.com:8086/?command=deployVirtualMachine&serviceofferingid=1\
+&templateid=3&zoneid=1&account=admin&diskofferingid=5
+}}}
+  * command : api 명령. deployVirtualMachine는 vm을 생성하라는 의미다.
+  * serviceofferingid :
+  * templateid : vm 생성을 위해 사용할 운영체제 템플릿의 id 
+  * zoneid : vm을 생성할 zone의 id 
+  * account : vm을 소유할 account
+  * diskofferingid : vm을 생성할 디스크 형태. (크기, shared / dedicate 방식 등...)   
+요청 결과는 JSON 형태로 반환한다.
+
+== 용어 정리 ==
+cloudstack api에 나오는 용어들을 정리한다. 주로 매개변수들이다.
+  * VirtualMachine 
+    가상 머신 혹은 VM이라고도 한다.
+  * virtualmachineid
+    만들어진 vm의 일련번호
+  * service offering
+    VM을 만들때 사용할 VM특징들이다. hypvervisor 타입, cpu 속도와 갯수, memory 크기, root volume 크기, root disk tag등이 정의돼있다. 하나 이상의 service offering을 가지고 있으며, VM의 용도에 따라서 선택하면 된다. 필요에 따라 service offering를 만들 수 있다.  
+  * serviceofferingid 
+    만들어진 service offering의 id로 API 호출시 사용한다.
+  * account 
+    cloudstack 계정.
+  * domain 
+    account를 묶는 상위 카테고리. 하나의 domain은 여러 개의 account를 가질 수 있다. domain > account > user 의 3 계층을 가진다. domain은 서비스 프로바이더, account는 서비스를 받는 계정, user은 account에 포함된 사용자 계념이다.  
+  * host 
+     cloudstack가 관리하는 cnode(computing node)로 hypervisor가 올라간 서버다. bear metal host도 관리할 수 있다. 
+  * hostid
+    API 호출시 사용하는 호스트의 일련 번호 
+  * securitygroup  
+    basic network mode에서 vm간 isolation을 위해서 사용하는 툴이다. iptable, arptable를 이용 패킷을 필터링하는 방식으로 이루어진다. vm은 하나 이상의 securitygroup를 가진다. 2.2까지는 입력 패킷에 대한 필터링만 가능했으나 3.0 부터는 입출력 패킷 모두 필터링이 가능하다.  
+  * disk offering  
+    VM이 사용할 disk 명세로, VM을 선택할 때 반드시 하나의 disk offering을 선택한다. 디스크의 크기, disk tag등의 정보를 가지고 있다. 
+  * diskofferingid
+    API 호출에 사용하는 disk offering의 일련 번호
+  * zone
+    cloudstack는 cloud 인프라스트럭쳐를 추상화 하는데, zone은 최상위 개념이다. zone > pod > cluster > host 의 계층구조를 가진다.   
+  * zoneid
+    API 호출에 사용하는 zone의 일련 번호
+  * volume  
+    vm이 사용하는 디스크 공간. volume은 root disk volume과 data disk volume이 있다. root disk volume은 VM의 구동을 위해서 사용하는 볼륨으로 커널이 위치한다. data disk volume은 추가적으로 볼륨을 제공하기 위해서 사용한다.  
+  * job 
+    cloudstack이 실행하는 작업단위. API를 호출하면 job이 만들어지고 이 job은 job queue에 들어간다.
+  * jobid
+    job의 일련번호. jobid를 이용해서 job 상태와 수행 결과를 확인할 수 있다. 
+  * template  
+    vm의 vhd와 vhd의 메타정보를 포함하고 있다. cloudstack 유저는 미리 준비된 template를 이용해서 vm을 만든다.
+  * templateid
+    API 호출에 사용하는 template의 일련 번호
+  * egressrule
+    securitygroup에서 출력 패킷을 필터링하기 위해서 사용한다.
+  * ingresule 
+    securitygroup에서 입력 패킷을 필터링하기 위해서 사용한다.
+  * mysql
+    cloudstack은 mysql로 cloud 인프라를 관리한다. 여기에 node, vm, template, job, disk, network 등 모든 정보가 들어간다.
+
+== 히스토리 ==
+  * 2012년 3월 2일 작성
+
+== 하위 문서 ==
+[[subindex(Site/cloud/cloudstack/API)]]

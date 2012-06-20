@@ -1,0 +1,1147 @@
+#title sms 프로그램 만들기 프로젝트
+
+[wiki:docbook/sms_프로그램_제작 Docbook 원문]
+
+=== Kernel 2.6에서 stat 정보가 바뀜 ===
+{{{#!plain
+cpu  160973516 140668 193307293 2350842518 97711250 250076 1915952 0
+cpu0 76866807 59063 92916755 1182630432 49046887 114166 936567 0
+cpu1 84106709 81605 100390538 1168212086 48664363 135910 979385 0
+}}}
+Kernel 2.4에서와는 달리, 4개의 필드가 더 추가되었다. 각각의 필드가 의미하는 바는 다음과 같다. 
+  * user : user 모드에서의 프로세스 실행시간
+  * nice : user 모드에서의 niced 프로세스 실행시간
+  * system : 커널 모드에서의 프로세스 실행시간
+  * idle : 논시간
+  * iowait : I/O가 완료되기를 기다린 시간 
+  * irq : servicing interrupts
+  * softirq : servicing softirqs
+이 내용을 docbook(:12)에 추가하도록 한다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>sms 제작기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>proc를 이용한 sms 제작</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 6월 13일 19시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN18"
+>jsms 소개</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN22"
+>시스템정보 수집 방법</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1&#51208;. <A
+HREF="#AEN26"
+>메모리 정보</A
+></DT
+><DT
+>2.1.2&#51208;. <A
+HREF="#AEN33"
+>CPU 사용율</A
+></DT
+><DT
+>2.1.3&#51208;. <A
+HREF="#AEN43"
+>디스크 사용율</A
+></DT
+><DT
+>2.1.4&#51208;. <A
+HREF="#AEN54"
+>프로세스 정보</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN58"
+>jsms 작성</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN61"
+>Source Tree의 구성</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN65"
+>Makefile</A
+></DT
+><DT
+>3.3&#51208;. <A
+HREF="#AEN72"
+>jsms.h</A
+></DT
+><DT
+>3.4&#51208;. <A
+HREF="#AEN78"
+>jsms.cc</A
+></DT
+><DT
+>3.5&#51208;. <A
+HREF="#AEN84"
+>main.cc</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		그동안 몇 번에 걸쳐서 /proc파일시스템에 관한 연재도 했었고  
+		관련되어서 sms정보를 가져오는 강좌도 마련했었다. 이번에는 좀더 
+		폭넓은 시스템정보를 가져오는 프로그램을 작성해보기로 했다. 
+	</P
+><P
+>		이 프로그램은 리눅스 kernel-2.4.x에서 코딩/테스트 되었으며, 
+		다른 유닉스들에서는 작동하지 않을것이다.     
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2&#51208;. jsms 소개</A
+></H1
+><P
+>		만들고자 하는 프로그램의 이름은 jsms으로 정했다. joinc+sms(-.-;)의 
+		줄임말이다. 이 프로그램은 시스템관리를 목적으로 사용하는 df, free등과 유사한 
+		정보를 얻어올 것이다.
+	</P
+><P
+>		즉 디스크정보, 메모리정보, CPU사용율 등의 정보를 출력한다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1&#51208;. 시스템정보 수집 방법</A
+></H2
+><P
+>			각각의 시스템 정보들은 대부분 /proc파일시스템에 있는 파일들을 
+			분석함으로써 얻어오게 된다. 이번 장에서는 각각의 정보별로 
+			어떤식으로 데이타를 얻어올 수 있는지를 설명하도록 할것이다. 
+			이러한 설명은 실제 작동되는 코드를 예제로 만들어가면서 이루어지게 
+			될것이다. 
+		</P
+><P
+>			이러한 각각의 예제코드들은 나중에 jsms에 통합되게 될것이다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN26"
+>2.1.1&#51208;. 메모리 정보</A
+></H3
+><P
+>				메모리는 크게 물리적메모리와 Swap메모리로 구성되며, 우리는 
+				이들 모두에 대한 정보를 가져올 수 있어야 한다. 가져올 데이타는 
+				할당된 전체 블럭크기, 사용되는 블럭크기, 
+				사용할수 있는 블럭크기, 
+				shared, buffers, cached된 블럭 크기이다.
+			</P
+><P
+>				이러한 메모리 정보는 /proc파일시스템에 의해서 파일로 
+				제공되어진다. 메모리 정보를 가지는 파일은 
+				<B
+CLASS="EMPHASIS"
+>/proc/meminfo</B
+>이다. 
+				이 파일은 다음과 같은 메모리의 상세한 정보를 가지고 있다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost proc]# cat meminfo 
+        total:    used:    free:  shared: buffers:  cached:
+Mem:  260984832 257720320  3264512  4489216 48381952  8617984
+Swap: 542826496        0 542826496
+MemTotal:       254868 kB
+MemFree:          3188 kB
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				데이터는 scanf를 이용하는 정도로 어렵지 않게 가져올 수 있다.
+				가져올 데이타를 정리할 구조체는 다음과 같이 만들기로 했다. 	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct _df
+{
+    // 물리적 메모리 크기 저장용
+    ulong real_total;
+    ulong real_used;
+    ulong real_buffers;
+    ulong real_cached;
+
+    // 스왑 메모리 크기 저장용
+    ulong swap_total;
+    ulong swap_used;
+} df;
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.1.2&#51208;. CPU 사용율</A
+></H3
+><P
+>				CPU사용률은 <B
+CLASS="EMPHASIS"
+>/proc/stat</B
+>를 참고하면 된다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco /root]# cat /proc/stat 
+cpu  94964 233 9932 1662334
+cpu0 94964 233 9932 1662334
+page 467656 48623
+swap 4365 11418
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				CPU사용률로써 부팅후 지금까지 소모된 jiffies의 크기를 나타낸다.  
+				5개의 필드로 구성되어 있으며, 첫번째 필드는 CPU번호, 두번째 필드는 
+				user 모드, 세번째 필드는 low priority(nice상태)의 user모드를 나타낸다.
+				네번째 필드는 system 모드 마지막은 idle 테스크의 jiffies
+				소모 값을 나타낸다. 우리가 필요로 하는 값은 두번째, 네번째, 다섯번째 필드의 
+				값으로 이들 값을 이용해서 CPU의 사용율을 얻어올 수 있다. 
+			</P
+><P
+>				/proc/stat의 출력내용을 보면 cpu와 cpu0과 같이 뒤에 숫자가 붙은 것과 그렇지 
+				않은 것이 있는데, 숫자가 붙지 않은 것은 (cpu가 여러 개 있을 때)전체 cpu에 
+				대한 jiffies총합의 계산을 보여준다. 숫자가 붙은것들은 개별 cpu에 대한 
+				jiffies값을 보여준다. 위의 리눅스시스템의 경우 단지 하나의 cpu로 
+				이루어져 있음을 짐작할 수 있을 것이다.  
+			</P
+><P
+>				만약 CPU의 IDLE상태만을 알고 싶다면 다섯번째 필드값만을 조사하면 될것이다. 
+			</P
+><P
+>				이렇게 해서 CPU의 jiffies를 가지고 오긴 했지만 이것만으로는 우리가 원하는 
+				정보를 얻어올순 없다. 실제 우리가 원하는 정보는 전체 CPU사용 jiffies중 
+				idle jiffies를 얻어와야 하고 이것을 다시 백분율로 표시해야 하므로 약간의 가공을 
+				해주어야 한다.  
+			</P
+><P
+>				방법은 간단하다. 일정시간 소비된 idel jiffies를 총 소비된 jiffies로 나눠 주면  
+				된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>(idle jiffies)*100 / (idle jiffies + use jiffies + system jiffies + low prio jiffies)    
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 방법을 통하면 cpu의 idle의 백분율 값을 얻어올 수 있다. 
+				일정 시간은 초단위로 하면 되고, 소비된 jiffies를 구해야 함으로 
+				이전의 jiffies값을 가지고 있어야 된다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.1.3&#51208;. 디스크 사용율</A
+></H3
+><P
+>				보통 디스크 사용율을 확인하기 위해서 여러분은 df시스템 명령어를 
+				사용할 것이다. 다음은 df로 확인해본 필자의 시스템의 디스크 사용율이다.
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN46"
+></A
+><P
+><B
+>&#44536;&#47548; 1. 디스크 사용율</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/adg.gif"></P
+></DIV
+>
+			</P
+><P
+>				디스크의 사용율을 검사하기 위해서는 /etc/mtab과 /proc/mounts, 
+				/proc/partition의 정보를 이용해야 한다.
+				/proc/mounts는 현재 마운트된 장치와 마운팅경로 파일시스템 종류 정보를 담고 있다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost proc]# mounts 
+/dev/root / ext2 rw 0 0
+/proc /proc proc rw 0 0
+usbdevfs /proc/bus/usb usbdevfs rw 0 0
+/dev/hda1 /boot ext2 rw 0 0
+/dev/hda6 /home ext2 rw 0 0
+/dev/hda5 /usr ext2 rw 0 0
+/dev/hda8 /var ext2 rw 0 0
+none /dev/pts devpts rw 0 0
+automount(pid556) /misc autofs rw 0 0
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 내용은 /proc/mounts의 내용이다. 우리는 실제 장치에 마운트된 파일시스템에 
+				대한 정보만을 필요로 하므로 /dev로 시작되는 것들에 대한 정보만 읽어 오면 된다. 
+				그런데 위의 정보를 보면 장치가 좀 이상하게 표시되는게 있을 것이다. /dev/root가 
+				그것인데, 기본적으로 /dev/root는 존재하지 않는 장치이다. 그럼으로 올바른 장치명을 
+				읽어와야만 하는데 그러기 위해서 /etc/mtab파일과 비교해서 같이 사용하게 된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost proc]# cat /etc/mtab  
+/dev/hda7 / ext2 rw 0 0
+none /proc proc rw 0 0
+usbdevfs /proc/bus/usb usbdevfs rw 0 0
+/dev/hda1 /boot ext2 rw 0 0
+/dev/hda6 /home ext2 rw 0 0
+/dev/hda5 /usr ext2 rw 0 0
+/dev/hda8 /var ext2 rw 0 0
+none /dev/pts devpts rw,gid=5,mode=620 0 0
+automount(pid556) /misc autofs rw,fd=5,pgrp=556,minproto=2,maxproto=3 0 0
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 정보를 보면 루트 파일 시스템이 연결된 장치가 제대로 표시되고 있음을 알 수 있다. 
+				이쯤 해서 한 가지 의문점이 생길 것이다. 그렇다면 그냥 처음부터 /etc/mtab를 이용해서 
+				마운트된 파일시스템의 정보를 가져올 수 있지 않은가 하는 점이다. 
+				분명히 /etc/mtab만을 이용해도 마운트된 파일시스템에 대한 정보를 얻어 올 수 있기는 하다. 
+				그런데 한가지 문제점이 있는데, 그건 mtab파일을 관리하는 주체가 커널이 아니라는 점이다. 
+				mount시스템 프로그램이 /etc/mtab의 정보를 갱신하고 사용하는데, 이는 mount버젼 혹은 
+				버그등에 의해서 mtab내용이 제대로 반영되지 않을 수 있음을 의미한다. 실제 가끔 이러한 
+				상황이 발생하기도 한다. 반면 /proc/mounts는 커널에서 직접 관리하게 됨으로 위의 문제들을 
+				피할 수 있다. 그래서 굳이 /etc/mtab만 사용하지 않고 /proc/mounts와 함께 사용하게 된다. 
+			</P
+><P
+>				실제 df의 쏘쓰코드를 보면 mtab와 /proc/mounts를 같이 이용해서 파일시스템 정보를 얻어 오는 
+				걸 확인 할 수 있다. 
+			</P
+><P
+>				이렇게 /proc/mounts와 mtab을 이용해서 정확한 마운트된 장치 정보를 얻어왔다면 각 장치의 
+				크기와 사용량등을 검사해야 할 것이다. 
+				이 정보는 statfs(2)시스템 함수를 이용하면 된다. 사용방법은 예제를 통해서 
+				알아 볼 것이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>2.1.4&#51208;. 프로세스 정보</A
+></H3
+><P
+>				프로세스 정보는 이미 
+				<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=123"
+TARGET="_top"
+>프로세스 정보 얻어오기</A
+>에서 다룬 바 있음으로 중복을 피하는 차원에서 다루지는 않을 것이다. 
+				이것은 각자 테스트해보기 바란다.  
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN58"
+>3&#51208;. jsms 작성</A
+></H1
+><P
+>		우리가 만들 프로그램은 기능의 구현에만 신경을 쓸 것이다. 깔끔, 효율, 가독성 이런건 각자 
+		의 몫으로 남겨 놓도록 하겠다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN61"
+>3.1&#51208;. Source Tree의 구성</A
+></H2
+><P
+>			원할한 프로젝트의 진행을 위해서 main함수와 함수 구현부분을 분리시키도록 할 것이다.
+			main함수를 포함하는 쏘쓰파일은 최소한의 기능만을 하면서 단지 필요로 하는 함수를 호출 
+			해서 화면에 출력하는 일만을 하도록 할것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> ./--+-- Makefile 
+     |
+     +-- jsms.cc
+     |
+     +-- main.cc
+     | 
+     +-- include/ ------ jsms.h
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN65"
+>3.2&#51208;. Makefile</A
+></H2
+><P
+>			이것은 make룰을 담고 있는 파일로 다음과 같이 구성된다. 
+			간단하게 이해 할 수 있을 것이다.
+			Makefile관련 내용은 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=7"
+TARGET="_top"
+>make를 이용한 프로젝트 관리</A
+>를 참고하기 바란다.
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : Makefile</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#############################################################################
+# Makefile for building jsms
+# Generated by tmake at 15:32, 2003/06/13
+#     Project: jsms
+#    Template: app
+#############################################################################
+
+####### Compiler, tools and options
+
+CC  =   gcc
+CXX =   g++
+CFLAGS  =   -pipe -Wall -W -O2 -DNO_DEBUG
+CXXFLAGS=   -pipe -Wall -W -O2 -DNO_DEBUG
+
+# ./include의 헤더파일을 참조하도록 하기 위해서
+INCPATH =   -I./include
+LINK    =   g++
+LFLAGS  =
+
+TAR =   tar -cf
+GZIP    =   gzip -9f
+
+####### Files
+
+HEADERS =   include/jsms.h
+SOURCES =   jsms.cc &#92;
+        main.cc
+OBJECTS =   jsms.o &#92;
+        main.o
+INTERFACES =
+UICDECLS =
+UICIMPLS =
+SRCMOC  =
+OBJMOC  =
+DIST    =
+TARGET  =   jsms
+INTERFACE_DECL_PATH = .
+
+####### Implicit rules
+
+.SUFFIXES: .cpp .cxx .cc .C .c
+
+.cpp.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.cxx.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.cc.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.C.o:
+    $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $@ $&#60;
+
+.c.o:
+    $(CC) -c $(CFLAGS) $(INCPATH) -o $@ $&#60;
+    
+####### Build rules
+    
+
+all: $(TARGET)
+    
+$(TARGET): $(UICDECLS) $(OBJECTS) $(OBJMOC) 
+    $(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJMOC) $(LIBS)
+    
+dist:
+    $(TAR) jsms.tar jsms.pro $(SOURCES) $(HEADERS) $(INTERFACES) $(DIST)
+    $(GZIP) jsms.tar
+
+clean:
+    -rm -f $(OBJECTS) $(OBJMOC) $(SRCMOC) $(UICIMPLS) $(UICDECLS) $(TARGET)
+    -rm -f *~ core
+
+####### Sub-libraries
+
+
+###### Combined headers
+
+
+####### Compile
+
+jsms.o: jsms.cc
+
+main.o: main.cc
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN72"
+>3.3&#51208;. jsms.h</A
+></H2
+><P
+>			역시 주석으로 모든 설명을 대신하도록 하겠다. 
+		</P
+><P
+>	
+			<B
+CLASS="EMPHASIS"
+>예제 : jsms.h</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef _JSMS_H_
+#define _JSMS_H_
+#include &#60;vector&#62;
+#include &#60;algorithm&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;set&#62;
+#include &#60;iostream&#62;
+#include &#60;sys/vfs.h&#62;
+
+#define MOUNT_STR_LEN 255
+#define DEVICE_STR_LEN 80
+#define MAX_CPU_NUM 32
+
+#define DF_LINE_LEN MOUNT_STR_LEN + DEVICE_STR_LEN
+
+using namespace std;
+
+// 디스크 정보를 저장하기 위한 구조체
+typedef struct _df
+{
+    int blocks;       // 할당된 블럭
+    int used;         // 사용하고 있는 블럭
+    int avail;        // 사용할 수 있는 블럭
+    char mount[MOUNT_STR_LEN];   // 마운트 디렉토리
+    char device[DEVICE_STR_LEN]; // 장치명 
+} df;
+
+// cpu 사용율
+// 여러개의 CPU를 사용할 수도 있음으로 
+// CPU의 갯수를 저장하며, 
+// CPU의 사용율은 (CPU갯수 만큼)배열에 저장된다.  
+typedef struct _cpu_usage
+{
+    int cpuid;          // 특별히 사용되지 않는다.
+    int countcpu;       // 등록된 CPU의 수
+    int cpuusage[MAX_CPU_NUM]; // 각 CPU의 사용율
+} cpu_usage;
+
+
+// 메모리 정보 
+// 물리적 메모리와 스왑 메모리 저장용
+typedef struct _mem_data
+{
+    ulong real;   // 물리적 메모리 크기
+    ulong free;   // 물리적 메모리 남은 크기 
+    ulong swap_use;  // 스왑 사용량
+    ulong swap_free; // 스왑 남은량
+} mem_data;
+
+// 나중에 /etc/mtab과 /proc/mounts의 정보를 
+// 비교하기 위한 목적으로 사용한다.  
+// 사용법은 jsms.cc를 참고
+struct ltstr
+{
+    bool operator()(const df m1, const df m2) const
+    {
+        return strcmp(m1.mount, m2.mount) &#60; 0;
+    }
+};
+
+
+class JSms
+{
+
+    private:
+        // 현재 CPU사용율 (jiffly 갯수)
+        int mcurrent_usage[MAX_CPU_NUM][3];
+        // 바로전의 CPU사용율
+        int mold_usage[MAX_CPU_NUM][3];
+
+    public :
+    // 디스크 정보를 얻기 위한 메서드 
+    vector&#60;df&#62; GetDf();
+    // CPU사용율을 얻기 위한 메서드
+    cpu_usage GetCpuIdle();
+    // 메모리 정보를 얻기 위한 메서드
+    mem_data GetMem();
+};
+
+#endif
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN78"
+>3.4&#51208;. jsms.cc</A
+></H2
+><P
+>			JSms의 클래스의 정의를 담고 있다. 코드드와 함께 /proc의 각 파일을 함께 
+			참고하면 좀더 이해하기 쉬울 것이다. /proc의 각 파일로 부터 정보를 얻어오는 것은 
+			scanf계열 함수를 사용했다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : jsms.cc</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;jsms.h&#62;
+#include &#60;vector&#62;
+#include &#60;algorithm&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;set&#62;
+#include &#60;iostream&#62;
+#include &#60;sys/vfs.h&#62;
+
+
+// /etc/mtab와 /proc/mounts의 파일내용을 이용해서 
+// 마운트된 디스크의 정보를 얻어온다. 
+vector&#60;df&#62; JSms::GetDf()
+{
+    FILE *fp = NULL;
+    struct statfs lstatfs;
+    unsigned int i = 0;
+
+    set&#60;df, ltstr&#62; smtab, smount;
+    vector&#60;df&#62; vmtab;
+
+    char line[DF_LINE_LEN];
+
+    df ldf_data;
+
+    // 먼저 /etc/mtab을 열어서 각 장치와 
+    // 장치에 마운트된 파일의 이름을 얻어온다. 
+    // 얻어온 데이터는 smtab set컨테이너에 저장한다. 
+    // smtab에 저장된 데이터는 나중에 /proc/mounts 데이터와 
+    // 비교하게 된다. 
+    // 왜냐하면 마운트 파일에 대한 디바이스 이름이 잘못 지정되어 
+    // 있을 수 있음으로 이경우 /proc/mounts의 내용을 참조해야 하기 
+    // 때문이다. 
+    fp = fopen("/etc/mtab", "r");
+    if (fp == NULL)
+    {
+        cout &#60;&#60; "Open Error mtab" &#60;&#60; endl;
+        exit(0);
+    }
+
+    while(fgets(line, DF_LINE_LEN, fp) != NULL)
+    {
+        if ((strstr(line, "/dev/") - line) == 0)
+        {
+            sscanf(line, "%s %s", ldf_data.device, ldf_data.mount);
+            smtab.insert(ldf_data);
+        }
+    }
+    fclose(fp);
+    fp = NULL;
+
+    // /proc/mounts로 부터 디바이스와 마운트파일 정보를 
+    // 얻어온다.  
+    fp = fopen("/proc/mounts", "r");
+    if (fp == NULL)
+    {
+        cout &#60;&#60; "Open Error mounts" &#60;&#60; endl;
+        exit(0);
+    }
+    while(fgets(line, DF_LINE_LEN, fp) != NULL)
+    {
+        if ((strstr(line, "/dev/") - line) == 0)
+        {
+            sscanf(line, "%s %s", ldf_data.device, ldf_data.mount);
+            smount.insert(ldf_data);
+        }
+    }
+    fclose(fp);
+    fp = NULL; 
+
+    // /proc/mount와 /etc/mtab의 내용을 intersection(교집합)연산을 시킨다. 
+    // 연산에 사용할 비교함수는 jsms.h에 정의 되어있는 ltstr이다.  
+    // 교집합에 사용될 비교 데이터는 마운트 디렉토리 이름이다. 
+    // 이렇게 할경우 비록 /etc/mtab에 있는 장치이름이 잘못되었다고 하더라도 
+    // /proc/mount의 제대로된 장치이름으로 덮어 쓸 수 있다.  
+    // 이 데이터는 vmtab에 저장된다. 
+    set_intersection( smtab.begin(), smtab.end(),
+               smount.begin(), smount.end(),
+               back_inserter(vmtab), ltstr());
+    
+    // 마운트된 파일시스템에 대한 디스크 사용율을 구한다. 
+    {
+        for (i = 0; i &#60; vmtab.size(); i++)
+        { 
+            statfs(vmtab[i].mount, &#38;lstatfs);
+            vmtab[i].blocks = lstatfs.f_blocks*(lstatfs.f_bsize/1024);
+            vmtab[i].avail  = lstatfs.f_bavail*(lstatfs.f_bsize/1024);
+            vmtab[i].used   = vmtab[i].blocks - vmtab[i].avail;
+        }
+    }
+    return vmtab;
+}
+
+// CPU사용율을 체크한다. 
+// CPU사용율을 위해서는 현재의 jiffies값을 구하고 
+// 과거의 jiffies의 값과 비교해서 얼마만큼 증가 했는지를 
+// 판단해서 백분율로 나타내게 된다.
+// 그러므로 이 메서드는 두번 호출해야 한다. 
+// 처음 호출로 알아낸 jiffies값은 별도의 변수에 저장되고 
+// sleep를 호출한 후 잠시후 다시 이 메서드를 호출해야 현재의 
+// jiffies값과 과거의 jiffies를 이용한 계산이 가능해 진다. 
+cpu_usage JSms::GetCpuIdle()
+{
+    FILE *fp = NULL;
+    char line[80];
+    cpu_usage lcpu_usage;
+    char cpuid[32];
+    int nulldata;
+    int totaldiff;
+    int diff[3];
+    int cpu_num = 0;
+
+    memset((void *)&#38;lcpu_usage, 0x00, sizeof(cpu_usage));
+
+    // /proc/stat파일을 읽어서 jiffies값을 계산한다. 
+    fp = fopen("/proc/stat", "r");
+    if(fp == NULL)
+    {
+        cout &#60;&#60; "Cannot open stat" &#60;&#60; endl;
+        return lcpu_usage;
+    }
+    while(1)
+    {
+        fgets(line,80, fp);
+        if (strstr(line, "cpu") == NULL)
+        {
+            fclose(fp);
+            // cpu 갯수를 세팅하고 리턴한다. 
+            lcpu_usage.countcpu = cpu_num -1;
+            return lcpu_usage;
+        }
+        else
+        {
+            // /proc/stat에서 최초에 읽어 들이는 데이터는 
+            // 전체 CPU에 대한 통계 데이터다. 
+            // 그러므로 개별 CPU에 대한 데이터를 얻기 위해서는 처음 라인은 
+            // 무시하고 넘어가야 한다. 
+            if (cpu_num &#62; 0)
+            {
+                // sscanf를 이용해서 jiffies값을 얻어온다. 
+                // 그리고 과거의 jiffies값과의 연산을 통해서 
+                // 각각의 jiffies가 얼마만큼 변했는지를 확인하고 
+                // 이 값을 백분율로 나타낸다. 
+                sscanf(line, "%s %d %d %d %d",
+                               cpuid,
+                               &#38;mcurrent_usage[cpu_num-1][0],
+                               &#38;nulldata,
+                               &#38;mcurrent_usage[cpu_num-1][1],
+                               &#38;mcurrent_usage[cpu_num-1][2]);
+                diff[0] = mcurrent_usage[cpu_num-1][0] - mold_usage[cpu_num-1][0];
+                diff[1] = mcurrent_usage[cpu_num-1][1] - mold_usage[cpu_num-1][1];
+                diff[2] = mcurrent_usage[cpu_num-1][2] - mold_usage[cpu_num-1][2];
+
+                totaldiff = diff[0] + diff[1] + diff[2];
+                lcpu_usage.cpuusage[cpu_num-1] = (diff[2]*100)/totaldiff;
+
+                memcpy((void *)&#38;mold_usage,
+                                (void *)&#38;mcurrent_usage,
+                                sizeof(mcurrent_usage));
+            }
+            cpu_num ++;
+        }
+    }
+    if(fp != NULL)
+        fclose(fp);
+}
+
+// 메모리 정보를 얻어온다.
+mem_data JSms::GetMem()
+{
+    FILE *fp = NULL;
+    int index = 0;
+    char line[128];
+    mem_data lmem_data;
+    int nulldata;
+    char null[12];
+
+    fp = fopen("/proc/meminfo", "r");
+    if (fp == NULL)
+    {
+        cout &#60;&#60; "Meminfo open error" &#60;&#60; endl;
+        exit(0);
+    }
+    
+    while(1)
+    {
+        fgets(line, 128, fp);
+        if(index == 0)
+        {
+            index ++;
+            continue;
+        }
+        else if(index == 1)
+        {
+            sscanf(line, "%s %lu %d %lu", null, &#38;lmem_data.real, &#38;nulldata, &#38;lmem_data.free
+);  
+        }
+        else if(index == 2)
+        {
+            sscanf(line, "%s %lu %lu %lu", null, &#38;nulldata, &#38;lmem_data.swap_use,
+                                        &#38;lmem_data.swap_free);
+        }
+        else
+        {
+            fclose(fp);
+            return lmem_data;
+        }
+        index ++;
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN84"
+>3.5&#51208;. main.cc</A
+></H2
+><P
+>			main함수는 단지 JSms클래스를 이용하는 것 말고는 하는 일이 없다. 
+			프로그램 실행인자를 처리하기 위해서 getopt()를 사용했다.
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : main.cc</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;jsms.h&#62;
+#include &#60;unistd.h&#62;
+
+void help()
+{
+    printf("Usage : jsms -[mcf] &#92;n"
+           "-m    : mem info&#92;n"
+           "-c    : cpu usage&#92;n"
+           "-h    : help message&#92;n"
+           "-f    : disk info&#92;n");
+    exit(0);
+}
+
+int main(int argc, char **argv )
+{
+    class JSms lSms;
+    vector&#60;df&#62; ldf;
+    mem_data lmem_data;
+    int opt;
+
+
+    while((opt = getopt(argc, argv, "mcfh")) != -1)
+    {
+        // 메모리 정보를 요청했을때
+        switch (opt)
+        {
+            case 'm':
+            {
+                ulong swap_real;
+                lmem_data = lSms.GetMem();
+                printf("REAL : %15lu %15lu %lu&#92;n", lmem_data.real,
+                    lmem_data.free,
+                    ((lmem_data.real - lmem_data.free)*100)/lmem_data.real);
+                swap_real = lmem_data.swap_use + lmem_data.swap_free;
+                printf("Swap : %15lu %15lu %lu&#92;n", swap_real,lmem_data.swap_free,
+                        (swap_real - lmem_data.swap_free)*100/swap_real);
+                break;
+            }
+            // CPU사용율을 요청했을때
+            // sleep()을 이용해서 시간차를 두고 GetCpuIdle를 두번 호출했음에 
+            // 유의 한다.  
+            case 'c':
+            {
+                cpu_usage lcpu_usage;
+                lcpu_usage = lSms.GetCpuIdle();
+                sleep(1);
+                lcpu_usage = lSms.GetCpuIdle();
+                for (int i = 0; i &#60; lcpu_usage.countcpu; i++)
+                {
+                    printf("[%d] : %d&#92;n", i+1, lcpu_usage.cpuusage[i]);
+                }
+                break;
+            }
+            // 디스크 사용량 체크 
+            case 'f':
+            {
+                ldf = lSms.GetDf();
+                for (int i = 0; i &#60; ldf.size(); i++)
+                {
+                    printf("%10s %-15s %12d %12d&#92;n", ldf[i].device,
+                                         ldf[i].mount,
+                                         ldf[i].blocks,
+                                         ldf[i].used);
+                }
+                break;
+            }
+            // 도움말
+            case 'h':
+            {
+                help();
+                break;
+            }
+            default :
+            {
+                help();
+                break;
+            }
+        }
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

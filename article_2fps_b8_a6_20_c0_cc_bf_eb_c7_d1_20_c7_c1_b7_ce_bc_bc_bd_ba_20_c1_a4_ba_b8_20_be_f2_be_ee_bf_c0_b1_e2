@@ -1,0 +1,129 @@
+#title Joinc wiki Template
+'''조인씨 문서를 만들기 위한 표준 템플릿 입니다.'''
+
+|| 만든날 	|| 2004/01/08 						||<|4> http://www.joinc.co.kr/images/myavata/2.gif	||
+|| 관리자 	|| yundream							||
+|| 홈페이지	|| http://www.joinc.co.kr			||
+|| 이메일	|| [mailto:yundream@joinc.co.kr]	||
+
+[[TableOfContents]]
+
+=== 소개 ===
+최근에 SMS 프로그램을 만들면서 골머리를 썩은 문제가 있었는데, 그것은 운영체제 마다 프로세스 정보를 얻어오는 방법이 전혀 틀리다는 것이였다. Linux, Solaris, AIX, HP-UX, BSD 다양한 운영체제에서 돌아가는 SMS를 만들려고 하니 그야말로 거의 죽음이였다. top과 같은 쏘쓰를 분석하기도 해서 특정 부분의 코드를 가져다 쓰기도 했지만 어쨋든 간에 상당한량의 작업을 필요로 했다. 
+
+Linux, Solaris, HP-UX까지는 그럭저럭 했는데, 여기에 몇개 더 추가되니 짜증나서 이럴 바엔 차라리 '''ps'''와 같은 외부 프로그램을 이용해서 정보를 가져오는게 훨씬 낳을 것이라는 생각을 하게 되었다.  
+
+물론 '''작은 것이 아름다운법'''이라면서 스스로 합리화를 시켰지만..
+
+간단한 내용이므로 그냥 가볍게 읽으면 될 것이다.
+==== ps의 사용한 공통 코드 ====
+'''ps'''를 사용하려고 하는 가장 큰 이유는 운영체제마다 약간씩 달라져야 하는 코드의 번거로움을 없애기 위함이다. 그렇다면 하나의 명령으로 같은 결과가 나와야 할것이며, 옵션 역시 동일하게 사용할 수 있어야 할것이다. 그렇지 않다면 운영체제마다 코드가 약간씩이나마 차이가 날 수 밖에 없을 것이다.    
+
+'''ps'''와 같은 기본적인 프로그램의 경우 다행히도 운영체제간 호환을 유지할 수 있도록 공통된 옵션들을 제공한다. 그렇다 하더라도 약간씩 출력결과물이 다를 수도 있을 건데 걱정 할 필요 없다. '''ps'''는 사용자 정의 출력 포맷을 지정할 수 있도록 옵션을 제공하기 때문이다.  
+
+{{{
+# ps -eo "pid uid comm cpu vsize"
+  PID   UID COMMAND          CPU   VSZ
+    1     0 init               0  1372
+    2     0 keventd            0     0
+    3     0 kapmd              0     0
+    4     0 ksoftirqd_CPU0     0     0
+    9     0 bdflush            0     0
+    5     0 kswapd             0     0
+    6     0 kscand/DMA         0     0
+    7     0 kscand/Normal      0     0
+    8     0 kscand/HighMem     0     0
+   10     0 kupdated           0     0
+}}}
+ps의 '''o''' 옵션을 이용하면 사용자 정의 포맷을 만들어 낼 수 있다. '''e'''옵션은 모든 프로세스를 출력하란 뜻인데, 옵션에 대한 자세한 내용은 ps의 man페이지를 참고하기 바란다. 사용자 출력으로 사용할 수 있는 값들은 아래와 같은 것들이 있다.        
+ || cmd			|| 간단한 실행 명령어 이름			||  
+ || pgrp		|| 프로세스 그룹 아이디				|| 
+ || %cpu		|| cpu 점유율						||
+ || utime		|| 유저 시간						||
+ || stime		|| 시스템 시간						||
+ || session		|| 세션 아이디						||
+ || pid			|| 프로세스 아이디					||
+ || ppid		|| 부모프로세스 아이디				||	
+ || rss			|| resident set size				||
+ || user		|| 유저이름							||
+ || uid			|| 유저 아이디						||
+ || vsize		|| 가상메모리 사이즈의 총합			||
+ || priority	|| 스케쥴링 우선순위				||	
+몇개 제외된게 있긴 하지만 위의 옵션정도면 필요한 프로세스 정보 거의 전부를 얻을 수 있다. 
+
+유닉스 운영체제에 따라 약간씩 다를 수 있겠지만 proc분석하고 시스템함수들 찾는 것보다는 훨씬 간단하게 프로그램의 작성이 가능하다. 
+==== popen(3)을 이용한 ps 정보 읽어 오기 ====
+ps를 통해서 가져오고자 하는 정보는 아래와 같다.
+{{{
+# ps -eo "pid ppid %cpu vsize cmd"
+}}}
+
+프로그램은 popen(3)을 통해서 위의 명령을 실행시키고 결과를 sscanf(3)로 분석해서 출력한다. 
+{{{#!vim c
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+typedef struct _pinfo
+{
+    char user[32];
+    unsigned int pid;
+    unsigned int ppid;
+    unsigned int cpu;
+    unsigned int vsz;
+    char cmd[80];
+    void H2N()
+    {
+        pid = htonl(pid);
+        ppid = htonl(ppid);
+        cpu = htonl(cpu);
+        vsz = htonl(vsz);
+    };
+} pinfo;
+
+#define OUTFORMAT "%12s %8d %8d %3d %11d %s\n"
+
+int main()
+{
+    FILE *fp = NULL;
+    char buff[256];
+    char cpu[3];
+    char null[4];
+    pinfo lpinfo;
+    int i=0;
+    if ((fp = popen("ps -eo \"user pid ppid %cpu vsize cmd\"", "r")) == NULL)
+    {
+        perror("popen error ");
+        exit(1);
+    }
+    while(fgets(buff, 255, fp))
+    {
+        if (i == 0)
+        {
+            i++;
+            continue;
+        }
+        sscanf(buff, "%s %d %d %[^.] %s %d %s",
+                         lpinfo.user,
+                         &lpinfo.pid, &lpinfo.ppid,
+                         cpu, null,
+                         &lpinfo.vsz, &lpinfo.cmd);
+        lpinfo.cpu = atoi(cpu);
+        fprintf(stdout, OUTFORMAT, lpinfo.user, lpinfo.pid, lpinfo.ppid,
+                        lpinfo.cpu, lpinfo.vsz, lpinfo.cmd);
+        i++;
+    }
+    fclose(fp);
+	fprintf(stdout "Process #%d\n", i);
+    fflush(NULL);
+    exit(0);
+}
+}}}
+
+위와 같은 방식으로 확실히 프로세스 정보를 쉽게 얻어 올 수 있긴 하지만 좀 문제가 있다. 운영체제 마다 ps의 버젼이 약간 다르고 관리자의 성격?에 따라서 새로운 버젼의 ps를 설치할 경우 위의 프로그램이 제대로 실행 되지 않을 수 있다는 점이다.
+
+필자 역시 이런 문제를 겪었는데, 결국 패키지를 배포할 때 ps까지 함께 배포하는 식으로 문제를 해결했다. 
+
+'''H2N()'''은 네트워크를 통해서 다른 서버에 정보를 보낼 때 byte ordering을 위한 목적으로 만들었다.
+
+=== 참고문헌 ===

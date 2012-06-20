@@ -1,0 +1,1100 @@
+[[TableOfContents]]
+
+== Windows 환경에서 OpenSSL 활용 ==
+
+'''작성자:''' mwyun([멍])
+
+리눅스 환경에서의 openssl관련 내용은 다음 URL을 참고하기 바랍니다 -- [yundream]
+ 1. [wiki:article_Openssl을_이용한_파일_암호화 openssl을 이용한 파일 암호화] 
+
+== OpenSSL 소스 받기 ==
+  === OpenSSL 사이트 ===
+    URL: http://www.openssl.org
+  === Download 사이트 ===
+    URL: http://www.openssl.org/source/
+{{{#!plain  
+    가장 최신 버전인 'openssl-0.9.7d.tar.gz' 를 다운받는다.
+
+	윈32 플랫폼을 빌딩할려면 INSTALL.W32 파일을 참조해야 한다.
+	이 문서는 'INSTALL.W32' 파일을 참조하여 작성되었다.
+
+	INSTALL.WCE 파일을 읽어보면 Windows CE용으로 빌딩하는 방법이 나와있다.
+	이것은 쉽게 Windows CE용으로 openssl을 포팅할 수 있음을 확인시켜주고 있다.
+}}}
+
+== 소스 파일 압축 풀기 ==
+{{{#!plain
+  'openssl-0.9.7d.tar.gz'를 'C:\openssl-0.9.7d'에 압축푼다.
+}}}
+
+== 빌드하기 위해 필요한 툴 ==
+=== Perl Interpreter ===
+{{{#!plain
+         cpan 사이트 가보면 perl win32용 버전을 찾을 수 있다.
+}}}
+	URL: http://www.cpan.org/ports/index.html
+
+ * ActiveState Perl 
+         URL : http://www.activestate.com/ActivePerl
+{{{#!plain
+			상용이므로 사용하지 않는다.
+}}}
+
+ * SIEMENS Win32 Perl(이것을 사용함) 
+	  URL : http://www.cpan.org/authors/id/G/GR/GRAHAMC/
+{{{#!plain
+		'SiePerl-5.8.0-bin-1.0-Win32.INSTALL.exe'파일을 다운받는다.
+		공개 perl win32 버전
+}}}
+
+=== C Compilers ===
+		* Visual C++
+		* Borland C
+		* GNU C (Mingw32 or Cygwin)
+
+=== Assembler ===
+		* Microsoft MASM (별명 "ml") <=== Microsoft Windows 2000 DDK에서 제공
+		* Free Netwide Assembler NASM : nasmw 
+  
+== 빌드전 준비 작업 ==
+=== Microsoft DDK 설치 ===
+{{{#!plain
+		Microsoft Windows 2000 DDK를 설치하지 않았으면 www.msdn.com에서 다운받아서 설치한다.
+		윈도 2000인 경우 2000용 DDK를 다운받는다.
+		자세한 설치방법은 다음 페이지를 참조한다.
+}}}
+		[wiki:article_ddk Microsoft Windows 2000 DDK]
+	
+
+=== perl win32 버전 설치 ===
+{{{#!plain
+    SiePerl-5.8.0-bin-1.0-Win32.INSTALL.exe를 zip을 이용하여 c:\perl 디렉토리에 압축푼다.
+	다음과 같이 서브 디렉토리가 생성된다.
+		
+	C:\perl\5.8.0\...  	(lots of sub dirs)
+	C:\perl\site\5.8.0\... 	(lots of sub dirs)
+
+   자세한 설치 방법은 다음 사이트를 참조한다.
+}}}
+    URL: http://www.cpan.org/authors/id/G/GR/GRAHAMC/SiePerl-5.8.0-bin-1.0-Win32.README
+    
+=== Path 등록 ===
+		커맨드 상에서 프로그램을 실행시키기 위해 Path를 등록한다.
+
+
+	
+ * 등록 방법
+{{{#!plain
+		바탕 화면 > 내 컴퓨터 > 마우스 오른쪽 버튼(팝업메뉴) > 등록 정보 > 고급 > 환경 변수 > 시스템 변수 > Path 변수 선택 > 편집 버튼 클릭
+		다음 세개 경로를 등록한다.
+			
+		C:\NTDDK\bin <=== ml
+		C:\perl\5.8.0\bin <=== perl
+		C:\perl\5.8.0\bin\MSWin32-x86-perlio <=== perl
+
+		추가할 텍스트 : C:\perl\5.8.0\bin;C:\perl\5.8.0\bin\MSWin32-x86-perlio;C:\NTDDK\BIN <=== ';'으로 Path를 구분한다.
+		셋팅 후 변수 값 : C:\PROGRA~1\Borland\Delphi5\Projects\Bpl;C:\PROGRA~1\Borland\vbroker\jre\Bin;C:\PROGRA~1\Borland\vbroker\Bin;C:\PROGRA~1\Borland\Delphi5\Bin;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;C:\Program Files\ESTsoft\ALZip\;C:\sourcenav\bin;C:\perl\5.8.0\bin;C:\perl\5.8.0\bin\MSWin32-x86-perlio;C:\NTDDK\BIN
+		확인 버튼을 클릭하여 창을 닫는다.
+}}}
+
+
+ * 테스트
+{{{#!plain
+		 커맨드 창을 뛰어서 ml, perl이 실행되는지 테스트해본다.
+		시작 > 실행 > "cmd"라고 입력하고 엔터
+		커맨드 창이 뜨면 ml or perl를 입력하고 엔터
+}}}
+
+== 빌드 ==
+  === Visual C++ === 
+{{{#!plain    
+    빌드를 위하여 Visual C++를 사용하였다.
+
+		커맨드 창 실행
+		C:\>cd C:\openssl-0.9.7d
+}}}
+		* Configure
+{{{#!plain  		
+		C:\openssl-0.9.7d>perl Configure VC-WIN32
+		Configuring for VC-WIN32
+		IsWindows=1
+		CC            =cl
+		CFLAG         =-DOPENSSL_SYSNAME_WIN32 -DOPENSSL_THREADS  -DDSO_WIN32 -DOPENSSL_NO_KRB5
+		EX_LIBS       =
+		BN_ASM        =bn_asm.o
+		DES_ENC       =des_enc.o fcrypt_b.o
+		BF_ENC        =bf_enc.o
+		CAST_ENC      =c_enc.o
+		RC4_ENC       =rc4_enc.o
+		RC5_ENC       =rc5_enc.o
+		MD5_OBJ_ASM   =
+		SHA1_OBJ_ASM  =
+		RMD160_OBJ_ASM=
+		PROCESSOR     =
+		RANLIB        =true
+		ARFLAGS       =
+		PERL          =perl
+		THIRTY_TWO_BIT mode
+		BN_LLONG mode
+		RC4_INDEX mode
+		RC4_CHUNK is undefined
+
+		Configured for VC-WIN32.
+}}}
+		* Makefile 생성
+{{{#!plain  		
+		MASM을 사용하는 경우 <=== 사용하였다.
+		C:\openssl-0.9.7d>ms\do_masm 
+		Generating x86 for MASM assember
+		Bignum
+		DES
+		"crypt(3)"
+		Blowfish
+		CAST5
+		RC4
+		MD5
+		SHA1
+		RIPEMD160
+		RC5\32
+
+		C:\openssl-0.9.7d>perl util\mkfiles.pl  1>MINFO
+
+		C:\openssl-0.9.7d>rem perl util\mk1mf.pl VC-MSDOS no-sock >ms\msdos.mak
+
+		C:\openssl-0.9.7d>rem perl util\mk1mf.pl VC-W31-32 >ms\w31.mak
+
+		C:\openssl-0.9.7d>perl util\mk1mf.pl dll VC-W31-32  1>ms\w31dll.mak
+
+		C:\openssl-0.9.7d>perl util\mk1mf.pl VC-WIN32  1>ms\nt.mak
+
+		C:\openssl-0.9.7d>perl util\mk1mf.pl dll VC-WIN32  1>ms\ntdll.mak
+
+		C:\openssl-0.9.7d>perl util\mkdef.pl 16 libeay  1>ms\libeay16.def
+
+		C:\openssl-0.9.7d>perl util\mkdef.pl 32 libeay  1>ms\libeay32.def
+
+		C:\openssl-0.9.7d>perl util\mkdef.pl 16 ssleay  1>ms\ssleay16.def
+
+		C:\openssl-0.9.7d>perl util\mkdef.pl 32 ssleay  1>ms\ssleay32.def
+
+		MASM을 사용할려면 DDK를 설치해야한다.
+
+		NASM을 사용하는 경우 <=== 사용하지 않았다.
+		C:\openssl-0.9.7d>ms\do_nasm 
+}}}
+		* Building
+{{{#!plain  		
+		C:\openssl-0.9.7d>nmake -f ms\ntdll.mak
+
+       실행과정 생략...
+                                
+                               
+		out32dll 디렉토리에 DLL 파일들이 생성된다.
+		생성된 정적/동적 라이브러리 파일들을 확인해본다.
+
+		C:\openssl-0.9.7d\out32dll>dir *.dll
+		 C 드라이브의 볼륨: 로컬 디스크
+		 볼륨 일련 번호: 0CB2-AF14
+
+		 C:\openssl-0.9.7d\out32dll 디렉터리
+
+		2004-04-18  06:17p             830,976 libeay32.dll
+		2004-04-18  06:17p             150,016 ssleay32.dll
+        		       2개 파일         980,992 바이트
+    		           0 디렉터리   5,091,676,160 바이트 남음
+
+		C:\openssl-0.9.7d\out32dll>dir *.lib
+		 C 드라이브의 볼륨: 로컬 디스크
+		 볼륨 일련 번호: 0CB2-AF14
+
+		C:\openssl-0.9.7d\out32dll 디렉터리
+
+		2004-04-18  06:17p           1,421,450 libeay32.lib
+		2004-04-18  06:17p             115,488 ssleay32.lib
+    		           2개 파일       1,536,938 바이트
+        		       0 디렉터리   5,091,676,160 바이트 남음
+
+		생성된 파일중에서 어플리케이션 개발에  필요한 라이브러리 파일 목록
+			ssleay32.lib
+			libeay32.lib
+			ssleay32.dll
+			libeay32.dll
+
+		 
+}}}			 
+		* Test
+{{{#!plain  	
+		정상적으로 정적/동적 라이브러리가 생성되었으면 다음 테스트는 정상 실행된다.
+
+		C:\openssl-0.9.7d>cd out32dll
+		C:\openssl-0.9.7d\out32dll>..\ms\test
+                               
+		실행과정 생략...
+		passed all tests <=== 이 메시지가 나오면 모든 테스트가 성공한 것입니다.
+}}}
+
+  === Mingw32 ===
+{{{#!plain    
+		msvcrt.dll or crtdll.dll 파일과 링크하여 실행할 수 있는 바이너리를 생성할려면 gcc-2.95.2-msvcrt.exe를 다운받는다.
+		gcc-2.95.2-msvcrt.exe은 msvcrt.dll or crtdll.dll 파일과 링크하여 실행하는 바이너리를 생성한다.
+		다음 툴을 다운받아서 설치한다.
+}}}
+	
+		URL : ftp://ftp.xraylith.wisc.edu/pub/khan/gnu-win32/mingw32/gcc-2.95.2/gcc-2.95.2-msvcrt.exe
+
+{{{#!plain
+		기존에 설치된 Mingw32 디렉토리를 찾아서 bin 밑에 gcc-2.95.2-msvcrt.exe을 복사한다.	
+		===> C:\gcc-2.95.2\bin
+			
+		Path 등록 		
+		===> C:\gcc-2.95.2\mingw32.bat 또는 윈도우 시스템 속성
+}}}
+
+  === Cygwin ===
+{{{#!plain  
+		Cygwin은 cygwin1.dll을 통하여 POSIX/UNIX을 구현하였으므로 Cygwin으로 빌딩된 openssl 라이브러리를 이용할려면 cygwin1.dll도 같이 배포해야하는 문제가 발생한다.
+		만약 Windows CE용으로 openssl을 빌딩하는 경우 cygwin1.dll도 빌딩해야하므로 부가적인 작업이 들므로 Cygwin을 사용하지 않았다.
+}}}		
+
+== 예제 프로그램 ==
+
+빌드한 openssl library를 이용하여 간단한 예제 프로그램을 개발해본다.
+
+  === 개발순서 ===
+
+ 1. VC++ IDE를 실행한다.
+ 1. 프로젝트 만들기
+{{{#!plain
+   File > New 메뉴를 선택하고 Projects 탭에서 "MFC AppWizard(exe)"를 선택한다. 
+   Project name: login  
+   Location: C:\login <- C:\인 경우 프로젝트 이름으로 디렉토리가 만들어진다. 
+   OK 버튼을 클릭한다.
+}}}
+attachment:login_1.jpg
+{{{#!plain
+   MFC AppWizard - Step1: Dialog base를 선택한다.
+}}}
+attachment:login_2.jpg
+{{{#!plain
+   MFC AppWizard - Setp2 of 4: Next 버튼을 클릭한다.
+}}}
+attachment:login_3.jpg
+{{{#!plain
+   MFC AppWizard - Setp3 of 4: Next 버튼을 클릭한다.
+}}}
+attachment:login_4.jpg
+{{{#!plain
+   MFC AppWizard - Setp4 of 4: Finish 버튼을 클릭한다.
+}}}
+attachment:login_5.jpg
+{{{#!plain
+   New Project Infomation: OK 버튼을 클릭한다.
+}}}
+attachment:login_6.jpg
+ 1. 소스 코드 작성
+{{{#!plain
+   '''6.2 소드 코드'''를 참조한다.
+}}}
+ 1. 프로젝트 셋팅
+  * 헤더 파일 경로 등록
+{{{#!plain
+      Project > Settings를 선택하고 C/C++ 탭을 선택한다. 
+      Preprocessor를 선택하고 "Additional include directories"에 ".\\include"를 추가한다.
+}}}
+  * 라이브러리 파일 경로 등록
+{{{#!plain
+      Project > Settings를 선택하고 Link 탭을 선택한다.
+      Input을 선택하고 "Object/library modules"에 "libeay32.lib ssleay32.lib"을 입력한다. 
+}}}
+ 1. 헤더/라이브러리 파일 복사
+{{{#!plain
+     C:\login\incldue에 openssl 헤더 파일 폴더를 복사한다.
+     C:\openssl-0.9.7d\inc32\openssl => C:\login\incldue\openssl
+     C:\login에 libeay32.lib, ssleay32.lib을 복사한다.
+     C:\openssl-0.9.7d\out32dll\*.lib => C:\login
+}}}
+ 1. 컴파일
+{{{#!plain
+     Build > Execute login.exe or Ctrl+F5
+}}}
+ 1. 디버깅
+
+	=== 6.2 소스 코드 ===
+
+'''loginDlg.h'''
+
+{{{#!plain
+// loginDlg.h : header file
+//
+
+#if !defined(AFX_LOGINDLG_H__29EBD912_9AF8_4F98_B7BC_C62601A84583__INCLUDED_)
+#define AFX_LOGINDLG_H__29EBD912_9AF8_4F98_B7BC_C62601A84583__INCLUDED_
+
+#include "SetupDlg.h"
+#include "MD5.h"
+
+#if _MSC_VER > 1000
+#pragma once
+#endif // _MSC_VER > 1000
+
+/////////////////////////////////////////////////////////////////////////////
+// CLoginDlg dialog
+
+class CLoginDlg : public CDialog
+{
+// Construction
+public:
+	UINT m_nFailCount;
+	BOOL Login(void);
+	CMD5 md5;
+	CLoginDlg(CWnd* pParent = NULL);	// standard constructor
+
+// Dialog Data
+	//{{AFX_DATA(CLoginDlg)
+	enum { IDD = IDD_LOGIN_DIALOG };
+	CString	m_Id;
+	CString	m_Password;
+	//}}AFX_DATA
+
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CLoginDlg)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	//}}AFX_VIRTUAL
+
+// Implementation
+protected:
+	HICON m_hIcon;
+
+	// Generated message map functions
+	//{{AFX_MSG(CLoginDlg)
+	virtual BOOL OnInitDialog();
+	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	afx_msg void OnPaint();
+	afx_msg HCURSOR OnQueryDragIcon();
+	virtual void OnOK();
+	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
+};
+
+//{{AFX_INSERT_LOCATION}}
+// Microsoft Visual C++ will insert additional declarations immediately before the previous line.
+
+#endif // !defined(AFX_LOGINDLG_H__29EBD912_9AF8_4F98_B7BC_C62601A84583__INCLUDED_)
+}}}
+
+'''loginDlg.cpp'''
+
+{{{#!plain
+// loginDlg.cpp : implementation file
+//
+
+#include "stdafx.h"
+#include "login.h"
+#include "loginDlg.h"
+#include "SetupDlg.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+// CAboutDlg dialog used for App About
+
+class CAboutDlg : public CDialog
+{
+public:
+	CAboutDlg();
+
+// Dialog Data
+	//{{AFX_DATA(CAboutDlg)
+	enum { IDD = IDD_ABOUTBOX };
+	//}}AFX_DATA
+
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CAboutDlg)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
+
+// Implementation
+protected:
+	//{{AFX_MSG(CAboutDlg)
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
+};
+
+CAboutDlg::CAboutDlg() : CDialog(CAboutDlg::IDD)
+{
+	//{{AFX_DATA_INIT(CAboutDlg)
+	//}}AFX_DATA_INIT
+}
+
+void CAboutDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CAboutDlg)
+	//}}AFX_DATA_MAP
+}
+
+BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
+	//{{AFX_MSG_MAP(CAboutDlg)
+		// No message handlers
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////////
+// CLoginDlg dialog
+
+CLoginDlg::CLoginDlg(CWnd* pParent /*=NULL*/)
+	: CDialog(CLoginDlg::IDD, pParent)
+{
+	//{{AFX_DATA_INIT(CLoginDlg)
+	m_Id = _T("");
+	m_Password = _T("");
+	//}}AFX_DATA_INIT
+	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
+	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+}
+
+void CLoginDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CLoginDlg)
+	DDX_Text(pDX, IDC_EDIT1, m_Id);
+	DDV_MaxChars(pDX, m_Id, 20);
+	DDX_Text(pDX, IDC_EDIT2, m_Password);
+	DDV_MaxChars(pDX, m_Password, 20);
+	//}}AFX_DATA_MAP
+}
+
+BEGIN_MESSAGE_MAP(CLoginDlg, CDialog)
+	//{{AFX_MSG_MAP(CLoginDlg)
+	ON_WM_SYSCOMMAND()
+	ON_WM_PAINT()
+	ON_WM_QUERYDRAGICON()
+	ON_WM_SHOWWINDOW()
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////////
+// CLoginDlg message handlers
+
+BOOL CLoginDlg::OnInitDialog()
+{
+	CDialog::OnInitDialog();
+	
+	// Add "About..." menu item to system menu.
+
+	// IDM_ABOUTBOX must be in the system command range.
+	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
+	ASSERT(IDM_ABOUTBOX < 0xF000);
+
+	CMenu* pSysMenu = GetSystemMenu(FALSE);
+	if (pSysMenu != NULL)
+	{
+		CString strAboutMenu;
+		strAboutMenu.LoadString(IDS_ABOUTBOX);
+		if (!strAboutMenu.IsEmpty())
+		{
+			pSysMenu->AppendMenu(MF_SEPARATOR);
+			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+		}
+	}
+
+	// Set the icon for this dialog.  The framework does this automatically
+	//  when the application's main window is not a dialog
+	SetIcon(m_hIcon, TRUE);			// Set big icon
+	SetIcon(m_hIcon, FALSE);		// Set small icon
+	
+	// TODO: Add extra initialization here
+	m_nFailCount = 0;
+	CString inifile;
+	inifile.Format(".\\%s.ini", AfxGetApp()->m_pszAppName);
+	md5.SetIniFile(inifile);
+	
+	if (!md5.GetINIData())
+	{
+		AfxMessageBox("설정정보를 읽는데 실패하였습니다.");
+
+		CSetupDlg dlg;
+		CString str;
+		int nResponse = dlg.DoModal();
+		if (nResponse == IDOK)
+			str.Format("아이디/패스워드를 저장하였습니다.\n다시 프로그램을 시작하세요!");
+		else if (nResponse == IDCANCEL)
+			str.Format("아이디/패스워드를 저장하지 않았습니다.\n프로그램을 종료합니다.");
+		AfxMessageBox(str);
+		
+		CDialog::OnOK(); // return FALSE;
+	}
+
+	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+void CLoginDlg::OnSysCommand(UINT nID, LPARAM lParam)
+{
+	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
+	{
+		CAboutDlg dlgAbout;
+		dlgAbout.DoModal();
+	}
+	else
+	{
+		CDialog::OnSysCommand(nID, lParam);
+	}
+}
+
+// If you add a minimize button to your dialog, you will need the code below
+//  to draw the icon.  For MFC applications using the document/view model,
+//  this is automatically done for you by the framework.
+
+void CLoginDlg::OnPaint() 
+{
+	if (IsIconic())
+	{
+		CPaintDC dc(this); // device context for painting
+
+		SendMessage(WM_ICONERASEBKGND, (WPARAM) dc.GetSafeHdc(), 0);
+
+		// Center icon in client rectangle
+		int cxIcon = GetSystemMetrics(SM_CXICON);
+		int cyIcon = GetSystemMetrics(SM_CYICON);
+		CRect rect;
+		GetClientRect(&rect);
+		int x = (rect.Width() - cxIcon + 1) / 2;
+		int y = (rect.Height() - cyIcon + 1) / 2;
+
+		// Draw the icon
+		dc.DrawIcon(x, y, m_hIcon);
+	}
+	else
+	{
+		CDialog::OnPaint();
+	}
+}
+
+// The system calls this to obtain the cursor to display while the user drags
+//  the minimized window.
+HCURSOR CLoginDlg::OnQueryDragIcon()
+{
+	return (HCURSOR) m_hIcon;
+}
+
+void CLoginDlg::OnOK() 
+{
+	// TODO: Add extra validation here
+	if (Login()) // 로그인 성공
+		CDialog::OnOK();
+	else // 로그인 실패
+	{
+		m_nFailCount++; // 실패 카운트 증가
+		if (m_nFailCount >= 3)
+		{
+			CString str;
+			str.Format("3번 이상 잘못 입력하였습니다.\n다시 프로그램을 시작하세요!");
+			AfxMessageBox(str);
+			CDialog::OnOK();
+		}
+
+		m_Id = "";
+		m_Password = "";
+		UpdateData(FALSE);
+		((CEdit *)GetDlgItem(IDC_EDIT1))->SetFocus();
+	}
+}
+
+BOOL CLoginDlg::Login()
+{
+	char *encrypt_password = NULL;
+
+	UpdateData(TRUE);
+	
+	if (md5.GetId() != m_Id) 
+	{
+		AfxMessageBox("아이디가 다름니다.");
+		return FALSE;
+	}
+
+	if (md5.GetMD5()) // md5 암호화
+	{
+		//m_Password를 md5 암호화 한다.
+		encrypt_password = md5.DigestMsg(m_Password.GetBuffer(m_Password.GetLength())); // Digest Data
+		m_Password.Format("%s", encrypt_password);
+	}
+
+#if _DEBUG
+	CString Password = md5.GetPassword();
+	TRACE("%s, %d\n%s, %d\n", Password, Password.GetLength(), m_Password, m_Password.GetLength());
+#endif
+
+	if (md5.GetPassword() != m_Password)
+	{
+		AfxMessageBox("암호가 다름니다.");
+		if (encrypt_password)
+			free(encrypt_password);
+		return FALSE;
+	}
+
+	AfxMessageBox("로그인에 성공하였습니다.");
+	if (encrypt_password)
+		free(encrypt_password);
+
+	return TRUE;
+}
+
+void CLoginDlg::OnShowWindow(BOOL bShow, UINT nStatus) 
+{
+	CDialog::OnShowWindow(bShow, nStatus);
+	
+	// TODO: Add your message handler code here
+	((CEdit *)GetDlgItem(IDC_EDIT1))->SetFocus();
+}
+}}}
+
+'''SetupDlg.h'''
+
+{{{#!plain
+#if !defined(AFX_SETUPDLG_H__1331B4D5_E122_4CC6_AA1C_7563BC934443__INCLUDED_)
+#define AFX_SETUPDLG_H__1331B4D5_E122_4CC6_AA1C_7563BC934443__INCLUDED_
+
+#if _MSC_VER > 1000
+#pragma once
+#endif // _MSC_VER > 1000
+// SetupDlg.h : header file
+//
+
+/////////////////////////////////////////////////////////////////////////////
+// CSetupDlg dialog
+
+class CSetupDlg : public CDialog
+{
+// Construction
+public:
+	CSetupDlg(CWnd* pParent = NULL);   // standard constructor
+// Dialog Data
+	//{{AFX_DATA(CSetupDlg)
+	enum { IDD = IDD_SETUP_DIALOG };
+	BOOL	m_md5;
+	CString	m_Id;
+	CString	m_Password;
+	//}}AFX_DATA
+
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CSetupDlg)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
+
+// Implementation
+protected:
+
+	// Generated message map functions
+	//{{AFX_MSG(CSetupDlg)
+	virtual void OnOK();
+	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
+};
+
+//{{AFX_INSERT_LOCATION}}
+// Microsoft Visual C++ will insert additional declarations immediately before the previous line.
+
+#endif // !defined(AFX_SETUPDLG_H__1331B4D5_E122_4CC6_AA1C_7563BC934443__INCLUDED_)
+}}}
+
+'''SetupDlg.cpp'''
+
+{{{#!plain
+// SetupDlg.cpp : implementation file
+//
+
+#include "stdafx.h"
+#include "login.h"
+#include "SetupDlg.h"
+#include "md5.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+// CSetupDlg dialog
+
+
+CSetupDlg::CSetupDlg(CWnd* pParent /*=NULL*/)
+	: CDialog(CSetupDlg::IDD, pParent)
+{
+	//{{AFX_DATA_INIT(CSetupDlg)
+	m_md5 = FALSE;
+	m_Id = _T("");
+	m_Password = _T("");
+	//}}AFX_DATA_INIT
+}
+
+
+void CSetupDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CSetupDlg)
+	DDX_Check(pDX, IDC_CHECK1, m_md5);
+	DDX_Text(pDX, IDC_EDIT11, m_Id);
+	DDV_MaxChars(pDX, m_Id, 20);
+	DDX_Text(pDX, IDC_EDIT22, m_Password);
+	DDV_MaxChars(pDX, m_Password, 20);
+	//}}AFX_DATA_MAP
+}
+
+
+BEGIN_MESSAGE_MAP(CSetupDlg, CDialog)
+	//{{AFX_MSG_MAP(CSetupDlg)
+	ON_WM_SHOWWINDOW()
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////////
+// CSetupDlg message handlers
+
+void CSetupDlg::OnOK() 
+{
+	// TODO: Add extra validation here
+
+	UpdateData(TRUE);
+
+	if (m_Id == "")
+	{
+		((CEdit *)GetDlgItem(IDC_EDIT11))->SetFocus();
+		return;
+	}
+	else if (m_Password == "")
+	{
+		((CEdit *)GetDlgItem(IDC_EDIT22))->SetFocus();
+		return;
+	}
+
+	CMD5 md5;
+	CString inifile;
+	inifile.Format(".\\%s.ini", AfxGetApp()->m_pszAppName);
+	md5.SetIniFile(inifile);
+	md5.SetId(m_Id);
+	md5.SetPassword(m_Password);
+	md5.SetMD5(m_md5);
+	md5.SetINIData();
+	
+	CDialog::OnOK();
+	//DestroyWindow();
+}
+
+void CSetupDlg::OnShowWindow(BOOL bShow, UINT nStatus) 
+{
+	CDialog::OnShowWindow(bShow, nStatus);
+	
+	// TODO: Add your message handler code here
+	((CEdit *)GetDlgItem(IDC_EDIT11))->SetFocus();
+}
+}}}
+
+'''MD5.h'''
+
+{{{#!plain
+// MD5.h: interface for the CMD5 class.
+//
+//////////////////////////////////////////////////////////////////////
+
+#if !defined(AFX_MD5_H__2FD75D63_0178_412A_B2DA_8B52C1921C38__INCLUDED_)
+#define AFX_MD5_H__2FD75D63_0178_412A_B2DA_8B52C1921C38__INCLUDED_
+
+#include <openssl/evp.h>
+
+#if _MSC_VER > 1000
+#pragma once
+#endif // _MSC_VER > 1000
+
+class CMD5  
+{
+public:
+	CMD5();
+	BOOL GetINIData();
+	void SetINIData();
+	CString GetId() { return m_Id; };
+	CString GetPassword() { return m_Password; };
+	void SetId(CString id) { m_Id = id; };
+	void SetPassword(CString password) { m_Password = password; };
+	CString StringToMD5(CString str);
+	BOOL GetMD5() { return m_bMD5; };
+	void SetMD5(BOOL md5) { m_bMD5 = md5; }
+	void SetIniFile(CString inifile) { m_IniFile = inifile; };
+	CString GetIniFile() { return m_IniFile; };
+	char *DigestMsg(char *mess);
+	void PrintDigestMsg(unsigned char *mess, int len);
+	char CharToHex(char ch);
+	void StrToHex(char *str, unsigned char *new_str);
+	virtual ~CMD5();
+
+private:
+	CString m_Id;
+	CString m_Password;
+	CString m_IniFile;
+	BOOL m_bMD5;
+
+};
+
+#endif // !defined(AFX_MD5_H__2FD75D63_0178_412A_B2DA_8B52C1921C38__INCLUDED_)
+}}}
+
+'''MD5.cpp'''
+
+{{{#!plain
+// MD5.cpp: implementation of the CMD5 class.
+//
+//////////////////////////////////////////////////////////////////////
+
+#include "stdafx.h"
+#include "login.h"
+#include "MD5.h"
+#include <string.h>
+//#include <openssl/evp.h>
+
+#ifdef _DEBUG
+#undef THIS_FILE
+static char THIS_FILE[]=__FILE__;
+#define new DEBUG_NEW
+#endif
+
+//////////////////////////////////////////////////////////////////////
+// Construction/Destruction
+//////////////////////////////////////////////////////////////////////
+
+CMD5::CMD5()
+{
+}
+
+CMD5::~CMD5()
+{
+
+}
+
+BOOL CMD5::GetINIData()
+{
+	int md5;
+	DWORD dwLen;
+	char password[128];
+	char id[128];
+
+	md5 = ::GetPrivateProfileInt("setup", "md5", 0, m_IniFile);
+	::GetPrivateProfileString("setup", "id", NULL, id, 128, m_IniFile);
+	dwLen = ::GetPrivateProfileString("setup", "password", NULL, password, 128, m_IniFile);
+
+	m_bMD5 = md5;
+	m_Id.Format("%s", id);
+	m_Password.Format("%s", password);
+
+#if _DEBUG
+	TRACE("%d, %s, %s, %d\n", md5, id, password, dwLen);
+	PrintDigestMsg((unsigned char *)password, dwLen);
+#endif
+
+	if (m_bMD5 == 0 && m_Id == "" && m_Password == "")
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+void CMD5::SetINIData()
+{
+	CString str;
+	str.Format("%d", m_bMD5);
+	::WritePrivateProfileString("setup", "md5", str, m_IniFile);
+	::WritePrivateProfileString("setup", "id", m_Id, m_IniFile);
+
+	if (m_bMD5) // md5 암호화 해서 저장
+	{
+		char *encrypt_password = DigestMsg(m_Password.GetBuffer(m_Password.GetLength())); // Digest Data
+
+#if _DEBUG
+			TRACE("%s, %d\n", encrypt_password, strlen(encrypt_password));
+#endif
+		::WritePrivateProfileString("setup", "password", encrypt_password, m_IniFile);
+		free(encrypt_password);
+	}
+	else // plain text로 저장
+	{
+		::WritePrivateProfileString("setup", "password", m_Password, m_IniFile);
+	}
+}
+
+
+// URL: http://www.openssl.org/docs/crypto/EVP_DigestInit.html
+char *CMD5::DigestMsg(char *mess)
+{
+  EVP_MD_CTX mdctx;
+  const EVP_MD *md;
+  int md_len; // digest data length
+  unsigned char md_value[EVP_MAX_MD_SIZE]; // Saved digest data
+  unsigned char encrypt_password[128];
+
+  if (m_Password == "")
+	  return "";
+
+  OpenSSL_add_all_digests();
+
+  md = EVP_get_digestbyname("md5");
+  if (!md)
+  {
+	  AfxMessageBox("Unknown message digest md5");
+	  return "";
+  } 
+
+  EVP_MD_CTX_init(&mdctx);
+  EVP_DigestInit_ex(&mdctx, md, NULL);
+  EVP_DigestUpdate(&mdctx, mess, strlen(mess)); // digest data
+  EVP_DigestFinal_ex(&mdctx, md_value, (unsigned int *)&md_len);
+  EVP_MD_CTX_cleanup(&mdctx);
+
+  md_value[md_len] = '\0'; // 꼬옥 넣어준다.
+  // 16진수 형태로 변환
+  StrToHex((char *)md_value, encrypt_password);
+
+#if _DEBUG
+  TRACE("md_len=%d\n", md_len);
+  PrintDigestMsg(md_value, md_len);
+  TRACE("md_value=%s\n", md_value);
+#endif
+
+  return _strdup((char *)encrypt_password);
+}
+
+void CMD5::PrintDigestMsg(unsigned char *mess, int len)
+{
+	int i;
+
+	for (i =0; i < len; i++)
+	{
+		TRACE("%02x", mess[i]);
+	}
+	TRACE("\n");
+}
+
+char CMD5::CharToHex(char ch) 
+{ 
+	char hex; 
+
+	if (ch >= 0 && ch <= 9) 
+		hex = ch - 0 + '0'; 
+	else if (ch >= 10 && ch <= 15) 
+		hex = ch - 10 + 'a'; 
+
+	return hex; 
+}
+
+void CMD5::StrToHex(char *str, unsigned char *new_str) 
+{ 
+	int i, j; 
+
+	i = 0; 
+	j = 0; 
+	while (i < strlen(str)) 
+	{ 
+		unsigned char ch;
+
+		// 상위 4비트 
+		ch = (str[i] >> 4) & 0x0f;
+		new_str[j] = CharToHex(ch); 
+		j++;
+
+		// 하위 4비트 
+		ch = str[i] & 0x0f;
+		new_str[j] = CharToHex(ch); 
+		j++;
+		i++;
+	} 
+	new_str[j] = '\0';
+}
+}}}
+
+	=== 실 행 ===
+
+  1. 동적 라이브러리 파일 복사
+     libeay32.dll, ssleay32.dll이 login 프로그램 디렉토리에 있던지 아니면 윈도우 시스템 디렉토리에 위치해야한다. 
+  1. 쉽게 libeay32.dll, ssleay32.dll 파일을 C:\login\debug 디렉토리에 복사한다. 
+     C:\login에 libeay32.dll, ssleay32.dll을 복사한다.
+     C:\openssl-0.9.7d\out32dll\*.dll => C:\login\debug
+  1. 탐색기를 실행하여 "C:\login\debug"로 이동한다.
+  1. login.exe를 실행한다.
+    1. login.ini 파일이 없는 경우
+
+{{{#!plain
+  에러 메시지 출력  
+}}}
+attachment:login_exe_1.jpg
+{{{#!plain
+  로그인 정보 설정
+  패스워드를 MD5로 암호화해서 저장할려면 "MD5 암호화"를 체크한다.
+}}}
+attachment:login_exe_2.jpg
+{{{#!plain
+  알림 메시지
+}}}
+attachment:login_exe_3.jpg
+
+    1. login.ini 파일이 있는 경우
+
+{{{#!plain
+  로그인 대화상자
+}}}
+attachment:login_exe_4.jpg
+{{{#!plain
+   아이디가 틀린 경우 알림 메시지 출력
+}}}
+attachment:login_exe_6.jpg
+{{{#!plain
+   암호가 틀린 경우 알림 메시지 출력
+}}}
+attachment:login_exe_5.jpg
+{{{#!plain
+  3번 이상 id 또는 password를 잘못 입력한 경우 프로그램을 종료시킨다.
+}}}
+attachment:login_exe_7.jpg
+{{{#!plain
+   로그인에 성공한 알림 메시지 출력
+   확인 버튼을 클릭하면 프로그램을 종료한다.
+}}}
+attachment:login_exe_8.jpg
+  ===  login.ini 파일 ===
+      
+  1. md5 암호화한 패스워드 저장 login.ini 파일
+{{{#!plain
+  [setup]
+  md5=1 <= 1이면 password가 md5 암호화 되었음을 의미
+  id=mwyun <= id
+  password=63f4dbbe4608cdc6c0912f94ddf4a12c <= md5 암호화된 것을 16진수 형태로 저장
+}}}
+
+  1. plain text로 패스워드 저장 login.ini 파일
+{{{#!plain
+  [setup]
+  md5=0 <= 0이면 password가 plain text임을 의미
+  id=mwyun <= id
+  password=yun934
+}}}
+
+  === 소스 코드 다운로드 ===
+ 1. attachment:login.zip 
+
+  === 참조 사이트 ===
+
+{{{#!plain
+  예제 프로그램의 md5 코드는 다음 사이트를 참조하여 작성하였다.
+  자세한 건 문서를 참조한다.
+}}}
+  * [http://www.openssl.org/docs/crypto/EVP_DigestInit.html EVP_DigestInit]
+  * [wiki:article_파일변조검사 md5를 이용한 파일변조 검사]

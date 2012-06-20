@@ -1,0 +1,755 @@
+#title 안전한 프로그래밍
+[wiki:docbook_안전한_프로그래밍 Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>애플리케이션 개발시 보안문제 피하기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>애플리케이션 개발시 보안문제 피하기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 7월 26일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN21"
+>권한(SUID) 관련</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN36"
+>SUID 예제 프로그램</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN44"
+>SUID의 문제점</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN54"
+>외부 명령어의 실행</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN58"
+>위험한 system()함수의 사용</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN70"
+>system()함수의 문제 해결</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이 문서는 Avoiding security holes when developing an application를 
+		<A
+HREF="http://www.tldp.org/linuxfocus/English/January2001/article182.shtml"
+TARGET="_top"
+>linuxfocus</A
+>의 문서를 참고 했다.
+	</P
+><P
+>		컴퓨터시스템을 운영하는데 있어서 현재 가장 중요한 이슈는 보안문제일 
+		것이다. 보안 문제가 발생하는 이유는 허락하지 않은 사용자가 시스템의 
+		자원을 접근하려는데에서 발생하게 된다. 이상적으로 보자면 운영체제가 
+		완벽하고 그 운영체제하에서 돌아가는 소프트웨어에 어떠한 결함도 존재 
+		하지 않는다면 보안문제가 발생할 어떠한 이유도 없겠지만, 안타깝게도 
+		완전한 운영체제와 완전한 프로그램은 존재하지 않는다. 
+		(운영체제 역시 프로그램의 일종이다) 이런 이유로 특정 프로그램의 
+		결함을 찾아서 발생가능한 보안문제를 미연에 방지하는 기술은 매우 
+		중요하다고 할 수 있다. 프로그래머의 경우 가능한한 이러한 결함이 
+		발생하지 않도록 어떤 "규칙"을 가지고 프로그래밍을 해야한다.
+	</P
+><P
+>		보안문제에 약간의 관심을 가지고 있다면, 거의 매일 보안결함이 발생한 
+		프로그램과 이러한 결함이 시스템에 미치는 영향 이러한 결합을 제거하기 
+		위한 패치가 발표되고 있음을 알수 있다. 이러한 보안 결함을 보면 
+		프로그래머의 사소한 부주의와 잘못된 코딩 습관등에 기인한 점이 많으며 
+		약간의 학습을 통해서 많은 수의 결함을 줄일 수 있다. 
+	</P
+><P
+>		이번 문서에서는 일반 애플리케이션의 작성에서 발생하기 쉬운 문제중 
+		권한(privileges)과 관련된 내용과 외부 명령어 실행에 대해서 알아 보도록 
+		하겠다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>2&#51208;. 권한(SUID) 관련</A
+></H1
+><P
+>		Unix시스템의 경우 모든 유저가 동일하게 취급되지 않으며, 고유의 권한을 
+		가지며 해당 권한내에서 행동에 제약을 받게 된다. 이러한 행동은 파일을 
+		삭제하고, 옮기고, 편집하거나 시스템설정을 바꾸는 등의 작업이 된다. 
+		마치 영화 메트릭스에서 요원 스미스의 행동이 메트릭스내에서 제한을 
+		받는 것과 같다.  
+	</P
+><P
+>		Unix시스템에 등록된 모든 유저는 yundream, yungum과 같은 자신의 이름을 
+		가진다. 그러나 이러한 문자열로 된 유저이름은 인간지향적이긴 하지만 
+		컴퓨터 입장에서 봤을때는 사용하기가 그리 좋지 않다. 
+		그래서 이름과 맵핑되는 int형의 (유일한)고유번호를 할당한다. 
+		이러한 고유 번호를
+		<B
+CLASS="EMPHASIS"
+>UID</B
+>(User Identifier)라고 한다. 이들 유저정보는 
+		/etc/passwd 파일에 저장된다. 
+	</P
+><P
+>		이중 UID 0을 가지는 유저가 있는데 이를 root유저라고 하며 시스템에 
+		대하여 특별한 권한을 가지며 어떠한 제한도 가지지 않는다. 
+		root유저는 모든 파일에 대해서 "읽기", "쓰기", "실행"의 완전한 권한을 
+		가지며 장치에 대해서도 일체의 권한 - 마운트, 언마운트, 이더넷 카드의 
+		주소할당등과 같은 - 부여 받는다. 이외에도 운영체제의 운영과 관련된 
+		(물리적, 스왑)메모리에 대한 조정, 각 프로세스에 대한 우선권부여, 
+		프로세스에 대한 시그널 발생등의 임무를 수행할 수도 있다. 한마디로 
+		모든일을 할 수 있는 특수한 유저라고 보면 된다.  
+	</P
+><P
+>		일단 유저가 시스템에 로그인 하면 유저는 각종 명령어들을 통해서 
+		여러가지 작업을 수행하게 된다. 이때 이들 명령어의 수행범위는 
+		실행된 유저의 권한에 따라서 변하게 된다. 이렇게 되므로써 자신의 권한 
+		밖에 있는 작업(다른 유저의 파일 삭제와 같은)을 수행하고자 하더라도 
+		권한문제로 원하는 작업을 할 수 없게 된다. 이렇게 유저별로 권한을 
+		둠으로써 여러명이 동시에 작업하는 유닉스 시스템에서 자신의 영역을 
+		침범받지 않고 작업을 수행할 수 있다. 
+		<DIV
+CLASS="TIP"
+><BLOCKQUOTE
+CLASS="TIP"
+><P
+><B
+>&#51089;&#51008; &#51221;&#48372;: </B
+>			전통적으로 유닉스 시스템은 슈퍼유저와 일반유저의 두개영역으로 
+			권한이 구분되어 진다. 슈퍼유저 외에는 모두 일반유저다.   
+		</P
+></BLOCKQUOTE
+></DIV
+>
+	</P
+><P
+>		이렇게 자신의 유저권한을 통해서 작업을 하게 되었는데, 때때로 
+		다른 유저의 권한으로 작업을 해야 하거나 혹은 슈퍼유저권한의 작업을 
+		해야될 경우가 발생한다. 이럴경우 우리는 <B
+CLASS="EMPHASIS"
+>su</B
+>와 
+		같은 프로그램을 이용해서 스위칭 유저(switching user)하게 된다.  
+	</P
+><P
+>		언뜻 su를 이용해서 스위칭 유저하는 것은 단지 올바른 패스워드를 
+		입력하는 정도로 끝날 것으로 생각 될 수 있지만 실은 그리 간단한 문제가 
+		아니다. 기본적으로 애플리케이션의 실행권한은 실행시킨 유저에 따라 
+		제한 되므로 일반유저가 애플리케이션을 실행 시켰을 경우 결코 다른 
+		유저의 권한을 획득할 수 없게된다. 당연히 su를 실행 시키고 
+		패스워드를 올바르게 입력했다고 해서 다른 유저 권한을 얻을 수 있게 되는 
+		건 아니다.  
+	</P
+><P
+>		이런 문제를 해결하기 위해서 유닉스는 잠시 동안 "임시로"다른 유저 
+		권한으로 프로그램을 실행시킬 수 있도록 실행파일의 권한을 조정할 수 
+		있도록 지원한다. 내가 비록 su를 일반유저 권한으로 실행시켰다고 하더라도 
+		슈퍼유저가 su를 실행시킨것과 같은 효과(effect)를 주도록 애플리케이션의 
+		실행권한을 조정해 줄 수 있다는 뜻이다. 이러한 권한을 Effectiv UID라고 
+		한다. ls를 통해서 su의 권한을 확인해 보자  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /root]# ls -al /bin/su
+-rwsr-xr-x    1 root     root        14112  1월 16  2001 /bin/su
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		소유자 권한에 's'가 보일 것이다. 이는 일반유저가 su 프로그램을 
+		실행하더라도 프로그램의 소유자인 root의 권한으로 작업을 할 수 있을을 
+		의미한다. 이 's'가 설정되는 비트를 Set-UID혹은 줄여서 SUID라고 한다. 
+	</P
+><P
+>		그럼 SUID의 테스트를 위해서 간단한 프로그램을 하나 만들어 보도록 
+		하자.
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>2.1&#51208;. SUID 예제 프로그램</A
+></H2
+><P
+>			만들고자 하는 프로그램은 간이 su프로그램이다 이름은 jsu로 
+			하겠다. 프로그램이 하는 일은 setuid(2)를 이용해서 슈퍼유저 권한의 
+			획득을 시도하고 execl(3)을 이용해서 쉘을 실행 시킨다. 
+			코드는 간단하므로 설명은 주석으로 대신 하다록 한다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : jsu.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;pwd.h&#62;
+#include &#60;sys/types.h&#62;
+
+int main(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        printf("Usage : jsu [username]&#92;n");
+        return 1;
+    }
+
+
+    if (setuid(0) != 0)
+    {
+        perror("setuid error : ");
+        exit(0);
+    }
+    execl("/bin/sh", "sh", NULL);
+
+    return 0;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위 프로그램을 컴파일한 뒤 바로 실행하면 분명 
+			setuid(2)호출이 실패했다는 
+			메시지를 출력하며 프로그램이 종료 될것이다(일반계정으로 테스트 하기 
+			바란다). 일반 계정으로 다른 계정권한을 얻을 수 없기 때문이다. 
+			이 문제를 해결 하기 위해서 jsu프로그램에 다음과 같이 USID비트를 
+			설정하면 된다.     
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# chmod +s jsu
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이제 성공적으로 다른 유저로 변경됨을 확인 할 수 있을 것이다. id를 
+			이용해서 자신의 권한 정보를 확인해보도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[yundream@test test]$ ./jsu 
+sh-2.04# id
+uid=0(root) gid=500 groups=500
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			uid가 0(슈퍼유저)로 성공적으로 세팅되어 있음을 확인 할 수 있다. 
+			이때 gid와 groups관련 정보가 제대로 나오지 않는데 
+			이유는 jsu프로그램이 
+			완전한 프로그램이 아니기 때문이다. 좀더 su와 비슷하게 작동하도록 
+			하기 위해서는 gid와 그 밖에 몇 가지 더 신경써야 할 부분들이 있는데, 
+			여기에서는 생략하도록 하겠다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN44"
+>2.2&#51208;. SUID의 문제점</A
+></H2
+><P
+>			위 프로그램은 치명적인 단점을 가지고 있다. 그것은 SUID가 적용된 
+		 	슈퍼유저 소유의 애플리케이션을 실행시킬 경우 아무런 제재 사항 없이 
+			슈퍼유저의 권한을 얻을 수 있다는 점이다. 물론 이러한 문제의 경우 
+			해당 권한을 얻기 위해서 su와 같이 패스워드 입력 과정을 
+			거치게 한다거나 
+			슈퍼유저로 작동하는 코드를 최소화하는 방법등을 사용하기는 하지만 
+			SUID자체가 매우 시스템 관리적 측면에서 매우 위험할 수 있다.
+		</P
+><P
+>			그래서 시스템 관리자는 SUID가 있는 프로그램에 대해서 매우 민감하게 
+			반응하며 많은 경우 cron등을 통해서 SUID의 프로그램이 있는지 
+			지속적으로 확인한다. 
+			시스템이 누군가의 침입을 받은 흔적이 있을 경우 SUID검사는 
+			필수 적으로 이루어진다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /bin]# find ./ -type f -perm +4000
+./ping
+./mount
+./umount
+./su
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위는 필자의 시스템(Linux Kernel 2.4.x)에서 /bin 디렉토리 밑에 
+			SUID설정된 프로그램을 찾은 결과이다.  
+		</P
+><P
+>			그러나 이러한 문제점에도 불구하고 su, ping과 같이 반드시 필요한 
+			경우도 있으므로 가능하면 SUID를 사용하지 않도록 하면  
+			필요할 경우 최대한 안전하게 코딩하도록 해야한다. 
+			<DIV
+CLASS="TIP"
+><BLOCKQUOTE
+CLASS="TIP"
+><P
+><B
+>&#51089;&#51008; &#51221;&#48372;: </B
+>				ping같은 경우 RAW소켓에 접근해야 하는데, 이럴 경우 슈퍼유저 
+				권한을 필요로 한다. 그러나 이렇게 될경우 ping를 사용할 때 마다 
+				root로 스위칭 유저 해야 하는데 이런 단순한 작업을 위해서는 
+				너무 번거로운 과정을 거쳐야 한다. SUID를 해결하면 간단하게 
+				번거로움을 해결할 수 있다.  
+			</P
+></BLOCKQUOTE
+></DIV
+>
+			안전한 코딩을 위한 일반적인 방법은
+			setuid()를 통해서 슈퍼 유저 권한을 얻었다면 슈퍼유저 권한이 
+			필요한 최소한의 작업을 끝내고 곧바로 setuid()를 이용해서 원래의 
+			유저권한으로 회귀하도록 코딩하는 것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int main()
+{
+   ... 
+   int myuid;
+   myuid = getuid(); // 현재 유저의 uid를 저장
+   setuid(0);        // 슈퍼유저 권한을 얻는다.
+   ...               // 최소한의 필요한 작업만을 한다.
+   ...
+   setuid(myuid);    // 원래 유저권한으로 되돌아 온다. 
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			더욱 안전한 프로그램의 작성을 원한다면 setuid()를 호출하기 전에 
+			해당 유저에 대한 패스워드를 체크하는 코드를 추가하면 될 것이다. 
+		</P
+><P
+>			시간이 된다면 위의 예제를 패스워드 체크가 가능하도록 변경해 
+			보기 바란다.  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>3&#51208;. 외부 명령어의 실행</A
+></H1
+><P
+>		프로그램을 작성하다 보면 종종 외부의 다른 프로그램을 실행시켜야 
+		할 경우가 발생한다. 가장 흔한 예는 프로그램내에서 메일을 전송하기 
+		위해서 외부 프로그램인 mail을 실행하는 경우가 될 것이다. 이럴 경우 
+		가장 유용하게 사용하는 함수는 system(3)함수 이다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdlib.h&#62;
+
+int system (const char *string);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN58"
+>3.1&#51208;. 위험한 system()함수의 사용</A
+></H2
+><P
+>			system()함수의 근본적인 문제점은 외부 프로그램을 실행시키기 위해서 
+			쉘을 사용하는데 쉘이 환경변수의 영향을 크게 받는 다는 점이다. 
+			예를들어 우리가 system()함수를 호출하여 mail프로그램을 
+			실행시키면 system()함수는 내부적으로 사용자 쉘을 호출하여서 
+			인자로 mail을 실행시킨다. 현재 사용자 쉘이 bash라고 한다면 
+			system("mail yundrema &#60; test.c");는 sh -c mail yundream &#60; test.c 와 
+			같은 방식으로 호출된다.    
+		</P
+><P
+>			언뜻 보기엔 별로 문제가 될것 같지 않지만 약간의 편법을 이용하면 
+			어렵지 않게 mail프로그램 대신 자신이 작성한 다른 프로그램을 
+			실행시키도록 할 수 있다. 쉘에서 실행시킬 프로그램의 찾기 경로는 
+			환경변수 PATH의 경로를 따르게 된다. 만약 환경변수 PATH의 값을 
+			약간만 바꾸게 된다면, 원래 실행되어야하는 mail프로그램 대신 
+			다른 프로그램이 실행되도록 변경할 수 있다. 원하는 프로그램 대신 
+			엉뚱한 프로그램이 실행될 수 있다는 자체가 큰문제일 뿐더러 
+			만약 프로그램이 SUID상태에서 실행된다면 심각한 보안 문제를 
+			발생 시킬 수도 있다.  
+		</P
+><P
+>			system()함수의 사용이 정말 위험한지 확인해 보기 위해서 간단한 
+			프로그램을 만들어 테스트 해보도록 하겠다. 일반적으로 cdrom을 
+			마운트 시키기 위해서는 슈퍼유저 권한이 필요로 하는데 주로 
+			일반유저를 통해서 리눅스에 접근해서 작업을 한다면 마운트 시키기 
+			위해서 스위칭 유저하는게 번거로운 작업이 될 수도 있다. 
+			그래서 SUID설정을 해서 일반 유저도 간단한 mount작업은 별도의 
+			스위칭 유저과정을 거치지 않도록 하는 프로그램을 만들도록 
+			하겠다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : cdmount.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+
+int
+main (void)
+{
+    int myuid;
+    myuid = getuid();
+
+	// 슈퍼유저 권한을 얻도록 한다. 
+    setuid(0);
+    if (system ("mount /dev/cdrom") != 0)
+        perror ("system");
+	else
+		printf("cdrom mount success&#92;n");
+	// 원래 권한으로 되돌린다.
+    setuid(myuid);
+    return (0);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램을 컴파일 시킨 다음 SUID권한을 주도록 한다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# chmod +s cdmount
+[root@localhost test]# ls -al cdmount
+-rwsr-sr-x    1 root     root        11706  7월 31 11:09 cdmount
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			일반 유저로 테스트 해보면 위 프로그램은 성공적으로 
+			실행 될 것이다. 
+		</P
+><P
+>			그러나 말했듯이 위 프로그램은 치명적인 문제점을 가지고 있다. 
+			system에서 실행시킬 프로그램을 찾을때 쉘의 환경변수 PATH의 경로들을 
+			이용한다는 점이다. 이 점을 이용하면 일반유저 권한으로 위의 
+			프로그램을 실행시켰을때 root 쉘이 뜨도록 할 수 있다. 
+			다음과 같은 간단한 쉘프로그램을 만들어 보도록 하자. 쉘 프로그램의 
+			이름은 mount이다. 일반유저인 yundream으로 접근해서 다음의 쉘을 
+			작성하도록 하자.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#!/bin/sh
+/bin/sh &#60; /dev/tty
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이제 현재 디렉토리에서 실행 프로그램을 
+			찾도록 환경변수 PATH를 변경한다. 이렇게 되면 cdmount프로그램을 
+			실행 시켰을때 우리가 만든 쉘 프로그램이 대신 실행된다. 이 쉘 
+			프로그램은 슈퍼유저 권한으로 실행이 됨으로 우리는 간단하게 
+			root 쉘을 얻게 된다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[yundream@test test]$ export PATH=.  
+[yundream@test test]$ chmod +x mount
+[yundream@test test]$ ./cdmount 
+sh-2.04# 
+sh-2.04# /usr/bin/whoami 
+root
+sh-2.04# 
+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN70"
+>3.2&#51208;. system()함수의 문제 해결</A
+></H2
+><P
+>			사용할 수 있는 가장 간단한 방법은 system()함수에 실행시킬 명령어를 
+			입력할때 PATH환경변수의 영향을 받지 않도록 완전한 디렉토리 경로를 
+			입력하는 것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>if (system ("/bin/mount /dev/cdrom") != 0)
+    perror ("system");
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			약간 코드가 길어지지만 system()함수 대신 execl()계열의 함수를 
+			사용하는 방법도 있다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>pid_t pid;
+int   status;
+
+if ((pid = fork()) &#60; 0) 
+{
+    perror("fork");
+    return (-1);
+}
+if (pid == 0) 
+{
+    /* 자식 프로세스 */
+    execl ("/bin/mount", "mount", "/dev/cdrom", NULL);
+    perror ("execl");
+    exit (-1);
+}
+/* 부모 프로세스 */
+waitpid (pid, &#38; status, 0);
+if ((! WIFEXITED (status)) || (WEXITSTATUS (status) != 0)) 
+{
+    perror ("Printing");
+    return (-1);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			위의 방법을 동원했을 경우 system()함수의 문제를 피해갈 수 있긴 
+			하지만 한가지 문제점이 발생한다. 그것은 system()에서 실행시키는 
+			프로그램이 반드시 지정된 경로에 있을 거라고 장담할 수가 없다는 
+			점이다. mount의 경우 /bin에 있을 수도 있지만 /sbin, /usr/bin, 
+			/usr/sbin 등의 디렉토리에 있을 수도 있기 때문이다. 
+		</P
+><P
+>			이 문제는 setenv을 통해서 프로그램 내부적으로 PATH경로를 
+			강제로 지정하는 방식으로 해결 가능하다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 1)
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

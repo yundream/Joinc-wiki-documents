@@ -1,0 +1,153 @@
+#title C 프로그래밍 팁
+[[TableOfContents(title=목차)]]
+
+== C에서 main보다 먼저 호출되는 함수 만들기 ==
+출처 : [http://kldp.org/node/68257 kldp]
+
+아래 글은 http://writely.com/ 에서 작성하여 http://kldp.org/xmlrpc.php 를 통하여 포스팅한 글입니다. Full HTML로 속성을 수정했습니다. 테스트 겸 중복 포스팅이네요..
+ 원문은 http://pynoos.byus.net/tt/index.php?pl=135 입니다.
+ C++ 언어는 그 특성상, 전역 개체의 초기화가 main 보다 먼저 이루어지므로 전역 개체의 생성자에 들어 있는 코드는 main 보다 먼저 호출된다.
+이것은 여러가지 트릭으로 사용될 수 있는데, C에는 과연 그런 것이 없을까? 표준 명세에는 없다.
+하지만, gcc의 __attribute__에는 그러한 일을 가능하게 해주는 지시자가 있는데, 바로 다음과 같이 사용된다.
+{{{#!plain
+void __attribute__((constructor)) before_main( void )
+{
+ /* Things to do before main function */
+}
+}}}
+
+
+또한 main 뒤에 호출되는 전형적인 방식은 atexit에 등록하는 것인데, 이것또한
+{{{#!plain
+void __attribute__((destructor)) after_main( void )
+{
+ /* Things to do after main function */
+}
+}}}
+와 같은 방식으로 호출된다.
+
+간단한 샘플을 돌려보자면,
+{{{#!plain
+$ more c.c
+#ifdef STRIP_ATTR
+#define __attribute__(x)
+#endif
+void __attribute__((constructor)) before_main( void )
+{
+ printf("I miss you Lorthlorien ever beauty.\n");
+}
+
+void __attribute__((constructor)) before_main_2nd( void ) 
+{
+ printf("Bombadil, where have you been in the morning?\n");
+}
+
+void __attribute__((destructor)) after_main( void ) 
+{
+ printf("Mithlandir, help me!\n");
+}
+
+int main()
+{
+ printf("I am working, no touch!\n");
+ return 0;
+}
+
+$ gcc -o c1 -save-temps c.c
+$ ./c1
+Bombadil, where have you been in the morning?
+I miss you Lorthlorien ever beauty.
+I am working, no touch!
+Mithlandir, help me!
+}}}
+
+근사하지 않은가? 다만 의심가는 것은 __attribute((constructor))로 지정한 함수들이 두 개 이상일때의 순서는 어떠하냐는 것인데, 외관상 stack형식으로 먼저 발견되는 것이 나중에 실행되는 것 같다. 자세한 것은 추후에 설명하지도 모르겠다.
+
+이것이 수행되는 원리를 좀더 파헤쳐보자면,
+
+우선 위 코드상에 STRIP_ATTR이라고 되어 있는 부분이 수행되도록하면 평범한 함수가 되는데, 그렇게 생성된 바이너리(c2)의 심볼들을 살펴보자. nm 은 -n 옵션을 주어 번지로 정렬되도록 하였다. 두 nm 결과를 비교하는데는 unified diff를 사용하여 보자. 그리고 -save-temps 를 통해 생성되는 c.s 라는 어셈블리어 파일은 각각 c1.s c2.s로 이름을 바꾸는 과정이 들어가 있다.
+{{{#!plain
+$ mv c.s c1.s
+$ gcc -o c1 c.c
+$ gcc -o c2 -DSTRIP_ATTR -save-temps c.c
+$ mv c.s c2.s
+$ nm -n c1 > c1.nm
+$ nm -n c2 > c2.nm
+$ diff -u c1.nm c2.nm 
+--- c1.nm Thu Jan 5 13:29:16 2006
++++ c2.nm Thu Jan 5 13:29:20 2006
+@@ -27,14 +27,14 @@
+0804952c r __FRAME_END__
+08049530 D _DYNAMIC
+080495f8 d __CTOR_LIST__
+-08049604 d __CTOR_END__
+-08049608 d __DTOR_LIST__
+-08049610 d __DTOR_END__
+-08049614 d __JCR_END__
+-08049614 d __JCR_LIST__
+-08049618 D _GLOBAL_OFFSET_TABLE_
+-08049630 A __bss_start
+-08049630 A _edata
+-08049630 b completed.1
+-08049634 b object.2
+-0804964c A _end
++080495fc d __CTOR_END__
++08049600 d __DTOR_LIST__
++08049604 d __DTOR_END__
++08049608 d __JCR_END__
++08049608 d __JCR_LIST__
++0804960c D _GLOBAL_OFFSET_TABLE_
++08049624 A __bss_start
++08049624 A _edata
++08049624 b completed.1
++08049628 b object.2
++08049640 A _end
+}}}
+
+이것을 잘 보아하니 __CTOR_LIST__ 라는 값까지는 같고 그 뒤가 달라지는 것을 볼 수가 있다.
+
+아앗! 이것은! 단지 section .ctor, .dtor에 함수 포인터만 추가하는 일을 하는 것 아닌가. 그렇다면, .ctor를 찾아서 하나씩 호출하는 부분은 어디에 있다는 것이지? ((계속)) 
+
+== C 언어와 C++ 언어에서 const 처리 ==
+C 언어와 C++ 언어에서 'const' 처리는 조금 다릅니다. Shocked?
+
+일단 C 언어의 경우, 32, 012, 0x3 등은 정수 상수입니다 (integer constant). 또는 정수 상수식 (integer constant expression)이라고도 합니다. 가변 배열을 제외하고, 배열 크기를 써 준다거나, struct bit-field로 지정할 수 있는 수치는 모두 정수 상수식이어야 합니다.
+
+'''const int ci = 3''' 에서, 변수 ci의 타입은 const int입니다. 보통 이런 식으로 'const'가 붙은 타입을 const-qualified type이라고 합니다. 그리고 const-qualified type의 오브젝트는 정수 상수가 아닙니다. 따라서 (가변 배열을 제외하고) 배열의 크기를 지정할 때 ci를 쓴다거나, case 레이블로 쓸 수 없습니다.
+
+C++ 언어 경우, 정수 상수, 정수 상수식 등은 C 언어와 같습니다. 단. const-qualified type의 오브젝트는 정수 상수가 됩니다. 따라서 const int 등으로 선언한 것도 정수 상수 취급을 받아서 배열의 크기를 지정한다거나 case 레이블로 쓸 수 있습니다. const가 붙은 오브젝트... 말이 좀 이상하죠? 아무리 생각해 봐도 좀 더 나은 표현은 "처음 값을 지정할 때를 제외하고 값을 변경할 수 없는 오브젝트"가 더 나은 표현일 것 같긴 한데.. 그렇다고 상수라고 표현하기 곤란한 게, 이것과 정수 상수와는 전혀 다른 뜻이기 때문에... Sad
+또, C/C++ 모두, const-qualified type으로 선언한 변수는 직/간접적으로 그 값을 변경하면 안됩니다. 이는 undefined behavior에 속합니다. 다음과 같은 코드를 보면 무슨 말인지 쉽게 알 수 있을 것입니다:
+{{{#!plain
+ const int i = 3;
+ int *p = (int *)&i;
+ *p = 4; /* wrong: undefined behavior */
+}}} 
+여담으로 C++에서 위와 같이 C 스타일 타입 변환보다, const_cast를 쓰는 것이 더 바람직합니다.
+포인터 선언할 때, const의 위치에 따라서 다양한 종류가 나올 수 있습니다.
+ 1. const int *cip (또는 int const *ip)
+ 1. int * const icp
+ 1. const int * const cicp (또는 int const * const ip)
+ 
+첫번째는 const int를 가리키는 포인터 ip입니다. 즉 const qualified int (값을 바꿀 수 없는 정수 타입)을 가리키는 포인터입니다. 이 포인터는 얼마든지 다른 const int를 가리키도록 바꿀 수 있지만, 가리키고 있는 대상의 값을 바꿀 수는 없습니다.
+{{{#!plain
+ const int ci1 = 4, ci2 = 8;
+ const int *cip = &ci1;
+ cip = &ci2; /* ok */
+ *cip = 0; /* wrong */
+}}} 
+두번째는 일반 정수 타입 int를 가리키는 const 포인터입니다. 즉, 가리키는 대상이 int이기 때문에, 얼마든지 값을 변경할 수 있지만, 포인터 자체가 const이기 때문에 다른 int를 가리키도록 바꿀 수 없습니다.
+{{{#!plain
+ int i1 = 4, i2 = 8;
+ int * const icp = &i1;
+ icp = &i2; /* wrong */
+ *icp = 0; /* ok */
+}}}
+세번째는 const int를 가리키는 const 포인터입니다. 따라서 다른 대상을 가리키도록 포인터를 바꿀 수도 없고, 대상이 가지고 있는 값을 바꿀 수도 없습니다.
+{{{#!plain
+ const int ci1 = 3, ci2 = 4;
+ const int * const cicp = &ci1;
+ cicp = &ci2; /* wrong */
+ *cicp = 0; /* wrong */
+}}} 
+참고: ISO C 표준 Sec. 6.7.3.5
+참고: ISO C++ 표준 Sec. 5.2.11.7, Sec. 7.1.5.1

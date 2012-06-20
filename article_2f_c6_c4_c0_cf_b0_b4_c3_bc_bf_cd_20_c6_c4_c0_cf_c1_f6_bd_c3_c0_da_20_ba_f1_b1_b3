@@ -1,0 +1,172 @@
+#title 파일객체와 파일지시자 비교
+
+{{{#!html
+FILE 객체와 파일지시자 와의 차이점..
+
+시스템 프로그램 파일관련 작업을 할때, 우리는 int 형의 파일지시자 값을 돌려주
+는 open 계열 함수와 FILE 객체를 돌려주는 fopen 계열함수중 택일 하여 사용한다.   
+이번장에서는 fopen 계열 함수와 open 계열 함수와의 차이점이 무엇이고, 어떠한
+장정과 단점을 가지는지에 대해서 알아보도록 하겠다.   
+
+기본적으로 유닉스에서는 모든 것을 파일로 처리한다는것에 대해사 알고 있을 
+것이다. 
+이는 모든 표준입출력 표준에러, 파일, 소켓에등에도 동일하게 적용된다. <br>   
+다음은 zipcode의 fork 버젼을 4444 번 port 로 실행시키고, zipcode 의 
+프로세스 상황을 출력한 결과 이다. <br>
+zipcode 의 fork 버젼은 <a href=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=20>다중연결서버 만들기 (1)</a>의 서버프로그램이다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@coco test]$ ./zipcode_m 
+Usage : ./zipcode [port]
+예    : ./zipcode 4444
+[yundream@coco test]$ ./zipcode_m 4444
+</pre>
+</td></tr>
+</table>  
+위와 같이 서버프로그램을 실행시키고 /proc 파일시스템을 이용해서 
+zipcode_m 의 프로세스 정보중 fd 정보를 출력해 보았다.   
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@hum test]$ ps -aux | grep zipcode_m | grep -v grep 
+yundream 14987  0.0  0.2  1340  376 ttyq1    S    15:02   0:00 ./zipcode_m 4444
+[yundream@hum test]$ cd /proc/14987/fd ; ls -al
+합계 0
+dr-x------    2 yundream 500             0  3월 18 15:15 .
+dr-xr-xr-x    3 yundream 500             0  3월 18 15:15 ..
+lrwx------    1 yundream 500            64  3월 18 15:15 0 -> /dev/ttyq1
+lrwx------    1 yundream 500            64  3월 18 15:15 1 -> /dev/ttyq1
+lrwx------    1 yundream 500            64  3월 18 15:15 2 -> /dev/ttyq1
+lr-x------    1 yundream 500            64  3월 18 15:15 3 -> /home/mycvs/test/zipcode.txt
+lrwx------    1 yundream 500            64  3월 18 15:15 4 -> socket:[587641]
+[yundream@hum fd]$ 
+</pre>
+</td></tr>
+</table>  
+위위 화면을 보면 알겠지만, 표준입력(0), 표준출력(1), 표준에러(2), 열린파일(3), 
+열린 소켓(4) 에 대해서 일련의 숫자로된 link 파일이 만들어지는걸 볼수 있을것이다.<br>
+표준입력,출력,에러는 자신의 터미널을 링크하고 있으며 열린파일은 파일, 소켓은 고유의 
+소켓번호를 링크하고 있음을 알수 있다. <br>
+INET(인터넷) 소켓의 경우에는 소켓통신을 위해서 파일을 생성하지 않고 커널에서 
+직접관리 하므로, INET 소켓의 경우 링크가 파일로 연결되지 않고, 커널의 소켓관리 
+번호에 연결된다는 점을 주의 하자 <br><br>
+테스트도 할겸 0 번파일에 쓰기를 한번해보자. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@hum fd]$  echo "111" > 0
+[yundream@coco test]$ ./zipcode_m 4444
+111
+</pre>
+</td></tr>
+</table>  
+그러면 ./zipcode_m 을 실행한곳에 111 이 출력 됨을 볼수 있을것이다. 
+<br><br> 
+<b>open 계열</b><br>
+우리가 흔히 사용하는 open 계열의 함수를 사용하면 바로 /proc/pid/fd 밑에 있는 
+링크파일의 이름을 int 형으로 변환시켜서 되돌려주며, 
+이값을 이용해서 우리는 여러가지 입출력 작업을 할수 있게 되는것이다.<br> 
+모든 입출력을 파일로 일관되게 처리할수 있으며, 프로그래밍 인터페이스와 /proc 파일의 
+인터페이스가 서로 동일하게 연결되어서 사용된다.<br> 
+매우 효율적이고 편리한 입출력환경을 제공해준다는걸 느낄수 있을것이다.<br><br>
+이처럼 open 계열을 사용하면 각각의 입출력 파일을 직접 엑세스 할수 있으므로, 
+저수준의 작업, 예를들면 select, polling, 파일잠금, 레코드잠금, 파일속성변경등의 
+파일을 다루기 위한 세세한 일들을 할수 있는 장점을 얻게 된다.<br> 
+반면 단점을 가지는데, 저수준으로 파일을 다루다 보니 간단한 일을 할기에는 
+너무 잔손이 많이 간다라는 점이다. <br>
+간단한 행입력을 받는 프로그램을 만든다고 생각해보자, open 을 사용하게 되면 
+개행문자 검사를 위해서 입력받은 문자를 바이트단위로 비교를 해주는 수고스러움을 
+감수해야 하며, 별도로 버퍼 관리를 해주어야 할것이다. <br><br>  
+
+<b>fopen 계열</b><br>
+이러한 문제를 해결하기 위해서(반드시 위의 문제때문에 나온것 만은 아니지만), f계열 
+의 좀더 고수준의 함수들을 제공한다.<br>  
+f 계열함수들은 파일을 "FILE" 객체를 이용 해서 다루게 된다. 
+FILE 객체는 fopen 함수를 이용해서 파일열기에 성공했을때 돌려주게 되는데,<br> 
+/usr/include/stdio.h 를 열어보면 다음과 같이 선언되어 있다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>	
+<pre>
+/* The opaque type of streams.  This is the definition used elsewhere.  */
+typedef struct _IO_FILE FILE;
+</pre>
+</td></tr>
+</table>
+struct _IO_FILE 는 liblo.h 에 선언되어 있는데, 멤버변수가 꽤 많으니 직접 살펴 
+보기바란다. _IO_FILE 구조체를 보면 파일지시자와 함께, 파일 입출력을 위한 
+많은 버퍼를 별도로 관리하고 있음을 알수 있는데 fopen 계열함수를 이용하면, 
+이러한 구조체의 제어를 알아서 해준다.<br>  
+결론적으로 파일을 객체로 다루게 됨으로 잔손질을 덜수 있게 된다. <br>  
+아래의 예제코드를 보자 <br><br>
+<b>예제 : fopen.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>	
+<pre>
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+	FILE *fp;
+	<b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>256</font>];
+
+	printf(<font COLOR=#ff0000>"끝낼려면 ^D&#92;n"</font>);
+	<b><font COLOR=#0000ff>while</font></b>(fgets(buf, <font COLOR=#a900a9>256</font>, stdin) != NULL)
+	{
+		printf(<font COLOR=#ff0000>"%s"</font>, buf);
+	}
+}
+</pre>
+</td></tr>
+</table>
+위의 코드를 open 계열함수로 사용하면 아마도 코드량이 2배 정도로 늘어날것이다. 
+<br><br>
+<b>FILE 과 파일지시자 사이의 호환</b><br>
+최초에 저수준으로 파일을 다룰필요가 있어서 open 을 썼더라도, 고수준의 f 계열 
+함수를 쓰고 싶을때가 있을것이다. <br>
+또는 그 반대의 경우도 있을수 있는데, 당연히 이에 대한 해법도 존재한다.<br>   
+둘의 호환의 방법을 생각해보면, 최초에 open 을 통해서 파일을 열었더라도, 
+FILE 객체의 구성요소를 전부체워주고 여기에 여결시키면 될것이며, fopen 을 통해서 
+FILE 객체로 받았다 하더라도 FILE 객체 구조체에 어차피 파일지시자가 있으므로, 
+이 값을 이용해서 저수준의 작업을 하는데 사용하면 될것이다.<br> 
+이러한 상호 호환을 위해서 별도의 함수가 존재한다.<br><br> 
+fdopen(3)과 fileno(3) 가 그것으로 fdopen 가 파일지시자를 받아서 FILE 객체를 
+되돌려주는 함수이고, fileno 가 FILE 객체를 받아서 파일지시자를 돌려받는 함수 이다. 
+<br> 
+아래는 fdopen 의 간단한 예이다. <br><br>
+<b>예제 : fdopen.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>	
+<pre>
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;fcntl.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+	<b><font COLOR=#0000ff>int</font></b>		fd;
+	FILE*	fp;
+	<b><font COLOR=#0000ff>char</font></b>	buf[<font COLOR=#a900a9>256</font>];
+
+	printf(<font COLOR=#ff0000>"끝내기 : ^D&#92;n"</font>);
+	fd = open(<font COLOR=#a900a9>0</font>, O_RDONLY);
+	fp = fdopen(<font COLOR=#a900a9>0</font>, <font COLOR=#ff0000>"r"</font>);
+	<b><font COLOR=#0000ff>while</font></b>(fgets(buf, <font COLOR=#a900a9>256</font>, fp) != NULL)
+	{
+		printf(<font COLOR=#ff0000>"%s"</font>, buf);
+	}
+	
+}
+</pre>
+</td></tr>
+</table>
+<br>
+
+이상 FILE 객체와 파일지시자 와의 차이점..에 대해서 알아보았습니다.<br>
+궁금한거나 잘못된점 있다면 댓글을 남겨주시면, 성심성의껏 답변드리도록 
+하겠습니다.
+}}}

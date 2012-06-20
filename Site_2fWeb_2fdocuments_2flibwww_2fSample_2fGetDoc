@@ -1,0 +1,67 @@
+Describe Site/Web/documents/libwww/Sample/GetDoc here
+
+HTTP(12) 문서를 읽어들인다. Makefile(12)은 [wiki:Site/Web/documents/libwww/Sample/GetLink GetLink]를 참조한다. 
+
+이 프로그램은 Header를 포함해서 해당 URL의 모든 정보를 읽어들여서 화면에 출력한다. 만약 Header를 제외한 내용을 읽어들이길 원한다면 '''HTRequest_setOutputFormat(request, WWW_RAW);''' 에서 WWW_RAW를 WWW_SOURCE로 바꾸면 된다.
+{{{#!plain down:GetDoc.c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <WWWLib.h>
+#include <WWWHTTP.h>
+#include <WWWInit.h>
+
+PRIVATE int terminate_handler(HTRequest *request, HTResponse *response,
+			void *parm, int status)
+{
+	HTPrint("Load result in status %d\n", status);
+	HTEventList_stopLoop();
+	return HT_ERROR;
+}
+
+int main(int argc, char **argv)
+{
+	HTRequest *request = HTRequest_new();
+	HTChunk *chunk = NULL;
+	char *url = argc == 2? argv[1] : NULL;
+
+	HTProfile_newPreemptiveClient("TestApp", "1.0");
+
+	/*
+	HTPrint_setCallback(printer);
+	HTPrint_setCallback(tracer);
+	*/
+
+	HTRequest_setOutputFormat(request, WWW_RAW);
+	HTRequest_addConnection(request, "close", "");
+
+	HTNet_addAfter(terminate_handler, NULL, NULL, HT_ALL, HT_FILTER_LAST);
+
+	if (url)
+	{
+		char *cwd = HTGetCurrentDirectoryURL();
+		char *absolute_url = HTParse(url, cwd, PARSE_ALL);
+		chunk = HTLoadToChunk(absolute_url, request);
+		HT_FREE(absolute_url);
+		HT_FREE(cwd);
+		if (chunk)
+		{
+			char *string;
+			HTEventList_loop(request);
+			string = HTChunk_toCString(chunk);
+			HTPrint("%s", string ? string : "no text");
+			HT_FREE(string);
+		}
+		else
+		{
+			HTPrint("Type the URL you want to access on the command line\n");
+		}
+	}
+
+	HTRequest_delete(request);
+
+	HTProfile_delete();
+	return 0;
+}
+}}}

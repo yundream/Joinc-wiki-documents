@@ -1,0 +1,34 @@
+#title 테터툴즈 RSS 모두 발행하기
+
+Joinc 팀블로그는 planet(:12) RSS 리더기를 이용해서, 팀원 블로그의 정보를 읽은 후, 분석해서 DB에 저장합니다. 그러므로 과거의 문서는 팀블로그에 발행이 되지 않습니다. 또한 카테고리 분류도 할 수 없게 되어 있습니다.
+
+뒤늦게 팀블로그에 참가한 분들의 경우 과거의 포스트를 팀블로그에 포함시키고, 카테고리에 넣고 싶을 겁니다. 과거의 포스트를 다시 포스팅 하는 방법도 사용할 수 있는데, 좀 귀찮죠. 
+
+테터툴즈를 사용한 블로거의 경우에는 다음과 같은 방식으로 모든 포스트의 RSS를 보여주도록 할 수 있습니다.  
+
+ 1. 먼저 cache된 rss 파일을 지웁니다. cache/*.xml 파일을 삭제하면 됩니다.  
+ 1. 그다음 blog/rss/index.php 에서 다음 부분을 수정합니다. 
+   {{{#!plain
+    if($blog['publishEolinSyncOnRSS']){
+        $result=DBQuery::query("SELECT e.*, c.name AS categoryName
+            FROM {$database['prefix']}Entries e
+            LEFT JOIN {$database['prefix']}Categories c ON e.owner = c.owner AND e.category = c.id
+            WHERE e.owner = $owner AND e.draft = 0 AND e.visibility >= 2 AND e.category >= 0 AND (c.visibility > 1 OR e.category = 0)
+            ORDER BY e.published
+            DESC LIMIT {$blog['entriesOnRSS']}");
+============
+    if($blog['publishEolinSyncOnRSS']){
+        $result=DBQuery::query("SELECT e.*, c.name AS categoryName
+            FROM {$database['prefix']}Entries e
+            LEFT JOIN {$database['prefix']}Categories c ON e.owner = c.owner AND e.category = c.id
+            WHERE e.owner = $owner AND e.draft = 0 AND e.visibility >= 2 AND e.category >= 0 AND (c.visibility > 1 OR e.category = 0)
+            ORDER BY e.published);
+            // DESC LIMIT {$blog['entriesOnRSS']}");
+}}}
+ 1. 이제 rss 페이지에 접근하면, 모든 포스트에 대한 RSS가 발행되는걸 확인할 수 있습니다.
+ 1. 한번만 수집되면 DB에 저장이 되므로, 1-2시간 후에 팀블로그에 제대로 올라가 있는지 확인하고, 코드를 원래대로 수정해 놓으면 됩니다. 
+이제 카테고리분류등이 가능하게 됩니다.
+
+현재로써는 Naver, 이글루스등에 대한건 방법이 없습니다. Naver 블로그의 경우 과거에 모든 포스트에 대한 RSS 발행 옵션이 있었는데, 사라졌다고 하더군요.
+
+먼 훗날 crawler를 만들어서 팀원의 블로그 주소에 있는 모든 문서를 직접 읽어오는 툴을 만든다면 모든 문제가 해결되겠지만.. 당분간은 힘들거 같습니다. 팀블로그 시스템이 좀 안정되면, 팀차원에서 저러한 도구를 만들어보는 것도 재미있을거 같습니다.

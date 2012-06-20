@@ -1,0 +1,2232 @@
+#title pstat.h 헤더파일
+
+ * HP-UX에서 시스템 정보를 얻기 위해 사용되는 구조체들이 정의되어 있다.   
+ * 아래의 구조체는 [pstat(2)]의 함수들에서 사용한다. 
+{{{#!vim c
+/*
+ * @(#) pstat.h $Date: 2007/01/09 02:46:39 $Revision: r11ros/6 PATCH_11.00 (PHKL_22986)
+ */
+
+#ifndef _SYS_PSTAT_INCLUDED
+#define _SYS_PSTAT_INCLUDED
+
+#ifdef _KERNEL_BUILD
+#include "../h/stdsyms.h"
+#include "../h/types.h"
+#else /* ! _KERNEL_BUILD */
+#include <sys/stdsyms.h>
+#include <sys/types.h>
+#endif /* _KERNEL_BUILD */
+
+#ifdef _INCLUDE_HPUX_SOURCE
+
+/*
+ * Header organization
+ *
+ * Structures for old interface
+ *	old sub structures
+ *	old structures
+ *	old related constants
+ * Structures for new interface
+ *	new sub structures,
+ *	new structures
+ *	new related constants
+ * PSTAT_XXX sub-function constants
+ * ANSI function prototypes for the new interface
+ *	pstun union
+ * ANSI function prototypes for the old interface
+ */
+
+
+/*
+ * The most significant (sign) bit of the function will be
+ * set for the 64bit version of the pstat functions.
+ */
+# define PSTAT64_INTF	(int)0x80000000
+
+/*
+ * function codes to the pstat() system call. When adding a new function
+ * update both the wide and and narrow versions.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# define PSTAT_PROC	1
+# define PSTAT_STATIC	2
+# define PSTAT_DYNAMIC	3
+# define PSTAT_SETCMD	4
+# define PSTAT_VMINFO	5
+# define PSTAT_DISKINFO	6
+# define PSTAT_SEMINFO	7
+# define PSTAT_MSGINFO	8
+# define PSTAT_SHMINFO	9
+# define PSTAT_PROCESSOR 10
+# define PSTAT_LVINFO	 11
+# define PSTAT_SWAPINFO	 12
+# define PSTAT_FILEINFO	 13
+# define PSTAT_IPCINFO	 14
+# define PSTAT_PROC_VM   15
+# define PSTAT_STABLE    16
+# ifdef _KERNEL
+#  define PSTAT_CRASHINFO 17
+#  define PSTAT_CRASHDEV  18
+# endif
+#else
+# define PSTAT_PROC	(1 | PSTAT64_INTF)
+# define PSTAT_STATIC	(2 | PSTAT64_INTF)
+# define PSTAT_DYNAMIC	(3 | PSTAT64_INTF)
+# define PSTAT_SETCMD	(4 | PSTAT64_INTF)
+# define PSTAT_VMINFO	(5 | PSTAT64_INTF)
+# define PSTAT_DISKINFO	(6 | PSTAT64_INTF)
+# define PSTAT_SEMINFO	(7 | PSTAT64_INTF)
+# define PSTAT_MSGINFO	(8 | PSTAT64_INTF)
+# define PSTAT_SHMINFO	(9 | PSTAT64_INTF)
+# define PSTAT_PROCESSOR (10 | PSTAT64_INTF)
+# define PSTAT_LVINFO	 (11 | PSTAT64_INTF)
+# define PSTAT_SWAPINFO	 (12 | PSTAT64_INTF)
+# define PSTAT_FILEINFO	 (13 | PSTAT64_INTF)
+# define PSTAT_IPCINFO	 (14 | PSTAT64_INTF)
+# define PSTAT_PROC_VM   (15 | PSTAT64_INTF)
+# define PSTAT_STABLE    (16 | PSTAT64_INTF)
+# define PSTAT_CRASHINFO (17 | PSTAT64_INTF)
+# define PSTAT_CRASHDEV  (18 | PSTAT64_INTF)
+#endif
+
+/*
+ * lengths for cached command line and u_comm entries
+ */
+#define PST_CLEN 64
+#define PST_UCOMMLEN (14 + 1)
+
+/*
+ * q4 template for looking at command strings
+ */
+typedef struct pst_cmd {
+	char s[PST_CLEN];
+} pst_cmd_t;
+
+/*
+ * q4 template for looking at command names
+ */
+typedef struct pst_ucomm {
+	char s[PST_UCOMMLEN];
+} pst_ucomm_t;
+
+/* Max number of cpu states
+ * that we can return info about.
+ */
+#define PST_MAX_CPUSTATES 15
+
+/* Max number of processors in
+ * system.  Used to define sizes
+ * of per-processor structures.
+ */
+#define PST_MAX_PROCS 32
+
+/* Max bytes in a PA-RISC stable store area.
+ */
+#define PST_MAX_PA_RISC_STABLE 256
+
+/* Number of page sizes (log 2).
+ */
+#define PST_N_PG_SIZES 16
+
+/* Indicates default page size selection heuristic is being used.
+ */
+#define PST_SZ_DEFAULT 0
+
+/*
+ * An abstraction of major/minor numbers of a dev
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct psdev32 {
+# else
+struct psdev {
+# endif
+	int32_t psd_major;
+	int32_t psd_minor;
+};
+#endif 
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct psdev {
+	int64_t psd_major;
+	int64_t psd_minor;
+};
+#endif
+
+
+/*
+ * An abstraction of a unique identification for a file system
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct psfsid32 {
+# else
+struct psfsid {
+#endif
+	int32_t psfs_id;	/* Filesystem ID */
+	int32_t psfs_type;	/* Filesystem type */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct psfsid {
+	int64_t psfs_id;	/* Filesystem ID */
+	int64_t psfs_type;	/* Filesystem type */
+};
+#endif
+
+/*
+ * An abstraction of a unique identification for a file
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct psfileid32 {
+	struct psfsid32	psf_fsid;	/* Filesystem identification */
+# else
+struct psfileid {
+	struct psfsid	psf_fsid;	/* Filesystem identification */
+# endif
+	int32_t		psf_fileid;	/* File identification within FS */
+	int32_t		psf_spare;	/* Reserved for future expansion */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct psfileid {
+	struct psfsid	psf_fsid;	/* Filesystem identification */
+	int64_t		psf_fileid;	/* File identification within FS */
+	int64_t		psf_spare;	/* Reserved for future expansion */
+};
+#endif
+
+/*
+ * An abstraction of co-processor information for a processor
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pscoproc32 {
+# else
+struct pscoproc {
+# endif
+	uint32_t psc_present;	/* mask of coprocessors present */
+	uint32_t psc_enabled;	/* mask of coprocessors enabled */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pscoproc {
+	uint64_t psc_present;	/* mask of coprocessors present */
+	uint64_t psc_enabled;	/* mask of coprocessors enabled */
+};
+#endif
+
+/*
+ * Coprocessor IDs.  The corresponding bit will be set in the fields of
+ * a struct pscoproc for a present or enabled co-processor.
+ */
+#define PS_PA83_FPU	0x1
+#define PS_PA89_FPU	0x2
+
+/*
+ * An abstraction of a time
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct psttime32 {
+# else
+struct psttime {
+# endif
+	int32_t pst_sec;	/* seconds */
+	int32_t pst_usec;	/* micro seconds */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct psttime {
+	int64_t pst_sec;	/* seconds */
+	int64_t pst_usec;	/* micro seconds */
+};
+#endif
+
+/*
+ * An abstraction of a 64 bit cycle count
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pstcycles32 {
+# else
+struct pstcycles {
+# endif
+	uint32_t psc_hi;	/* most significant bits */
+	uint32_t psc_lo;	/* least significant bits */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pstcycles {
+	uint64_t psc_hi;	/* most significant bits */
+	uint64_t psc_lo;	/* least significant bits */
+};
+#endif
+
+/* 
+ * Even though this structure is similar to pstcycles structure above, it
+ * has been declared here in order to make the pstat_getlwp interface
+ * independent of the other pstat* interfaces since the former is available
+ * only as a 64-bit interface and the latter in both 32-bit and 64-bit
+ * flavors.
+ */
+
+#if defined(__STDC_EXT__) || (!defined(__STDC__) && defined (__LL_MODE__)) || defined(__LP64__)
+struct lwpcycles {
+	uint64_t psc_hi;        /* most significant bits */
+	uint64_t psc_lo;        /* least significant bits */
+};
+#endif /* __STDC_EXT__ || (! __STDC__ &&  __LL_MODE__ )  || __LP64__ */
+
+#define PST_SIGWORDS 8
+struct pstsigset {
+	int32_t pst_sigset[PST_SIGWORDS];
+};
+
+/*
+ * This structure contains per-process information
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_status32 {
+# else
+struct pst_status {
+# endif
+	int32_t pst_idx;/* Index for further pstat() requests */
+	int32_t pst_uid;	/* Real UID */
+	int32_t pst_pid;	/* Process ID */
+	int32_t pst_ppid;	/* Parent process ID */
+	int32_t pst_dsize;	/* # real pages used for data */
+	int32_t pst_tsize;	/* # real pages used for text */
+	int32_t pst_ssize;	/* # real pages used for stack */
+	int32_t pst_nice;	/* Nice value */
+# ifdef _KERNEL
+	struct psdev32	/* TTY of this process; -1/-1 if there isn't one */
+# else
+	struct psdev	/* TTY of this process; -1/-1 if there isn't one */
+# endif
+	    pst_term;
+	int32_t pst_pgrp;	/* Process group of this process */
+	int32_t pst_pri;	/* priority of process */
+	int32_t pst_addr;	/* address of process (in memory) */
+	int32_t pst_cpu;	/* processor utilization for scheduling */
+	int32_t pst_utime;	/* user time spent executing (in seconds) */
+	int32_t pst_stime;	/* system time spent executing (in seconds) */
+	int32_t pst_start;	/* time process started (seconds since epoch) */
+	int32_t pst_flag;	/* flags associated with process */
+	int32_t pst_stat;	/* Current status */
+	int32_t pst_wchan;	/* If state PS_SLEEP, value sleeping on */
+	int32_t pst_procnum;	/* processor this proc last run on */
+	char		/* Command line for the process, if available */
+	    pst_cmd[PST_CLEN];
+	int32_t pst_time;	/* resident time for scheduling */
+	int32_t pst_cpticks;	/* ticks of cpu time */
+	int32_t pst_cptickstotal; /* total ticks for life of process */
+	int32_t pst_fss;	/* fair share scheduler group id */
+	float pst_pctcpu;	/* %cpu for this process during p_time */
+	int32_t pst_rssize;  /* resident set size for process (private pages) */
+	int32_t pst_suid;    /* saved UID */
+	char		     /* executable basename the process is running */
+	    pst_ucomm[PST_UCOMMLEN];
+	int32_t pst_shmsize;	/* # real pages used for shared memory */
+	int32_t pst_mmsize;	/* # real pages used for memory mapped files */
+	int32_t pst_usize;	/* # real pages used for U-Area & K-Stack */
+	int32_t pst_iosize;	/* # real pages used for I/O device mapping */
+	int32_t pst_vtsize;	/* # virtual pages used for text */
+	int32_t pst_vdsize;	/* # virtual pages used for data */
+	int32_t pst_vssize;	/* # virtual pages used for stack */
+	int32_t pst_vshmsize;	/* # virtual pages used for shared memory */
+	int32_t pst_vmmsize;	/* # virtual pages used for mem-mapped files */
+	int32_t pst_vusize;	/* # virtual pages used for U-Area & K-Stack */
+	int32_t pst_viosize;	/* # virtual pages used for I/O dev mapping */
+	uint32_t pst_minorfaults; /* # page reclaims for the process */
+	uint32_t pst_majorfaults; /* # page faults needing disk access */
+	uint32_t pst_nswap;	/* # of swaps for the process */
+	uint32_t pst_nsignals;	/* # signals received by the process */
+	uint32_t pst_msgrcv;	/* # socket msgs received by the proc*/
+	uint32_t pst_msgsnd;	/* # of socket msgs sent by the proc */
+	int32_t pst_maxrss;	/* highwater mark for proc resident set size */
+	int32_t pst_sid;		/* session ID */
+	int32_t pst_schedpolicy;	/* scheduling policy for the process */
+	int32_t pst_ticksleft;	/* clock ticks left in process' RR timeslice */
+# ifdef _KERNEL
+	struct psfileid32
+	  pst_rdir;		/* File ID of the process' root directory */
+	struct psfileid32
+	  pst_cdir;		/* File ID of the process' current directory */
+	struct psfileid32
+	  pst_text;		/* File ID of the process' executable */
+# else
+	struct psfileid
+	  pst_rdir;		/* File ID of the process' root directory */
+	struct psfileid
+	  pst_cdir;		/* File ID of the process' current directory */
+	struct psfileid
+	  pst_text;		/* File ID of the process' executable */
+# endif
+	int32_t pst_highestfd;	/* highest file descriptor currently opened */
+	int32_t pst_euid;	/* Effective UID */
+	int32_t pst_egid;	/* Effective GID */
+	int32_t pst_ioch;	/* # of characters read/written */
+# ifdef _KERNEL
+	struct pstcycles32
+	  pst_usercycles;	/* 64-bit user mode execution cycle count */
+	struct pstcycles32
+	  pst_systemcycles;	/* 64-bit system mode execution cycle count */
+	struct pstcycles32
+	  pst_interruptcycles;	/* 64-bit interrupt for proc cycle count */
+# else
+	struct pstcycles
+	  pst_usercycles;	/* 64-bit user mode execution cycle count */
+	struct pstcycles
+	  pst_systemcycles;	/* 64-bit system mode execution cycle count */
+	struct pstcycles
+	  pst_interruptcycles;	/* 64-bit interrupt for proc cycle count */
+# endif
+	int32_t pst_gid;	/* Real GID */
+	int32_t pst_sgid;	/* saved effective gid */
+	int32_t pst_nlwps;	/* # lwps within this process */
+	struct pstsigset pst_psig;	/* signals pending to proc */
+        int32_t pst_lwpid; /* LWP identifier. NOTE: If this process is 
+			    * multi-threaded, this is an lwpid of one of the 
+			    * LWPs in the process at this exact moment, which 
+			    * LWP is undefined (random)
+			    */
+	int32_t pst_valid; /* This is a vector that will indicate if a
+			    * certain field in the structure is valid or not.
+			    */	
+	int32_t pst_text_size; /* Page size used for text objects. */
+	int32_t pst_data_size; /* Page size used for data objects. */
+
+# if defined (_KERNEL) 
+	struct pstcycles32
+          pst_child_usercycles;       /* reaped child user mode execution
+                                       * cycle count
+                                       */
+        struct pstcycles32
+          pst_child_systemcycles;     /* reaped child system mode execution
+                                       * cycle count
+                                       */
+        struct pstcycles32
+          pst_child_interruptcycles;  /* reaped child interrupt
+                                       * mode execution cycle count
+                                       */
+        struct psttime32
+          pst_child_utime;      /* reaped child user mode execution time */
+        struct psttime32
+          pst_child_stime;      /* reaped child system mode execution time */
+# elif !defined (_KERNEL) && defined (_RUSAGE_EXTENDED)  
+	struct pstcycles
+          pst_child_usercycles;       /* reaped children user mode execution
+                                       * cycle count
+                                       */
+        struct pstcycles
+          pst_child_systemcycles;     /* reaped children system mode execution
+                                       * cycle count
+                                       */
+        struct pstcycles
+          pst_child_interruptcycles;  /* reaped children interrupt
+                                       * mode execution cycle count
+                                       */
+        struct psttime
+          pst_child_utime;      /* reaped child user mode execution time */
+        struct psttime
+          pst_child_stime;      /* reaped child system mode execution time */
+# endif 
+
+# if defined (_KERNEL) || defined (_RUSAGE_EXTENDED)
+        int32_t pst_inblock;       /* # block input operations */
+        int32_t pst_oublock;       /* # block output operations */
+        int32_t pst_nvcsw;         /* # voluntary context switches */
+        int32_t pst_nivcsw;        /* # involuntary context switches */
+        int32_t pst_child_inblock;   /* reaped child # of block input 
+				        operations */
+        int32_t pst_child_oublock;   /* reaped child # of block output 
+					operations */
+        int32_t pst_child_ioch;      /* reaped child # of characters 
+					read/written */
+        int32_t pst_child_msgsnd;    /* reaped child # of messages sent */
+        int32_t pst_child_msgrcv;    /* reaped child # of messages received */
+        int32_t pst_child_nvcsw;     /* reaped child # voluntary context 
+					switches */
+        int32_t pst_child_nivcsw;    /* reaped child # involuntary context 
+					switches */		
+	int32_t pst_child_minorfaults;    /* reaped child # of page reclaims */
+	int32_t pst_child_majorfaults;    /* reaped child # of page faults 
+					     needing disk access */
+# endif 
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_status {
+	int64_t pst_idx;/* Index for further pstat() requests */
+	int64_t pst_uid;	/* Real UID */
+	int64_t pst_pid;	/* Process ID */
+	int64_t pst_ppid;	/* Parent process ID */
+	int64_t pst_dsize;	/* # real pages used for data */
+	int64_t pst_tsize;	/* # real pages used for text */
+	int64_t pst_ssize;	/* # real pages used for stack */
+	int64_t pst_nice;	/* Nice value */
+	struct psdev	/* TTY of this process; -1/-1 if there isn't one */
+	    pst_term;
+	int64_t pst_pgrp;	/* Process group of this process */
+	int64_t pst_pri;	/* priority of process */
+	int64_t pst_addr;	/* address of process (in memory) */
+	int64_t pst_cpu;	/* processor utilization for scheduling */
+	int64_t pst_utime;	/* user time spent executing (in seconds) */
+	int64_t pst_stime;	/* system time spent executing (in seconds) */
+	int64_t pst_start;	/* time process started (seconds since epoch) */
+	int64_t pst_flag;	/* flags associated with process */
+	int64_t pst_stat;	/* Current status */
+	int64_t pst_wchan;	/* If state PS_SLEEP, value sleeping on */
+	int64_t pst_procnum;	/* processor this proc last run on */
+	char		/* Command line for the process, if available */
+	    pst_cmd[PST_CLEN];
+	int64_t pst_time;	/* resident time for scheduling */
+	int64_t pst_cpticks;	/* ticks of cpu time */
+	int64_t pst_cptickstotal; /* total ticks for life of process */
+	int64_t pst_fss;	/* fair share scheduler group id */
+	float pst_pctcpu;	/* %cpu for this process during p_time */
+	int64_t pst_rssize;  /* resident set size for process (private pages) */
+	int64_t pst_suid;    /* saved UID */
+	char		     /* executable basename the process is running */
+	    pst_ucomm[PST_UCOMMLEN];
+	int64_t pst_shmsize;	/* # real pages used for shared memory */
+	int64_t pst_mmsize;	/* # real pages used for memory mapped files */
+	int64_t pst_usize;	/* # real pages used for U-Area & K-Stack */
+	int64_t pst_iosize;	/* # real pages used for I/O device mapping */
+	int64_t pst_vtsize;	/* # virtual pages used for text */
+	int64_t pst_vdsize;	/* # virtual pages used for data */
+	int64_t pst_vssize;	/* # virtual pages used for stack */
+	int64_t pst_vshmsize;	/* # virtual pages used for shared memory */
+	int64_t pst_vmmsize;	/* # virtual pages used for mem-mapped files */
+	int64_t pst_vusize;	/* # virtual pages used for U-Area & K-Stack */
+	int64_t pst_viosize;	/* # virtual pages used for I/O dev mapping */
+	uint64_t pst_minorfaults; /* # page reclaims for the process */
+	uint64_t pst_majorfaults; /* # page faults needing disk access */
+	uint64_t pst_nswap;	/* # of swaps for the process */
+	uint64_t pst_nsignals;	/* # signals received by the process */
+	uint64_t pst_msgrcv;	/* # socket msgs received by the proc*/
+	uint64_t pst_msgsnd;	/* # of socket msgs sent by the proc */
+	int64_t pst_maxrss;	/* highwater mark for proc resident set size */
+	int64_t pst_sid;		/* session ID */
+	int64_t pst_schedpolicy;	/* scheduling policy for the process */
+	int64_t pst_ticksleft;	/* clock ticks left in process' RR timeslice */
+	struct psfileid
+	  pst_rdir;		/* File ID of the process' root directory */
+	struct psfileid
+	  pst_cdir;		/* File ID of the process' current directory */
+	struct psfileid
+	  pst_text;		/* File ID of the process' executable */
+	int64_t pst_highestfd;	/* highest file descriptor currently opened */
+	int64_t pst_euid;	/* Effective UID */
+	int64_t pst_egid;	/* Effective GID */
+	int64_t pst_ioch;	/* # of characters read/written */
+	struct pstcycles
+	  pst_usercycles;	/* 64-bit user mode execution cycle count */
+	struct pstcycles
+	  pst_systemcycles;	/* 64-bit system mode execution cycle count */
+	struct pstcycles
+	  pst_interruptcycles;	/* 64-bit interrupt for proc cycle count */
+	int64_t pst_gid;	/* Real GID */
+	int64_t pst_sgid;	/* saved effective gid */
+	int64_t pst_nlwps;	/* # lwps within this process */
+	struct pstsigset pst_psig;	/* signals pending to proc */
+        int64_t pst_lwpid;  /* LWP identifier. NOTE: If this process is 
+			     * multi-threaded, this is an lwpid of one of the 
+			     * LWPs in the process at this exact moment, which 
+			     * LWP is undefined (random)
+			     */
+	int32_t pst_valid; /* This is a vector that will indicate if a
+			    * certain field in the structure is valid or not.
+			    */	
+	int64_t pst_text_size; /* Page size used for text objects. */
+	int64_t pst_data_size; /* Page size used for data objects. */
+
+# if defined (_KERNEL) || defined (_RUSAGE_EXTENDED)
+	struct pstcycles
+          pst_child_usercycles;       /* dead children user mode execution
+                                       * cycle count
+                                       */
+        struct pstcycles
+          pst_child_systemcycles;     /* dead children system mode execution
+                                       * cycle count
+                                       */
+	struct pstcycles
+          pst_child_interruptcycles;  /* dead children interrupt
+                                       * mode execution cycle count
+                                       */
+	struct psttime
+          pst_child_utime;        /* reaped child user mode execution time */
+        struct psttime
+          pst_child_stime;        /* reaped child system mode execution time */
+        int64_t pst_inblock;    /* block input operations */
+        int64_t pst_oublock;    /* block output operations */
+	int64_t pst_nvcsw;      /* voluntary context switches */
+        int64_t pst_nivcsw;     /* involuntary context switches */
+        int64_t pst_child_inblock;   /* reaped child block input operations */
+        int64_t pst_child_oublock;   /* reaped child block output operations */
+        int64_t pst_child_ioch;      /* reaped child # of characters 
+					read/written */
+	int64_t pst_child_msgsnd;    /* reaped child # of messages sent */
+        int64_t pst_child_msgrcv;    /* reaped child # of messages received */
+        int64_t pst_child_nvcsw;     /* reaped child voluntary context 
+					switches */
+        int64_t pst_child_nivcsw;    /* reaped child involuntary context 
+					switches */
+	int64_t pst_child_minorfaults;    /* reaped child # of page reclaims */
+	int64_t pst_child_majorfaults;    /* reaped child # of page faults
+					     needing disk access */
+# endif
+};
+#endif
+
+#define	pst_major	pst_term.psd_major
+#define	pst_minor	pst_term.psd_minor
+
+/*
+ * Process states for pst_stat
+ */
+#define PS_SLEEP	1	/* Sleeping on pst_wchan value */
+#define PS_RUN		2	/* Running/waiting for CPU */
+#define PS_STOP		3	/* Stopped for ptrace() */
+#define PS_ZOMBIE	4	/* Dead, waiting for parent to wait() */
+#define PS_IDLE		6       /* Being created */
+#define PS_OTHER	5	/* Misc. state (forking, exiting, etc.) */
+
+/*
+ * Process flag bits for pst_flag
+ */
+#define PS_INCORE	0x1	/* this process is in memory */
+#define PS_SYS		0x2	/* this process is a system process */
+#define PS_LOCKED	0x4	/* this process is locked in memory */
+#define PS_TRACE	0x8	/* this process is being traced */
+#define PS_TRACE2	0x10	/* this traced process has been waited for */ 
+#define PS_TXTLOCKED	0x20	/* this process' text is locked in memory*/ 
+#define PS_DATLOCKED	0x40	/* this process' data is locked in memory*/ 
+#define PS_SYSCALLTRACE	0x80	/* per-process syscall tracing enabled */ 
+#define PS_SWLAZY	0x100	/* process has associated Lazy Swap region(s) */ 
+#define PS_64ASL	0x200	/* process has 64-bit address space layout */ 
+
+/*
+ * Scheduling policies for pst_schedpolicy
+ */
+#define PS_TIMESHARE	0x1	/* HP-UX scheduling (Tshare/FSS) */
+#define PS_RTPRIO	0x2	/* HP-UX rtprio(2) scheduling */
+#define PS_FIFO		0x4	/* P1003.4 FIFO scheduling */
+#define PS_RR		0x8	/* P1003.4 Round Robin scheduling */
+#define PS_RR2		0x10	/* Round Robin with variable timeslice */
+
+#define PS_HPUX	PS_TIMESHARE	/* A.K.A. */
+
+/* 
+ * Macros for field validity check for struct pst_status 
+ */
+#define PST_ADDR       0x1
+#define PST_WCHAN      0x2
+#define PST_MAXRSS     0x4
+
+/*
+ * This structure contains static system information -- data that will
+ * remain the same (at least) until reboot
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_static32 {
+# else
+struct pst_static {
+# endif
+	int32_t	       max_proc;
+# ifdef _KERNEL
+	struct psdev32 console_device;
+# else
+	struct psdev   console_device;
+# endif
+	int32_t        boot_time;
+	int32_t        physical_memory;
+	int32_t        page_size;
+	int32_t        cpu_states;
+	int32_t        pst_status_size;
+	int32_t        pst_static_size;
+	int32_t        pst_dynamic_size;
+	int32_t	       pst_vminfo_size;
+	int32_t        command_length;
+	int32_t        pst_processor_size;
+	int32_t        pst_diskinfo_size;
+	int32_t        pst_lvinfo_size;
+	int32_t        pst_swapinfo_size;
+	int32_t	       pst_maxmem;
+	int32_t	       pst_lotsfree;
+	int32_t	       pst_desfree;
+	int32_t	       pst_minfree;
+	int32_t	       pst_max_ninode;
+	int32_t	       pst_max_nfile;
+	int32_t        pst_stable_size;
+	int32_t        pst_supported_pgsize[PST_N_PG_SIZES];
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_static {
+	int64_t	       max_proc;
+	struct psdev   console_device;
+	int64_t        boot_time;
+	int64_t        physical_memory;
+	int64_t        page_size;
+	int64_t        cpu_states;
+	int64_t        pst_status_size;
+	int64_t        pst_static_size;
+	int64_t        pst_dynamic_size;
+	int64_t	       pst_vminfo_size;
+	int64_t        command_length;
+	int64_t        pst_processor_size;
+	int64_t        pst_diskinfo_size;
+	int64_t        pst_lvinfo_size;
+	int64_t        pst_swapinfo_size;
+	int64_t	       pst_maxmem;
+	int64_t	       pst_lotsfree;
+	int64_t	       pst_desfree;
+	int64_t	       pst_minfree;
+	int64_t	       pst_max_ninode;
+	int64_t	       pst_max_nfile;
+	int64_t        pst_stable_size;
+	int64_t        pst_supported_pgsize[PST_N_PG_SIZES];
+};
+#endif
+
+/*
+ * This structure contains dynamic system variables, ones which may
+ * change frequently during normal operation of the kernel.
+ *
+ * The following fields are obsolete and provided only for backward
+ * compatibility:
+ *
+ *	psd_mp_avg_1_min[]
+ *	psd_mp_avg_5_min[]
+ *	psd_mp_avg_15_min[]
+ *	psd_mp_cpu_time[][]
+ *
+ * Since the size of these arrays is hard-wired, there is no way to
+ * get information about more than a fixed number of processors with
+ * the pstat_getdynamic() call.  Instead, pstat_getprocessor() should
+ * be used.  It returns the same information (see below) and supports
+ * any number of processors.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_dynamic32 {
+# else
+struct pst_dynamic {
+# endif
+	int32_t	psd_proc_cnt;	/* MP: number of active processors */
+	int32_t	psd_max_proc_cnt; /* MP: max active processors */
+	int32_t	psd_last_pid;	/* last run process ID */
+	int32_t	psd_rq;		/* run queue length */	
+	int32_t	psd_dw;		/* jobs in disk wait */
+	int32_t	psd_pw;		/* jobs in page wait */
+	int32_t	psd_sl;		/* jobs sleeping in core */
+	int32_t	psd_sw;		/* swapped out runnable jobs */
+	int32_t	psd_vm;		/* total virtual memory */
+	int32_t	psd_avm;		/* active virtual memory */
+	int32_t	psd_rm;		/* total real memory */
+	int32_t	psd_arm;		/* active real memory */
+	int32_t	psd_vmtxt;	/* virt mem text */
+	int32_t	psd_avmtxt;	/* active virt mem text */
+	int32_t	psd_rmtxt;	/* real mem text */
+	int32_t	psd_armtxt;	/* active real mem text */
+	int32_t	psd_free;	/* free memory pages */
+	double	psd_avg_1_min;	/* global run queue lengths */
+	double	psd_avg_5_min;
+	double	psd_avg_15_min;
+					/* global cpu time/state */
+	int32_t	psd_cpu_time[PST_MAX_CPUSTATES];
+					/* OBSOLETE: per-processor run
+					   queue lengths */
+	double	psd_mp_avg_1_min[PST_MAX_PROCS];
+	double	psd_mp_avg_5_min[PST_MAX_PROCS];
+	double	psd_mp_avg_15_min[PST_MAX_PROCS];
+					/* OBSOLETE: per-processor cpu
+					   time/state */
+	int32_t	psd_mp_cpu_time[PST_MAX_PROCS][PST_MAX_CPUSTATES];
+	int32_t	psd_openlv;	/* # of open Logical Volumes */
+	int32_t	psd_openvg;	/* # of open LV Volume groups */
+	int32_t	psd_allocpbuf;	/* # of allocated LV pvol buffers */
+	int32_t	psd_usedpbuf;	/* # of LV pvol buffers in used */
+	int32_t	psd_maxpbuf;	/* max # of LV pvol buffers avail. */
+	int32_t	psd_activeprocs; /* # of active proc  table entries */
+	int32_t	psd_activeinodes;/* # of active inode table entries */
+	int32_t	psd_activefiles; /* # of active file  table entries */
+	int32_t	psd_mpdcnt;	 /* # of (bad) memory pages deallocated */
+	int32_t psd_procovf;     /* # of times the proc table overflowed */
+	int32_t psd_inodeovf;    /* # of times the inode table overflowed */
+	int32_t psd_fileovf;     /* # of times the file table overflowed */
+	int32_t	psd_global_virtual; /* Available global virt space (pages) */
+	int32_t	psd_valid;	 /* This is a vector that will indicate 
+				  * if a certain field in is valid */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_dynamic {
+	int64_t	psd_proc_cnt;	/* MP: number of active processors */
+	int64_t	psd_max_proc_cnt; /* MP: max active processors */
+	int64_t	psd_last_pid;	/* last run process ID */
+	int64_t	psd_rq;		/* run queue length */	
+	int64_t	psd_dw;		/* jobs in disk wait */
+	int64_t	psd_pw;		/* jobs in page wait */
+	int64_t	psd_sl;		/* jobs sleeping in core */
+	int64_t	psd_sw;		/* swapped out runnable jobs */
+	int64_t	psd_vm;		/* total virtual memory */
+	int64_t	psd_avm;		/* active virtual memory */
+	int64_t	psd_rm;		/* total real memory */
+	int64_t	psd_arm;		/* active real memory */
+	int64_t	psd_vmtxt;	/* virt mem text */
+	int64_t	psd_avmtxt;	/* active virt mem text */
+	int64_t	psd_rmtxt;	/* real mem text */
+	int64_t	psd_armtxt;	/* active real mem text */
+	int64_t	psd_free;	/* free memory pages */
+	double	psd_avg_1_min;	/* global run queue lengths */
+	double	psd_avg_5_min;
+	double	psd_avg_15_min;
+					/* global cpu time/state */
+	int64_t	psd_cpu_time[PST_MAX_CPUSTATES];
+					/* OBSOLETE: per-processor run
+					   queue lengths */
+	double	psd_mp_avg_1_min[PST_MAX_PROCS];
+	double	psd_mp_avg_5_min[PST_MAX_PROCS];
+	double	psd_mp_avg_15_min[PST_MAX_PROCS];
+					/* OBSOLETE: per-processor cpu
+					   time/state */
+	int64_t	psd_mp_cpu_time[PST_MAX_PROCS][PST_MAX_CPUSTATES];
+	int64_t	psd_openlv;	/* # of open Logical Volumes */
+	int64_t	psd_openvg;	/* # of open LV Volume groups */
+	int64_t	psd_allocpbuf;	/* # of allocated LV pvol buffers */
+	int64_t	psd_usedpbuf;	/* # of LV pvol buffers in used */
+	int64_t	psd_maxpbuf;	/* max # of LV pvol buffers avail. */
+	int64_t	psd_activeprocs; /* # of active proc  table entries */
+	int64_t	psd_activeinodes;/* # of active inode table entries */
+	int64_t	psd_activefiles; /* # of active file  table entries */
+	int64_t	psd_mpdcnt;	 /* # of (bad) memory pages deallocated */
+	int64_t    psd_procovf;     /* # of times the proc table overflowed */
+	int64_t    psd_inodeovf;    /* # of times the inode table overflowed */
+	int64_t    psd_fileovf;     /* # of times the file table overflowed */
+	int64_t	psd_global_virtual; /* Available global virt space (pages) */
+	int32_t	psd_valid;	 /* This is a vector that will indicate 
+				  * if a certain field in is valid */
+};
+#endif
+
+/* 
+ * Macros for field validity check for struct pst_dynamic
+ */
+#define PSD_VM       0x1
+#define PSD_AVM      0x2
+
+/*
+ * This structure contains VM-related system variables
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_vminfo32 {
+# else
+struct pst_vminfo {
+# endif
+	int32_t	psv_rdfree;	/* rate:	 pages freed by daemon */
+	int32_t	psv_rintr;	/* device interrupts */
+	int32_t	psv_rpgpgin;	/* pages paged in */
+	int32_t	psv_rpgpgout;	/* pages paged out */
+	int32_t	psv_rpgrec;	/* total page reclaims */
+	int32_t	psv_rpgtlb;	/* tlb flushes - 800 only */
+	int32_t	psv_rscan;	/* scans in pageout daemon */
+	int32_t	psv_rswtch;	/* context switches */
+	int32_t	psv_rsyscall;	/* calls to syscall() */
+	int32_t	psv_rxifrec;	/* found in freelist rather than in filesys */
+	int32_t	psv_rxsfrec;	/* found in freelist rather than on swapdev */
+	int32_t	psv_cfree;	/* cnt:		free memory pages */
+	int32_t	psv_sswpin;	/* sum:		swapins */
+	int32_t	psv_sswpout;	/* swapouts */
+	int32_t	psv_sdfree;	/* pages freed by daemon */
+	int32_t	psv_sexfod;	/* pages filled on demand from executables */
+	int32_t	psv_sfaults;	/* total faults taken */
+	int32_t	psv_sintr;	/* device interrupts */
+	int32_t	psv_sintrans;	/* intransit blocking page faults */
+	int32_t	psv_snexfod;	/* number of exfod's created */
+	int32_t	psv_snzfod;	/* number of zero filled on demand */
+	int32_t	psv_spgfrec;	/* page reclaims from free list */
+	int32_t	psv_spgin;	/* pageins */
+	int32_t	psv_spgout;	/* pageouts */
+	int32_t	psv_spgpgin;	/* pages paged in */
+	int32_t	psv_spgpgout;	/* pages paged out */
+	int32_t	psv_spswpin;	/* pages swapped in */
+	int32_t	psv_spswpout;	/* pages swapped out */
+	int32_t	psv_srev;	/* revolutions of the hand */
+	int32_t	psv_sseqfree;	/* pages taken from sequential programs */
+	int32_t	psv_sswtch;	/* context switches */
+	int32_t	psv_ssyscall;	/* calls to syscall() */
+	int32_t	psv_strap;	/* calls to trap */
+	int32_t	psv_sxifrec;	/* found in free list rather than in filesys */
+	int32_t	psv_sxsfrec;	/* found on free list rather than on swapdev*/
+	int32_t	psv_szfod;	/* pages zero filled on demand */
+	int32_t	psv_sscan;	/* scans in pageout daemon */
+	int32_t	psv_spgrec;	/* total page reclaims */
+	int32_t	psv_deficit;	/* estimate of needs of new swapped-in procs */
+	int32_t	psv_tknin;	/* number of characters read from ttys */
+	int32_t	psv_tknout;	/* number of characters written to ttys */
+	int32_t	psv_cntfork;	/* number of forks */
+	int32_t	psv_sizfork;	/* number of pages forked */
+	uint32_t psv_lreads;	/* number of disk blk reads issued */
+	uint32_t psv_lwrites;	/* number of disk blk writes issued */
+	uint32_t psv_swpocc;	/* # of times swrq occ'd since boot */
+	uint32_t psv_swpque;	 /* cumulative len of swrq since boot */
+	int32_t	psv_paging_thold;/* paging threshold, moves between
+				    pst_desfree & pst_lotsfree */
+	int32_t	psv_sysmem;	 /* pages of memory unavailable for 
+				    in-memory backing store */
+	int32_t	psv_swapspc_cnt; /* pages of on-disk backing store */
+	int32_t	psv_swapspc_max; /* max pages of on-disk backing store */
+	int32_t	psv_swapmem_cnt; /* pages of in-memory backing store */
+	int32_t	psv_swapmem_max; /* max pages of in-memory backing store */
+	int32_t	psv_swapper_mem; /* pages of backing store management 
+				    overhead:- 
+				    psv_swapper_mem + malloc space 
+				    = psv_swapmem_cnt */
+        int32_t psv_lreadsize;   /* # of char xfer'd by bread */
+	int32_t psv_lwritesize;  /* # of char xfer'd by bwrite */
+
+	int32_t	psv_swapmem_on;	 /* in-memory backing store enabled */
+	int32_t psv_select_success[PST_N_PG_SIZES];
+				 /* success by page size of LP fault page size
+				  * selection 
+				  */
+	int32_t psv_select_failure[PST_N_PG_SIZES];
+				 /* failure by page size of LP fault page size
+				  * selection 
+				  */
+	int32_t psv_pgalloc_success[PST_N_PG_SIZES];
+				 /* success by page size of LP allocation */
+	int32_t psv_pgalloc_failure[PST_N_PG_SIZES];
+				 /* failure by page size of LP allocation */
+	int32_t psv_demotions[PST_N_PG_SIZES];
+				 /* LP demotions by page size */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_vminfo {
+	int64_t	psv_rdfree;	/* rate:	 pages freed by daemon */
+	int64_t	psv_rintr;	/* device interrupts */
+	int64_t	psv_rpgpgin;	/* pages paged in */
+	int64_t	psv_rpgpgout;	/* pages paged out */
+	int64_t	psv_rpgrec;	/* total page reclaims */
+	int64_t	psv_rpgtlb;	/* tlb flushes - 800 only */
+	int64_t	psv_rscan;	/* scans in pageout daemon */
+	int64_t	psv_rswtch;	/* context switches */
+	int64_t	psv_rsyscall;	/* calls to syscall() */
+	int64_t	psv_rxifrec;	/* found in freelist rather than in filesys */
+	int64_t	psv_rxsfrec;	/* found in freelist rather than on swapdev */
+	int64_t	psv_cfree;	/* cnt:		free memory pages */
+	int64_t	psv_sswpin;	/* sum:		swapins */
+	int64_t	psv_sswpout;	/* swapouts */
+	int64_t	psv_sdfree;	/* pages freed by daemon */
+	int64_t	psv_sexfod;	/* pages filled on demand from executables */
+	int64_t	psv_sfaults;	/* total faults taken */
+	int64_t	psv_sintr;	/* device interrupts */
+	int64_t	psv_sintrans;	/* intransit blocking page faults */
+	int64_t	psv_snexfod;	/* number of exfod's created */
+	int64_t	psv_snzfod;	/* number of zero filled on demand */
+	int64_t	psv_spgfrec;	/* page reclaims from free list */
+	int64_t	psv_spgin;	/* pageins */
+	int64_t	psv_spgout;	/* pageouts */
+	int64_t	psv_spgpgin;	/* pages paged in */
+	int64_t	psv_spgpgout;	/* pages paged out */
+	int64_t	psv_spswpin;	/* pages swapped in */
+	int64_t	psv_spswpout;	/* pages swapped out */
+	int64_t	psv_srev;	/* revolutions of the hand */
+	int64_t	psv_sseqfree;	/* pages taken from sequential programs */
+	int64_t	psv_sswtch;	/* context switches */
+	int64_t	psv_ssyscall;	/* calls to syscall() */
+	int64_t	psv_strap;	/* calls to trap */
+	int64_t	psv_sxifrec;	/* found in free list rather than in filesys */
+	int64_t	psv_sxsfrec;	/* found on free list rather than on swapdev*/
+	int64_t	psv_szfod;	/* pages zero filled on demand */
+	int64_t	psv_sscan;	/* scans in pageout daemon */
+	int64_t	psv_spgrec;	/* total page reclaims */
+	int64_t	psv_deficit;	/* estimate of needs of new swapped-in procs */
+	int64_t	psv_tknin;	/* number of characters read from ttys */
+	int64_t	psv_tknout;	/* number of characters written to ttys */
+	int64_t	psv_cntfork;	/* number of forks */
+	int64_t	psv_sizfork;	/* number of pages forked */
+	uint64_t psv_lreads;	/* number of disk blk reads issued */
+	uint64_t psv_lwrites;	/* number of disk blk writes issued */
+	uint64_t psv_swpocc;	/* # of times swrq occ'd since boot */
+	uint64_t psv_swpque;	/* cumulative len of swrq since boot */
+	int64_t	psv_paging_thold;/* paging threshold, moves between
+				    pst_desfree & pst_lotsfree */
+	int64_t	psv_sysmem;	 /* pages of memory unavailable for 
+				    in-memory backing store */
+	int64_t	psv_swapspc_cnt; /* pages of on-disk backing store */
+	int64_t	psv_swapspc_max; /* max pages of on-disk backing store */
+	int64_t	psv_swapmem_cnt; /* pages of in-memory backing store */
+	int64_t	psv_swapmem_max; /* max pages of in-memory backing store */
+	int64_t	psv_swapper_mem; /* pages of backing store management 
+				    overhead:- 
+				    psv_swapper_mem + malloc space 
+				    = psv_swapmem_cnt */
+        int64_t psv_lreadsize;   /* # of char xfer'd by bread */
+	int64_t psv_lwritesize;  /* # of char xfer'd by bwrite */
+
+	int64_t	psv_swapmem_on;  /* in-memory backing store enabled */
+	int64_t psv_select_success[PST_N_PG_SIZES];
+				 /* success by page size of LP fault page size
+				  * selection 
+				  */
+	int64_t psv_select_failure[PST_N_PG_SIZES];
+				 /* failure by page size of LP fault page size
+				  * selection 
+				  */
+	int64_t psv_pgalloc_success[PST_N_PG_SIZES];
+				 /* success by page size of LP allocation */
+	int64_t psv_pgalloc_failure[PST_N_PG_SIZES];
+				 /* failure by page size of LP allocation */
+	int64_t psv_demotions[PST_N_PG_SIZES];
+				 /* LP demotions by page size */
+};
+#endif
+
+/*
+ * Flag bits for pst_vm_status.pst_flags.
+ */
+#define PS_MEMORY_LOCKED	0x1
+#define PS_EXECUTABLE		0x2
+#define PS_SHARED		0x4	/* Shared object. */
+#define PS_SHARED_LIBRARY	0x8	/* Shared library. */
+
+/*
+ * Type values for pst_vm_status.pst_type.
+ */
+#define PS_NOTUSED		0
+#define PS_USER_AREA		1
+#define PS_TEXT			2
+#define PS_DATA			3
+#define PS_STACK		4
+#define PS_SHARED_MEMORY	5
+#define PS_NULLDEREF		6
+#define PS_IO			7
+#define PS_MMF			8
+#define PS_GRAPHICS		9
+#define PS_GRAPHICS_DMA         10
+
+#define PS_PROT_READ            0x1
+#define PS_PROT_WRITE           0x2
+#define PS_PROT_EXECUTE         0x4
+
+/*
+ * Contains process address space information.  See pstat_proc_vm().
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_vm_status32 {
+# else
+struct pst_vm_status {
+# endif
+	int32_t pst_space;
+	int32_t pst_vaddr64bit_pad;
+	int32_t pst_vaddr;
+	int32_t pst_length;
+	int32_t pst_phys_pages;
+	int32_t pst_flags;
+	int32_t pst_type;
+	int32_t pst_permission;
+# ifdef _KERNEL
+	struct psfileid32 pst_id;
+# else
+	struct psfileid pst_id;
+# endif
+	int32_t pst_valid; /* This is a vector that will indicate if a
+			    * certain field is valid */	
+	int32_t pst_pagesize_hint;
+	int32_t pst_vps_pgsizes[PST_N_PG_SIZES];
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_vm_status {
+	int64_t pst_space;
+	int64_t pst_vaddr64bit_pad;
+	int64_t pst_vaddr;
+	int64_t pst_length;
+	int64_t pst_phys_pages;
+	int64_t pst_flags;
+	int64_t pst_type;
+	int64_t pst_permission;
+	struct psfileid pst_id;
+	int32_t pst_valid; /* This is a vector that will indicate if a
+			    * certain field is valid */	
+	int64_t pst_pagesize_hint;
+	int64_t pst_vps_pgsizes[PST_N_PG_SIZES];
+};
+#endif
+
+/* Macros for field validity check in pst_vm_status */
+#define PST_VADDR       0x1
+
+/*
+ * An abstraction of a driver name
+ */
+#define PS_DRV_NAM_MAX	32
+struct psdrvnam {
+	char psd_name[PS_DRV_NAM_MAX];	/* driver name */
+};
+
+/*
+ * An abstraction of a hardware path
+ */
+#define PS_MAX_HW_ELEMS	32
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pshwpath32 {
+# else
+struct pshwpath {
+# endif
+	int32_t psh_first_index;		
+	int32_t psh_last_index;		
+	char psh_name[PS_MAX_HW_ELEMS]; /* hardware path */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pshwpath {
+	int64_t psh_first_index;		
+	int64_t psh_last_index;		
+	char psh_name[PS_MAX_HW_ELEMS]; /* hardware path */
+};
+#endif
+
+
+#define PS_DK_CYL_SIZE	80
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_diskinfo32 {
+	int32_t	psd_idx;	/* Index for further pstat() requests */
+	struct psdev32 psd_dev;	/* device specification for the disk */
+# else
+struct pst_diskinfo {
+	int32_t	psd_idx;	/* Index for further pstat() requests */
+	struct psdev psd_dev;	/* device specification for the disk */
+# endif
+	int32_t	psd_dktime;	/* cumulative milliseconds on the disk */
+	int32_t	psd_dkseek;	/* cumulative number of seeks done */
+	int32_t	psd_dkxfer;	/* cumulative number of transfers, the 
+				 * number include requests with high 
+				 * (read/write) and low (ioctl) priorities
+				 */
+	int32_t	psd_dkwds;	/* cumulative number of 64-byte transfers */
+	float	psd_dkmspw;	/* OBSOLETE: was milliseconds per word
+				 */
+# ifdef _KERNEL
+	struct	psdev32 psd_cdev;/* device specification for the raw disk */
+				 /* psd_dev (above) describes the block dev */
+# else
+	struct	psdev psd_cdev;	/* device specification for the raw disk */
+				/* psd_dev (above) describes the block dev */
+# endif
+	struct	psdrvnam psd_drv_name;	/* driver name */
+        int32_t	psd_token;	/* driver's id */
+        int32_t	psd_instance;   /* the instance of the device */
+# ifdef _KERNEL
+        struct	pshwpath32 psd_hw_path;  /* hardware path */
+	struct  psttime32 psd_dkwait; /*cumulative time from enqueue to start */
+	struct  psttime32 psd_dkresp; /* cumulative time from enqueue to done */
+# else
+        struct	pshwpath psd_hw_path;  /* hardware path */
+	struct  psttime psd_dkwait; /* cumulative time from enqueue to start */
+	struct  psttime psd_dkresp; /* cumulative time from enqueue to done */
+# endif
+        int32_t psd_dkcyl_index;  /* cylinder number index, used by sadp */
+        int32_t psd_dkcyl[PS_DK_CYL_SIZE]; /* cylinder number array, used by 
+                                            * sadp 
+                                            */
+	int32_t psd_dkqlen_curr;/* current queue length */
+	int32_t psd_dkqlen;     /* cummulative queue length */
+	int32_t psd_dkq_merged; /* cummulative # of transfer would have been
+				 * if some of the requests weren't merged
+				 */
+	int32_t psd_dkenq_cnt;  /* number of calls to enqueue */
+	int32_t	psd_status;     /* 0 = device is closed, 1 = device is open */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_diskinfo {
+	int64_t	psd_idx;	/* Index for further pstat() requests */
+	struct psdev psd_dev;	/* device specification for the disk */
+	int64_t	psd_dktime;	/* cumulative milliseconds on the disk */
+	int64_t	psd_dkseek;	/* cumulative number of seeks done */
+	int64_t	psd_dkxfer;	/* cumulative number of transfers, the 
+				 * number include requests with high 
+				 * (read/write) and low (ioctl) priorities
+				 */
+	int64_t	psd_dkwds;	/* cumulative number of 64-byte transfers */
+	float	psd_dkmspw;	/* OBSOLETE: was milliseconds per word
+				 */
+	struct	psdev psd_cdev;	/* device specification for the raw disk */
+				/* psd_dev (above) describes the block dev */
+	struct	psdrvnam psd_drv_name;	/* driver name */
+        int64_t	psd_token;	/* driver's id */
+        int64_t	psd_instance;   /* the instance of the device */
+        struct	pshwpath psd_hw_path;  /* hardware path */
+	struct  psttime psd_dkwait; /* cumulative time from enqueue to start */
+	struct  psttime psd_dkresp; /* cumulative time from enqueue to done */
+        int64_t psd_dkcyl_index;  /* cylinder number index, used by sadp */
+        int64_t psd_dkcyl[PS_DK_CYL_SIZE]; /* cylinder number array, used by 
+                                            * sadp 
+                                            */
+	int64_t psd_dkqlen_curr;/* current queue length */
+	int64_t psd_dkqlen;     /* cummulative queue length */
+	int64_t psd_dkq_merged; /* cummulative # of transfer would have been
+				 * if some of the requests weren't merged
+				 */
+	int64_t psd_dkenq_cnt;  /* number of calls to enqueue */
+	int64_t	psd_status;     /* 0 = device is closed, 1 = device is open */
+};
+#endif
+
+/*
+ * This structure contains per-logical volume information.
+ * Each structure returned describes one logical volume.
+ */
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_lvinfo32 {
+	uint32_t	psl_idx;	/* Index for further pstat() requests*/
+	struct psdev32	psl_dev;	/* device specification for the vol */
+# else
+struct pst_lvinfo {
+	uint32_t	psl_idx;	/* Index for further pstat() requests*/
+	struct psdev	psl_dev;	/* device specification for the vol */
+# endif
+	uint32_t	psl_rxfer;	/* # of reads */
+	uint32_t	psl_rcount;	/* # of bytes read */
+	uint32_t	psl_wxfer;	/* # of writes */
+	uint32_t	psl_wcount;	/* # of bytes written */
+	uint32_t	psl_openlv;	/* # of opened LV's in this LV's LVG */
+	uint32_t	psl_mwcwaitq;	/* Length of LV's LVG
+					 * mirror write consistency cache (MWC)
+					 */
+	uint32_t	psl_mwcsize;	/* Size of LV's LVG's MWC */
+	uint32_t	psl_mwchits;	/* # of hits to the LV's LVG's MWC */
+	uint32_t	psl_mwcmisses;	/* # of misses to the LV's LVG's MWC */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_lvinfo {
+	uint64_t	psl_idx;	/* Index for further pstat() requests*/
+	struct psdev	psl_dev;	/* device specification for the vol */
+	uint64_t	psl_rxfer;	/* # of reads */
+	uint64_t	psl_rcount;	/* # of bytes read */
+	uint64_t	psl_wxfer;	/* # of writes */
+	uint64_t	psl_wcount;	/* # of bytes written */
+	uint64_t	psl_openlv;	/* # of opened LV's in this LV's LVG */
+	uint64_t	psl_mwcwaitq;	/* Length of LV's LVG
+					 * mirror write consistency cache (MWC)
+					 */
+	uint64_t	psl_mwcsize;	/* Size of LV's LVG's MWC */
+	uint64_t	psl_mwchits;	/* # of hits to the LV's LVG's MWC */
+	uint64_t	psl_mwcmisses;	/* # of misses to the LV's LVG's MWC */
+};
+#endif
+
+/*
+ * The application will experience binary compatibility problem
+ * under the following condition:
+ *
+ *  o  Application is compiled with the new fields of the pstat data
+ *     structure, and it runs on the kernel which has not been patched
+ *     (PHKL_22986 or superseding ones) and therefore does not have the 
+ *     additional fields.
+ * 
+ * When the application requests more information than what the kernel can 
+ * provide, it will fail.  pstat() cannot return any valid information beyond 
+ * what kernel data structure is kept and maintained.
+ * 
+ * To ensure binary compatibility, the "_ICOD_BASE_INFO" macro has
+ * been added to the pstat data structure.  The macro will condition the
+ * new pstat data structure.  So, when the application writers need to
+ * access the new pstat data structure on the new kernel, they should
+ * compile their applications with the "_ICOD_BASE_INFO" macro.
+ */
+
+/*
+ * Processor state definition
+ * PSP_SPU_INTRANSITION/PSP_SPU_HW_FAIL_DISABLED were added on post-LR release 
+ */
+# if defined (_KERNEL) || defined (_ICOD_BASE_INFO)
+#    define PSP_SPU_ENABLED          1
+#    define PSP_SPU_DISABLED         2
+#    define PSP_SPU_INTRANSITION     3
+#    define PSP_SPU_HW_FAIL_DISABLED 5
+# endif
+
+/*
+ * Processor interrupt info for pst_flags
+ *
+ * INTERRUPT_ENABLED implies that the given processor is or
+ * may be configured to receive I/O interrupts.
+ *
+ * INTERRUPT_DISABLED implies that the given processor is not and
+ * cannot be configured to receive I/O interrupts.
+ *
+ */
+# if defined (_KERNEL) || defined (_ICOD_BASE_INFO)
+#    define PSP_INTERRUPT_ENABLED        0x1
+#    define PSP_INTERRUPT_DISABLED       0x2
+# endif
+
+
+
+/*
+ * This structure describes per-processor information.
+ * Each structure returned describes one processor on a multi-processor
+ * system.  (A total of one structure for uni-processor machines)
+ */
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_processor32 {
+# else
+struct pst_processor {
+# endif
+	uint32_t	psp_idx;	/* Index of the current spu in the
+					 * array of processor statistic entries
+					 */
+	uint32_t	psp_fsreads;	/* # of reads from filesys blocks. */
+	uint32_t	psp_fswrites;	/* # of writes to filesys blocks. */
+	uint32_t	psp_nfsreads;	/* # of nfs disk blk reads issued. */
+	uint32_t	psp_nfswrites;	/* # of nfs disk blk writes issued. */
+	uint32_t	psp_bnfsread;	/* # of bytes read from NFS. */
+	uint32_t	psp_bnfswrite;	/* # of bytes written to NFS. */
+	uint32_t	psp_phread;	/* # of physical reads to raw devs. */
+	uint32_t	psp_phwrite;	/* # of physical writes to raw devs. */
+	uint32_t	psp_runocc;	/* # of times the processor had
+					 * processes waiting to run.  This
+					 * running total is updated once
+					 * a second.
+					 */
+	uint32_t	psp_runque;	/* # of processes the processor had
+					 * waiting to run.  This running total
+					 * is updated once a second.
+					 */
+	uint32_t	psp_sysexec;	/* # of exec system calls. */
+	uint32_t	psp_sysread;	/* # of read system calls. */
+	uint32_t	psp_syswrite;	/* # of write system calls. */
+	uint32_t	psp_sysnami;	/* # of calls to sysnami(). */
+	uint32_t	psp_sysiget;	/* # of calls to sysiget(). */
+	uint32_t	psp_dirblk;	/* # of filesystem blocks read doing
+					 * directory lookup.
+					 */
+	uint32_t	psp_semacnt;	/* # of System V semaphore ops. */
+	uint32_t	psp_msgcnt;	/* # of System V message ops. */
+	uint32_t	psp_muxincnt;	/* # of MUX interrupts received. */
+	uint32_t	psp_muxoutcnt;	/* # of MUX interrupts sent. */
+	uint32_t	psp_ttyrawcnt;	/* # of raw characters read. */
+	uint32_t	psp_ttycanoncnt; /* # of canonical chars processed. */
+	uint32_t	psp_ttyoutcnt;	/* # of characters output. */
+# ifdef _KERNEL
+	struct pscoproc32 psp_coprocessor; /* info on any co-processors */
+# else
+	struct pscoproc	psp_coprocessor; /* info on any co-processors */
+# endif
+	uint32_t	psp_iticksperclktick; /* interval timer counts (CR16)
+					       * per clock tick,
+					       * see sysconf(_SC_CLK_TCK)
+					       */
+	uint32_t	psp_sysselect;	/* # of select system calls. */
+# ifdef _KERNEL
+	struct pstcycles32
+# else
+	struct pstcycles
+# endif
+			psp_idlecycles;	/* 64-bit idle execution cycle count */
+	double		psp_avg_1_min;	/* per-processor run queue lengths */
+	double		psp_avg_5_min;
+	double		psp_avg_15_min;
+					/* per-processor cpu time/state */
+	int32_t		psp_cpu_time[PST_MAX_CPUSTATES];
+
+#if defined (_KERNEL) || defined(_PSET_BASE_INFO) || defined (_ICOD_BASE_INFO)
+	uint32_t        psp_logical_node; /* node the spu is on         */
+	int32_t         psp_pset_id;      /* processor set id to which this
+                                           * processor is assigned 
+                                           */
+
+#if defined (_KERNEL) || defined (_ICOD_BASE_INFO)
+	int32_t         psp_logical_id;   /* logical id of a processor */
+        int32_t         psp_processor_state; /* state of a processor */
+        int32_t         psp_flags;        /* processor flags */
+#endif /* _ICOD_BASE_INFO */
+
+#endif /* _PSET_BASE_INFO */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_processor {
+	uint64_t	psp_idx;	/* Index of the current spu in the
+					 * array of processor statistic entries
+					 */
+	uint64_t	psp_fsreads;	/* # of reads from filesys blocks. */
+	uint64_t	psp_fswrites;	/* # of writes to filesys blocks. */
+	uint64_t	psp_nfsreads;	/* # of nfs disk blk reads issued. */
+	uint64_t	psp_nfswrites;	/* # of nfs disk blk writes issued. */
+	uint64_t	psp_bnfsread;	/* # of bytes read from NFS. */
+	uint64_t	psp_bnfswrite;	/* # of bytes written to NFS. */
+	uint64_t	psp_phread;	/* # of physical reads to raw devs. */
+	uint64_t	psp_phwrite;	/* # of physical writes to raw devs. */
+	uint64_t	psp_runocc;	/* # of times the processor had
+					 * processes waiting to run.  This
+					 * running total is updated once
+					 * a second.
+					 */
+	uint64_t	psp_runque;	/* # of processes the processor had
+					 * waiting to run.  This running total
+					 * is updated once a second.
+					 */
+	uint64_t	psp_sysexec;	/* # of exec system calls. */
+	uint64_t	psp_sysread;	/* # of read system calls. */
+	uint64_t	psp_syswrite;	/* # of write system calls. */
+	uint64_t	psp_sysnami;	/* # of calls to sysnami(). */
+	uint64_t	psp_sysiget;	/* # of calls to sysiget(). */
+	uint64_t	psp_dirblk;	/* # of filesystem blocks read doing
+					 * directory lookup.
+					 */
+	uint64_t	psp_semacnt;	/* # of System V semaphore ops. */
+	uint64_t	psp_msgcnt;	/* # of System V message ops. */
+	uint64_t	psp_muxincnt;	/* # of MUX interrupts received. */
+	uint64_t	psp_muxoutcnt;	/* # of MUX interrupts sent. */
+	uint64_t	psp_ttyrawcnt;	/* # of raw characters read. */
+	uint64_t	psp_ttycanoncnt; /* # of canonical chars processed. */
+	uint64_t	psp_ttyoutcnt;	/* # of characters output. */
+	struct pscoproc	psp_coprocessor; /* info on any co-processors */
+	uint64_t	psp_iticksperclktick; /* interval timer counts (CR16)
+					       * per clock tick,
+					       * see sysconf(_SC_CLK_TCK)
+					       */
+	uint64_t	psp_sysselect;	/* # of select system calls. */
+	struct pstcycles
+			psp_idlecycles;	/* 64-bit idle execution cycle count */
+	double		psp_avg_1_min;	/* per-processor run queue lengths */
+	double		psp_avg_5_min;
+	double		psp_avg_15_min;
+					/* per-processor cpu time/state */
+	int64_t		psp_cpu_time[PST_MAX_CPUSTATES];
+
+
+#if defined (_KERNEL) || defined(_PSET_BASE_INFO) || defined (_ICOD_BASE_INFO)
+	uint64_t        psp_logical_node; /* node the spu is on         */
+	int64_t         psp_pset_id;      /* processor set id to which this
+                                           * processor is assigned 
+                                           */
+
+#if defined (_KERNEL) || defined (_ICOD_BASE_INFO)
+	int64_t         psp_logical_id;   /* logical id of a processor */
+        int64_t		psp_processor_state; /* state of a processor */
+        int64_t         psp_flags;        /* processor flags */
+#endif /* _ICOD_BASE_INFO */
+
+#endif /* _PSET_BASE_INFO */
+
+};
+#endif
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pss_blk32 {
+	struct psdev32	Pss_dev;	/* Device specification */
+# else
+struct pss_blk {
+	struct psdev	Pss_dev;	/* Device specification */
+# endif
+	uint32_t	Pss_start;	/* For 300,700: starting blk */
+	uint32_t	Pss_nblks;	/* OBSOLETE, was total # of blocks */
+#define Pss_nblksenabled Pss_nblks;	/* USE INSTEAD, # of blocks enabled */
+	uint32_t	Pss_nblksavail;	/* # of blocks available */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pss_blk {
+	struct psdev	Pss_dev;	/* Device specification */
+	uint64_t	Pss_start;	/* For 300,700: starting blk */
+	uint64_t	Pss_nblks;	/* OBSOLETE, was total # of blocks */
+#define Pss_nblksenabled Pss_nblks;	/* USE INSTEAD, # of blocks enabled */
+	uint64_t	Pss_nblksavail;	/* # of blocks available */
+};
+#endif
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pss_fs32 {
+# else
+struct pss_fs {
+# endif
+	uint32_t	Pss_allocated;	/* # of blocks curr. avail. */
+	uint32_t	Pss_min;	/* min # of blocks to alloc. */
+	uint32_t	Pss_limit;	/* max # of blocks to alloc. */
+	uint32_t	Pss_reserve;	/* # of blocks to reserve */
+	char		Pss_mntpt[256];	/* FS mount point path */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pss_fs {
+	uint64_t	Pss_allocated;	/* # of blocks curr. avail. */
+	uint64_t	Pss_min;	/* min # of blocks to alloc. */
+	uint64_t	Pss_limit;	/* max # of blocks to alloc. */
+	uint64_t	Pss_reserve;	/* # of blocks to reserve */
+	char		Pss_mntpt[256];	/* FS mount point path */
+};
+#endif
+
+struct pss_reserved {
+	char		Pss_XXX[512];	/* reserved for pss_fs/pss_blk
+					   expansion. */
+};
+
+/*
+ * This structure describes per-swap-area information.
+ * Each structure returned describes one "pool" of swap space on the system,
+ * either a block device or a portion of a filesystem.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_swapinfo32 {
+# else
+struct pst_swapinfo {
+# endif
+	uint32_t	pss_idx;	/* Idx for further pstat() requests */
+	uint32_t	pss_flags;	/* flags associated with swap pool */
+	uint32_t	pss_priority;	/* priority of the swap pool */
+	uint32_t	pss_nfpgs;	/* # of free pages of space in pool */
+	union {				/* block and fs swap differ */
+# ifdef _KERNEL
+		struct pss_blk32 Pss_blk; /* Block device Fields */
+		struct pss_fs32  Pss_fs;  /* File System Fields */
+# else
+		struct pss_blk Pss_blk;	/* Block device Fields */
+		struct pss_fs  Pss_fs;	/* File System Fields */
+# endif
+		struct pss_reserved Pss_XX; /* reserved for union expansion */
+	} pss_un;
+	uint32_t	pss_swapchunk;	/* block size */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_swapinfo {
+	uint64_t	pss_idx;	/* Idx for further pstat() requests */
+	uint64_t	pss_flags;	/* flags associated with swap pool */
+	uint64_t	pss_priority;	/* priority of the swap pool */
+	uint64_t	pss_nfpgs;	/* # of free pages of space in pool */
+	union {				/* block and fs swap differ */
+		struct pss_blk Pss_blk;	/* Block device Fields */
+		struct pss_fs  Pss_fs;	/* File System Fields */
+		struct pss_reserved Pss_XX; /* reserved for union expansion */
+	} pss_un;
+	uint64_t	pss_swapchunk;	/* block size */
+};
+#endif
+
+#define pss_dev		pss_un.Pss_blk.Pss_dev
+#define pss_start	pss_un.Pss_blk.Pss_start
+#define pss_nblks	pss_un.Pss_blk.Pss_nblks
+#define pss_nblksavail	pss_un.Pss_blk.Pss_nblksavail
+#define pss_nblksenabled pss_un.Pss_blk.Pss_nblks
+
+#define pss_allocated	pss_un.Pss_fs.Pss_allocated
+#define pss_min		pss_un.Pss_fs.Pss_min
+#define pss_limit	pss_un.Pss_fs.Pss_limit
+#define pss_reserve	pss_un.Pss_fs.Pss_reserve
+#define pss_mntpt	pss_un.Pss_fs.Pss_mntpt
+
+#define pss_major	pss_dev.psd_major
+#define pss_minor	pss_dev.psd_minor
+
+/*
+ * Swap info for pss_flags
+ */
+#define SW_ENABLED	0x1
+#define SW_BLOCK	0x2
+#define SW_FS		0x4
+
+
+/*
+ * This structure describes per-file information.
+ * Each structure returned describes one open file a process
+ */
+
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_fileinfo32 {
+# else
+struct pst_fileinfo {
+# endif
+	uint32_t	psf_idx;	/* Index for further pstat() requests*/
+	uint32_t	psf_fd;		/* file descriptor of the file */
+# ifdef _KERNEL
+	struct psfileid32 psf_id;	/* unique identification of the file */
+# else
+	struct psfileid	psf_id;		/* unique identification of the file */
+# endif
+	off32_t		psf_offset;	/* current 32-bit offset for the file*/
+#if !defined(__STDC_32_MODE__)
+	off64_t		psf_offset64;	/* current 64-bit offset for the file*/
+#else
+	off32_t		psf_dummy[2];	/* place holder in other name spaces */
+#endif
+	int32_t		psf_valid;	/* valid vector */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_fileinfo {
+	uint64_t	psf_idx;	/* Index for further pstat() requests*/
+	uint64_t	psf_fd;		/* file descriptor of the file */
+	struct psfileid	psf_id;		/* unique identification of the file */
+	off32_t		psf_offset;	/* current 32-bit offset for the file*/
+	off64_t		psf_offset64;	/* current 64-bit offset for the file*/
+	int32_t		psf_valid;	/* valid vector */
+};
+#endif
+
+/* Macros for field validity check in pst_fileinfo */
+#define PSF_OFFSET       0x1
+
+/*
+ * This structure describes the system-wide global System V IPC constants.
+ * These are typically (currently) defined at boot time, but may become
+ * dynamic in future releases.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_ipcinfo32 {
+# else
+struct pst_ipcinfo {
+# endif
+	int32_t	psi_semmap; /* resource map size for SysV semaphores */
+	int32_t	psi_semmni; /* number of identifiers for SysV sems */
+	int32_t	psi_semmns; /* system-wide total of SysV sems */
+	int32_t	psi_semmnu; /* system-wide total of SysV sem undo structs */
+	int32_t	psi_semmsl; /* max # of sems per identifier */
+	int32_t	psi_semopm; /* max # of operations per semop() call */
+	int32_t	psi_semume; /* max # of undo entries per process */
+	int32_t	psi_semusz; /* size in bytes of undo structure */
+	int32_t	psi_semvmx; /* maximum value for sem */
+	int32_t	psi_semaem; /* adjust-on-exit maximum value */
+
+	int32_t	psi_msgmap; /* resource map size for SysV messages */
+	int32_t	psi_msgmax; /* maximum message size */
+	int32_t	psi_msgmnb; /* maximum bytes on message queue */
+	int32_t	psi_msgmni; /* system-wide total of SysV msg queue IDs */
+	int32_t	psi_msgssz; /* message segment size */
+	int32_t	psi_msgtql; /* system-wide total of SysV msg headers */
+	int32_t	psi_msgseg; /* system-wide total of SysV msg segments */
+
+	int32_t	psi_shmmax; /* maximum shared memory segment size */
+	int32_t	psi_shmmin; /* minimum shared memory segment size */
+	int32_t	psi_shmmni; /* system-wide total of SysV shm identifiers */
+	int32_t	psi_shmseg; /* max # of attached SysV shm segs per process */
+	int32_t	psi_valid;  /* valid vector */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_ipcinfo {
+	int64_t	psi_semmap; /* resource map size for SysV semaphores */
+	int64_t	psi_semmni; /* number of identifiers for SysV sems */
+	int64_t	psi_semmns; /* system-wide total of SysV sems */
+	int64_t	psi_semmnu; /* system-wide total of SysV sem undo structs */
+	int64_t	psi_semmsl; /* max # of sems per identifier */
+	int64_t	psi_semopm; /* max # of operations per semop() call */
+	int64_t	psi_semume; /* max # of undo entries per process */
+	int64_t	psi_semusz; /* size in bytes of undo structure */
+	int64_t	psi_semvmx; /* maximum value for sem */
+	int64_t	psi_semaem; /* adjust-on-exit maximum value */
+
+	int64_t	psi_msgmap; /* resource map size for SysV messages */
+	int64_t	psi_msgmax; /* maximum message size */
+	int64_t	psi_msgmnb; /* maximum bytes on message queue */
+	int64_t	psi_msgmni; /* system-wide total of SysV msg queue IDs */
+	int64_t	psi_msgssz; /* message segment size */
+	int64_t	psi_msgtql; /* system-wide total of SysV msg headers */
+	int64_t	psi_msgseg; /* system-wide total of SysV msg segments */
+
+	int64_t	psi_shmmax; /* maximum shared memory segment size */
+	int64_t	psi_shmmin; /* minimum shared memory segment size */
+	int64_t	psi_shmmni; /* system-wide total of SysV shm identifiers */
+	int64_t	psi_shmseg; /* max # of attached SysV shm segs per process */
+	int32_t	psi_valid;  /* valid vector */
+};
+#endif
+
+/* Macros for field validity check in pst_ipcinfo */
+#define PSI_SHMMAX       0x1
+
+/*
+ * This structure describes per-(System V semaphore set) information.
+ * Each structure returned describes on semaphore identifier on the system.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_seminfo32 {
+# else
+struct pst_seminfo {
+# endif
+	uint32_t	pse_idx;	/* Idx for further pstat() requests */
+	int32_t		pse_uid;	/* UID of semaphore set owner */
+	int32_t		pse_gid;	/* GID of semaphore set owner */
+	int32_t		pse_cuid;	/* UID of semaphore set creator */
+	int32_t		pse_cgid;	/* GID of semaphore set creator */
+	uint32_t	pse_mode;	/* mode of semaphore set (9 bits) */
+	uint32_t	pse_seq;	/* sequence number of semaphore set */
+	uint32_t	pse_key;	/* IPC key of semaphore set */
+	uint32_t	pse_nsems;	/* number of semaphores for this set */
+	int32_t		pse_otime;	/* last semop time (secs since 1970) */
+	int32_t		pse_ctime;	/* last change time (since 1970) */
+	uint32_t	pse_flags;	/* flags for the semaphore set */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_seminfo {
+	uint64_t	pse_idx;	/* Idx for further pstat() requests */
+	int64_t		pse_uid;	/* UID of semaphore set owner */
+	int64_t		pse_gid;	/* GID of semaphore set owner */
+	int64_t		pse_cuid;	/* UID of semaphore set creator */
+	int64_t		pse_cgid;	/* GID of semaphore set creator */
+	uint64_t	pse_mode;	/* mode of semaphore set (9 bits) */
+	uint64_t	pse_seq;	/* sequence number of semaphore set */
+	uint64_t	pse_key;	/* IPC key of semaphore set */
+	uint64_t	pse_nsems;	/* number of semaphores for this set */
+	int64_t		pse_otime;	/* last semop time (secs since 1970) */
+	int64_t		pse_ctime;	/* last change time (since 1970) */
+	uint64_t	pse_flags;	/* flags for the semaphore set */
+};
+#endif
+
+/*
+ * flag bit definitions for pse_flags
+ */
+#define PS_SEM_ALLOC	0x1	/* semaphore set is in use */
+
+
+/*
+ * This structure describes per-(System V message queue) information.
+ * Each structure returned describes on message queue identifier on the system.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_msginfo32 {
+# else
+struct pst_msginfo {
+# endif
+	uint32_t	psm_idx;	/* Idx for further pstat() requests */
+	int32_t		psm_uid;	/* UID of msg queue owner */
+	int32_t		psm_gid;	/* GID of msg queue owner */
+	int32_t		psm_cuid;	/* UID of msg queue creator */
+	int32_t		psm_cgid;	/* GID of msg queue creator */
+	uint32_t	psm_mode;	/* mode of msg queue (9 bits) */
+	uint32_t	psm_seq;	/* sequence number of msg queue */
+	uint32_t	psm_key;	/* IPC key of msg queue */
+	uint32_t	psm_qnum;	/* number of msgs on this queue */
+	uint32_t	psm_qbytes;	/* max bytes for msgs on this queue */
+	uint32_t	psm_cbytes;	/* cur bytes for msgs on this queue */
+	int32_t		psm_lspid;	/* pid of last msgsnd()er */
+	int32_t		psm_lrpid;	/* pid of last msgrcv()er */
+	int32_t		psm_stime;	/* last msgsnd() time (since 1970) */
+	int32_t		psm_rtime;	/* last msgrcv() time (since 1970) */
+	int32_t		psm_ctime;	/* last change time (since 1970) */
+	uint32_t	psm_flags;	/* flags for the message queue */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_msginfo {
+	uint64_t	psm_idx;	/* Idx for further pstat() requests */
+	int64_t		psm_uid;	/* UID of msg queue owner */
+	int64_t		psm_gid;	/* GID of msg queue owner */
+	int64_t		psm_cuid;	/* UID of msg queue creator */
+	int64_t		psm_cgid;	/* GID of msg queue creator */
+	uint64_t	psm_mode;	/* mode of msg queue (9 bits) */
+	uint64_t	psm_seq;	/* sequence number of msg queue */
+	uint64_t	psm_key;	/* IPC key of msg queue */
+	uint64_t	psm_qnum;	/* number of msgs on this queue */
+	uint64_t	psm_qbytes;	/* max bytes for msgs on this queue */
+	uint64_t	psm_cbytes;	/* cur bytes for msgs on this queue */
+	int64_t		psm_lspid;	/* pid of last msgsnd()er */
+	int64_t		psm_lrpid;	/* pid of last msgrcv()er */
+	int64_t		psm_stime;	/* last msgsnd() time (since 1970) */
+	int64_t		psm_rtime;	/* last msgrcv() time (since 1970) */
+	int64_t		psm_ctime;	/* last change time (since 1970) */
+	uint64_t	psm_flags;	/* flags for the message queue */
+};
+#endif
+
+/*
+ * Definitions of flag bits in psm_flags
+ */
+#define PS_MSG_ALLOC	0x1	/* message queue is in use */
+#define PS_MSG_RWAIT	0x2	/* one or more processes waiting to read */
+#define PS_MSG_WWAIT	0x4	/* one or more processes waiting to write */
+
+/*
+ * This structure describes per-(System V shared memory segment) information.
+ * Each structure returned describes on segment identifier on the system.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_shminfo32 {
+# else
+struct pst_shminfo {
+# endif
+	uint32_t	psh_idx;	/* Idx for further pstat() requests */
+	int32_t		psh_uid;	/* UID of shm segment owner */
+	int32_t		psh_gid;	/* GID of shm segment owner */
+	int32_t		psh_cuid;	/* UID of shm segment creator */
+	int32_t		psh_cgid;	/* GID of shm segment creator */
+	uint32_t	psh_mode;	/* mode of shm segment (9 bits) */
+	uint32_t	psh_seq;	/* sequence number of shm segment */
+	uint32_t	psh_key;	/* IPC key of shm segment id */
+	uint32_t	psh_segsz;	/* size of shm segment (bytes) */
+	int32_t		psh_cpid;	/* PID of shm segment creator */
+	int32_t		psh_lpid;	/* PID of last shmop() */
+	uint32_t	psh_nattch;	/* cur # of procs attached (accurate)*/
+	uint32_t	psh_cnattch;	/* cur # attached/in mem (inaccurate)*/
+	int32_t		psh_atime;	/* last shmat() time (since 1970) */
+	int32_t		psh_dtime;	/* last shmdt() time (since 1970) */
+	int32_t		psh_ctime;	/* last change time (since 1970) */
+	uint32_t	psh_flags;	/* flags for the shm segment */
+	int32_t		psh_valid;	/* This is a vector that will indicate 
+					 * if a certain field in is valid */
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_shminfo {
+	uint64_t	psh_idx;	/* Idx for further pstat() requests */
+	int64_t		psh_uid;	/* UID of shm segment owner */
+	int64_t		psh_gid;	/* GID of shm segment owner */
+	int64_t		psh_cuid;	/* UID of shm segment creator */
+	int64_t		psh_cgid;	/* GID of shm segment creator */
+	uint64_t	psh_mode;	/* mode of shm segment (9 bits) */
+	uint64_t	psh_seq;	/* sequence number of shm segment */
+	uint64_t	psh_key;	/* IPC key of shm segment id */
+	uint64_t	psh_segsz;	/* size of shm segment (bytes) */
+	int64_t		psh_cpid;	/* PID of shm segment creator */
+	int64_t		psh_lpid;	/* PID of last shmop() */
+	uint64_t	psh_nattch;	/* cur # of procs attached (accurate)*/
+	uint64_t	psh_cnattch;	/* cur # attached/in mem (inaccurate)*/
+	int64_t		psh_atime;	/* last shmat() time (since 1970) */
+	int64_t		psh_dtime;	/* last shmdt() time (since 1970) */
+	int64_t		psh_ctime;	/* last change time (since 1970) */
+	uint64_t	psh_flags;	/* flags for the shm segment */
+	int32_t		psh_valid;	/* This is a vector that will indicate 
+					 * if a certain field in is valid */
+};
+#endif
+
+/*
+ * Flag bit definitions for psh_flags
+ */
+#define PS_SHM_ALLOC	0x1	/* shared mem segment is in use */
+#define PS_SHM_DEST	0x2	/* shm segment to be deleted on last detach */
+#define PS_SHM_CLEAR	0x4	/* shm segment to be zeroed on first attach */
+
+/* Macros for field validity check in pst_shminfo */
+#define PSH_SEGSZ       0x1
+
+/*
+ * This structure describes a hardware path in a stable store.
+ */
+struct pst_ss_path {
+        unsigned char   psp_autoboot:1;	/* Auto-Boot flag (primary path only) */
+	unsigned char   psp_autosearch:1; /* Auto-Search flag (primary only) */
+	unsigned char   psp_pad:2;	/* Reserved */
+	unsigned char   psp_timer:4;	/* Boot timer (primary & console only)
+					 * (log(base2) of # of seconds)  */
+	unsigned char   psp_busconv[6];	/* Bus converters leading to boot mod */
+	unsigned char   psp_module;	/* Boot module */
+	uint32_t        psp_layer[6];	/* Layers past boot module */
+};
+
+/*
+ * This structure describes the OS-dependent portion of the PA-RISC stable
+ * store.
+ */
+struct pst_osdep {
+        unsigned short	pso_osid;	/* Operating system ID */
+	unsigned short  pso_pad1;	/* Reserved */
+	uint32_t	pso_pad2[5];	/* Reserved */
+};
+
+/*
+ * This structure describes the HP-UX dump information stored in the OS-
+ * dependent portion of the PA-RISC stable store.
+ */
+struct pst_dump {
+        unsigned short	psd_osid;	/* Operating system ID, must be HPUX */
+	unsigned short	psd_flags;	/* Flags half-word, see below. */
+	uint32_t	psd_pad;	/* Reserved */
+	uint32_t	psd_device_high;
+	uint32_t	psd_device_low;	/* Device containing dump */
+	uint32_t	psd_offset_high;
+	uint32_t	psd_offset_low;	/* Offset of dump on device */
+};
+
+#define psd_device psd_device_low
+#define psd_offset psd_offset_low
+
+/*
+ * Values for pso_osid and psd_osid.
+ */
+#define PS_OSID_NONE	0x0		/* No OS-dependent data */
+#define PS_OSID_HPUX	0x1		/* HP-UX dependent data */
+#define PS_OSID_MPEXL	0x2		/* MPE-XL dependent data */
+
+/*
+ * Values for psd_flags.
+ */
+#define PS_EARLY_DUMP	0x1		/* Last dump was an early dump;
+					 * psd_device and _offset are invalid */
+
+/*
+ * This structure describes the information in a PA-RISC system's stable
+ * storage area.
+ */
+struct pst_stable_PA_RISC {
+        struct pst_ss_path Pss_primary;	/* Primary boot path */
+	unsigned char   Pss_pad1[32];	/* Reserved */
+	union {
+	  struct pst_osdep Pss_osdep;	/* OS-Dependent information */
+	  struct pst_dump  Pss_dump;	/* HP-UX dump header information */
+	}               Pss_osdep;
+	unsigned char   Pss_pad2[7];	/* Reserved */
+	unsigned char   Pss_pad3:4;	/* Reserved */
+	unsigned char   Pss_fastsize:4;	/* Fast size value (see below) */
+	struct pst_ss_path Pss_console;	/* Console/display path */
+	struct pst_ss_path Pss_alternate; /* Alternate boot path */
+	struct pst_ss_path Pss_keyboard;  /* Keyboard path */
+	unsigned char   Pss_pad4[64];	/* Reserved */
+};	
+
+#define PS_FASTSIZE_256KB	0x0
+#define PS_FASTSIZE_512KB	0x1
+#define PS_FASTSIZE_1MB		0x2
+#define PS_FASTSIZE_2MB		0x3
+#define PS_FASTSIZE_4MB		0x4
+#define PS_FASTSIZE_8MB		0x5
+#define PS_FASTSIZE_16MB	0x6
+#define PS_FASTSIZE_32MB	0x7
+#define PS_FASTSIZE_64MB	0x8
+#define PS_FASTSIZE_128MB	0x9
+#define PS_FASTSIZE_256MB	0xA
+#define PS_FASTSIZE_512MB	0xB
+#define PS_FASTSIZE_1GB		0xC
+#define PS_FASTSIZE_2GB		0xD
+#define PS_FASTSIZE_ALL		0xE	/* or 0xF */
+
+/*
+ * This structure describes the information in any system's stable storage
+ * area.
+ */
+#if !defined(_PSTAT64) || defined(_KERNEL)
+# ifdef _KERNEL
+struct pst_stable32 {
+# else
+struct pst_stable {
+# endif
+        int32_t		pss_size;	/* Number of bytes of stable store */
+	int32_t         pss_type;	/* Type of stable store, see below */
+	int32_t		pss_pad[8];	/* Reserved */
+        union {
+	  unsigned char Pss_PA_RISC_buffer[PST_MAX_PA_RISC_STABLE];
+				        /* Uninterpreted stable store data */
+	  struct pst_stable_PA_RISC Pss_PA_RISC_stable;
+				        /* PA-RISC stable store data */
+	}		pss_un;
+};
+#endif
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_stable {
+        int64_t		pss_size;	/* Number of bytes of stable store */
+	int64_t         pss_type;	/* Type of stable store, see below */
+	int64_t		pss_pad[8];	/* Reserved */
+        union {
+	  unsigned char Pss_PA_RISC_buffer[PST_MAX_PA_RISC_STABLE];
+				        /* Uninterpreted stable store data */
+	  struct pst_stable_PA_RISC Pss_PA_RISC_stable;
+				        /* PA-RISC stable store data */
+	}		pss_un;
+};
+#endif
+
+#define pss_buffer	pss_un.Pss_PA_RISC_buffer
+#define pss_primary	pss_un.Pss_PA_RISC_stable.Pss_primary
+#define pss_osdep	pss_un.Pss_PA_RISC_stable.Pss_osdep.Pss_osdep
+#define pss_dump	pss_un.Pss_PA_RISC_stable.Pss_osdep.Pss_dump
+#define pss_fastsize	pss_un.Pss_PA_RISC_stable.Pss_fastsize
+#define pss_console	pss_un.Pss_PA_RISC_stable.Pss_console
+#define pss_alternate	pss_un.Pss_PA_RISC_stable.Pss_alternate
+#define pss_keyboard	pss_un.Pss_PA_RISC_stable.Pss_keyboard
+
+/*
+ * Values for pss_type
+ */
+#define PS_PA_RISC	0x1	/* PA-RISC stable store */
+
+/*
+ * This structure describes the system crash dump configuration.
+ * It is only available as 64-bit data (_PSTAT64 defined).
+ */
+#define PST_MAXCLASSES 32	        /* Max. number of page classes */
+
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_crashinfo {
+        int64_t      psc_flags;		/* Dump config. flags, see below */
+        struct psdev psc_headerdev;	/* Device containing dump header */
+  	int64_t      psc_headeroffset;	/* Byte Offset of dump hdr on device */
+  	int64_t      psc_ncrashdevs;	/* Number of dump devices */
+  	int64_t      psc_totalsize;	/* Total amount of dump space (kB) */
+  	int64_t      psc_included;	/* Page classes to be included */
+  	int64_t      psc_excluded;	/* Page classes to be excluded */
+  	int64_t      psc_default;	/* Defaults for unspec'd classes */
+  	int64_t      psc_nclasses;	/* Number of classes */
+  	int64_t      psc_pgcount[PST_MAXCLASSES];
+					/* Number of pages in each class */
+	int64_t      psc_reserved;      /* Reserved for future use */
+};
+#else
+struct pst_crashinfo;
+#endif
+
+/* Flag values for psc_flags: */
+#define PS_EARLY_DUMP   0x1		/* An early dump was taken */
+#define PS_CONF_CHANGED 0x2		/* Config. changed since boot */
+#define PS_HEADER_VALID 0x4		/* headerdev and headeroffset valid */
+
+/*
+ * This structure describes a crash dump device.
+ * It is only available as 64-bit data (_PSTAT64 defined).
+ */
+#if defined(_PSTAT64) || defined(_KERNEL)
+struct pst_crashdev {
+        int64_t      psc_idx;		/* Index of this device. */
+        struct psdev psc_device;	/* Device number of physical device */
+  	int64_t      psc_offset;	/* Offset (kB) of area on phys. dev. */
+  	int64_t      psc_size;		/* Size (kB) of dump area */
+        struct psdev psc_lv;		/* Logical volume dev number, if any */
+	int64_t      psc_source;        /* How'd this device get config'd? */
+};
+#else
+struct pst_crashdev;
+#endif
+
+/* Flag values for psc_source: */
+#define PS_BOOTTIME 0x1                 /* Device configured at boot */
+#define PS_RUNTIME  0x2                 /* Device configured by crashconf(2) */
+
+/*
+ * ============ Beginning of old pstat interface spec ===========
+ */
+
+/* old union for buf argument */
+union pstun {
+	struct pst_static	*pst_static;
+	struct pst_dynamic	*pst_dynamic;
+	struct pst_status	*pst_status;
+	char			*pst_command;
+	struct pst_vminfo	*pst_vminfo;
+	struct pst_diskinfo	*pst_diskinfo;
+	struct pst_processor	*pst_processor;
+	struct pst_lvinfo	*pst_lv;
+	struct pst_swapinfo	*pst_swapinfo;
+	struct pst_fileinfo	*pst_fileinfo;
+	struct pst_seminfo	*pst_seminfo;
+	struct pst_msginfo	*pst_msginfo;
+	struct pst_shminfo	*pst_shminfo;
+	struct pst_ipcinfo	*pst_ipcinfo;
+	struct pst_vm_status    *pst_vm_status;
+	struct pst_stable       *pst_stable;
+        struct pst_crashinfo    *pst_crashinfo;
+        struct pst_crashdev     *pst_crashdev;
+};
+
+/* old function prototype */
+
+#ifndef _KERNEL
+#ifdef __cplusplus
+   extern "C" {
+#endif /* __cplusplus */
+
+#ifdef _PROTOTYPES
+    int pstat(int, union pstun, size_t, size_t, int);
+#else /* not _PROTOTYPES */
+    int pstat();
+#endif /* not _PROTOTYPES */
+
+#ifdef __cplusplus
+   }
+#endif /* __cplusplus */
+#endif /* not _KERNEL */
+
+/*
+ * ============ Begin of pstat_get_lwp interface spec ================
+ */
+
+/*
+ * This structure contains per-lwp information
+ */
+
+#if defined(__STDC_EXT__) || (!defined(__STDC__) && defined (__LL_MODE__)) || defined(__LP64__)
+struct lwp_status {
+	int64_t lwp_idx;	/* Index for further pstat_get_lwp() reqs */
+	int64_t lwp_lwpid;	/* lwp ID */
+	int64_t lwp_pid;	/* pid that lwp belongs to */
+	int64_t lwp_flag;	/* flags associated with lwp */
+	int64_t lwp_stat;	/* Current status */
+	int64_t lwp_wchan;	/* If state LWP_SLEEP, value sleeping on */
+	int64_t lwp_pri;	/* priority of lwp */
+	int64_t lwp_cpu;	/* (decaying) cpu utilization for scheduling */
+	int64_t lwp_spu;	/* spu number lwp is assigned to */
+	int64_t lwp_user_suspcnt;/* user-initiated suspend count */
+	struct pstsigset lwp_sig;	/* signals pending to lwp */
+	struct pstsigset lwp_sigmask;	/* current signal mask */
+	int64_t lwp_schedpolicy;	/* scheduling policy */
+	int64_t lwp_ticksleft;	/* clock ticks left in lwp's RR timeslice */
+	int64_t lwp_start;	/* time lwp created (seconds since epoch) */
+	uint64_t lwp_minorfaults;  	/* # page reclaims */
+	uint64_t lwp_majorfaults;  	/* # page faults needing disk access */
+	uint64_t lwp_ndeact;       	/* # deactivates */
+	uint64_t lwp_inblock;      	/* # block input operations */
+	uint64_t lwp_oublock;      	/* # block output operations */
+	uint64_t lwp_ioch; 		/* # of characters read/written */
+	uint64_t lwp_msgsnd; 		/* # messages sent */
+	uint64_t lwp_msgrcv;       	/* # messages received */
+	uint64_t lwp_nsignals;		/* # signals received */
+	uint64_t lwp_nvcsw;        /* # voluntary context switches */
+	uint64_t lwp_nivcsw;       /* # involuntary context switches */
+	uint64_t lwp_syscall;		/* # syscalls */
+	int64_t lwp_syscall_code;	/* last syscall code */
+	int64_t lwp_utime;	/* user time spent executing (in secs) */
+	int64_t lwp_stime;	/* system time spent executing (in secs) */
+	struct lwpcycles
+	  lwp_usercycles;	/* 64-bit user mode execution cycle count */
+	struct lwpcycles
+	  lwp_systemcycles;	/* 64-bit system mode execution cycle count */
+	struct lwpcycles
+	  lwp_interruptcycles;	/* 64-bit interrupt for thread cycle count */
+	int64_t lwp_valid;	/* valid vector */
+};
+#endif /* __STDC_EXT__ || (! __STDC__ &&  __LL_MODE__ )  || __LP64__ */
+
+
+/*
+ * LWP flag bits for lwp_flag
+ */
+#define LWP_OMASK          0x1	   /* Restore old mask after taking signal */
+#define LWP_OWEUPC         0x2	   /* Owe lwp an addupc() call */
+#define LWP_SEL            0x4	   /* Selecting */
+#define LWP_FIRSTLWP	   0x8	   /* Initial lwp in process */
+#define LWP_DEACT          0x10	   /* lwp is deactivated */
+#define LWP_DEACTSELF      0x20	   /* lwp is to self deactivate */
+#define LWP_FAULTING       0x40	   /* lwp is faulting */
+#define LWP_ANYPAGE        0x80	   /* Doing any kind of paging */
+#define LWP_LPT            0x100   /* Lower Priv Transfer trap */
+#define LWP_RUNPROC        0x200   /* Running on a processor */
+#define LWP_MPLOCK         0x400   /* Locked */
+#define LWP_MP_STOP        0x800   /* lwp entering stopped state */
+#define LWP_MP_SEMA_BLOCK  0x1000  /* lwp blocked on semaphore */
+#define LWP_MP_SEMA_NOSWAP 0x2000  /* Do not swap this lwp */
+#define LWP_SIGABL         0x4000  /* Signalable lwp */
+#define LWP_ACTIVE         0x8000  /* lwp active? */
+#define LWP_HALTED         0x10000 /* lwp halted at clean point? */
+#define LWP_AST_NULL       0x20000 /* AST reason */
+#define LWP_AST_HALT       0x40000 /* AST reason */
+#define LWP_AST_TERMINATE  0x80000 /* AST reason */
+
+/* Sleep types for lwp_sleep_type */
+#define LWP_WAKEUP_ALL		0x1
+#define LWP_WAKEUP_ONE		0x2
+#define LWP_WAKEUP_OTHER        0x100
+
+/*
+ * The following are needed only for the narrow platform.
+ */
+#if defined(_PSTAT64) && !defined(__LP64__)
+# define pstat_getstatic    __pstat_getstatic64
+# define pstat_getdynamic   __pstat_getdynamic64
+# define pstat_getvminfo    __pstat_getvminfo64
+# define pstat_getprocessor __pstat_getprocessor64
+# define pstat_getproc      __pstat_getproc64
+# define pstat_getdisk      __pstat_getdisk64
+# define pstat_getlv        __pstat_getlv64
+# define pstat_getswap      __pstat_getswap64
+# define pstat_getfile      __pstat_getfile64
+# define pstat_getsem       __pstat_getsem64
+# define pstat_getmsg       __pstat_getmsg64
+# define pstat_getshm       __pstat_getshm64
+# define pstat_getipc       __pstat_getipc64
+# define pstat_getstable    __pstat_getstable64
+# define pstat_getprocvm    __pstat_getprocvm64
+# define pstat_getcrashinfo __pstat_getcrashinfo64
+# define pstat_getcrashdev  __pstat_getcrashdev64
+#endif /* _PSTAT64 && !__LP64__ */
+
+#ifndef _KERNEL
+#ifdef __cplusplus
+   extern "C" {
+#endif /* __cplusplus */
+
+#ifdef _PROTOTYPES
+    int pstat_getproc(struct pst_status *, size_t, size_t, int);
+#if defined(__STDC_EXT__) || (!defined(__STDC__) && defined (__LL_MODE__)) || defined(__LP64__)
+    int pstat_getlwp(struct lwp_status *, size_t, size_t, int, pid_t);
+#endif /* __STDC_EXT__ || (! __STDC__ &&  __LL_MODE__ )  || __LP64__ */
+    int pstat_getstatic(struct pst_static *, size_t, size_t, int);
+    int pstat_getdynamic(struct pst_dynamic *, size_t, size_t, int);
+    int pstat_getvminfo(struct pst_vminfo *, size_t, size_t, int);
+    int pstat_getdisk(struct pst_diskinfo *, size_t, size_t, int);
+    int pstat_getprocessor(struct pst_processor *, size_t, size_t, int);
+    int pstat_getlv(struct pst_lvinfo *, size_t, size_t, int);
+    int	pstat_getswap(struct pst_swapinfo *, size_t, size_t, int);
+    int	pstat_getfile(struct pst_fileinfo *, size_t, size_t, int);
+    int	pstat_getsem(struct pst_seminfo *, size_t, size_t, int);
+    int	pstat_getmsg(struct pst_msginfo *, size_t, size_t, int);
+    int	pstat_getshm(struct pst_shminfo *, size_t, size_t, int);
+    int	pstat_getipc(struct pst_ipcinfo *, size_t, size_t, int);
+    int pstat_getprocvm(struct pst_vm_status *, size_t, size_t, int);
+    int pstat_getstable(struct pst_stable *, size_t, size_t, int);
+#ifdef _PSTAT64
+    int pstat_getcrashinfo(struct pst_crashinfo *, size_t, size_t, int);
+    int pstat_getcrashdev(struct pst_crashdev *, size_t, size_t, int);
+#endif /* _PSTAT64 */
+#else /* ! _PROTOTYPES */
+    int pstat_getproc();
+    int pstat_getlwp();
+    int pstat_getstatic();
+    int pstat_getdynamic();
+    int pstat_getvminfo();
+    int pstat_getdisk();
+    int pstat_getprocessor();
+    int pstat_getlv();
+    int pstat_getswap();
+    int pstat_getfile();
+    int pstat_getsem();
+    int pstat_getmsg();
+    int pstat_getshm();
+    int pstat_getipc();
+    int pstat_getprocvm();
+    int pstat_getstable();
+#ifdef _PSTAT64
+    int pstat_getcrashinfo();
+    int pstat_getcrashdev();
+#endif /* _PSTAT64 */
+#endif /* _PROTOTYPES */
+
+#ifdef __cplusplus
+   }
+#endif /* __cplusplus */
+#endif /* ! _KERNEL */
+
+#endif /* _INCLUDE_HPUX_SOURCE */
+
+#endif /* _SYS_PSTAT_INCLUDED */
+}}}

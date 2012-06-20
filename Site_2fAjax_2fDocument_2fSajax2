@@ -1,0 +1,149 @@
+#title Sajax 응용 : 채팅
+
+=== 소개 ===
+이번에는 Sajax를 이용해서 좀 더 고급스러운 Ajax(:12)응용을 만들어 보고자 한다. 이글은 http://www.modernmethod.com/sajax/examples.phtml 을 참고해서 작성되었다.
+
+=== 아이디어 ===
+이 웹채팅 응용은 다음과 같은 흐름을 가진다.
+ 1. Client 에서 Chat.php를 요청하면, Sajax로 만들어진 Javascript가 HTML 문서와 함께 Client로 전송된다. 
+ 1. 내용을 입력하고 전송버튼을 누르면 Chat.php로 POST방식으로 전달되고
+ 1. Chat.php는 전달된 내용을 파일에 쓴다. 
+ 1. 클라이언트측의 Sajax javascript는 1초간격으로 Data.php에 새로운 데이터가 있는지를 요청하고
+ 1. 새로운 데이터가 있다면, Chat.php를 통해서 최근 10개의 데이터를 얻어온다. 
+ 1. 얻어온 데이터는 <div id="comment"> 에 출력시킨다.
+
+다음은 Chat.php의 코드다
+{{{#!plain
+<?php
+    //
+    // The world's least efficient wall implementation
+    //
+    require("../sajax-0.12/Sajax.php");
+
+    function colorify_ip($ip)
+    {
+        $parts = explode(".", $ip);
+        $color = sprintf("%02s", dechex($parts[1])) .
+                 sprintf("%02s", dechex($parts[2])) .
+                 sprintf("%02s", dechex($parts[3]));
+        return $color;
+    }
+
+    function add_line($msg) {
+        $f = fopen("./tmp/wall.html", "a");
+        $dt = date("Y-m-d h:i:s");
+        $msg = rawurldecode($msg);
+        $msg = strip_tags(stripslashes($msg));
+        $remote = $_SERVER["REMOTE_ADDR"];
+        // generate unique-ish color for IP
+        $color = colorify_ip($remote);
+        fwrite($f, "<span style=\"color:#$color\">$dt</span> $msg<br>\n");
+        fclose($f);
+    }
+
+    function refresh() {
+        $lines = file("./tmp/wall.html");
+        // return the last 25 lines
+        return join("\n", array_slice($lines, -25));
+    }
+
+    $sajax_request_type = "POST";
+    sajax_init();
+    sajax_export("add_line", "refresh");
+    sajax_handle_client_request();
+?>
+<html>
+<head>
+    <title>Wall</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=euc-kr" />
+<style>
+div.comment
+{
+    border:1px solid #000000;
+    padding:2px;
+    width:auto;
+}
+</style>
+    <script>
+    <?
+    sajax_show_javascript();
+    ?>
+    
+    var check_n = 0;
+    var old_data = "--";
+    
+    function refresh_cb(new_data) { 
+        if (new_data != old_data) {
+            document.getElementById("comment").innerHTML = new_data;
+            setTimeout("refresh()", 1000);
+            old_data = new_data;
+        } else {
+            setTimeout("refresh()", 2500);
+        }
+        document.getElementById("status").innerHTML = "Checked #" + check_n++;
+    }
+    
+    function refresh() {
+        document.getElementById("status").innerHTML = "Checking..";
+        x_refresh(refresh_cb);
+    }
+    
+    function add_cb() {
+        // we don't care..
+    }
+
+    function add() {
+        var handle;
+        var r ='';
+        var s;
+        var i;
+
+        s = document.getElementById("line");
+        // UniCode 처리
+        for(i=0; i < s.value.length; i++) { 
+            if (s.value.charCodeAt(i) > 128) { 
+                r += '&#'+s.value.charCodeAt(i)+';'; 
+            } else { 
+                r += s.value.substr(i,1); 
+            } 
+        } 
+        line = r;
+
+        r ='';
+        handle = document.getElementById("handle");
+        for(i=0; i < handle.value.length; i++) { 
+            if (handle.value.charCodeAt(i) > 128) { 
+                r += '&#'+handle.value.charCodeAt(i)+';'; 
+            } else { 
+                r += handle.value.substr(i,1); 
+            } 
+        } 
+        handle = r;
+
+        if (line == "") 
+            return;
+        sajax_request_type = "POST";
+        x_add_line("[" + handle + "] " + line, add_cb);
+        document.getElementById("line").value = "";
+    }
+    </script>
+    
+</head>
+<body onload="refresh();" bgcolor=#FFFFFF>
+<div id='wikiBody'>
+<form name="f" action="#" onsubmit="add();return false;">
+    <input type="text" name="handle" id="handle" value="(name)"
+        onfocus="this.select()" style="width:130px;">
+    <input type="text" name="line" id="line" value="(메시지입력)"
+        onfocus="this.select()"
+        style="width:300px;">
+    <input type="button" name="check" value="Post message"
+        onclick="add(); return false;">
+    <div id="comment"></div>
+    <div id="status"><em>Loading..</em></div>
+</form>
+</div>
+</body>
+</html>
+}}}
+ <!>  [wiki:Site/Ajax/Chat 테스트 페이지]

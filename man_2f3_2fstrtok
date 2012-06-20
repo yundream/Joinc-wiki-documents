@@ -1,0 +1,130 @@
+#title strtok - 문자열로 부터 token을 뽑아낸다. 
+
+=== 사용법 ===
+{{{#!plain
+#include <string.h>
+
+char *strtok(char *s, const char *delim);
+char *strtok_r(char *s, const char *delim, char **ptrptr);
+}}}
+
+=== 설명 ===
+'''token'''은 '''delim'''에 있는 문자를 포함하지 않은 하나이상의 문자로 된 문자열을 의미한다. strtok()함수는 주어진 문자열 '''s'''를 delim을 기준으로 토큰을 뽑아낸다. strtok()는 다음 토큰을 가리키는 포인터를 리턴한다. 만약 더이상 가져올 수 있는 토큰이 없다면 NULL(:12)을 리턴하게 된다. 토큰이 구분자로 끝나면, 이 구분자가 \0 로 겹쳐 쓰여지고, 이에 대한 포인터(:12)가 다음 strtok()의 호출을 위해서 저장된다. strtok_r()함수는 strtok()와 동일하게 작동한다. 그러나 정적버퍼를 사용하지 않고 char * 포인터로 할당된 유저 포인터를 사용한다.
+
+=== 주의 ===
+이 함수는 사용에 주의를 해야한다.
+  1. 이 함수는 주어진 인자를 수정한다.
+  1. 구분자의 원본을 잃어 버린다.
+  1. 상수 문자열에 사용해서는 안된다. - 원본을 \0 로 겹쳐쓰기 때문에 -
+  1. strtok()는 파싱할때 정적버퍼를 사용하며 때문에 thread(:12) safe하지 않다. thread:::safe(:12)를 보장받고 싶다면 strtok_r()을 사용하라. 
+ 
+
+=== 리턴값 ===
+strtok() 함수는 다음 토큰에 대한 포인터(:12)를 반환하거나 만일 더 이상 토큰이 없다면 NULL을 반환한다.
+
+=== 예제 ===
+이 프로그램은 HTML(:12) 태그를 제거한다.
+{{{#!plain
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+using namespace std;
+
+const int MAX_BUF_SIZE=1024;
+
+enum tag_token {TAG_LT = '<', TAG_GT='>'};
+int main(int argc, char **argv)
+{
+  int fd;
+  int readn;
+  int ridx;
+  int widx;
+  char rbuf[MAX_BUF_SIZE] = {0x00,};
+  char wbuf[MAX_BUF_SIZE] = {0x00,};
+  int lt_flag = 0;
+
+  // used tokenizing
+  char seps[] = "()|{}, \t.;&-[]\"\':`";
+  char *tr;
+
+
+  int tag_status = 0;
+  int offset = 0;
+
+  if (argc != 2)
+  {
+    fprintf(stderr, "Usage : %s [file]\n", argv[0]);
+    return 1;
+  }
+  if ((fd = open(argv[1], O_RDONLY)) < 0)
+  {
+    return 1;
+  }
+
+  while ((readn = read(fd, rbuf+offset, MAX_BUF_SIZE)) > 0)
+  {
+    ridx = 0;
+    widx = 0;
+    while(ridx < readn)
+    {
+      if (rbuf[ridx] == TAG_LT)
+      {
+        lt_flag++;
+      }
+      if (rbuf[ridx] == TAG_GT)
+      {
+        lt_flag--;
+        if (lt_flag == 0)
+        {
+          ridx++;
+          continue;
+        }
+      }
+
+      if (lt_flag == 1)
+      {
+        ridx++;
+        continue;
+      }
+
+      // Special Chracter 제거
+      if (rbuf[ridx] == '&')
+      {
+         int i =0;
+         char special[10] = {0x00,};
+         for(i = 0; i < 10; i++)
+         { 
+           if (rbuf[ridx+i] == ';')
+           {
+             ridx = (ridx+i);
+             break;
+           }
+         } 
+      }
+    
+      if (rbuf[ridx] == '\n' || rbuf[ridx] == '\r')
+        wbuf[widx] = ' ';
+      else
+        wbuf[widx] = rbuf[ridx];
+
+      widx++;
+      ridx++;
+    }
+    tr = strtok(wbuf, seps);
+    while (tr != NULL)
+    {
+        printf("%s\n", tr);
+        tr = strtok(NULL, seps);
+    }
+    memset(rbuf, 0x00, MAX_BUF_SIZE);
+    memset(wbuf, 0x00, MAX_BUF_SIZE);
+  }
+  return 0;
+}
+}}}
+
+[[tag(리눅스 표준 라이브러리,프로그래밍,C,strtok,thread)]]

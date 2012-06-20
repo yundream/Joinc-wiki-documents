@@ -1,0 +1,72 @@
+#title winsock api : connect - 서버로 연결한다.
+
+== connect ==
+connect 함수는 지정된 소켓으로 연결을 시도한다.
+
+=== 사용법 ===
+{{{#!plain
+int connect 
+{
+  __in  SOCKET s,
+  __in  const struct sockaddr *name,
+  __in  int namelen
+};
+}}}
+
+=== 매개변수 ===
+  * s
+     연결되지 않은 소켓 기술자
+  * name
+     연결정보를 담고 있는 sockaddr(:12) 구조체의 포인터(:12)
+  * namelen
+     sockaddr 구조체 포인터가 가리키는 데이터의 크기
+
+=== 반환 값 ===
+에러가 아니면 0을 반환한다. 그렇지 않을 경우 '''SOCKET_ERROR'''를 반환한다. 
+
+봉쇄(blocking) 소켓일 경우 연결시도시의 실패 혹은 성공 값을 리턴한다.
+
+비봉쇄(nonblocking) 소켓일 경우 연결시도시 접속이 이루어지지 않을 때가 있다. 이 경우 connect 함수는 WSAEWOULDBLOCK 에러코드를 발생한다. 에러코드가 생성되었지만 접속은 계속 진행중이므로 접속에러라고 볼 수는 없다. 이 경우 3가지 처리 시나리오가 있다.
+  * select 함수를 사용했을 경우 소켓에 write 할 때, 연결이 성공했는지 검사할 수 있다.
+  * WSAAsyncSelect 함수를 사용했다면 접속 이벤트로 FD_CONNECT가 발생한다. 이때 연결을 검사하면 된다.
+  * If the application is using WSAEventSelect to indicate interest in connection events, then the associated event object will be signaled indicating that the connect operation is complete (successfully or not).
+
+=== 에러 코드 ===
+ || WSANOTINITIALISED   || WSAStartup(:12)를 성공적으로 호출한 적이 없다.   ||
+ || WSAENETDOWN         || 네트워크 서비스시템에 문제가 생겼다.             ||
+ || WSAEADDRINUSE       || 지정한 주소가 이미 사용되고 있다. SO_REUSEADDR(:12)를 사용해야 한다. ||
+ || WSAEINTR            || 블럭킹 윈속 v1.1이 WSACancelBlockingCall() 함수에 의해 취소되었다.   || 
+ || WSAEINPROGRESS      || 블럭킹 윈속 v1.1이 현재 진행중이거나 서비스 프로바이더가 콜백함수를 여전히 처리하고 있다. ||
+ || WSAEALREADY         || 지정된 소켓에서 비동기 connect 호출이 진행되고 있다.  ||
+ || WSAEFAULT           || name 혹은 namelen 매개변수가 올바르지 않다.           ||
+ || WSAENETUNREACH      || 지정된 네트워크로 연결할 수 없다.                     ||
+ || WSAENOBUFS          || 버퍼공간이 남아있지 않아서 연결할 수 없다.            ||
+ || WSAENOTSOCK         || 기술자가 소켓 기술자가 아니다.                        ||
+ || WSAETIMEDOUT        || 접속 시간이 초과했다.                                 ||
+ || WSAEACCES           || SO_BROADCAST을 설정하지 않고, broadcaset 주소를 지정했다. ||
+
+=== 설명 ===
+connect 함수는 명시된 호스트로의 접속을 시도한다. 소켓 기술자 SOCKET s 가 bind되지 않았다면, 인터페이스 주소와 포트번호를 소켓에 bind 한다. 이는 INADDR_ANY 주소와 0번 포트로 bind 한 것과 비슷하다. 클라이언트의 경우 bind()하지 않고 connect()를 호출하는 경우가 많은데, 이 때문에 임의의 포트주소가 할당이 된다. 
+
+비 연결 지향 소켓 (SOCK_DGRAM)에서 connect는 단지 send(), recv() 함수에 대한 기본 (default) 목적지 주소를 명시하기 위해서 사용된다. 만약 send,recv 함수의 주소가 0으로 설정되면, connect에서 명시된 주소로 통신을 한다.
+
+=== 예제 ===
+{{{#!plain
+WSADATA wsaData;
+sockaddr_in serveraddr;
+
+WSAStartup(MAKEWORD(2,2), &wsaData);
+ClientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+...
+...
+
+serveraddr.sin_family = AF_INET;
+serveraddr.sin_addr.s_addr = inet_addr("xxx.xxx.xxx.xxx");
+serveraddr.sin_port = htons(12345);
+
+if (connect(ClientSocket, (SOCKADDR *)&serveraddr, sizeof(serveraddr)) == SOCKET_ERROR)
+{
+	WSACleanup();
+	return 1;
+}
+}}}

@@ -1,0 +1,117 @@
+#title chef를 이용한 cloud 자동화 전략
+
+== cloud 자동화 ==
+cloud는 크게 두 부분으로 이루어진다. 네트워크, 호스트, 스토리지와 같은 cloud 인프라와 이 인프라를 관리하기 위한 관리 소프트웨어다. 이 두 부분중 cloud 인프라 자동화에 대해서 고민해 보려 한다.
+
+=== 인프라 자동화 ===
+컴퓨팅 노드와 스토리지 노드, 네트워크 장비등 클라우드 서비스를 위한 물리적 하부 구조의 자동화다. 여기에서는 컴퓨팅 노드와 스토리지 노드만을 다룬다. 네트워크 장비의 경우 chef client를 설치하는데 한계가 있기 때문에 제외한다. 해당 장비에 chef client를 설치하는 대신 별도의 설정 node를 둬서 snmp등을 이용 원격으로 제어하는 방법이 있겠지만, 네트워크의 경우 굳이 이렇게 할 필요가 있나 싶다.  
+
+
+=== 관리 시스템 자동화 ===
+클라우드 소프트웨어와 인프라를 관리하기 위한 모니터링 소프트웨어의 설치와 운용을 자동화 한다. 여기에서는 다루지 않는다.
+
+== 인프라 자동화 == 
+=== 자동화할 인프라의 구성 ===
+cloud 인프라의 최소 단위는 POD으로 한다. 이 POD는 스위치와 cnode, snode로 구성된다. 이 인프라를 자동화 하면 된다.
+
+=== 자동화 범위 ===
+어디서 부터 어디까지를 자동화 하는지를 정의 한다. 당연하지만 물리적인 셋팅, 그러니까 상면을 확보하고 랙을 두고, 랙에 switch, cnode, snode를 배치하는 것은 엔지니어의 손을 거쳐야 한다. 
+
+이 상태에서 cnode의 전원을 올리면, 운영체제가 자동으로 설치된다. 여기에 더해서 cnode의 경우 hypervisor, snode의 경우에는 스토리지를 관리하기 위한 소프트웨어와 설정까지 자동으로 설치된다.   
+
+=== 자동화의 핵심 기술 셋 ===
+자동화는 chef를 이용할 것이다. 이제 남은 문제는 자동화를 위해서 chef로 어떤 정보를 관리할 것인가 하는 거다. 자동화를 위한 key를 찾기 위해서 운영체제 설치 과정을 하나씩 따라가 보겠다. 
+  1. 운영체제는 PXE-Boot를 이용해서 원격 설치를 한다. 
+     CD 들고 뛰어다닐 수는 없는 노릇이다. 중앙 저장소에 운영체제별로 ISO 파일을 저장하고, 원격 부팅을 이용해서 운영체제를 설치하도록 한다. 
+  1. kickstart를 이용 원할한 원격 설치를 지원한다. 
+     운영체제를 설치할 때 마다 일일이 손으로 설정을 집어 넣을 수 없는 노릇이다. kickstart를 이용해서 설정 입력을 자동화 한다.
+  1. node의 전원을 올리면, dhcp 서버에 접근해서 '''ip''', 와 '''host name'''을 가져온다. 
+     노드를 클라우드 인프라에 배치하려면 IP 주소가 필요할 것이다. 이제 배치된 노드에 노드의 성격에 맞는 소프트웨어 환경을 만들어야 한다. chef를 사용할 건데, host name을 이용해서 role을 정할 수 있다. 예컨데, mysql.mycloud.com 이라면 mysql role를 적용하는 식이다.
+
+핵신 기술은 결국 PXE-Boot, Kickstart, dhcp(:12)로 요약된다. 이중 PXE-Boot와 kickstart는 기술 명세가 단순하니 넘어가고, 이슈가 좀 있는 dhcp에 대해서 살펴보려고 한다. 
+
+'''dhcp를 이용해서 노드에 ip와 hostname을 할당하고, hostname을 이용 적당한 chef role를 적용한다''' 여기까지는 간단하다. 문제는 dhcp 서버의 위치다. dhcp는 L2 프로토콜이기 때문에, 노드와 같은 subnet에 위치를 해야 한다. 이는 Zone (data center)를 구성하는 10개의 pod가 서로 다른 subnet으로 구성돼 있다면, 각 subnet 마다 네트워크 정보를 할당하기 위한 dhcp 서버가 놓여야 함을 의미한다. 
+
+가장 손쉬운 해결 방법은 POD 별로 dhcp 서버를 두는 것이다. 문제는 서버낭비가 있을 수 있다는 점. 하지만 단순한 해결방법이기 때문에, POD 모니터링 솔류션 등을 함께 두는 정도로 해서 타협하는 경우가 있다.  
+
+다른 해결 방법으로 dhcp-relay를 사용하는 방법이 있을 것이다. dhcp-relay를 이용하면 L3 네트워크에서 dhcp 서비스가 가능하다. 
+== 구축 및 테스트 환경 ==
+VirtualBox를 이용한다. VirtualBox 
+ * 우리집
+ * cloudstack 3.0의 basic network 모드로 테스트 한다.
+   * advanced network 모드는 vlan을 이용하는데, 스위치를 가지지 않는 한 집에서 구현하기는 무리가 있다. advacned network를 테스트하는게 목적이 아니니 그냥 basic network 모드로 한다. 
+ * 사용할 수 있는 node : 2대
+   * 작업용 노트북 컴퓨터 
+      * cloudstack 3.0
+      * NFS 올려서 snode로 사용
+      * chef server
+      * dhcp + tftp + kickstart + yum repository
+   * 놀고 있는 노트북 컴퓨터 : xenserver 6.0설치 cnode로 사용  
+
+== cloud 환경 ==
+ * cloudstack를 기준으로 한다.
+ * zone > pod > cluster > cnode 구조를 가진다. 
+ * cloud 구성요소는 다음과 같다.
+   * cnode : conputing node 
+   * snode : primary storage & secondary storage
+   * network : L2, L3 네트워크 장비
+ * 운영체제 설치부터 자동화 한다. 이를 위해서 필요한 것들은 다음과 같다.  
+   * TFTP : PXEBooting을 위한 부트로더를 다운로드한다.
+   * IPMI : IPMI를 이용해서 PXEBooting을 하도록 명령을 내린다.  
+   * Yum Repository : 패키지를 저장한다. 
+
+== 자동화 진행 과정 ==
+ 1. 먼저 준비해야 할 것들
+   * chef server 
+   * dhcp server
+   * PXEBooting 환경 + kickstart server 
+ 1. cnode 추가 : 메타정보 등록
+   * knife를 이용해서 cnode를 추가한다.
+   * role에 cnode를 추가한다. 
+ 1. 운영체제 설치 준비 
+   * cnode가 준비되면, cnode의 정보를 databag에 저장한다.  
+   * databags에는 cnode의 zone, pod 정보와 함께 '''ip''', '''macaddress'''정보가 들어있다. 
+ 1. dhcp 서버 정보 변경
+   * databags의 정보를 읽어와서 cnode 정보를 dhcp server에 추가한다. 필수 정보는 '''ip address, mac address, host name'''이다.  
+ 1. cnode 설치 
+   * IPMI를 이용, 네트워크 부팅 명령을 내린다. 
+   * cnode는 dhcp서버에 연결해서 macaddress를 key로 네트워크를 설정한다.
+   * cnode는 ip, mac address, 호스트 이름을 가져온다. 
+   * ks의 post configuration을 이용해서 chef client를 설치하고 실행해서 chef server cookbook을 설치한다. 
+
+== cloud 자동화 ==
+=== 구성 ===
+전체 구성은 다음과 같다. 
+ 1. boot-os
+   부팅관련 환경을 가지고 있다. tftp, dhcp, http 서버가 설치돼 있다.
+ 1. yum-repo
+   패키지 저장소
+ 1. chef-server
+
+=== chef server ===
+chef server를 가장 먼저 설치하면 될 것이다. chef server 설치도 자동화 할 수 있겠지만, 어차피 chef server를 자동화하기 위한 환경의 자동화라는 문제에 부닥친다. 어차피 한번은 수작업이 필요하다고 생각되는 바 chef server 설치는 자동화 하지 않을 것이다.  
+
+=== yum repository ===
+chef server를 설치하고 나면, yum repository를 만들어야 한다. yum repository를 자동화 범위는 http 서버 설치와 mirror 사이트로 부터, 패키지를 읽어와서 yum repository를 동기화 하는 데 까지다.    
+
+=== boot-os ===
+마지막으로 boot-os를 설치한다. 역시 chef 자동화 대상이다. chef server의 data bags로 부터, cloud 형상을 읽어오고 그것을 dhcp 설정파일로 만든다. tftp는 네트워크 부팅을 지원하기 위해서, http는 kickstart를 위해서 사용한다. 
+
+'''dhcp server'''
+cnode가 요청을 해오면, cnode의 mac address를 읽어서 host name과 ipaddress를 돌려준다. mac address가 '''key'''인 셈인데, mac 정보는 chef server의 databags에 저장돼 있다.
+
+=== 네트워크 장비 ===
+네트워크 장비도 자동화 해야 하겠는데, 고민이 필요하다. 일반적인 chef 자동화 모델은 chef-client가 설치될 것이라는 것을 가정하는데, 네트워크 장비들에는 chef client가 설치되지 않기 때문이다. 결국 원격에서 제어해야 하는데, 특성상 물리적 작업이 많은 네트워크 장비들에 굳이 이렇게까지 자동화 해야할 필요가 있을까라는 생각이 든다. 
+
+=== cnode와 snode 자동화 ===
+cnode가 부팅하면 dhcp server로 부터 ip와 hostname을 가져와서 부팅을 시작한다. 부팅과정은 kickstart로 자동화 한다. 별로 신경쓸게 없다.
+
+snode는 cnode에 비해서 복잡하다. secondary storage는 swift로 구성할 테니, swift에 대한 이해가 우선이다. primary storage는 운영체제가 뭐냐에 따라 달라질 텐데, opensolaris 기반의 Nexenta와 같은 어플라이언스라면 자동화가 쉽지 않을 수도 있다.
+
+
+== 구축 테스트 ==
+실제 구축 해보기로 했다. 구축 환경은 다음과 같다.
+
+=== chef server 구축 ===
+
+== history ==

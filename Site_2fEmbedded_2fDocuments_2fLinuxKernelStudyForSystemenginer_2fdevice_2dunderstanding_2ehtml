@@ -1,0 +1,393 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>모듈 동작의 이해</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="디바이스 드라이버"
+HREF="chap06.html"><LINK
+REL="PREVIOUS"
+TITLE="샘플 디바이스 드라이버"
+HREF="device-sample.html"><LINK
+REL="NEXT"
+TITLE="알아야할 것 들"
+HREF="device-learn.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="device-sample.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>6장. 디바이스 드라이버</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="device-learn.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="DEVICE-UNDERSTANDING"
+>6.3. 모듈 동작의 이해</A
+></H1
+><P
+>			모듈은 등록될 때 디바이스 번호를 등록하고 이와 함께 file_operations 라는 구조체를 커널에
+			알려준다. file_operations는 include/linux/fs.h에 정의되어 있고 다음과 같다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ * NOTE:
+ * read, write, poll, fsync, readv, writev can be called
+ *   without the big kernel lock held in all filesystems.
+ */
+struct file_operations {
+	struct module *owner;
+	loff_t (*llseek) (struct file *, loff_t, int);
+	ssize_t (*read) (struct file *, char *, size_t, loff_t *);
+	ssize_t (*write) (struct file *, const char *, size_t, loff_t *);
+	int (*readdir) (struct file *, void *, filldir_t);
+	unsigned int (*poll) (struct file *, struct poll_table_struct *);
+	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
+	int (*mmap) (struct file *, struct vm_area_struct *);
+	int (*open) (struct inode *, struct file *);
+	int (*flush) (struct file *);
+	int (*release) (struct inode *, struct file *);
+	int (*fsync) (struct file *, struct dentry *, int datasync);
+	int (*fasync) (int, struct file *, int);
+	int (*lock) (struct file *, int, struct file_lock *);
+	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
+	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+};</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			모든 디바이스 드라이버는 사용자가 file_operations를 사용해 등록해준 표준화되어 있는 인터페이스
+			를 사용해 입/출력 등의 일을 하게된다. 유닉스에서는 디바이스나 네트웍이나 모두 하나의 파일 처럼
+			동작하도록 되어 있는데 이에 따른 함수들이 등록되어 있다. 예를 들어 디바이스로부터 읽기 동작을
+			원한다면 file_operations에 등록된 read 함수를 사용해 읽기를 한다.
+		</P
+><P
+>			file_operations는 모두 채울 필요는 없다. 필요하거나 지원되야하는 것을 채워 넣으면 된다. 그러나
+			범용적인 디바이스를 만든다면 되도록 모든 함수를 다 채워넣어 주는 것이 좋을 것이다.
+		</P
+><P
+>			그러나 file_operations에 존재하는 함수의 개수에 제약이 있으므로 디바이스에 대해 file_operations
+			외의 다른 기능 혹은 함수를 원하는 경우엔 ioctl을 사용한다. ioctl의 C 라이브러리 내의 정의는
+			다음과 같이 되어 있다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#include &#60;sys/ioctl.h&#62;
+
+int ioctl(int d, int request, ...)</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			ioctl 함수를 사용할 때 request란 숫자를 전달해 주는데 이 것이 ioctl에 의해 불리는 함수의 
+			인덱스가 된다. 즉 ioctl로 불리는 함수는 switch 문과 같은 것을 이용해 request로 전달된 값을
+			비교해 해당 함수를 다시 호출해 주게 된다. 다음 소스는 하드 디스크의 시리얼 번호를 읽어 내는
+			기능을 하는 디바이스 드라이버를 만들어 본 것이다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/* hddinfo.c */
+#ifndef __KERNEL__
+#define __KERNEL__
+#endif
+#ifndef MODULE
+#define MODULE
+#endif
+
+#define __NO_VERSION__
+#include &#60;linux/module.h&#62;
+#include &#60;linux/version.h&#62;
+#include &#60;linux/errno.h&#62;
+#include &#60;linux/fs.h&#62;
+#include &#60;linux/ide.h&#62;
+#include &#60;asm/uaccess.h&#62;
+
+#define HDA			0x0300
+#define HARDDISK	HDA
+
+char kernel_version[] = UTS_RELEASE;
+
+static int hddinfo_open(struct inode *node, struct file *f)
+{
+	return 0;
+}
+
+static int hddinfo_release(struct inode *node, struct file *f)
+{
+	return 0;
+}
+
+static ssize_t hddinfo_read(struct file *f, char *buf, size_t nbytes, loff_t *ppos)
+{
+	return nbytes;
+}
+
+static ssize_t read_serial(char *dst)
+{
+	ide_drive_t *drv;
+
+	drv = get_info_ptr(HARDDISK);
+	if (drv)
+		copy_to_user(dst, drv-&#62;id-&#62;serial_no, 20);
+	else
+	{
+		;//PDEBUG("HDDINFO : Cannot get the drive information\n");
+		return 0;
+	}
+
+	return 20;
+}
+
+int hddinfo_ioctl(struct inode *node, struct file *f, unsigned int ioctl_num, unsigned long ioctl_param)
+{
+	switch (ioctl_num)
+	{
+		case 0 :
+			read_serial((char *)(ioctl_param));
+			break;
+	}
+
+	return 0;
+}
+
+struct file_operations Fops = {
+	NULL,
+	NULL,
+	hddinfo_read,
+	NULL,
+	NULL,
+	NULL,
+	hddinfo_ioctl,
+	NULL,
+	hddinfo_open,
+	NULL,
+	hddinfo_release
+};
+
+int init_module()
+{
+	if (register_chrdev(212, "hddinfo", &#38;Fops) &#60; 0)
+	{
+		//PDEBUG("HDDINFO : Unable to register driver.\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+void cleanup_module()
+{
+	if (unregister_chrdev(212, "hddinfo") &#60; 0)
+		;//PDEBUG("HDDINFO : Unable to unregister\n");
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			hddinfo.c에서 정의된 file_operations는 read/ioctl/open/release 만을 사용한다. open과 release는
+			이 디바이스를 open/close할 때 불리므로 디바이스를 사용하기 전에 초기화 해야하거나 혹은 사용을
+			중지하기 전에 또 필요한 작업을 해야하는 경우 이 함수들에 필요한 기능을 넣으면 된다. hddinfo.c
+			에서는 open/close에 따른 작업을 할 필요가 없어 아무것도 넣지 않고 그냥 0을 리턴하는 기능을 넣어
+			예제로 올렸다. read를 사용해 하드디스크의 시리얼 번호를 읽도록 해도 되지만 여기선 ioctl의
+			사용을 보기위해 일부러 read에서 할 읽을 ioctl로 뽑아 만들어 봤다.
+		</P
+><P
+>			이 모듈의 사용은 아래와 같은 프로그램으로 동작 시킨다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/ioctl.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main()
+{
+	int fd;
+	char buf[256];
+
+	fd = open("/dev/hdd_info", O_RDWR);
+	if (fd &#60; 0)
+	{
+		printf("Device open error.\n");
+		return -1;
+	}
+
+	ioctl(fd, 0, buf);
+
+	printf("buf : %s\n", buf);
+
+	close(fd);
+
+	return 0;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			test.c를 동작 시키기 전에 /dev/hdd_info를 만들어 줘야한다. 'mknod c 212 0 /dev/hdd_info'로 만들어
+			준다. 일반적으로 디바이스를 사용하기 위해 디바이스 파일을 사용해 디바이스를 open 한다. 여기에서
+			얻어지는 핸들을 사용해 디바이스에 읽고 쓰기 동작 등을 한 후 다 사용했으면 close로 사용을 중지해
+			준다. 이 절차가 전형 적인 절차에 해당한다.
+		</P
+><P
+>			test.c에서도 open 후 ioctl의 0번 함수를 호출해 hddinfo.c의 read_serial()을 불러 하드디스크의
+			시리얼 번호를 읽어온다. 하드디스크의 시리얼 번호는 커널 부팅할 때 이미 얻어진 하드디스크에 대한
+			정보를 갖고 있는 구조체에서 복사한다.
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="device-sample.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="device-learn.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>샘플 디바이스 드라이버</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap06.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>알아야할 것 들</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

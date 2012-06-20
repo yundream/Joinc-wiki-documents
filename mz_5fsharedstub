@@ -1,0 +1,42 @@
+#title Shared library stub 만들기
+== Shared library stub 만들기 ==
+ * Shared library를 '''실행가능한 형태'''로도 만들었으면 좋겠다는 생각 해본적 있습니까? 매우 제한적인 부분이 있고 어셈블리를 이해해야 하는 조건이 있지만 방법이 있습니다. 일단 자신이 만든 Shared library를 하나 골라서 아래의 소스를 함께 링크 합니다. 단, 링크할때 "'''-e L_EngineStub'''" 이라는 옵션을 주시고 해보세요. 이제 링크가 되었다면 실행속성을 주시고 실행해보세요. 이것이 가장 간략한 Stub 구조를 이식한것이 됩니다. 응용은 여러분이 다양하게 해보시고 좋은 응용이 있으면 이곳에 적어주세요. - [minzkn]
+ {{{#!vim asm
+# Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> Made in KOREA
+# http://minzkn.pe.ky
+                                                                                                                        
+.global L_EngineStub
+                                                                                                                        
+.text
+.org 0x0000
+L_EngineStub:
+                              
+        /* Shared library 가 실행될때 offset 을 검출하기 위한 trick */                                                                                          
+        call 0f
+0:
+        popl %ecx
+        subl $0b, %ecx
+                                                                                               
+        /* write(1, (void *)pMessage, strlen(pMessage)); */
+        movl $0x4,%eax
+        movl $1, %ebx
+        addl $0f, %ecx
+        movl $1f - 0f, %edx
+        int $0x80
+                                                                                  
+        /* exit(0); */                                      
+        movl $1,%eax
+        xorl %ebx, %ebx
+        int $0x80
+                         
+        /* while(1); */                                                                                               
+        jmp . /* Halt */
+                                                                                                                        
+0:     /* pMessage */
+        .ascii "My shared stub message\n"
+        .ascii "Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> Made in KOREA\n"
+        .ascii "\n"
+1:
+                                                                                                                        
+# End of source
+}}}

@@ -1,0 +1,238 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>시스템 콜 추가</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스에 시스템 콜 만들어 넣기"
+HREF="app2.html"><LINK
+REL="PREVIOUS"
+TITLE="시스템 콜 테이블"
+HREF="system-call-table.html"><LINK
+REL="NEXT"
+TITLE="Inline Assembly"
+HREF="app3.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="system-call-table.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>부록 B. 리눅스에 시스템 콜 만들어 넣기</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="app3.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="MY-SYSTEM-CALL"
+>B.4. 시스템 콜 추가</A
+></H1
+><P
+>			시스템 콜을 추가해보자. 우선 새로운 시스템 콜이 들어있는 파일을 만들자($TOPDIR)/kernel/mysyscall.c
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/* $(TOPDIR)/kernel/mysyscall.c */
+#include &#60;linux/linkage.h&#62;
+
+asmlinkage int sys_mysyscall()
+{
+	printk("My First System Call.\n");
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			$(TOPDIR)/include/asm/unistd.h에 새로운 시스템 콜을 위한 번호를 추가한다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>...
+#define __NR_vfork	190
+#define __NR_mysyscall	191</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			$(TOPDIR)/i386/kernel/entry.S에 있는 시스템 콜 테이블에 등록한다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>ENTRY(sys_call_table)
+	...
+.long	SYSBOL_NAME(sys_mysyscall)
+.rept NR_syscalls-191</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			커널을 컴파일하는데 위에서 만든 mysyscall.c를 Makefile에 등록해 준다. 간단히 'O_OBJS='이란 줄에
+			mysyscall.o라고 추가해주면 된다.
+		</P
+><P
+>			커널 컴파일이 끝나면 새로운 커널을 설치하고 재부팅한 다음 아래와 같은 테스트 프로그램을 만들어
+			실행해 보자.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/* test.c */
+#include &#60;linux/unistd.h&#62;
+
+_syscall0(int, mysyscall);
+
+int main()
+{
+	int i;
+
+	i = mysyscall();
+
+	return i;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			테스트 프로그램을 실행했을 때 화면에 'My First System Call'이라고 출려되면 다행인데 아무런 출력도
+			없다면 dmesg를 사용해 커널 출력을 확인해 보자. 제일 끝에 문장이 제대로 찍혔는가?
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="system-call-table.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="app3.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>시스템 콜 테이블</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="app2.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>Inline Assembly</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

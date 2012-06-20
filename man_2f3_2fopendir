@@ -1,0 +1,59 @@
+#title opendir - 디렉토리 열기
+
+== 사용법 ==
+{{{#!plain
+#include <sys/types.h>
+#include <dirent.h>
+
+DIR *opendir(const char *name);
+}}}
+
+== 설명 ==
+opendir() 함수는 ''name'' 디렉토리를 열고, 이에 대한 스트림 포인터를 리턴한다. 이 스트림은 디렉토리의 첫번째 요소의 위치를 가리킨다. 
+
+== 리턴값 ==
+opendir() 함수는 디렉토리 스트림의 포인터를 리턴한다. 에러가 발생했다면 NULL을 리턴한다.
+
+== 에러 ==
+  * EACCES
+    Permission 거부
+  * EMFILE
+    프로세스에 의해서 너무 많은 파일이 열렸음 
+  * ENFILE
+    최근 시스템에 의해서 너무 많은 파일이 열렸음
+  * ENOENT
+    '''name'''이 빈문자열 이거나 혹은 같은 이름의 디렉토리가 없음
+  * ENOMEM
+    작업을 수행하기 위한 충분한 메모리가 없음
+  * ENOTDIR
+    '''name'''이 디렉토리가 아님
+
+== 참고 ==
+open(2), closedir(3), readdir(3), rewinddir(3), scandir(3), seekdir(3), telldir(3), telldir(3), dirfd(3)
+
+== 예제코드 ==
+{{{#!plain
+#include <dirent.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <string.h>
+
+int main()
+{
+    struct dirent *item;
+    DIR *dp;
+
+    dp = opendir("/");
+    if (dp != NULL)
+    {
+        for(;;)
+        {
+            item = readdir(dp);
+            if (item == NULL)
+                break;
+            printf("DIR : %s\n", item->d_name);
+        }
+        closedir(dp);
+    }
+}
+}}}

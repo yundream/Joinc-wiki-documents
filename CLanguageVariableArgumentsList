@@ -1,0 +1,472 @@
+#title CLanguageVariableArgumentsList
+==  C언어 가변 인자  ==
+
+printf()와 scanf()와 같은 가변 인자를 받는 함수를 만들거나 이 함수를 덮어 쓰는 wrapper를 만들려면 가변 인자를 처리할 줄 알아야 합니다.
+
+가변 인자를 처리할려면 다음과 같은 data type과 함수 (또는 매크로 함수)를 써야 합니다:
+
+ * va_list -- type
+ * va_start(va_list argptr, last-arg) -- 가변 인자 처리 시작.
+ * va_end(va_list argptr) -- 가변 인자 처리 끝.
+ * T va_arg(va_list argptr, T) -- 가변 인자 얻기.
+
+이들은 모두 표준 헤더 파일인 <stdarg.h>에 선언되어 있습니다. 일단 간단히 N개의 정수(int type)를 받아서 더하는 함수를 만들어 봅시다:
+
+{{{#!vim c
+#include <stdarg.h>
+
+int
+sum(int nargs, ...)
+{
+  va_list argptr;
+  int i, total = 0;
+
+  va_start(argptr, nargs);        /* 가변 인자 처리 시작 */
+  for (i = 0; i < nargs; i++)
+    total += va_arg(argptr, int); /* 하나씩 가변 인자 얻기 */
+  va_end(argptr);                 /* 가변 인자 처리 끝 */
+
+  return total;
+}
+}}}
+
+
+위와 같이 정의해 놓고 다음과 같이 쓸 수 있습니다 (주의: sum()의 첫번째 인자는 두번째부터 나올 가변 인자의 갯수입니다):
+
+{{{#!vim c
+int sum(int nargs, ...);
+
+int
+main(void)
+{
+  int s1, s2;
+
+  /* 1부터 5까지 더한 값을 s1에 저장. */
+  s1 = sum(5, 1, 2, 3, 4, 5);
+
+  /* 100, 200, 300을 더한 값을 s2에 저장. */
+  s2 = sum(3, 100, 200, 300);
+
+  /* ... */
+  return 0;
+}
+}}}
+
+
+일단 가변 인자를 처리하기 위해서는 va_list type의 변수 하나를 선언해야 합니다:
+
+{{{#!vim c
+va_list argptr;
+}}}
+
+
+그리고, 가변 인자를 처리할 부분 앞에 다음과 같이 써 줍니다:
+
+{{{#!vim c
+va_start(argptr, nargs);
+}}}
+
+
+va_start()의 첫번째 인자는 아까 선언한 va_list type의 변수 이름이며, 두번째 인자는 이 함수에서 가변 인자를 받는 부분의 바로 앞의 (고정된) argument입니다. 즉, 위에서 예로 든 sum()의 경우, 가변 인자를 나타내는 "..." 앞에 오는 argument인 nargs가 두번째 인자가 됩니다.
+
+눈치가 빠른 분은 이미 알고 있겠지만, 가변 인자를 받는 함수는 여러 가지 제한이 붙습니다. 첫째, va_start()에 가변 인자 바로 앞의 고정된 인자를 주어야 하기 때문에, 가변 인자를 받는 함수는 고정된 인자가 하나 이상 나와야 합니다. 즉, void foo(...)와 같은 함수는 만들 수 없습니다. 둘째, 가변 인자를 나타내는 "..."는 반드시 마지막 인자이어야 합니다. "..."가 중간이나 처음에 나올 수는 없습니다. 예를 들어 void bar(..., int a)와 같은 함수는 만들 수 없습니다.
+
+실제 함수에 전달된 가변 인자를 얻기 위해서는 va_arg()를 불러서 처리합니다. va_arg()는 가변 인자로 전달된 값을 호출할 때마다 하나씩 얻어서 줍니다. va_arg()는 첫번째 인자로, va_start()로 초기화한 va_list type을 받으며, 두번째 인자로는 가변 인자로 전달된 값의 type을 써 주어야 합니다. 우리가 만든 sum()의 경우, 함수의 목적이 모든 int를 더한 값을 계산하는 것이므로, va_arg()의 두번째 인자로 int를 주면 됩니다.
+
+{{{#!vim c
+va_arg(argptr, int);
+}}}
+
+
+눈치가 더욱 빠른 분이면 아시겠지만, 여기서 가변 인자를 받는 함수에 또다른 제한이 붙습니다. 아시겠지만, 가변 인자로 전달되는 값의 타입에는 제한이 없습니다 (printf(), scanf()를 생각해보세요). 아쉽게도 va_arg()는 전달되는 값의 타입을 알아낼 방법이 없습니다. 따라서 미리 그 type을 알아서 va_arg()의 두번째 인자로 전달해 주어야 합니다.
+
+게다가, 가변 인자를 받는 함수의 입장에서, 몇개의 가변 인자가 전달되었는지 알아낼 방법은 없습니다. 따라서 고정된 인자로 가변 인자의 갯수를 전달하는 등 (위의 sum()의 예처럼)의 방법으로 va_arg()를 몇번을 불러야 되는가를 알아낼 방법을 제공해야 합니다.
+
+더 골치 아픈 것은 va_arg()의 두번째 인자로 쓸 수 있는 type에 제한이 있다는 것입니다. 이건 뒤에서 다루겠습니다.
+
+이제 가변 인자를 처리하는 함수를 만들어 보았으니, printf()의 wrapper를 만들어 봅시다.
+
+노파심에서 말씀드리지만, 다음과 같은 함수는 동작하지 않습니다:
+
+{{{#!vim c
+int
+my_printf(const char *fmt, ...)
+{
+  return printf(fmt, ...);
+}
+}}}
+
+
+일단 먼저, printf의 계열에는 다음과 같은 함수들이 있다는 것을
+알아둡시다:
+
+{{{#!vim c
+int printf(const char *fmt, ...);
+int fprintf(FILE fp, const char *fmt, ...);
+int sprintf(char *sr, const char *fmt, ...);
+int snprintf(char *s, size_t n, const char *fmt, ...);
+/* 이상 <stdio.h>에 선언되어 있는 함수들 */
+
+int vprintf(const char *fmt, va_list ap);
+int vfprintf(FILE fp, const char *fmt, va_list ap);
+int vsprintf(char *sr, const char *fmt, va_list ap);
+int vsnprintf(char *s, size_t n, const char *fmt, va_list ap);
+/* 이상 <stdarg.h>에 선언되어 있는 함수들 */
+}}}
+
+
+잘 보면 알겠지만, <stdarg.h>에 있는 함수들은 <stdio.h>에 있는 printf() 계열 함수 이름 앞에 'v'가 붙고, "..." 대신에 va_list
+type의 인자가 온다는 것을 알 수 있습니다.
+
+printf() style의 문자열을 받으려면, 이 v*printf() 계열의 함수를
+쓰면 편리합니다. 예를 들어 단순히 printf()와 똑같은 기능을 하는 wrapper는 다음과 같이 만들 수 있습니다:
+
+{{{#!vim c
+int
+my_printf(const char *fmt, ...)
+{
+  va_list argptr;
+  int ret;
+
+  va_start(argptr, fmt);
+  ret = vprintf(fmt, argptr);
+  va_end(argptr);
+
+  return ret;
+}
+}}}
+
+
+즉, 가변 인자 처리를 위한 va_list type 변수를 선언, va_start()로 초기화한 다음에 v*printf() 계열의 함수에 이 va_list type의 변수를 넘겨주기만 하면 됩니다. (va_end()를 불러 끝내는 것을 잊지 마세요!!)
+
+좀더 복잡하게 하나 더 만들어 봅시다. 함수는 error()입니다. 이 함수는 주어진 printf() style의 에러 메시지를 받아서 stderr로 출력하고, 필요하면 errno의 내용도 알려주고, 필요하면 exit()를 불러서 프로그램을 종료하는 함수입니다. 선언은 다음과 같습니다:
+
+{{{#!vim c
+void error(int status, int ecode,
+           const char *fmt, ...);
+}}}
+
+
+이 함수는 ecode가 0이 아닌 경우, strerror(ecode) 값을 출력하고, fmt와 "..."으로 전달된 printf() style의 에러 메시지도 출력한 다음, status가 0이 아닌 경우, exit(status)를 호출합니다. 함수 정의는 다음과 같습니다.
+
+{{{#!vim c
+void
+error(int status, int ecode,
+      const char *fmt, ...)
+{
+  va_list argptr;
+
+  fflush(stdout);
+  fprintf(stderr, "error: ");
+  if (ecode)
+    fprintf(stderr, "%s: ", strerror(ecode));
+
+  va_start(argptr, fmt);
+  vfprintf(stderr, fmt, argptr);
+  va_end(argptr);
+
+  fputc('\n', stderr);
+
+  fflush(stderr);  /* redundant */
+
+  if (status)
+    exit(status);
+}
+}}}
+
+
+다음과 같이 쓸 수 있습니다.
+
+{{{#!vim c
+#include <stdio.h>
+#include <errno.h>
+
+...
+
+void
+foo(const char *filename)
+{
+  FILE *fp;
+  fp = fopen(filename, "r");
+  if (!fp)
+    error(1, errno, "cannot open file %s.", filename);
+  ...
+}
+}}}
+
+
+참고로 여기서 예로 만든 error()는 GNU C library (glibc)에 이미
+포함되어 있습니다. 여기에서는 좀더 간략화해서 만들어 본 것이죠. 실제 여러분의 코드에 <error.h>를 포함시키면 위 error()를 정의할 필요없이 바로 쓸 수 있습니다. (출력 형태는 약간 다를 수 있습니다만, 인자 type이나 갯수는 같으니 똑같이 쓸 수 있습니다)
+
+마지막으로 아까 va_arg()의 두번째 인자로 나올 수 있는 type에 제한이 있다고 했는데 그 얘기를 해보겠습니다. 결론부터 말하면, va_arg()의 두번째 인자로 나올 수 있는 type은 다음과 같습니다:
+
+ * int 계열 (int, unsigned int, signed int)
+ * long 계열 (long, unsigned long, signed long)
+ * double 계열 (double, long double)
+ * 포인터 계열 (모든 타입의 포인터, 예를 들어 void *, char *, 등등)
+
+다음과 같은 타입은 올 수 없습니다:
+
+ * char 계열 (char, unsigned char, signed char)
+ * short 계열 (short, unsigned short, signed short)
+ * float 계열 (float)
+
+그럼 가변 인자로 char나 float type은 올 수 없느냐, 그렇지는 않습니다. 이런 타입을 받기 위해서는, va_arg()에 다음과 같이 전달합니다.
+
+ * char -> int (unsigned char는 unsigned int, 이런 식으로)
+ * short -> int (unsigned short는 unsigned short, 이런 식으로)
+ * float -> double
+
+그 이유는 다음과 같습니다. C 언어가 처음 만들어질 때에는 function prototype이란게 없었습니다. 인자가 몇개이고, 어떤 타입이냐에 상관없이 단순히 함수가 있고, 리턴 타입이 뭐다. 정도만 알려 줬죠. 예를 들면 다음과 같습니다:
+
+{{{#!vim c
+double bar();
+
+double bar(a, f, ch)
+  int a;
+  float f;
+  char ch;
+{
+  ...
+}
+}}}
+
+
+이런 식으로 함수를 선언하게 되면, 컴파일러가 함수의 정의를 보기 전에는 이 함수에 전달되는 인자의 타입이 뭔지 알 수 없습니다. 만약 컴파일러가 bar()의 정의를 보기 전에 다음과 같은 코드를 컴파일해야 한다고 가정해 보기 바랍니다:
+
+{{{#!vim c
+void
+foo(void)
+{
+  bar(4, 2.5, 9);
+}
+}}}
+
+
+일단 bar()의 인자가 3개인데,, "void bar();"만 보고서는 인자가 적절하게 전달되었는지 알 방법이 없습니다. 따라서 인자 갯수 체크를 할 수 없습니다.
+
+둘째로, 각각의 인자가 알맞는 타입인지도 알 수 없습니다. 함수 호출을 위해서는 (stack에 인자를 push해야 하는데), 인자의 type을 알 수 없으니, 첫번째 인자인 4를 push할 때, 8 bit로 4를 push할 것인지, 16 bit로 4를 push할 것인지, 32 bit로 할 것인지 알 수가 없습니다.
+
+따라서 C 언어에는 "integral promotion"이란 용어? 개념?이 있고, 여기에 따라서 모든 인자는 다음과 같은 type으로 변환해서 stack에 push합니다.
+
+ * char, short -> int
+ * float -> double
+ * int -> int (그대로)
+ * long -> long (그대로)
+ * double -> double (그대로)
+ * long double -> long double (그대로)
+ * 모든 pointer type -> 모든 pointer type (그대로)
+
+즉, 인자로 전달된 값이 character 값이라 할 지라도 함수를 호출할 때에는 int type으로 변환해서 전달합니다.
+
+지금까지는 ANSI C에서 function prototype이 나오기 전의 old style (K&R) C에 필요한 내용입니다. 자, ANSI C에서는 function prototype이 있으니, 컴파일러가 함수 호출을 하기 전에 함수의 인자 갯수와 타입을 모두 알 수 있습니다.
+
+{{{#!vim c
+double bar(int a, float f, char ch);
+}}}
+
+
+따라서 더 이상 이러한 변환이 필요없게 되었지만, 하나 예외가 있는데, 바로 가변 인자를 처리하는 함수입니다. 가변 인자는 실제로 어떠한 타입이 몇개가 들어올 지 알 수 없기 때문에, 이러한 변환이 계속 수행됩니다.
+따라서 va_arg()로 이러한 타입을 받을려면 이 integral conversion을 미리 생각해 두어야 합니다.
+
+예를 들어 문자 하나씩 받아서 출력하는 함수를 만들어 보겠습니다:
+
+{{{#!vim c
+void
+putchars(int nargs, ...)
+{
+  va_list argptr;
+  char ch;
+  int i;
+
+  va_starg(argptr, nargs);
+  for (i = 0; i < nargs; i++) {
+    ch = (char) va_arg(argptr, int);
+    putchar(ch);
+  }
+  va_end(argptr);
+}
+}}}
+
+
+즉, 들어올 가변 인자가 char type일지라도 va_arg()에서는 integral promotion에 따라 int type으로 받아서 처리해야 합니다.
+
+잘 생각해 보면, 이미 여기에 대해 알고 있었을 것입니다. printf()와 scanf()를 생각해봅시다.
+
+printf에서 float이나 double을 출력하기 위해서는 "%f"를 씁니다.
+그런데, scanf에서는 float은 "%f", double은 "%lf"를 씁니다.
+아래 예 참고:
+
+{{{#!vim c
+double d;
+float f;
+
+printf("%f", d);
+printf("%f", f);
+
+scanf("%f", &f);
+scanf("%lf", &d);
+}}}
+
+
+그 이유는, integral promotino에 의해 printf의 경우, float을
+double로 받기 때문입니다. 따라서 float과 double에 관한 차이가 없습니다. 그러나 scanf의 경우에는 모든 인자가 pointer type이기 때문에 이러한 변환이 필요없습니다. 즉, 모든 타입을 각각 구별해야 하는 것이죠.
+
+분명 printf 코드안에서 float을 출력하는 부분은 다음과 같은 코드를 포함합니다:
+
+{{{#!vim c
+  value = (float) va_arg(argptr, double);
+}}}
+
+
+또한 scanf 코드 안에서 float을 출력하는 부분은 다음과 같은 코드를 포함합니다:
+
+{{{#!vim c
+  ptr = va_arg(argptr, float *);
+}}}
+
+
+이 정도면 가변 인자를 처리하는 방법은 완벽히! 익히셨을 것입니다. 그럼 다음 기회에... 
+
+끝 -- [cinsk]
+
+----
+
+ * TODO: Function prototype이 ANSI C에서 소개된 것 맞나?
+ * TODO: Integral Promotion이라고 했는데, 여기에 float, double이 포함되는 것이 확실한가?
+이거 알아보고 글 고칠 것.. -- [cinsk].
+
+함수 선언(정의가 아닌)의 경우에는 그 전에도 있었던 것 같습니다.
+[http://www.ifi.uio.no/forskning/grupper/dsb/Programvare/Xite/ProgrammersManual/node11.html#SECTION000111000000000000000]
+그러나 매개변수의 타입들을 함께 적어주는 function prototype은 ANSI C에서 새로이 나온 것인 듯 합니다.
+
+가변인자 함수에서 적용되는 것은 Integral Promotion을 포함하는 Default argumnt promotion입니다.
+
+C99 6.5.2.2 Function calls 중에서...
+
+If the expression that denotes the called function has a type that does not include a
+prototype, the integer promotions are performed on each argument, and arguments that
+have type float are promoted to double. These are called the default argument
+promotions.
+
+그리고 표준문서에서는 Integer promotion이라는 용어를 씁니다.
+
+Integer promotion은 이름 그대로 정수형의 승급만을 의미합니다. double이나 포인터는 포함되지 않습니다.
+int형 또는 unsigned int형보다 rank가 낮은 (즉 표현범위가 좁은) 정수형에 한해서 int 형 또는 unsigned 형으로
+승급됩니다. 해당되지 않는 데이터 형들은 그대로 남습니다.
+
+6.3.1.1 Boolean, characters, and integers 중에서...
+
+The following may be used in an expression wherever an int or unsigned int may
+be used:
+
+ * An object or expression with an integer type whose integer conversion rank is less than the rank of int and unsigned int.
+ * A bit-field of type _Bool, int, signed int, or unsigned int.
+
+If an int can represent all values of the original type, the value is converted to an int;
+otherwise, it is converted to an unsigned int. These are called the integer
+promotions. All other types are unchanged by the integer promotions.
+
+----
+
+==  가변 인자 매크로  ==
+
+ISO C 표준을 지원하는 컴파일러에서는 가변 인자를 처리하는 매크로도 정의할 수 있습니다.
+함수 형태의 매크로를 정의할 때, "..."을 써 주고, 매크로 정의 부분에서 __VA_ARGS__를
+써주면 그 자리에 확장됩니다. 예를 들면, 다음과 같습니다:
+
+{{{#!vim c
+#define debug(s, ...)    fprintf(stderr, s, __VA_ARGS__)
+
+void
+foo(void)
+{
+  debug("Entered the function, %s\n", __func__);
+  /* ... */
+}
+}}}
+
+
+간단하게 printf 형태의 메시지를 입력받은 표준 함수 assert()와 비슷한 매크로 함수를
+만들어 봅시다; 함수 이름은 ASSERT()로 하겠습니다. ASSERT()의 첫 인자는, assert()의
+인자와 같습니다. 즉 거짓인 경우, abort()를 부릅니다. ASSERT()의 두번째 인자부터는
+printf()와 같습니다. 또한 NDEBUG 매크로가 정의된 경우, ASSERT()는 아무런 영향을 주지
+않습니다.
+
+일단, ASSERT()가 쓰인 시점의 파일 이름, 줄 번호, 그리고 함수 이름을 자동으로 출력하게
+합시다. 따라서 미리 정의된 매크로인 __FILE__과 __LINE__을 쓰며, 미리 정의된 이름,
+__func__를 씁니다.
+
+아래에 ASSERT()의 정의가 나갑니다:
+
+{{{#!vim c
+#ifndef NDEBUG
+# define ASSERT(exp, s, ...)  assert_(__FILE__, __LINE__, __func__, \
+                                      #exp, s, __VA_ARGS__)
+#else
+# define ASSERT(exp, s, ...)  ((void)0)
+#endif /* NDEBUG */
+}}}
+
+
+간단합니다. NDEBUG가 정의된 경우에는 ASSERT()가 assert_()를 호출합니다.
+assert_()의 처음 세 인자는 ASSERT()를 부른 곳의 파일 이름, 줄 번호, 함수 이름을
+자동으로 전달하게 됩니다. 다음으로 ASSERT()의 첫 인자를 문자열로 바꾸어 전달하며(#exp),
+그 다음으로, printf() 스타일의 format string인 s가 들어오며,
+그 뒤에 가변 인자가 들어옵니다.
+
+이제 assert_()의 정의가 나갑니다:
+
+{{{#!vim c
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void
+assert_(const char *filename, int lineno, const char *func,
+        const char *exp, const char *fmt, ...)
+{
+  va_list argptr;
+
+  fflush(stdout);
+  fprintf(stderr, "%s:%d: assertion, (%s) failed in function, %s\n",
+          filename, lineno, exp, func);
+  fprintf(stderr, "\treason: ");
+  va_start(argptr, fmt);
+  vfprintf(stderr, fmt, argptr);
+  va_end(argptr);
+  putc('\n', stderr);
+  abort();
+}
+}}}
+
+
+예를 들어 다음 함수를 생각해 봅시다:
+{{{#!vim c
+void
+set_age(int age)
+{
+
+ASSERT(age > MIN_AGE, "age should be larger than %d.", MIN_AGE);
+/* ... */
+
+}
+}}}
+MIN_AGE는 10으로 정의된 매크로이고, 사용자가 set_age(3)을 호출했다면,
+다음과 같은 ASSERT''''''ion이 발생합니다:
+
+{{{#!vim nosyntax
+tmp.c:36: assertion, (age > minimum) failed in function, set_age
+        reason: age should be larger than 10.
+Aborted
+}}}
+
+
+자, 그럭 저럭 ASSERT() 쓸만하죠? assert()보다는 좀 나을 것 같습니다.
+
+참고: ISO C 표준 6.4.2.2, 6.10.3
+
+그럼 또 다음 기회에.. -- [cinsk]
+
+----
+CategoryDevelopment

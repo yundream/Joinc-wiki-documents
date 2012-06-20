@@ -1,0 +1,69 @@
+#title linux man page : mktime - Unix Time 을 얻어온다.
+
+=== mktime ===
+Unix Time 시간을 가져온다. 
+
+=== 사용법 ===
+{{{#!plain
+#include <time.h>
+
+time_t mktime(struct tm *tm);
+}}}
+
+=== 설명 ===
+mktime 함수는 인자로 받은 '''시간 구조체 timeptr'''의 값을 Unix:::Time(:12) 시간으로 변경시킨다.
+
+struct tm(:12) 구조체의 원형이다.
+{{{#!plain
+struct tm {
+    int tm_sec;         /* seconds */
+    int tm_min;         /* minutes */
+    int tm_hour;        /* hours */
+    int tm_mday;        /* day of the month */
+    int tm_mon;         /* month */
+    int tm_year;        /* year */
+    int tm_wday;        /* day of the week */
+    int tm_yday;        /* day in the year */
+    int tm_isdst;       /* daylight saving time */
+};
+}}}
+tm 구조체의 멤버변수에 대한 설명이다.
+  * __tm_sec__ : 0 - 59 까지의 초 
+  * __tm_min__ : 0 - 59 까지의 분
+  * __tm_hour__ : 0 - 23 까지의 시
+  * __tm_mday__ : 1 - 31 까지의 일
+  * __tm_mon__ : 0 - 11 까지의 월
+  * __tm_year__ : 년도로 1900년이 시작 년으로 한다.
+  * __tm_wday__ : 일요일 부터의 일 , 0 - 6 
+  * __tm_yday__ : 1월 1일 부터의 일, 0 - 365
+  * __tm_isdst__ : 일광절약 시간을 적용할 것인지.
+월과 년도를 정할 때 주의해야 한다. 예를 들어 2000년 9월이라면 '''tm_year = (2000-1900)''', '''tm_mon = (9-1)'''을 입력해야 한다.
+
+=== 예제 ===
+{{{#!plain
+#include <time.h>
+
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+int main()
+{
+    struct tm tm_ptr;
+    time_t the_time;
+    int i;
+
+    // 2002년 2월 8일 23시 50분 50초 에 대한
+    // Unix Time 를 되돌려준다.
+    tm_ptr.tm_year = 102;  // 2002 - 1900
+    tm_ptr.tm_mon  = 1;    // 2 - 1
+    tm_ptr.tm_mday = 8;
+    tm_ptr.tm_hour = 23;
+    tm_ptr.tm_min  = 50;
+    tm_ptr.tm_sec  = 50;
+
+    printf("%d\n", mktime(&tm_ptr));
+}
+}}}
+
+[[tag(time,시간)]]

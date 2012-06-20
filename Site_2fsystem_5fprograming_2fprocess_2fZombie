@@ -1,0 +1,706 @@
+#title Zombie 프로세스 에 대한 고찰
+참고문헌 
+  * waitpid(2), wait(2), fork(2), 시스템프로그래밍(:12)
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Zombie에 대한 고찰</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Zombie에 대한 고찰</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 3월 27일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>Zombie 프로세스</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN16"
+>Zombie 프로세스란 ?</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#ZOMBIEWHAT"
+>Zombie 프로세스의 상태확인</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN46"
+>좀비프로세스 없애기</A
+></DT
+><DD
+><DL
+><DT
+>1.3.1&#51208;. <A
+HREF="#AEN56"
+>블럭킹 모드에서의 작업이 가능할경우</A
+></DT
+><DT
+>1.3.2&#51208;. <A
+HREF="#AEN62"
+>비블록킹 모드에서의 작업</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>2&#51208;. <A
+HREF="#AEN77"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. Zombie 프로세스</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>1.1&#51208;. Zombie 프로세스란 ?</A
+></H2
+><P
+>			좀비프로세스의 정의는 실행이 종료되었지만 아직 삭제되지 않은 
+			프로세스를 말한다.  
+		</P
+><P
+>			종료되었지만 삭제되지 않았다는 뜻에 대해서 알아보도도록 하자. 
+			보통 프로세스는 exit 시스템함수를 호출함으로써, 프로세스를 
+			종료시킬려고 한다. 그리고 자신의 모든 자원을 해제 시키게 
+			된다. 그러나 프로세스의 exit status 상태와  PID는 여전히 
+			남아서(커널의 task struct에) 유지되게 된다. 이렇게 하는 몇가지 
+			이유가 있는데, 이렇게 함으로써 부모 프로세스는 자식프로세스에 
+			대한 종료상태등을 가져올수 있어서 자신의 자식프로세스가 
+			어떤 상태로 작업을 마쳤는지에 대한 정보를 확인할수 있기 때문이다. 
+			만약 프로세스가 exit 를 호출하는 즉시 모든 자원을 되돌려줌과 동시에 
+			커널에서 task struct 에서 프로세스 정보를 삭제시켜 버린다면, 
+			부모프로세스는 자신의 자식 프로세스가 어떤 상태로 종료되었는지 
+			알수 없게 될것이다.  		     
+		</P
+><P
+>			다음은 커널에서 유지하고있는 <B
+CLASS="EMPHASIS"
+>task_struct</B
+> 구조체의 
+			모습이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct task_struct 
+{
+    /*
+     * offsets of these are hardcoded elsewhere - touch with care
+     */
+    volatile long state;    /* -1 unrunnable, 0 runnable, &#62;0 stopped */
+    unsigned long flags;    /* per process flags, defined below */
+    int sigpending;
+    mm_segment_t addr_limit;    /* thread address space:
+                        0-0xBFFFFFFF for user-thead
+                        0-0xFFFFFFFF for kernel-thread
+                     */
+    ....
+    long counter;
+    long nice;
+
+    int <B
+CLASS="EMPHASIS"
+>exit_code</B
+>, exit_signal;
+
+	struct task_struct *next_task, *prev_task;
+    ....
+    pid_t <B
+CLASS="EMPHASIS"
+>pid</B
+>;
+    pid_t session;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			좀비프로세스를 설명하는데 필요하지 않다고 생략되는 다른 멤버변수들은 
+			생략했다. 위의 구조체를 보면 프로세스의 PID와 종료값 을 저장하고 있는 
+			변수인 <B
+CLASS="EMPHASIS"
+>exit_code</B
+> 와 <B
+CLASS="EMPHASIS"
+>pid</B
+>를 
+			볼수 있을것이다. 부모프로세스는 이 2개의 값을 얻어옴으로써 자식 프로세스의 
+			종료값을 얻어올수 있을것이다.  
+		</P
+><P
+>			실제 시스템관리를 하면서 특히 쉘스크립트등의 시스템관리 
+			언어를 통해서 작업을 할때 이 종료값은 매우 중요하게 사용된다.    
+			쉘상에서 어떤 스크립트를 만들고자 할때, 실행한 명령의 결과에 
+			따라서 분기를 하고 싶을때가 있을것이다. 이럴경우 이 종료값을 
+			매우 유용하게 사용가능하다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#!/bin/bash
+which mutt 2&#62;&#38;1&#62;&#38;/dev/null
+
+echo -n "Default Mail Client is "
+if [ $? = 0 ]
+then
+    echo "mutt"
+else
+    echo "pine"
+fi
+			</PRE
+></TD
+></TR
+></TABLE
+> 
+			위의 쉘스크립트는 mutt가 있는지 확인해서 존재한다면(종료값이 0)
+			mutt를 기본 메일클라이언트로 그렇지 않을경우 pine을 기본 메일클라이언트로 
+			선택하는 스크립트이다. 이러한 자식프로세스의 종료상태를 확인가능한것은 
+			자식프로세스가 종료되면 좀비프로세스로 전환되고, 부모프로세스는 
+			이 좀비프로세스로부터 종료값을 얻어올수 있기 때문이다. 
+		</P
+><P
+>			exit호출로 종료된 프로세스는 자신의 
+			부모프로세스가 종료되거나 wait(2) 계열의 함수를 
+			이용해서 프로세스가 정리될때까지  "좀비(zombie)" 상태로 남아있게 된다.  
+			이미 설명했듯이 좀비프로세스는 이미 프로세스가 exit 한상태이기 때문에, 
+			메모리나, 파일디스크, cpu 자원을 소모하지는 않는다. 
+			그러나 task_struct 구조체를 소비하게 됨으로, 많은 수의 좀비프로세스는 
+			시스템에 악영향을 끼칠수 있다.   
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="ZOMBIEWHAT"
+>1.2&#51208;. Zombie 프로세스의 상태확인</A
+></H2
+><P
+>			그럼 실제로 좀비프로세스를 발생시키고 발생된 좀비프로세스의 
+			상태를 확인해서 좀비프로세스가 시스템에 어떤영향을 미칠수 있는지에 
+			대해서 알아보도록 하겠다. 그리고 좀비프로세스가 악영향을 미칠수 있다고 
+			했는데, 그렇다면 좀비 프로세스를 방지하는 방법에 대해서도 알아보도록 
+			한다.  
+		</P
+><P
+>			좀비프로세스를 발생시키는 가장 간단한 방법은 
+			fork(2) 를 통해서 자식프로세스를 생성시킨후 exit 를 하고, 
+			부모프로세스는 wait(2)를 호출하지 않을경우가 될것이다.  이렇게 
+			되면 자식프로세스는 exit 상태가 되었지만 부모프로세스가 
+			자식프로세스의 상태를 정리하지 않아서, wait 가 호출되거나, 부모프로세스가 
+			종료되기 전까지 Zombie 프로세스로 남게 된다.   
+		</P
+><P
+>			다음은 Zombie 프로세스를 확인할수 있는 예제이다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : zombie.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    int pid;
+    int status;
+    pid = fork();
+
+    if (pid == 0)
+    {
+        sleep(5);
+        printf("I will be back %d&#92;n", getpid());
+        exit(0);
+    }
+    else if(pid &#62; 0)
+    {
+        printf("Im parent %d&#92;n", getpid());
+        printf("Press any key&#92;n");
+        getchar();
+    }
+    else
+    {
+        perror("fork error :");
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			fork()를 이용해서 생성된 자식프로세스는 5초후 중료되며, 
+			부모프로세스는 사용자의 키입력이 있을때까지 getchar() 영역에서 
+			블럭킹 된다. 위 코드를 실행시키면 5초후에 자식프로세스가 
+			좀비프로세스로 변하는걸 확인할수 있을것이다.  
+			정상프로세스에서 좀비프로세스로 변환되었을 때의 상황을 
+			ps 를 통해서 알아보도록 하자. 다음은 프로세스 상황을 
+			1초 단위로 확인하기 위한 간단한 스크립트이며 이것의 
+			실행결과이다. 
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN38"
+></A
+><P
+>
+}}}
+[[sadsense(big)]]
+{{{#!html
+<B
+>&#44536;&#47548; 1. 좀비 프로세스 상태확인</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/acj.gif"></P
+></DIV
+>
+			위의 상태확인 결과를 보면 자식프로세스가 exit 를 한후에 좀비프로세스로 
+			전환된걸 확인할 수 있다. 좀비프로세스는 PID를 가지고 있기는 하지만 
+			CPU, MEMORY 등 어떠한 시스템 자원도 소모하지 않고 있음을 알수 있다. 
+			다만 task 구조체에 프로세스정보만 남아서 커널에 의해서 관리되어 있을 뿐이다.  
+		</P
+><P
+>			위에서 task 구조체를 본적이 있는데, 커널은 이중링크드 리스트 형태로 관리하는 	
+			프로세스의 데이타를 유지하게 된다. 그럼으로 비록 좀비프로세스가 어떠한 자원도 
+			소모하지 않는다고는 하지만 커널입장에서 봤을때는 task 자료구조를 유지하기 위한 
+			얼마간의 자원을 소모하고 있음을 알수 있다. 무엇보다 커널이 유지할수 있는 
+			task 구조체의 리스트의 크기에 제한이 있음으로, 많은 좀비프로세스가 발생할경우 
+			시스템성능에영향을 미칠수 있다. 또한 리스트의 크기가 크면 리스트를 순환하는데 
+			걸리는 시간(각 프로세스를 스케쥴링하기 위한)도 더걸리게 됨으로 역시 성능에 
+			좋지 않은 영향을 미칠수 있을것이다. 
+			관리자가 ps 명령을 이용해서 시스템을 모니터링 할때 기분이 나뻐지는 
+			심리적효과도 무시할 수 없다(정신적인 데미지를 입는다).
+		</P
+><P
+>			실제 /proc/[PID] 디렉토리에가서 프로세스 상태를 확인해보면 모든 proc 파일의 
+			크기가 0으로 되어있는걸 확인할수 있다. 프로세스 이미지 자체가 남아 있는 
+			않다는 것을 알수 있다. 또한 모든 파일(표준입력, 출력, 에러, 기타파일) 
+			역시 닫혔음을 알수 있다. 
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN43"
+></A
+><P
+><B
+>&#44536;&#47548; 2. 좀비 프로세스의 proc 상태</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/ack.gif"></P
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN46"
+>1.3&#51208;. 좀비프로세스 없애기</A
+></H2
+><P
+>			좀비프로세스는 시스템에 좋지 않은영향을 줌과 동시에, 심리적인 타격을 
+			줌으로 좀비프로세스는 생기지 않도록 하는게 중요하다.
+			이번장에서는 좀비프로세스를 없애는 방법들에 대해서 알아보도록 하겠다.  
+			<DIV
+CLASS="TIP"
+><BLOCKQUOTE
+CLASS="TIP"
+><P
+><B
+>&#51089;&#51008; &#51221;&#48372;: </B
+>				보통 특정 프로세스를 종료시키기 위해서 우리는 kill 시스템명령어를 
+				이용해서 해당 프로세스의 PID로 시그널을 보내며, 프로세스가 시그널에 
+				반응하지 않을경우 -9 (SIGKILL)을 보내서 강제적으로 종료한다.     
+				</P
+><P
+>				그러나 좀비프로세스의 경우 이러한 시그널을 보낸다고 하더라도 
+				종료되지 않는다. 이것은 당연하다. 좀비프로세스는 실제 존재하지 않는 
+				이미 종료된 프로세스임으로 종료된 프로세스에 
+				종료시그널을 보낸다고 해서 여기에 반응하지는 않기 때문이다. 
+				</P
+></BLOCKQUOTE
+></DIV
+>
+		</P
+><P
+>			좀비프로세스가 발생하는 상황은 <A
+HREF="#ZOMBIEWHAT"
+>1.2&#51208;</A
+>에서 설명했듯이, 
+			자식프로세스가 종료되었는데, 아직 부모프로세스가 종료되지 않았거나, 
+			부모프로세스가 wait()계열 함수를 호출해서 자식프로세스를 정리하지 않았을 
+			경우 발생한다. 즉 fork()를 사용하는 프로그래밍에서 좀비프로세스가 발생할 
+			확률이 높다는 뜻이 될것이다. 이러한경우 좀비프로세스를 막는 일반적인 
+			방법은 wait()함수를 부모에서 호출하는 것이다.   
+		</P
+><P
+>			다음은 wait() 함수의 선언내용이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/wait.h&#62;
+
+pid_t wait(int *status);
+pid_t waitpid(pid_t pid, int *status, int options);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			wait 함수는 자식프로세스가 종료될때까지 현재 프로세스를 블럭킹 시키며,  
+			자식이 종료되거나 시그널(주로 SIGCHLD)이 발생해서 시그널핸들러를 
+			호출할때 return 된다. 만일 wait 를 호출하기 전에 자식프로세스가 이미 종료
+			되어서 좀비상태로 기다리고 있다면, 함수는 즉시 리턴한다. 리턴하면서 
+			함수는 프로세스의 상태값을 얻어오고, task 구조체에서 해당 프로세스의 
+			정보를 완전히 삭제한다. wait(2) 함수에 대한 자세한 내용은 man 페이지를 
+			참고하기 바란다.   
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN56"
+>1.3.1&#51208;. 블럭킹 모드에서의 작업이 가능할경우</A
+></H3
+><P
+>				이경우는 단지 wait 를 이용해서 기다리기만 하면된다. 
+				위의 zombie.c 예제를 wait 를 이용해서 좀비가 발생하지 않도록 
+				코드를 수정해보도록 하자.   
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : zombie_wait.c</B
+> 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/wait.h&#62;
+
+
+int main()
+{
+    int pid;
+    int status;
+    int spid;
+    pid = fork();
+
+    if (pid == 0)
+    {
+        sleep(5);
+        printf("I will be back %d&#92;n", getpid());
+        return 1;
+    }
+
+    else if(pid &#62; 0)
+    {
+        printf("Im parent %d&#92;n", getpid());
+        printf("Press any key and wait&#92;n");
+        getchar();
+        // 자식프로세스를 wait 한다. 
+        // 자식프로세스의 종료상태는 status 를 통해 받아온다. 
+        spid = wait(&#38;status);
+        printf("자식프로세스 wait 성공 &#92;n");
+        // 자식프로세스의 PID, 리턴값, 종료상태(정상종료혹은 비정상종료)를 
+        // 얻어온다.
+        printf("PID         : %d&#92;n", spid);
+        printf("Exit Value  : %d&#92;n", WEXITSTATUS(status));
+        printf("Exit Stat   : %d&#92;n", WIFEXITED(status));
+    }
+    else
+    {
+        perror("fork error :");
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				코드는 간단하다. wait 를 통해서 자식프로세스를 기다리고, 
+				wait 의 상태값을 이용해서 자식프로세스를 평가하는 코드가 
+				추가되어있다. WEXITSTATUS()는 메크로로 해당 프로세스의 
+				exit 값을 평가한다. WIFEXITED()는 프로세스의 종료상태를 판단하며 
+				정상종료가 되었다면 0이 아닌값을 리턴한다. 이들 메크로함수의 
+				좀더 상세한 내용은 wait(2)의 man page를 이용하기 바란다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN62"
+>1.3.2&#51208;. 비블록킹 모드에서의 작업</A
+></H3
+><P
+>				그런데 위의 코드에는 모든경우에 적용하기엔 약간의 문제가 있다. 
+				wait 가 기본적으로 
+				블럭모드로 작동함으로써, 동시에 여러개의 자식프로세스를 
+				생성할경우 문제가 생긴다는 점이다. 이는 특히 다중의 연결을 
+				받아들이는 (fork로 구현된) 네트워크 서버의 경우 문제가 
+				될수 있다.     
+			</P
+><P
+>				네트워크 서버의 경우 accept를 통해서 클라이언트 연결이 확인되면, 
+				fork() 한후 다시 부모는 accept로 넘어가야 하는데, wait 를 호출해 
+				버릴경우 가장최근에 연결된 클라이언트처리 프로세스가 종료하지 
+				않는 한은 accept로 넘어갈수 없을것이다. 결국 의도와는 달리 
+				한번에 하나의 연결만을 처리하는 서버프로그램이 될것이다. 
+			</P
+><P
+>				간단하게 생각해서 wait를 제거하면 되겠지만, 그랬다가는 다수의 좀비프로세스가 
+				계속적으로 발생하게 될것이다.  
+			</P
+><P
+>				이러한 문제는 프로세스의 종료가 비동기적인 상황하에서 일어나기 때문에 
+				발생한다. 안타깝게도 wait 는 동기적인 상황하에서 프로세스의 종료를 
+				기다릴수 있기 때문에 wait 만으로는 이문제를 해결할 수 없다.
+			</P
+><P
+>				그럼으로 우리는 다른 비동기적인 사건을 감지할 수 있는 도구를 사용해야 할것이다. 
+				다행히도 유닉스는 이러한 비동기적인 사건을 다루기 위한 signal 도구를 제공한다. 
+				우리는 signal 을 통해서 프로세스 종료라는 비동기적인 사건을 감지할수 있고, 
+				사건이 감지되면 wait 를 함으로써, 성공적으로 종료된 프로세스를 정리할수 있다.  
+			</P
+><P
+>				signal을 이용한 종료된 프로세스에 대한 wait 작업은 간단하다. 
+				자식프로세스는 종료되면 자신이 종료되었다는걸 부모프로세스에게 알리기 위해서 
+				SIGCHLD 시그널을 발생시킨다. 부모프로세스는 SIGCHLD 시그널에 대한 핸들러를 
+				설치하고 SIGCHLD 발생하면 해당 핸들러를 호출하면 된다. 이 시그널 핸들러에서는 
+				wait를 호출해서 해당 (시그널을 발생하고 종료한)자식프로세스에 대한 정리를 하게 된다.  
+			</P
+><P
+>				다음은 signal 과 wait의 조합으로 좀비프로세스 발생문제를 해결한 예제이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : zombie_signal.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/wait.h&#62;
+#include &#60;signal.h&#62;
+
+void zombie_handler()
+{
+    int status;
+    int spid;
+    spid = wait(&#38;status);
+    printf("자식프로세스 wait 성공 &#92;n");
+    printf("================================&#92;n");
+    printf("PID         : %d&#92;n", spid);
+    printf("Exit Value  : %d&#92;n", WEXITSTATUS(status));
+    printf("Exit Stat   : %d&#92;n", WIFEXITED(status));
+}
+
+int main()
+{
+    int pid;
+    int status;
+    int spid;
+    int i;
+
+    // SIGCHLD에 대해서 시그널핸들러를 설치한다.  
+    signal(SIGCHLD, (void *)zombie_handler);
+    for (i = 0; i &#60; 3; i++)
+    {
+        pid = fork();
+        int random_value = (random()%5)+3;
+        if (pid == 0)
+        {
+            // 랜덤하게 기다린후 종료한다. 
+            // 랜덤값을 리턴한다. 
+            printf("I will be back %d %d&#92;n", random_value, getpid());
+            sleep(random_value);
+            return random_value;
+        }
+    }
+    getchar();
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음은 위의 예제를 테스트한 결과이다.  
+				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN74"
+></A
+><P
+><B
+>&#44536;&#47548; 3. zombie_signal의 실행결과</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/acm.gif"></P
+></DIV
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN77"
+>2&#51208;. 결론</A
+></H1
+><P
+>		이상 간단하게 좀비프로세스에 대한 좀더 깊은내용에 대해서 알아보았다. 
+		잘못된 내용이나, 추가하면 좋을 내용은 댓글을 남겨주길 바란다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+

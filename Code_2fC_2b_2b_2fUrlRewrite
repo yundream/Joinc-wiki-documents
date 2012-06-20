@@ -1,0 +1,39 @@
+#title pcrecpp를 이용한 URL Rewrite 예제
+
+== Url Rewrite ==
+{{{#!plain
+#include <pcrecpp.h>
+#include <string.h>
+#include <stdio.h>
+
+#include <iostream>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+using namespace std;
+#define READ_LINE 32 
+#define MAX_BUF READ_LINE * 2 
+
+int main(int argc, char **argv)
+{
+    string s = "<a href=http://music.daum.net>안녕</a>\n\
+<a href=http://media.2.daum.net>미디어 다음</a>\n<a href=http://www.daum.net>천만에</a>\n";
+
+    pcrecpp::RE_Options opt;
+    opt.set_caseless(true);
+    pcrecpp::RE("href=http://([\\w\\d\\.]*)\\.daum\\.net",opt).
+        GlobalReplace("href=http://www.mycorp.co.kr:1111/\\1.daum.net/",&s);
+    cout << s << endl;
+}
+}}}
+pcrecpp를 이용한 URL Rewrite 예제. 아래는 실행 결과
+{{{#!plain
+$ ./pcrecppf 
+<a href=http://www.mycorp.co.kr:1111/music.daum.net/>안녕</a>
+<a href=http://www.mycorp.co.kr:1111/media.2.daum.net/>미디어 다음</a>
+<a href=http://www.mycorp.co.kr:1111/www.daum.net/>천만에</a>
+}}}
+
+[[tag(정규표현,pcre,pcrecpp)]]

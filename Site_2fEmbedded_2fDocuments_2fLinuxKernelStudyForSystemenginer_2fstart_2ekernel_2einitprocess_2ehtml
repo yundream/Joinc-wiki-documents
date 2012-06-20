@@ -1,0 +1,373 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>init()</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="PREVIOUS"
+TITLE="sched_init ()"
+HREF="start.kernel.sched.html"><LINK
+REL="NEXT"
+TITLE="dmesg 정리"
+HREF="kernel-dmesg.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="start.kernel.sched.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>5장. 리눅스 커널 부팅</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="kernel-dmesg.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="START.KERNEL.INITPROCESS"
+>5.7. init()</A
+></H1
+><P
+>			커널의 부팅에 필요한 기본 초기화(CPU, 메모리 등)가 끝나면 init 프로세스가 만들어지고 시스템에
+			존재하는 다른 하드웨어 등을 초기화 한다음 루트 디바이스를 찾아 나머지 부팅을 시작한다. init
+			프로세스는 1번 프로세스 번호를 갖는다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>static int init(void * unused)
+{
+	lock_kernel();
+<A
+NAME="INIT.DOBASICSETUP"
+><B
+>(1)</B
+></A
+>
+	do_basic_setup();
+
+<A
+NAME="INIT.NAMESPACE"
+><B
+>(2)</B
+></A
+>
+	prepare_namespace();
+
+	/*
+	 * Ok, we have completed the initial bootup, and
+	 * we're essentially up and running. Get rid of the
+	 * initmem segments and start the user-mode stuff..
+	 */
+<A
+NAME="INIT.INITMEM"
+><B
+>(3)</B
+></A
+>
+	free_initmem();
+	unlock_kernel();
+
+<A
+NAME="INIT.CONSOLE"
+><B
+>(4)</B
+></A
+>
+	if (open("/dev/console", O_RDWR, 0) &#60; 0)
+		printk("Warning: unable to open an initial console.\n");
+
+	(void) dup(0);
+	(void) dup(0);
+	
+	/*
+	 * We try each of these until one succeeds.
+	 *
+	 * The Bourne shell can be used instead of init if we are 
+	 * trying to recover a really broken machine.
+	 */
+
+	if (execute_command)
+		execve(execute_command,argv_init,envp_init);
+<A
+NAME="INIT.INIT"
+><B
+>(5)</B
+></A
+>
+	execve("/sbin/init",argv_init,envp_init);
+	execve("/etc/init",argv_init,envp_init);
+	execve("/bin/init",argv_init,envp_init);
+	execve("/bin/sh",argv_init,envp_init);
+<A
+NAME="INIT.NOINIT"
+><B
+>(6)</B
+></A
+>
+	execve("/sbin/init",argv_init,envp_init);
+	panic("No init found.  Try passing init= option to kernel.");
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.DOBASICSETUP"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						여기 까지의 상태는 시스템이 이제 사용 가능한 상태까지는 왔지만 붙어 있는 다른 모든
+						디바이스에 대해선 초기화가 되지 않은 상태다. CPU 하부 시스템, 메모리 그리고 프로세스
+						관리는 동작하는 상태다.
+					</DD
+><DD
+><P
+>						이제 할 것은 나머지 디바이스 들을 모두 초기화 하는 일을 하는 것이다.
+						초기화 하는 목록은 다음과 같다. 이외에 더 있으나 중요한 것만 조금 간추렸다.
+					</P
+></DD
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>mtrr</DT
+><DD
+><P
+>									현재는 i386에서만 존재 하는 기능으로 MTRR(Memory Type Range Register)를 말한다.
+									PCI나 AGP 비디오 카드를 좀더 빨리 쓸 수 있도록 해준다.		
+								</P
+></DD
+><DT
+>sysctrl</DT
+><DD
+><P
+>									proc file system을 사용하도록 설정 되어 있으면 이를 초기화 해준다.
+								</P
+></DD
+><DT
+>pci</DT
+><DD
+><P
+>									PCI 시스템을 초기화 한다. PCI의 루트 디바이스를 초기화 하고 이어 PCI 버스에 연결된
+									모든 다른 하드웨어를 찾아 리스트에 등록한다.
+								</P
+></DD
+><DT
+>isapnp</DT
+><DD
+><P
+>									ISA 버스에 물려 있는 PnP 디바이스를 초기화한다.			
+								</P
+></DD
+><DT
+>socket</DT
+><DD
+><P
+>									사용되는 프로토콜을 초기화 한다. 소켓 용 슬랩도 초기화 하고 netlink, netfileter
+									등도 초기화 한다.
+								</P
+></DD
+><DT
+>context thread</DT
+><DD
+><P
+>									keventd를 kernel thread로 실행한다.
+								</P
+></DD
+><DT
+>pcmcia</DT
+><DD
+><P
+>									PCMCIA 디바이스 초기화 한다.
+								</P
+></DD
+></DL
+></DIV
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.NAMESPACE"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						무엇을 어디서 마운트할 지 결정한다. 루트 디바이스를 마운트하고 램디스크를 읽어 들이는
+						일도 한다.
+					</DD
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.INITMEM"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						바로 전까지 실행되면 이제 커널이 완전히 부팅한 것으로 봐도 된다. 커널 부팅에 사용된
+						메모리 중 필요 없는 것을 반환한다.
+					</DD
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.CONSOLE"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						초기 콘솔을 열고 stdin, stdout, stderr을 open 한다.
+					</DD
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.INIT"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						이제 마운트된 루트 파일 시스템에서 init를 찾아 실행해 준다.
+					</DD
+><DT
+><A
+HREF="start.kernel.initprocess.html#INIT.NOINIT"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						init를 찾지 못하면 여기와서 커널의 부팅이 멈춘다. 여기 까지 온다는 것은 아마도 루트 파일
+						시스템을 마운트하지 못했거나 루트 파일 시스템에 init가 없기 때문일 것이다.
+					</DD
+></DL
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="start.kernel.sched.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="kernel-dmesg.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>sched_init()</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>dmesg 정리</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,518 @@
+#title 소켓 전달을 통한 prefork 서버 구현
+
+[[tag(네트워크프로그래밍,프로세스,IPC,dup,입출력다중화)]]
+== 소개 ==
+fork()는 새로운 자식프로세스를 실행시키기 위해서 사용하며, 다수의 클라이언트를 동시에 처리하기 위해서 입출력다중화(:12)와 함께 가장 널리 사용되는 방식이다.
+
+이 방식의 단점이라면 fork()로 새로운 프로세스를 생성시키는 자체에 많은 비용이 들어간다는 점이 될 것이다. 이 문제를 해결하기 위해서 적당한 수만큼 프로세스를 미리 할당시켜 놓고, 새로운 연결이 들어오면 할당된 프로세스에 소켓을 전달해주는 '''prefork'''방식을 사용하기도 한다. 일종의 프로세스 풀을 만들어서 활용 하는 것으로 볼 수 있다. 이 문서는 prefork 에 대해서 소개한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1g0-dIwEihGz1zWNJgEgtULL9iLfY7WYoZt9jmkTcz3I&amp;w=841&amp;h=340">
+}}}
+
+다음과 같은 정보들을 가지고 있다면 문서의 접근이 쉬울 것이다.
+ * [wiki:Site/system_programing/process/Process_Relation 프로세스 관계]
+ * fork(2) 함수
+ * [wiki:Site/Network_Programing/Documents/multi_process 멀티 프로세스 기반 다중연결 서버 만들기]
+ 
+== 소켓 전달 ==
+prefork 구현의 핵심은 accept 함수 호출 후 만들어진 '소켓 지정 번호'를 어떻게 이미 만들어져 있는 자식 프로세스에 전달하느냐에 있다. 다행히 이에 대한 해법은 나와 있긴 한데, 해법 자체가 좀 마법적이다.
+
+소켓 전달은 sendmsg(:2) 함수로 이루어진다. sendmsg 함수는 msghdr 구조체로 데이터를 전달하는데, msghdr 구조체에 전달할 소켓 지정 번호 정보를 포함한 '''제어 정보'''를 함께 넘기는 방식으로 이루어 진다.  다음은 소켓 전달을 위해서 사용하는 함수인 write_fd 이다.
+{{{#!plain
+int write_fd(int fd, void *ptr, size_t nbytes, int sendfd)
+{
+  struct msghdr	msg;
+  // 부가적으로 넘길 데이터 구조체
+  struct iovec	iov[1];
+  union {
+    struct cmsghdr cm;
+    char  control[CMSG_SPACE(sizeof(int))];
+  } control_un;
+  // 제어 정보를 포함한 cmsghdr 구조체
+  struct cmsghdr *cmptr;
+
+  msg.msg_control = control_un.control;
+  msg.msg_controllen = sizeof(control_un.control);
+
+  // 제어 정보를 설정한다.
+  cmptr = CMSG_FIRSTHDR(&msg);
+  cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+  cmptr->cmsg_level = SOL_SOCKET;
+  cmptr->cmsg_type = SCM_RIGHTS;
+  // 전송할 소켓 지정 번호를 복사한다.
+  *((int *) CMSG_DATA(cmptr)) = sendfd;
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+
+  // 기타 보낼 데이터가 있다면 함께 전송한다.
+  iov[0].iov_base = ptr;
+  iov[0].iov_len = nbytes;
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+  // sendmsg 함수로 데이터를 전송한다.
+  return(sendmsg(fd, &msg, 0));
+}
+}}}
+
+다음은 소켓 지정 번호를 읽기 위한 함수 read_fd로 자식 프로세스에서 호출 한다.
+{{{#!plain
+int read_fd(int fd, char *buf, size_t buflen)
+{
+  int n;
+  int recvfd;
+  char ptr;
+
+  struct iovec iov[1];
+  struct cmsghdr *cmptr;
+  struct msghdr msg;
+
+  union {
+    struct cmsghdr cm;
+    char control[CMSG_SPACE(sizeof(int))];
+  } control_un;
+
+  // 제어 정보를 설정한다.
+  msg.msg_control = control_un.control;
+  msg.msg_controllen = sizeof(control_un.control);
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+
+  // 부가적으로 읽어올 데이터  
+  iov[0].iov_base = buf;
+  iov[0].iov_len = buflen;
+
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+
+  if ( (n = recvmsg(fd, &msg, 0)) <= 0)
+  {
+    perror("recvmsg Error");
+    return -1;
+  }
+
+  cmptr = CMSG_FIRSTHDR(&msg); 
+  if ((cmptr == NULL))
+  {
+    perror("CMSG ERROR\n");
+    return -1;
+  }
+
+  // 제어 정보에서 소켓 지정 번호를 가져와서 반환한다.
+  recvfd = *((int *) CMSG_DATA(cmptr));
+  return recvfd;
+}
+}}}
+
+== 테스트에 사용할 echo 서버 ==
+{{{#!plain down:socket.c
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define SA struct sockaddr
+
+
+struct _SocketInfo
+{
+  int pid;
+  int fd;
+  int status;
+};
+
+int write_fd(int fd, void *ptr, size_t nbytes, int sendfd);
+int prefork_client(int fd);
+int read_fd(int fd);
+
+int main_server(int server_sockfd, 
+    struct _SocketInfo *SInfo, 
+    struct sockaddr_in clientaddr, 
+    int preforknum);
+
+int main(int argc, char **argv)
+{
+    char buf_in[80];
+    int state;
+    int clilen;
+    int n,i,pid;
+    int preforknum;
+    int ppid;
+    int sv[2];
+    struct _SocketInfo *SocketArray;
+
+    int server_sockfd, client_sockfd;
+    struct sockaddr_in clientaddr, serveraddr;
+
+    if (argc != 2)
+    {
+      fprintf(stderr, "Usage: %s [prefork#]\n", argv[0]);
+      return 1;
+    }
+    preforknum = atoi(argv[1]);
+
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("Error");
+        return 1;
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(8083);
+
+    bind(server_sockfd, (SA *)&serveraddr, sizeof(serveraddr));
+    if ((state = listen(server_sockfd, 5))<0)
+    {
+        perror("listen error: ");
+        exit(0);
+    }
+
+    if(preforknum > 10)
+    {
+      fprintf(stderr,"Max preforknum is 10\n");
+      exit(0);
+    }
+    ppid = getpid();
+
+    // Socket Infomation Array
+    SocketArray = (void *)malloc(sizeof(struct _SocketInfo)*preforknum);
+    memset((void *)SocketArray, 0x00, sizeof(struct _SocketInfo)*preforknum);
+
+    for (i = 0; i < preforknum; i++)
+    {
+      socketpair(AF_LOCAL, SOCK_STREAM, AF_LOCAL, sv);
+      pid = fork();
+      if (pid < 0)
+      {
+        perror("fork error");
+        exit(0);
+      }
+      if (pid == 0)
+      {
+        dup2(sv[0], 0);
+        close(sv[1]);
+        close(sv[0]);
+        close(server_sockfd);
+        prefork_client(0);
+      }
+      else
+      {
+        close(sv[0]);
+        SocketArray[i].pid    = pid; 
+        SocketArray[i].fd     = sv[1];
+        SocketArray[i].status = 1;  
+      }
+    }
+    main_server(server_sockfd, SocketArray, clientaddr, preforknum);
+}
+
+int write_fd(int fd, void *ptr, size_t nbytes, int sendfd)
+{
+  struct msghdr	msg;
+  struct iovec	iov[1];
+  union {
+    struct cmsghdr cm;
+    char  control[CMSG_SPACE(sizeof(int))];
+  } control_un;
+  struct cmsghdr *cmptr;
+
+  msg.msg_control = control_un.control;
+  msg.msg_controllen = sizeof(control_un.control);
+
+  cmptr = CMSG_FIRSTHDR(&msg);
+  cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+  cmptr->cmsg_level = SOL_SOCKET;
+  cmptr->cmsg_type = SCM_RIGHTS;
+  *((int *) CMSG_DATA(cmptr)) = sendfd;
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+
+  iov[0].iov_base = ptr;
+  iov[0].iov_len = nbytes;
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+  return(sendmsg(fd, &msg, 0));
+}
+
+int read_fd(int fd)
+{
+  int n;
+  int recvfd;
+  char ptr;
+
+  struct iovec iov[1];
+  struct cmsghdr *cmptr;
+  struct msghdr msg;
+
+  union {
+    struct cmsghdr cm;
+    char control[CMSG_SPACE(sizeof(int))];
+  } control_un;
+
+
+  msg.msg_control = control_un.control;
+  msg.msg_controllen = sizeof(control_un.control);
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+
+  iov[0].iov_base = (void *)&ptr;
+  iov[0].iov_len = 1;
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+
+  if ( (n = recvmsg(fd, &msg, 0)) <= 0)
+  {
+    perror("recvmsg Error");
+    return -1;
+  }
+
+  cmptr = CMSG_FIRSTHDR(&msg); 
+  if ((cmptr == NULL))
+  {
+    perror("CMSG ERROR\n");
+    return -1;
+  }
+  recvfd = *((int *) CMSG_DATA(cmptr));
+  return recvfd;
+}
+
+int main_server(int server_sockfd, 
+      struct _SocketInfo *SocketArray, 
+      struct sockaddr_in clientaddr, 
+      int preforknum)
+{
+    int clilen;
+    int client_sockfd;
+    int i;
+    char ptr;
+    int n;
+    int maxfd;
+    fd_set readfds, allfds;
+    int data;
+    FD_ZERO(&readfds);
+    FD_SET(server_sockfd, &readfds);
+    for (i = 0; i < preforknum; i++)
+    {
+      FD_SET(SocketArray[i].fd, &readfds);
+      maxfd = SocketArray[i].fd;
+      printf("socketpair fd %d\n", maxfd);
+    }
+
+    printf("%d\n", maxfd+1);
+    allfds = readfds;
+    while(1)
+    {
+        readfds = allfds;
+        clilen = sizeof(clientaddr);
+
+        printf("select Wait\n");
+        n = select(maxfd + 1, &readfds, (fd_set *)0, (fd_set *)0, NULL);
+        printf("select Wait End %d\n", n);
+        if (n < 0) continue;
+
+        if (FD_ISSET(server_sockfd, &readfds))
+        {
+           printf("ACCEPT\n");
+           if ((client_sockfd = accept(server_sockfd, (SA *)&clientaddr, (size_t *)&clilen)) ==-1)
+           {
+              perror("accept error:");
+              close(client_sockfd);
+           }
+           else
+           {
+             for (i = 0; i < preforknum; i++)
+             {
+                if(SocketArray[i].status)
+                {
+                  printf("SocketSend pid(%d) -> %d\n", SocketArray[i].pid, client_sockfd);
+                  write_fd(SocketArray[i].fd, &ptr, 1, client_sockfd);
+                  SocketArray[i].status = 0;
+                  close(client_sockfd);
+                  break;
+                }
+              }
+              if (i == preforknum)
+              {
+                fprintf(stderr, "max Client error\n");
+                close(client_sockfd);
+              }
+           }
+        }
+
+        for (i = 0; i < preforknum; i++)
+        {
+          if(FD_ISSET(SocketArray[i].fd, &readfds))
+          {
+            printf("OK Chield Data\n");
+            read(SocketArray[i].fd, (void *)&data, sizeof(data));
+            printf("(%d) : Read Data %d\n", SocketArray[i].fd, data);
+            if(data == 0)
+            {
+              SocketArray[i].status = 1;
+            }
+          }
+        }
+    }
+}
+
+int prefork_client(int fd)
+{
+	int n;
+  char buf_in[80]={0x00,};
+  int sockfd;
+  int msg = 0;
+  printf("Child PID %d\n", getpid());
+
+  while(1)
+  {
+    sockfd = read_fd(fd);
+    for(;;)
+    {
+      if ((n = read(sockfd, buf_in, 79)) > 0)
+      {
+        write(sockfd, buf_in, strlen(buf_in));
+      }
+      else
+      {
+        printf("Client Socket Close\n");
+        write(fd, (void *)&msg, sizeof(msg));
+        close(sockfd);
+        break;
+      }
+      memset(buf_in, 0x00, sizeof(buf_in));
+    } 
+  }
+}
+}}}
+
+== exec 응용 ==
+fork(2)방식에서 소켓전달이 성공적으로 이루어지는걸 확인했다. 이제 exec(2)에서도 가능한지 확인해 보려 한다. 위의 프로그램을 약간 수정해서 클라이언트의 연결을 accept하고 prefork를 하는 socketmain.c 프로그램과 prefork되어서 데이터를 처리하는 prefork.c라는 프로그램을 만들었다. 
+
+socketmain.c는 위의 fork 버젼에서 아래의 라인만 수정했다. 
+{{{#!plain
+if (pid == 0)
+{
+  dup2(sv[0], 0);
+  close(sv[1]);
+  close(sv[0]);
+  close(server_sockfd);
+  prefork_client(0);
+}
+를
+if (pid == 0)
+{
+  dup2(sv[0], 0);
+  close(sv[1]);
+  close(sv[0]);
+  close(server_sockfd);
+  execl("./client", "client", NULL);
+}
+로
+}}}
+
+다음은 prefork.c 로 int prefork_client 함수를 약간 수정해서 재 작성했다.
+{{{#!plain
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define SA struct sockaddr
+
+int read_fd(int fd);
+int main(int argc, char **argv)
+{
+  int n;
+  char buf_in[80]={0x00,};
+  int sockfd;
+  int msg = 0;
+  printf("Child PID %d\n", getpid());
+  int fd = 0;
+
+  while(1)
+  {
+    sockfd = read_fd(fd);
+    for(;;)
+    {
+      if ((n = read(sockfd, buf_in, 79)) > 0)
+      {
+        write(sockfd, buf_in, strlen(buf_in));
+      }
+      else
+      {
+        printf("Client Socket Close\n");
+        write(fd, (void *)&msg, sizeof(msg));
+        close(sockfd);
+        break;
+      }
+      memset(buf_in, 0x00, sizeof(buf_in));
+    } 
+  }
+}
+
+int read_fd(int fd)
+{
+  int n;
+  int recvfd;
+  char ptr;
+
+  struct iovec iov[1];
+  struct cmsghdr *cmptr;
+  struct msghdr msg;
+
+  union {
+    struct cmsghdr cm;
+    char control[CMSG_SPACE(sizeof(int))];
+  } control_un;
+
+
+  msg.msg_control = control_un.control;
+  msg.msg_controllen = sizeof(control_un.control);
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+
+  iov[0].iov_base = (void *)&ptr;
+  iov[0].iov_len = 1;
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+
+  if ( (n = recvmsg(fd, &msg, 0)) <= 0)
+  {
+    perror("recvmsg Error");
+    return -1;
+  }
+
+  cmptr = CMSG_FIRSTHDR(&msg); 
+  if ((cmptr == NULL))
+  {
+    perror("CMSG ERROR\n");
+    return -1;
+  }
+  recvfd = *((int *) CMSG_DATA(cmptr));
+  return recvfd;
+}
+}}}
+
+테스트 해본 결과 문제없이 작동됨을 확인할 수 있었다.
+
+== 참고문헌 ==
+ * [wiki:article/InetDaemonMake Inet 데몬서버 작성]
+ 

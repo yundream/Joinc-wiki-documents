@@ -1,0 +1,390 @@
+#title pthread_kill(3)
+[wiki:docbook_pthread_kill(3) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>pthread_kill(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. pthread_kill(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN18"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN21"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN35"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN39"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	쓰레드 시그널 관련 함수들</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;signal.h&#62;
+
+int pthread_kill(pthread_t thread, int signo);
+int  pthread_sigmask(int  how,  const  sigset_t  *newmask,
+               sigset_t *oldmask);
+int sigwait(const sigset_t *set, int *sig);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		이 함수는 현재 쓰레드에 시그널newmask와 how 를 이용해서 시그널 
+		마스크를 만든다. how는 SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK중 
+		하나를 선택할 수 있다. SIG_BLOCK는 현재 설정된 시그널 마스크에 
+		newmask를 추가하며 SIG_UNBLOCK는 현재 설정된 시그널
+		 마스크에서 newmask를 제거하고 SIG_SETMASK는 newmask로 현재 
+		시그널 마스크를 설정한다
+	</P
+><P
+>		pthread_kill()은 시그널번호<B
+CLASS="EMPHASIS"
+>signo</B
+>를 가지는 
+		시그널을 스레드 식별번호<B
+CLASS="EMPHASIS"
+>thread</B
+>를 가지는 
+		쓰레드에 전달한다.  
+	</P
+><P
+>		sigwait()는 시그널 셋<B
+CLASS="EMPHASIS"
+>set</B
+>에 지정된 시그널이 
+		전달될 때까지 해당영역에서 대기한다. 만약 시그널을 받게 되면 
+		받은 시그널 번호를 <B
+CLASS="EMPHASIS"
+>sig</B
+>에 복사하고 리턴한다.  
+		<B
+CLASS="EMPHASIS"
+>set</B
+>에 명시된 시그널들은 반드시 봉쇄로 지정되어야
+		한다. 그래야만 sigwait()에 의해서 검출되고 리턴된다. 만약 
+		해당 시그널에 대해서 시그널 핸들러가 지정되어 있다면 함수는 
+		호출되지 않게 된다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+></A
+>1.3. 반환값</H1
+><P
+>		성공하면 0을, 실패하면 0이 아닌 값을 리턴한다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>ESRCH</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>th</B
+>식별자를 가진 쓰레드가 존재하지 않는다.
+				</P
+></DD
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>th</B
+>식별자를 가진 쓰레드가 이미 detach상태에 있다. 
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN35"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;sys/wait.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;signal.h&#62;
+
+/*
+ * 시그널 핸들러
+ * 핸들러가 호출된 쓰레드의 ID와 시그널 번호를 출력한다.
+ */
+void sig_handler(int signo)
+{
+    printf("SIGNAL RECV TH ID %d : %d\n", pthread_self(),signo);
+}
+
+void *threadfunc2(void *arg);
+void *threadfunc(void *arg);
+void *s_signal(void *arg);
+
+// 쓰레드 ID를 저장한다.  
+int sigid[2];
+
+int main()
+{
+    int n, i, j;
+    pthread_t threadid;
+
+    // 원하는 쓰레드로 시그널이 전달하는지 확인하기 위해서
+    // 쓰레드 ID를 확인한다.
+    if ((n = pthread_create(&#38;threadid, NULL, threadfunc2, NULL)) != 0 )
+    {
+        perror("Thread create error ");
+        exit(0);
+    }
+    sigid[0] = threadid;
+    printf("thread2 id %d\n", threadid);
+
+    if ((n = pthread_create(&#38;threadid, NULL, threadfunc, NULL)) != 0 )
+    {
+        perror("Thread create error ");
+        exit(0);
+    }
+    sigid[1] = threadid;
+    printf("thread id %d\n", threadid);
+
+    if ((n = pthread_create(&#38;threadid, NULL, s_signal, NULL)) != 0 )
+    {
+        perror("Thread create error ");
+        exit(0);
+    }
+
+    pthread_join(threadid, NULL);
+}
+
+void *threadfunc(void *arg)
+{
+    int i=0, j;
+    struct sigaction act;
+    sigset_t newmask;
+
+    // 결과의 확인을 위해서 쓰레드 ID를 출력한다.
+    printf("SIGINT Thread Start (%d)\n", pthread_self());
+
+    // SIGINT에 대해서 시그널 핸들러를 등록했지만 
+    // SIGINT를 블럭하도록 했으므로 시그널은 전달되지 않는다.  
+    sigemptyset(&#38;newmask);
+    sigaddset(&#38;newmask, SIGINT);
+    act.sa_handler = sig_handler;
+    sigaction(SIGINT, &#38;act, NULL);
+    pthread_sigmask(SIG_BLOCK, &#38;newmask, NULL);	
+
+    while(1)
+    {
+        printf("%d\n", i);
+        i++;
+        sleep(1);
+    }
+    return ;
+}
+
+void *threadfunc2(void *arg)
+{
+    struct sigaction act;
+	int lsigno;
+
+    sigset_t newmask;
+    sigemptyset(&#38;newmask);
+    sigaddset(&#38;newmask, SIGINT);
+
+	// 시그널 핸들러를 등록 시켰지만 
+	// sigwiat()가 가디리고 있으므로 실행되지 않는다.  
+    act.sa_handler = sig_handler;
+    sigaction(SIGINT, &#38;act, NULL);
+
+    while(1)
+    {
+		sigwait(&#38;newmask, &#38;lsigno);
+		printf("i receive signo %d\n", lsigno);
+        sleep(1);
+    }
+}
+
+/*
+ * SIGINT를 두개의 쓰레드로 서로다른 시간간격으로 
+ * 전달한다. 
+ */
+void *s_signal(void *arg)
+{
+    int i = 1;
+    while(1)
+    {
+        sleep(1);
+        i++;
+        if((i % 7) == 0)
+        {
+            printf("Send SIGINT %d\n", sigid[0]);
+            pthread_kill(sigid[0], SIGINT);
+        }
+        if((i % 11) == 0)
+        {
+            printf("Send SIGINT %d\n", sigid[1]);
+            pthread_kill(sigid[1], SIGINT);
+        }
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN39"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_쓰레드와_시그널"
+TARGET="_top"
+>쓰레드와 시그널</A
+>
+				</P
+></LI
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_Pthread_API_Reference"
+TARGET="_top"
+>Pthread API 레퍼런스</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

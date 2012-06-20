@@ -1,0 +1,92 @@
+#title Amazon ELB 서비스 분석
+
+[[TableOfContents]]
+== ELB에 대해서 ==
+ELB의 핵심은 다음과 같다. LB와의 차이 점 이기도 하다.
+  * 유저가 원할 때, 즉시 LB 서비스를 전개할 수 있다. 
+  * 서로 다른 zone의 VM을 LB 그룹에 포함할 수도 있다.  
+  * 자유로운 scaling : traffic, cpu 사용량에 따라서 LB그룹에 새로운 VM을 추가 및 traffic에 대한 scale-out.
+    * 쓴만큼 비용을 지불 할 수 있다.
+  * ssl offload를 지원한다.
+    * ssl certificate를 중앙에서 관리한다. ELB에서 처리를 해주기 때문에 클라이언트는 별도의 인증서버를 관리할 필요가 없다.    
+
+아마존 ELB의 기능은 [http://aws.amazon.com/elasticloadbalancing/ Elastic Load Balancing]를 참고
+
+=== zone과 region ===
+zone과 region은 언제 자세히 다뤄야 할 것 같다. 여기에서는 간단히 다룬다. region은 지역의 개념으로 하나의 region은 여러 zone을 포함할 수 있다. zone은 하나의 데이터 센터에 대응되는 개념인데, 일반적으로 물리적인 하나의 데이터 센터는 하나 이상의 zone으로 구성이 되는 경우가 많다. 물리적인 데이터 센터를 하나의 zone으로 하지 않는 것은 클라우드 자원의 효율적인 관리 때문이다. 하나의 zone이 너무 많은 네트워크, 스토리지, computing 자원을 가지면 효율이 떨어지기 떨어질 수 있으므로, 여러 개의 zone으로 나눌 필요가 있다.   
+
+이를테면 4층과 5층을 각각 하나의 zone으로 하는 식이다. 하나의 region에 있는 zone들은 네트워크와 물리적 환경이 비슷하기 때문에 네트워크 자원을 공유할 수 있다. 예컨데 zone-1, zone-2, zone-3 으로 구성된 region-서을이 있다면, 유저의 virtual machine는 zone-1,2,3 모두에 만들 수 있다.  
+
+여기에서 availability zone 개념이 나온다. 유저는 여러 zone에 분산해서 인터넷을 서비스하도록 구성할 수 있는데, 이렇게 하면 하나의 zone의 네트워크에 문제가 생기더라도 다른 zone에서 서비스 할 수 있으므로 서비스의 가용성을 높일 수 있다. 
+
+region과 region은 기본적으로 서로 분리된다. 이들 사이에서 가상 머신이나 네트워크 자원의 이동은 제한된다. 혹은 별도의 비용을 지불해야만 자원을 이동할 수 있다. region-서울 과 region-부산 간의 자원 공유를 생각하면 된다. 이 경우에 자원을 이동하거나 공유하기 위해서는 cloud 서비스 업체는 region간에 별도의 네트워크 회선을 구축하거나 GSLB 같은 별도의 네트워크 장비를 둬야지 된다. 당연히 비용이 올라갈 수 밖에 없다. 
+
+=== ELB 서비스를 위한 구조 ===
+ELB는 기본적으로 availability zone 개념을 사용할 수 있어야 한다. 서비스의 가용성을 높이기 위해서 모든 zone에 걸쳐서 VM을 LB 그룹에 포함할 수 있어야 한다. 여기에 더해서 region간 VM을 LB 그룹에 포함할 수 있어야 한다. 즉 region-서울 과 region-부산 에 있는 VM을 하나의 LB 그룹으로 묶을 수 있어야 한다. 이렇게 region을 뛰어넘을 수 있으면, "부산에서 발생하는 트래픽은 region-부산 으로 서을에서 발생한 트래픽은 region-서울로"하는 식의 로드 밸런싱이 가능하다.
+
+이렇게 region을 뛰어넘는 서비스를 위해서는 GSLB를 이용해서 Domain 기반으로 LB 서비스를 제공해야 할 것이다.  일반적인 구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1jYWdw9SrbnLAC-Q0Y8ge9LcVLCT63i2iTi6jFTcEcLM&amp;w=678&amp;h=369">
+}}}
+
+각 region에는 ELB를 서비스하기 위한 LB Cluster가 있다. LB Cluster를 구성하는 LB는 VIP(:12)와 VM의 public ip를 맵핑하는 방식으로 LB 서비스를 한다. 일반적인 LB 서비스라면 하나의 VIP를 가지고 LB 그룹을 관리하겠지만, public cloud 환경에서는 여러 개의 VIP를 가질 수도 있다.    
+
+때문에 VIP를 Domain 이름으로 묶어줄 필요가 있다. 이 일은 GSLB 같은 Domain name server를 이용 한다. GSLB를 이용하면 region간 LB도 가능하다. 실제 amazon의 ELB 서비스도 Domain 기반이며, 하나의 LB 그룹이 두 개 이상의 VIP로 구성되기도 하는 걸 보면, 이 구조를 크게 벗어나는 것 같지는 않다. 
+
+A라는 유저가 ELB를 서비스한다고 가정해 보자. 이 유저는 Zone-1에 있는 VM을 VIP-1 주소로 로드 밸런싱 한다. 그런데 트래픽이 로드밸런스가 감당할 수 있는 범위를 초과하게 생겼다. 이 경우 LB Cluster의 다른 LB에 VIP-2를 하나 더 만들어서 트래픽을 분산한다. 
+
+그런데, 부산에서 서비스 받는 사람들은 물리적 거리 때문에 서비스 속도가 느려서 불만이라는 의견이 접수 됐다. 이 경우 물리적으로 가까운 부산 데이터 센터 (Region-부산)에 VIP-3를 만들어서 서비스 하면 된다. 지역간 트래픽 분산이 가능하다. 
+
+=== LB Cluster의 구성 ===
+LB Cluster는 하나 이상의 LB Device로 구성된다. 핵심은 어떻게 scale-out 한 형태로 구성할 수 있는 가 하는 것이다.  
+
+LB Cluster를 어떻게 구성할 것인지는 '''과금 정책'''과 밀접하게 관련돼 있다. 서버 호스팅방식이라면 정액제를 선택할 수 있겠지만 public cloud에서 라면, 종량제를 선택해야 할 것이다. 
+
+종량제하에서는 VIP 별 B/W 제한을 두지 않고 사용한 만큼만 과금을 한다. (최대 제한 폭 정도는 있을 거다.) 만약에 100Mbits/Sec, 200MBits/Sec, ... 이런식으로 과금정책을 정해 버리면, VIP의 대역폭을 scale-up하기가 굉장히 까다로워 진다. public cloud는 자원을 대여한다는 개념이므로 종량제로 과금하는게 맞는 것 같다.   
+
+LB Cluster를 구성하는 LB Device는 scaling을 위해서 여분의 B/W를 남겨 둘 필요가 있다. 여분의 제한을 10%로 했다고 가정하면, 90% 정도를 초과하는 시점에서 다른 cluster에 VIP를 만들 필요가 있다.
+
+=== LB scaling와 VM auto-scaling ===
+LB scaling와 VM scaling는 서로 독립적으로 작동한다. LB scaling는 LB 트래픽에 대한 것이고 VM scaling는 LB 그룹의 VM에 대한 scaling이다.
+
+==== LB scaling ====
+현재 Load balancer의 대역폭이 90%를 모두 채웠다고 가정 해보자. 그러면 앞으로 생기는 LB 그룹은 다른 Load balancer에 만들면 될 것이다. 하지만 90%를 꽉채운 Load balancer에서 특정 VIP의 트래픽이 계속 증가하는 경우 다른 방식으로 처리할 필요가 있다.   
+   1. 많은 B/W를 차지하는 VIP를 다른 Load balancer로 이동 한다. 
+   1. 많은 B/W를 차지하는 VIP를 그대로 둔다. 대신 다른 Load balancer에 새로운 VIP를 만든다. 즉 하나의 LB 그부을 2개의 VIP로 처리한다. VIP간 Load balancing는 GSLB가 맡는다. 
+
+scaling 프로그램은 load balancer의 B/W를 지속적으로 관리하다가 임계치에 근접하면, TOP B/W VIP를 선택해서 VIP를 분산한다. 
+
+==== VM scaling ====
+LB 트래픽이 충분 한데, LB 그룹의 VM들의 CPU나 메모리 같은 자원에 문제가 생겨서 scaling 해야 하는 경우가 생길 수도 있다. 사용자는 CPU와 메모리에 임계치를 설정하고, 이를 초과할 경우 자동으로 scaling 하라고 명령을 만들 수도 있다. 예컨데 다음과 같다.
+   * LB 그룹에 포함돼 있는 VM의 cpu가 90%를 초과하면, 새로운 VM을 만들어서 LB 그룹에 포함시켜라. 
+
+== 오픈소스 Load balancer ==
+로드밸런서에 대해서 알아보자. 하드웨어 장비를 구매하면 되겠지만 가격이 마음에 들지 않을 것 같다. 일반적으로 클라우드는 '''전문가의 도움 없이, 짧은 시간에, 서비스를 젼개할 수 있는''' 인프라라고 정의할 수 있을 것이다. 다른말로 온디맨드 셀프서비스가 가능한 플랫폼. 그것도 '''비교적 저렴하게'''
+
+사실 '''저렴하다'''라는 것을 클라우드의 특징이라고 할 수 있을까 하는 생각이 들어서 단어의 사용이 좀 조심스럽기는 하다. 어디에선가 Amazon의 EC2가 서버 호스팅에 비해서 그리 싼 것도 아니라는 이야기도 들었기 때문이다. 
+
+하지만 덤으로 저렴하다고 나쁠 것은 없다. 특히나 public cloud라면 더욱 그러할 것이다. 
+
+그럴려면 오픈소스 기반의 Load balancer 구축을 고려해봄 직하다. 개인적으로 익숙한 소프트웨어는 haproxy다. haproxy는 cloudstack을 사용하면서 경험하게 됐다. cloudstack의 Advanced Network Mode에서는 Router VM을 통해서 네트워크 서비스를 제공하는데, haproxy를 이용해서 로드밸런서를 서비스 했다.  
+
+haproxy는 간단하게 사용할 수 있지만 ssl offload 등의 기능을 사용하려면 stunnel 과 같은 소프트웨어와 함께 사용해야 한다. 이 경우 ssl key 관리 인터페이스 제공 등 소프트웨어 구성이 복잡해 질 수 있다.  
+
+시간이 되면 stunnel + haproxy 구성을 테스트 해봐야 겠다.
+
+가장 간단하게 구현할 수 있는 방법은 LVS를 이용하는 것이다. IPVS를 이용해서 커널레벨에서 UDP(:12), TCP(:12) 데이터를 로드 밸런싱할 수 있다. L4 Layer이기 때문에 ssl offloading등의 기능을 사용할 수 없다는 문제점이 있다. 이 문제를 해결할 수 있는 방법을 찾아봐야 겠다. 혹은 LVS와 haproxy와 같은 조합을 생각해 봐야 겠다. 
+
+=== 오픈소스 기반 LB Cluster 구현하기 ===
+ELB의 생명은 가용성과 확장성이다. 그러므로 단지 LB 서비스를 할 수 있는 환경 구축은 별 의미가 없다. 어떻게 가용성과 확장성을 가지는 구조를 만들 것인가 하는게 중요한 문제다.
+
+역시 LB Cluster를 만들어야 할 것 같다. 이에 대한 연구가 필요하다. 
+
+== 앞으로 할 일 ==
+  * [wiki:Site/cloud/ClusterLBWithOpenSource 오픈소스 기반 LB Cluster 구성]
+  * haproxy 테스트
+  * stunnel 테스트
+  * haproxy와 stunnel 조합 활용 방안
+   
+== 히스토리 ==
+  1. 2012년 5월 6일 작성
+[[tag(cloud,ELB,cloudstack,haproxy)]]

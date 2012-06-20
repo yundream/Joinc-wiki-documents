@@ -1,0 +1,279 @@
+#title C표준 라이브러리 함수를 이용한 문자다루기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>ctype.h 를 이용한 문자다루기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>ctype.h 를 이용한 문자다루기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>문자 제어의 어려움</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN15"
+>ctype.h</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>문자 제어 함수들</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 문자 제어의 어려움</A
+></H1
+><P
+>		전통적으로 C 언어에서의 문자 제어는 상당히 어려운 부분에 속한다. 
+		문자열이라는게 존재하지 않으며, 단지 문자의 배열로 문자열을 구현하기 
+		때문에 문자열에 대한 제어를 위해서는 pointer 혹은 배열값을 이용해야 
+		하는데, 매우 혼동되는 작업이며, 많은 시간을 소비하게 만든다.
+	</P
+><P
+>		또한 문자는 여러가지 특성을 지니며 때때로 이러한 특성에 대해서 
+		알아야 할때가 있다. 즉 문자가 영문인지, 숫자인지, 공백(whitespace) 인지 
+		대문자인지, 소문자인지 등인데 ctype.h 에서 제공하는 함수들을 사용하면 
+		이러한 문자특성을 쉽게 분류해서 알아낼수 있다.
+	</P
+><P
+>		만약 ctype.h 에서 제공하는 함수를 사용하지 않는다면, 여러분은 직접 
+		ASCII 테이블표를 이용해서 크기 계산을 해야 할것이다. 예를 들어서 
+		해당 문자가 영문 인지 확인하려면 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char test_char;
+if (('a' &#60;= test_char &#38;&#38; 'z' &#62;= test_char) || ('A' &#60;=test_char &#38;&#38; 'Z' &#62;= test_char)) 
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		이런식의 복잡한 작업을 해줘야 할것이다. 물론 위의 식을 좀더 간단하게 
+		만들수도 있고, 메크로 연산을 수행할수도 있겠지만 귀찮은 작업임에는 
+		틀림없다. 게다가 쏘쓰코드도 지저분해진다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2&#51208;. ctype.h</A
+></H1
+><P
+>		우리 프로그래머들이 가장 싫어하는것중에 하나는 바로 이런 별로 
+		필요없는 노가다와 코드의 가독성을 떨어트리는 잡다한 코드들이며, 
+		그런 이유로 우리는 이러한 잡다하지만 자주쓰이는 코드들을 라이브러리로 
+		만들어서 사용한다. 
+	</P
+><P
+>		그렇다면 위의 문자를 다루기 위한 라이브러리를 일일이 만들어야 할까 ? 
+		시간이 충분하고 공부도 할겸.. 해서 일일이 만든다면, 어쩔수 없는일이지만 
+		그렇지 않다면 ctype.h 에서 제공하는 함수들을 사용하자. 
+	</P
+><P
+>		여기에서 사용되는 함수들은 C에서 표준적으로 제공하는 라이브러리에 
+		포함된다 (Standard C Library). 그러므로 windows, linux, 그밖의 Unix 
+		에 관계 없이 공통적으로 사용되어질수 있다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR>
+}}}
+[[sadsense(center)]]
+{{{#!html
+<H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. 문자 제어 함수들</A
+></H2
+><P
+>			문자 제어라기 보다는 "문자의 종류를 알아내는" 함수들의 모음 
+			이라고 보는게 적당하겠지만, 편의상 문자제어 함수라고 부르도록 
+			하겠다. 
+		</P
+><P
+>			#include &#60;ctype.h&#62;
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>int isalpha(int c)</DT
+><DD
+><P
+>						주어진 문자가 알파벳 인지 검사한다. 
+						A-Z a-z 
+					</P
+></DD
+><DT
+>int isalnum(int c)</DT
+><DD
+><P
+>						주어진 문자가 알파벳 또는 숫자인지 검사한다. 
+						A-Z a-z 0-9
+					</P
+></DD
+><DT
+>int isdigit(int c)</DT
+><DD
+><P
+>						주어진 문자가 숫자인지 검사한다. 
+						0-9	
+					</P
+></DD
+><DT
+>int isxdigit(int c)</DT
+><DD
+><P
+>						주어진 문자가 16 진수인지를 검사한다. 
+						0-9 a-f A-F
+					</P
+></DD
+><DT
+>int iscntrl(int c)</DT
+><DD
+><P
+>						제어(control)문자인지를 검사한다. 
+					</P
+></DD
+><DT
+>int isspace(int c)</DT
+><DD
+><P
+>						FF('&#92;f'), NL('&#92;n'), CR('&#92;r'), HT('&#92;t'), VT('&#92;v'), 
+						공백문자(' ')등을 검사한다.
+					</P
+></DD
+><DT
+>int ispunct(int c)</DT
+><DD
+><P
+>						알파벳문자 혹은 공백문자가 아닌 출력가능한 문자인지 
+						확인한다.
+					</P
+></DD
+><DT
+>int isgraph(int c)</DT
+><DD
+><P
+>						공백문자를 제외한 출력가능 문자인지 검사한다.
+					</P
+></DD
+><DT
+>int isprint(int c)</DT
+><DD
+><P
+>						공백문자를 포함한 출력가능한 문자인지 검사한다. 
+					</P
+></DD
+><DT
+>int islower(int c)</DT
+><DD
+><P
+>						소문자인지 검사한다. a-z
+					</P
+></DD
+><DT
+>int isupper(int c)</DT
+><DD
+><P
+>						대문자인지 검사한다. A-Z
+					</P
+></DD
+><DT
+>int tolower(int c)</DT
+><DD
+><P
+>						입력된 문자를 대문자로 변경한다.
+					</P
+></DD
+><DT
+>int toupper(int c)</DT
+><DD
+><P
+>						입력된 문자를 소문자로 변경한다.
+					</P
+></DD
+></DL
+></DIV
+>
+		</P
+><P
+>			위의 모든 함수들은 검사 테스트후 테스트되는 문자와 같은 종류일 
+			경우 0이 아닌 값을 그렇지 않으면 0을 반환한다.
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

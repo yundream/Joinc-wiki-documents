@@ -1,0 +1,83 @@
+#title 디자인 패턴 - Facade Pattern
+
+=== 소개 ===
+아래 UML은 staruml(:12)을 이용해서 작성했음.
+
+attachment:facade.png
+
+어떤 일을 하는 프로그램(:12)을 만든다고 가정해보자. 일반적으로 하나의 함수를 이용하는 것보다는 가능한 분할을 해서 여러개의 서브함수를 만드는 방식을 선호한다. 이렇게 할경우 디버깅, 유지보수, 코드관리가 수월해지기 때문이다.
+
+그러나 여러개의 서브함수를 두게 될 경우에는 이들을 다루기가 지나치게 복잡해지는 경우가 발생할 수 있다. socket(:12)프로그램을 예로 들어보자면, 하나의 endpoint 소켓을 만들기 위해서는 socket(2)->bind(2)->listen(2) 의 과정을 거쳐야 한다. 이때 이들 함수를 호출하는 개발자는 단순히 호출만 하는게 아니라 에러처리를 위해서 각각의 리턴값을 검사하는 코드도 신경써야 한다.
+
+facade pattern을 이용하면, 이러한 과정을 숨기고 개발자에게는 단순한 Interface만을 제공할 수 있다. 제품을 만드는 공장으로 치자면, 여러개의 컨테이너 벨트로 나뉘어진 공정을 하나로 통일 시키는 거라고나 할 수 있겠다.
+
+공정 1 : 3번의 입력, 즉 3개의 Interface가 필요하다.
+
+attachment:belt1.png
+
+공정 2 : 1번의 입력, 즉 1개의 Interface만을 가진다.
+
+attachment:belt2.png
+=== C++ ===
+아래는 컴퓨터를 가동하는 간단한 시뮬레이션 프로그램이다. 컴퓨터를 가동하기 위해서는 CPU, Memory, HardDisk를 순서에 맞게 제어를 해야 한다. facade 패턴을 이용하면, 이러한 과정을 숨길 수 있다. 프로그래머는 다른 것에 신경쓸 필요없이 '''startComputer'''메서드만 호출하면 된다.
+{{{#!plain
+#include <iostream>
+using namespace std;
+
+#define BOOT_ADDRESS 0x11
+#define BOOT_SECTOR  0x18
+#define SECTOR_SIZE  0x80
+
+class CPU
+{
+  public:
+    void freeze() {cout <<"Freeze" << endl;}
+    void jump(unsigned int pos){ cout << "Position " << pos << endl; }
+    void execute(){cout << "EXECUTE" << endl;}
+};
+
+class Memory
+{
+  public:
+    void load(unsigned int pos, char *data)
+    {
+      cout << "Memory Load" << pos << endl;
+    }
+};
+
+class HardDrive
+{
+  public:
+    char * read(long lba, int size)
+    {
+    }
+};
+
+// Facade
+class Computer
+{
+  public:
+    void startComputer()
+    {
+      CPU cpu;
+      Memory memory;
+      HardDrive harddrive;
+
+      cpu.freeze();
+      memory.load(BOOT_ADDRESS, harddrive.read(BOOT_SECTOR, SECTOR_SIZE));
+      cpu.jump(BOOT_ADDRESS);
+      cpu.execute();
+    }
+};
+
+int main()
+{
+  Computer facade;
+  facade.startComputer();
+}
+
+}}}
+
+=== 할일 ===
+  * C로도 구현해보기.
+[[Category(2)]]

@@ -1,0 +1,458 @@
+#title 리눅스 익명 파이프 응용
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>PIPE 응용</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>PIPE 응용</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN13"
+>만들고자 하는것</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN19"
+>pipe(2) 함수에 대해서</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN24"
+>작동 process</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN29"
+>예제 코드</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		우리는 이미 PIPE 를 통한 IPC 의 구현에 대해서 몇번에 걸쳐 다루었었다. 
+		그런데 필자가 실수로 보모자식간의 통신을 위한 pipe 의 사용에 대한 
+		내용은 빼먹었었다. 
+	</P
+><P
+>		이번에는 이 pipe 의 사용법에 대한 응용을 예를들어 설명할 생각이다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>2&#51208;. 만들고자 하는것</A
+></H1
+><P
+>		우리는 몇개의 실행프로그램으로 이루어진 시스템을 설치하 일종의 
+		자동실행 프로그램을 만들것이다. 이 시스템은 3개의  
+		프로그램으로 이루어져 있다. 이 프로그램들은 일정한 순서대로 실행이 
+		되어야 하며, 하나의 프로그램이 실행되기전에 바로앞의 프로그램이 
+		제대로 실행되었는지 확인후 제대로 실행되었다면 실행되어야 한다. 
+	</P
+><P
+>	
+		이것을 구현하기 위해서 우리는 main 실행파일을 하나 만든후, main 
+		실행파일에서 fork&#38;exec 방식을 이용해서 순서대로 나머지 3개의 sub 
+		프로그램들을 실행하게 될것이다. 
+	</P
+><P
+>	
+		sub 프로그램의 실행순서와 실행할 파일이름을 지정해주기 위한 
+		설정파일을 가지게 되며, main 프로그램은 설정파일을 읽어들여서 
+		sub 프로그램들을 실행시키게 될것이다. 
+	</P
+><P
+>	
+		그런데 이들 프로그램은 앞의 프로그램이 제대로 실행되었는지 확인후 
+		차례대로 실행시켜주어야 할것이다. 그러기 위해서 main 프로그램은 
+		하나의 sub 프로그램을 실행시킨후 실행시킨 sub 프로그램과 pipe 를 
+		이용해서 통신을 하게 될것이다. sub 프로그램은 자신의 pid 를 
+		main 프로그램에 넘겨주게 되고, main 은 이 pid 를 넘겨 받으면 sub 
+		프로그램이 제대로 실행되었다고 판단하고 다음 sub 프로그램을 실행하게 
+		된다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.1&#51208;. pipe(2) 함수에 대해서</A
+></H2
+><P
+>			pipe 함수를 호출하게 되면, 읽기전용과 쓰기전용 두개의 파이프를 
+			생성할수 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+#include &#60;unistd.h&#62;
+int pipe(int filedes[2]);
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+			아규먼트를 보면 int형 배열임을 알수 있다. 이는 pipe 호출로 만들어 
+			지는 읽기전용과 쓰기전용의 파이프 연결자를 넘겨 받기 위함이다. 
+		</P
+><P
+>			PIPE 의 전반적인 특성은 이 사이트의 다른 문서들을 참고하기 바란다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>2.2&#51208;. 작동 process</A
+></H2
+><P
+>			이 프로그램은 아마 다음과 같은 방식으로 작동할것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>메인 프로그램 시작
+int main()
+{
+    설정파일을 읽어들인다. 
+    파이프를 생성한다. 
+    while(설정파일의 크기만큼)
+    {
+       fork 시킨다
+       fork 시킨 프로세스가 자식 프로세스라면
+       {
+           dup2 함수를 이용해서 1번 파이프(쓰기전용)을 1(표준출력) 으로 복사
+		   한다. 
+           설정파일에서 읽어들인 sub 프로그램을 
+           execl 함수를 통해서 실행시킨다.  
+       }
+       0번 파이프(읽기전용)에서 sub 프로그램으로 부터 넘어오는 데이타를 
+	   읽는다. 
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			exec 함수를 실행시킬경우 열린파일 지시자가 상속된다는 점을 
+			알고 있을것이다. dup2 를 이용해서 기존에 만들어진 쓰기전용 파이프 
+			번호를 표준출력(1) 으로 복사하고 나서 execl 함수를 이용해서 
+			프로그램을 실행시키면, 이 프로그램은 표준출력을 통해서 
+			부모의 파이프 와 통신할수 있게 된다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>2.3&#51208;. 예제 코드</A
+></H2
+><P
+>	
+			예제 코드는 2개의 소스로 이루어질 것이다. 하나는 main 프로그램으로 
+			프로그램의 이름은 pm.cc 이고, 다른 하나는 pm 프로그램에서 
+			frok&#38;exec 로 실행시킬 sub 프로그램으로 이름은 proc.c 이다. 
+		</P
+><P
+>	
+			<B
+CLASS="EMPHASIS"
+>예제 : proc.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+int main()
+{
+    char buf[20];
+    memset (buf, 0x00, 20);
+    sprintf(buf, "%d", getpid()); 
+    write(1, buf, 20);
+    while(1)
+    {
+        sleep(1);
+    }
+}
+
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+		</P
+><P
+>	
+			프로그램이 하는일은 간단하다. 자신의 pid 번호를 write 를 이용해서 
+			표준출력으로 보내는 것이다. 이 표준출력은 pm 에서 생성시킨 
+			pipe 와 연결되어 있음으로 pid 번호는 pm 프로그램으로 전달될 
+			것이다. 
+		</P
+><P
+>	
+			이 파일을 컴파일 한다음에 proc1, proc2, proc3 라는 이름으로 
+			복사해서 적당한 디렉토리에 옮겨 놓도록 하자. 
+			필자의 경우 /usr/yundream/bin 에 옮겨 놓았다. 
+		</P
+><P
+>	
+			<B
+CLASS="EMPHASIS"
+>예제 : main.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string&#62;
+#include &#60;unistd.h&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *fp;    
+    char buf[80];
+    char info[20];
+    int my_pid;
+    int pid;
+    int mypipe[2];
+    vector&#60;string&#62; proc_info;
+
+    fp = fopen("config.cfg", "r");
+
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        buf[strlen(buf) - 1] = 0x00; 
+        proc_info.push_back(buf);
+    }
+    fclose(fp);
+
+    my_pid = getpid();
+    pipe(mypipe);
+    for (int i = 0; i &#60; proc_info.size(); i++)
+    {
+        if (getpid() != my_pid)
+            exit(0);
+
+        pid = fork();
+        if (pid == 0)
+        {
+            dup2(mypipe[1], 1);
+            close(mypipe[0]);
+            close(mypipe[1]);
+            execl(proc_info[i].c_str(), proc_info[i].c_str(), NULL);
+        }
+        read(mypipe[0], info, 20);    
+        cout &#60;&#60; "exec " &#60;&#60; info &#60;&#60; endl; 
+    }
+    pause();
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>	
+			pm.cc 는 main 프로그램이다. 설정파일 config.cfg 로 부터 
+			실행시켜야될 파일이름을 읽어들어와서 vector 로 목록을 
+			만든다음에 fork&#38;exec 로 미리 만들어 놓은 proc1, proc2, proc3 
+			를 실행 시키다. 
+			config.cfg 파일은 다음과 같이 구성될것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>/usr/yundream/bin/proc1
+/usr/yundream/bin/proc2
+/usr/yundream/bin/proc3
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>	
+			위의 프로그램을 실행시키면 아래와 같은 결과를 보여줄것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./pm
+exec 3642
+exec 3643
+exec 3644
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			실행을 했다면 실제로 sub 프로그램들의 표준출력이 어떻게 처리되고 
+			있는지 알아보도록 하자. /proc/3642/fd 로 이동해서 ls 값을 
+			보도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost fd]# ls -al
+합계 0
+dr-x------    2 root     root            0  7월 28 14:09 .
+dr-xr-xr-x    3 root     root            0  7월 28 14:08 ..
+lrwx------    1 root     root           64  7월 28 14:09 0 -&#62; /dev/pts/5
+l-wx------    1 root     root           64  7월 28 14:09 1 -&#62; pipe:[28721]
+lrwx------    1 root     root           64  7월 28 14:09 2 -&#62; /dev/pts/5
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 결과를 보면 표준출력 1 이 /dev/pts/5 로 연결되어 있지 않고, 
+			pipe 로 연결되어 있음을 알수 있다. 또한 이 파이는 쓰기 전용임을 
+			알수 있다. 
+		</P
+><P
+>	
+			이제 pm 의 파일지시자 구조를 알아보겠다. pm 의 pid 번호를 알아내고 
+			/proc/pmpid/fd 로 이동해서 ls 값을 알아보도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost fd]# ls -al
+합계 0
+dr-x------    2 root     root            0  7월 28 14:11 .
+dr-xr-xr-x    3 root     root            0  7월 28 14:11 ..
+lrwx------    1 root     root           64  7월 28 14:11 0 -&#62; /dev/pts/5
+lrwx------    1 root     root           64  7월 28 14:11 1 -&#62; /dev/pts/5
+lrwx------    1 root     root           64  7월 28 14:11 2 -&#62; /dev/pts/5
+lr-x------    1 root     root           64  7월 28 14:11 3 -&#62; pipe:[28721]
+l-wx------    1 root     root           64  7월 28 14:11 4 -&#62; pipe:[28721]
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			2개의 파이프가 생성되었음을 알수 있다. 하나는 읽기전용 파이프이고, 
+			또다른 하나는 쓰기전용 파이프이다. 그리고 파이프 번호를 보면 
+			28721 로 각 sub 프로그램들의 파이프번호와 일치함을 알수 있다. 
+			이를 통해서 각 sub 프로그램들의 표준출력 1 은 pm 의 읽기전용 
+			파이프의 연결번호인 3 번과 연결되어 있음을 알수 있다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,738 @@
+#title 반복구조와 분기구조의 예
+
+[[TableOfContents]]
+
+번역자:강웅빈 번역감수:프겔ㅤㅎㅛㅇ들
+
+
+=== 반복구조와 분기구조의 예  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_1.html
+
+이 장에서는 반복과 분기구조를 보여주는 두개의 예제 프로그램을 공부한다. 또한 어셈블리어에서 문자열과 정수의 배열을 어떻게 표현하는 가를 공부한다. 
+
+주제:
+
+    * Null로 끝나는 문자 strings.
+    * string의 길이를 구하는 프로그램.
+    * 정수 배열.
+    * Array를합산하는 프로그램.
+
+질문: 문자열 또는 string은 ascii 패턴을 담고 있는 바이트의 열이다. null로 끝나는 string의 끝에는 무었이 옵니까?
+
+
+=== Null로 끝나는 String ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_2.html
+
+답: 0 byte (또는 null byte)
+
+null로 끝나는 string 이란  하나의 문자가 하나의 바이트에 해당하는 ascII 문자열이고 0 byte(null)로 끝난다. null로 끝나는 string은 C와 C++ 언어에서 일반적으로 사용된다. 다음은 어셈블리에서 string이 어떻게 선언되는가를 보여준다.
+
+{{{#!plain
+        .data
+str:    .asciiz "Time is the ghost of space."
+}}}
+
+문자들은 메모리에 'T'부터 시작하여 순서대로 배열된다. 다음 그림은 문자가 배열되는 것을 보여준다. 공백을 나타내는 바이트는 ASCII의 space 코드(0x20)으로 채워진다. 마지막 바이트는 그림에서는 사선(slash)으로 표현된 0x00로 채워진다.
+
+attachment:nullTermString.gif
+
+다음과 같은 것을 PC 윈도우에서 작동하는 SPIM의 데이터 표시창에서 볼 수 있다. 문자들은 주소  0x10000000에 있는 문자 'T'부터 시작하여 순서대로 메모리에 배치된다. 실제 표시창에서 이것을 보기가 쉽지는 않을 것이다.
+표시창은 32 비트 little-endian의 정수를 나타내는 것이 목적이다. 4바이트씩 묶어서 오른쪽에서 왼쪽으로 표시된다.
+
+attachment:spimString.gif
+
+{{{#!plain
+    'T' 는 주소 0x10000000에 위치한다. 
+    'i'는 주소 0x10000001에 위치한다.
+    'm'은 주소 0x10000002에 위치한다.
+    'e'는 주소 0x10000003에 위치한다.
+}}}
+
+빈칸 또는 Space(0x20)은 '_'으로 표현되었다. null byte는 주소 0x1000001B에 위치한다.
+
+질문:주소  0x100000005에는 무슨 문자가 위치해 있습니까?
+
+=== String의 길이 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_3.html
+
+답:
+
+'i'
+
+attachment:strlen.gif
+
+널로 끝나는 string의 길이는 null을 뺀 나머리 문자의 갯수이다. string의 길이를 계산하기 위해서 0부터 string 길이의 값을 세기 시작한다. string의 연속되는 byte에서 null이 아닌 byte 값마다. string 길이의 값을 증가시킨다. null 값을 발견하면 길이 계산을 중단한다.  
+
+그림의 순서도는 이러한 절차를 보여주고 있다. 순서도는 일반적인 차원에서 알고리즘을 보여주고 있다. 어셉블리의 세부사항은 코딩단계에서 한다. 다음은 프로그램의 대략적인 뼈대이다.
+
+{{{#!plain
+## strlen.asm
+##
+## Count the characters in a string
+##
+## Registers:
+## $8 --- count
+## 
+
+        .text
+        .globl  main
+		
+# Initialize
+main:   ori     $8,$0,0         #  count = 0
+
+# while not ch==null do
+loop:
+         
+         
+         j    loop
+		 
+# finish
+done:   sll   $0,$0,0           # target for branch
+
+        .data
+string: .asciiz  "Time is the ghost of space."
+
+## End of file
+}}}
+
+질문: string의 길이 값을 구할때 왜 null값을 포합하여 계산하지 않을까요? (힌트:2개의 string을 이어 붙이는 경우를 생각해 봅시다.)
+
+=== 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_4.html
+
+답:
+
+일반적으로
+
+length( string1 ) + length( string2 )   =   length( concat( string1, string2) )
+
+입니다. 만약 문자열의 끝의 null값이 길이에 포함 된다면, 결과 문자열은 null값이 끝에 하나만 있는 것에 반해 원래의 두 문자열은 null을 두개 포함하기 때문에 이 식은 참이 되지 않습니다.
+
+차트의 두번째 박스에 따르면 먼저 첫번째 문자를 가리켜야 한다. 첫번째 문자를 가리키는 방법은 여러 가지가 있다. 나중에 어런 일을 하는 쉬운 방법을 배울 것이다. 그러나, 일단은, 데이터 섹션이 0x10000000에서 시작한다는 것을 기억하자. lui명령으로 베이스 레지스터의 상위 halfword 0x1000을 올린다.
+
+ 
+{{{#!plain
+## strlen.asm 
+## 
+## 문자열의 길이 구하기
+## 
+## 레지스터 사용: 
+## $8 --- 카운트 
+## $9 --- 문자로의 포인터
+## $10 --- 실제 문자(로우 오더 바이트)
+
+.text 
+.globl main 
+
+# 초기화 
+
+main: 
+      ori $8,$0,0           # 카운트 = 0 
+      lui $9,0x1000         # 첫 글자로의 포인터 
+  
+# while not ch==null do 
+  
+loop: 
+       lbu $10,____($9)     # 글자를 구한다 
+       sll   $0,$0,0        # 로드지연슬롯
+
+       _____ $10,$0,done    # char == null 이면 루프를 벗어난다
+       sll   $0,$0,0        # 분기지연슬롯
+   
+       . . .
+   
+       j loop               # 점프 
+
+done:  sll $0,$0,0          # 분기를 위한 타겟 
+
+.data 
+string: .asciiz "Time is the ghost of space." 
+## 파일의 끝 
+}}}
+
+
+질문:
+현재 문자를 구하고 테스트 하기 위해 몇 문장이 더 추가 되었습니다. 빈 칸을 채워보세요.
+
+=== 루프 본체 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_5.html
+
+답: 아래를 참조하세요.
+
+lbu명령에 있는 바이트의 주소는 $9 에 차를 더한 값과 같다. 베이스 주소인 $9가 이미 문자를 가리키고 있기 때문에 차는 0가 될 것이다.lbu는 $10의 하위 바이트로 문자를 로드한다. 상위 3바이트는 0이 된다. beq명령이 레지스터 전체가 0인지를 검사한다 (물론 하위 바이트도 0인지 점검한다).
+
+ 
+{{{#!plain
+## strlen.asm 
+## 
+## 문자열의 길이 구하기
+## 
+## 레지스터 사용: 
+## $8 --- 카운트 
+## $9 --- 문자로의 포인터
+## $10 --- 실제 문자(로우 오더 바이트)
+
+.text 
+.globl main 
+
+# 초기화 
+
+main: 
+      ori $8,$0,0           # 카운트 = 0 
+      lui $9,0x1000         # 첫 글자로의 포인터 
+# while not ch==null do
+loop:    lbu   $10,0($9)         # 글자를 구한다 
+         sll   $0,$0,0          # 로드지연슬롯
+           
+         beq   $10,$0,done      # char == null 이면 루프를 벗어난다
+         sll   $0,$0,0          # 분기지연슬롯
+
+         addiu    ___,___,___   # count++
+
+         addiu    ___,___,___   # 다음 문자를 가리킨다.
+
+         j       loop
+         
+# finish
+
+
+done:  sll $0,$0,0          # 분기를 위한 타겟 
+
+.data 
+string: .asciiz "Time is the ghost of space." 
+## 파일의 끝 
+}}}
+프로그램은 count의 값을 증가시켜야 한다. count 값을 증가시킨이후 string의 다음 바이트를 가리키도록 베이스 레지스터를 이동 시킨다.
+
+질문: 빈칸을 채워보자
+
+=== 완성된 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_6.html
+답: 아래를 참조
+
+베이스 레지스터는 string의 각바이트 마다 1바이트씩 주소를 증가시켜 이동한다. 이것을 pointer를 이동시킨다라고 할 수 있다.이 프로그램은 각각의 행마다 중요한 개념을 가지고 있다. 이러한 개념을 사용하는 것이 바로 프로그램하는 방법이다.
+  
+ 
+{{{#!plain
+## strlen.asm
+##
+## string의 문자수를 센다.
+##
+## Registers:
+## $8 --- count
+## $9 --- pointer to the char
+## $10 --- the char (in low order byte)
+
+         .text
+         .globl  main
+                
+# Initialize
+main:    ori      $8,$0,0        #  count = 0
+         lui      $9,0x1000      #  척벗째 문자를 가리킨다.
+
+# while not ch==null do
+loop:    lbu      $10,0($9)      # 문자를 가져온다.
+         sll      $0,$0,0        # 분기 지연
+          
+         beq      $10,$0,done    # if char == null라면 loop를 나온다.
+         sll      $0,$0,0        # 분기 지연
+
+         addiu    $8,$8,1        # count++
+         addiu    $9,$9,1        # 다음 문자를 가리킨다.
+
+         j        loop
+
+# finish
+done:    sll      $0,$0,0        # 분기 타겟
+
+         .data
+string:  .asciiz  "Time is the ghost of space."
+## End of file
+}}}
+
+이 프로그램은 c 표준 라이브러리의 function int strlen(char*)와 아주 유사하다. 위에 쓰여진 프로그램은 자체의 데이터를 가지고 있고 function을 호출할 수 있도록 쓰여진 것은 아니다. 나중 장에서 페라미터와 함께 호출할 수 있는 function을 작성 해 볼것이다.
+
+
+질문: string이 null 바이트로만 작성된 길이가 0인 null string이라도 이 프로그램이 올바르게 작동하겠습니까?
+
+=== 정수 배열 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_7.html
+
+답:
+
+예.
+
+정수의 배열은 메모리에 연속되는 word로된 정수들의 연속이다. 배열에서 정수의 숫자는 메모리에도 그 값이 또한 저장 된다.
+
+attachment:integerArray.gif
+
+어셈블리어에서 정수의 배열은 지정자(directive) .word로 지정하고 정수를 쉼표(,)로 구분한 리스트를 사용한다.
+{{{#!plain
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+}}}
+
+.word라는 지정자는 data를 워드로 정렬된 장소에 저장한다.
+
+질문: 왜 배열의 끝에는 문자처럼 null word를 사용하지 않을까요?
+
+=== 프로그램 예제: 정수 배열의 합 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_8.html
+
+답: null word는0x00000000이고 일반적으로 흔히 쓰이는 정당한 정수값이다.
+
+때때로 프로그래머는 0x00000000같은 비트 형태가 데이터에 전혀 나오지 않을 것이라고 확신하면서 배열의 끝을 나타내는데 사용하고자 한다. 이러한 것에 버그가 발생하기 쉽다. 그러한 비트 패턴이 정확한 데이터에는 나타나지 않을 지라도 잘못된 데이터에서는 흔하게 찾아볼 수 있다. 여러분이 작성하는 프로그램은 잘못된 데이터라도 적절히 다룰 수 있어야 한다.
+
+다음의 예제 프로그램은 정수의 배열을 사용한다. 배열의 길이는 미리 정해져 있다. 여러분이 작성하는 프로그램은 세가지 합을 계산한다:
+
+    * 모든 정수의 합.
+    * 양수의 합.
+    * 음수의 합.
+
+아마도 C나 자바로 작성한 예제 프로그램을 전에 보았을 것이다.
+질문: 프로그램의 순서도를 그려보거나 의사코드를 작성해 보자.
+
+=== 순서도 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_9.html
+
+답: 다음을 보자
+
+attachment:addIntArray.gif
+
+순서도는 어떤 언어에서도 사용할 수 있다. 언어적인 세부사항들은 디자인과정에서는 생략하였다. 위의 차트는 구조를 갖춘 순서도이다. 다음은 프로그램의 대략적인 틀이다.
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+         .text
+         .globl  main
+# Initialize
+main:    ori      $____,$0,0       #  count = 0
+         ori      $____,$0,0       #  sum = 0
+         ori      $____,$0,0       #  neg = 0
+         ori      $____,$0,0       #  pos = 0
+
+# while  count < SIZE do
+loop:     
+         . . . .
+		 
+         j        loop
+         sll      $0,$0,0        #  분기지연
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+
+## 파일의 끝
+}}}
+
+스핌이 레지스터를 0으로 초기화 하지만 누산레지스터를 명확하게 0으로 초기화하는 것은 좋은 습관이다. 
+질문:빈칸을 채워보자
+
+=== 배열의 크기를 구해보자 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_10.html
+
+답:아래를 보자.
+
+
+attachment:addIntArray.gif
+
+이제 배열의 크기를 알아야 한다. 데이타 영역에서 첫번째 word가 배열의 크기를 선언하고 있다. 데이터 영역은 스핌에서 주소 0x10000000에서부터 시작한다. 그 주소의 상위반을 베이스 레지스터에 오린다. 그런 후에 배열의 크기를 레지스터 $15에 올린다.
+그런 후에 베이스 레지스터가 배열의 첫번째 워드를 가리키도록 하자. 
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+##   초기화 한다.
+main:    ori      $8,$0,0        #  count = 0
+         ori      $11,$0,0       #  sum = 0
+         ori      $12,$0,0       #  neg = 0
+         ori      $13,$0,0       #  pos = 0
+
+         ____     $9,0x1000     #  SIZE를 가리킨다.
+         ____     $15,0($9)     #  SIZE를 구한다.
+         addiu    $9,$9,____    #  배열의 첫번째 항을 가리킨다. 
+
+# while  count < SIZE do
+loop: 
+         . . . .
+		 
+         j        loop
+         sll      $0,$0,0        #  분기 지연
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+}}}
+질문:
+
+빈칸을 채워보자.
+
+=== 루프 만들기  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_11.html
+
+답: 다음을 보자
+
+여러분은 베이스 레지스터에 4를더하기 보다는 1을 더했을 수도 있다. 베이스레지스터 $9은 완전한 워드 크기인 4씩 증가 시켜야만 한다. 자이제 루프를 완성해보자. beq명령에서 count 값이 배열의 끝에 도달하면 루프에서 분가하여 나간다. 
+
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+##   초기화 한다.
+
+main:    ori      $8,$0,0        #  count = 0
+         ori      $11,$0,0       #  sum = 0
+         ori      $12,$0,0       #  neg = 0
+         ori      $13,$0,0       #  pos = 0
+         lui      $9,0x1000      #  SIZE를 가리킨다.
+
+         lw       $15,0($9)      #  SIZE값을 구한다.
+         addiu    $9,$9,4        #  배열의 첫번째 항목을 가리킨다.
+
+# while  count < SIZE do
+loop:    beq      $____,$____,done 
+         sll      $0,$0,0        #  분기 지연
+
+
+         addiu    $8,$8,____     # count++
+         addiu    $9,$9,____     # 배열의 다음 항목을 가리킨다.
+         j        loop
+         sll      $0,$0,0        #  분기 지연
+
+done:    sll      $0,$0,0        #  분기 목적지.
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+}}}
+
+루프의 끝부분에서 count 값을 증가 시킨다. 베이스 레지스터는 배열의 다음 항으로 이동한다.
+
+질문:빈칸을 채워보자
+
+=== 합계 구하기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_12.html
+
+답: 아래를 보자.
+
+루프의 끝부분에서 count 값을 1만큼 증가시킨다. 포인터 값은 4만큼 증가한다.
+이제 루프 몸체를 작성해 보자. 현제 배열의 값을 구해서 정수의 합에 더한다.
+
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+##   초기화 한다.
+
+main:    ori      $8,$0,0        #  count = 0
+         ori      $11,$0,0       #  sum = 0
+         ori      $12,$0,0       #  neg = 0
+         ori      $13,$0,0       #  pos = 0
+         lui      $9,0x1000      #  point at SIZE
+
+         lw       $15,0($9)      #  get SIZE
+         addiu    $9,$9,4        #  배열의 첫번째 항을 가리킨다.
+
+# while  count < SIZE do
+loop:    beq      $8,$15,done 
+         sll      $0,$0,0        #  분기지연.
+
+
+# get entry, add to sum
+         lw       $10,____($____) #  get entry
+
+         sll      $0,$0,0        #  load delay
+
+         addu     $11,$____,$____ #  합을 더한다.
+
+         addiu    $8,$8,1        # count++
+         addiu    $9,$9,4        # 배열의 다음 항을가리킨다.
+         j        loop
+         sll      $0,$0,0        #  분기 지연
+
+done:    sll      $0,$0,0        # 분기 목표
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+}}}
+
+질문: 빈칸을 채워보자.
+
+=== 음수값을 판단하기  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_13.html
+답: 아래를 보자
+
+만약 배열의 항이 음수라면 레지스터 14에 표시를 한다. 음수라면 기호 주소 neg로 분기한다.
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+##   초기화 한다.
+
+# while  count < SIZE do
+loop:    beq      $8,$15,done 
+         sll      $0,$0,0        #  분기지연 
+
+# get entry, add to sum
+         lw       $10,0($9)      #  배열의 항 값을 가져온다.
+         sll      $0,$0,0        #  로드 지연
+         addu     $11,$11,$10    # 합계를 더한다.
+
+#  test neg. or pos.
+         slti     $14,$10,_____  #  음수라면 표시를 한다. 
+         bne      $___,$___,neg  #  음수일 경우 분기한다. 
+         sll      $0,$0,0        #  분기지연
+
+neg:
+         addiu    $8,$8,1        # count++
+         addiu    $9,$9,4        # 다음항 가리킨다.
+         j        loop
+         sll      $0,$0,0        #  분기지연
+
+done:    sll      $0,$0,0        #  분기 목표
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+}}}
+
+질문:빈칸을 채우자.
+
+=== 참 또는 거짓으로 분기하기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_14.html
+
+답: 다음을 보자
+
+이제 참 블록과 거짓 블록을 구현해보자. 참일 경우 음수의 합에 현재 배열의 값을 더하고.거짓인 경우는 양수의 합에 값을 더한다. 자세히 살펴보고 블록을 혼동하지 말자.
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+# while  count < SIZE do
+loop:    beq      $8,$15,done 
+         sll      $0,$0,0        #  분기 지연
+
+
+# get entry, add to sum
+         lw       $10,0($9)      #  항의 값을 구한다.
+         sll      $0,$0,0        #  load 지연
+         addu     $11,$11,$10    #  sum에 더한다.
+
+#  음수인지 양수인지 검사한다.
+         slti     $14,$10,0      # 배열의 항이 음수라면 표시를 한다.
+         bne      $14,$0,neg     # 음수라면 분기하다. 
+         sll      $0,$0,0        #  분기지연
+         ____     $13,$13,$10    # positive: PLUS에 더한다.
+         j        _______
+         sll      $0,$0,0        #  분기지연
+
+neg:     ____     $12,$12,$10    #  negative:  NEG에 더한다.
+ifend:   addiu    $8,$8,1        #  count++
+         addiu    $9,$9,4        #  배열의 다음항을 가리킨다.
+         j        loop
+         sll      $0,$0,0        #  분기지연
+
+done:    sll      $0,$0,0        #  분기 목적지
+
+        .data
+size:   .word  17
+array:  .word  12, -1, 8, 0, 6, 85, -74, 23, 99, -30, 30, 95, 4, 7, 10, 28, 14
+
+질문:빈칸을 채우자.
+}}}
+
+=== 완성된 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_15.html
+
+답: 다음을 보자
+
+다음은 직접 실행해 볼 수 있는 완성된 프로그램이다. 테스트를 쉽게 하기위해 배열에 있는 데이터는 간단한 것을 사용하였다. 작성된 코드가 어떻게 순서도와 부합하는지 공부해보자. 
+
+
+{{{#!plain
+## addIntArray.asm
+##
+## 배열에 있는 모든 정수의 합,양수의 합과 음수의 합을 구한다.
+
+## 레지스터:
+## $8 --- count
+## $9 --- 배열의 엔트리르 가리키는 포인터 
+## $10 -- 현재 배열의 엔트리
+## $11 -- 모든 정수의 합 
+## $12 -- 음수의 합 
+## $13 -- 양수의 합 
+## $14 -- 음수나 양수를 나타냄 
+## $15 -- 배열의 크기 
+
+
+         .text
+         .globl  main
+# Initialize
+main:    ori      $8,$0,0        #  count = 0
+         ori      $11,$0,0       #  sum = 0
+         ori      $12,$0,0       #  neg = 0
+         ori      $13,$0,0       #  pos = 0
+         lui      $9,0x1000      # SIZE를 가리킨다.
+
+         lw       $15,0($9)      #  SIZE값을 구한다.
+         addiu    $9,$9,4        #  배열의 첫 항을 가리킨다.
+
+# while  count < SIZE do
+loop:    beq      $8,$15,done 
+         sll      $0,$0,0        #  분기 지연
+
+# get entry, add to sum
+         lw       $10,0($9)      #  항을 가져온다.
+         sll      $0,$0,0        #  로드 지연
+         addu     $11,$11,$10    #  SUM에 더한다.
+
+#  test neg. or pos.
+         slti     $14,$10,0x0    #  만약 항이 음수라면 set $14 
+         bne      $14,$0,neg     # 음수면 분기한다.  
+         sll      $0,$0,0        #  분기지연
+         addu     $13,$13,$10    #  양수 PLUS에 더한다. 
+         j        ifend
+         sll      $0,$0,0        #  분기지연
+
+neg:     addu     $12,$12,$10    #음수 NEG에 더한다.  
+
+ifend:   addiu    $8,$8,1        # count++
+         addiu    $9,$9,4        # 다음 항을 가리킨다. 
+         j        loop
+         sll      $0,$0,0        #  분기지연
+
+# finish
+done:    sll      $0,$0,0        # 분기 목표
+
+        .data
+size:   .word  4
+array:  .word  1, 2, -2, -1
+
+## End of file
+}}}
+
+질문: 지연 슬롯을 더잘 사용할 수 있도록 코드를 재배치할 수 있을까요?
+
+=== 프로그램 실행하기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_16.html
+
+답: 예,연습삼아 해봅시다.
+
+attachment:continueMenu.gif
+
+PC (to 0x00400000) 를 초기화해서 프로그램을 실행시킬 수 있다. 반복해서 1스텝씩(F10) 실행시켜보자. 배열의 데이터가 많으면 이런 과정은 지루할 수 도 있다. 윈도우 버전의 스핌에서는 다음과 같이 시작해서 프로그램을 실행 할 수 있다.
+
+
+   1. PC를 초기화 한다. 
+   2. F10키를 한번 누른다. 또는 원한다면 여러번 누린다. 
+   3. Simulator 메뉴의 Continue를 클릿 한다. 
+   4. 프로그램은 프로그램의 끝으로 PC가 넘어갈때까지 수행된다. 
+   5. 스핌 스뮬레이터가 정지된다. 
+
+이런 절차가 어색할 수 도 있다. 원한다면 마지막 명령에 브레이크 포인트를 설정할 수 있다. 또는 루프 위쪽에 브레이크를 설정하고 Continue마다 루프가 한번씩 수행되게 할 수 있다.
+
+Go를 메뉴에서 클릭 하면 시뮬레이터는 존재하지 않는 코드를 실행하려다 멈출것이다. Bare Machine이 옵션 메뉴에 설정되어 있기 때문에 추가적인 코드가 없는 것이다. 이런 저런 실험을 하고 싶지않다면 당분간 이런식으로 설정을 한다.
+
+질문: 프로그램을 한번 실행하는 것으로 코드가 정확하다고 확신할 수 있습니까? 
+
+
+=== 20장 끝 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20_17.html
+
+답: 이와같이 아무리 간단한 프로그램이라도 사려깊은 테스트만이 발견할 수 있는 버그가 있을 수 있다.
+
+논의 된 주제
+
+    * Null로 끝나는 문자 
+    * String의 길이  length.
+    * 베이스 레지스터 초기화 하기 
+    * string을 따라 베이스 레지스터 이동하기 
+    * 어셈블리에서 정수 배열 구현하기
+    * 정수배열을 따라 베이스 레지스터 이동하기
+
+[http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20quiz.html 퀴즈]와 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-20/ass20programs.html 과제]를 풀어봅시다.
+
+
+
+집에서 지금도 사이트 접속이 안되는데요.. -_- feb 8th
+
+
+{{{#!comment
+강웅빈
+5일 오후5시에 supplementary form냅니다.. 지금 밤 새면서 쓰고 있는데.. 이제 바로 컴백합니다. 기대하셔도 좋습니다...
+슬슬 운전면허도 따보고 그래야겠습니다
+}}}

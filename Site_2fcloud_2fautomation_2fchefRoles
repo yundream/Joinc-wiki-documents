@@ -1,0 +1,300 @@
+#title chef roles
+
+[[tableofcontents]]
+== Roles ==
+Roles을 이용하면 비슷한 성격을 가지는 노드들을 하나의 그룹으로 묶어서 설정을 관리할 수 있다. 서비스를 위한 웹서버를 운용한다고 가정해 보자. 이들 웹 서버는 apache 웹서버, php, mysql이 올라간다. 그렇다면 앞으로 추가되는 웹 서버들도 모드 동일한 애플리케이션과 설정을 가질 것이다. 그렇다면 webserver role을 만들어서 여기에 APM에 대한 정보를 넣어 넣고, 웹서버 node가 추가될 때마다 webserver role을 추가하면 간단하게 자동화 할 수 있을 것이다. 
+
+또한 동일한 APM으로 구성된 웹 서버라고 할지라도 서비스를 위한 웹 서버와 내부 개발을 위해서 사용하는 웹서버는 설정이 다를 것이다. 이때는 webserver-dev 등의 role을 따로 만들어서 관리할 수 있을 것이다. ubunt와 centos등 운영체제에 따라서 다른 룰을 만들 수도 있을 것이다. 
+
+role을 이용해서 복잡한 자동화 관리를 간단히 만들어 보자.
+
+이 문서는 [wiki:Site/cloud/automation/chefInstall chef install], node 및 cookbook 등록은 할 줄 안다는 가정하에 만들었습니다. 
+
+=== role 구성 ===
+ * role은 attribute와 run list로 구성된다. 
+ * node는 하나 이상의 role를 적용할 수 있다. 
+
+=== role 관리 ===
+role은 4가지 방식으로 관리할 수 있다.
+ 1. chef repository에 디렉토리를 만들어서 role를 관리한다. role 파일은 json 형식을 따른다. 
+ 1. 혹은 json 대신에 ruby DSL로 만들 수도 있다. DSL은 JSON으로 컴파일 된다.  
+ 1. knife를 이용.
+ 1. 혹은 REST API를 이용.
+
+=== role 작업 방법 ===
+role 파일을 수정할 경우.
+  * ruby DSL 혹은 JSON 형식을 사용할 수 있다. 
+  * JSON은 간단하게 사용할 수 있으며, DSL을 이용할 경우 다이나믹한 role을 만들 수 있다.
+  * role을 형상관리 시스템을 이용해서 버전관리를 하도록 한다.  
+  * role을 완성했다면 knife를 이용해서 chef 서버에 upload 한다. 
+
+Chef server management console (웹 콘솔)을 이용할 경우
+  * management console를 이용하면, 직관적으로 role을 관리할 수 있다. 
+  * 하지만 DSL을 이용할 수 없으며,
+  * 버전관리도 쉽지 않다.
+
+가능하면 role 파일을 이용해서 작업하는 걸 권장한다. 
+
+=== 주요 role 필드들 ===
+JSON을 기준으로 설명한다.
+==== name ====
+각 role은 유일한 '''name'''을 가져야 한다.
+{{{#!plain
+"name": "base"
+}}}
+
+==== description ====
+role이 하는 일에 대한 간단한 설명.
+{{{#!plain
+"description": "The webserver role for APM service"
+}}}
+
+==== run_list ====
+node에 적용할 recipes의 목록으로 하나 이상의 recipes로 구성할 수 있다.
+{{{#!plain
+"run_list": [
+	"recipe[apache]",
+	"recipe[mysql]",
+	"recipe[php]",
+	"recipe[sqlite]"
+]
+}}}
+
+==== env_run_list ====
+chef 0.10.x에 추가된 기능으로, 환경에 따라 다른 run list를 적용할 수 있다. 
+
+==== default_attributes ====
+{{{#!plain
+"default_attributes" {
+	"port": "80",
+	"max client": "100",
+	"max thread": "50"
+}
+}}}
+
+==== override_attributs ====
+{{{#!plain
+"override_attributes" {
+	"port": "80",
+	"max client": "100",
+	"max thread": "50"
+}
+}}}
+
+==== role 예제 ====
+{{{#!plain
+{
+  "name": "webserver",
+  "chef_type": "role",
+  "json_class": "Chef::Role",
+  "default_attributes": {
+    "apache2": {
+      "listen_ports": [ 
+        "80",
+        "443"
+      ]
+    }
+  },
+  "description": "The base role for systems that serve HTTP traffic",
+  "run_list": [
+    "recipe[apache2]",
+    "recipe[apache2::mod_ssl]",
+    "role[montior]"
+  ],
+  "env_run_lists" : {
+    "production" : [],
+    "preprod" : [],
+    "dev": [
+      "role[base]",
+      "recipe[apache]",
+      "recipe[apache::copy_dev_configs]",
+    ],
+    "test": [
+      "role[base]",
+      "recipe[apache]"
+    ]
+   },
+  "override_attributes": {
+    "apache2": {
+      "max_children": "50"
+    }
+  }
+}
+}}}
+
+=== role 다루기 예 ===
+knife로 role을 만들어 보자. role이 실제 동작하는 환경을 만들어야 이해가 쉬울 것 같다서, 다음과 같은 테스트 환경을 만들었다. 
+  * chef client 운영체제 : Centos 6.2. virtualbox(:12)를 이용해서 생성.
+  * chef client 도메인 이름 : web01.yundream.com
+  * chef server 운영체제 : Centos 6.2. virtualbox(:12)로 생성
+  * webserver를 위한 role을 만든다. 이 role은 mysql과 apache를 run_list로 가진다.  
+     * role 이름은 '''webserver'''
+     * mysql과 apache cookbook을 만든다.
+     * 제대로 하자면 php cookbook까지 만들어야 하겠지만, 여기에서는 설치 후 실행까지만 진행한다. 
+  * web01.yundream.com node에 webserver role 적용.  
+     * mysql : 설치/실행 후 패스워드까지 적용한다. 
+     * apache : 설치/실행.
+
+==== cookbook 만들기 ==== 
+===== mysql cookbook =====
+cookbook 생성
+{{{#!plain
+# knife cookbook create mysql
+}}}
+
+template 파일 생성
+{{{#!plain
+# cat mysql/templates/default/my.cnf.erb  
+# This file is created by chef server
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+user=mysql
+port=3306
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+#log-bin=mysql-bin
+#server-id=1
+
+[mysqld_safe]
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+}}}
+
+recipes 만들기
+{{{#!plain
+# mysql package를 install 한다.
+package "mysql" do
+        action :install
+end
+
+# mysql-server package를 install
+package "mysql-server" do
+        action :install
+end
+
+# 만약 template 내용이 변경되면, mysqld service를 restart 한다. 
+template "/etc/my.cnf" do
+        notifies :restart, "service[mysqld]"
+end
+
+# my.cnf 파일 생성
+template "/etc/my.cnf" do
+        owner "root"
+        group "root"
+        mode "0644"
+        source "my.cnf.erb"
+end
+
+# mysqld 서비스 등록
+service "mysqld" do
+        supports :restart => true, :start => true
+        action :start
+end
+
+# 설치 완료 후 root 패스워드를 만든다. 
+execute "mysqladmin" do
+        command "mysqladmin -u root password 12345678"
+        action :run
+end
+}}}
+
+===== apache cookbook =====
+cookbook 생성
+{{{#!plain
+# knife cookbook create apache 
+}}}
+
+template 파일 : 그냥 적당한 httpd.conf 파일 가져다 사용한다.
+
+recipies
+{{{#!plain
+package "httpd" do
+        action :install
+end
+
+directory "/etc/httpd/conf" do
+        owner "root"
+        group "root"
+        mode "0744"
+        action :create
+end
+
+template "/etc/httpd/conf/httpd.conf" do
+        owner "root"
+        group "root"
+        mode "0644"
+        source "httpd.conf.erb"
+end
+
+service "httpd" do
+        supports :restart => true, :start => true
+        action :start
+end
+}}}
+
+==== role 만들기 ====
+이름이 '''webserver'''인 role를 만든다. 만들기 전에 편집에 사용할 에디터를 지정해야 한다.
+{{{#!plain
+# export EDITOR=vim
+}}}
+
+{{{#!plain
+# knife role create webserver
+}}}
+knife를 실행하고, JSON 파일을 수정하면 된다. run_list에 apache와 mysql를 추가했다.
+{{{#!plain
+{
+  "default_attributes": {
+  },
+  "override_attributes": {
+  },
+  "json_class": "Chef::Role",
+  "chef_type": "role",
+  "run_list": [
+    "recipe[apache]",
+    "recipe[mysql]"
+  ],
+  "env_run_lists": {
+  },
+  "description": "",
+  "name": "webserver"
+}}}
+
+==== role 추가및 확인 ====
+'''web01.yundream.com''' node에 '''webserver''' role을 추가 
+{{{#!plain
+# knife node run list add web01.yundream.com 'role[webserver]'
+}}}
+
+role 정보 확인
+{{{#!plain
+# knife role show webserver
+chef_type:            role
+default_attributes:   
+description:          
+env_run_lists:        
+json_class:           Chef::Role
+name:                 webserver
+override_attributes:  
+run_list:             recipe[apache], recipe[mysql]
+}}}
+
+node에 role이 잘 적용됐는지 확인
+{{{#!plain
+# knife node show web01.yundream.com
+Node Name:   web01.yundream.com
+Environment: _default
+FQDN:        web01.yundream.com
+IP:          192.168.56.111
+Run List:    role[webserver]
+Roles:       webserver
+Recipes:     apache, mysql
+Platform:    centos 6.2
+}}}
+
+
+== 히스토리 ==
+  1. 2012년 2월 28일 작성
+
+[[tag(chef,cloud,role)]]

@@ -1,0 +1,171 @@
+#title me2day 포스트 위젯 만들기
+
+me2day 친구로 등록된 사용자의 포스트목록을 보여주는 위젯을 만들어 보려고 한다. 이와 비슷한 위젯이 있긴 한데, 플레쉬 기반인점이 일단 맘에 안들고, 여러 친구의 포스트를 가져오기엔 문제가 있는 것 같아서이다. 아래는 현재 공개되어있는 위젯이다. 제작자는 [http://lostsin.tistory.com/ lostsin]님
+{{{#!html
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
+   id="Me2dayEmbed" width="200" height="280"
+   codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab">
+   <param name="movie" value="http://lostsin.tistory.com/attachment/ik20.swf" />
+
+   <param name="FlashVars" value="me2id=yundream&me2nick=yundream&bgcolor=#000000" />
+   <param name="quality" value="high" />
+   <param name="bgcolor" value="#869ca7" />
+   <param name="allowScriptAccess" value="sameDomain" />
+   <embed src="http://lostsin.tistory.com/attachment/ik20.swf" quality="high" bgcolor="#869ca7"
+    width="200" height="280" name="Me2dayEmbed" align="middle"
+    play="true"
+    loop="false"
+    quality="high"
+    allowScriptAccess="sameDomain"
+    type="application/x-shockwave-flash"
+    FlashVars="me2id=yundream&me2nick=yundream&bgcolor=#000000"
+    pluginspage="http://www.adobe.com/go/getflashplayer">
+   </embed>
+ </object>
+}}}
+
+== me2day API ==
+요즘의 웹서비스들이 그러하듯이 me2day도 서비스에 접근해서 원하는 정보를 가져올 수 있는 API를 제공하고 있다. [http://codian.springnote.com/pages/86001 API 문서]도 상당히 친절하다. 이거 보면서 만들면, 어렵지 않게 원하는 위젯을 만들수 있을 것 같다.
+
+=== 포스트정보 얻어오기 : get_posts ===
+요청한 데이터는 XML(:12) 형식으로 넘어온다. DTD를 정의해야 겠으나 귀차니즘이고, 형식을 이해하는데에는 전혀 문제가 없을 것 같다. 아래 정도의 데이터만 얻어오면 충분할 것 같다.
+  * permalink : 링크주소
+  * body : 포스트 내용
+  * icon : 포스트의 성격을 나타내는 아이콘
+  * metooCount : 포스트의 인기도
+  * id : 작성자
+  * nickname : 별칭
+  * homepage : 홈페이지
+  * face : face 이미지
+  * commentsCount : 댓글 갯수
+  * author : 저자정보들
+  * tags : 태그들
+{{{#!plain
+  <post>
+    <post_id>pqk7d</post_id>
+    <permalink>http://me2day.net/yundream/2008/09/02#17:50:53</permalink>
+    <body>Hello World</body>
+    <kind>think</kind>
+    <icon>http://me2day.net/images/post_think.gif</icon>
+    <tags>
+      <tag>
+        <name>wow</name>
+        <url>http://me2day.net/yundream/tag/wow</url>
+      </tag>
+    </tags>
+    <me2dayPage>http://me2day.net/yundream</me2dayPage>
+    <pubDate>2008-09-02T17:50:53+0900</pubDate>
+    <commentsCount>4</commentsCount>
+    <metooCount>0</metooCount>
+    <contentType></contentType>
+    <iconUrl></iconUrl>
+
+    <callbackUrl></callbackUrl>
+    <author>
+      <id>yundream</id>
+      <nickname>yundream</nickname>
+      <face>http://me2day.net/images/user/yundream/profile.png?1220340156</face>
+      <homepage>http://www.joinc.co.kr</homepage>
+      <me2dayHome>http://me2day.net/yundream</me2dayHome>
+
+    </author>
+    <location>
+      <name>Seoul</name>
+      <longitude></longitude>
+      <latitude></latitude>
+    </location>
+    <media>
+    </media>
+  </post>
+</posts>
+}}}
+
+== POST 정보를 얻어오는 셈플 코드 ==
+{{{#!plain
+$currentElements = array();
+$newsArray = array();
+$body="";
+
+macro_me2dayPost("http://me2day.net/api/get_posts/yundream.xml","","");
+
+function macro_me2dayPost($file, $value, $options)
+{
+	$handle = fopen($file,"r");
+	if (!$handle)
+	{
+		return "Error";
+	}
+	$xml_parser = xml_parser_create();
+	xml_set_element_handler($xml_parser, "startElement", "endElement");
+	xml_set_character_data_handler($xml_parser, characterData);
+	while ($data = fread($handle, 4096)) {
+		if (!xml_parse($xml_parser, $data, feof($handle))) {
+			die(sprintf("XML ¿¡·￣: %s at line %d",
+                xml_error_string(xml_get_error_code($xml_parser)),
+                xml_get_current_line_number($xml_parser)));
+		}
+	}
+	pclose($handle);
+}
+
+// Prints XML data; finds highlights and links
+function characterData($parser, $data)
+{
+	global $currentElements, $newsArray, $itemCount, $body;
+
+	$currentCount = count($currentElements);
+	$parentElement = $currentElements[$currentCount-2];
+	$thisElement = $currentElements[$currentCount-1];
+
+		switch($thisElement)
+		{
+			case "FACE":
+				print "FACE -> $data<br>";
+				break;
+			case "BODY":
+				$body .= $data;
+				break;
+			case "ID":
+				print "ID -> $data<br>";
+				break;
+			case "NICKNAME":
+				print "NICKNAME -> $data<br>";
+				break;
+			case "ME2DAYHOME":
+				print "HOME -> $data<br>"; 
+				break;
+			case "COMMENTSCOUNT":
+				print "COMMENTSCOUNT -> $data<br>"; 
+				break;
+		}
+} 
+
+function startElement($parser, $name, $attrs)
+{
+    global $currentElements, $itemCount; 
+		array_push($currentElements, $name);
+		if ($name == "POST")
+		{
+			$itemCount +=1;
+		}
+}
+
+function endElement($parser, $name)
+{
+	global $currentElements, $body;
+
+	if ($name == "BODY")
+	{
+		echo $body,"<br>";
+		$body = "";
+	}
+	$currentCount = count($currentElements);
+	if($currentElements[$currentCount-1] == $name)
+	{
+         array_pop($currentElements);
+	}
+}
+}}}
+
+[[tag(me2day,web2.0,widget)]]
+

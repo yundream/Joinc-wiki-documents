@@ -1,0 +1,71 @@
+#title GNS3 - Layer 3
+
+== Layer 3 ==
+이제 GNS3로 Layer 3 네트워크를 시뮬레이션 해볼까 합니다. L2까지는 MAC주소를 이용해서 물리적으로 연결 됐지만 지금부터는 라우팅 프로토콜과 IP(인터넷 주소)가 사용됩니다. 한 계층 더 추상화된 논리적계층이라고 할 수 있습니다.
+
+=== L3로 연결하기 위한 관문 Gateway ===
+Gateway에 대한 여러해석이 있지만 '''L2 에서 L3로 나가기 위한 관문'''이라고 하면 이해가 편하지 않을까 싶다. L2 네트워크의 노드들이 L3, 즉 인터넷으로 나가기 위한 Gateway를 만들어 보려고 한다. Cisco Router를 두는 구성이 일반적이겠으나, Cisco Router를 공부하는게 중요한게 아니니 Linux VM으로 대체하려고 한다.  
+
+네트워크 구성은 다음과 같다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/WRS-YCahGLBrhRnM20hukNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh5.googleusercontent.com/-tcC5n1RWod8/Txbi93e3gjI/AAAAAAAAB-k/ferTD0m-CHg/s400/gns13.png" height="268" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+  * VBOX1 : 192.168.110.1
+  * VBOX2 : 192.168.110.2
+  * VBOX3 : Gateway 
+    * eth3 : 192.168.110.3
+    * eth4 : 192.168.56.2 
+VBOX3의 eth4는 호스트 운영체제의 vboxnet0과 통신을 할 수 있습니다. 
+
+192.168.110.0/24 네트워크의 Gateway는 192.168.110.3 (VBOX3)입니다. VBOX1와 VBOX2는 자기의 서브넷으로 향하는 패킷이 아니라면 Gateway로 보내도록 Default gateway로 설정 하면 됩니다. Gateway인 VBOX3는 패킷을 호스트 운영체제로 보내고 호스트 운영체제는 패킷을 SNAT해서 인터넷으로 보냅니다. 
+
+VBOX1의 route 설정을 보겠습니다.
+{{{#!plain
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.110.0   0.0.0.0         255.255.255.0   U     0      0        0 eth2
+}}}
+아직 default gateway가 설정되지 않았습니다. 이 상태에서 서브넷에 있지 않은 IP 주소로 패킷을 보내면, 경로를 설정할 수 없기 때문에 패킷을 버려버릴 겁니다. route 명령을 이용해서 gateway를 설정했습니다. 
+{{{#!plain
+# route add default gw 192.168.110.3 eth2
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.110.3   0.0.0.0         UG    0      0        0 eth2
+192.168.110.0   0.0.0.0         255.255.255.0   U     0      0        0 eth2
+}}}
+
+이제 외부 IP로 ping을 때려보겠습니다. 만만한 8.8.8.8로 날려보죠. 물론 8.8.8.8로 ping을 날려도 응답이 오지 않을 겁니다. IP forwarding와 NAT 설정을 하지 않았기 때문입니다. 
+
+=== IP forwarding ===
+운영체제는 패킷이 향하는 주소가 네트워크 인터페이스의 서브넷 주소가 아니라면 버려버립니다. VBOX1인 8.8.8.8로 패킷을 전송하면 디폴트 게이트웨이인 VBOX3로 패킷을 보낼 겁니다. 이 패킷을 받은 VBOX3는 패킷의 목적지 IP가 eth3 서브넷 네트워크 192.168.110.0/24로 향하지 않기 때문에 패킷을 버립니다. 
+
+일반적인 호스트라면 문제가 없겠지만, 게이트웨이의 경우에는 문제가 됩니다. 이 경우에는 IP forwarding을 해줘야 합니다. 자기 서브넷으로 향하는 패킷이 아니라도 일단 받은 다음 라우팅 룰을 타도록 해야 하기 때문입니다. 
+
+리눅스는 '''/proc/sys/net/ipv4/ip_forward'''의 값을 1로 해서 IP forwarding이 활성화 되도록 설정할 수 있습니다.
+{{{#!plain
+# echo 1 /proc/sys/net/ipv4/ip_forward
+}}}
+이 값은 휘발성 이므로 부팅 때마다 적용되게 하려면 /etc/sysctl.conf에서 ip_foward 값을 1로 설정해 주면 됩니다. 
+{{{#!plain
+# cat /etc/sysctl.conf
+....
+....
+net.ipv4.ip_forward=1
+...
+}}}
+
+이제 VBOX1에서 8.8.8.8로 보낸 패킷은 드랍되지 않고 라우팅 룰을 타게 됩니다. 모든 목적지에 대해서 host 운영체제로 나가게 하면 되겠죠.
+{{{#!plain
+VBOX3 # route add default gw 192.168.56.1 dev eth4
+VBOX3 # route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.56.1    0.0.0.0         UG    0      0        0 eth4
+192.168.56.0    0.0.0.0         255.255.255.0   U     0      0        0 eth4
+192.168.110.0   0.0.0.0         255.255.255.0   U     0      0        0 eth3
+}}}
+
+이제 VBOX1에서 8.8.8.8로 ICMP ping을 보내면 VBOX3로 향하고, VBOX3는 이 패킷을 다시 자신의 디폴트 게이트웨이인 192.168.56.1로 보냅니다.  
+=== Static routing ===

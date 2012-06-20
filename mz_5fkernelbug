@@ -1,0 +1,49 @@
+= Linux kernel bug =
+[[TableOfContents]]
+== 개요 ==
+ * 이 페이지는 일상적으로 이미 알려진 버그를 기록하는 것이 아니고 [minzkn]이 직접 겪어보고 확인한 버그만을 기록합니다.
+== BUG: O_SYNC ==
+ * 다음과 같은 코드에서 데이터의 첫번째 블록 일부가 간혹 왜곡이 되는 현상이 발생합니다. 이는 2.4.20 까지 버그가 확인되었습니다. O_SYNC플래그가 일부 CF장치에서 문제가 발생합니다. 이것을 해결하는 방법은 write 시점후에 fsync를 사용하는것이 있습니다.
+ {{{#!vim c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+
+int main(void)
+{
+ int s_Handle, s_ReadBytes;
+ unsigned char s_ReadBuffer[ 1 << 20 ];
+ unsigned char s_Buffer[ 1 << 20 ];
+ const char c_TestFile[] = {"test.dat"};
+ umask(022);
+ s_Current = 0;
+ do
+ {
+  for(s_ReadBytes = 0;s_ReadBytes < sizeof(s_Buffer);s_ReadBytes++)s_Buffer[s_ReadBytes] = rand() & 0xff;
+  s_Handle = open(c_TestFile, O_WRONLY | O_SYNC, 0755);
+  if(s_Handle != (-1))
+  {
+   write(s_Handle, &s_Buffer[0], sizeof(s_Buffer) >> 1);
+   close(s_Handle);
+  }
+  s_Handle = open(c_TestFile, O_RDONLY);
+  if(s_Handle != (-1))
+  {
+   s_ReadBytes = read(s_Handle, &s_ReadBuffer[0], sizeof(s_ReadBuffer));
+   if(s_ReadBytes != sizeof(s_ReadBuffer))
+   {
+    if(memcmp(&s_ReadBuffer[0], &s_Buffer[0], s_ReadBytes) != 0)
+    {
+     fprintf(stderr, "Block destroy data !\n");
+     break;
+    }
+   }
+   close(s_Handle);
+  }
+ }while(1);
+}
+}}}
+----

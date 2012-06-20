@@ -1,0 +1,887 @@
+#title XML과 expat 응용
+
+|| 만든날 	|| 2004/01/30 						||<|4> http://www.joinc.co.kr/images/myavata/2.gif	||
+|| 관리자 	|| yundream							||
+|| 홈페이지	|| http://www.joinc.co.kr			||
+|| 이메일	|| [mailto:yundream@joinc.co.kr]	||
+
+[[TableOfContents]]
+
+=== 교정 과정 ===
+ 1. 아직 초안단계이므로 용어통일등이 이루어지진 않았습니다.
+
+=== 토론및 잡담 ===
+ 1. 이글의 많은 내용은 http://dblab.comeng.chungnam.ac.kr/~dolphin/xml/atoz/xml-9710/xml-9710.html XML (eXtensible Markup Language) Introduction]을 참고하고 있습니다.
+ 1. 참고할 내용들  
+{{{#!plain
+ 1. Introduction to XML  
+   XML Fundamental Course
+   What is mean XML
+   HTML vs XML
+   Where is Used XML
+   Goals of XML
+   The XML Core 
+ 
+ 2. XML BasicMarkup Syntax 
+   Characters, Elements
+   The Structure of XML Data
+   The Document Element
+   Special-purpose Markup
+ 
+ 3. XML Namespace 
+   What is an XML Namespace
+   XML Namespace in prefix
+   Qualified Names
+   UnQualified Names
+   Declaring Namespace
+   Namespace & Attributes
+   Why Use Namespace
+   MisUnderstanding
+ 
+ 4. Well-formed XML 
+   Tag and Text and elements, 
+   Rules for Elements
+   What is mean Well-formed XML
+ 
+ 5. Document Type Definitions 
+   What is mean Validation
+   Why Validate XML
+   DTD
+   DTD Structure
+   Basic DTD Declaration
+   Entities
+   Standalone
+ 
+ 6. XML SchemaSchema 
+   Advantages of XML Schema
+   Use XML Syntax
+   Stronger Support for Content Model
+   Benefits of XML Schemas
+   Basic XML Schemas
+ 
+ 7. Handling XML Data 
+   Metadata and XML Processing
+   What is mean XSL
+   What is mean XSLT
+   What is mean XPath
+   What is mean XQuery
+   What is mean DOM
+ 
+ 8. Advanced XPath  
+   Introduction to XPath
+   What is mean XPath
+   Why use XPath
+   XPath Structure
+   How XPath works
+   XPath Basics
+ 
+ 9. Advanced XSLT  
+   What is mean XSL
+   XSLT
+   XPath Expressions
+   XSLT Fundamentals
+ 
+ 10. Document Object Model 
+   What is mean DOM
+   Why Use the DOM
+   XML Object Model
+   XML DOM
+   DOM Implementations
+ 
+ 11. XML Web Services 
+   Web Service
+   SOAP
+   WSDL
+   UDDI
+}}}
+==== 해야할 것들 ==== 
+ 1. 용어통일
+ 1. expat 깔끔 한글 처리
+ 1. 깔끔 한글처리 완성되면 RSS 리더기 작성 : wxPython과 QT중 선택 
+   1. QT의 경우 자체적으로 xml 클래스를 제공하고 있으며, UTF8을 처리한다. 
+ 1. DSSL 응용 : docbook 사이트에 좋은 문서 많음
+ 1. DSSL 참고문헌 : http://www.prescod.net/dsssl
+ 
+==== expat 에서의 한글 처리 ==== 
+expat에서 한글(euc-kr)을 처리하기 위해서는 다음과 같은 2가지 문제를 해결해야 한다. 
+ * '''euc-kr 인코딩 인식 문제''' : euc-kr 인코딩이 나올 경우 인식할 수 없는 인코딩 타입으로 해석 해서 에러를 리턴해 버린다. expat에서 UnknownEncoding관련 함수를 살펴보긴 했지만 제대로 대응되지 못하는 것 같아서 expat 소스를 수정했다. 수정한 expat버젼은 1.95.7이다.   
+{{{#!plain
+xmltok.c
+=========
+  UTF_16_ENC,
+  UTF_16BE_ENC,
+  UTF_16LE_ENC,   // 1420 line
++  EUC_KR,   
+  /* must match encodingNames up to here */
+  NO_ENC
+};
+
+static const char KW_UTF_16LE[] = {  // 1448 line
+  ASCII_U, ASCII_T, ASCII_F, ASCII_MINUS, ASCII_1, ASCII_6, ASCII_L, ASCII_E,
+  '\0'
+};
++ static const char KW_EUC_KR[]= {
++   ASCII_E, ASCII_U, ASCII_C, ASCII_MINUS, ASCII_K, ASCII_R, '\0'
++ };
+}}}
+===== iconv를 이용한 utf인코딩 및 디코딩 =====
+ * 위의 코드 수정으로 xml encoding문제는 해결되었다. 두번째 문제는 xml데이터 중 한글이 포함되어 있을 파싱을 제대로 못하고 종래해 버리는 문제다. 이 문제는 '''iconv'''를 이용해서 expat가 인식가능한 문자열로 변경시키는 것으로 해결 했다. 다음은 대략적인 코드로 euc-kr, 한글인스턴스 문서도 제대로 파싱한다. 본문 예제의 수정판으로 완성되는 대로 본문예제를 교체할 것이다. iconv()부분은 함수화 시켜서 간단히 사용가능 하도록 수정할 생각이다. 
+{{{#!plain
+#include <stdio.h>
+#include <expat.h>
+#include <stdio.h>
+#include <string.h>
+#include <iconv.h>
+#include <errno.h>
+
+#define ICONV_DONE() (r>=0)
+#define ICONV_INVAL() (r<0) && (errno==EILSEQ)
+#define ICONV_OVER() (r<0) && (errno==E2BIG)
+#define ICONV_TRUNC() (r<0) && (errno==EINVAL)
+
+char ibuf[BUFSIZ];
+char obuf[BUFSIZ];
+
+
+int Depth = 0;
+int is_value = 0;
+
+const char *current_el;   // 가장 최근 태그 기억용
+const char **current_id;  // 태그의 특성값 기억용
+
+int  user_num = 0;   // 몇개의 레코드가 저장되었는지 검사 
+
+// xml (태그가 아닌) 데이터를 만났을 때 호출된다.
+void parser(void *data, const char *s, int len)
+{
+	int i = 0; 
+	int index =  0;	
+	char buf[1024] = {0x00, };
+	char obuf[1024] = {0x00, };
+
+	iconv_t cd;
+	char *ip, *op;
+	int ileft, oleft;
+    // 개행,탭문자 제거
+	for (i = 0; i < len; i++)
+	{
+		if (s[i] != '\n' && s[i] != '\t' && i < len)
+		{
+			buf[index] = s[i]; 
+			index++;
+		}
+	}
+
+
+	if (is_value && current_el && (buf[0] != 0x00))
+	{
+
+		cd = iconv_open("euc-kr", "utf-8");
+		ip = buf;
+		op = obuf; 
+		oleft = 1024;
+		ileft = strlen(buf);
+		iconv(cd, &ip, &ileft, &op, &oleft);
+		if (current_id[0])
+			printf("==> %s : %s (%s)\n", current_el, current_id[1], obuf);
+		else
+			printf("==> %s (%s)\n", current_el, obuf);
+		iconv_close(cd);
+	}
+}
+
+// xml (여는)태그를 만났을 때 호출되는 함수다.
+// depth를 1증가 시키고, depth가 0즉 처음 만나나는 테그라면 
+// version을 검사한다. 물론 테그(el)를 직접 비교해도 될 것이다.       
+void
+start(void *data, const char *el, const char **attr) {
+	is_value = 1;
+	current_el = el;
+
+	current_id = attr;
+	if(Depth == 0) 
+	{
+		printf("Configuration Version is %s\n\n", current_id[1]); 
+	}
+	if (strcmp(current_el,"uinfo") == 0)
+	{
+		printf("==================\n", current_el);
+		user_num++;
+	}
+	Depth++;
+}
+
+// xml (닫는)태그를 만났을 때 호출되는 함수다.
+// 닫히게 되므로 depth가 1감소할 것이다. 
+void
+end(void *data, const char *el) 
+{
+	is_value = 0;
+	Depth--;
+} 
+
+int main(int argc, char **argv) {
+    // xml 파서를 생성한다.
+	XML_Parser p = XML_ParserCreate(NULL);
+	void *enData;	
+	int first = 1;
+	iconv_t cd;
+	int r; 
+	int oleft;
+    int ileft=0;
+	char *ip, *op;
+	if (! p) 
+	{
+		fprintf(stderr, "Couldn't allocate memory for parser\n");
+		exit(-1);
+	}
+
+	// xml의 element를 만났을 때 호출될 함수를 등록한다. 
+    // start는 처음태그, end는 마지막 태그를 만났을 때 호출된다.
+	XML_SetElementHandler(p, start, end);
+
+    // 실제 데이터 (예 : <tag>data</tag>의 data)를 처리하기 위해서 
+    // 호출될 함수를 등록한다.
+	XML_SetCharacterDataHandler(p, parser);	
+	cd = iconv_open("utf-8", "euc-kr");
+
+	for (;;) 
+	{
+        int done;
+ 
+        ileft = fread(ibuf, 1, BUFSIZ, stdin);
+        if (ferror(stdin)) {
+          fprintf(stderr, "Read error\n");
+          exit(-1);
+        }
+        done = feof(stdin);
+		oleft = BUFSIZ;
+		ip = ibuf;
+		op = obuf; 
+		ileft = strlen(ibuf);	
+		r = iconv(cd, &ip, &ileft, &op, &oleft); 	
+		printf("OK\n");
+		//fwrite(obuf, 1, BUFSIZ-oleft, stdout);
+		/*
+		if (ICONV_TRUNC() || ICONV_OVER())
+                memcpy(ibuf, ip, ileft);
+		*/
+        if (! XML_Parse(p, obuf, strlen(obuf), done)) {
+          fprintf(stderr, "Parse error at line %d:\n%s\n",
+ 	         XML_GetCurrentLineNumber(p),
+ 	         XML_ErrorString(XML_GetErrorCode(p)));
+          exit(-1);
+        }
+    	if (done)
+      		break;
+	}
+	printf("\n\n리스트의 크기 : %d\n", user_num);
+	return 0;
+}
+}}}
+위의 경우 iconv를 사용해서 어느정도 파싱 효율이 떨어지는걸 감수해야 할 것이다.  가장 좋은 방법은 euc-kr 문자에 대해서 expat가 제대로 인식하게 해주는 것인데, 약간의 노력이 필요할 것 같다. 같은 문자권인 일본개발자들 역시 이런 고민을 하고 있는 것으로 보이며 실제 euc-jp패치가 비록 예전 버전에 대한 패치지만 나온 것을 봤다.(링크를 까먹었다 -.-;, 다시 찾아봐야지) 시간이 된다면 이 패치를 이용해서 euc-kr을 인식가능하도록 만들어 보는 것도 좋을 것 같다.
+
+===== QTstring을  이용한 utf인코딩 및 디코딩 =====
+[http://www.troll.no troll]에서 제공하는 '''QT''' 라이브러리중 문자열 제어를 위한 Qstring라이브러리는 자체적으로 문자열에 대한 인코딩 디코딩기 능을 제공한다.  별도로 QTlib를 호출해야 한다는 단점이 있지만 iconv에 비해서 간단하게 사용할 수 있으니 거기에 만족하고 사용했다. 사용방법은 간단하니 별도로 예를 들지는 않도록  하겠으니 각자 테스트 해보길 바란다. Qstring에 대한 내용은 [http://doc.trolltech.com/3.3/qstring.html qstring]를 참고하기 바란다. 다음은 간단한 테스트 프로그램이다. 
+{{{#!plain
+#include <qstring.h>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    const char *my;
+    string mystr;
+    QString hoho,data = "안녕하세요 Hello world";
+    hoho = data.utf8();
+    cout << hoho << endl;
+    cout << hoho.fromUtf8(data.utf8(), 256) << endl;
+    //cout << (const char *)hoho.local8Bit() << endl;
+}
+}}}
+다음은 컴파일 방법이다.
+{{{#!plain
+# g++  -o qstring qstring.o   -L/usr/lib/qt-3.1/lib -L/usr/X11R6/lib -lqt -lXext -lX11 -lm
+}}}
+
+=== 소개 ===
+어찌 어찌 하다가 보니 '''XML'''에 관심을 가지게 되었다. 물론 관심을 가지기 전에도 [wiki:docbook/howto Docbook]를 사용하다 보니 관심은 없었더라도 쭉 써오긴 했으니 관심은 없었더라도 어쨋든 사용은 하고 있었다고 볼 수 있겠다.
+
+그러다가 실제 XML데이터를 제어하고 생성해야될 상황에 놓이게 되었다. 처음엔 그냥 간단한 파싱라이브러리 만들어서 제한적인 용도로 사용하려고 했었으나, 이왕 한거 한번 제대로? 해보자고 마음먹게 되었고 많은 XML관련 라이브러리 중 가장 대중적이라고 생각되는 expat를 이용해서 XML을 제어해 보기로 했다. XML의 성격을 파악하기 위한 공부도 더불어 하기로 마음 먹고 이 위키를 만들게 되었다.  
+
+=== XML에 대해서 ===
+XML이 데이터를 관리하기 위한 차세대 포맷이 될거라며 XML을 당장 익히지 않으면 시대에 뒤떨어질 것이라고 선전을 하던게 아마 5년전이였던 것같다. 그뒤로 오랜 시간이 지났지만 아직까지도 그리 대중화 되지 못한것 같으며(적어도 일반 개발자들이 피부로 느끼기에는) 마치 세상을 뒤 바꾸기라도 할 것과 같은 열기는 식어서 이제 좀 냉정하게 XML이란 것을 바라보기 시작한 것 같다. 
+
+XML이 HTML을 대체하고, 기업에서 사용하는 응용에서도 XML이 주를 이룰 것 같았지만 역시 90%이상의 문서는 HTML혹은 TEXT로 생산되어 지고 있으며 기업에서 사용하는 응용들 역시 대부분 TEXT혹은 전용 포맷을 사용하고 있다. XML을 사용하는 애플리케이션은 아직까지는 한정적이며 일반 개발자들이 접하기 힘든 중/대형 이상의 SI성격이 강한 시장에서 제한적으로 사용되는 것 같다. 
+
+그러나 최근들어 XML이 대중적인 영역까지 범위를 넓히고 있다. (제한적으로 XML이 사용되고 있긴 했으나) 문서작성툴들이 자체 포맷을 버리고 XML을 적극적으로 사용하기로 했으며 웹 애플리케이션, 메신저, 어플리케이션 로그, 데이터 교환을 위해서 폭넓게 사용되어 지고 있다. 특히 웹 애플리케이션에서 그 활약이 두드러 지는것 같다. 
+
+이 번장에서는 이러한 XML의 면모에 대해서 간단하게 알아보도록 하겠다. 
+
+==== XML 이란 무엇인가 ====
+XML은 e'''X'''tensible '''M'''arkeup '''L'''anguage의 약자로  1996년 W3C(World Wide Web Consortium)에서 제안된 것으로써 웹에서 구조화된 데이터의 전소이 가능하도록 설계된 언어이다. (웹)인터넷상에서의 데이터 교환이라면 HTML이란 언어가 있긴 했지만 HTML은 데이터를 "어떻게 보여질지"에 대해서 기준을두고 만들어진 언어라서 구조적인(즉 문서 자체가 정보가 되거나 정보의 일부가 되는) 정보의 교환에는 적당하지가 않았다.   
+
+XML은 기본적으로는 HTML의 한계를 극복하기 위한 목적에서 탄생한 언어이다. XML을 이해하기 위해서는 XML의 족보에 대해서 좀 살펴봐야 할 것 같다. 
+
+===== HTML =====
+웹이 지금처럼 성장할 수 있었던 가장 큰영향력을 끼친 일등 공신이라면 HTML을 빼놓을 수 없을 것이다. 현재 인터넷에서 사용되어지고 있는 대부분(아마도 90%이상)의 문서는 HTML로 되어 있을 것이다. HTML(HyperText Markup Language)라는 이름에서 볼 수 있듯이 '''하이퍼 텍스트''', '''하이퍼 미디어'''의 지원을 특징적으로 하는 언어이다. HTML은 누구라도 몇 시간만 투자하면 어렵지 않게 구사할 수 있을 정도로 쉬운 언어 인데다가 일반 텍스트를 통해서 기술 되기 때문에 확장성과 이식성이 매우 편리하였다. 웹서버만 돌아가고 있다면 그게 윈도우건 유닉스건 리눅스건 임베디드 장비건 간에 상관없이 동일하게 데이터를 전달 할 수 있다.  
+
+HTML은 어느날 갑자기 만들어진 전혀 독립적인 언어는 아니다. '''SGML'''이라고 하는 언어의 DTD로 정의되어 있는 언어다. SGML 역시 HTML과 비슷한 마크업 언어이긴 하지만 웹상에서 간단하게 데이터를 서비스하기에는 너무 복잡하고 크고 매우기 어려웠다. 그래서 SGML의 서브셋 형태로 HTML이 만들어 진 것이다. 
+
+HTML은 간단하고 확장성과 이식성이 좋다는 장점을 가졌으나 단지 보여주는 기능 이외의 다른 기능을 가지고 있지 않다는 단점을 가진다. 이는 개인 홈페이지와 같은 보여주는 일만을 하는 단순 홈페이지에는 사용하기 적당했으나 데이터를 가공/처리 해야 하는 기업 수준의 복잡한 홈페이지에 사용하기에는 매우 불편했다.     
+
+위와 같은 단점을 일부 해결하기 위해서 CSS(Cascading Style Sheet)가 개발 되긴 했으나 HTML이 고정적인 태그 셋(tag set)만을 지원한다는 근본적인 문제와 문서의 구조적인 정보를 담을 수 없다는 것은 정보를 처리하는데 큰 장애물이 된다. 
+
+{{{#!plain
+HTML에서는 미리 정의된 표준 태그외에 임의의 태그를 만들 수 없다. 
+문서의 정보를 제대로 표현하려면 임의의 태그를 만들 수 있어야 하고 태그에 
+대한 정보를 가진 DTD를 읽고 해석할 수 있는 브라우저가 있어야 한다.   
+}}}
+
+HTML의 단순함이 웹이 발전하는데 큰 공헌을 한게 사실이지만 지금에 와서는 오히려 발전을 더디게 하는 모습을 보이고 있다. 이러한 문제를 해결해서 여전히 웹을 인터넷에서의 정보교환의 중심에 있도록 하기 위해서 XML이 제안된다.  
+
+===== SGML =====
+XML과 HTML이 있기전 태초에 SGML이라는 언어가 있었다. SGML은 1986년 ISO8879에 정의된 표준으로 문서의 논리적인 구조와 내용을 기술하기 위해서 만들어진 언어다. SGML을 이용하면 문서의 기술에 필요한 다양한 태그를 생성할 수 있으며, 문서의 내용이나 내용 구조를 정의할 수 있다. 이를 이용해서 구조화된 데이터의 상호교환이 가능해지며 데이터에서 쉽게 정보를 추출해 내고 이를 응용할 수 있다. 
+
+이러한 이유로 SGML이 문서(정보)처리를 위한 업계 표준으로 정착하여 사용되어 지고 있기는 한데, 너무 복잡한 이유로 관련 응용의 개발이 용이하지 않았다. 또한 너무 일반적(범용적으로)만들어져 있기 때문에 화학,물리,전기와 같은 특수한 목적으로 만들어진 문서를 처리하려면 일일이 응용을 만들어야만 했다. 즉 화학, 물리, 전기를 다루는 산업의 경우 사용하기가 매우 꺼려진다는 단점이 생긴다.  
+
+SGML로 작성된 문서를 보고 싶다면 [docbook/zlib_prog]을 참고하기 바란다. 사용자 정의된 태그들이 사용된다는 것만을 제외한다면 전체적으로 HTML와 매우 유사하다는걸 확인 할 수 있을 것이다.    
+
+===== XML =====
+위에서 언급한 HTML과 SGML의 장점을 수용하고 단점을 보완한게 XML이다. XML은 SGML에서 거의 사용하지 않는 것들을 없애고 필요한 기능을 수용해서 사용을 단순화 시켰다. 그렇지만 SGML의 주요한 기능들은 수용하고 있다. SGML의 서브셋이라고 이해하면 된다.    
+
+또한 해서 필요한 태그를 정의해서 사용할 수 있도록 HTML의 단점을 보완했다. 
+
+전체적으로 SGML > XML > HTML 정도로 이해하면 되겠다. 
+
+=== XML 스팩 ===
+XML의 가장 큰 특징은 HTML과 달리 DTD가 고정되어 있지 않고, 사용자가 필요에 따라서 만들 수 있다는데 있다. 이들을 이용해서 특정한 문서를 효과적으로 표현할 수 있는 DTD를 만들어 낼 수 있다. 인터넷에서 배포되는 문서를 효과적으로 작성하기 위한 XML Docbook DTD등이 대표적인 예이다. XML DocBook에 대한 내용은 [http://www.docbook.or.kr docbook 한국 사이트]를 참고하기 바란다. 
+
+여기에서는 XML의 DTD를 만드는 방법과 XML 문서를 출력하는 방법에 대해서 알아보도록 하겠다.
+
+==== XML 문서 포맷 ==== 
+XML문서는 다음과 같은 포맷을 가진다.
+유명한 '''Hello, World'''출력의 XML버젼이다.  
+{{{#!plain
+<?XML version="1.0" encoding="UTF-8" RMD='INTERNAL'?> (1)
+<!DOCTYPE greeting [                   --+
+  <!ELEMENT greeting (#PCDATA)>          | (2)
+]>                                     --+ 
+
+<greeting>Hello, World</greeting>          (3)
+}}}
+ 1. 은 XML의 헤더부분으로 문서의 버젼, 인코딩 방식, DTD를 선택적으로 지정할 것인지를 명시하는 RMD를 기술한다. 자세한 내용은 다음 장에서 다룰 것이다.  
+ 1. 는 DTD부분으로 인스턴스(실제 내용)의 해석을 위해서 사용된다.  
+ 1. 은 인스턴스(실제 내용) 부분으로 문서가 기술된다.  
+
+위의 경우는 DTD와 인스턴스가 하나의 문서에 포함되는 경우인데, C에서의 '''include'''와 마찬가지로 '''DTD''' 부분을 별도의 문서로 관리할 수도 있다. 이럴 경우 다음과 같은 포맷을 가진다.  
+{{{#!plain
+<?XML version="1.0" encoding="UTF-8" RMD='INTERNAL'?> (1)
+<!DOCTYPE greeting SYSTEM "hello.dtd">     (2) 
+<greeting>Hello, World</greeting>          (3)
+}}}
+
+===== Well-Formed XML =====
+Well-Formed XML이란 DTD가 존재하지 않는 인스턴스라도 구문에 맞게 태그 사용이 잘 구성된 문서를 의미한다.
+{{{#!plain
+<?XML  version="1.0"  encoding="UTF-8"  RMD='INTERNAL'?>
+<greeting>Hello, world!</greeting>
+}}}
+
+==== XML DTD ====
+다음과 같은 XML문서가 있다고 가정해 보자..
+{{{#!plain
+<?XML version="1.0" encoding="UTF-8"?>
+<userinfo>
+	<name>yundream</name>
+	<email>yundream@joinc.co.kr</email>
+	<homepage>http://www.joinc.co.kr</homepage>
+</userinfo>
+}}}
+우리는 척보면 위의 XML문서가 유저의 정보를 표현하기 위한 형식을 취하고 있음을 감잡을 수 있다. 그러나 이건 인간쯤 되기 때문에 가능한거고 컴퓨터라면 저것이 어떤 정보를 표현하는 것인지 알 수 있는 방법이 없을 것이다. 응용에 사용할려면 '''userinfo'''는 유저 정보를 나타내기위한 태그, '''name'''은 유저의 이름을 나타내기 위한 태그라는 등등의 정보를 알고 있어야 할것이다.  
+
+이러한 정의된 정보를 '''DTD'''라고 한다.
+
+DTD의 주요 구성요소는 Element, Attribute, Entity로 이들에 대해서 알아보도록 하겠다. 
+
+'''Element'''는 태그로 표현될 수 있으며 내용의 특성을 정의하기 위해서 사용한다.  
+{{{#!plain
+<ulink>http://www.joinc.co.kr</ulink>
+}}}
+위에서 바로 ulink가 Element가 된다. '''Attribute'''(에트리뷰트)는 Element의 부가적인 속성을 나타내기 위해서 사용된다. 
+{{{#!plain
+<ulink url=http://www.joinc.co.kr>joinc 홈페이지</ulink>
+}}}
+
+엘리먼트는 다음과 같이 선언된다.
+{{{#!plain
+ +----+---------+---+---------------+---+------+---+
+ | <! | ELEMENT | S | 엘리먼트 이름 | S | 특성 | > |
+ +----+---------+---+---------------+---+------+---+
+   1      2       3         4         5    6     7
+}}}
+ 1. 마크업의 시작을 알리는 열기 문자
+ 1. ELEMENT의 선언을 위해 사용하는 DTD 예약어 
+ 1. 구분자 
+ 1. 엘리먼트의 고유 이름 
+ 1. 엘리먼트 특성  
+ 1. 마크업의 종료를 알리는 닫기 문자 
+
+엘리먼트 특성('''5''')에는 EMPTY, ANY, Mixed, 내용 모델중 하나가 올 수 있다.
+ 1. EMPTY : HTML의 <BR>, <IMG>와 Docbook의 <xref>와 같이 내용을 가지지 않는 엘리먼트 
+ 1. ANY : 포괄적이고 구조적인 요소를 필요로 하지 않을 때 (하위 엘리먼트로 어떤 것이 와돠 상관이 없을 때) 사용한다.
+ 1. Mixed : #PCDATA와 하위 엘리먼트를 섞어서 표현할 때 사용 
+ 1. 내용 모델은 하나의 엘리먼트로 선언이 되거나 여러 엘리먼트가 순서를 가지고 선언되어진 것을 의미한다. 
+
+다음은 엘리먼트의 선언 예이다.
+{{{#!plain
+<!ELEMENT  br  EMPTY>                             ------ (1)
+<!ELEMENT  container  ANY>                        ------ (2)
+<!ELEMENT  p  (#PCDATA | a | ul | b | i | em)*>   ------ (3)
+<! ELEMENT spec  (front, body, back?)>            ------ (4)
+}}}
+첫번째 라인의경우 br이라는 태그를 정의하고 있는데 '''EMPTY'''라고 되어 있으므로 어떠한 내용도 가지지 않게 된다. 위의 선언예를 보면 ''',''''와 ''''|''''기호가 사용되었는데 이들은 엘리먼트를 선언할 때 사용할 수 있는 연결자(connectors)로 엘리먼트간의 상호 관계를 지시하기 위해 사용한다. 
+ || 연결자			|| 사용			||		설명			||
+ || ,				|| X, Y			|| X 다음에 Y			||
+ || |				|| X|Y			|| X 또는 Y				||
+
+두번째 라인은 하위에 어떤 엘리먼트라도 올 수 있는 container라는 태그를 정의하고 있다. 어떤 엘리먼트라도 올 수 있으므로 중간에 br태그등이 오는일이 가능할 것이다. 
+{{{#!plain
+<container>
+	hello world <br>
+	Im korean <br>
+</container>
+}}}
+
+세번째 라인의 p 엘리먼트는 는 mixed로 선언되어 있는데, 하위 엘리먼트로 #PCDATA, a, ul, b, I, em 중 하나 이상이 중복되어서 나올 수 있다.  
+
+네번째 라인의 spec 엘리먼트는 모델형태로 선언되어 있는데, 서브 엘리먼트로 front, body, back를 순차적으로 가지며 back는 생략될 수도 있음을 의미한다. docbook를 예로 들어보자면 <section>다음에는 <title>이 나와야 되고 그다음에는 <para>가 나와야 하며, <para>는 생략 될 수도 있으며, 반복적으로 사용될 수도 있다. 다음과 같은 문서 구조를 나타내고자 하는 경우이다. 
+{{{#!plain
+<section>
+    <title>What ? Linux Programming</title>
+    <para>
+        Linux Programming .. is hello world
+    </para>
+    <para>
+		hahahaha
+    </para>
+</section>
+}}}
+위의 경우 아래와 같이 section 엘리먼트 선언이 가능할 것이다.
+{{{#!plain
+<!ELEMENT section (title, para*)>
+}}}
+제목은 반드시 (하나만)와야 하지만 내용은 없을 수도 있고 여러개의 문단으로 구성될 수도 있으므로 para뒤에 "*"지시자가 사용되었다. "*"외에도 다음과 같은 지시자가 준비되어 있다. 
+ || 지시자	|| 의미									||
+ ||			|| 한번 발생							||
+ || +		|| 한번 이상 발생할 수 있음				||
+ || ?		|| 발생할 수도 있고 안할 수도 있음		||
+ || *		|| 반복적으로 발생할 수도 있고 안할 수도 있음		||
+
+==== 어트리뷰트 선언(Attribute Declarations) ====
+어트리뷰트는 말그대로 문서나 엘리먼트의 속성을 정의하기 위해서 사용한다. 관계된엘리먼트의 형과 어트리뷰트의 이름, 데이터 형, 디폴트 값등을 기술할 수 있다. 
+{{{#!plain
++----+---------+---+--------------------+----+------------------------+---+
+| <! | ATTLIST | S | 관계된 엘리먼트 형 | S? | 에트리뷰트 정의 리스트 | > |
++----+---------+---+--------------------+----+------------------------+---+
+         (1)                (2)                        (3)
+}}}
+ 1. 어트리뷰트 선언을 위해 사용되는 예약어.  
+ 1. 선언할 어트리뷰트를 갖을 엘리먼트 형 
+ 1. 어트리뷰트 이름과 형 그리고 디폴트값으로 구성된다.   
+
+어트리부트는 스트링 형(String), 토큰 형(Tokenized), Enumeration 의 3가지 형으로 나눌 수 있다. 
+
+스트링 형에는 '''CDATA'''라는 텍스트를 저장할 수 있는 형이 있고, 토큰형에는 어트리뷰트 값을 엘리먼트의 고유 식별자로 선언하는 ID, 어트리뷰트 값을 ID참조값이나 참조값의 리스트를 선언하는 IDREF나 IDREFS, 어트리뷰트 값을 현재 선언된 부분이나 또는 데이터 엔티티 명, 엔티티 명령의 리스트가 될 수 있도록 선언하는 ENTITY, ENTITIES, 속성값을 명칭토큰이나 명칭 토큰들의 리스트로 선언하는 NMTOKEN, NMTOKENS 형이 있다.   
+
+Enumeration형은 어트리부트 값을 괄호 안에 선언하여 값들의 리스트를 구성하는 것이다. 어트리뷰트 선언에 사용되는 디폴트 값에는 다음과 같은 4가지 타입이 있다. 
+ 1. 명확히 인식할 수 있는 값
+ 1. REQUIRED : 속성값이 반드시 입력 되어야 하는 경우
+ 1. IMPLIED : 속성값이 정의되지 않았다면 프로그램에서 그 값을 부여하는 경우
+ 1. FIXED : 고정된 디폴트 속성값만을 갖도록 하는 경우 
+{{{#!plain
+<!ATTLIST termdef                       --- 1
+    id      ID     #REQUIRED 
+    name    CDATA  #IMPLIED 
+<!ATTLIST  list                         --- 2
+    type   (bullets | ordered | glossary ) "ordered">
+<!ATTLIST  form                         --- 3
+    method CDATA   #FIXED   "POST">  
+}}}
+위에는 termdev, list, form 3개의 엘리먼트에 대한 각각의 어트리뷰트를 정의하고 있다. 
+ 1. termdef 엘리먼트에 대해 토큰형의 ID와 디폴트 값을 REQUIRE로 하는 어트리뷰트 id를 선언했고, 스트링형의 CDATA와 디폴트 값을 IMPLIED로 하는 어트리뷰트 name을 선언했다. 어트리뷰트는 id는 termdef 엘리먼트를 인스턴스에서 사용할 때 생략할 수 있다.   
+ 1. list 엘리먼트에 대해 (bullets|ordered|glossary)와 같이 Enumeration 형의 타입을 선언하고 디폴트 값으로 ordered를 지정했다. 만약 인스턴스(실제 내용)에서 list 엘리먼트의 어트리뷰트 타입에 값을 지정하지 않으면 기본적으로 ordered가 지정된다. RDBMS를 다루어 보았다면 필드를 정의 할 때 디폴트 값을 '''NULL'''이 아닌 특별한 값으로 지정한 경우를 볼 수 있을 것이다. 이와 같은 경우라고 생각하면 된다.   
+ 1. form 엘리먼트에 method 에트리뷰트가 스트링 형의 CDATA로 선언 되어 있고, 디폴트 값은 FIXED를 이용해서 POST로 고정 시켰다.  
+
+(이들에 대해서 docbook를 통한 실제예를 들고 싶지만 아직 정확하게 이해를 하지 못한 관계로 나중으로 미루기로 했다)
+
+==== 엔티티 선언(Entity Declarations) ====
+엔티티는 문서 내에서 참조될 수 있는 문자 집합의 단위로, 일반 엔티티와 매개 변수 엔티티로 크게 나눌 수 있다. 위치에 따라서 내부 엔티티 혹은 위부 엔티티가 될수 있다. 라고 복잡하게 설명되어 있지만 간단히 말해서 HTML, Docbook내에서 사용되는 &amp;와 같은 문자열이다. &amp;와 같은 텍스트 엔티티는 일반 엔티티로서 '&'와 ';'을 사용한다. 매개 변수 엔티티는 DTD나 조건 처리를 할 때 사용하는 텍스트 엔티티로 '%'와 ';'를 사용한다.   
+
+일반 엔티티는 C와 같은 프로그래밍언어에서의 디파인(#define)와 매우 비슷하다. 예를 들어 Republic Of Korean 이라는 단어가 XML 인트턴스에 자주 들어간다고 가정해 보자. 이럴 경우 일일이 입력해 줄 수도 있겠지만, <!ENTITY ROK "Republic Of korean">로 엔티티를 선언해서 사용할 수도 있다. 그러면 인스턴스 작성중 Republic Of Korean이 들어가야될 일이 있다면 '''&ROK'''를 써 넣으면 된다. 
+
+외부 엔티티는 외부의 XML 문서나 비 XML 문서를 가리키기 위해서 혹은 하나의 XML 시스템에서 사용될수 있도록 설계 선언된 엔티티를 포함하기 위해서 선언될 수 있다.
+{{{#!plain
+<!ENTITY  open-hatch
+ SYSTEM  "http://www.textuality.com/boilerplate/OpenHatch.xml">
+<!ENTITY  open-hatch
+ PUBLIC  "-//Textuality//TEXT Standard open-hatch boilerplate//EN"
+ "http://www.textuality.com/boilerplate/OpenHatch.xml">
+<!ENTITY  hatch-pic
+ SYSTEM  "../grafix/OpenHatch.gif"
+ NDATA  gif>
+}}}
+
+==== 주석 ====
+XML도 언어이므로 주석을 제공한다. 주석은 실제로 해석되지 않으며 단지 개발자에게
+문서에 대한 부가 정보를 제공하기 위한 목적으로 사용된다. HTML에서와 마찬가지로 
+<!-- 주석 -->의 형태로 사용된다. 
+{{{#!plain
+<!-- made by yundream -->
+<!-- www.joinc.co.kr  -->
+}}}
+
+==== CDATA 섹션(CDATA Section) ====
+XML 파서가 인지하는 문자정보를 일만 문자 정보처럼 인식시켜야 할때, CDATA 
+섹션으로 선언해서 사용할 수 있다. 
+
+<greeting>Hello, World!</greeting>를 파서가 인식하지 못하게 할려면 아래와 같이
+표현하면 된다. 
+{{{#!plain
+<![CDATA[<greeting>Hello, World!</greeting>]]>
+}}}
+
+=== 실전 : XML DTD와 인스턴스 생성 ===
+지금 까지의 내용을 토대로 XML DTD와 인스턴스를 실제 행성해보도록 하자. 만들 문서는 사용자 정보를 가지는 문서 '''USER INFO''' 문서다.
+{{{#!plain
+Subject : USERINFO                ----+          -------+
+Author  : JOINC                       |                 |
+Email   : yundream@joinc.co.kr        | Document INFO   | USER
+Version : 1.0                         |                 |
+Date    : 2004/02/04              ----+                 |
+                                                        |
+Name  : yun                       ----+                 |
+ID    : yundream                      |                 |
+Email : yundrea@joinc.co.kr           |                 |
+HOME  : www.joinc.co.kr               |                 |
+Birth : 1974/02/08                    | User INFO       |
+                                      |                 |
+Name  : yun mung                      |                 |
+ID    : mung                          |                 |
+Email : mung@joinc.co.kr              |                 |
+Home  : NONE                          |                 |
+Birth : 1974/05/11                    |                 |
+                                      |                 |
+......                            ----+           ------+
+}}}
+문서는 크게 두부분으로 나뉜다. 하나는 문서 자체의 정보를 가지고 있는 Document INFO 부분이며 다른 한부분은 실제 유저 정보를 담고 있는 User INFO 부분이다.  
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/agj.png>
+}}}
+
+==== DTD 생성 ====
+그럼 DTD를 생성해 보도록 하자. DTD를 생성 하기 위해서는 엘리먼트와 엘리먼트의 어트리뷰트에 대해서 명확히 정의 되어야 한다.  
+
+===== 엘리먼트의 정의 =====
+가장 상위 엘리먼트의 이름은 '''USER'''로 정하도록 하자. '''USER'''은 다시 Document INFO와 User INFO 크게 두개의 구성요소로 나뉘게 된다. 이들은 각각 '''DocINFO'''와 '''UINFO'''의 엘리먼트 이름을 부여하도록 한다. 
+
+'''DocINFO'''엘리먼트는 다시 '''Subject''', '''Author''', '''Email''', '''Version''', '''Date'''의 엘리먼트들을 가지며, '''UINFO'''엘리먼트는 '''Name''', '''ID''', '''Email''', '''Home''', '''Birth''' 엘리먼트들을 가진다. 
+
+===== 엘리먼트의 어트리뷰트 정의 =====
+이것으로 모든 엘리먼트가 정의되었다. 이제 각 엘리먼트들의 어트리뷰트를 정의 해야 한다. 
+
+ 1. 최상위 엘리먼트인 '''USER'''의 경우 반드시 문서의 정보를 위해서 반드시 '''DocINFO''' 어트리뷰트를 포함해야만 할 것이다. 반면 '''UINFO'''어트리뷰트는 고객이 한명도 없을 경우가 있으니 포함되지 않을 수도 있으며, 여러명의 고객을 확보하고 있다면 하나 이상의 '''UINFO'''가 사용될 수도 있을 것이다. 고로 '''USER'''은 다음과 같이 정의 될 수 있을 것이다. 
+{{{#!plain
+<!ELEMENT USER (DocINFO, UINFO*)>
+}}}
+ 1. '''DocINFO'''의 경우 5개의 서브 엘리먼트를 가지는데, 특징을 규정지을 수 있을 것이다. '''Subject''', '''Author'''은 DocInfo의 특성상 반드시 필요한 엘리먼트들이며, 나머지 엘리먼트들은 필요하지 않다면 굳이 사용하지 않아도 될것이다.  
+{{{#!plain
+<!ELEMENT DocINFO (SUBJECT, AUTHOR, EMAIL?, Version?, Date?)>
+<!ELEMENT SUBJECT (#PCDATA)>
+<!ELEMENT AUTHOR (#PCDATA)>
+<!ELEMENT EMAIL (#PCDATA)>
+<!ELEMENT VERSION (#PCDATA)>
+<!ELEMENT DATE (#PCDATA)>
+}}}
+ 1. '''UINFO'''는 실제 유저 정보를 다루게 다루게 되며 다음과 같이 정의할 수 있을 것이다. 
+{{{#!plain
+<!ELEMENT UINFO (NAME, ID, EMAIL?, HOME?)>
+<!ELEMENT NAME (#PCDATA)>
+<!ELEMENT ID (#PCDATA)>
+<!ELEMENT EMAIL (#PCDATA)>
+<!ELEMENT HOME (#PCDATA)>
+<!ELEMENT Birth (#PCDATA)>
+}}}
+ 1. 이제 엘리먼트에 대한 어트리뷰트를 정의해 보도록 하자. 이번에 예로든 문서에 대한 DTD는 유저에 대한 간단한 정보만을 제공해 주므로 어트리뷰트 역시 간단하게 정의할 수 있을 것이다. '''Birth'''(생일)의 경우 음력과 양력중 선택할 수 있을 것이다. 그러므로 '''Birth'''에 대해서는 어트리뷰트를 정의하도록 하겠다. 어트리뷰트명은 '''solar'''로 하고 생략가능하도록 할 것이다. 생략되면 기본으로 양력 값이 들어가도록 설정하겠다. 
+{{{#!plain
+<!ATTLIST Birth
+    SOLAR (sun | moon)  "sun">
+}}}
+
+다음은 주석까지 포함한 완성된 '''DTD'''다. 이 DTD는 '''user.dtd'''에 저장하도록 한다. 
+{{{#!plain
+<!-- DTD NAME -->
+<!ELEMENT USER (DocINFO, UINFO*)>
+
+<!-- Document Information -->
+<!ELEMENT DocINFO (SUBJECT, AUTHOR, EMAIL?, Version?, Date?)>
+<!ELEMENT SUBJECT (#PCDATA)>
+<!ELEMENT AUTHOR (#PCDATA)>
+<!ELEMENT EMAIL (#PCDATA)>
+<!ELEMENT VERSION (#PCDATA)>
+<!ELEMENT DATE (#PCDATA)>
+
+<!-- User Information -->
+<!ELEMENT UINFO (NAME, ID, EMAIL?, HOME?)>
+<!ELEMENT NAME (#PCDATA)>
+<!ELEMENT ID (#PCDATA)>
+<!ELEMENT EMAIL (#PCDATA)>
+<!ELEMENT HOME (#PCDATA)>
+<!ELEMENT Birth (#PCDATA)>
+
+<!ATTLIST Birth
+    SOLAR (sun | moon)  "sun">
+}}}
+
+==== DTD 적용을 마친 XML 인스턴스 ====
+다음은 지금까지 작성한 user.dtd의 정의를 만족하는 XML 인스턴스의 예이다. 
+{{{#!plain
+<?XML VERSION="1.0" ENCODING="UTF-8" RMD="NONE"?>
+<!DOCTYPE USER SYSTEM "user.dtd">
+
+<USER>
+	<DocINFO>
+		<SUBJECT>JOINC USER INFO</SUBJECT>
+		<AUTHOR>yundream</AUTHOR>
+		<EMAIL>yundream@joinc.co.kr</EMAIL>
+		<VERSION>1.0</VERSION>
+		<DATE>2004/01/24</DATE>
+	</DocINFO>
+
+	<UINFO>
+		<NAME>yun SanHa</NAME>
+		<ID>SanHa</ID>
+		<EMAIL>SanHa@joinc.co.kr</EMAIL>
+		<BIRTH solar="sun">1987/01/02</BIRTH>
+	</UINFO>
+
+	<UINFO>
+		<NAME>yun dream</NAME>
+		<ID>dream</ID>
+		<EMAIL>dream@joinc.co.kr</EMAIL>
+		<HOME>http://www.joinc.co.kr</HOME>
+		<BIRTH solar="moon">1978/11/12</BIRTH>
+	</UINFO>
+</USER>
+}}}
+
+
+=== expat를 이용한 XML 제어 ===
+XML 스팩연구 보다 expat를 통한 XML 테스트가 먼저 만들어진 관계로(즉 XML에 대한 정확한 이해가 없이 만들어졌음) 예제 자체의 완성도가 떨어진다. 조만간 좀더 현실적인 예제를 만들 계획이다. - 2004/02/05
+
+==== 간단 예제 ====
+XML에 대한 스터디는 우선 뒤로하고 과연 내가 써먹을 곳에 유용하게 써먹을 수 있을런지 확인 하기 위해서 expat 라이브러리를 이용한 간단한 프로그램을 작성해 보기로 했다. 가장 먼저 써먹을 곳은 설정파일의 유지인데 expat를 이용해서 효과적으로 유지할 수 있을 것인지에 대한 감을 잡기 위해서 예재를 만들어 보았다. 
+
+분석하고자 하는 다음과 같은 XML로 구성된 파일이다. 별도의 DTD를 지정하지 않은 Well-Formed XML 문서다. 위에서 다루 었던 XML내용과 거의 동일하다.
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8"?>
+
+<user ver="1.0">
+    <docinfo>
+        <SUBJECT>JOINC USER INFO</SUBJECT>
+        <AUTHOR>yundream</AUTHOR>
+        <EMAIL>yundream@joinc.co.kr</EMAIL>
+        <VERSION>1.0</VERSION>
+        <DATE>2004/01/24</DATE>
+    </docinfo>
+
+    <uinfo>
+        <NAME>yun SanHa</NAME>
+        <ID>SanHa</ID>
+        <EMAIL>SanHa@joinc.co.kr</EMAIL>
+        <BIRTH solar="sun">1987/01/02</BIRTH>
+    </uinfo>
+
+    <uinfo>
+        <NAME>yun dream</NAME>
+        <ID>dream</ID>
+        <EMAIL>dream@joinc.co.kr</EMAIL>
+        <HOME>http://www.joinc.co.kr</HOME>
+        <BIRTH solar="moon">1978/11/12</BIRTH>
+    </uinfo>
+</user>
+}}}
+참고로 expat는 EUC_KR을 지원하지 않는다. 그러므로 한글을 사용하려면 '''iconv'''라이브러리를 이용해서 '''UTF-8'''로 변경 후 사용해야 한다. 이러한 작업은 꽤 귀찮은 작업이므로 여기에서는 (주속을 포함한)XML 인스턴스의 모든 것을 영어를 
+사용했다. 
+
+다음은 간단한 예제다. 예제는 expat의 레퍼런스 가이드를 보고 작성했다. 아직은 expat의 이런 저런 자세한 설명은 하지 않을 것이다. 작동에 급급한 코드다.
+{{{#!plain
+#include <stdio.h>
+#include <expat.h>
+#include <stdio.h>
+#include <string.h>
+
+#define BUFFSIZE    8192
+
+char Buff[BUFFSIZE];
+
+int Depth = 0;
+int is_value = 0;
+
+const char *current_el;   // 가장 최근 태그 기억용
+const char **current_id;  // 태그의 특성값 기억용
+
+int  user_num = 0;   // 몇개의 레코드가 저장되었는지 검사 
+
+// xml (태그가 아닌) 데이터를 만났을 때 호출된다.
+void parser(void *data, const char *s, int len)
+{
+    int i = 0; 
+    int index =  0;    
+    char buf[1024] = {0x00, };
+    // 개행,탭문자 제거
+    for (i = 0; i < len; i++)
+    {
+        if (s[i] != '\n' && s[i] != '\t' && i < len)
+        {
+            buf[index] = s[i]; 
+            index++;
+        }
+    }
+
+
+    if (is_value && current_el && (buf[0] != 0x00))
+    {
+        if (current_id[0])
+            printf("==> %s : %s (%s)\n", current_el, current_id[1], buf);
+        else
+            printf("==> %s (%s)\n", current_el, buf);
+    }
+}
+
+// xml (여는)태그를 만났을 때 호출되는 함수다.
+// depth를 1증가 시키고, depth가 0즉 처음 만나나는 테그라면 
+// version을 검사한다. 물론 테그(el)를 직접 비교해도 될 것이다.       
+void
+start(void *data, const char *el, const char **attr) {
+    is_value = 1;
+    current_el = el;
+
+    current_id = attr;
+    if(Depth == 0) 
+    {
+        printf("User Info Version is %s\n\n", current_id[1]); 
+    }
+    if (strcmp(current_el,"uinfo") == 0)
+    {
+        printf("==================\n", current_el);
+        user_num++;
+    }
+    Depth++;
+}
+
+// xml (닫는)태그를 만났을 때 호출되는 함수다.
+// 닫히게 되므로 depth가 1감소할 것이다. 
+void
+end(void *data, const char *el) 
+{
+    is_value = 0;
+    Depth--;
+} 
+
+int main(int argc, char **argv) {
+    // xml 파서를 생성한다.
+    XML_Parser p = XML_ParserCreate(NULL);
+    if (! p) 
+    {
+        fprintf(stderr, "Couldn't allocate memory for parser\n");
+        exit(-1);
+    }
+
+    // xml의 element를 만났을 때 호출될 함수를 등록한다. 
+    // start는 처음태그, end는 마지막 태그를 만났을 때 호출된다.
+    XML_SetElementHandler(p, start, end);
+
+    // 실제 데이터 (예 : <tag>data</tag>의 data)를 처리하기 위해서 
+    // 호출될 함수를 등록한다.
+    XML_SetCharacterDataHandler(p, parser);    
+
+    for (;;) 
+    {
+        int done;
+        int len;
+ 
+        len = fread(Buff, 1, BUFFSIZE, stdin);
+        if (ferror(stdin)) {
+          fprintf(stderr, "Read error\n");
+          exit(-1);
+        }
+        done = feof(stdin);
+ 
+        if (! XML_Parse(p, Buff, len, done)) {
+          fprintf(stderr, "Parse error at line %d:\n%s\n",
+              XML_GetCurrentLineNumber(p),
+              XML_ErrorString(XML_GetErrorCode(p)));
+          exit(-1);
+        }
+        if (done)
+              break;
+    }
+    printf("\n\n리스트의 크기 : %d\n", user_num);
+    return 0;
+}
+}}}
+아직 XML에 대한 본격적인 스터디가 없는 상태라서 정확한 용어를 사용하지 않았음을 이해해 주기 바란다.
+
+다음은 Makefile이다.
+{{{#!plain
+CPPFLAGS =
+LDFLAGS =
+LIBS = -lexpat
+CFLAGS = -O2 -march=i386 -mcpu=i686 -Wall
+
+all: testxml 
+
+testxml: testxml.o
+    $(CC) -o testxml testxml.o $(LDFLAGS) $(LIBS)
+
+clean:
+    rm -rf *.o core testxml 
+}}}
+
+다음은 실행 결과다.
+{{{#!plain
+[root@localhost test]# ./expat < test.txt 
+User Info Version is 1.0
+
+==> SUBJECT (JOINC USER INFO)
+==> AUTHOR (yundream)
+==> EMAIL (yundream@joinc.co.kr)
+==> VERSION (1.0)
+==> DATE (2004/01/24)
+==================
+==> NAME (yun SanHa)
+==> ID (SanHa)
+==> EMAIL (SanHa@joinc.co.kr)
+==> BIRTH : sun (1987/01/02)
+==================
+==> NAME (yun dream)
+==> ID (dream)
+==> EMAIL (dream@joinc.co.kr)
+==> HOME (http://www.joinc.co.kr)
+==> BIRTH : moon (1978/11/12)
+
+
+리스트의 크기 : 2
+}}}
+
+=== 참고문헌 ===
+ 1. [http://expat.sourceforge.net expat 홈페이지];
+ 1. [http://www.xml.com/pub/a/1999/09/expat/index.html expat 소개문서]
+ 1. [http://www.xml.com/pub/a/98/10/guide0.html A Technical Introduction to XML]
+ 1. [http://www.w3.org/TR/REC-xml Extensible Markup Language (XML) 1.0 (Second Edition)]
+ 1. [http://dblab.comeng.chungnam.ac.kr/~dolphin/xml/atoz/xml-9710/xml-9710.html XML (eXtensible Markup Language) Introduction]
+

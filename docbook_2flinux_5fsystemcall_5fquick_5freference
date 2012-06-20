@@ -1,0 +1,1218 @@
+#title linux systemcall quick reference
+[wiki:article/linux_systemcall_quick_reference HTML 변환문서]
+
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>리눅스 시스템 콜 퀵 레퍼런스</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>yundream@joinc.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2004년 3월 19일 23시</date>
+			<revremark>최초 번역</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>	
+		시스템 콜이란 리눅스 커널에 의해 제공되는 서비스이다. 예를 들어 
+		파일에 쓰는 서비스를 이용하길 원한다면 프로그래머는 리눅스에서 
+		제공하는 해당 시스템콜을 이용해서 프로그램을 작성한다.  
+		C를 이용해서 프로그래밍을 할경우 대부분의 시스템콜은 libc를 통한 
+		포장(wrapper)함수형태로 제공받을 수 있다.  
+	</para>	
+	<para>	
+		시스템 콜 함수에 대한 정보는 메뉴얼 페이지(man page)의 섹션 2번을 
+		통해서 얻어올 수 있다. 예를 들어 read()시스템콜에 대한 정보를 얻기를 
+		원한다면 man 2 read 하면 된다. 시스템콜에 대한 소개를 원한다면 
+		<emphasis>man 2 intro</emphasis>를 이용하기 바란다. 
+		<screen>
+# man 2 intro
+		</screen>
+	</para>
+	<para>
+		시스템 콜을 사용하기 위해서 libc를 통한 포장함수를 호출하는 외에도 
+		syscall()함수를 이용해서 직접 실행시키는 방법도 있다. 각각의 
+		시스템콜은 고유한 번호를 가지고 있는데, syscall에 이 시스템 콜의 
+		번호를 입력하는 방식으로 호출한다. 내부적으로 syscall은 0x80 인터럽트를
+		이용해서 커널에 명령을 전달한다.   
+	</para>
+	<para>
+		시스템 콜함수들은 syscall.h 와 unistd.h 에 정의되어 있으며, 
+		시스템 콜 테이블은 "arch/i386/kernel/entry.S"리눅스 커널 소스파일에 
+		정의되어 있다. 
+	</para>
+</section>
+<section>
+	<title>시스템 콜 예제</title>
+	<para>
+		<screen>
+#include &lt;syscall.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+
+int main()
+{
+    long ID1, ID2;
+
+    // 시스템콜의 직접 사용  
+    // 시스템콜 번호 : 20
+    ID1 = syscall(SYS_getpid);
+    printf("%ld\n", ID1);
+
+    // libc를 이용한 시스템 콜
+    // 시스템콜 번호 : 20
+    ID2 = getpid();
+    printf("%ld\n", ID2);
+
+    return (0);
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>시스템 콜 레퍼런스</title>	
+	<para>
+		<table>
+		<title>시스템 콜 레퍼런스</title>	
+		<tgroup cols=4>
+		<tbody>
+			<row>
+				<entry>번호</entry>
+				<entry>함수 이름</entry>
+				<entry>설명</entry>
+				<entry>소스</entry>
+			</row>
+			<row>
+				<entry>1</entry>
+				<entry>exit()</entry>
+				<entry>현재 프로세스의 종료</entry>
+				<entry>kernel/exit.c</entry>
+			</row>
+			<row>
+				<entry>2</entry>
+				<entry>fork()</entry>
+				<entry>자식 프로세스의 생성</entry>
+				<entry>arch/i385/kernel/process.c</entry>
+			</row>
+			<row>
+				<entry>3</entry>
+				<entry>read()</entry>
+				<entry>파일 지정자로 부터 읽기</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>4</entry>
+				<entry>write()</entry>
+				<entry>파일 지정자로 쓰기</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>5</entry>
+				<entry>open()</entry>
+				<entry>파일이나 장치열기</entry>
+				<entry>fs/open</entry>
+			</row>
+			<row>
+				<entry>6</entry>
+				<entry>close()</entry>
+				<entry>파일 지정자 닫기</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>7</entry>
+				<entry>waitpid()</entry>
+				<entry>프로세스의 종료를 기다린다</entry>
+				<entry>kernel/exit.c</entry>
+			</row>
+			<row>
+				<entry>8</entry>
+				<entry>creat()</entry>
+				<entry>파일이나 장치의 생성</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>9</entry>
+				<entry>link()</entry>
+				<entry>파일을 위한 새로운 이름 만들기</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>10</entry>
+				<entry>unlink()</entry>
+				<entry>파일 혹은 참조된 이름을 삭제한다</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>11</entry>
+				<entry>execv()</entry>
+				<entry>프로그램의 실행</entry>
+				<entry>arch/i386/kernel/process.c</entry>
+			</row>
+			<row>
+				<entry>12</entry>
+				<entry>chdir()</entry>
+				<entry>작업디렉토리의 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>13</entry>
+				<entry>time()</entry>
+				<entry>초단위의 시간 얻기</entry>
+				<entry>kernel/time.h</entry>
+			</row>
+			<row>
+				<entry>14</entry>
+				<entry>mknod()</entry>
+				<entry>일반 혹은 특수파일의 생성</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>15</entry>
+				<entry>chmod()</entry>
+				<entry>파일의 권한 바구기</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>16</entry>
+				<entry>chown()</entry>
+				<entry>파일의 소유자 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>18</entry>
+				<entry>stat()</entry>
+				<entry>파일의 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>19</entry>
+				<entry>lseek()</entry>
+				<entry>파일에서의 위치 변경</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>20</entry>
+				<entry>getpid()</entry>
+				<entry>프로세스의 ID를 얻어온다</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>21</entry>
+				<entry>mount()</entry>
+				<entry>파일 시스템의 마운트</entry>
+				<entry>fs/super.c</entry>
+			</row>
+			<row>
+				<entry>22</entry>
+				<entry>umount()</entry>
+				<entry>파일 시스템 마운트 해제</entry>
+				<entry>fs/super.c</entry>
+			</row>
+			<row>
+				<entry>23</entry>
+				<entry>setuid()</entry>
+				<entry>실제 유저 아이디 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>24</entry>
+				<entry>getuid()</entry>
+				<entry>실제 유저 아이디 얻어오기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>25</entry>
+				<entry>stime()</entry>
+				<entry>시스템의 시간과 날짜 설정</entry>
+				<entry>kernel/time.c</entry>
+			</row>
+			<row>
+				<entry>26</entry>
+				<entry>ptrace()</entry>
+				<entry>부모프로세스가 자식프로세스의 실행을 제어하도록 허가</entry>
+				<entry>arch/i386/kernel/ptrace.c</entry>
+			</row>
+			<row>
+				<entry>27</entry>
+				<entry>alarm()</entry>
+				<entry>실정시간후 alarm시그널이 전달되도록 한다.</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>28</entry>
+				<entry>fstat()</entry>
+				<entry>파일 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>29</entry>
+				<entry>pause()</entry>
+				<entry>시그널이 전달될때까지 대기한다.</entry>
+				<entry>arch/i386/kernel/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>30</entry>
+				<entry>utime()</entry>
+				<entry>파일의 엑세스시간과 수정시간을 수정한다.</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>33</entry>
+				<entry>access()</entry>
+				<entry>파일의 권한을 검사한다.</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>34</entry>
+				<entry>nice()</entry>
+				<entry>프로세스의 우선순위를 번경한다.</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>36</entry>
+				<entry>sync()</entry>
+				<entry>슈퍼블럭을 업데이트 한다.</entry>
+				<entry>fs/buffer.c</entry>
+			</row>
+			<row>
+				<entry>37</entry>
+				<entry>kill()</entry>
+				<entry>프로세스에 시그널을 전송한다.</entry>
+				<entry>kernel/signal.h</entry>
+			</row>
+			<row>
+				<entry>38</entry>
+				<entry>rename()</entry>
+				<entry>파일의 이름과 위치를 변경한다.</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>39</entry>
+				<entry>mkdir()</entry>
+				<entry>디렉토리를 생성한다.</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>40</entry>
+				<entry>rmdir()</entry>
+				<entry>디렉토리를 제거한다.</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>41</entry>
+				<entry>dup()</entry>
+				<entry>열린 파일 지정자를 복사한다.</entry>
+				<entry>fs/fcntl.c</entry>
+			</row>
+			<row>
+				<entry>42</entry>
+				<entry>pipe()</entry>
+				<entry>내부통신을 위한 채널을 생성한다.</entry>
+				<entry>arch/i386/kernel/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>43</entry>
+				<entry>times()</entry>
+				<entry>프로세스 시간을 얻는다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>45</entry>
+				<entry>brk()</entry>
+				<entry>프로세스의 데이터 세그먼트 크기를 변경한다.</entry>
+				<entry>mm/mmap.c</entry>
+			</row>
+			<row>
+				<entry>46</entry>
+				<entry>setgid()</entry>
+				<entry>real 그룹 아이디를 설정한다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>47</entry>
+				<entry>getgid()</entry>
+				<entry>real 그룹 아이디를 얻어온다.</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>48</entry>
+				<entry>sys_signal()</entry>
+				<entry>ANSI C 시그널 제어</entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>49</entry>
+				<entry>geteuid()</entry>
+				<entry>effective 유저 아이디 가져오기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>50</entry>
+				<entry>getegid()</entry>
+				<entry>effective 그룹 아이디 가져오기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>51</entry>
+				<entry>acct()</entry>
+				<entry>프로세스 측정을 켜거나 끈다.</entry>
+				<entry>kernel/acct.c</entry>
+			</row>
+			<row>
+				<entry>52</entry>
+				<entry>umount2()</entry>
+				<entry>파일시스템 unmount</entry>
+				<entry>fs/super.c</entry>
+			</row>
+			<row>
+				<entry>54</entry>
+				<entry>ioctl()</entry>
+				<entry>장치 제어</entry>
+				<entry>fs/ioctl.c</entry>
+			</row>
+			<row>
+				<entry>55</entry>
+				<entry>fcntl()</entry>
+				<entry>파일 제어</entry>
+				<entry>fs/fcntl.c</entry>
+			</row>
+			<row>
+				<entry>56</entry>
+				<entry>mpx</entry>
+				<entry>사용되지 않음</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>57</entry>
+				<entry>setpgid()</entry>
+				<entry>프로세스의 그룹 아이디 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>58</entry>
+				<entry>ulimit()</entry>
+				<entry>사용되지 않음</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>59</entry>
+				<entry>olduname</entry>
+				<entry>구식의 uname 시스템콜</entry>
+				<entry>arch/i386/kernel/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>60</entry>
+				<entry>umaks()</entry>
+				<entry>파일 마스크의 생성</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>61</entry>
+				<entry>chroot()</entry>
+				<entry>루트디렉토리의 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>62</entry>
+				<entry>ustat()</entry>
+				<entry>파일시스템의 통계 얻기</entry>
+				<entry>fs/super.c</entry>
+			</row>
+			<row>
+				<entry>63</entry>
+				<entry>dup2()</entry>
+				<entry>파일 지정자 복사</entry>
+				<entry>fs/fcntl.c</entry>
+			</row>
+			<row>
+				<entry>64</entry>
+				<entry>getppid()</entry>
+				<entry>부모 프로세스의 PID 얻기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>65</entry>
+				<entry>getpgrp()</entry>
+				<entry>프로세스의 그룹 아이디 얻기</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>66</entry>
+				<entry>setsid()</entry>
+				<entry>세션과 프로세스 그룹 아이디 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>67</entry>
+				<entry>sigaction()</entry>
+				<entry>POSIX 시그널 제어 함수</entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>68</entry>
+				<entry>sigmask()</entry>
+				<entry>ANSI C 시그널 제어</entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>69</entry>
+				<entry>ssetmask()</entry>
+				<entry>ANSI C 시그널 제어</entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>70</entry>
+				<entry>setreuid()</entry>
+				<entry>실제 혹은 유효사용자 아이디의 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>71</entry>
+				<entry>setregid()</entry>
+				<entry>실제 혹은 유효그룹 아이디의 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>72</entry>
+				<entry>sigsuspend()</entry>
+				<entry>시그널 마스크를 일시적으로 대체한후 시그널을 기다린다.</entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>73</entry>
+				<entry>sigpending()</entry>
+				<entry>시그널을 블럭하고 검사를 수행한다.</entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>74</entry>
+				<entry>sethostname()</entry>
+				<entry>호스트이름 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>75</entry>
+				<entry>setrlimit()</entry>
+				<entry>자원의 제한값을 설정한다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>76</entry>
+				<entry>getrlimit()</entry>
+				<entry>자원의 제한값을 얻어온다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>77</entry>
+				<entry>getrusage()</entry>
+				<entry>자원의 제한값을 얻어온다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>78</entry>
+				<entry>gettimeofday()</entry>
+				<entry>날짜와 시간을 얻는다.</entry>
+				<entry>kernel/time.c</entry>
+			</row>
+			<row>
+				<entry>79</entry>
+				<entry>settimeofday()</entry>
+				<entry>날짜와 시간을 설정한다.</entry>
+				<entry>kernel/time.c</entry>
+			</row>
+			<row>
+				<entry>80</entry>
+				<entry>getgroups()</entry>
+				<entry>포함된 그룹아이디의 목록을 얻는다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>81</entry>
+				<entry>setgroups()</entry>
+				<entry>포함될 르룹아이디의 목록을 설정한다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>82</entry>
+				<entry>old_select()</entry>
+				<entry>오래된 버젼의 입출력다중화</entry>
+				<entry>arch/i386/kernel/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>83</entry>
+				<entry>symlink()</entry>
+				<entry>파일에 대한 심볼릭링크 생성</entry>
+				<entry>fs/namei.c</entry>
+			</row>
+			<row>
+				<entry>84</entry>
+				<entry>lstat()</entry>
+				<entry>파일의 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>85</entry>
+				<entry>readlink()</entry>
+				<entry>심볼릭 링크의 연결된 파일 이름을 읽는다.</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>86</entry>
+				<entry>uselib()</entry>
+				<entry>공유라이브를 선택한다.</entry>
+				<entry>fs/exec.c</entry>
+			</row>
+			<row>
+				<entry>87</entry>
+				<entry>swapon()</entry>
+				<entry>파일과 장치의 스와핑을 시작한다.</entry>
+				<entry>mm/swapfile.c</entry>
+			</row>
+			<row>
+				<entry>88</entry>
+				<entry>reboot()</entry>
+				<entry>리붓 시키거나 Ctrl-Alt-Del을 활성화/비활성화 시킨다.</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>89</entry>
+				<entry>old_readdir()</entry>
+				<entry>오래된 버젼의 디렉토리 내용읽기</entry>
+				<entry>fs/readdir.c</entry>
+			</row>
+			<row>
+				<entry>90</entry>
+				<entry>old_mmap()</entry>
+				<entry>오래된 버젼의 메모리 파일 대응</entry>
+				<entry>arch/i386/kernel/sys/i386.c</entry>
+			</row>
+			<row>
+				<entry>91</entry>
+				<entry>mnunmap()</entry>
+				<entry>메모리 페이지 해제</entry>
+				<entry>mm/mmap.c</entry>
+			</row>
+			<row>
+				<entry>92</entry>
+				<entry>truncate()</entry>
+				<entry>파일의 길이 결정</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>93</entry>
+				<entry>ftruncate()</entry>
+				<entry>파일의 길이 결정</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>94</entry>
+				<entry>fchmod()</entry>
+				<entry>파일의 권한 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>95</entry>
+				<entry>fchown()</entry>
+				<entry>파일의 그룹및 소유자 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>96</entry>
+				<entry>getpriority()</entry>
+				<entry>프로그램의 우선순위 얻어오기</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>97</entry>
+				<entry>setpriority()</entry>
+				<entry>프로그램의 우선순위 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>98</entry>
+				<entry>profile()</entry>
+				<entry>execution time profile</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>99</entry>
+				<entry>statfs()</entry>
+				<entry>파일시스템 정보 얻기</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>100</entry>
+				<entry>fstatfs()</entry>
+				<entry>파일시스템 정보 얻기</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>101</entry>
+				<entry>ioperm()</entry>
+				<entry>set port input/output permissions</entry>
+				<entry>arch/i386/kernel/ioport.c</entry>
+			</row>
+			<row>
+				<entry>102</entry>
+				<entry>socketcall()</entry>
+				<entry>소켓 시스템콜</entry>
+				<entry>net/socket.c</entry>
+			</row>
+			<row>
+				<entry>103</entry>
+				<entry>syslog()</entry>
+				<entry>커널 메시지 버퍼의 내용을 읽거나 클리어한다.</entry>
+				<entry>kerne/printk.c</entry>
+			</row>
+			<row>
+				<entry>104</entry>
+				<entry>setitimer()</entry>
+				<entry>내부 타이머 설정</entry>
+				<entry>kernel/itimer.c</entry>
+			</row>
+			<row>
+				<entry>105</entry>
+				<entry>getitimer()</entry>
+				<entry>내부 타이머 값 가져오기</entry>
+				<entry>kernel/itimer.c</entry>
+			</row>
+			<row>
+				<entry>106</entry>
+				<entry>sys_newstat()</entry>
+				<entry>파일의 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>107</entry>
+				<entry>sys_newlstat()</entry>
+				<entry>파일의 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>108</entry>
+				<entry>sys_newfstat()</entry>
+				<entry>파일의 상태 얻기</entry>
+				<entry>fs/stat.c</entry>
+			</row>
+			<row>
+				<entry>109</entry>
+				<entry>olduname()</entry>
+				<entry>최근 커널의 정보얻기</entry>
+				<entry>arch/i386/kernel/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>110</entry>
+				<entry>iopl()</entry>
+				<entry>I/O privilege 레벨 변경</entry>
+				<entry>arch/i386/kernel/ioport.c</entry>
+			</row>
+			<row>
+				<entry>111</entry>
+				<entry>vhangup()</entry>
+				<entry>가상으로 현재 tty를 중지시킨다.</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>112</entry>
+				<entry>idle()</entry>
+				<entry>0번 프로세스를 idel상태로 한다.</entry>
+				<entry>arch/i386/kernel/process.c</entry>
+			</row>
+			<row>
+				<entry>113</entry>
+				<entry>vm86old()</entry>
+				<entry>가상 8086모드로 들어가기</entry>
+				<entry>arch/i386/kernel/vm86.c</entry>
+			</row>
+			<row>
+				<entry>114</entry>
+				<entry>wait4()</entry>
+				<entry>프로세스의 종료를 기다린다. BSD 스타일</entry>
+				<entry>kernelk/exit.c</entry>
+			</row>
+			<row>
+				<entry>115</entry>
+				<entry>swapoff()</entry>
+				<entry>파일/장치의 스와핑 끝내기</entry>
+				<entry>mm/swapfile.c</entry>
+			</row>
+			<row>
+				<entry>116</entry>
+				<entry>sysinfo()</entry>
+				<entry>시스템의 정보 얻어오기</entry>
+				<entry>kernel/info.c</entry>
+			</row>
+			<row>
+				<entry>117</entry>
+				<entry>ipc()</entry>
+				<entry>System V IPC 시스템 콜</entry>
+				<entry>arch/i386/kernelk/sys_i386.c</entry>
+			</row>
+			<row>
+				<entry>118</entry>
+				<entry>fsync()</entry>
+				<entry>파일의 내부상태와 디스크상의 상태를 동기화 한다.</entry>
+				<entry>fs/buffer.c</entry>
+			</row>
+			<row>
+				<entry>119</entry>
+				<entry>sigreturn()</entry>
+				<entry>시그널 핸들러와 클린업 스택 프레임으로 부터 반환</entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>120</entry>
+				<entry>clone()</entry>
+				<entry>자식 프로세스의 생성</entry>
+				<entry>arch/i386/kernel/process.c</entry>
+			</row>
+			<row>
+				<entry>121</entry>
+				<entry>setdomainname()</entry>
+				<entry>도메인 이름 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>122</entry>
+				<entry>uname()</entry>
+				<entry>최근 커널의 정보 얻어오기</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>123</entry>
+				<entry>modify_ldt()</entry>
+				<entry>ldt를 가져오거나 설정한다.</entry>
+				<entry>arch/i386/kernel/ldt.c</entry>
+			</row>
+			<row>
+				<entry>124</entry>
+				<entry>adjtmex()</entry>
+				<entry>커널 클럭을 조율한다.</entry>
+				<entry>kernel/time.c</entry>
+			</row>
+			<row>
+				<entry>125</entry>
+				<entry>mprotect()</entry>
+				<entry>메모리 영역에 대한 접근을 제어한다.</entry>
+				<entry>mm/mprotect.c</entry>
+			</row>
+			<row>
+				<entry>126</entry>
+				<entry>sigprocmask()</entry>
+				<entry>POSIX 시그널 제어 관련 함수</entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>127</entry>
+				<entry>create_module()</entry>
+				<entry>적재가능한 모듈엔트리 생성</entry>
+				<entry>kernel/module.c</entry>
+			</row>
+			<row>
+				<entry>128</entry>
+				<entry>init_module()</entry>
+				<entry>적재가능한 모듈 엔트리 초기화</entry>
+				<entry>kernelk/module.c</entry>
+			</row>
+			<row>
+				<entry>129</entry>
+				<entry>delete_module()</entry>
+				<entry>적재 모듈의 삭제</entry>
+				<entry>kernel/module.c</entry>
+			</row>
+			<row>
+				<entry>130</entry>
+				<entry>get_kernel_syms()</entry>
+				<entry>retrieve exported kernel and module symbols</entry>
+				<entry>kernel/module.c</entry>
+			</row>
+			<row>
+				<entry>131</entry>
+				<entry>quotactl()</entry>
+				<entry>디스크 쿼터 수정</entry>
+				<entry>fs/dquot.c</entry>
+			</row>
+			<row>
+				<entry>132</entry>
+				<entry>getpgid()</entry>
+				<entry>프로세스 그룹아이디 가져오기</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>133</entry>
+				<entry>fchdir()</entry>
+				<entry>작업 디렉토리 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>134</entry>
+				<entry>bdflush()</entry>
+				<entry>start, flush, buffer-dirty-flush 데몬을 조정한다</entry>
+				<entry>fs/buffer.c</entry>
+			</row>
+			<row>
+				<entry>135</entry>
+				<entry>sysfs()</entry>
+				<entry>파일시스템 타입정보 가져오기</entry>
+				<entry>fs/super.c</entry>
+			</row>
+			<row>
+				<entry>136</entry>
+				<entry>personality()</entry>
+				<entry>프로세스 실행 도메인 설정</entry>
+				<entry>kernel/exec_domain.c</entry>
+			</row>
+			<row>
+				<entry>137</entry>
+				<entry>afs_syscall()</entry>
+				<entry>사용하지 않음</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>138</entry>
+				<entry>setfsuid()</entry>
+				<entry>파일 시스템 검사를 위해 사용되는 사용자 실별자를 설정</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>139</entry>
+				<entry>setfsgid()</entry>
+				<entry>파일 시스템 검사를 위해 사용되는 그룹 식별자를 설정</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>140</entry>
+				<entry>sys_llseek()</entry>
+				<entry>읽기/쓰기 파일의 위치 이동</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>141</entry>
+				<entry>getdents()</entry>
+				<entry>디렉토리 내용을 읽어들인다.</entry>
+				<entry>fs/readdir.c</entry>
+			</row>
+			<row>
+				<entry>142</entry>
+				<entry>select()</entry>
+				<entry>입출력 다중화</entry>
+				<entry>fs/select.c</entry>
+			</row>
+			<row>
+				<entry>143</entry>
+				<entry>flock()</entry>
+				<entry>열린파일에 대한 권고잠금 적용및 제거</entry>
+				<entry>fs/locks.c</entry>
+			</row>
+			<row>
+				<entry>144</entry>
+				<entry>msync()</entry>
+				<entry>메모리 맵과 파일의 동기화</entry>
+				<entry>mm/filemap.c</entry>
+			</row>
+			<row>
+				<entry>145</entry>
+				<entry>readv()</entry>
+				<entry>벡터를 읽는다</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>146</entry>
+				<entry>writev()</entry>
+				<entry>벡터를 쓴다</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>147</entry>
+				<entry>sys_getsid()</entry>
+				<entry>세션리더의 프로세스 아이디를 가져온다</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>148</entry>
+				<entry>fdatasync()</entry>
+				<entry>파일의 디스크에 있는 in-core 데이터를 동기화</entry>
+				<entry>fs/buffer.c</entry>
+			</row>
+			<row>
+				<entry>149</entry>
+				<entry>sysctl()</entry>
+				<entry>시스템 파라메터를 읽고 쓴다</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>150</entry>
+				<entry>mlock()</entry>
+				<entry>메모리의 페이지 잠금</entry>
+				<entry>mm/mlock.c</entry>
+			</row>
+			<row>
+				<entry>151</entry>
+				<entry>munlock()</entry>
+				<entry>메모리의 페이지 잠금 풀기</entry>
+				<entry>mm/mlock.c</entry>
+			</row>
+			<row>
+				<entry>152</entry>
+				<entry>mlockall()</entry>
+				<entry>호출한 프로세스의 페이징을 금지시킨다</entry>
+				<entry>mm/mlock.c</entry>
+			</row>
+			<row>
+				<entry>153</entry>
+				<entry>munlockall()</entry>
+				<entry>호출한 프로세스에 대한 페이징을 다시 가능하도록 한다.</entry>
+				<entry>mm/mlock.c</entry>
+			</row>
+			<row>
+				<entry>154</entry>
+				<entry>sched_setparam()</entry>
+				<entry>스케줄 파라메터 설정</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>155</entry>
+				<entry>sched_getparam()</entry>
+				<entry>스케쥴 파라메터 설정값 가져오기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>156</entry>
+				<entry>sched_setscheduler()</entry>
+				<entry>스케쥴 알고리즘 파라메터 설정</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>157</entry>
+				<entry>sched_getscheduler()</entry>
+				<entry>스케쥴 알고리즘 파라메터 값 가져오기</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>158</entry>
+				<entry>sched_yield()</entry>
+				<entry></entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>159</entry>
+				<entry>sched_get_priority_max()</entry>
+				<entry>정적 선행 범위를 가진다</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>160</entry>
+				<entry>sched_get_priority_mix()</entry>
+				<entry></entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>161</entry>
+				<entry>sched_rr_get_interval()</entry>
+				<entry>프로세스의 SCHED_RR간격을 가져온다.</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>162</entry>
+				<entry>nanosleep()</entry>
+				<entry>지정한 시간에 실행을 잠시 멈춘다</entry>
+				<entry>kernel/sched.c</entry>
+			</row>
+			<row>
+				<entry>163</entry>
+				<entry>mremap()</entry>
+				<entry>가상 메모리 주소를 재대응시킨다</entry>
+				<entry>mm/mremap.c</entry>
+			</row>
+			<row>
+				<entry>164</entry>
+				<entry>setresuid()</entry>
+				<entry>set real, effective and saved user or group ID</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>165</entry>
+				<entry>getresuid()</entry>
+				<entry>get real, effective and saved user or group ID</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>166</entry>
+				<entry>vm86()</entry>
+				<entry>8086가상 모드로 진입</entry>
+				<entry>arch/i386/kernel/vm86.c</entry>
+			</row>
+			<row>
+				<entry>167</entry>
+				<entry>query_module()</entry>
+				<entry>query the kernel for various bits pertaining to modules</entry>
+				<entry>kernel/module.c</entry>
+			</row>
+			<row>
+				<entry>168</entry>
+				<entry>poll()</entry>
+				<entry>파일 지정자로 부터 이벤트를 기다린다</entry>
+				<entry>fs/select.c</entry>
+			</row>
+			<row>
+				<entry>169</entry>
+				<entry>nfsservctl()</entry>
+				<entry>커널 nfs 데몬을 위한 인터페이스</entry>
+				<entry>fs/filesystems.c</entry>
+			</row>
+			<row>
+				<entry>170</entry>
+				<entry>setresgid()</entry>
+				<entry>set real, effective and saved user or group ID</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>171</entry>
+				<entry>getresgid()</entry>
+				<entry>get real, effective and saved user or group ID</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>172</entry>
+				<entry>prctl()</entry>
+				<entry>프로세스상에서의 실행</entry>
+				<entry>kernel/sys.c</entry>
+			</row>
+			<row>
+				<entry>173</entry>
+				<entry>rt_sigreturn</entry>
+				<entry></entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>174</entry>
+				<entry>rt_sigaction</entry>
+				<entry></entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>175</entry>
+				<entry>rt_sigprocmask</entry>
+				<entry></entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>176</entry>
+				<entry>rt_sigpending</entry>
+				<entry></entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>177</entry>
+				<entry>rt_sigtimedwait</entry>
+				<entry></entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>178</entry>
+				<entry>rt_sigqueueinfo</entry>
+				<entry></entry>
+				<entry>kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>179</entry>
+				<entry>rt_sigsuspend</entry>
+				<entry></entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>180</entry>
+				<entry>pread()</entry>
+				<entry>파일 지정자로 부터 위치를 가져오거나 읽는다</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>181</entry>
+				<entry>sys_pwrite()</entry>
+				<entry>파일 지정자로 부터 위치를 가져오거나 쓴다</entry>
+				<entry>fs/read_write.c</entry>
+			</row>
+			<row>
+				<entry>182</entry>
+				<entry>chown()</entry>
+				<entry>파일 소유자 변경</entry>
+				<entry>fs/open.c</entry>
+			</row>
+			<row>
+				<entry>183</entry>
+				<entry>getcwd()</entry>
+				<entry>최근 작업 디렉토리 가져오기</entry>
+				<entry>fs/dcache.c</entry>
+			</row>
+			<row>
+				<entry>184</entry>
+				<entry>capget()</entry>
+				<entry>프로세스 기능의 설정값 가져오기</entry>
+				<entry>kernel/capability.c</entry>
+			</row>
+			<row>
+				<entry>185</entry>
+				<entry>capset</entry>
+				<entry>프로세스 기능 설정하기</entry>
+				<entry>kernle/capability.c</entry>
+			</row>
+			<row>
+				<entry>186</entry>
+				<entry>sigaltstack()</entry>
+				<entry>시그널 스택 문맥을 가져오가나 설정</entry>
+				<entry>arch/i386/kernel/signal.c</entry>
+			</row>
+			<row>
+				<entry>187</entry>
+				<entry>sendfile()</entry>
+				<entry>파일 지정자 사이의 데이터 교환</entry>
+				<entry>mm/filemap.c</entry>
+			</row>
+			<row>
+				<entry>188</entry>
+				<entry>getpmsg()</entry>
+				<entry>사용하지 않음</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>189</entry>
+				<entry>putpmsg()</entry>
+				<entry>사용하지 않음</entry>
+				<entry></entry>
+			</row>
+			<row>
+				<entry>190</entry>
+				<entry>vfork()</entry>
+				<entry>자식 프로세스 생성과 부모 프로세스 블럭</entry>
+				<entry>arch/i386/kernel/process.c</entry>
+			</row>
+		</tbody>
+		</tgroup>
+		</table>
+	</para>
+</section>
+</article>
+}}}

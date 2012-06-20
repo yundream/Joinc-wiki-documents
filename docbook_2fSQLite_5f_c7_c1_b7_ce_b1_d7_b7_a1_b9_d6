@@ -1,0 +1,643 @@
+#title Sqlite 프로그래밍
+{{{#!html
+<a href=http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_SQLite%20%C7%C1%B7%CE%B1%D7%B7%A1%B9%D6>HTML 변환문서</a>
+}}}
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+    <title>Sqlite 프로그래밍</title>
+
+    <author>
+        <surname>윤상배</surname>
+
+        <affiliation>
+            <address>
+                <email>yundream@join.co.kr</email>
+            </address>
+        </affiliation>
+    </author>
+    <revhistory>
+        <revision>
+            <revnumber>0.9</revnumber>
+            <date>2004년 2월 16일 8시</date>
+            <revremark>참고문헌및 사이트 추가</revremark>
+        </revision>
+        <revision>
+            <revnumber>0.8</revnumber>
+            <date>2004년 1월 09일 20시</date>
+            <revremark>최초 문서작성</revremark>
+        </revision>
+    </revhistory>
+</articleinfo>
+
+<section>
+    <title>소개</title>
+    <para>
+        지금까지 Oracle, Mysql, Postgresql 과 같은 큰 규모의 DB프로그래밍을 
+        해왔으며 작은 규모에서 간단하게 사용하기 위한 용도로 gdbm 과 같은 
+        라이브러리를 사용했었다.  
+        이들의 문제는 Oracle, Mysql, Postgresql은 적당한 기능을 지원하기 
+        위해서 지나치게 무겁다는 점이고, gdbm과 같은 경우 매우 가볍고 
+        간단하기는 하지만 기능이 너무 제한적이고 
+        SQL문법을 지원하지 않는다는 점이다. 
+        그러던중 Sqlite를 알게 되었다. 웹프로그래밍도 겸하다보니 좀더 
+        가벼운 DB도구를 찾아 헤메던중 발견했다. 
+        이 문서는 Sqlite의 설치와 프로그래밍 활용방안등에 대한 내용을 담고 있다. 
+    </para>
+    <para>
+		문서는 Linux OS를 기준으로 작성되었다. Windows환경에서의 SQLite의 설치에 
+		대한 힌트를 얻고 싶다면 <ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/SQLite%20Windows">SWLite Windows</ulink>를 참고하기 바란다. 
+    </para>
+    <para>
+		또한 SQLite응용 프로젝트도 있으니 이 글을 읽은후 관심이 생겼다면 
+		한번쯤 찾아주길 바란다. 
+		<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/project_SQLiteDBMS">SQLiteDBMS 프로젝트</ulink>로 가기 
+    </para>
+</section>
+<section>
+    <title>Sqlite</title>
+    <para>
+        현재 시점에서 최신 버젼인 sqlite-2.8.9를 기준으로 한다.
+    </para>
+    <section>
+        <title>Sqlite의 특징</title>
+        <para>
+            <orderedlist>
+                <listitem>
+                <para>
+                    SQL92의 대부분을 지원한다. 다음은 지원하지 않는 몇 가지 기능들이다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    단일 파일에 데이터베이스의 모든것을 포함한다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    ACID(Atomic, Consistent, Isolate, Durable) 보증
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    byte order에 관계없이 데이터 파일의 공유가 가능
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    2테라바이트 (2^41)크기의 데이터 파일 생성지원
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    효율적인 메모리 사용 : 25k라인정도의 C코드로 이루어졌다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    많은 일반적인 명령을 실행하는데 PostgreSql과 Mysql보다 최소 
+                    2배이상 명령에 따라서 10-20배 이상 빠르다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    하나의 구조체와 3개의 함수만 사용하는 정도로 sqlite를 
+                    사용하는 C/C++ 코드를 만들어 낼 수 있다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    TCL, Perl, PHP, .Net, Java, Python, SmallTalk, Ruby등의 다양한 언어지원
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    다른 라이브러리등의 도움없이 작동된다. 
+                    libsqlite.so와 sqlite 2개의 파일이면 작동 환경을 만들 수 있다. 
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    Public Domain 라이센스를 가진다.
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    sqlite는 서버/클라이언트 모델을 지원하는 RDBMS가 아니다. 
+                    로컬에서만 사용가능하며 인터넷응용을 원한다면 별도의 서버 
+                    프로그램을 만들어야 한다. 
+                </para>
+                </listitem>
+            </orderedlist>
+        </para>
+    </section>
+    <section>
+        <title>설치하기</title>
+        <para>
+            <ulink url="http://www.hwaci.com/sw/sqlite">SQLite 홈페이지</ulink>에서 
+            다운로드 받을 수 있다. 현재(2003/1/08) sqlite-2.8.9.tar.gz 버젼이 최신버젼이다.
+            다운로드 받아서 압축까지 풀고 보니 4M정도 되는 작은 크기였다. 
+            oracle은 말할 것도 없고 수십메가의 크기를 가지는 postgresql이나 
+            mysql에 비해서도 매우 작은 크기이다. 
+        </para>
+        <para>
+            rpm도 준비되어 있기는 한데, 서버 프로그램들은 무조건 컴파일해서 설치해야 하는 
+            성격이라 tarball을 받아서 컴파일 후 설치하기로 했다.
+            다음은 필자가 사용중인 리눅스박스의 사양이다.
+            <table>
+                <title>시스템 사양</title>
+                <tgroup cols=3>
+                <tbody>
+                    <row>
+                        <entry>OS</entry>
+                        <entry>Linux</entry>
+                        <entry>Kernel 2.6.0</entry>
+                    </row>
+                    <row>
+                        <entry>컴파일러</entry>
+                        <entry>gcc</entry>
+                        <entry>2.96</entry>
+                    </row>
+                    <row>
+                        <entry>cpu</entry>
+                        <entry>Intel 800MHZ</entry>
+                        <entry>업그레이드 시키고 싶다.</entry>
+                    </row>
+                </tbody>
+                </tgroup>
+            </table>
+        </para>
+        <para>
+            설치는 매우 간단하다.
+            <screen>
+# wget http://www.hwaci.com/sw/sqlite/sqlite-2.8.9.tar.gz
+# mv sqlite-2.8.9.tar.gz /usr/src
+# tar -xvzf sqlite-2.8.9.tar.gz
+# cd sqlite
+# ./configure
+# make 
+# make install
+            </screen>
+            옵션없이 설치했을 경우 /usr/local 밑에 자리잡게 된다. 이걸로 설치 끝이다. 
+        </para>
+    </section>
+</section>
+<section>
+    <title>Sqlite 간단 운용</title>
+    <section>
+        <title>DB 생성및 간단한 내부명령어들</title>
+        <para>
+            sqlite [dbname] 으로 간단하게 생성할 수 있다. 
+            동일한 이름이 존재하면 열고 그렇지 않다면 새로 생성한다. 
+            <screen>
+# sqlite test.db
+SQLite version 2.8.9
+Enter ".help" for instructions
+sqlite> 
+            </screen>
+            그다음 부터는 알고 있는 <emphasis>Sql query</emphasis>를 이용해서 
+            필요한 작업을 하면 된다. 
+            <screen>
+sqlite> create table test(name char(80), age int);
+sqlite> insert into test values("yundream", 19);
+sqlite> insert into test values("hello world", 29);
+sqlite> select * from test;
+yundream|19
+hello world|29
+            </screen>
+            내부명령어와 관련된 도움말은 '''.help'''를 입력하는 정도로 간단히 참조할 수 있다.
+            <orderedlist>
+                <listitem>
+                <para>
+                    .databases : 현재 작업중인 DB파일과 관련된 다른 파일들 목록 출력
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .echo ON|OFF : 명령어를 반향 할건지 여부
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .exit : 프로그램 종료
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .help : 도움말
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .schema ?TABLE? : 테이블 구조 
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .show : 현재 프로그램 설정값을 보여준다. 
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .read FILENAME : FILENAME으로 부터 SQL을 실행한다. 
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .output FILENAME : 출력을 FILENAME으로 보냄
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .output stdout : 출려을 화면으로 보냄(기본 값) 
+                </para>
+                </listitem>
+                <listitem>
+                <para>
+                    .output stdout : 출려을 화면으로 보냄(기본 값) 
+                </para>
+                </listitem>
+            </orderedlist>
+        </para>
+    </section>
+</section>
+<section>
+    <title>C/C++ Interface</title>
+    <para>
+        sqlite는 매우 쉽게 관련 애플리케이션을 제작할 수 있도록 디자인되어 있다. 
+        여기에서는 sqlite C/C++프로그래밍 방법에 대해서 알아 보겠다. 
+    </para>
+    <section>
+        <title>핵심 API</title>
+        <para>
+            sqlite는 3개의 핵심 함수와 하나의 자료구조를 제공한다. 
+            이외에도 몇가지 리턴값과 상수들을 가지고 있다.  
+            <screen>
+typedef struct sqlite sqlite;
+#define SQLITE_OK
+
+sqlite *sqlite_open(const char *dbname, int mode, char **errmsg);
+
+void sqlite_close(sqlite *db);
+
+int sqlite_exec
+(
+  sqlite *db,
+  char *sql,
+  int (*xCallback)(void*,int,char**,char**),
+  void *pArg,
+  char **errmsg
+);
+            </screen>
+            위의 내용만 숙지하는 정도로 C,C++프로그램을 만들 수 있다.
+        </para>
+    </section>
+    <section>
+        <title>DB 열기</title>
+        <para>
+            <screen>
+            sqlite *sqlite_open(const char *dbname, int mode, char **errmsg);
+            </screen>
+            sqlite_open 함수를 이용해서 SQLite DB를 열거나 새로운 DB를 생성할 수 있다. 
+            첫번째 인자는 DB이름이다. 두번째 인자는 현재 사용하지 않는다. 
+            DB를 여는 중에 에러가 발생한다면 errmsg에 에러메시지를 채우게 된다. 에러가 
+            발생하지 않았다면 NULL을 가리킨다. 
+        </para>
+        <para>
+        </para>
+    </section>
+    <section>
+        <title>DB닫기</title>
+        <para>
+            sqlite_close()함수를 호출하면 된다. 인자로는 sqlite_open()으로 생성된 sqlite 
+            구조체 포인터가 들어간다. sqlite_close()를 호출했을 때 트랜잭션(transaction)이
+            활성화 되어 있는 상태라면 이 트랜잭션은 rolled back 하게 된다. 
+        </para>
+    </section>
+    <section>
+        <title>SQL 실행</title>
+        <para>
+            sqlite_exec()를 이용해서 SQL쿼리와 각종 명령을 수행할 수 있다. 이 함수는 5개의 
+            인자를 가진다. 
+            <orderedlist>
+                <listitem>
+                    <para>
+                        sqlite_open()에 의해서 만들어진 sqlite구조체 포인터다.
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        sql 쿼리와 sql 명령을 위한 문자열이 들어간다. 이 문자열은 
+                        null로 끝난다. 
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        콜백함수로써 쿼리의 결과를 처리하기 위해서 호출 된다. NULL
+                        이라면 아무일도 하지 않게 된다.  
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        콜백함수로 넘겨줄 인자의 처음을 가르키는 포인터다. 
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        에러메시지를 가르키는 포인터다. 이 포인터는 malloc()등을 이용해서 
+                        할당된 공간에 씌여지며 함수가 종료되면 free() 된다. NULL이라면 
+                        어떤 에러메시지도 보고되지 않을 것이다. 
+                    </para>
+                </listitem>
+            </orderedlist>
+        </para>
+        <para>
+            콜백(callback)함수는 쿼리의 결과를 받기 위해서 사용된다. 콜백함수는 
+            다음과 같이 선언되어 있다. 
+            <screen>
+int Callback(void *pArg, int argc, char **argv, char **columnNames))
+{
+    return 0;
+}
+            </screen>
+            콜백함수의 첫번째 인자는 sqlite_exec()의 네번째 아규먼트의 복사다. 이 인자는 
+            클라이언트 코드로 부터 콜백함수로 임의의 정보를 전달하기 위해서 사용되어 진다. 
+            두번째 인자는 쿼리결과 생성된 컬럼(columns)의 갯수이다. 세번째 아규먼트는 
+            컬럼의 실제 내용을 담고 있으며 하나의 컬럼 내용은 하나의 배열에 대응한다. 
+            네번째 인자는 컬럼의 이름이다. 
+        </para>
+        <para>
+            콜백함수는 정상적으로 수행되었을 경우 0을 리턴한다. 만약 에러가 발생한다면 
+            0이 아닌 값을 리턴하고 쿼리는 취소된다. 이경우 sqlite_exe()는 
+            <emphasis>SQLITE_ABORT</emphasis>를 리턴할 것이다.  
+        </para>
+    </section>
+    <section>
+        <title>에러 코드</title>
+        <para>
+            정상적으로 실행되었을 경우 sqlite_exec()함수는 SQLITE_OK를 리턴한다. 
+            그렇지 않을경우 다음과 같은 에러 코드들을 리턴한다. 
+            <screen>
+#define SQLITE_OK           0   /* Successful result */
+#define SQLITE_ERROR        1   /* SQL error or missing database */
+#define SQLITE_INTERNAL     2   /* An internal logic error in SQLite */
+#define SQLITE_PERM         3   /* Access permission denied */
+#define SQLITE_ABORT        4   /* Callback routine requested an abort */
+#define SQLITE_BUSY         5   /* The database file is locked */
+#define SQLITE_LOCKED       6   /* A table in the database is locked */
+#define SQLITE_NOMEM        7   /* A malloc() failed */
+#define SQLITE_READONLY     8   /* Attempt to write a readonly database */
+#define SQLITE_INTERRUPT    9   /* Operation terminated by sqlite_interrupt() */
+#define SQLITE_IOERR       10   /* Some kind of disk I/O error occurred */
+#define SQLITE_CORRUPT     11   /* The database disk image is malformed */
+#define SQLITE_NOTFOUND    12   /* (Internal Only) Table or record not found */
+#define SQLITE_FULL        13   /* Insertion failed because database is full */
+#define SQLITE_CANTOPEN    14   /* Unable to open the database file */
+#define SQLITE_PROTOCOL    15   /* Database lock protocol error */
+#define SQLITE_EMPTY       16   /* (Internal Only) Database table is empty */
+#define SQLITE_SCHEMA      17   /* The database schema changed */
+#define SQLITE_TOOBIG      18   /* Too much data for one row of a table */
+#define SQLITE_CONSTRAINT  19   /* Abort due to contraint violation */
+#define SQLITE_MISMATCH    20   /* Data type mismatch */
+#define SQLITE_MISUSE      21   /* Library used incorrectly */
+#define SQLITE_NOLFS       22   /* Uses OS features not supported on host */
+#define SQLITE_AUTH        23   /* Authorization denied */
+#define SQLITE_ROW         100  /* sqlite_step() has another row ready */
+#define SQLITE_DONE        101  /* sqlite_step() has finished executing */
+            </screen>
+            다음은 각 에러코드들에 대한 설명이다.
+            <variablelist>
+                <varlistentry>
+                    <term>SQLITE_OK</term>
+                    <listitem>
+                    <para>
+                        명령이 정상적으로 수행되었다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_INTERMAL</term>
+                    <listitem>
+                    <para>
+                        SQLite library의 내부적인 문제로 발생하는데, SQLite 라이브러리의 
+                        버그에 의해서만 발생된다고 되어 있다. 만약 이 에러가 발생했다면 
+                        SQLite mailing list에 문제를 보고하기 바란다.  
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_ERROR</term>
+                    <listitem>
+                    <para>
+                        SQL에 문제가 있을 경우 발생된다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_PERM</term>
+                    <listitem>
+                    <para>
+                        데이터페이스 파일을 열기위한 권한이 없을 경우 발생한다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_ABORT</term>
+                    <listitem>
+                    <para>
+                        콜백함수가 0이 아닌 값을 리턴했을 때 발생한다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_BUSY</term>
+                    <listitem>
+                    <para>
+                        다른 프로그램이나 쓰레드가 데이터베이스를 사용하고 있을 때 
+                        발생한다. SQLite는 하나의 데이터베이스에 동시에 두개나 그 이상의 
+                        쓰레드가 읽는 것을 허용한다. 그러나 쓰기위해서 열었을 경우에는 
+                        단지 하나만의 쓰레드만이 접근이 가능하다.  
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_NOMEM</term>
+                    <listitem>
+                    <para>
+                        malloc()에 실패했을 때 리턴한다. 
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_READONLY</term>
+                    <listitem>
+                    <para>
+                        단지 읽기만 가능한 데이터베이스(혹은 읽기 전용으로 연)
+                        파일에 쓰려고 했을 때 발생한다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_FULL</term>
+                    <listitem>
+                    <para>
+                        디스크에 더이상의 공간이 없거나 데어터베이스 파일이 너무나 클경우 
+                        발생한다.  
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>SQLITE_AUTH</term>
+                    <listitem>
+                    <para>
+                        인증에 실패했다.
+                    </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+    </section>
+    <section>
+        <title>예제 프로그램</title>
+        <para>
+            지금까지의 내용들을 이용해서 sqlite 데이터 베이스에 연결해서 
+            데이터를 가져오는 간단한 프로그램을 만들어 보도록 하겠다.
+            <screen>
+#include &lt;stdio.h&gt;
+#include &lt;sqlite.h&gt;
+
+static int callback(void *NU, int argc, char **argv, char **azColName)
+{
+    int i;
+    for (i = 0; i &lt; argc; i++)
+    {
+        printf ("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
+int main(int argc, char **argv)
+{
+    sqlite *db;
+    char *ErrMsg = 0;
+    int rc;
+
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usge : ./testsql [dbname] [query]\n");
+        exit(0);
+    }
+    db = sqlite_open(argv[1], 0, &amp;ErrMsg);
+    if (db == 0)
+    {
+        fprintf(stderr, "Cant open database ; %s\n", ErrMsg);
+        exit(0);
+    }
+    rc = sqlite_exec(db, argv[2], callback, 0, &amp;ErrMsg);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "SQL error : %d\n", ErrMsg);
+    }
+    sqlite_close(db);
+    return 0;
+}
+            </screen>
+            프로그램의 이름은 <emphasis>testsql</emphasis>로 하겠다. 다음과 같이 
+            컴파일후 테스트 해보기 바란다. 
+            <screen>
+# gcc -o testsql testsql.c -L/usr/local/lib -lsqlite
+            </screen>
+            다음은 테스트 결과다
+            <screen>
+# ./testsql test.db "select * from test"
+name = yundream
+age = 19
+
+name = hello
+age = 22
+# ./testsql test.db "insert into test values(\"kknd\", 56);"
+# ./testsql test.db "select * from test"
+name = yundream
+age = 19
+
+name = hello
+age = 22
+
+name = kknd
+age = 56
+            </screen>
+            고작 38라인 정도로 제대로 작동하는 DB 애플리케이션을 작성했다.
+        </para>
+    </section>
+</section>
+<section>
+    <title>콜백함수를 이용하지 않는 데이터 접근</title>    
+    <para>
+        sqlite_exec() 함수는 SQLite 데이터베이스로 부터 데이터를 가져오기 위한 단지 한 가지
+        방법만을 제공한다. 방법이 제한되어 있으니 이것 저것 신경스지 않고 간단하게 사용할 수 
+        있겠으나 많은 프로그래머들이 콜백함수를 이용해서 데이터를 가져오는 것에 만족하지 
+        않을 수도 있다. 이런 이유로 SQLite 2.7.7이후 버전에서는 콜백함수가 아닌 다른 방법을 
+        통해서 데이터를 가져올 수 있도록 지원함수를 추가했다.        
+    </para>
+    <para>
+        3개의 새로운 함수가 추가되었는데, sqlite_exec()의 기능을 3개로 나누어서 
+        좀더 세밀하게 제어할 수 있도록 기능을 분할 했다고 보면 된다.
+        <screen>
+typedef struct sqlite_vm sqlite_vm;      
+
+int sqlite_compile
+(
+    sqlite *db,          /* 열린 데이터 베이스 */
+    const char *zSql,    /* SQL statement to be compiled */ 
+    const char **pzTail, /* OUT: uncompiled tail of zSql */ 
+    sqlite_vm **ppVm,    /* OUT: the virtual machine to execute zQsql */ 
+    char **pzErrmsg      /* OUT: Error message */
+);
+
+int sqlite_step
+(
+    sqlite_vm *pVm,           /* The virtual machine to exeucte */
+    int *pN,                  /* OUT: Number of columns in result */ 
+    const char ***pazValue,   /* OUT: Column data */ 
+    const char ***pszColName  /* OUT: Column names and datatypes */
+);
+
+int sqlite_finalize
+(
+    sqlite_vm *pVm,        /* The virtual machine to be finalized */
+    char **pzErrMsg        /* OUT: Error message */
+);
+        </screen>
+    </para>
+</section>
+
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+		<para>
+			<ulink url="http://www.sqlite.org">sqlite 홈페이지</ulink>		
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/SQLite%20Windows">SWLite Windows</ulink>		
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/project_SQLiteDBMS">SQLiteDBMS 프로젝트</ulink>
+		</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</article>
+}}}

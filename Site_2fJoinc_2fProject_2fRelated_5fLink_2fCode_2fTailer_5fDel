@@ -1,0 +1,136 @@
+#title 조사제거하는 코드
+
+여기에서 중요한 것은 컴퓨터에서 사용되는 '''명사'''를 중심으로 단어를 제거하는 것이다. 높은 수준에서 조사를 제거하지는 않을 것이다. 
+{{{#!plain
+#include <sys/types.h>
+#include <regex.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <set>
+#include <string>
+#include <map>
+
+using namespace std;
+
+const char token[] ="<>-,()/\\\"';:{}+!@#$&*=[]%?\n ";
+
+void invertStr(char *src, char *dst)
+{
+    int len, i;
+    char b[20] = {0x00,};
+    len = strlen(src);
+    for (i = 0; i < len; i += 2)
+    {
+        dst[len-i-2] = src[i];
+        dst[len-i-1] = src[i+1];
+    }
+}
+int tailerdel(char *tr, int);
+
+const int MAXTAILNUM=7;
+char a[][MAXTAILNUM] ={"로써", "로서", "으로써", "으로서" , "은", "는",
+    "이","가","하는","하면","과","라면","에서", "해서", "\0"};
+
+set<string> tailer;
+
+int main(int argc, char **argv)
+{
+    FILE *fp;
+    char line[1024];
+    char *tr;
+    char buf[20];
+    int tlen;
+    char *pt;
+    char dst[20];
+
+    pt = *a;
+    while(pt[0] != '\0')
+    {
+        for (int i = strlen(pt)-2; i >= 0; i-=2)
+        {
+            tailer.insert(pt+i);
+        }
+        pt = pt+MAXTAILNUM;
+    }
+    fp = fopen(argv[1],"r");
+    if (fp == NULL)
+        return 1;
+    int depth;
+    while(fgets(line, 1024, fp) != NULL)
+    {
+        tr = strtok(line, token);
+        while(tr != NULL)
+        {
+            tr = strtok(NULL, token);
+            sprintf(buf, "%s", tr);
+            if (tr != NULL)
+            {
+                depth = tailerdel(tr, 0);
+                if (depth)
+                {
+                    buf[strlen(buf)-(depth*2)] = '\0';
+                    printf("====>%s %s\n", tr, buf);
+                }
+            }
+        }
+    }
+}
+
+int tailerdel(char *tr, int depth)
+{
+    set<string>::iterator si;
+    for (int i =  strlen(tr)-2*(depth) ; i >= 0; i-=2)
+    {
+        si = tailer.find(tr+i);
+        if (si != tailer.end())
+        {
+            depth++;
+            tailerdel(tr+i, depth);
+        }
+    }
+    return depth;
+}
+}}}
+
+다음은 테스트 결과다. 컴퓨터용어와 관련되어서는 그럭저럭 결과를 보여주는걸 확인할 수 있다.
+{{{#!plain
+background====>background
+프로그램과====>프로그램
+Daemon====>Daemon
+프로그램은====>프로그램
+엄연한====>엄연한
+차이가====>차이
+있다.====>있다.
+br====>br
+background====>background
+프로그램은====>프로그램
+터미널을====>터미널을
+가지지만====>가지지만
+Daemon====>Daemon
+프로그램은====>프로그램
+가지지====>가지지
+않는다.====>않는다.
+br====>br
+보통====>보통
+데몬프로그램은====>데몬프로그램
+특별한====>특별한
+일이====>일
+없는한====>없는한
+사용자와====>사용자와
+상호대화할====>상호대화할
+(null)====>(null)
+없이====>없
+아무도====>아무도
+모르게====>모르게
+telnet====>telnet
+httpd====>httpd
+mysql====>mysql
+PID====>PID
+PPID====>PPID
+PGID====>PGID
+SID====>SID
+CLS====>CLS
+PRI====>PRI
+STIME====>STIME
+}}}

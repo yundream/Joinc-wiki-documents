@@ -1,0 +1,270 @@
+#title Ajax Tutorial
+
+[[TableOfContents]]
+Ajax는 javascript 기술을 중요하게 사용하는데, javascript는 브라우저마다 지원내용이 틀리다. IE는 표준을 지키지 않는 것으로 유명한데, 이 문서는 가능한 표준을 지키도록 노력할 것이다. 모든 설명과 테스트는 firefox를 기준으로 이루어질 것이다. IE지원에 대한 내용은 시간이 남으면 다루어보도록 하겠다.
+
+== Ajax 소개 ==
+Ajax는 '''A'''synchronous '''J'''avascript '''A'''nd '''X'''ML 의 줄임말이다. 새로운 기술처럼 얘기하고 있지만 (지금까지 알아본 바로는) 특별히 새로운 기술이라고 보기는 힘든거 같다. 시스템/네트워크 프로그래머인 필자의 입장에서 보자면 '''HTML'''의 단점인 '''폼을 채워서 넘기면 결과물로 되돌려 받은 페이지를 출력하는'''문제점을 해결하기 위해서, 소켓통신을 살짝쿵 끼워 놓은 정도로 보인다.   
+
+즉 연결을 끊지 않고, 서버와 통신하면서 동적으로 정보를 전달받아서 상호작용하는 웹서비스의 설계가 가능하도록 하는 것이다. 서버와의 통신은 TCP/IP를 이용하고, 통신에 사용되는 정보는 XML을 이용한다. 즉 Ajax는 새로운 기술이라기 보다는 
+ 1. HTTP(:12) : 서버와 클라이언트가 사용하는 프로토콜 
+ 1. NetWork 응용 : 서버와 클라이언트(브라우저)간의 데이터 전달 
+ 1. Java Script : 전달된 데이터객체의 처리
+ 1. XML(:12) : 전달에 사용되는 데이터 형식 
+등 기존에 이미 나와있는 기술의 복합응용이라고 할 수 있을 거 같다. 앞에서도 언급했지만 이러한 복합응용은 기존에도 널리 사용되고 있던 것들이다. Ajax의 성과라면 표준화되어 있지 않던 이러한 기술을 정리하고 표준화 시켜서 수면위(혹은 마케팅영역)로 부상시킨 정도라고 생각하면 될거 같다. 
+
+=== Ajax가 사용되는 이유 ===
+애플리케이션을 영역별로 나눈다면, 크게 '''데스크탑 애플리케이션'''과 '''웹 에플리케이션'''으로 나눌 수 있을 것이다. 데스크탑 애플리케이션은 일반적으로 개인 PC에서 실행되며, 매우 빠르고 결과가 즉시적이다. 그러나 실행을 위해서 반드시 설치되어야 하며, 최신의 정보를 얻어내기가 힘들다라는 단점을 가진다. 상호작용 가능한 유려하고 빠른 인터페이스를 제공하는 것은 데스크탑 애플리케이션의 가장 큰 장점이라 하겠다. 
+
+웹 애플리케이션은 데스크탑 애플리케이션에 비해서 '''느리고 불편한 인터페이스를 가지고 있으며, 반응속도 역시 느리다'''라는 단점을 가지고 있다. 반면 어디에서나 간단히 서비스 받을 수 있으며, 최신의 정보를 쉽게 얻을 수 있고, 새로운 애플리케이션을 만들기가 매우 쉽다는 장점을 가진다. 특히 '''어디에서나 간단히 사용할 수 있고, 최신의 정보를 얻을 수 있다는'''장점은 여러 단점에도 불구하고 웹애플리케이션을 선호하게 되는 매우 결정적인 요인이다.
+
+네트워킹 환경이 좋아지면서 웹 애플리케이션의 장점이 점점 부각되면서, 웹 애플리케이션을 데스크탑 애플리케이션의 수준으로 올리려는 시도가 있게 되었고, 결국 Ajax가 표준적인 기술로 등장하게 된다. 
+
+이상에서 Ajax란 웹 애플리케이션과 데스크탑 애플리케이션의 간격을 줄여주기 위한 기술이라는걸 눈치챘을 것이다. Ajax 기술이 사용된 [http://docs.google.com google docs]과 [http://maps.google.com/ google map]을 사용해 보면, 확실히 그 간격이 좁혀지고 있음을 느낄 수 있을 것이다. 
+
+Ajax가 필요한 또다른 이유는 그 확장성과 개방성에 있다. 액티브엑스, 자바애플릿, 플렉스를 이용해도 Ajax가 하려고 했던것과 비슷한 일을 할 수 있다. 그러나 이들 기술은 확장이 용이하지 않고 폐쇄되어 있다는 큰 단점을 가진다. 위의 기술을 제대로 활용하기 위해서는 플렛폼이 설치되어 있어야 하거나, 다운로드 받아야 하는 등의 문제가 발생한다. PC를 바꾸기라도 하면 새로 설치해야 한다. 특정한 운영체제가 아니면 아예 작동하지 않는 경우도 발생한다.
+
+반면 Ajax는 XML과 자바스크립트의 응용으로 개방성과 뛰어난 확장성을 가진다. 기본적으로 브라우저만 있다면, 별다른 수고 없이 어떠한 PC에서라도 실행될 수 있다.
+
+실제 Ajax는 기존의 플레쉬와 액티브엑스를 위협하고 있다. 선봉장은 역시 구글이다. 구글이 Ajax에 적극적인 이유는 '사용자를 불편하게 하는 행동은 하지 않겠다'라는 구글의 철학에서 시작된다. 
+
+여러분이 국내 대형 포탈사이트에 가입을 했다고 가정해보자. 포탈 사이트의 서비스를 제대로 이용하기 위해서는 거의 10분 동안 많게는 10개 가량의 프로그램 설치와 관련된 안내문을 만나야 한다. 이들 프로그램은 무슨일을 하는지 알 수 없으며, 스파이웨어처럼 행동하는 프로그램도 있다. 심지어는 사용자의 컴퓨터를 느리게 만들기도 한다. 그렇다고 특별한 서비스도 아니다. 뉴스, 블러그, 웹메일, 커뮤니티를 위한 흔한 서비스들이다. 이러한 일이 포탈사이트에 접속 혹은 로그인 할 때마다 발생한다. 이러한 프로그램들은 모두 ActiveX 기술로 만들어졌으며, 국내 사이트는 유독 ActiveX에 대한 의존이 심한 편이다. 
+
+반면 구글은 어떤 서비스를 이용하더라도 프로그램을 다운로드 받을 필요가 없다. 로긴 한번 해주면 끝이다. 다른 사이트들도 결국은 Ajax를 이용하는 방향으로 움직일 거라고 생각된다. 
+
+=== Ajax의 단점 ===
+'''개발자가 신경써야 할게 많다''': 개발자는 Cross Browsing에 대한 지식이 필요하다. 사실 W3C(:12)의 권고안만 잘 지켜낸다면, 크게 문제되지 않을 것 같기도하다. 그러나 압도적인 IE(:12)를 사용하는 환경에서 MS의 여러가지 비표준안에 익숙한 개발자들이 많다보니 문제가 된다. 또한 Ajax를 지원하지 않은 브라우저에 대해서도 좀 더 세심한 관찰이 필요해진다. 로그인 과정을 Ajax로 해놨을 경우, w3m(:12), lynx(:12) 같은 브라우저에서는 아예 로긴조차 못하는 사태가 발생한다.
+
+'''북마킹이 어렵다''' : Ajax를 이용할 경우 새로운 페이지를 만들지 않고 정보를 출력하는게 가능해진다. 이경우 북마킹에 어려움을 느낄 수 있다. 북마크 버튼을 페이지 안에 디자인 해주면 문제를 해결할 수는 있지만, 사용자 입장에서는 좋은 방법이 아니다. 
+
+'''상업적인 문제''' : 많은 사이트들이 배너광고를 통해서 수익을 얻고 있다. 배너광고의 생명은 다양한 종류의 광고를 페이지 내용의 성격에 맞도록 노출시키는데 있다. Ajax는 페이지 리로드 과정이 생략될 수 있는데, 때문에 광고가 고정되거나 페이지의 내용에 맞지 않는 광고가 노출될 수 있다.
+
+'''보안문제''' : Ajax의 '''XMLHttpRequest'''는 GET, POST를 이용해서 데이터를 교환한다. 때문에 데이터를 누군가 가로챌 수 있다 (이 문제는 Ajax의 문제라기 보다는 TCP(:12)/IP 가 가지는 근본적인 문제라고 볼 수 있다.) 가장 최선의 방법은 SSL(:12)를 이용하는 것이다.
+
+'''검색의 어려움''' : 현재의 검색엔진에 사용되는 로봇들은 hypertext의 link를 이용해서 문서를 crawling 한다. 때문에 Ajax를 이용해서 컨텐츠를 탐색하는 사이트의 경우 검색엔진에 노출되지 않을 수도 있다. link기반의 검색도 가능하도록 페이지를 디자인 해야 할 것이다. 로봇이 더 똑똑해 지길 기다리는 방법도 있겠다.
+[[sadsense(center)]]
+== Ajax 기초 ==
+그럼 Ajax를 실제로 익혀보도록 하자. Ajax는 javascript로 제어되며, '''XMLHttpRequest'''로 모든게 시작된다. 가장 중요한 객체라고 할 수 있다.
+=== XMLHttpRequest 객체와 생성 ===
+XMLHttpRequest 객체는 이름에서 느낄 수 있듯이, XML과 HTTP 프로토콜을 이용해서 서버와 통신하는 객체이다. XMLHttpRequest 객체는 다음과 같이 생성할 수 있다. 
+{{{#!plain
+<script language="javascript" type="text/javascript">
+
+var xmlHttp = new XMLHttpRequest();
+
+</script>
+}}}
+
+일반적으로 웹에서 서버측에 결과를 요청하기 위해서는 '''POST'''방식을 이용해서 데이터를 전송하게 된다. 일반 데스크탑 애플리케이션이라면 화면은 그대로 있고, 내부적으로 데이터만 움직이겠지만 웹의 경우 페이지 자체를 이동하게 된다. 그러다보니 스크린이 깜빡되거나, 정지되거나 하는 일이 발생한다.
+
+XMLHttpRequest 객체는 데스크탑 애플리케이션의 그것처럼, 화면(페이지)자체를 전환하지 않고 내부적으로 데이터만 전송하며, 이것은 클라이언트가 눈치 채지 못하게 이루어진다. 그래서 화면이 리프레쉬 혹은 정지되거나 하는 일 없이, 마치 데스크탑 애플리케이션을 사용하는 것처럼, 요청과 응답이 이루어진다. 웹과 데스크탑 모두의 장점을 가진 웹 애플리케이션이 만들어지는 것이다.
+
+일단 XMLHttpRequest를 제어하게 되었다면, 나머지는 일반적인 javascript기술이다. javascript를 이용해서 응답값을 특정 form에 출력하거나, table을 제어하는 등의 일을 하게 된다.
+
+예를 들어 사용자의 정보를 입력받는 폼으로 부터 입력값을 얻어오길 원한다면, 아래와 같이 하면 된다.
+{{{#!plain
+var name = document.getElementById("name").value;
+var addr = document.getElementById("addr").value;
+}}}
+
+=== Ajax에서의 요청과 응답 ===
+Ajax는 웹에서 사용하는 요청과 응답과는 차이가 많으며, 일반적인 C/S 프로그램에서 사용되는 네트워크 통신과 비슷한 측면이 있다. 이것을 단지 javascript를 통해서 제어한다는 차이가 있을 뿐이다. (물론 내부적으론 다른 차이들이 있겠지만, 우선은 이렇게 이해하자)
+
+앞에서 '''XMLHttpRequest'''객체를 생성하는 방법을 알아봤으니, 실제 요청과 응답이 어떻게 이루어지는 지에 대해서 알아보도록 하자. 요청과 응답을 확인하기 위해서 다음과 같은 페이지를 준비하도록 하겠다. 
+{{{#!plain
+<html>
+	<body>
+		<input type=text name=a size=4> + <input type=text name=b size=4> = 
+		<input type=text name=result size=5> 
+	</body>
+</html>
+}}}
+==== 요청보내기 ====
+ 1. 먼저 서버에 연결을 해야한다. 연결을 위해서 '''open''' 메서드를 사용한다. 
+ 1. Ajax는 콜백함수를 이용해서 비동기 통신을 한다. '''onreadystatechange'''에 콜백함수를 등록한다. 
+ 1. 마지막으로 '''send'''메서드를 이용해서 요청을 보낸다.
+ 1. 요청을 받은 서버로 부터 응답이 오면, 등록된 콜백함수(:12)가 호출되어서 응답을 처리하게 된다.
+{{{#!plain
+function Request()
+{
+	var a = document.getElementByld("a").value;
+	var b = document.getElementByld("b").value;
+	if ((a == null) || (b == null)) return;
+
+	var url = "ajaxsum.php?a="+escape(a)+"&b="+escape(b);
+
+	// 서버에 연결한다.
+	xmlHttp.open("GET", url, true);
+
+	// 콜백함수의 등록
+	xmlHttp.onreadystatechange = updatePage;
+
+	// 요청을 보낸다.
+	xmlHttp.send(null);
+}
+}}}
+==== 요청처리 ====
+이제 요청처리를 위한 '''updatePage'''콜백함수에 대해서 알아보자.
+{{{#!plain
+function updatePage ()
+{
+    if(xmlHttp.readyState == 4)
+    {
+        if (xmlHttp.status == 200)
+        {
+            var response = xmlHttp.responseText;
+            document.getElementById("result").value = response;
+        }
+				else if (xmlHttp.status == 404)
+				{
+						alert("Page Not Found");
+				}
+        else
+        {
+            alert("Server Error!");
+        }
+    }
+}
+}}}
+모든 제대로된 애플리케이션이 그렇듯이 Ajax에서도 역시 발생할지 모르는 에러를 처리하기 위한 방법을 가지고 있다.
+
+'''readyState'''를 이용해서 서버의 진행상태를 알 수 있다. readyState가 4라면 모든 작업이 끝났음을 의미한다.
+
+'''status'''를 이용해서 서버의 상태를 알 수 있다. 사용되는 코드는 HTTP의 상태들을 나타내는 코드다. '''200'''이라면 정상처리, '''404'''라면 페이지 존재하지 않음의 상태를 나타낸다.
+
+'''responseText'''를 이용해서 읽어들인 데이터를 얻어올 수 있다.
+
+==== 실 테스트 ====
+다음은 Ajax를 이용해서 덧셈 계산결과를 보여주는 완전한 코드다.
+{{{#!plain
+<html>
+<head>
+<script language="JavaScript" type="text/javascript">
+var xmlHttp=false;
+try
+{
+    xmlHttp = new XMLHttpRequest();
+} catch (failed)
+{
+    xmlHttp = false;
+}
+
+if (!xmlHttp)
+{
+    alert("Error initializing XMLHttpRequest!");
+    exit;
+}
+
+function Request()
+{
+    var a = document.getElementById("a").value;
+    var b = document.getElementById("b").value;
+
+    if ((a == null) || (b == null)) return;
+
+    var url = "/ajaxsum.php?a="+escape(a)+"&b="+escape(b);
+
+    xmlHttp.open("GET", url, true);
+    xmlHttp.onreadystatechange = updatePage;
+
+    xmlHttp.send(null);
+}
+
+function updatePage()
+{
+    if(xmlHttp.readyState == 4)
+    {
+        if (xmlHttp.status == 200)
+        {
+            var response = xmlHttp.responseText;
+            document.getElementById("result").value = response;
+        }
+        else if (xmlHttp.status == 404)
+        {
+            alert("Page Not Found");
+        }
+        else
+        {
+            alert("Server Error!");
+        }
+    }
+}
+</script>
+</head>
+    <body>
+        <form>
+        <input type=text id=a name=a size=4> + <input type=text id=b name=b size=4> =
+        <input type=text id=result name=result size=5>
+        <!--<a href="" onClick=Request(this)>Test</a>-->
+        <input type=button onclick=Request(this) value=Test>
+        </form>
+    </body>
+</html>
+}}}
+
+
+다음은 서버측 프로그램으로 php(:12)로 작성되었다. 아주 간단하다
+{{{#!plain
+echo $a + $b;
+}}}
+
+필자의 사이트에 적용된 예다.
+{{{#!html
+<script type="text/javascript" src="http://www.joinc.co.kr/ajax/ajax.js"></script>
+        <form>
+        <input type=text id=a name=a size=4> + <input type=text id=b name=b size=4> = 
+        <input type=text id=result name=result size=5> 
+        <!--<a href="" onClick=Request(this)>Test</a>-->
+        <input type=button onclick=Request(this) value=Test>
+        </form>
+
+}}}
+=== 브라우저 호환성 ===
+비동기 통신을 위한 Ajax 객체를 생성시키는 방법은 IE(:12) Firefox(:12)가 서로 다르다. 그러므로 Ajax 응용을 만들때는 각 브라우저에 맞는 Ajax 실행방법을 선택할 수 있도록 장치를 마련해두어야 한다. 다음과 같이 간단하게, 브라우저간 호환가능한 코드를 작성할 수 있다.
+{{{#!plain
+var xmlHttp=false;
+if (window.XMLHttpRequest)
+{
+  xmlHttp = new XMLHttpRequest();
+}
+else if (window.ActiveXObject)
+{
+  xmlHttp = new ActiveXObject("Microsoft.XMLHTTP");
+}
+
+if (!xmlHttp)
+{
+  alert("Error initializing XMLHttpRequest!");
+  exit;
+}
+}}}
+
+
+=== XMLHttpRequest  IDL ===
+XMLHttpRequest객체를 Interface Definition Language 형식으로 나타내보았다.
+{{{#!plain
+interface XMLHttpRequest {
+           attribute EventListener   onreadystatechange;
+  readonly attribute unsigned short  readyState;
+  void               open(in DOMString method, in DOMString url);
+  void               open(in DOMString method, in DOMString url, in boolean async);
+  void               open(in DOMString method, in DOMString url, in boolean async, in DOMString user);
+  void               open(in DOMString method, in DOMString url, in boolean async, in DOMString user, in DOMString password);
+  void               setRequestHeader(in DOMString header, in DOMString value);
+  void               send();
+  void               send(in DOMString data);
+  void               send(in Document data);
+  void               abort();
+  DOMString          getAllResponseHeaders();
+  DOMString          getResponseHeader(in DOMString header);
+  readonly attribute DOMString       responseText;
+  readonly attribute Document        responseXML;
+  readonly attribute unsigned short  status;
+  readonly attribute DOMString       statusText;
+};
+}}}
+ <!> 자세한 내용은 [http://www.w3.org/TR/XMLHttpRequest w3c XMLHttpRequest 문서] 를 참고하기 바란다.
+
+'''이 문서가 도움이 되었나요 ?'''
+
+[[Vote(아주 많이 35, 많이 14, 그럭저럭 7, 별로 4, 전혀 24)]]

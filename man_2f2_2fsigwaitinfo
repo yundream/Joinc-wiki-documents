@@ -1,0 +1,354 @@
+#title linux man page : sigwaitinfo - 대기열의 시그널을 기다린다.
+[wiki:docbook/sigwaitinfo(2) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>sigwaitinfo(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. sigwaitinfo(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN19"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN22"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN40"
+>예제</A
+></DT
+><DT
+>1.6&#51208;. <A
+HREF="#AEN47"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	대기열의 시그널(:12)을 동기적으로 기다린다.  </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+
+int sigwaitinfo(const sigset_t *set, siginfo_t *info);
+int sigtimedwait(const  sigset_t  *set,  siginfo_t  *info,
+                 const struct timespec timeout);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		sigwaitinfo()는 시그널 셋<B
+CLASS="EMPHASIS"
+>set</B
+>에 설정된 
+		시그널중 하나가 전달될 때까지 대기한다. 설정된 시그널 중 하나가
+		전달되면 즉시 리턴한다. 만약 <B
+CLASS="EMPHASIS"
+>info</B
+>가 NULL이 
+		아니라면 시그널 관련 정보를 채워준다.     
+	</P
+><P
+>		sigtimedwait()는 <B
+CLASS="EMPHASIS"
+>timeout</B
+>만큼 신호를 기다리다가 
+		신호가 없을 경우 리턴한다는 걸 제외하고는 sigwaitinfo()와 동일하다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct timespec 
+{
+    long    tv_sec;         /* seconds */
+    long    tv_nsec;        /* nanoseconds */
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		다음은 <B
+CLASS="EMPHASIS"
+>info</B
+>구조체에 정의된 멤버 변수들이다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct siginfo {
+   int si_signo;     /* Signal number */
+   int si_errno;     /* Error code */
+   int si_code;                                                    
+   pid_t si_pid;
+   uid_t si_uid;
+   void *si_addr;
+   union sigval si_value;
+   union {                                                        
+      /* Skipping other fields */
+      struct {
+         int _band;  /* Socket event flags (similar to poll) */   
+         int _fd;    /* Socket fd where event occurred */          
+      } _sigpoll;                                      
+   } _sifields;                                        
+}  siginfo_t;                                        
+                                                          
+#define si_fd     _sifields._sigpoll._fd                  
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할 경우 sigwaitinfo(), sigtimedwait()모두 시그널 번호를 리턴한다.
+		실패했을 경우 -1을 리턴한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EAGIN</DT
+><DD
+><P
+>	
+					sigtimedwait()에서 <B
+CLASS="EMPHASIS"
+>timeout</B
+>동안 
+					아무런 신호가 전달되지 않았을 ㅕㅇ우	
+				</P
+></DD
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>timeout</B
+>가 잘못 설정되었다.
+				</P
+></DD
+><DT
+>EINTR</DT
+><DD
+><P
+>	
+					시그널:::핸들러(:12)에 의해서 인터럽트가 걸렸다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+
+int main()
+{
+    struct sigaction sigact;
+    siginfo_t info;
+    int signo;
+    printf("My pid %d\n", getpid());
+    sigemptyset(&#38;sigact.sa_mask);
+    sigaddset(&#38;sigact.sa_mask, SIGUSR2);
+    while(1)
+    {
+        signo = sigwaitinfo(&#38;sigact.sa_mask, &#38;info);
+        printf("%d : %d\n", signo, info.si_pid);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위 프로그램은 <B
+CLASS="EMPHASIS"
+>SIGUSR2</B
+>가 전달되는걸 기다린다. 
+		만약 SIGUSR2 시그널을 받는다면 시그널을 전달한 프로세스(:12)의 PID(:12)를 
+		출력한다.
+	</P
+><P
+>		아래 프로그램은 위의 예제를 테스트 하기 위한 프로그램이다. 인자로 SIGUSR2 시그널을 받을 PID를 지정한다. 시그널을 받은 프로그램 측에서 시그널을 보낸 프로세스의 PID를 얻어오는지 확인해 보도록 하자. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    int pid = atoi(argv[1]);
+    printf("%d\n", getpid());
+    while(1)
+    {
+        kill(pid, SIGUSR2);
+        sleep(1);
+        printf("OK SIG\n");
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN47"
+>1.6&#51208;. 참고문헌</A
+></H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Network_Programing/AdvancedComm/RTS1"
+TARGET="_top"
+>RTS 개요</A
+>
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

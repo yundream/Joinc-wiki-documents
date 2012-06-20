@@ -1,0 +1,35 @@
+#title win api : GetQueuedCompletionStatus - IOCP로 부터 입출력 완료를 기다린다.
+
+== GetQueuedCompletionStatus ==
+IOCP의 '''입출력 완료 대기열'''로 부터 입출력 완료를 기다린다. 만약 대기열에 완료가 없다면, 이 함수는 대기열에 입출력 완료가 있을 때까지 대기한다.
+
+{{{#!plain
+BOOL WINAPI GetQueuedCompletionStatus(
+  __in   HANDLE CompletionPort,
+  __out  LPDWORD lpNumberOfBytes,
+  __out  PULONG_PTR lpCompletionKey,
+  __out  LPOVERLAPPED *lpOverlapped,
+  __in   DWORD dwMilliseconds
+);
+}}}
+
+=== 매개 변수 ===
+  * CompletionPort
+     CP는 CreateIoCompletionPort(:12) 함수로 만든 CP 핸들.
+  * lpNumberOfBytes
+     입출력 완료 연산의 결과로 전송된 데이터의 크기.
+  * lpCompletionKey
+  * lpOverlapped
+     중첩 연산의 정보를 가지고 있는 OVERLAPPED 구조체를 가리키는 포인터.
+  * dwMilliseconds
+     입출력 완료 대기열에서 기다리는 시간. dwMilliseconds 시간동안 완료 보고가 없으면 FALSE를 반환한다. 시간을 초과한 경우 lpOverlapped는 NULL을 반환한다.
+     만약 '''INFINITE'''를 지정하면 완료 보고가 있을 때까지 영원히 기다린다.
+
+=== 반환 값 ===
+성공하면 0, 실패하면 0이 아닌 값을 반환 한다. 
+
+=== 설명 ===
+이 함수는 워커 스레드에서 CP에서 완료 보고를 기다리기 위해서 사용한다.
+
+=== 예제 ===
+[wiki:Site/win_network_prog/doc/iocp IOCP 프로그래밍 참고]

@@ -1,0 +1,626 @@
+#title lucene 쿼리및 검색 분석
+[[TableOfContents]]
+[[UploadFile]]
+
+== TodoList ==
+ 1. 대략의 소스흐름은 이해했다고 생각됨으로, 순수 프로시져 코드로 나타낸다.
+ 1. 필요할 경우 이미지화 한다. 
+ 1. 수식이 의미하는 바를 명확히 한다.
+ 1. 용어 정리
+    * field, term
+    * did,
+
+== 소개 ==
+이 문서는 완성단계의 문서가 아니다. lucene 구문분석과 lucene searcher의 분석을 위한 메모장 형식의 문서다. 언젠가는 정리된 문서가 되겠지만 지금은 아니다. 정리되기 전까지는 읽기 쉽지 않을 것이다. 
+
+== 구문분석 ==
+Search 는 사용자의 QueryString를 분석하는데에서 부터 시작한다. 그러므로 우선 Lucene와 Nutch의 구문분석에 대해서 알아보도록 하겠다.
+=== Nutch 구문분석 ===
+구문분석은 lucene에서 지원하고 있으며, Nutch는 가장 단순한 형태의 (거의 테스트용) 구문분석기만 지원하고 있을 뿐으로, 검색시스템 운용을 위해서는 lucene 구문분석 엔진을 사용할 필요가 있다.
+
+다음은 Nutch에서 지원하는 구문분석이다. 
+ || Type			|| 예							|| 구분			|| 설명														||
+ || Term			|| apache tcl			||					|| 문장검색 추가 									||
+ || '+', '-' 	|| apache -tcl 		|| 0				||																||
+ || 문장			|| "apache tcl" 	|| X				||																||
+ || AND, OR		|| apache AND tcl	|| X				|| Term 방식으로 처리							||
+ || *, ?			|| te*ris					|| X				|| Term 방식처리(te ris)					||
+ || ^					|| apache^4.0			|| X				|| Term 처리, white space로 치환	||
+ || Field			|| content:tcl		|| X				|| Term 처리, white space로 치환	||
+ || Fuzzy			|| tcl~						|| X				|| white space로 치환							||
+ || Grouping	|| 								|| X				||																||
+ || Range			|| aa to bb				|| X				|| Term 처리											||
+
+Nutch의 구문분석이 심플한 이유는 당연하다. 쿼리문자열을 파싱해서 검색하는 일은 Lucene가 전문적으로 맡고 있기 때문으로 Nutch에서는 Web UI를 통해서 운용가능한 수준에서의 최소한의 기능만을 제공하고 있다.  
+
+한마디로 말하자면 엔진자체가 없으므로 볼필요가 없다.
+
+=== Lucene Query 구문분석 엔진 ===
+==== 자료구조 ====
+C 스타일로 정리해 보았다. Lucene.QueryParser에 직접 쿼리를 만들어서 디버깅 하는게 자료구조를 확인하는 가장 확실한 방법같다. org.apache.lucene.queryParser에 준비된 main함수로 자료구조를 확인했다.
+{{{#!plain
+struct Query
+{
+	float boost;
+	struct clause clauses; 
+};
+
+struct clauses
+{
+	struct elementList;
+};
+
+struct elementList
+{
+  float boost;               // default boost
+	struct clauses;            // Grouping Query 
+	vector<struct Element>;
+};
+
+struct Element
+{
+	int Type{SHOULD, MUST, MUSTNOT};
+	int query{Wildcardquery, Temquery, RangeQuery} 
+	flost boost; 
+	vector<{field, text}> Terms;
+
+	struct elementList;       // PharaseQuery 
+};
+}}}
+
+트리로 표현해보면 다음과 같은 구조를 가진다.
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses ---+--- elementList ---+-- Element1 --+-- TYPE
+                                              |              |
+                                              |              +-- boost
+                                              |              |
+                                              |              +--- Term1 {field, Term}
+                                              |
+                                              +-- Element2 --+-- TYPE
+                                                             |
+                                                             +-- boost
+                                                             |
+                                                             +--- Term2 {field, Term}
+}}}
+
+ * 예 : '''tcl AND -ap*che'''
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses ---+--- elementList ---+-- Element1 --+-- TYPE {MUST} {Termquery}
+                                              |              |
+                                              |              +-- boost {1.0}
+                                              |              |
+                                              |              +--- Term1 {"field", "tcl"}
+                                              |
+                                              +-- Element2 --+-- TYPE {MUSTNOT} {Whldcardquery}
+                                                             |
+                                                             +-- boost {1.0}
+                                                             |
+                                                             +--- Term2 {"field", "ap*che"}
+}}}
+
+그룹 검색을 할경우  '''elementList.causes'''를 확장 시키면 된다.
+ * 예 : '''tcl AND (linux OR -ap*che)'''
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses ---+--- elementList ---+-- Element1 --+-- TYPE {MUST} {Termquery}
+                                              |              |
+                                              |              +-- boost {1.0}
+                                              |              |
+                                              |              +--- Term1 {"field", "tcl"}
+                                              |
+                                              +-- clauses --+
+                                                            |
+     +------------------------------------------------------+
+     |
+     +-- elementList --+--- Element1 --+-- TYPE{SHOULD} {Termquery} 
+                      |               |
+                      |               +-- boost {1.0} 
+                      |               |
+                      |               +-- Term1 {"field", "linux"}
+                      |
+                      +--- Element1 --+-- TYPE{SHOULD} {Wildcardquery}  
+                                      |
+                                      +-- boost {1.0} 
+                                      |
+                                      +-- Term1 {"field", "linux"}
+}}}
+
+ * 예 : "{apache TO tcl} tcl AND ap*che" (RangeQuery)  
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses ---+--- elementList ---+-- Element1 --+-- TYPE {MUST} {RangeQuery}
+                                              |              |
+                                              |              +-- boost {1.0}
+                                              |              |
+                                              |              +--- lowerTerm {"field", "apache"}
+                                              |              |
+                                              |              +--- upperTerm {"field", "tcl"} 
+                                              | 
+                                              +-- Element2 --+-- TYPE {MUST} {Whldcardquery}
+                                                             |
+                                                             +-- boost {1.0}
+                                                             |
+                                                             +--- Term2 {"field", "ap*che"}
+}}}
+ 
+ * 예 : "tcl AND apache~" {fuzzyquery} 
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses ---+--- elementList ---+-- Element1 --+-- TYPE {SHOULD} {RangeQuery}
+                                              |              |
+                                              |              +-- boost {1.0}
+                                              |              |
+                                              |              +-- Term {"field", "tcl"}
+                                              | 
+                                              +-- Element2 --+-- TYPE {MUST} {fuzzyquery}
+                                                             |
+                                                             +-- minimumSimilarity {0.5}
+                                                             |
+                                                             +-- boost {1.0}
+                                                             |
+                                                             +--- Term {"field", "apche"}
+
+
+}}}
+
+ * 복잡한 쿼리라고 하더라도, 위에 제시된 구문트리 구성방식을 이해한다면 결과를 쉽게 예측할 수 있을 것이다.
+ * 예 : "title:apache (content:tcl^4.0 AND -content:apache AND title{1999 TO 2006}^4.0) AND tcl^3.0 (\"hello world\" -cra*) NOT tcl tcl"
+ * 명확한 구분분석 룰을 확인하려면 구문분석을 위해 사용된 JavaCC에 적용된 룰파일을 참조해야 할 것이다. 
+{{{#!plain
+  Query -+--- boost
+         |
+         +---- clauses --+-- elementList(6)-+-- Element1 --+-- TYPE {SHOULD} {TermQuery}
+                                            |              |
+                                            |              +-- boost {1.0}
+                                            |              |
+                                            |              +-- Term {"title", "apachle"}
+                                            | 
+                                            +-- Element2 --+-- TYPE {MUST} {BooleanQuery}
+                                            |              |
+                                            |              +-- minimumSimilarity {0.5}
+                                            |              |
+                                            |              +-- boost {1.0}
+                                            |              |
+                                            |              +--- causes --+-- Element1 --+-- TYPE {MUST} {TermQuery}  
+                                            |                            |              | 
+                                            |                            |              +-- boost {4.0}
+                                            |                            |              | 
+                                            |                            |              +-- Term {"content","tcl"}
+                                            |                            |
+                                            |                            +-- Element2 --+-- TYPE {MUSTNOT} {TermQuery}  
+                                            |                            |              | 
+                                            |                            |              +-- boost {1.0}
+                                            |                            |              |
+                                            |                            |              +-- Term {"content","windows"} 
+                                            |                            |
+                                            |                            +-- Element3 --+-- TYPE {MUST} {RangeQuery}  
+                                            |                                           | 
+                                            |                                           +-- boost {4.0}
+                                            |                                           |
+                                            |                                           +-- TopTerm {"title","1999"} 
+                                            |                                           |
+                                            |                                           +-- BooTerm {"title","2006"} 
+                                            |
+                                            +-- Element3 --+-- TYPE {MUST} {TermQuery}
+                                            |              |
+                                            |              +-- boost {3.0}
+                                            |              |
+                                            |              +-- Term {"field", "tcl"}
+                                            |
+                                            +-- Element4 --+-- TYPE {SHOULD} {BooleanQuery}
+                                            |              |
+                                            |              +-- boost {1.0}
+                                            |              |
+                                            |              +--- causes --+-- Element1 --+-- TYPE {SHOULD} {TermQuery}  
+                                            |                            |              | 
+                                            |                            |              +-- boost {1.0}
+                                            |                            |              |
+                                            |                            |              +-- slop {0}
+                                            |                            |              |
+                                            |                            |              +-- Term {"field","hello"}
+                                            |                            |              |
+                                            |                            |              +-- Term {"field","world"}
+                                            |                            |
+                                            |                            +-- Element2 --+-- TYPE {MUSTNOT} {PrefixQuery}  
+                                            |                                           | 
+                                            |                                           +-- boost {1.0}
+                                            |                                           |
+                                            |                                           +-- Term {"field","cra"}
+                                            |
+                                            +-- Element5 --+-- TYPE {MUSTNOT} {TermQuery}
+                                            |              |
+                                            |              +-- boost {1.0}
+                                            |              |
+                                            |              +-- Term {"field", "tcl"}
+                                            |
+                                            +-- Element6 --+-- TYPE {SHOULD} {TermQuery}
+                                                           |
+                                                           +-- boost {1.0}
+                                                           |
+                                                           +-- Term {"field", "tcl"}
+}}}
+ <!> boolean 이 생략될 경우 각 그룹의 첫번째 등장하는 Term은 '''SHOULD'''로 체크된다. 
+ <!> '''AND'''가 명시되지 않는한 모두 '''SHOULD'''로 체크된다.
+ <!> QueryParser는 파서로써의 일만한다. 중복 Term체크는 하지 않는다. 
+ <!> 기본 boost 값은 1로 설정된다. 
+ <!> 문장검색의 경우 slop는 0 (DEFAULT_PARASE_SLOP)으로 설정되며, QueryParser.setPhraseSlop()로 설정할 수 있다.
+
+자료구조를 이해하기 쉽도록 도식화 해보았다.
+attachment:QueryParser.gif
+
+다음은 실제 입력된 QueryString이 어떠한 자료구조를 가지는지에 대한 예이다. 
+attachment:QueryParserSample.gif
+
+결국 '''clauses'''가 node가 되고 '''term'''이 value가 되는 전형적인 구문스택트리의 자료구조를 가지고 있음을 알 수 있다. JavaCC(:12)를 통해서 구현되었음으로 당연한 결과라고 할 수 있다. 
+attachment:QueryTree.gif
+
+clauses는 하나 이상의 Term과 하나이상의 grouping query나 range query가 사용되고 있을 경우, clauses로 보고 노드를 확장시킨다. 
+
+
+==== Lucene QueryParser ====
+Lucene QueryParser는 JavaCC로 만들어졌다. 관련된 내용은 https://javacc.dev.jsva.net 을 참고하기 바란다. 정규표현(:12) lex(:12), yacc(:12)도 참고할만 하니, 관심있으면 확인해 보기 바란다. 
+
+
+== Lucene Searcher ==
+ * Lucene QueryParser에 의해서 구문분석결과를 가지고 있는 '''Query'''객체가 생성된다.
+ * 이 '''Query''' 객체가 Lucene Searcher에 전달되어서 검색작업을 한다.
+
+=== 디버깅 환경 설정 ===
+엔진의 분석은 소스코드의 분석과 함께 분석된 내용이 실제 어떻게 구현이 되는지를 확인하기 위한 디버깅 과정을 병행하는게 가장 좋은 방법이라 생각된다.  그래서 nutch-hadoop-lucene 기반에서 디버깅 환경을 만들어 보기로 했다.
+
+nutch crawling를 이용해서 수집된 http://tcl.apache.org 의 문서를 디버깅을 위해서 사용할 것이다. nutch를 이용했기 때문에 수집된 문서는 hadoop를 통해서 분산파일시스템에 저장되어 있을 것이다.  
+
+디버깅에 사용할 테스트 코드는 org.apache.lucene.queryParser의 main 함수를 이용하기로 했다. 검색을 하기 위해서는 QueryString의 구문분석이 끝난 '''Query''' 객체를 search에 넘겨줘야 하기 때문이다.
+{{{#!plain
+public static void main(String[] args) throws Exception {
+    if (args.length == 0) {
+      System.out.println("Usage: java org.apache.lucene.queryParser.QueryParser <input>");
+      System.exit(0);
+    }
+    QueryParser qp = new QueryParser("content",
+                           new org.apache.lucene.analysis.SimpleAnalyzer());
+    Query q = qp.parse(args[0]);
+
+    IndexSearcher searcher = new IndexSearcher("/usr/apache/index");
+    Hits hits = searcher.search(q);
+    System.out.println(q.toString("field"));
+}
+}}}
+
+lucene에서 지원하는 검색중 IndexSearcher를 이용할 것인데, 색인이 들어있는 로컬파일 시스템의 경로를 지정해 줘야 한다. 현재는 hadoop를 이용해서 분산파일시스템에 저장되어 있음으로 '''hadoop dfs'''를 이용해서 로컬 파일시스템으로 dump시켜줘야 한다. 
+{{{#!plain
+# ./hadoop dfs -copyToLocal apache /usr/apache
+}}}
+
+이제 eclipse(:12)의 디버깅 기능을 이용해서 검색이 제대로 이루어져서 Hits객체가 리턴되는지를 확인한다. 확인이 되었다면, 이제 searcher.search를 파고들어가면서 분석을 하면 된다.  
+
+attachment:debug.gif
+
+=== IndexSearcher ===
+==== 문서 scoreing ====
+lucene는 핵심 기능을 Plugin 형태로 적재할 수 있도록 되어 있으며, Search 엔진역시 마찬가지다. lucene에서 제공하는 몇가지 기본 검색모듈중 IndexSearcher을 가장 일반적으로 사용할 수 있다. 
+
+색인은 이미 만들어져 있기 때문에, 검색을 단순히 해당 단어를 포함하는 문서만을 찾는 행위로 한정지은다면 Searcher가 하는일은 많지 않다고 볼 수 있다. 그러나 단지 단어를 포함하는 문서만을 출력하는 정도로는 고객이 원하는 수준의 검색결과를 보여줄 수 없다. 그래서 문서 랭킹개념을 도입해서, 높은 랭킹의 문서를 우선적으로 보여주는 방식을 사용하게 된다.
+
+문서의 랭킹에 있어서 가장 중요한 사항이 Term Weighting 이다. 단어의 가중치라고 생각할 수 있는데, 아래의 대전제에서 시작하게 된다.
+ 1. 한 문서에서 자주 출현하는 단어는 그 문서를 대표한다. Term Frequency == '''tf'''
+ 1. 여러문서에 걸쳐서 자주 출현하는 단어는 범용적인 단어로 중요도가 떨어진다고 할 수 있다. Inverted Document Frequency == '''idf'''
+어떤 문서에 Linux란 단어가 많이 출현한다면, Linux는 그 문서를 대표하는 키워드로 사용자가 '''Linux'''라는 키워드로 검색했을 때, '''더 보여줄만한''' 문서라고 정의 내릴 수 있을 것이다.
+
+달리 생각해서 10개의 문서중 9개의 문서에서 Linux라는 단어가 빈번하게 출현한다면, 문서군에서 Linux라는 단어가 차지하는 비중은 상대적으로 떨어질 것이다.   
+
+다음은 lucene Searcher에서 문서의 중요도를 검사하기 위해서 사용하는 공식이다.
+
+attachment:score.jpg
+attachment:squareweights.jpg
+
+상당히 다양한 요소들이 문서의 중요도를 계산하기 위해서 사용되고 있는데, 핵심은 '''idf'''와 '''tf'''이다. 이 두개의 요소는 단어의 '''가중치'''를 계산하기 위해서 사용된다. 가중치는 '''1. 단어가 해당문서에서 얼마나 자주 출현하는지 2. 얼마나 많은 문서에서 해당 단어가 출현하는지'''로 결정한다. 단어의 가중치는 tf와 idf를 곱해주면 된다. 나머지 계산 요소들은 '''정규화'''를 위해서 사용된다. 
+
+attachment:weight.jpg
+attachment:weight2.jpg
+
+위의 공식은 가장 일반적인 공식으로, 많은 경우 tf와 idf만을 가지고도 문서의 중요도(랭킹)를 계산하는데 큰 무리는 없을 것이다. 그러나 문서의 종류가 다양해짐으로써 위의 방법만으로는 랭킹을 정하기에는 부족한 경우가 생기고 있다. blog(:12)와 도서관, 신문, 웹문서등 검색하고자 하는 문서의 특징에 따라서 랭킹계산하는 방식도 차이가 생길 수 밖에 없다. 위에서 언급된 lucene의 랭킹공식역시 기본공식을 뜯어고쳐서 사용하고 있음을 알 수 있다.  
+
+진보된 랭킹 공식으로 아래와 같은 것들이 있다.
+ 1. vector:::Space:::model(:12)
+ 1. P-Norm 모델 (확장 불리언 모델)
+
+==== boost ====
+term의 가중치를 결정하기 위해서 사용한다. '''apache'''라는 단어는 content, url, title, anchor등에서 출현할 수 있을 것이다. 그렇다면 아무래도 title에 apache가 출현했을 경우 이 문서가 찾고자하는 문서일 확률이 높다. 반대로 content(본문)에 출현했을 경우에는 아무래도 중요가도 떨어질 수 있을 것이다. boost는 이러한 가중치의 결정을 위해서 사용한다. 기본 boost값은 1.0이며 setBoost 메서드를 통해서 결정해줄 수 있다. 필드별 기본 boost값은 아래와 같다.   
+
+==== QueryNorm ====
+쿼리의 Term Weight를  정규화하기 위해서 사용한다.
+
+attachment:querynorm.jpg
+
+가정 
+ 1. 100,000개의 문서셋이 준비되어 있다.
+ 1. Query는 5개의 Term을 포함하고 있다.
+
+그렇다면 idf는 0.1에서 9정도의 범위를 가질 것이다. 5개의 Term이므로 SumOfSquaredWeights는 0.5에서 45까지의 범위를 가진다.
+
+다음은 '''SumOfSquaredWeights'''가 0.5에서 45까지 증가할때 queryNorm의 변화를 나타낸 그래프다. 
+
+attachment:querynorm.gif
+
+
+==== lengthNorm ====
+lucene 검색은 field:term 검색이다. 문서가 있으면 문서를 contnet, url, anchor, title등의 필드로 구분을 해서 각각의 필드에 대해서 term검색을 하는 방식이다. 그렇다면 각 필드에 대한 정규화작업이 필요하게 된다.      
+
+예를들어서 title에 '''linux'''문자를 포함한 문서를 검색 한 결과 아래와 같은 타이틀을 가지는 2개의 문서가 발견되었다고 가정해보자. - '''title:linux'''라는 쿼리를 사용했을 것이다. -
+ 1. Linux 운영체제
+ 1. Linux에서의 Apache Tomcat서버 설치와 운용
+1번 문서가 유사도가 더 높은 문서라는건 의심할 필요가 없다. 일반적으로 해당필드에 토큰의 갯수가 많아질 수록 쿼리에 대한 문서의 유사도는 떨어지게 된다. lengthNorm 필드내의 토큰들의 갯수(length)를 이용해서 정규화(Norm)한 값이다. lucence는 lengthNorm을 구하기 위해서 아래와 같은 공식을 사용한다. lengthNorm공식은 field의 종류에 따라서 약간씩 달라진다.
+
+attachment:lengthnorm.gif
+
+다음은 DocScore를 0.5로 했때, token의 증가에 따른 LengthNorm의 변화다. 
+
+attachment:scorenorm.png
+
+content의 경우 문서에 토큰이 1000개가 넘어가기 전까지는 정규값에 변화가 없음을 알 수 있다. 위의 그래프는 gnuplot(:12)를 통해서 작성되었으며, gnuplot를 위한 데이터는 아래의 코드를 이용해서 만들었다.
+{{{#!plain
+#include <stdio.h>
+#include <math.h>
+
+int max(int a, int b)
+{
+  if (a > b)
+    return a;
+  else return b;
+}
+
+int main(int argc, char **argv)
+{
+  float result;
+  int i = 0;
+  double docscore = 0.5;
+
+  for(i = 1; i < 2000; i++)
+  {
+    printf("%lu %lf\n",i, sqrt(docscore)/log(2.71828182 + (double)i));
+  }
+
+  for(i = 1; i < 2000; i++)
+  {
+    printf("%lu %lf\n",i, sqrt(docscore)/sqrt((double)max(i, 1000)));
+  }
+
+  for(i = 1; i < 2000; i++)
+  {
+    printf("%lu %lf\n",i, sqrt(docscore)/sqrt((double)i));
+  }
+}
+}}}
+
+
+==== Coord ====
+말그대로 coordinator 다. 값을 평준화 시키기 위해서 사용한다. 예를 들어 score의 값이 0.0000000001 수준에서 변한다면, 의미있는 값을 만들어내기가 힘들 것이다. 이경우 적절한 값을 곱해준다. 기본으로 주어지는 값은 1.0이다. 
+
+==== tf ====
+{{{#!plain
+public float tf(int freq)
+}}}
+'''tf'''는 문서내에서 단어나 문장이 얼마나 자주 발생하는지에 대한 점수를 계산한다. 값이 클수록 해당 단어와 문장이 더 자주 등장함을 의미한다. 공식은 아래와 같다. 
+
+attachment:termfrequency.jpg
+
+분모는 문서에 출현한 단어중 출현빈도가 가장 높은 용어가 된다.
+
+분모에 문서에 출현한 모든 단어가 들어간다면, 큰 문서에서는 상대적으로 값이 작아질 것이고, 작은 문서에서는 상대적으로 값이 커지는 문제가 발생할 것이므로, 정규화할 필요가 있다.분모를 출현 빈도가 가장 높은 용어로 한 이유다.
+
+Freq가 5개로 고정되어있다고 했을때, MaxFreq에 따른 '''tf'''의 변화는 다음과 같다.
+
+attachment:termfreqgrp.gif
+
+==== idf ====
+{{{#!plain
+public float idf(Term term, Searcher searcher) throws IOException
+}}}
+'''I'''nver '''D'''ocument '''F'''requency 의 줄임말이다. <Term, DID List>형식으로 된 색인테이블을 검사함으로써, 해당 텀이 얼마나 많은 문서에서 출현했는 지를 검사한다. 검사된 값은 score의 계산인자로 넘겨진다.  
+
+attachment:idf.jpg
+
+로그는 스케일을 조절하기 위해서 사용했다. 중요한 단어는 해당 단어를 전문적으로 다루는 몇개의 문서에서 본격적으로 출현할 확률이 높을 것이다. 반대로 우리가 일상적으로 사용하는 단어는 많은 문서에서 출현할 것이다. 어떤 문서에서 5개의 '''linux'''라는 단어가 발생했다면, maxDoc의 갯수에 따라서 '''idf'''는 다음과 같이 변한다.
+
+attachment:idflog.gif
+
+maxDoc가 커질 수록 idf의 값도 커진다. 10개의 문서 중 5개의 문서에서 linux가 발생된것 보다는, 1000개의 문서중 5개의 문서에서 linux가 발생되었을 경우 문서의 중요도가 커질거라고 예상할 수 있기 때문이다. 
+
+다음은 maxDoc를 1000개로 고정시키고 df를 5에서 1000까지 증가시켰을 때, idf 값의 변화를 측정한 결과다.
+
+attachment:idflog2.gif
+
+예를들어 '''the''', '''a'''와 같이 여러문서에 걸쳐서 나타날 수 있는 Term은 낮은 idf 값을 가지게 된다. 
+
+=== Lucene Searcher ===
+Lucene.Searcher은 주어진 Query를 이용해서 검색을 하는 클래스다. 다양할 수 있는 검색방식을 지원하기 위해서 검색엔진은 Plugin 방식으로 적재할 수 있다. 기본 검색 Plugin은 색인검색을 하는 search.IndexSearcher와 search.Hitcollector, search.TopFieldDocCollector 이다.
+
+ * 프로시져 코드 간단버전
+{{{#!plain
+사용자 검색 문자열을 받아들여서 Query를 생성한다.
+for(i = 0; i < Query.Term.size(); i++)
+{
+	Term.Weight를 계산한다.
+	{
+		TermInfoIndex 파일에서, 해당 Term이 포함된 TermInfos.block의 포인터를 찾아낸다.
+		해당 block를 찾았다면 선형검색을 하면서 일치하는 <field:term>이 있는지 확인한다. 
+		찾았다면 TermInofs 테이블에서 다음과 같은 정보를 얻어온다.
+		{
+			@ DocFreq         : 해당 Term을 포함한 문서가 몇개 있는지 
+			@ freq pointer    : TermFreq에 대한 <did,freq>정보를 가진 파일에서, 현재 Term에 대한 <did,freq>가 시작하는 위치값
+			@ prox pointer    : 현재 Term이 문서의 어느위치에 존재하고 있는지에 대한 정보를 가진 파일에서, 현재 Term이 시작되는 위치값
+		}
+		/*
+			이제 freq pointer를 이용해서 해당 Term을 어떤 문서가 몇개 포함하고 있는지 알 수 있다.
+			prox pointer를 이용하면 검색결과의 요약을 만들어 낼 수 있다.
+		*/
+		// term의 idf 를 구하고 weight 객체를 생성한다.
+		term.idf = log(maxDocs/docFreq+1))+1.0; 
+		weights.add(term);
+	}
+
+	weight 객체를 순환하면서 sumOfSquaredWeights를 구한다.
+	for (i = 0; i < weights.size(); i++)
+	{
+		queryWeight = weights[i].idf * getboost();
+		Squared = queryWeight * queryWeight;
+		sum += Squared;
+	}
+	sum *= getboost()^2;
+	sumOfSquaredWeights = sum;
+	// queryNorm(sumOfSquaredWeights) 값을 구한다. 
+	{
+		1.0/sqrt(sumOfSquaredWeights);
+	}
+	// queryNorm(sumOfSquaredWeights)를 이용해서 idf query weight를 정규화 한다. 
+	for (i = 0; i < weights.size(); i++)
+	{
+		queryWeight *= queryNorm;
+		WeightValue = queryWeight * idf;
+	}
+}
+
+HitsQueue 를 생성한다.
+여기에는 가장 높은 Score를 가지는 score객체정보가 유지된다.
+
+weight를 순환하면서 해당 weight.term을 포함한 모든 weight에 대한 score를 가져와서
+BolleanScorer에 add한다.
+
+BolleanScorer result;
+for (i = 0; i < weights.size(); i++)
+{
+	// tis.freqpointer 를 이용해서 score연산을 위한 freq pointer, prox pointer등을 가져올 수 있다.  
+	Weight w = weights.elementAt(i);
+	w.scorer()를 호출 해당 weight에 대한 scorer을 계산한다.
+	{
+		weight의 성격에 따라서	
+		SloopyPhraseScorer 혹은 ExactPharseScorer을 선택한다. 
+		SloopyPhraseScorer 은 slop가 0이 아닌 경우
+		ExactPharseScorer 은 slop가 0인 경우
+	}
+	// weight.scorer를 BooleanScorer.result에 add 한다.
+	result.add(w.scorer, c.isRequired(), c.isProhibited())
+	{
+		isRequired (반드시 요구), isProhibited(반드시 제외)인지를 확인한다음
+		// isRequired 는 쿼리의 Term에 '''AND'''나 '''+'''이 지정되었을 경우
+		// isProhibited는 쿼리의 Term에 '''-'''가 지정되었을 경우
+		if(isRequired)
+		{
+			requiredScorers.add(scorer);
+		}
+		else if (prohibited)
+		{
+			prohibitedScorers.add(scorer);
+		}
+		else
+		{
+			optionalScorers.add(scorer);
+		}
+	}
+	return scorer.BolleanScorer;
+}
+
+scorer.scorer()를 호출
+{
+	if(requriedScorers.size()가 하나이상 존재한다면)
+	{
+		makeCountingSumScorerSomeReq()을 호출
+		{
+			optionalScorer가 존재 하지 않는 경우
+			optionalScorer이 존재하는 경우
+			{
+				requiredScorer이 하나라면
+					SingleMatchScorer을 수행 (해당 scorer를 그대로 리턴)
+				그렇지 않다면
+					countingConjunctionSumScorer를 수행
+			}
+		}
+	}
+	그렇지 않다면
+	{
+		makeCountingSumScorerNoReq()를 호출
+	}
+	위의 sumScorer과정을 거치고나면 각 weight에 대한 scorer heap이 생성된다. 
+	heap의 각 scorer는 DID를 가지고 있는 priorityQueue를 가지고 있다. 
+
+	// Heap의 top부터 scorer를 하나씩 가져온다.
+	for (i =0; i < heap.size(); i++) 
+	{
+		Scorer top = heap[i];
+		// 해당 doc에 대한 score를 얻어온다.
+		currentDoc = top.doc();
+		currentScore = top.score();
+
+		// heap의 다른 scorer에 currentDoc와 동일한 doc가 있는지 확인한다. 
+		while(!top.next())
+		{
+			top=scorerQueue.top();
+			if (top.doc() == currentDoc)
+			{
+				currentscore += top.score();
+			}
+		}
+		HitCollector(currentDoc,currentScorer);
+	}
+}
+}}}
+
+attachment:QuerySearch.gif
+
+=== HitsCollector 의 생성 생성 ===
+scorer는 각 term에 대해서 만들어진다. 만약 쿼리에 2개의 텀이 있었다면. 2개의 scorer이 만들어지게 된다. nutch의 경우 '''linux'''라는 단일 단어로 만들어진 쿼리를 입력했다면, nutch 내부적으로 각 필드별로 5개의 Term을 가진 쿼리를 만들게 된다 (url:linux OR content:linux OR anchor:linux OR site:linux OR title:linux). 그러므로 이경우 5개의 텀에 대한 scorer이 만들어며, 각각의 scorer는 heap 자료구조에 들어가게 된다. 그리고 각각의 scorer는 해당 term에 대한 '''priorityscorerqueue'''를 유지한다. 
+
+다음은 '''linux'''라는 쿼리가 주어졌을때 HistsQueue가 어떤식으로 생성되는지를 보여주는 그림이다. 
+
+attachment:scorerqueue.gif
+
+ 1. 각 Term에 대한 scorer를 만들고, ScorerQueue를 만들어서 유지한다.
+ 1. 각 ScorerQueue는 priorityQueue를 유지한다.   
+ 1. PriorityQueu.top.doc()을 가져온다. 
+ 1. 다른 scorer에서도 top.doc()를 가져와서 동일한 doc가 있다면 score를 더해서,   
+ 1. HietQueue에 넣는다.
+
+'''MergeSort'''구현임을 알 수 있다.
+
+=== Score 자료구조 ===
+attachment:scorertree.gif
+
+Scorer의 재귀호출을 이용한 Stack 자료구조를 가진다. weight.scorer을 통해서 term에 대한 score가 만들어지면 타입에 따라서 아래와 같이 분류되어서 Add된다.  
+ || Type					|| Scorer Type					|| 설명												||
+ || isprohibit		|| prohibitedScorers		|| 해당 Term 제외							||
+ || isrequired 		|| requiredScorers			|| 해당 Term 반드시 포함			||
+ || should 				|| optionalScorers			|| 해당 Term 포함할 수 있음		||
+
+예를 들어 '''apache -linux'''라면 아래와 같이 표현될 것이다. 
+
+attachment:scoretreesmp.gif
+
+다음은 또다른 예이다.
+
+attachment:advscoresmp.gif
+
+이번에는 상당히 복잡한 쿼리를 이용해서 scorer의 작동방식에 대해서 알아보도록 하겠다. 쿼리는 다음과 같다.
+ * title:apache (content:tcl^4.0 AND -content:apache AND {1999 TO 2006}) AND tcl^3.0 ("php programing" -windows*) NOT tcl tcl 
+
+ 1. 총 6개의 clauses가 만들어질 것이다. 
+ 1. 6개의 clauses에 대한 weight를 만들 것이다.
+   1. 이중 2번째 clauses는 group query로 3개의 clauses를 가지게 될 것이며, 이것은 weight를 재귀호출 할 것이다. 4번째 clauses역시 마찬가지로 2개의 clauses를 가진다. 
+ 1. search를 이용해서 weight.score를 구한다. 
+ 1. Scorer는 아래와 같은 구성을 가질 것이다.
+attachment:cplxscorer.jpg
+ * 각각의 scorer들은 쉬운연산을 위해서 '''BooleanScorer'''과 '''ReqOptSumScorer'''로 sumCounting 과정을 거쳐서 그룹화 한다.
+
+=== Distributed Search ===
+[[include(JCvs/Search/Document/nutch/Distributed_Search)]]
+
+=== 해야할일 ===
+==== search를 확실히 하기 위해서는 색인파일구조를 깊이 살펴봐야 한다. ====
+==== DistributionSearch 에 대해서 알아본다. ====

@@ -1,0 +1,123 @@
+----
+ 1. getDiskIO 
+ 1. DISK IO 정보를 얻어온다. 
+ 1. [yundream]
+ 1. Version 0.2 
+ 1. 2005/05/20
+----
+
+=== 설명 ===
+ * 리눅스의 /proc 파일시스템을 분석해서 DISK IO 값을 얻어온다. 
+ * DISK IO값을 얻어오기 위해서 partitions 파일을 분석한다.
+=== 사용방법 ===
+{{{#!plain
+vector<partition_info> getDiskIO();
+}}}
+ 1. 리턴값 : 각 장치의 IO정보 리스트를 vector 자료구조에 담아서 되돌려준다.
+
+{{{#!plain
+int main()
+{
+  int i;
+  vector<partition_info> diskio;
+  cout << "Dev\t\tRio\t\tWio" << endl;
+  while(1)
+  {
+    diskio = getDiskIO();
+    for (i = 0; i < diskio.size(); i++)
+    {
+      cout << diskio[i].name <<  "\t\t" << diskio[i].rio 
+          << "\t\t" << diskio[i].wio << endl;
+    }
+    sleep(2);
+  }
+}
+
+}}}
+
+
+=== 코드 ===
+{{{#!plain
+typedef struct _partion_info
+{
+  char major[16];
+  char minor[16];
+  char blocks[16];
+  char name[24];
+  char rio[16];
+  char rmerge[16];
+  char rsect[16];
+  char ruse[16];
+  char wio[16];
+  char wmerge[16];
+  char wsect[16];
+  char wuse[16];
+  char running[16];
+  char use[16];
+  char aveq[16];
+} partition_info;
+
+#define partition_format "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s"
+
+vector<partition_info> getDiskIO()
+{
+  FILE *fp;
+  char line[512];
+  class Config *esmCfg;
+  int last_time = 0;
+  int n;
+  int first = 0;
+  partition_info lpartition_info;
+  vector<partition_info> vpartition_info;
+
+  if ((fp = fopen("/proc/partitions", "r")) == NULL)
+  {
+    perror("fopen error");
+  }
+  char major[12];
+
+  first = 0;
+
+  while(fgets(line, 511, fp) != NULL)
+  {
+    if (first == 0)
+    {
+      first ++;
+      continue;
+    }
+    n = sscanf(line,
+        partition_format,
+        lpartition_info.major,
+        lpartition_info.minor,
+        lpartition_info.blocks,
+        lpartition_info.name,
+        lpartition_info.rio,
+        lpartition_info.rmerge,
+        lpartition_info.rsect,
+        lpartition_info.ruse,
+        lpartition_info.wio,
+        lpartition_info.wmerge,
+        lpartition_info.wsect,
+        lpartition_info.wuse,
+        lpartition_info.running,
+        lpartition_info.use,
+        lpartition_info.aveq
+        );
+    // 포맷에 맞지 않을 경우 건너 뛴다.
+    if(n < 10)
+    {
+      continue;
+    }
+
+    if(!isdigit(lpartition_info.name[strlen(lpartition_info.name) - 1 ]))
+    {
+      vpartition_info.push_back(lpartition_info);
+    }
+  }
+  fclose(fp);
+  return vpartition_info;
+}
+}}}
+
+=== 토론 ===
+ 1. 실제로는 byte/sec 정보를 얻어야 할것이다. byte/sec 정보를 얻기 위해서는 이전의 IO count값을 저장하고 있어야 한다. 

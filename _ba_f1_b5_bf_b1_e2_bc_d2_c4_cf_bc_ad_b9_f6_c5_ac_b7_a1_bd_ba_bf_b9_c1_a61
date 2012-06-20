@@ -1,0 +1,180 @@
+ * 개요
+
+ 비동기소켓서버클래스를 이용한 서버-클라이언트 예제를 보여준다. 예제의 설명은 서버와 클라어언트의 main.cpp의 상단 주석을 보라.
+
+
+ * 실행방법
+
+ 서버와 클라이언트 각각 다른 터미널에서 실행을 하는것이 보기에 좋을것이다. 더불어 클라이언트의 usleep부분의 딜레이를 더 길게주어서 봐도 될것이다. (너무 짧게 주면 로컬에서 매우 빠르게 전송이 일어나므로 나중엔 버퍼가 차고 버벅거리며 전송이 정확하게 되지 않을것이다) SOCKET_NUM는 약 1020개 정도를 넘으면 커널 디폴트값인 한 프로세스의 1024제한을 넘게되어서 에러메세지를 보게 될것이다. 소스 조정 후 커널 재컴파일하여도 될것이며, 1000개 넘는 소켓은 다른 쓰레드에서 관리하게 하여도 좋을것이다. epoll로 대체하는 버젼업과 함께 이 부분도 처리되게 될 것이다. 종료시엔 클라이언트를 먼저 Ctrl-C로 종료하여 서버에서 잘 처리되는지 볼 필요가 있을것이다.
+
+
+ * 참고
+
+ [비동기소켓서버클래스]
+
+
+ * 클라이언트 - cliManager.h
+{{{#!vim cpp
+#include <iostream>
+
+using namespace std;
+
+#include "asyncSocket.h"
+
+class CliManager : public AsyncSocket {
+
+	public:
+		void atAccept(int index) {}
+		void atConnect(int index) { cout << "Connect success at " << index << endl;	}
+		void atPollin(int index) {}
+		CliManager(int num) : AsyncSocket(num) {}
+		
+};
+}}}
+
+
+ * 클라이언트 - main.cpp
+{{{#!vim cpp
+ /*
+ *  비동기 다중 소켓 클래스 테스트 프로그램 - 클라이언트
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 1. 31.
+ *
+ *  1000개의 소켓을 연결시도 하고  0 - 4 사이의 난수를 발생시켜 그 난수를 먼저 보내고
+ *  0 : socket close, 1 : socket connect, 2 : sWriteN, 3: sWriteR, 4 : \n으로 끝나는 버퍼쓰기
+ *  등을 호출하여 각각에 맞게 서버에서 읽도록 하여 정확하게 주고 받아지는지 확인한다
+ */
+ 
+#include <iostream>
+#include <stdlib.h>
+#include <unistd.h>
+#include "cliManager.h"
+
+#define SOCKET_NUM 1000
+#define DATA_SIZE 10
+
+using namespace std;
+
+int main(int argv, char** argc) {
+	char data[] = "0123456789\n";
+	int i, ranNum;
+	CliManager sm(SOCKET_NUM + 1); 							// 0번 fd는 서버소켓용이므로
+	for (i = 1; i <= SOCKET_NUM; i++) {
+		sm.aConnect(AF_INET, SOCK_STREAM, 0, "127.0.0.1", 7070, 10, 10);
+		cout << "Socket " << i << " connecting..." << endl;
+		usleep(10000);
+	}
+	while (true) {							
+		sm.aPoll(0);															// connect의 완료, 시간만료등의 체크
+		for (i = 1; i <= SOCKET_NUM; i++) {
+			if (sm.getSockStatus(i) > 0) {								// 사용중인 소켓이라면
+				cout << "Using socket numbers is " << sm.getConNum() << endl;
+				ranNum = rand() % 5;										// 0 - 4 사이의 수
+				switch (ranNum) {
+					case (0):												
+						sm.aClose(i);
+						cout << "Socket " << i << " closing..." << endl;
+						break;
+					case (1):												
+						sm.aConnect(AF_INET, SOCK_STREAM, 0, "127.0.0.1", 7070, 10, 10);
+						break;	
+					case (2):
+						sm.sock[i].sSendN("2", 1, 0);
+						sm.sock[i].sSendN(data, DATA_SIZE, 0);
+						cout << "sSendN called" << endl;
+						break;
+					case (3):
+						sm.sock[i].sSendN("3", 1, 0);
+						sm.sock[i].sSendR(data, DATA_SIZE, 0);
+						cout << "sSendR called" << endl;
+						break;
+					case (4):
+						sm.sock[i].sSendN("4", 1, 0);
+						sm.sock[i].sSendN(data, DATA_SIZE + 1, 0);	// \n까지 포함해서 보낸다
+						cout << "sSendLine called" << endl;
+						break;
+				}
+			}
+			usleep(10000);
+		}
+	}
+	return(0);
+}
+}}}
+
+
+ * 서버 - svrManager.h
+{{{#!vim cpp
+#include <iostream>
+
+using namespace std;
+
+#include "asyncSocket.h"
+
+#define DATA_SIZE 10
+
+class SvrManager : public AsyncSocket {
+
+	public:
+		int sndType, len;
+		char buff[100];
+		SvrManager(int num, size_t size) : AsyncSocket(num, size) {}
+		void atAccept(int index) { cout << "Accept socket is " << index << endl; }
+		void atConnect(int index) {}
+		void atPollin(int index) {
+			sndType = sock[index].sRecv(buff, 1, MSG_WAITALL);
+			if (sndType <= 0) {
+				cout << "Socket closed at " << index << endl;
+				aClose(index);
+			} else {
+				switch (buff[0]) {
+					case ('2'):
+						len = sock[index].sRecv(buff, DATA_SIZE, MSG_WAITALL);
+						break;
+					case ('3'):
+						len = sock[index].sRecvR(buff, MSG_WAITALL);
+						break;
+					case ('4'):
+						len = sock[index].sRecvLine(buff);
+						break;
+				}
+				buff[len] = '\0';			// 널문자를 붙여서 제대로 받아졌는지 확인한다
+				cout << "Socket " << index << " received data : " << buff << endl;
+			}
+		}
+
+};
+}}}
+
+
+ * 서버 - main.cpp
+{{{#!vim cpp
+ /*
+ *  비동기 다중 소켓 클래스 테스트 프로그램 - 서 버
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 1. 31.
+ *
+ *  클라이언트의 각 소켓에서 보낸 1byte의 데이터를 먼저 읽고 그 값에 따라
+ *  2 : sRecv, 3: sRecvR, 4 : sRecvLine   을 호출하여
+ *  \0이 없는 읽은 데이터의 마지막에 \0을 추가한후 출력하여 제대로 주고 받았는지 확인한다
+ */
+ 
+
+#include <iostream>
+#include <signal.h>
+#include <unistd.h>
+#include "svrManager.h"
+
+#define SOCKET_NUM 1000
+
+using namespace std;
+
+int main(void) {
+	SvrManager sm(SOCKET_NUM + 1, 100);
+	sm.aListen(AF_INET, SOCK_STREAM, 0, "INADDR_ANY", 7070, SOCKET_NUM + 1);
+	while (true) {
+		sm.aPoll(-1);
+	}
+	return(0);
+}
+}}}

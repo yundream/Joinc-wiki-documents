@@ -1,0 +1,360 @@
+#title 8장. 라이브러리 이용하기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>라이브러리를 통한 함수 공유</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="Programming from the Ground Up"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="견고한 프로그램 작성하기"
+HREF="robustprogmake.html"><LINK
+REL="NEXT"
+TITLE="메모리에 대하여"
+HREF="aboutmemory.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>Programming from the Ground Up</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="robustprogmake.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="aboutmemory.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="USEDLIBRARY"
+></A
+>8. 라이브러리를 통한 함수 공유</H1
+><P
+>	
+		지금까지의 내용을 통하여 단순히 사칙연산을 하는 간단한 프로그램 조차도, 컴퓨터를 
+		통해서 구현시킬려면 상당히 많은 일을 해야한다는 것을 느꼈을 것이다.
+		게다가 우리가 앞으로 만들어야 할 프로그램들은 지금까지 만들어왔던 (간단한)프로그램들 
+		보다 훨씬 복잡할 확률이 많다. 
+		그러므로 가능한한 프로그램을 쉽게 만들 수 있는 어떤 프로세스의 정립이 필요하게 
+		된다. 여기에는 다음과 같은 몇가지 방법이 있다. 
+		<P
+></P
+><UL
+><LI
+><P
+>					어셈블리 대신 고급언어를 이용해서 코드를 작성한다. 
+				</P
+></LI
+><LI
+><P
+>					프로그램을 만들기 전에 여러개의 (간단한) 코드를 만들고, 이걸 
+					조합해서(가져다 붙이기로) 프로그램을 작성한다.
+				</P
+></LI
+><LI
+><P
+>					프로그램들 사이에 공통적으로 사용하는 함수의 모음을 따로 관리해서 
+					공유할 수 있도록 한다. 
+				</P
+></LI
+></UL
+>
+		위의 방법들은 모두 프로젝트를 수행함에 있어서 실질적으로 필요한 것들이다. 
+		첫번째 방법인 고급언어를 이용하는 것에 대해서는 11장에서 다루도록 하겠다. 
+		두번째 방법은 유용한 방법이긴 하지만 다음과 같은 문제점들을 가진다. 
+		<P
+></P
+><UL
+><LI
+><P
+>					복사된 코드는 실제 코드에서 종종 크게 수정되곤 한다.
+				</P
+></LI
+><LI
+><P
+>					보통 복사되는 코드는 프로그램에 여러번 포함이 된다. 
+					이것은 낭비를 초래할 뿐 아니라, 코드의 수정을 어렵게 만든다.	
+				</P
+></LI
+><LI
+><P
+>					만약 복사된 코드에서 문제가 발생했다면 이 코드를 사용하는
+					모든 응용의 코드를 수정해서 다시 배포해야만 한다.
+				</P
+></LI
+></UL
+>
+		그러므로 두번째 방법은 꼭 필요한 부분에서만 사용하도록 한다. 세번째 방법은 가장 
+		자주 이용한다. 이것은 공통으로 사용되는 코드를 재작성 하지 않고 이미 저장되어 있는 
+		코드를 읽어오는 방식을 취한다 - 정확하게는 호출된 함수의 위치를 가져와서 실행한다 -. 
+		이것은 동일한 함수를 복사해서 사용해야 하는 낭비를 없애준다. 
+		또한 코드에 버그가 발생했을 경우에도 일일이 프로그램을 수정할 필요 없이 
+		공통으로 호출하는 함수만 수정하면 되기 때문에 버그도 쉽게 관리할 수 있게 된다.
+		물론 이 방법도 몇가지 문제를 가지고 있다.
+		<P
+></P
+><UL
+><LI
+><P
+>					만약 여러개의 프로그램이 함수파일(라이브러리)를 공유하고 있을 때, 
+					과연 이 함수파일을 지워도 괜찮을지 어떻게 판단할 수 있을 까 ?
+					더이상 필요 없다고 판단해서 지웠는데, 다른 프로그램이 이를 사용하고 있어서 
+					그 프로그램이 실행되지 않는 경우를 예상할 수도 있을 것이다. 
+				</P
+></LI
+><LI
+><P
+>Some programs inadvertantly rely on bugs within shared functions. Therefore, if upgrading the shared program fixes a bug that a program depended on, it could cause that application to cease functioning.
+				</P
+></LI
+></UL
+>
+		이러한 문제를 "DLL hell"이라고 부른다. 그렇지만 이러한 단점보다는 얻는 이득이 
+		훨씬 크기 때문에 이 방법을 주로 사용한다.
+	</P
+><P
+>	
+		프로그래밍에서 이러한 공유되는 코드 파일을 <B
+CLASS="EMPHASIS"
+>shared libraries, shared objects,
+		dynamic-link libraries, DLLs 혹은 .so 파일</B
+> 이라고 한다.
+		여기에서는 공유라이브러리(shared libraries)라고 부르도록 하겠다.
+	</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="SHAREDLIBRARYUSED"
+></A
+>8.1. 공유 라이브러리의 이용</H2
+><P
+>			공유라이브러리를 테스트 하기 위해서 간단한 예를 들어보도록 하겠다. 
+			이 프로그램은 화면에 hello world를 출력하는 프로그램으로 
+			이름은 helloworld-nolib.s로 하겠다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.include "linux.s"
+.section .data
+
+helloworld:
+    .ascii "hello world\n"
+helloworld_end:
+
+    .equ helloworld_len, helloworld_end - helloworld
+
+    .section .text
+    .globl _start
+
+_start:
+    movl  $STDOUT, %ebx
+    movl  $helloworld, %ecx
+    movl  $helloworld_len, %edx
+    movl  $SYS_WRITE, %eax
+    int   $LINUX_SYSCALL
+
+    movl  $0, %ebx
+    movl  $SYS_EXIT, %eax
+    int   $LINUX_SYSCALL
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			간단한 코드임으로 설명은 생략하겠다. 다음은 위 프로그램의 공유라이브러리(:12)
+			호출 버젼으로 이름은 helloworld-lib.s이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.section .data
+
+helloworld:
+    .ascii "hello world\n\0"
+
+    .section .text
+    .globl _start
+
+_start:
+    pushl $helloworld
+    call printf
+
+    pushl $0
+    call exit
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			공유 라이브러리 호출 버젼은 코드가 더욱 단순해 졌다. 이유는 간단하다. 출력과 
+			관련된일을 시스템 호출을 통하여 직접 코딩하지 않고, 라이브러리에서 제공하는 
+			printf함수를 사용했기 때문이다.
+			첫번째 프로그램은 다음과 같이 컴파일 해서 실행시키면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as helloworld-nolib.s -o helloworld-nolib.o
+# ld helloworld-nolib.o -o helloworld-nolib
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그러나 두번째 프로그램의 경우 printf를 어떤 공유 라이브러리에서 호출하도록 
+			했는지 링크과정에서 알려줄 필요가 있다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as helloworld-lib.s -o helloworld-lib.o
+# ld -dynamic-linker /lib/ld-linux.so.2 -o helloworld-lib helloworld-lib.o -lc
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			공유 라이브러리를 링크 시키기 위해서 -dynamic-linker 옵션을 사용하고 있다. 
+			리눅스 상에서 공유 라이브러리 링크를 위해서는 항상 
+			-dynamic-linker /lib/ld-linux.so.2이 프홈되어야 한다. 이것은 프로그램이 
+			실행될때 운영체제로 부터 /lib/ld-linux.so.2를 이용해서 외부 라이브러리를 
+			링크 시킬 수 있도록 만들어 준다. 
+		</P
+><P
+>			-lc 는 c 라이브러리를 링크시켜란 뜻이다. c라이브러리는 
+			GNU/Linux의 경우 libc.so라는 이름을 가지고 있다. 여기에서 처음의 lib와 마지막의 
+			.so를 제거시킨 이름을 -l뒤에 붙여줌으로써 필요한 라이브러리를 링크시키게 된다. 
+			libc에는 printf(3)와 exit(3)를 비롯한 다양한 함수를 가지고 있다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="robustprogmake.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="aboutmemory.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>견고한 프로그램 작성하기</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>메모리에 대하여</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

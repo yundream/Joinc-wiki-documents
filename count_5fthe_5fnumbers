@@ -1,0 +1,111 @@
+/* 특정입력시 버그가 있으나 대부분 계산을 잘한다. 현재 바쁘므로 조만간 버그픽스를 하여 완전버젼을 올리겠다. */
+
+* 외국의 프로그래밍 문제풀기 사이트를 알게 되었는데 참 재밌는 문제가 하나 있어서 풀어보았다.
+
+
+이 문제의 링크는 다음과 같으며
+
+http://acm.uva.es/contest/data/next/problemset/h.html
+
+아래에서  왼쪽 레지스터를 눌려 자신의 ID를 만들어 응시할 수 도 있다. 내 소스도 곧 올려보까 한다.
+
+http://acm.uva.es/problemset/
+
+
+
+문제의 핵심은 0 <= N <= 999,  0 <= A <= B <= 2000000000
+
+을 N A B  세개를 한쌍으로 입력하면 N이 들어가는 숫자가 A 와  B 사이에서 몇개나 있는가 하는것이 출력으로 나오는것이다.
+
+-1 -1 -1을 넣으면 종료된다.
+
+* 이 프로그램의 시간복잡도는 O(logB) 이다
+
+* 소스에 대한 설명은 차차 하기로 한다... 한번 이해를 해보시기 바라며 이거보다 빠른 user time이나 sys time이 나오는 프로그램을 짜시게 된다면 필히 나에게 알려주시기 바란다. :-)
+
+{{{#!vim c
+/* Code by SaNha 2004. 8. 29 */
+
+#include <stdio.h>
+
+// #define MAX_N 999
+// #define MAX_B 2000000000
+
+char N[3 + 1], A[10 + 1], B[10 + 1];
+
+int parse() {
+
+   int N2, upper, middle, lower, A2, A3, B2, B3, powN = 1, total = 0;
+   char branchA[10 + 1], branchB[10 + 1];
+
+   int cipherN = strlen(N);
+   int cipherA = strlen(A);
+   int cipherB = strlen(B);
+   int forkA = cipherA - cipherN;
+   int forkB = cipherB - cipherN;
+   memcpy(branchA, A, cipherA);
+   memcpy(branchB, B, cipherB);
+   N2 = atoi(N);
+
+   for (; forkB >= 0; forkA--, forkB--, powN *= 10, N2 *= 10) {
+
+      if (forkA < 0) {
+         A3 = -1;
+      } else {
+         A2 = atoi(A + forkA);
+         branchA[forkA] = '\0';
+         A3 = atoi(branchA);
+         if (N2 >= A2) A3--;
+      }
+
+      B2 = atoi(B + forkB);
+      branchB[forkB] = '\0';
+      B3 = atoi(branchB);
+      middle = 0;
+
+
+      if (N2 > B2) {
+         B3--;
+      } else if (!memcmp(N, B + forkB, cipherN)) {
+         B3--;
+         middle = B2 - N2 + 1;
+      }
+
+      upper = B3 - A3;
+      lower = powN;
+      total += upper * lower + middle;
+
+   }
+
+   return total;
+}
+
+int main() {
+
+   while (1) {
+      scanf("%s %s %s", N, A, B);
+      if ((*N == '-') || (*A == '-') || (*B == '-')) {
+         break;
+      } else {
+         printf("%d\n", parse());
+      }
+   }
+
+   return 0;
+}
+
+}}}
+
+
+123, 0, 2000000000 을 입력하였을때의 time값이다.
+
+{{{
+[sanha@koguryo test 16:47:06]$ time ./a.out
+123 0 2000000000
+24000000
+-1 -1 -1
+
+real    0m4.952s
+user    0m0.000s
+sys     0m0.000s
+}}}

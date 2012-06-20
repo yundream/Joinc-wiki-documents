@@ -1,0 +1,808 @@
+#title 스레드 풀
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Thread Pooling</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Thread Pooling</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.7</TD
+><TD
+ALIGN="LEFT"
+>2003년 1월 24일 14시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>Thread Pool 구성도 이미지 추가,문서 히스토리 추가</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>Thread Pooling</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN16"
+>Thread Pooling 이란</A
+></DT
+><DD
+><DL
+><DT
+>1.1.1&#51208;. <A
+HREF="#AEN22"
+>Thread Pool의 구현방식</A
+></DT
+><DT
+>1.1.2&#51208;. <A
+HREF="#AEN31"
+>구현 프로세스</A
+></DT
+></DL
+></DD
+><DT
+>1.2&#51208;. <A
+HREF="#AEN40"
+>예제</A
+></DT
+></DL
+></DD
+><DT
+>2&#51208;. <A
+HREF="#AEN47"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. Thread Pooling</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>1.1&#51208;. Thread Pooling 이란</A
+></H2
+><P
+>			pool 의 사전적인 뜻을 찾아보면 연못, 저수지, 수영장 풀 등 
+			"무엇을 담아놓는" 의 뜻을 가진다. 
+			이대로 해석하자면 Thread Pooling 이란 쓰레드를 
+			담아 놓는 용기(메모리가 될것이다) 를 뜻하며, 프로그래밍 측면에서 
+			해석하자면, "미리 쓰레드를 할당시켜 놓는기법" 을 뜻한다.  
+		</P
+><P
+>			그렇다면 쓰레드를 미리 할당시켜 놓는 이유에 대해서 생각해보자, 
+			지금까지 이 사이트에서 다루었던 쓰레드프로그래밍 기법은 
+			기본적으로 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=fork">fork</a>(2) 방식과 매우 비슷하며, 쓰레드를 생성시켜야 될 
+			필요가 있을때 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_create">pthread_create</a>(3)등의 함수를 이용하여 새로운 작업쓰레드를 
+			생성시키는 방식을 사용했다. 보통 쓰레드프로그래밍은 네트웍 프로그래밍시 
+			주로 사용됨으로 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>(2) 로 연결을 기다리다가 연결이 만들어지면 
+			accept 에서 넘어온 소켓 지시자를 인자로 하는 쓰레드를 생성했다.   
+		</P
+><P
+>			이러한 방식 - 요청이 있을때 쓰레드를 생성시키는 - 의 쓰레드 프로그래밍기법은 
+			대부분의 작업을 처리하기에 충분히 효율적이며, 빠르긴하지만 클라이언트로 부터의 
+			연결과 종료가 매우 바쁘게 일어나는 서버의 경우, 계속적으로 쓰레드를 생성하고 
+			종료해야 하는 비용을 무시할수 없게 된다. 쓰레드가 비록 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=fork">fork</a>()에 비해서 
+			생성과 소멸시에 훨씬 적은 비용을 소모한다고는 하지만, 이건 어디까지나 
+			상대적인 것으로 실상은 꽤 많은 시간과 비용을 소비하는 작업이다. 특히 
+			<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=Linux">Linux</a> 에서의 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=Pthread">Pthread</a> 의 경우 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=clone">clone</a>(2)를 이용한 구현임으로 더욱더 많은 
+			비용을 소비하게 된다.   
+		</P
+><P
+>			Thread Pooling 은 이러한 반복적인 쓰레드의 생성/소멸에 의한 비효율적인 측면을 
+			없애고자 하는 목적으로 만들어진 프로그래밍 기법이다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>1.1.1&#51208;. Thread Pool의 구현방식</A
+></H3
+><P
+>				개념적으로 보자면 Thread Pool 을 구성하는건 매우 간단하다. 
+				생성하고자 하는 크기만큼 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=ptread_create">ptread_create</a>() 함수를 돌리면 되기 때문이다.  	 
+			</P
+><P
+>				하지만 이건 어디까지나 개념적인 것으로 대부분의 경우 각각의 쓰레드를 
+				스케쥴링 해주어야 함으로, 때에 따라서는 구현을 위해서 매우 복잡한 
+				프로그래밍 기법을 동원해야 할때도 있다. 간단히 
+				웹 서버를 Thread Pool 로 구현한다고 가정을 해보자 - 보통 웹서버는 
+				<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=HTTP">HTTP</a> 의 특성상 연결과/종료가 빈번하게 일어 남으로 쓰레드풀을 사용할경우 
+				많은 이익을 얻을수 있다 -, 만약 100 개의 Thread 를 미리 생성시켰고, 
+				각각의 Thread 는 하나의 클라이언트 연결을 처리한다고 가정했을때, 
+				main 쓰레드는 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>(2) 를 통해서 클라이언트를 받아들였을때, 
+				<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>() 로 만들어진 소켓 지정번호를 미리 만들어진 100 개의 쓰레드중 
+				"놀고" 있는 쓰레드에게 넘겨주어야 할것이다. 그러기 위해서는 
+				main 쓰레드에서 각각의 쓰레드 상태를 유지해서 적당한 쓰레드에게 
+				파일지정자를 넘겨줘야 할것이다.      
+			</P
+><P
+>				그나마 위의 경우는 하나의 쓰레드가 하나의 연결을 처리함으로 어렵지 
+				않게 구현하겠지만, 만약 100개의 쓰레드가 있고, 거기에 각각의 쓰레드가 
+				10개 씩의 클라이언트 연결을 처리하도록 구성한다면, 거기에다가 적당한 
+				로드밸런싱 기능 까지 포함시키고자 한다면, 구현이 꽤 복잡해 질수도 
+				있다. 
+			</P
+><P
+>				<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN28"
+></A
+><P
+><B
+>&#44536;&#47548; 1. Thread Pool 구성도</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/abi.gif"></P
+></DIV
+>
+				위는 Thread Pool 의 대략적인 구현상태를 그림? 으로 나타낸 것이다. 
+				Thread Pool 에 들어있는 각각의 쓰레드를 관리하기 위해서는 
+				필수적으로 각각의 쓰레드의 상태를 가지고 있는 Schedul 자료구조 를 
+				가지고 있어야한다. 그래야만 MAIN THREAD 에서 쓰레드 상태를 
+				확인해서 적당한 쓰레드로 작업분배가 가능할것이기 때문이다. 
+				- 실제 Linux 커널도 각각의 task 의 스케쥴링을 위해서 task 구조체를 
+				유지한다. - 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>1.1.2&#51208;. 구현 프로세스</A
+></H3
+><P
+>				이제 구현방식에 대한 밑그림이 나왔으니, 실제로 구현을 위한 
+				프로세스를 만들어 보도록 하자. 프로세스는 슈도코드로 구성을 
+				하도록 하겠다. 네트웍 서버 작성을 기준으로 하겠다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>스케쥴관련 자료구조
+{
+   현재 연결된 클라이언트수
+   현재 처리해야될 클라이언트 소켓지시자
+
+   쓰레드풀에 만들어진 쓰레드 상태 : 쓰레드풀 크기만큼의 배열 
+   {
+       0 이면 휴식상태 
+       1 이면 작업상태 
+       처리중인 소켓지시자
+   }
+};
+
+main 함수시작
+{
+    아규먼트로 몇개의 쓰레드를 생성할지를 받음
+    while(쓰레드 생성수만큼)
+    {
+        pthread_create 를 이용해서 쓰레드 생성
+        // 통신쓰레드 함수
+        {
+            WAIT:
+            main 쓰레드가 깨우길 기다린다. 
+            만약 main 쓰레드로 부터 깨움이 있다면   
+            {
+                스케쥴 자료구조-&#62;현재 처리해야될 소켓지시자 를 읽어온다. 
+                스케쥴 자료구조-&#62;자신의 상태를 1로 세팅한다.  
+                스케쥴 자료구조-&#62;처리중인 소켓지시자를 세팅한다. 
+                <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+                {
+                    클라이언트와 통신한다. 
+                    만약 에러가 발생하면 
+                    {
+                        스케쥴 자료구조-&#62;처리중인 소켓지시자를 0으로 세팅  
+                        스케쥴 자료구조-&#62;자신의 상태를 0으로 세팅
+                        스케쥴 자료구조-&#62;현재 연결된 클라이언트수 --; 
+                        goto WAIT:
+                    }
+                }
+            }
+        } 
+    }
+
+    // main 쓰레드
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+    {
+        만약 accept 를 통해서 연결이 발생한다면
+        {
+            스케쥴관련 자료구조-&#62;현재연결된 클라이언트수가 MAX 를 초과하지 않았다면
+            {
+                스케쥴관련 자료구조-&#62;현재연결된 클라이언트수 ++; 
+                스케쥴관련 자료구조-&#62;현재처리해야될 클라이언트 소켓지시자 = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=accept">accept</a>();
+                스케줄관련 자료구조-&#62;쓰레드풀에 만들어진 쓰레드상태 가 0인 
+                  쓰레드를 찾아서 해당 쓰레드를 깨운다.  
+            }
+            그렇지 않고 초과했을경우
+            {
+                클랑리언트에게 에러메시지를 전송한다. 
+            }
+        }
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				구현은 구현하는 프로그래머가 상황에 따라서 선택하기 나름이긴 하지만 
+				보통은 위의 방법을 기본으로 해서, 약간의 변경을 가하는 정도가 
+				될것이다. 위의 슈도코드를 보면 main 쓰레드에서 accept 를 받으면 
+				휴식상태에 있는 쓰레드를 깨운다고 되어있는데, 이때 깨우기 
+				위해서는 쓰레드 조건변수를 사용하면 될것이다. 
+			</P
+><P
+>				그렇다면 스케쥴관련 자료구조는 어떻게 구현하는게 쉬운방법인지 
+				생각해보도록 하자. 구현하는 방법은 프로그래머 맘이겠지만, 
+				필자가 구현하고자 한다면 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=multimap">multimap</a> 을 이용해서 구현할것이다. 
+				이 자료구조는 아마 다음과 같을것이다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>// 쓰레드 정보 구조체
+struct ph
+{
+   int sockfd;    // 처리중인 소켓지정번호
+   int index_num; // 쓰레드의 인덱스 번호
+};
+
+// 쓰레드 구조체 MAP
+multimap&#60;int, struct ph&#62; phinfo;
+
+struct schedul_info
+{
+    int client_num;      // 총 연결중인 클라이언트수 
+    int current_sockfd;  // 가장최근에 연결된 소켓지정번호
+    phinfo mphinfo;      // 쓰레드 구조체 map
+} 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				멀티맵의 key 는 쓰레드의 활성화 여부로 1 혹은 0이 된다. 
+				그리고 value 는 해당 쓰레드 정보가 될것이다. 
+				이렇게 멀티맵으로 만든이유는 간단하다. 멀티맵은 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=정렬연관 컨테이너">정렬연관 컨테이너</a> 임으로 
+				key 를 기준으로 자동적으로 정렬이 될것이다. 
+				만약 첫번째 쓰레드가 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=처리중">처리중</a>(1)로 변경되었다면 이 원소는 
+				multimap 의 가장 뒤로 정렬이 될것이다. 그럼으로 우리는 
+				클라이언트의 수가 총연결가능한 클라이언트수(Thread Pool 에 생성된 쓰레드수)	
+				를 초과하지 않는한 phinfo.begin() 으로 가져온 쓰레드는 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=휴식상태">휴식상태</a>(0) 이라는걸 
+				믿을수 있게 된다. 다시 말해서 복잡해서 쓰레드상태가 0인지 1인지 처음부터 
+				검사할 필요가 없다는 뜻이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  1 2 3 4 5 6 7    99 100  : 쓰레드 번호
+ +-+-+-+-+-+-+-+---+-+-+
+ |0|0|0|0|0|0|0|...|0|0|
+ +-+-+-+-+-+-+-+---+-+-+
+
+ --&#62; 연결이 들어왔다면 
+  1 2 3 4 5 6 7    99 100  : 쓰레드 번호
+ +-+-+-+-+-+-+-+---+-+-+
+ |1|0|0|0|0|0|0|...|0|0|
+ +-+-+-+-+-+-+-+---+-+-+
+  |                   |  
+  +-----------&#62;-------+
+  가장 뒤로 자동으로 sort 됨
+
+ --&#62; Sort 후
+  2 3 4 5 6 7 8   100 1 : 쓰레드 번호
+ +-+-+-+-+-+-+-+---+-+-+
+ |0|0|0|0|0|0|0|...|0|1|
+ +-+-+-+-+-+-+-+---+-+-+
+
+ --&#62; 클라이언트가 99개가 접속해 있을경우
+ +-+-+-+-+-+-+-+---+-+-+
+ |0|1|1|1|1|1|1|...|1|1|
+ +-+-+-+-+-+-+-+---+-+-+
+
+ 그럼으로 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=begin">begin</a>() 을 사용하게 될경우 
+ 언제나 휴식상태에 있는 쓰레드를 가져올수 있음 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				사실 multimap 을 쓴다면 굳이 "현재 연결된 클라이언트 수" 를 
+				유지하기 위해서 별도의 변수를 둘 필요가 없을것이다. 
+				multimap 에서 제공하는 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=count">count</a>() 를 이용해서 key 가 "1" 인 
+				요소의 수를 구하면 되기 때문이다. 만약 multimp 의 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=begin">begin</a>() 
+				값이 1 이라면 MAX 클라이언트가 가득찼다는걸 의미할것이다.  
+			</P
+><P
+>				물론 multimap 의 경우 기본적으로 key 값의 수정은 허용하지 않기 
+				때문에 0 을 1로 변경할경우 실제로는 
+				0 을 가지는 요소를 삭제하고, 1을 가지는 새로운 요소를 삽입하는 
+				방식을 취해야 할것이다. 마찬가지로 클라이언트가 종료해서 
+				1을 0으로 변경할때에도 삭제/인서트를 해야할것이다. 
+    			Value(값) 는 그대로 복사해서 삭제/인서트를 해야 한다.    
+			</P
+><P
+>				이 방법이 번거롭다면, 그냥 배열을 쓰거나 혹은 다른 어떤 자료구조를 
+				쓰더라도 전혀 관계없기는 하다. 그건 자기의 기호에 맞게 선택해서 
+				사용하면 될문제이다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+>
+
+
+<script type="text/javascript"><!--
+google_ad_client = "pub-0339096251232740";
+google_ad_width = 468;
+google_ad_height = 60;
+google_ad_format = "468x60_as";
+google_ad_type = "text_image";
+//2007-06-19: blog_center
+google_ad_channel = "8014010384";
+//-->
+</script>
+<script type="text/javascript" src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
+</script><br />
+
+<HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.2&#51208;. 예제</A
+></H2
+><P
+>			지금까지 Thread POOL 의 구현방법에 대해서 알아봤으니, 
+			간단하게 구현해 보도록 하겠다. 이 코드는 지극히 기능구현에만 
+			신경쓴 코드이다. 에러처리와 몇군데 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=mutex">mutex</a>잠금처리는 각자의 
+			재량에 맡기겠다.   
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : pool_echo.cc</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;map&#62;
+#include &#60;iostream&#62;
+#include &#60;pthread.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;time.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;signal.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;sys/un.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+
+// 최대 쓰레드 POOL 크기
+#define MAX_THREAD_POOL 256
+using namespace std;
+
+// 전역 쓰레드 구조체 
+typedef struct _ph
+{
+    int sockfd;    // 현재 사용중인 소켓 fd
+    int index_num; // 인덱스 번호
+} ph;
+
+// 전역쓰레드 구조체로써 
+// 현재 쓰레드 상황을 파악함
+struct schedul_info
+{
+    int client_num;       // 현재 연결된 클라이언트수
+    int current_sockfd;   // 가장최근에 만들어진 소켓지시자
+    multimap&#60;int, ph&#62; phinfo; 
+};
+
+// 각 쓰레드별 조건변수
+pthread_cond_t *mycond;
+// 쓰레드 동기화를 위한 조건변수
+pthread_cond_t async_cond = PTHREAD_COND_INITIALIZER;
+
+// 각 쓰레드별 조건변수의 크리티컬세션 지정을 위한 
+// 뮤텍스 
+pthread_mutex_t mutex_lock= PTHREAD_MUTEX_INITIALIZER; 
+// 쓰레드 동기화용 조건변수의 크리티컬세션 지정을 위한 
+// 뮤텍스
+pthread_mutex_t async_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// 클라이언트와의 통신용 쓰레드
+void *<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=thread_func">thread_func</a>(void *data);
+// 현재 클라이언트 상태 모니터용 쓰레드
+// 한마디로 디버깅용 
+void *<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=mon_thread">mon_thread</a>(void *data);
+
+schedul_info s_info;
+
+// 메인 함수
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=main">main</a>(int argc, char **argv)
+{
+    int i;
+    ph myph;
+    int status;
+    int pool_size = atoi(argv[2]);
+    pthread_t p_thread;
+    struct sockaddr_in clientaddr, serveraddr;
+    int server_sockfd;
+    int client_sockfd;
+    int client_len;    
+
+    // 풀사이즈 검사
+    if ((pool_size &#60; 0) || (pool_size &#62; MAX_THREAD_POOL))
+    {    
+        cout &#60;&#60; "Pool size Error" &#60;&#60; endl;
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);    
+    }
+
+    // Make Socket
+    if ((server_sockfd = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=socket">socket</a>(AF_INET, SOCK_STREAM, 0)) &#60; 0)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+    // Bind
+    bzero(&#38;serveraddr, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=htonl">htonl</a>(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    if (bind (server_sockfd, (struct sockaddr *)&#38;serveraddr, 
+                        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr)) == -1) 
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("bind error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+    // Listen
+    if (<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=listen">listen</a>(server_sockfd, 5) == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("listen error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+    // 쓰레드 갯수만큼 조건변수 생성 
+    mycond     = (pthread_cond_t *)malloc(sizeof(pthread_cond_t)*pool_size);
+
+    // 쓰레드 전역변수 초기화
+    s_info.client_num = 0;
+    s_info.current_sockfd = 0; 
+
+    // 쓰레드 POOL 새성
+    for (i = 0; i &#60; pool_size; i++)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=memset">memset</a>((void *)&#38;myph, 0x00, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(myph));
+        myph.index_num = i;
+        s_info.phinfo.insert(pair&#60;int, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=ph&#62;">ph&#62;</a>(0, myph));
+
+        // 조건변수를 이용해서 쓰레드간 동기화를 실시한다.
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_lock">pthread_mutex_lock</a>(&#38;async_mutex);
+        if (pthread_create(&#38;p_thread, NULL, thread_func, (void *)&#38;i) &#60; 0)
+        {
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("thread Create error : ");
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);    
+        }    
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_cond_wait">pthread_cond_wait</a>(&#38;async_cond, &#38;async_mutex); 
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_unlock">pthread_mutex_unlock</a>(&#38;async_mutex);
+    }
+
+    // 디버깅용 쓰레드 생성
+    pthread_create(&#38;p_thread, NULL, mon_thread, (void *)NULL);
+
+    // MAIN THREAD accept wait
+    client_len = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(clientaddr);
+
+    // 클라이언트 ACCEPT 처리를 위한 
+    // MAIN 쓰레드 
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+    {
+        multimap&#60;int, ph&#62;::iterator mi;
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&#38;clientaddr, 
+                                        (socklen_t *)&#38;client_len);
+        if (client_sockfd &#62; 0)
+        {
+            // 만약 쓰레드풀이 가득찼다면 클라이언트 연결을
+            // 종료시킨다.
+            mi = s_info.phinfo.begin();
+            if (mi-&#62;first == 1)
+            {
+                //error message send to client_sockfd
+                cout &#60;&#60; "SOCKET IS FULL" &#60;&#60; endl;    
+                <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(client_sockfd);
+            }
+            // 그렇지 않다면 연결을 받아들이고 
+            // 클라이언트 전역 변수를 세팅한다. 
+            // 세팅후 해당 처리쓰레드에게 시그널을 보내어서 
+            // 처리하게 한다. 
+            else
+            {
+                ph tmpph;
+                int psockfd;
+                int pindex_num;
+                s_info.current_sockfd = client_sockfd;
+
+                tmpph.sockfd = client_sockfd;
+                tmpph.index_num = mi-&#62;second.index_num;
+                s_info.phinfo.erase(mi);    
+                s_info.phinfo.insert(pair&#60;int, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=ph&#62;">ph&#62;</a>(1,tmpph));
+                s_info.client_num ++;
+                cout &#60;&#60; "SEND SIGNAL " &#60;&#60; mi-&#62;second.index_num &#60;&#60; endl;     
+                pthread_cond_signal(&#38;mycond[mi-&#62;second.index_num]);    
+            }
+        }
+        else
+        {
+            cout &#60;&#60; "ACCEPT ERROR " &#60;&#60; endl;    
+        }
+    }
+    pthread_join(p_thread, (void **)status);
+}
+
+void *<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=thread_func">thread_func</a>(void *data)
+{
+    char buf[255];
+    int mysocket;
+    int mynum = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=*">*</a>((int *)data); 
+    multimap&#60;int, ph&#62;::iterator mi;
+    // 쓰레드 동기화용 조건변수
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_lock">pthread_mutex_lock</a>(&#38;async_mutex);
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_cond_signal">pthread_cond_signal</a>(&#38;async_cond);
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_unlock">pthread_mutex_unlock</a>(&#38;async_mutex);
+
+    cout &#60;&#60; "Thread create " &#60;&#60; mynum &#60;&#60; endl;
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+    {
+        // MAIN 쓰레드로 부터 신호를 기다린다. 
+        // 신호가 도착하면 쓰레드 전역변수로 부터 
+        // 현재 처리해야할 소켓지정값을 가져온다. 
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_lock">pthread_mutex_lock</a>(&#38;mutex_lock);
+        pthread_cond_wait(&#38;mycond[mynum], &#38;mutex_lock);
+        mysocket = s_info.current_sockfd;
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=pthread_mutex_unlock">pthread_mutex_unlock</a>(&#38;mutex_lock);
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=memset">memset</a>(buf, 0x00, 255);    
+
+        // 데이타를 처리한다. 
+        // 만약 quit 문자열을 만나면 
+        // 쓰레드 전역변수를 세팅한다음 연결종료 한다. 
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+        {
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=read">read</a>(mysocket, buf, 255);
+            if (<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=strstr">strstr</a>(buf, "quit") == NULL)
+            {
+                <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=write">write</a>(mysocket, buf, 255);
+            }
+            else
+            {
+                mi = s_info.phinfo.begin();
+                while(mi != s_info.phinfo.end())
+                {
+                    cout &#60;&#60; "search " &#60;&#60; mi-&#62;second.index_num &#60;&#60; endl;
+                    if (mi-&#62;second.index_num == mynum)
+                    {
+                        ph tmpph;
+                        tmpph.index_num = mynum;
+                        tmpph.sockfd = 0;
+                        s_info.phinfo.erase(mi);
+                        s_info.phinfo.insert(pair&#60;int, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=ph&#62;">ph&#62;</a>(0, tmpph));
+                        s_info.client_num --;
+                        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(mysocket);
+                        break;
+                    }
+                    mi ++;
+                }
+                break;
+            }
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=memset">memset</a>(buf, 0x00, 255);    
+        }
+    }
+}
+
+void *<a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=mon_thread">mon_thread</a>(void *data)
+{
+    cout &#60;&#60; "moniter thread" &#60;&#60; endl;
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=while">while</a>(1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sleep">sleep</a>(10);
+        multimap&#60;int, ph&#62;::iterator mi;
+        mi = s_info.phinfo.begin();
+        cout &#60;&#60; "size " &#60;&#60; s_info.phinfo.size() &#60;&#60; endl;
+        while(mi != s_info.phinfo.end())
+        {
+            cout &#60;&#60; mi-&#62;first &#60;&#60; " : " &#60;&#60; mi-&#62;second.index_num 
+                 &#60;&#60; " : " &#60;&#60; mi-&#62;second.sockfd &#60;&#60; endl; 
+            mi ++;
+        }
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램은 2개의 인자를 받아들이며, 클라이언트의 
+			입력을 되돌려주는 일을한다 (echo 서버). 
+			첫번째 인자는 서비스할 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=PORT">PORT</a> 번호이고, 두번째 인자는 
+			쓰레드 생성갯수이다. 프로그램은 인자의 정보를 이용해서 
+			PORT 를 열고 클라이언트를 받아들인다. 클라이언트가 연결하면, 
+			Thread Pool 에 남는 공간이 있는지를 확인하고, 남는 공간이 
+			있다면 클라이언트와 통신하게 된다.     
+		</P
+><P
+>			단지 쓰레드를 미리 생성시키고 나서, 이것을 스케쥴링하기 위한 
+			코드가 몇줄 추가되었을 뿐 
+			특별히 복잡한 코드는 아닐거라고 생각된다.  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN47"
+>2&#51208;. 결론</A
+></H1
+><P
+>		이상 간단한 쓰레드 풀의 작성요령에 대해서 알아보았다. 
+		위에서 설명했듯이 쓰레드 풀이란 개념적인 요소에 가까움으로 
+		어떻게 구현할지는 상황에 따라서 매우 달라지게 되며, 
+		위의 예제는 그러한 여러가지 상황중 가장 기본적인 상황을 
+		예로 해서 만들어진 것이다. 어쨋든 위의 예제를 충분히 이해한다면 
+		다른 상황으로의 응용역시 별 어려움없을 것이라고 생각된다.  
+	</P
+><P
+>		쓰레드 풀은 보통 매우 효율적인 성능을 보장해주는 어플리케이션의 
+		작성을 위해서 사용되어짐으로, 가능한한 빠른 쓰레드간 전환이 가능하도록 
+		고민해서 코딩을 해야 한다. 위의 경우 쓰레드간 전환을 위해서 
+		multimap 을 사용하고 있는데, accept 가 들어왔을경우 해당 클라이언트에 대한 
+		쓰레드 할당은 매우 빠르다고 볼수 있을것이다. 그러나 
+		종료할경우에는 multimap 의 첫번째 원소부터 마지막번 원소까지 
+		search 해야 한다. 이것은 매우 비효율적임으로 개선할 여지가 있다. 
+		가장 간단하게 생각할수 있는 것은 multimap 의 key 값이 1인 원소내에서만 
+		검색하는 것이다. 우리는 쓰레드 풀의 크기와 현재 연결된 
+		클라이언트의 수를 알고 있음으로, multimap 의 몇번째 요소부터 key 값이 
+		1인지를 계산해 낼수 있기 때문이다. 이렇게 할경우 약간의 시간단축효과를 
+		기대할수 있을것이다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>   1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  |0|0|0|0|0|0|0|0|1|1|1|1|1|1|1|
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                  |             |
+                  +-------------+ 
+                      15 - 8 
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		이 시간단축효과는 연결된 클라이언트의 수가 전체 POOL 사이즈에 비례해서 
+		작을 수록 커질것이다. 
+	</P
+><P
+>		나머지 방법은 각자 고민을 해보기 바란다. 아마 전혀 다른 자료구조를 
+		사용할수도 있을것이다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

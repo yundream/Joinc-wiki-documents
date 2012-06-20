@@ -1,0 +1,281 @@
+#title linux man page : socketpair - 연결된 소켓쌍을 생성한다.
+
+[[tag(네트워크프로그래밍,ipc)]]
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>socketpair(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. socketpair(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN16"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN19"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN40"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	연결된 소켓 쌍을 생성한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/socket.h&#62;
+
+int socketpair(int d, int type, int protocol, int sv[2]);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		socketpair()은 옵션으로 <B
+CLASS="EMPHASIS"
+>d</B
+>영역(domain)을 가지며
+		<B
+CLASS="EMPHASIS"
+>protocol</B
+>프로토콜을 사용하는 
+		<B
+CLASS="EMPHASIS"
+>type</B
+>의 소켓 쌍을 생성한다. 생성된 소켓 쌍은
+		<B
+CLASS="EMPHASIS"
+>sv</B
+>를 통해서 넘어온다. 두개의 소켓은 서로 
+		구별할 수 없다.  
+	</P
+><P
+>		보통 부모 자식 프로세스간 내부 통신(IPC)를 위해서 사용한다. 소켓이므로
+		양방향(읽고/쓰기) 통신이 가능하다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공시 0을 반환하고 실패할 경우 -1을 반환한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EMFILE</DT
+><DD
+><P
+>	
+					너무 많은 파일이 열려있어서 더이상 소켓을 생성할 수 없다.
+				</P
+></DD
+><DT
+>EAFNOSUPPORT</DT
+><DD
+><P
+>					지정한 주소 지정방식이 지원되지 않는다.
+				</P
+></DD
+><DT
+>EPROTONOSUPPORT</DT
+><DD
+><P
+>					지정된 프로토콜이 지원되지 않는다.
+				</P
+></DD
+><DT
+>EFAULT</DT
+><DD
+><P
+>					주소 <B
+CLASS="EMPHASIS"
+>ev</B
+>가 프로세스 주소 공간의 
+					유효한 부분을 가리키지 않는다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/types.h&#62;
+
+int main()
+{
+    int pid;
+    char buf[256];
+    int fd;
+    int sv[2];
+    int num = 0;
+
+    socketpair(AF_UNIX, SOCK_STREAM, AF_LOCAL, sv);
+    pid = fork();
+    if (pid == 0)
+    {
+        dup2(sv[0], 0);
+        close(sv[1]);
+        close(sv[0]);
+        execl("./pipe_cl", "pipe_cl", NULL);
+    }
+    else if (pid &#62; 0)
+    {
+        close(sv[0]);
+        while(1)
+        {
+            write(sv[1], (void *)&#38;num, 4);
+            printf("write %d\n", num);
+            read(sv[1], (void *)&#38;num, 4);
+            printf("read %d\n", num);
+        }
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위 프로그램은 fork()한 후 자식프로세스에서 pipe_cl을 실행시킨다.
+		자식과 부모 프로세스는 소켓을 통하여 연결되고 이것을 통해서 
+		데이터를 교환할 수 있다. 다음은 pipe_cl의 코드다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    int num;
+    while(1)
+    {
+        read(0, (void *)&#38;num, 4);
+        num++;
+        write(0, (void *)&#38;num, 4);
+        sleep(1);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

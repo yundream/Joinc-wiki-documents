@@ -1,0 +1,1086 @@
+#title 라이브러리 만들기
+
+
+[[tag(C,시스템프로그래밍,라이브러리)]]
+=== 추가할 내용 ===
+'''nm'''을 이용하면 라이브러리(:12)에 포함된 오브젝트와 함수명까지 확인할 수 있습니다.
+{{{#!plain
+# nm libproc.a
+alloc.o:
+nm: alloc.o: no symbols
+compare.o:
+nm: compare.o: no symbols
+devname.o:
+nm: devname.o: no symbols
+ksym.o:
+nm: ksym.o: no symbols
+}}}
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>library 의 사용</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>library 의 사용</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				yundream@coconut.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN15"
+>Library 이야기</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN17"
+>라이브러리란 무엇인가</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN22"
+>라이브러리의 종류</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN41"
+>왜 정적라이브러리의 사용을 지양하는가</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN46"
+>라이브러리 만들고 사용하기</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN49"
+>라이브러리화 할 코드</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN58"
+>정적라이브러리 제작</A
+></DT
+><DT
+>3.3&#51208;. <A
+HREF="#AEN70"
+>공유라이브러리 제작 / 사용</A
+></DT
+><DT
+>3.4&#51208;. <A
+HREF="#AEN82"
+>동적라이브러리의 사용</A
+></DT
+><DT
+>3.5&#51208;. <A
+HREF="#AEN93"
+>동적라이브러리를 사용하여 프로그램의 확장성과 유연성을 높이기</A
+></DT
+><DD
+><DL
+><DT
+>3.5.1&#51208;. <A
+HREF="#AEN98"
+>동적라이브러리를 이용한 예제</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN121"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이 문서는 library 의 사용방법에 대한 내용을 담고 있다. 
+		왜 라이브러리가 필요한지, 라이브러리는 어떤 종류가 있으며, 
+		어떻게 작성할수 있는지, 그리고 어떻게 사용하는지에 대해서 얘기하도록 
+		할것이다. 그리고 중간중간에 이해를 돕기 위한 실제 코딩역시 들어갈 
+		것이다.
+	</P
+><P
+>	
+		라이브러리에 대한 이러저러한 세부적인 내용까지 다루진 않을것이다. 
+		좀더 이론적인 내용을 필요로 한다면 <A
+HREF="http://kldp.org/HOWTO/html/Program-Library-HOWTO"
+TARGET="_top"
+>Program Library HOWTO</A
+> 를 참고하기 
+		바란다. 이 문서에서는 라이브러리를 만들고 활용하는 면에 중점을 둘것이다. 
+		그러므로 위의 문서는 이문서를 읽기전에 대충이라도 한번 
+		읽어보도록 한다. 
+	</P
+><P
+>	
+		정적 라이브러리와 공유라이브러리는 일반적인 내용임으로 간단한 설명과 
+		일반적인 예제를 드는 정도로 넘어갈 것이다. 그러나 동적라이브러리에 
+		대해서는 몇가지 다루어야할 이슈들이 있음으로 다른 것들에 비해서 
+		좀더 비중있게 다루게 될것이다.  	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2&#51208;. Library 이야기</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2.1&#51208;. 라이브러리란 무엇인가</A
+></H2
+><P
+>			라이브러리란 특정한 코드(함수 혹은 클래스)를 포함하고 있는 
+			컴파일된 파일이다. 이러한 라이브러리를 만드는 이유는 
+			자주 사용되는 특정한 기능을 main 함수에서 분리시켜 놓음으로써, 
+			프로그램을 유지, 디버깅을 쉽게하고 컴파일 시간을 좀더 빠르게 할수 
+			있기 때문이다. 
+		</P
+><P
+>			만약 라이브러리를 만들지 않고 모든 함수를 main 에 집어 넣는다면, 
+			수정할때 마다 main 코드를 수정해야 하고 다시 컴파일 해야 할것이다. 
+			당연히 수정하기도 어렵고 컴파일에도 많은 시간이 걸린다. 
+		</P
+><P
+>			반면 라이브러리화 해두면 우리는 해당 라이브러리만 다시 컴파일 시켜서 
+			main 함수와 링크 시켜주면 된다. 시간도 아낄뿐더러 수정하기도 매우 쉽다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.2&#51208;. 라이브러리의 종류</A
+></H2
+><P
+>			라이브러리에도 그 쓰임새에 따라서 여러가지 종류가 있다(크게 3가지). 가장 
+			흔하게 쓰일수 있는 "정적라이브러리"와 "공유라이브러리", "동적라이브러리" 가 
+			있다. 
+		</P
+><P
+>			이들 라이브러리가 서로 구분되어지는 특징은 적재 시간이 될것이다.    
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>정적라이브러리</DT
+><DD
+><P
+>						정적라이브러리는 object file(.o로 끝나는) 의 단순한 모음이다. 
+						정적라이브러린느 보통 .a 의 확장자를 가진다. 간단히 사용할수 
+						있다. 컴파일시 적재되므로 유연성이 떨어진다. 최근에는 
+						정적라이브러리는 지양되고 있는 추세이다. 컴파일시 적재되므로 
+						아무래도 바이너리크기가 약간 커지는 문제가 있을것이다.   
+					</P
+></DD
+><DT
+>공유라이브러리</DT
+><DD
+><P
+>						공유라이브러리는 프로그램이 시작될때 적재된다. 
+						만약 하나의 프로그램이 실행되어서 공유라이브러리를 사용했다면, 
+						그뒤에 공유라이브러리를 사용하는 모든 프로그램은 
+						자동적으로 만들어져 있는 공유라이브러리를 사용하게 된다. 
+						그럼으로써 우리는 좀더 유연한 프로그램을 만들수 잇게 된다.   
+					</P
+><P
+>						정적라이브러리와 달리 라이브러리가 컴파일시 적재되지 않으므로 
+						프로그램의 사이즈 자체는 작아지지만 이론상으로 봤을때, 
+						라이브러리를 적재하는 시간이 필요할것이므로 정적라이브러리를 
+						사용한 프로그램보다는 1-5% 정도 느려질수 있다. 
+						하지만 보통은 이러한 느림을 느낄수는 없을것이다. 
+					</P
+></DD
+><DT
+>동적라이브러리</DT
+><DD
+><P
+>						공유라이브러리가 프로그램이 시작될때 적재되는 반면 
+						이것은 프로그램시작중 특정한때에 적재되는 라이브러리이다. 
+						플러그인 모듈등을 구현할때 적합하다. 
+						설정파일등에 읽어들인 라이브러리를 등록시키고 원하는 
+						라이브러리를 실행시키게 하는등의 매우 유연하게 작동하는 
+						프로그램을 만들고자 할때 유용하다.  
+					</P
+><P
+>					</P
+></DD
+></DL
+></DIV
+>
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>2.2.1&#51208;. 왜 정적라이브러리의 사용을 지양하는가</A
+></H3
+><P
+>				예전에 libz 라는 라이브러리에 보안 문제가 생겨서 한창 시끄러웠던적이 
+				있다. libz 라이브러리는 각종 서버프로그램에 매우 널리 사용되는 
+				라이브러리였는데, 실제 문제가 되었던 이유는 많은 libz 를 사용하는 
+				프로그램들이 "정적라이브러리" 형식으로 라이브러리를 사용했기 때문에, 
+				버그픽스(bug fix)를 위해서는 문제가 되는 libz 를 사용하는 프로그램들을 
+				다시 컴파일 시켜야 했기 때문이다. 한마디로 버그픽스 자체가 어려웠던게 
+				큰 문제였었다. 도대체 이 프로그램들이 libz 를 사용하고 있는지 그렇지 
+				않은지를 완전하게 알기도 힘들뿐더러, 언제 그많은 프로그램을 다시 
+				컴파일 한단 말인가.
+			</P
+><P
+>				만약 libz 를 정적으로 사용하지 않고 "공유라이브러리" 형태로 사용한다면 
+				bug fix 가 훨씬 쉬웠을것이다. 왜냐면 libz 공유라이브러리는 하나만 있을 
+				것이므로 이것만 업그레이드 시켜주면 되기 때문이다. 
+			</P
+><P
+>				아뭏든 이렇게 유연성이 지나치게 떨어진다는 측면이 정적라이브러리를 
+				사용하지 않는 가장 큰 이유가 될것이다. 프로그램들의 덩치가 커지는 
+				문제는 유연성 문제에 비하면 그리큰문제가 되지는 않을것이다. 
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN46"
+>3&#51208;. 라이브러리 만들고 사용하기</A
+></H1
+><P
+>		이번장에서는 실제로 라이브러리를 만들고 사용하는 
+		방법에 대해서 각 라이브러리 종류별로 알아볼 것이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN49"
+>3.1&#51208;. 라이브러리화 할 코드</A
+></H2
+><P
+>			라이브러리의 이름은 libmysum 이 될것이며, 여기에는 2개의 함수가 
+			들어갈 것이다. 하나는 덧셈을 할 함수로 "ysum" 또 하나는 뺄셈을 
+			위한 함수로 "ydiff" 으로 할것이다. 이 라이브러리를 만들기 위해서 
+			mysum.h 와 mysum.c 2개의 파일이 만들어질것이다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>mysum.h</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int ysum(int a, int b); 
+int ydiff(int a, int b);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>mysun.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include "mysum.h"
+int ysum(int a, int b)
+{
+    return a + b; 
+}
+int ydiff(int a, int b)
+{
+    return a - b;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN58"
+>3.2&#51208;. 정적라이브러리 제작</A
+></H2
+><P
+>			정적라이브러리는 위에서 말했듯이 단순히 오브젝트(.o)들의 모임이다. 
+			오브젝트를 만든다음에 ar 이라는 명령을 이용해서 라이브러리 아카이브를 
+			만들면 된다. 
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -c mysum.c
+[root@localhost test]# ar rc libmysum.a mysum.o
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			아주아주 간단하다. 단지 ar 에 몇가지 옵션만을 이용해서 libmysum 이란 라이
+			브러리를 만들었다. 'r' 은 libmysum.a 라는 라이브러리 아카이브에 새로운 
+			오브젝트를 추가할것이라는 옵션이다. 'c' 는 아카이브가 존재하지 않을경우 
+			생성하라는 옵션이다. 
+		</P
+><P
+>			이제 라이브러리가 실제로 사용가능한지 테스트해보도록 하자.
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : print_sum.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include "mysum.h"
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main()
+{
+    char oper[5];
+    char left[11];
+    char right[11];
+    int  result;
+
+    memset(left, 0x00, 11);
+    memset(right, 0x00, 11);
+
+    // 표준입력(키보드)으로 부터  문자를 입력받는다.
+    // 100+20, 100-20 과 같이 연산자와 피연산자 사이에 공백을 두지 않아야 한다.  
+    fscanf(stdin, "%[0-9]%[^0-9]%[0-9]", left, oper, right);
+    if (oper[0] == '-')
+    {
+        printf("%s %s %s = %d&#92;n", left, oper, right, 
+                        ydiff(atoi(left), atoi(right)));
+    }
+    if (oper[0] == '+')
+    {
+        printf("%s %s %s = %d&#92;n", left, oper, right, 
+                        ysum(atoi(left), atoi(right)));
+    }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			위의 프로그램을 컴파일 하기 위해서는 라이브러리의 위치와 어떤 라이브러리를 
+			사용할것인지를 알려줘야 한다. 라이브러리의 위치는 '-L' 옵션을 이용해서 
+			알려줄수 있으며, '-l' 옵션을 이용해서 어떤 라이브러리를 사용할것인지를 
+			알려줄수 있다. -l 뒤에 사용될 라이브러리 이름은 라이브러리의 이름에서 
+			"lib"와 확장자 "a"를 제외한 나머지 이름이다. 즉 libmysum.a 를 사용할 것이라면 
+			"-lmysum" 이 될것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -o print_sum print_num.c -L./ -lmysum
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			만약 우리가 사용할 라이브러리가 표준 라이브러리 디렉토리경로에 있다면 
+			-L 을 사용하지 않아도 된다. 표준라이브러리 디렉토리 경로는 /etc/ld.so.conf 
+			에 명시되어 있다.  
+		</P
+><P
+>			정적라이브러리 상태로 컴파일한 프로그램의 경우 컴파일시에 라이브러리가 
+			포함되므로 라이브러리를 함께 배포할 필요는 없다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN70"
+>3.3&#51208;. 공유라이브러리 제작 / 사용</A
+></H2
+><P
+>	
+			print_sum.c 가 컴파일되기 위해서 사용할 라이브러리 형태가 정적라이브러리에서 
+			공유라이브러리로 바뀌였다고 해서 print_sum.c 의 코드가 변경되는건 아니다. 컴파일 
+			방법역시 동일하며 단지 라이브러리 제작방법에 있어서만 차이가 날뿐이다. 
+		</P
+><P
+>			이제 위의 mysum.c 를 공유라이브러리 형태로 만들어보자. 공유라이브러리는 
+			보통 .so 의 확장자를 가진다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -fPIC -c mysum.c
+[root@localhost test]# gcc -shared -W1,-soname,libmysutff.so.1 -o libmysum.so.1.0.1 mysum.o
+[root@localhost test]# cp libmysum.so.1.0.1 /usr/local/lib
+[root@localhost test]# ln -s /usr/local/lib/libmysum.so.1.0.1 /usr/local/lib/libmysum.so
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			우선 mysum.c 를 -fPIC 옵션을 주어서 오브젝트 파일을 만들고, 다시 gcc 를 이용해서 
+			공유라이브러리를 제작한다. 만들어진 라이브러리를 적당한 위치로 옮기고 나서 
+			ln 을 이용해서 컴파일러에서 인식할수 있는 이름으로 심볼릭 링크를 걸어준다. 
+		</P
+><P
+>			컴파일 방법은 정적라이브러리를 이용한 코드의 컴파일 방법과 동일하다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco test]# gcc -o print_sum print_sum.c -L/usr/local/lib -lmysum
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			공유라이브러리는 실행시에 라이브러리를 적재함으로 프로그램을 배포할때는 
+			공유라이브러리도 함께 배포되어야 한다. 그렇지 않을경우 다음과 같이 
+			공유라이브러리를 찾을수 없다는 메시지를 출력하면서 프로그램 실행이 중단될 
+			것이다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco library]# ./print_sum
+./print_sum: error while loading shared libraries: libmysub.so: cannot open shared object file: No such file or directory
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위와 같은 오류메시지를 발견했다면 libmysub.so 가 시스템에 존재하는지 확인해 보자. 
+			만약 존재하는데도 위와 같은 오류가 발생한다면 이는 LD_LIBRARY_PATH 나 /etc/ld.so.conf 에 
+			라이브러리 패스가 지정되어 있지 않을 경우이다. 이럴때는 LD_LIBRARY_PATH 환경변수에 
+			libmysub.so 가 있는 디렉토리를 명시해주거나, /etc/ld.so.conf 에 디렉토리를 추가시켜주면 
+			된다.  
+			</P
+><P
+>			만약 libmysub.so 가 /usr/my/lib 에 복사되어 있고 환경변수를 통해서 라이브러리의 
+			위치를 알려주고자 할때는 아래와 같이 하면된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/my/lib 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그렇지 않고 ld.so.conf 파일을 변경하길 원한다면(이럴경우 관리자 권한을 가지고 있어야 
+			할것이다) ld.so.conf 에 라이브러리 디렉토리를 추가하고 ldconfig 를 한번 실행시켜주면 된다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# cat /usr/my/lib &#62;&#62; /etc/ld.so.conf 
+[root@localhost test]# ldconfig
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			ldconfig 를 실행시키게 되면 /etc/ld.so.conf 의 파일을 참조하여서 /etc/ld.so.cache 
+			파일이 만들어지고, 프로그램은 ld.so.cache 의 디렉토리 경로에서 해당 라이브러리가 
+			있는지 찾게 된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN82"
+>3.4&#51208;. 동적라이브러리의 사용</A
+></H2
+><P
+>			동적라이브러리라고 해서 동적라이브러리를 만들기 위한 어떤 특별한 방법이 있는것은 
+			아니다. 일반 공유라이브러리를 그대로 쓰며, 단지 실행시간에 동적라이브러리를 
+			호출하기 위한 방법상의 차이만 존재할 뿐이다.   
+		</P
+><P
+>			정적/공유 라이브러리가 라이브러리의 생성방법과 컴파일방법에 약간의 차이만 있고 
+			코드는 동일하게 사용되었던것과는 달리 동적라이브러리는 코드자체에 차이가 
+			있다. 그럴수밖에 없는게, 동적라이브러리는 프로그램이 샐행되는 중에 특정한 
+			시점에서 부르고 싶을때 라이브러리를 적재해야 하므로, 라이브러리를 적재하고, 사용하고 
+			해제(free) 하기 위한 코드를 생성해야 하기 때문이다. 
+		</P
+><P
+>			linux 에서는 이러한 라이브러리를 호출하기 위한 아래와 같은 함수들을 제공한다. 
+			아래의 함수들은 solaris 에서 동일하게 사용될수 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;dlfcn.h&#62;
+
+void *dlopen (const char *filename, int flag);
+const char *dlerror(void);
+void *dlsym(void *handle, char *symbol);
+int dlclose(void *handle); 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			<B
+CLASS="EMPHASIS"
+>dlopen</B
+> 은 동적라이브러리를 적재하기 위해서 사용된다. 
+			첫번째 아규먼트인 filename 은 
+			/usr/my/lib/libmysum.so 와 같이 적재하기 원하는 라이브러리의 이름이다. 만약 
+			적재시킬 라이브러리의 이름이 절대경로로 지정되어 있지 않을경우에는 LD_LIBRARY_PATH 
+			에 등록된 디렉토리에서 찾고, 여기에서도 찾지 못할경우 /etc/ld.so.cache 에 등록된 
+			디렉토리 리스트에서 찾게 된다. dlopen(3) 이 성공적으로 호출되면 해당 라이브러리에 대한 
+			handle 값을 넘겨 준다. flag 는 RTLD_LAZY와 RTLD_NOW 중 하나를 정의할수 있다. 
+			RTLD_LAZY는 라이브러리의 코드가 실행시간에 정의되지 않은 심볼을 해결하며, 
+			RTLD_NOW 는 dlopen 의 실행이 끝나기전에(return 전에) 라이브러리에 정의되지 않은 
+			심볼을 해결한다.  
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>dlerror</B
+> 는 dl 관련함수들이 제대로 작동을 수행하지 않았을경우 
+			에러메시지를 되돌려준다. dleooro(), dlsym(), dlclose(), dlopen(3)중 마지막 호출된 
+			함수의 에러메시지를 되돌려준다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>dlsym</B
+> 은 dlopen(3) 을 통해서 열린라이브러리를 사용할수 있도록 
+			심볼값을 찾아준다. 심볼이라고 하면 좀 애매한데, 
+			심볼값은 즉 열린라이브러리에서 여러분이 실제로 호출할 함수의이름이라고 
+			생각하면 된다. handle 는 dlopen(3) 에 의해서 반환된 값이다. symbol 은 
+			열린라이브러리에서 여러분이 실제로 부르게될 함수의 이름이다. dlsym 의 리턴값은 
+			dlopen 으로 열린 라이브러리의 호출함수를 가르키게 된다. 리턴값을 보면 void * 형으로 
+			되어 있는데, void 형을 사용하지 말고 호출함수가 리턴하는 형을 직접명시하도록 
+			하자. 이렇게 함으로써 나중에 프로그램을 유지보수가 좀더 수월해진다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN93"
+>3.5&#51208;. 동적라이브러리를 사용하여 프로그램의 확장성과 유연성을 높이기</A
+></H2
+><P
+>			동적라이브러리는 실행시간에 필요한 라이브러리를 호출할수 있음으로 
+			조금만(사실은 아주 많이겠지만 T.T) 신경쓴다면 매우 확장성높고 유연한 
+			프로그램을 만들수 있다. 
+		</P
+><P
+>			동적라이브러리의 가장 대표적인 예가 아마도 Plug-in 이 아닐까 싶다. 
+			만약에 모질라 브라우저가 plug-in 을 지원하지 않는 다면 우리는 새로운 기능들 
+			이 추가될때 마다 브라우저를 다시 코딩하고 컴파일하는 수고를 해야할것이다. 
+			그러나 동적라이브러리를 사용하면 브라우저를 다시 코딩하고 컴파일 할필요 없이, 
+			해당 기능을 지원하는 라이브러리 파일만 받아서 특정 디렉토리에 설치하기만 하면 
+			될것이다. 물론 동적라이브러리를 사용하기만 한다고 해서 이러한 기능이 바로 구현되는 
+			건 아니다. Plug-in 의 효율적인 구성을 위한 표준화된 API를 제공하고 여기에 
+			맞게 Plug-in 용 라이브러리를 제작해야만 할것이다. 
+		</P
+><P
+>			우리가 지금까지 얘로든 프로그램을 보면 현재 '+', '-' 연산을 지원하고 있는데, 
+			만약 'x', '/' 연산을 지원하는 라이브러리가 만들어졌다면, 
+			우리는 프로그램의 코딩을 다시해야만 할것이다. 이번에는 동적라이브러리를 
+			이용해서 plug-in 방식의 확장이 가능하도록 프로그램을 다시 만들어 보도록 
+			할것이다.    
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN98"
+>3.5.1&#51208;. 동적라이브러리를 이용한 예제</A
+></H3
+><P
+>				동적라이브러리를 이용해서 main 프로그램의 재코딩 없이 추가되는 
+				새로운 기능을 추가시키기 위해서는 통일된 인터페이스를 지니는 특정한 
+				형식을 가지도록 라이브러리가 작성되어야 하며, 설정파일을 통하여서 
+				어떤 라이브러리가 불리어져야 하는지에 대한 정보를 읽어들일수 있어야 
+				한다. 그래서 어떤 기능을 추가시키고자 한다면 특정 형식에 맞도록 
+				라이브러리를 제작하고, 설정파일을 변경하는 정도로 만들어진 새로운 
+				라이브러리의 기능을 이용할수 있어야 한다.  
+			</P
+><P
+>				설정파일은 다음과 같은 형식으로 만들어진다. 설정파일의 이름은 
+				plugin.cfg 라고 정했다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>+,ysum,libmysum.so
+-,ydiff,libmysum.so
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				'-' 연산에대해서는 libmysum.so 라이브러리를 호출하며, ydiff 함수를 사용한다. 
+				'=' 연산에 대해서는 libmysum.so 라이브러리를 호출하고 ysum 함수를 사용한다는 
+				뜻이다. 설정파일의 이름은 plugin.cfg 로 하기로 하겠다. 
+			</P
+><P
+>				다음은 동적라이브러리로 만들어진 print_sum 의 새로운 버젼이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : print_sum_dl.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;dlfcn.h&#62;
+#include &#60;string.h&#62;
+
+struct input_data
+{
+    char    oper[2];
+    char    func[10]; 
+    char    lib[30];
+};
+
+int main(int argc, char **argv)
+{
+    char oper[2];
+    char left[11];
+    char right[11];
+    char buf[50];
+    char null[1];
+    int data_num;
+
+    struct input_data plug_num[10]; 
+
+    void *handle;
+
+    int (*result)(int, int);
+    int i;
+    char *error;
+
+    FILE *fp;
+
+    // 설정파일을 읽어들이고 
+    // 내용을 구조체에 저장한다. 
+    fp = fopen("plugin.cfg", "r");
+    data_num = 0;
+    while(fgets(buf, 50, fp) != NULL)
+    {
+        buf[strlen(buf) -1] = '&#92;0';
+        sscanf(buf, "%[^,]%[,]%[^,]%[,]%[^,]", plug_num[data_num].oper, 
+                                               null,    
+                                               plug_num[data_num].func, 
+                                               null,
+                                               plug_num[data_num].lib);
+        data_num ++;
+    }
+    fclose(fp);
+
+    printf("&#62; ");
+    memset(left, 0x00, 11);
+    memset(right, 0x00, 11);
+    fscanf(stdin, "%[0-9]%[^0-9]%[0-9]", left, oper, right);
+
+    // 연산자를 비교해서 
+    // 적당한 라이브러리를 불러온다. 
+    for (i  = 0; i &#60; data_num ; i++)
+    {
+        int state; 
+        if ((state = strcmp(plug_num[i].oper, oper)) == 0) 
+        {
+            printf("my operator is      : %s&#92;n", plug_num[i].oper);
+            printf("my call function is : %s&#92;n", plug_num[i].func);
+            break;
+        }
+    }    
+
+    if (i == data_num)
+    {
+        printf("--&#62; unknown operator&#92;n");
+        exit(0);
+    }
+
+    handle = dlopen(plug_num[i].lib, RTLD_NOW);
+    if (!handle)
+    {
+        printf("open error&#92;n");
+        fputs(dlerror(), stderr);
+        exit(1);
+    }
+
+    // 연산자에 적당한 함수를 불러온다. 
+    result = dlsym(handle, plug_num[i].func);
+    if ((error = dlerror()) != NULL)
+    {
+        fputs(error, stderr);
+        exit(1);
+    }
+
+    printf("%s %s %s = %d&#92;n",left, oper, right, result(atoi(left), atoi(right)) ); 
+
+    dlclose(handle);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 예제 프로그램은 다음과 같이 컴파일되어야 한다.   
+				라이브러리 파일의 위치는 /usr/my/lib 아래에 있는것으로 하며, 라이브러리 찾기 
+				경로에 등록되어 있다고 가정하겠다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -o print_sum_dl print_sum_dl.c -ldl 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 프로그램을 실행하면 사용자의 입력을 기다리는 "&#62; "가 뜨게 되고, 
+				여기에 계산하기 원하는 값을 입력하면 된다. 현재는 '+'와 '-' 연산만을 
+				지원하며, 연산자와 피연산자들 간에 간격이 없어야 한다. 다음은 실행결과 화면이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  
+[root@localhost test]# ./print_sum_dl
+&#62; 99+99
+my operator is      : +
+my call function is : ysum
+99 + 99 = 198
+[root@localhost test]#
+				</PRE
+></TD
+></TR
+></TABLE
+>  
+				사용자가 프로그램을 실행하면 프로그램은 사용자의 입력을 받아들이고 
+				sscanf 를 이용해서 연산자와 피연산자를 구분하게 된다. 
+				그리고 피연산자를 값으로 하여, 설정파일에 설정된 라이브러리를 불러들이고(dlopen) 
+				해당 함수를 가져와서(dlsym) 실행시키게 된다.  
+			</P
+><P
+>				자 이렇게 해서 우리는 '+', '-' 연산이 가능한 프로그램을 하나 만들게 되었다. 
+				그런데 A 라는 개발자가 '*','/' 연산도 있으면 좋겠다고 생각해서 
+				아래와 같은 코드를 가지는 
+				'*', '/' 연산을 위한 라이브러리를 제작하였다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : mymulti.h</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int multi(int a, int b);
+int div(int a, int b);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				<B
+CLASS="EMPHASIS"
+>예제 : mymulti.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int multi(int a, int b)
+{
+    return a * b;
+}
+
+int div(int a, int b)
+{
+    return a / b;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				A 라는 개발자는 이것을 다음과 같이 공유라이브러리 형태로 만들어서 
+				간단한 라이브러리의 설명과 함께 email 로 전송했다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# gcc -c -fPIC mymulti.c
+[root@localhost test]# gcc -shared -W1,-soname,libmymulti.so.1 -o libmymulti.so.1.0.1 mymulti.o
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				라이브러리를 받았으므로 새로운 라이브러리가 제대로 작동을 하는지 
+				확인을 해보도록 하자. 우선 libmymulti.so.1.0.1 을 /usr/my/lib 로 
+				복사하도록 하자. 그다음 설정파일에 다음과 같은 내용을 가지도록 
+				변경 시키도록 하자.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
++,ysum,libmystuff.so
+-,ydiff,libmystuff.so
+*,ymulti,libmymulti.so.1.0.1
+/,ydiv,libmymulti.so.1.0.1
+				</PRE
+></TD
+></TR
+></TABLE
+> 
+				이제 print_sum_dl 을 실행시켜보자.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./print_sum_dl
+&#62; 10*10
+my operator is      : *
+my call function is : ymulti
+10 * 10 = 100
+
+[root@localhost test]# ./print_sum_dl
+&#62; 10/10
+my operator is      : /
+my call function is : ydiv
+10 / 10 = 1
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				print_sum_dl.c 의 원본파일의 아무런 수정없이 단지 설정파일만 변경시켜 
+				줌으로써 기존의 print_sum_dl 에 "곱하기"와 "나누기"의 새로운 기능이 
+				추가 되었다.  
+			</P
+><P
+>				위에서도 말했듯이 이러한 Plug-in 비슷한 기능을 구현하기 위해서는 
+				통일된 함수 API가 제공될수 있어야 한다. 
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN121"
+>4&#51208;. 결론</A
+></H1
+><P
+>		여기에 있는 내용중 동적라이브러리에 대한 내용은 솔라리스와 리눅스에서만 동일하게 
+		사용할수 있다. Hp-Ux 혹은 윈도우에서는 사용가능하지 않는 방법이다. 
+		이에 대한 몇가지 해법이 존재하는데, 이 내용은 나중에 시간이 되면 다루도록 하겠다. 
+		어쨋든 솔라리스와 리눅스 상에서 코딩되고 윈도우 혹은 다른 유닉스로 포팅될 프로그램이 
+		아니라면 위의 방법을 사용하는데 있어서 문제가 없을것이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,412 @@
+= IDE interface =
+ [[TableOfContents]]
+ * 작성자: 조재혁 ([mailto:minzkn@infoeq.com])
+ == 개요 ==
+  * 우리가 일반적으로 사용하는 HardDisk의 제어방식은 크게 IDE와 SCSI로 나뉘어 집니다. 그 밖에도 여러가지 방식이 있지만 일반적으로 널리쓰인다고 보기 어려우므로 여기서는 가장 많이 사용되는 IDE방식에 대해서 설명하고 여유가 있다면 SCSI에 대하여 언급하고자 합니다.
+  * 이 문서의 최근 버젼은 http://www.joinc.co.kr 의 위키페이지에서 접하실수 있습니다.
+  * 여기에 기술된 정보는 필자의 x86에서 해본것에 제한이 걸립니다. 다른 환경에서는 또 다른 방법의 접근이 있을수 있겠습니다.
+  * 만약 문서에 잘못된 부분이 있으면 마음대로 고쳐주세요. 그리고 저에게 알려주신다면 문서의 버젼업에 도움이 될겁니다. (E-Mail: minzkn@infoeq.com)
+ == 물리적 방식 ==
+  === 물리적인 HardDisk를 구분하기 위한 방식 ===
+   * 아래에서 사용된 이름은 통상적으로 불리워지는 이름일뿐 반드시 그렇게 불러야 하는 철칙은 아닙니다. 제작사가 다르게 부르라고 하면 다르게 불러야 겠죠?
+   * 크게 직접적으로 IDE adapter에 붙는 것은 Master와 Slave의 두개의 커넥터로 연결이 되며 IDE adapter는 Primary와 Secondary로 2개가 보통(통상) 존재하게 됩니다.
+   * IDE adapter가 2개, 그리고 각각 Master와 Slave커넥터가 있어서 이론적으로 4개의 물리적으로 분리된 HardDisk를 사용할수 있게 됩니다.
+   * 보통 ISA 또는 EISA bus를 사용하여 IDE adapter와 구성되는데 일반적인 모습인거 같이도 합니다. 그러나 이것은 SCSI를 사용하는 경우 PCI bus가 사용되는것도 일반적인 구성인거 같아 보입니다.
+   ||<|2> Primary   || Master ||
+                    || Slave  ||
+   ||<|2> Secondary || Master ||
+                    || Slave  ||
+
+  === 주소를 부여하기 위한 방식 ===
+   ==== C/H/S ====
+    * C/H/S 는 Cyliner 또는 Track, Head, Sector로 구성된 요소 3가지를 사용하여 주소를 지정하는 방법을 지칭합니다.
+    * 이 주소지정 방법은 Software적인 면에서만 보면 억지로 분류한다면 BIOS를 통한 방법과 PIO를 직접 통하는 방법으로 나뉘며 주소지정의 한계에 차이가 있게 됩니다.
+     * BIOS call을 통한 register인자 전달에 의해서 C/H/S의 접근에서는 Cyliner(0 ~ 1023),  Head(0 ~ 255), Sector(1 ~ 63)의 공간을 지정할수 있게 됩니다.
+     * 여기서 실린더 1024의 제한이라는 예기를 들어보셨을겁니다. 바로 Cylinder 주소가 1024개까지 지정할수 있어서 발생한 문제입니다.
+     * 그리고 보시면 Head가 255까지 지정가능하지만 실제 물리적인 구성은 많아봐야 16개의 Head가 많은편에 속할겁니다. 그래서 528MByte 이상을 주소지정할수 없게 되던 시절이 있었습니다. (486시절 이전)
+     * 그래서 나온것이 BIOS에서 논리적으로 C/H/S를 재 매핑하여 마치 Head가 256개인것처럼 재 계산해서 매핑해주는 방법이 있는데 BIOS설정에서 LBA방식이라고 하는 것이 그것입니다. 
+     * 결론적으로 이렇게 BIOS를 통해서 Head수를 가상적으로 매핑해주면 최대 8GByte라는 주소지정이 가능합니다. (512 byte sector를 기준으로 본다면)
+     * 그런데 요즘에는 10G, 20G, 40G, ... 등이 사용되는 것을 볼수 있습니다. 물론 이것은 BIOS를 통한 방법이 아니기 때문에 가능하게 된겁니다. 바로 그것은 직접 IDE controller를 제어하는 것이죠. 그렇게 되면 행복하게도 Cylinder(0 ~ 65535), Head(0 ~ 15), Sector(0 ~ 255)까지를 주소지정하는것이 가능하게 됩니다. 원래 이것이 가능했었지만 단지 BIOS를 사용하게 될때 인자 전달시 register를 16bit로만 사용하였기 때문에 문제가 어렵게 풀려진 것입니다. 그리하여 결론은 이렇게 직접 제어하게 되면 이론적으로 2의 28승인 주소지정이 가능하고 512 byte sector를 기준으로 한다면 128GByte를 사용할수 있게 됩니다.
+   ==== LBA ====
+    * 논리적으로 Cylinder/Head/Sector의 개념을 감추고 하나의 선형주소공간을 사용하는 것인데 복잡한 계산없이 곧바로 선형주소를 사용하기 때문에 운영체제 개발자들에게는 참으로 편한 방법입니다. 
+    * 마찬가지로 이것이 접근 가능한 최대 주소공간은 2의 28승이고 512 byte sector를 기준으로 한다면 128GByte를 사용할수 있습니다.
+  === 속도를 위해 접근하는 방식 ===
+   ==== 건너뛰는 섹터 (Interleave format) ====
+    * Head의 Data접근 속도를 올리는 것은 사실상 너무 어려운 부분입니다. 가격적인 면에서도 그렇지요. 그래서 디스크의 회전속도를 좀 높이고 Sector의 배열을 1->2->3->... 순으로 하지 않고 1->32->2->33->3->34->...63->32->1->32->... 과 같이 배열을 하여 적절한 속도를 꾀하는 방법을 사용합니다.
+    * 왜 디스크 회전속도를 높이면 좋을까요? 헤드가 못따라가주는데 굳이 빠르게 하는 이유는 뭘까요? 마로 Cylinder간을 Head가 이동했을때 특정 Sector의 접근이 빨라지겠죠?
+   ==== 뒤틀린 실린더 (Cylinder skew) ====
+    * 정확히는 Cylinder에 따라서 뒤틀려가는 Sector라고 표현하는게 맞는거 같지만 언어표현의 문제이므로 그냥 설명으로 하겠습니다. 일종의 Interleave방식에서 보다 개선하고자 하는 노력에서 나온거 같은데 필자의 생각으로는 그렇게 큰 향상은 보일수 없지만 순차적으로 큰 파일을 속도변화 없이 읽는 Streamming에서는 효과가 좀 있지 않을까라는 생각을 해봅니다. 디스크 원반의 중심에서 외곽으로 선을 그었을때 외곽의 Sector가 1번인 위치에서 안쪽으로 들어갈수록 같은 1번 Sector로 구성되는 것이 아닌 1->2->3->4 순으로 Sector를 약간 어긋나게 하는 방식입니다. 이유는 Head가 움직여야 하기 때문에 그 시간만큼을 뒤틀어 주는것이죠.
+   ==== 건너뛰는 섹터에 뒤틀리는 실린더 (Interleave cylinder skew) ====
+    * 이것은 위의 2가지 방법을 합쳐서 최적화하고자 하는 겁니다. 설명이 필요없겠죠? 위의 2가지에서 1가지만 취해도 좋지만 장인정신에 입각한다면 당연히 2가지 전부 고려해야 되겠죠?
+   ==== 연관성이 있는 Data로 순서 바꾸기 (디스크조각모음) ====
+    * 디스크 조각모음은 다들 아실겁니다. 연관된 파일단위 또는 디렉토리단위의 묶음을 하나의 일직선처럼 연속된 접근을 할수 있도록 Data를 특정 조건에 의하여 재 정렬하는 겁니다. 보통 이것은 우리가 HardDisk를 사용하지 않을때 하는게 보통이죠.
+    * 보통 이것은 Head의 움직임을 줄이고자 하는게 가장 큰 목표일겁니다.
+   ==== 예측 버퍼화 (buffering) ====
+    * 예측이라는 말이 대단한 것은 아니고 그냥 다음 섹터를 미리 읽거나 하나의 Cylinder를 읽어두거나 하는 방법입니다. 특별히 이것은 이거다! 라고 할수는 없고 물리적으로 구성된 내용과 파일시스템 관리적인 차원을 고려하여 적절히 Buffering을 취하는 겁니다. 이것에 대해서 필자는 필자가 알고 있는것을 적지 않겠습니다. 그것이 절대적인 방법이 아니기 때문이죠.
+  === Data의 신뢰도를 높이는 방식 ===
+   ==== Data를 외곽에 배치하도록 바꾸기 (디스크 최적화) ====
+    * 원반형 디스크를 관찰해보면 외곽쪽이 안쪽보다 밀도와 데이터 양에 따른 비율로 보면 외곽이 Data의 신뢰도가 있을거라는 추측을 할수 있습니다.
+    * 보통 Cylinder의 0번이 물리적으로 외곽에 위치하는데 자주 쓰이는 데이터를 외곽에 저장할수 있도록 확률을 높여보자는 취지도 있습니다.
+ == 제어차원의 방식 ==
+  === PIO ===
+   * Multi task환경이 아니라면 이것의 속도가 훨씬 빠른경우가 많겠습니다. 물론 디스크 개발자가 DMA에 보다 신경 썼다면 예기는 다를수 있지만 보통은 PIO가 훨씬 빠릅니다. 하지만 그것도 옛날예기인듯 되어가는 것이 개발기술이 발전되어 이것은 거짓이 될수 있겠네요.
+  === DMA ===
+ == 문서를 마치며 ==
+ == 부록 ==
+  === IDE를 PIO방식으로 사용하는 예제 (Real mode) ===
+   * 아쉽게도 필자 나름대로의 목적이 있어서 32bit code로는 보여드리지 않고 옛날에 만들었던 DOS용 source를 보여드리겠습니다. 참고로 이것은 PIO모드입니다.
+   {{{#!vim masm
+COMMENT #
+ Code by JaeHyuk Cho
+ NOTE: 2000.10.03 (TUE)
+  - Reference
+    "The SCSI Bus & IDE Interface (SECOND EDITION) : ASSISON-WESLEY"
+    "Linux source (linux/kernel/hd.c) : (C) 1991 Linus Tovalds "
+#
+
+DEF_ASM_IDE        EQU "IDE.ASM"
+
+DEF_IDE_Fixed_00   = 01F0h
+DEF_IDE_Fixed_01   = 0170h
+;
+DEF_IDE_PORT_Data  = 0000h
+DEF_IDE_PORT_Error = 0001h
+DEF_IDE_PORT_NSector = 0002h
+DEF_IDE_PORT_Sector = 0003h
+DEF_IDE_PORT_LCylinder = 0004h
+DEF_IDE_PORT_HCylinder = 0005h
+DEF_IDE_PORT_Current = 0006h
+DEF_IDE_PORT_Status = 0007h
+DEF_IDE_PORT_PreComp = DEF_IDE_PORT_Error
+DEF_IDE_PORT_Command = DEF_IDE_PORT_Status
+DEF_IDE_PORT_CMD   = 03F6h
+;
+DEF_IDE_PORT_CMD_SRST = 04h
+;
+DEF_IDE_ERR_AMNF   = 01h
+DEF_IDE_ERR_TK0NF  = 02h
+DEF_IDE_ERR_ABRT   = 04h
+DEF_IDE_ERR_MCR    = 08h
+DEF_IDE_ERR_IDNF   = 10h
+DEF_IDE_ERR_MC     = 20h
+DEF_IDE_ERR_UNC    = 40h
+DEF_IDE_ERR_BBK    = 80h
+;
+DEF_IDE_STAT_ERR   = 01h
+DEF_IDE_STAT_IDX   = 02h
+DEF_IDE_STAT_CORR  = 04h
+DEF_IDE_STAT_DRQ   = 08h
+DEF_IDE_STAT_DSC   = 10h
+DEF_IDE_STAT_DF    = 20h
+DEF_IDE_STAT_DRDY  = 40h
+DEF_IDE_STAT_BSY   = 80h
+;
+DEF_IDE_TimeOutCount = 0FFFFh
+DEF_IDE_FixedMax   = 0002h
+DEF_IDE_DeviceMax  = 0002h
+
+PUBLIC             IDE_Identify
+PUBLIC             IDE_Read, IDE_Write, IDE_Seek
+;
+PUBLIC             IDE_BasePort
+
+                   ASSUME CS:CODE_IDE, DS:DATA_IDE, ES:NOTHING, SS:STACK_DEFAULT
+CODE_IDE           SEGMENT
+IDE_GetBasePort    PROC NEAR ; DX near pascal IDE_GetBasePort(unsigned int s_fixed, unsigned int s_index)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH DS
+                   PUSH BX
+                   MOV BX, DATA_IDE
+                   MOV DS, BX
+                   MOV BX, WORD PTR [BP + 06h]             ; s_fixed
+                   SHL BX, 01h
+                   MOV DX, WORD PTR DATA_IDE:IDE_BasePort[BX]
+                   ADD DX, WORD PTR [BP + 04h]             ; s_index
+                   POP BX
+                   POP DS
+                   POP BP
+                   RETN 2 + 2
+IDE_GetBasePort    ENDP
+IDE_WhileBusy      PROC NEAR ; CX near pascal IDE_WhileBusy(unsigned int s_fixed)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH AX
+                   PUSH DX
+                   PUSH WORD PTR [BP + 04h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Status
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   MOV CX, DEF_IDE_TimeOutCount
+L_IDE_WhileBusy_00 LABEL SHORT
+                   IN AL, DX
+                   AND AL, (DEF_IDE_STAT_BSY OR DEF_IDE_STAT_DRDY OR DEF_IDE_STAT_DF OR DEF_IDE_STAT_DSC OR DEF_IDE_STAT_ERR)
+                   CMP AL, DEF_IDE_STAT_DRDY OR DEF_IDE_STAT_DSC
+                   LOOPNE SHORT L_IDE_WhileBusy_00
+                   POP DX                   
+                   POP AX
+                   POP BP
+                   RETN 2
+IDE_WhileBusy      ENDP
+IDE_WriteByte      PROC NEAR ; CX near pascal IDE_WriteByte(unsigned int s_fixed, unsigned int s_port, unsigned int s_byte)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH WORD PTR [BP + 08h]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_WhileBusy
+                   JCXZ SHORT L_IDE_WriteByte_00
+                   PUSH AX
+                   PUSH DX
+                   MOV DX, WORD PTR [BP + 06h]             ; s_port
+                   MOV AL, BYTE PTR [BP + 04h]             ; s_byte
+                   OUT DX, AL
+                   POP DX
+                   POP AX
+L_IDE_WriteByte_00 LABEL SHORT
+                   POP BP
+                   RETN 2 + 2 + 2
+IDE_WriteByte      ENDP
+IDE_ReadByte       PROC NEAR ; CX, AX near pascal IDE_ReadByte(unsigned int s_fixed, unsigned int s_port)
+                   PUSH BP
+                   MOV BP, SP
+                   XOR AX, AX
+                   PUSH WORD PTR [BP + 06h]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_WhileBusy
+                   JCXZ SHORT L_IDE_ReadByte_00
+                   PUSH DX
+                   MOV DX, WORD PTR [BP + 04h]             ; s_port
+                   IN AL, DX
+                   POP DX
+L_IDE_ReadByte_00  LABEL SHORT
+                   POP BP
+                   RETN 2 + 2
+IDE_ReadByte       ENDP
+MAC_IDE_WriteByte  MACRO m_fixed, m_port, m_byte
+                   PUSH &m_fixed
+                   PUSH &m_port
+                   PUSH &m_byte
+                   CALL NEAR PTR CODE_IDE:IDE_WriteByte
+                   ENDM
+IDE_Setup          PROC NEAR ; CX near pascal IDE_Setup
+                   ; unsigned int s_fixed        : 10h
+                   ; unsigned int s_device       : 0Eh
+                   ; unsigned int s_head         : 0Ch
+                   ; unsigned int s_cylinder     : 0Ah
+                   ; unsigned int s_sector       : 08h
+                   ; unsigned int s_nsector      : 06h
+                   ; unsigned int s_command      : 04h
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH AX
+                   PUSH DX
+                   PUSH WORD PTR [BP + 10h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Data
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   ADD DX, 0002h ; The sector count register
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <WORD PTR [BP + 06h]>
+                   JCXZ SHORT L_IDE_Setup_00
+                   INC DX ; The sector number register
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <WORD PTR [BP + 08h]>
+                   JCXZ SHORT L_IDE_Setup_00
+                   INC DX ; The cylinder low-number register
+                   XOR AH, AH
+                   MOV AL, BYTE PTR [BP + 0Ah + DEF_Word_Low]
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <AX>
+                   JCXZ SHORT L_IDE_Setup_00
+                   INC DX ; The cylinder high-number register
+                   XOR AH, AH
+                   MOV AL, BYTE PTR [BP + 0Ah + DEF_Word_High]
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <AX>
+                   JCXZ SHORT L_IDE_Setup_00
+                   INC DX ; The drive / head register
+                   MOV AL, BYTE PTR [BP + 0Ch]             ; s_head
+                   AND AL, 0Fh
+                   MOV AH, BYTE PTR [BP + 0Eh]             ; s_device
+                   AND AH, 01h
+                   SHL AH, 04h
+                   OR AL, AH
+                   OR AL, 0A0h ; CHS mode
+                   XOR AH, AH
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <AX>
+                   JCXZ SHORT L_IDE_Setup_00
+                   INC DX ; The command register
+                   MAC_IDE_WriteByte <WORD PTR [BP + 10h]>, <DX>, <WORD PTR [BP + 04h]>
+                   JCXZ SHORT L_IDE_Setup_00
+                   PUSH WORD PTR [BP + 10h]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_WhileBusy
+                   JCXZ SHORT L_IDE_Setup_00
+L_IDE_Setup_00     LABEL SHORT
+                   POP DX
+                   POP AX
+                   POP BP
+                   RETN 2 + 2 + 2 + 2 + 2 + 2 + 2 
+IDE_Setup          ENDP
+IDE_Result         PROC NEAR ; unsigned int near pascal IDE_Result(unsigned int s_fixed)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH DX
+                   XOR AX, AX
+                   PUSH WORD PTR [BP + 04h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Status
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   IN AL, DX
+                   TEST AL, DEF_IDE_STAT_ERR
+                   JZ SHORT L_IDE_Result_00
+                   PUSH WORD PTR [BP + 04h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Error
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   IN AL, DX
+                   MAC_JumpShort <L_IDE_Result_01>
+L_IDE_Result_00    LABEL SHORT
+                   MOV AH, AL
+                   AND AL, (DEF_IDE_STAT_BSY OR DEF_IDE_STAT_DRDY OR DEF_IDE_STAT_DF OR DEF_IDE_STAT_DSC OR DEF_IDE_STAT_ERR)
+                   CMP AL, DEF_IDE_STAT_DRDY OR DEF_IDE_STAT_DSC
+                   JE SHORT L_IDE_Result_01
+                   MOV AL, AH
+                   MOV AH, 01h ; If status then AH=1 else AH=0
+L_IDE_Result_01    LABEL SHORT
+                   POP DX
+                   POP BP
+                   RETN 2
+IDE_Result         ENDP
+IDE_Identify       PROC FAR ; unsigned int far pascal IDE_Identify(unsigned int s_fixed, unsigned int s_device, void far *s_buffer)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH CX
+                   PUSH WORD PTR [BP + 0Ch]                ; s_fixed
+                   PUSH WORD PTR [BP + 0Ah]                ; s_device
+                   PUSH DEF_Null
+                   PUSH DEF_Null
+                   PUSH 0001h
+                   PUSH 0001h
+                   PUSH 00ECh ; Identify command
+                   CALL NEAR PTR CODE_IDE:IDE_Setup
+                   JCXZ SHORT L_IDE_Identify_00
+                   PUSH DX
+                   PUSH WORD PTR [BP + 0Ch]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Data
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Segment] ; s_buffer high
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Offset] ; s_buffer low
+                   PUSH DX
+                   PUSH DEF_SIZE_Sector SHR 01h
+                   CALL FAR PTR CODE_PORT:InPortsW
+                   POP DX
+L_IDE_Identify_00  LABEL SHORT
+                   PUSH WORD PTR [BP + 0Ch]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_Result
+                   POP CX
+                   POP BP
+                   RETF 2 + 2 + 4
+IDE_Identify       ENDP
+IDE_Read           PROC FAR ; unsigned int far pascal IDE_Read
+                   ; unsigned int s_fixed        : 12h
+                   ; unsigned int s_device       : 10h
+                   ; unsigned int s_head         : 0Eh
+                   ; unsigned int s_cylinder     : 0Ch
+                   ; unsigned int s_sector       : 0Ah
+                   ; void far * s_buffer         : 06h
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH CX
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   PUSH WORD PTR [BP + 10h]                ; s_device
+                   PUSH WORD PTR [BP + 0Eh]                ; s_head
+                   PUSH WORD PTR [BP + 0Ch]                ; s_cylinder
+                   PUSH WORD PTR [BP + 0Ah]                ; s_sector
+                   PUSH 0001h
+                   PUSH 0020h ; Read sector command
+                   CALL NEAR PTR CODE_IDE:IDE_Setup
+                   JCXZ SHORT L_IDE_Read_00
+                   PUSH DX
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Data
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Segment] ; s_buffer high
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Offset] ; s_buffer low
+                   PUSH DX
+                   PUSH DEF_SIZE_Sector SHR 01h
+                   CALL FAR PTR CODE_PORT:InPortsW
+                   POP DX
+L_IDE_Read_00      LABEL SHORT
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_Result
+                   POP CX
+                   POP BP
+                   RETF 2 + 2 + 2 + 2 + 2 + 4
+IDE_Read           ENDP
+IDE_Write          PROC FAR ; unsigned int far pascal IDE_Write
+                   ; unsigned int s_fixed        : 12h
+                   ; unsigned int s_device       : 10h
+                   ; unsigned int s_head         : 0Eh
+                   ; unsigned int s_cylinder     : 0Ch
+                   ; unsigned int s_sector       : 0Ah
+                   ; void far * s_buffer         : 06h
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH CX
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   PUSH WORD PTR [BP + 10h]                ; s_device
+                   PUSH WORD PTR [BP + 0Eh]                ; s_head
+                   PUSH WORD PTR [BP + 0Ch]                ; s_cylinder
+                   PUSH WORD PTR [BP + 0Ah]                ; s_sector
+                   PUSH 0001h
+                   PUSH 0030h ; Write sector command
+                   CALL NEAR PTR CODE_IDE:IDE_Setup
+                   JCXZ SHORT L_IDE_Write_00
+                   PUSH DX
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   PUSH DEF_IDE_PORT_Data
+                   CALL NEAR PTR CODE_IDE:IDE_GetBasePort
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Segment] ; s_buffer high
+                   PUSH WORD PTR [BP + 06h + DEF_Far_Offset] ; s_buffer low
+                   PUSH DX
+                   PUSH DEF_SIZE_Sector SHR 01h
+                   CALL FAR PTR CODE_PORT:OutPortsW
+                   POP DX
+L_IDE_Write_00     LABEL SHORT
+                   PUSH WORD PTR [BP + 12h]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_Result
+                   POP CX
+                   POP BP
+                   RETF 2 + 2 + 2 + 2 + 2 + 4
+IDE_Write          ENDP
+IDE_Seek           PROC FAR ; unsigned int far pascal IDE_Seek
+                   PUSH BP
+                   MOV BP, SP
+                   ; unsigned int s_fixed        : 0Eh
+                   ; unsigned int s_device       : 0Ch
+                   ; unsigned int s_head         : 0Ah
+                   ; unsigned int s_cylinder     : 08h
+                   ; unsigned int s_sector       : 06h                   
+                   PUSH CX
+                   PUSH WORD PTR [BP + 0Eh]                ; s_fixed
+                   PUSH WORD PTR [BP + 0Ch]                ; s_device
+                   PUSH WORD PTR [BP + 0Ah]                ; s_head
+                   PUSH WORD PTR [BP + 08h]                ; s_cylinder
+                   PUSH WORD PTR [BP + 06h]                ; s_sector
+                   PUSH 0001h
+                   PUSH 0070h ; Write sector command
+                   CALL NEAR PTR CODE_IDE:IDE_Setup
+                   JCXZ SHORT L_IDE_Seek_00
+L_IDE_Seek_00      LABEL SHORT
+                   PUSH WORD PTR [BP + 0Eh]                ; s_fixed
+                   CALL NEAR PTR CODE_IDE:IDE_Result
+                   POP CX
+                   POP BP
+                   RETF 2 + 2 + 2 + 2 + 2
+IDE_Seek           ENDP
+CODE_IDE           ENDS
+
+                   ASSUME CS:CODE_IDE, DS:DATA_IDE, ES:NOTHING, SS:STACK_DEFAULT
+DATA_IDE           SEGMENT
+IDE_BasePort       DW DEF_IDE_Fixed_00
+                   DW DEF_IDE_Fixed_01
+DATA_IDE           ENDS
+
+                   ASSUME CS:CODE_IDE, DS:BSS_IDE, ES:NOTHING, SS:STACK_DEFAULT
+BSS_IDE            SEGMENT
+BSS_IDE            ENDS
+                   END
+
+; End of source
+}}}
+----

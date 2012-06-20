@@ -1,0 +1,44 @@
+#title Network tap 
+
+=== Network Tap ===
+network '''tap'''는 컴퓨터 네트워크(:12)를 가로지르는 데이터의 흐름을 방해없이 access 하기 위한 하드웨어 장치다. 인터넷에 연결된 컴퓨터 네트워크는 computer(:12), 라우터(:12), 스위치(:12)등의 장치로 연결이 된다.  
+attachment:10_100_1000.jpg
+
+다음과 같은 이유로 네트워크에서 흐르는 데이터에 접근 해야될 필요가 있다.
+  1. 보안 모니터링을 위해서 IDS(:12)제품을 설치할경우 
+  1. 패킷 모니터링을 통한 QOS(:12)의 목적 
+
+예를 들어 하나의 라우터로 묶인 LAN(:12)영역에 IDS(:12)를 설치하고자 할경우 LAN으로 입출력되는 전체 패킷에대한 접근이 가능해야 한다. 대부분의 라우터가 Mirror Port 기능을 제공하고, 이것을 이용해서 특정 포트로 흐르는 패킷을 다른 포트로 복사하는 기능이 있는데, 이를 이용해서 패킷을 수집할 수도 있지만, 패킷을 복사함에 따른 성능저하가 발생할 수 있다. 
+
+tap을 이용하면 성능저하없이도 7Layer의 모든 패킷에 대한 접근이 가능해진다.
+{{{#!plain
+  WAN 
+    |
+ +--|----------------+ 
+ | +--+  +--+   +--+ | network tap
+ | +--+  +--+   +--+ |
+ +--------|-------|--+
+          |       |
+     +--------+ +----------+
+     | Router | | Analyzer |
+     +--------+ +----------+
+         /|\
+}}}
+가장 전형적인 구성으로 Analyzer 서버에 IDS(:12) 혹은 QOS(:12) 소프트웨어를 설치하면 된다.
+
+=== Linux Tap Driver ===
+원한다면 Linux(:12) 시스템을 Network Tap으로 만들 수 있다. 다음의 커널 옵션을 조정하고 커널 이미지를 생성하면 된다.
+{{{#!plain
+[*] Network device Support
+< > ARCnet Support  --->
+<M> Dummy net driver Support
+< > Bonding driver support
+< > EQL (SeriaL Line Load baLancing) Support
+< > Universal TUN/TAP device driver support  <----
+< > Ethertap network tap (OBSOLETE)           <----
+< > General Instruments Surfboard 1000  
+[*] Ethernet (10 of 100Mbit)  --->
+Ethernet (1000 Mbit)  --->
+}}}
+
+단 커널이 관리한다는 측면에서 전문 Tap과 비교해서 성능이 어떨지는 보장할 수 없다.

@@ -1,0 +1,241 @@
+#title netstate 정보 얻어오기 
+
+netstat(:8) 프로그램은 네트워크 연결, 라우팅테이블, 인터페이스 상태, 멀티케스트(:12) 멤버등 다양한 정보를 보여준다. 네트워크 연결 정보의 경우에도 INET TCP(:12) 연결 뿐만 아니라 Unix Domain 소켓이 사용하는 연결도 보여준다.  
+
+여기에서는 네트워크 연결 정보중 TCP 정보를 가져오는 법에 대해서 알아보도록 하겠다. netstat 프로그램을 이용할 경우 '''-t''' 옵션을 이용하면 '''tcp''' 연결정보를 얻어올 수 있다.
+{{{#!plain
+# netstat -t
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 joinc:http              222.122.194.224:4936    ESTABLISHED
+tcp        0      0 joinc:http              lj602145.inktomis:60739 TIME_WAIT
+tcp        0      0 joinc:ssh               dhcp-ippool24.onn:52070 ESTABLISHED
+tcp        0      0 joinc:http              202.179.183.71:43503    TIME_WAIT
+tcp        0      0 joinc:http              lj602348.inktomis:50637 TIME_WAIT
+tcp        0      0 joinc:http              222.122.194.31:36932    ESTABLISHED
+tcp        0      0 localhost:56988         localhost:http          TIME_WAIT
+tcp        0      0 localhost:56989         localhost:http          TIME_WAIT
+...
+}}}
+
+리눅스 운영체제는 /proc 파일시스템을 이용해서 유저에게 '''tcp'''정보를 제공한다. tcp 연결정보는 '''/proc/net/tcp''' 파일에 ASCII 형태로 저장되어 있다. 
+{{{#!plain
+# cat /proc/net/tcp
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 0100007F:A320 00000000:0000 0A 00000000:00000000 00:00000000 00000000   105        0 10199 1 dd071c00 3000 0 0 2 -1
+   1: 0100007F:B8EF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   105        0 10210 1 dd071800 3000 0 0 2 -1
+   2: 0100007F:0277 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 10292 1 de477c00 3000 0 0 2 -1
+   3: 85D5E5CB:B44C 266E2ECF:0747 01 00000000:00000000 00:00000000 00000000  1001        0 61497 1 c978cc00 350 40 22 2 100
+   4: 85D5E5CB:CB66 5713EADA:0016 01 00000000:00000000 02:000886F8 00000000  1001        0 70721 2 cb642800 211 59 26 3 100
+   5: 85D5E5CB:C713 5713EADA:0016 01 00000000:00000000 02:0007A91B 00000000  1001        0 66949 2 cc6d7400 205 40 30 3 100
+   6: 0100007F:A320 0100007F:B812 01 00000000:00000000 00:00000000 00000000   105        0 10202 1 dd071000 201 0 0 2 100
+   7: 0100007F:B812 0100007F:A320 01 00000000:00000000 00:00000000 00000000   105        0 10216 1 dd071400 201 0 0 2 100
+   8: 85D5E5CB:ABE2 521B2ECF:0747 01 00000000:00000000 00:00000000 00000000  1001        0 62217 1 cc6d7800 545 40 8 2 100
+   9: 85D5E5CB:DEC3 F73D75D3:1A0B 01 00000000:00000000 02:0002A4C1 00000000  1001        0 21080 2 de477800 277 40 30 2 100
+}}}
+각 필드는 다음과 같은 의미를 가진다.
+ || local_address		|| 출발지 주소			||
+ || rem_address			|| 목적지 주소			||
+ || st							|| 상태 (ESTABLISHED, TIME_WAIT, FIN_WAIT ...) ||
+ || tx_queue				|| Send  Queue			||
+ || rx_queue				|| Receive Queue		||
+ || tr:tm->when			|| 소켓 타이머가 작동하고 있는지를 확인한다. 0이라면 작동하고 있지 않음을 의미한다.	||
+ || uid							|| 소켓을 생성한 유저의 ID	||
+ || timeout					|| 사용되지 않는다.	||
+ || inode						|| 리눅스 Virtual Filesystem에서의 소켓 inode ||
+
+연결상태는 /usr/include/netinet/tcp.h에 다음과 같이 정의되어 있다.
+{{{#!plain
+enum
+{
+  TCP_ESTABLISHED = 1,
+  TCP_SYN_SENT,
+  TCP_SYN_RECV,
+  TCP_FIN_WAIT1,
+  TCP_FIN_WAIT2,
+  TCP_TIME_WAIT,
+  TCP_CLOSE,
+  TCP_CLOSE_WAIT,
+  TCP_LAST_ACK,
+  TCP_LISTEN,
+  TCP_CLOSING   /* now a valid state */
+};
+}}}
+
+실행되는데 문제 없는 정도로만 만들었으니, 다듬는건 각자..
+{{{#!plain down:mynetstat.c
+#include <stdio.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <pwd.h>
+
+const char *TCPFILE = "/proc/net/tcp";
+const char *FORMAT ="%s%s%s%s%s%s%s%s%s%s";
+static char states[16][20] = { "UNKNOWN" ,"ESTABLISHED", "SYN_SENT", "SYN_RECV", "FIN_WAIT1", "FIN_WAIT2", "TIME_WAIT", "CLOSE", 
+"CLOSE_WAIT", "LAST_ACK", "LISTEN", "CLOSING", "MAX_STATES"};
+
+struct netinfo
+{
+	FILE *tcpfp;
+	char localaddr[24];
+	char localport[16];
+	char remaddr[24];
+	char remport[16];
+	char stat[16];
+	int  txq;
+	int  rxq;
+	int	 uid;
+	int  idx;
+	char uname[24];
+};
+
+typedef struct netinfo TCPINFO;
+
+TCPINFO *nsopen()
+{
+	TCPINFO *ltcpinfo;
+	if(access(TCPFILE,F_OK) !=0)
+	{
+		perror("ACCESS Error");
+		return (TCPINFO *)NULL; 
+	}
+	ltcpinfo = (TCPINFO *)malloc(sizeof(*ltcpinfo)); 
+	memset((void *)ltcpinfo, 0x00, sizeof(*ltcpinfo));
+
+	ltcpinfo->tcpfp = NULL;
+	ltcpinfo->tcpfp = fopen(TCPFILE, "r");
+	if (ltcpinfo == NULL)
+	{
+		perror("ACCESS Error");
+		free(ltcpinfo);
+		return (TCPINFO *)NULL;
+	}
+	ltcpinfo->uid = -1;
+	ltcpinfo->idx = 0;
+
+	return ltcpinfo;
+}
+
+void nsclose(TCPINFO *tf)
+{
+	if (tf->tcpfp == NULL)
+		fclose(tf->tcpfp);
+	free(tf);
+}
+
+char *getuname(char *uname, int uid, int size)
+{
+	struct passwd *pass_info = NULL;
+	while((pass_info = getpwent()) != NULL)
+	{
+		if (pass_info->pw_uid == uid)
+		{
+			strncpy(uname, pass_info->pw_name, size);
+			return uname;
+		}
+	}
+	return (char *)NULL;
+}
+
+
+TCPINFO *nsread(TCPINFO *info)
+{
+	char buf[256];
+	char *tr;
+	char null[16];
+	char localaddr[24];
+	char remaddr[24];
+	char st[4];
+	char trxqueue[20];
+	char uid[8];
+	char uname[36] = {0x00,};
+	int  fnum;
+	int  snum;
+	struct in_addr in;
+	char *addr;
+
+	if (info->idx == 0)
+	{
+		if (fgets(buf, 256, info->tcpfp) == NULL)
+		{
+			return (TCPINFO *)NULL;
+		}
+		info->idx=1;
+	}
+	if (fgets(buf, 256, info->tcpfp) == NULL)
+		return (TCPINFO *)NULL;
+	// sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+	// 0: 0100007F:A56F 00000000:0000 0A 00000000:00000000 00:00000000 00000000   105        0 10282 1 c34a1c00 3000 0 0 2 -1
+	sscanf(buf,"%s %s %s %s %s %s %s %s %s %s", 
+									null,      // sl : 미 사용 
+									localaddr, // local_address 
+									remaddr,	 // rem_address
+									st,        // status
+									trxqueue,  // tx_queue & rx_queue
+									null,      // tr & tm->when : 미 사용
+									null,      // retrnsmt : 미사용
+									uid,       // uid
+									null,      // timeout : 미사용
+									null);     // inde : 미사용
+	// get localaddr
+	sscanf(localaddr, "%x%[:]%x", &fnum, null, &snum);
+	in.s_addr = fnum;
+	addr = inet_ntoa(in);
+	sprintf(info->localaddr, "%s", addr); 
+	sprintf(info->localport, "%d", snum); 
+
+	// get remaddr
+	sscanf(remaddr, "%x%[:]%x", &fnum, null, &snum);
+	in.s_addr = fnum;
+	addr = inet_ntoa(in);
+	sprintf(info->remaddr, "%s", addr); 
+	sprintf(info->remport, "%d", snum); 
+
+	// Status
+	sscanf(st, "%x", &fnum);
+	sprintf(info->stat,"%s", states[fnum]);
+
+	// User Infomation
+	if (getuname(uname, atoi(uid), 32) == NULL)
+	{
+		sprintf(info->uname,"%s", "");
+	}
+	else
+		sprintf(info->uname,"%s", uname);
+	info->uid = atoi(uid);
+	return info; 
+
+}
+
+int main(int argc, char **argv)
+{
+	TCPINFO *tf;
+	tf = nsopen();
+	while (nsread(tf) != (TCPINFO *)NULL)
+	{
+		printf("%s:%s ---> %s:%s\t%s\t%s\n", tf->localaddr, tf->localport, 
+										tf->remaddr, tf->remport, tf->stat, tf->uname);
+	}
+	nsclose(tf);
+}
+}}}
+다음은 실행 결과다.
+{{{#!plain
+# ./mynetstat
+127.0.0.1:37382 ---> 0.0.0.0:0  CLOSING hplip
+127.0.0.1:34641 ---> 0.0.0.0:0  CLOSING
+127.0.0.1:631 ---> 0.0.0.0:0    CLOSING
+203.229.213.133:39600 ---> 207.46.27.62:1863    SYN_SENT
+203.229.213.133:33609 ---> 203.229.213.91:22    SYN_SENT
+203.229.213.133:44665 ---> 65.54.228.33:1863    SYN_SENT
+203.229.213.133:45402 ---> 211.117.61.247:6667  SYN_SENT
+203.229.213.133:50398 ---> 207.46.26.112:1863   SYN_SENT
+203.229.213.133:37614 ---> 207.46.26.162:1863   SYN_SENT
+203.229.213.133:48312 ---> 207.46.111.89:1863   SYN_SENT
+127.0.0.1:43480 ---> 127.0.0.1:34641    SYN_SENT
+127.0.0.1:34641 ---> 127.0.0.1:43480    SYN_SENT
+}}}

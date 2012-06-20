@@ -1,0 +1,111 @@
+#title bit field
+
+== bit field ==
+'''bit field'''는 컴퓨터 과학에서 사용하는 용어로, 데이터의 최소단위인 bit 를 이용해서 데이터를 간단히 저장하는 방법을 제시한다. 단일 비트 즉, 0과 1을 사용하기 때문에 on/off의 상태정보를 저장하는데 유용하게 사용할 수 있다. 가장 널리 사용되는 영역은 '''flag'''를 이용한 상태저장일 것이다.
+
+== C 예제 ==
+{{{#!plain
+#include <stdio.h>
+
+#define STATUS_WATCHES_TV    (1 << 0) /* 0x01 */
+#define STATUS_READS_BOOK    (1 << 1) /* 0x02 */
+#define STATUS_PLAY_GAMES     (1 << 2) /* 0x04 */
+#define STATUS_EAT_FOOD        (1 << 3) /* 0x08 */
+
+unsigned int status;
+
+void setStatus(unsigned int flag)
+{
+    status |= flag;
+}
+
+void resetStatus(unsigned char flag)
+{
+    status &= ~flag;
+}
+
+unsigned int getStatus(unsigned int flag)
+{
+    return (status & flag) != 0;
+}
+
+int main(int argc, char ** argv)
+{
+  setStatus(STATUS_WATCHES_TV);
+  setStatus(STATUS_PLAY_GAMES);
+
+  if(getStatus(STATUS_WATCHES_TV))
+  {
+    printf("I Watching TV\n");
+  }
+  if(getStatus(STATUS_READS_BOOK))
+  {
+    printf("I reading book\n");
+  }
+  if(getStatus(STATUS_PLAY_GAMES))
+  {
+    printf("I playing game\n");
+  }
+  if(getStatus(STATUS_EAT_FOOD))
+  {
+    printf("I eat food!\n");
+  }
+}
+}}}
+각각의 상태값을 위해서 하드코딩된 값을 사용하는 대신에, bit field를 사용하고 있다. 각 필드에 값은 shift 연산을 사용하고 있으므로, bit 연산을 이용해서 간단히 상태를 설정하고 얻어올 수 있다. 가독성도 덤으로 얻을 수 있다.
+
+=== 구조체와 bit field ===
+구조체에서 bit field가 사용되는 경우는 흔하지 않을 것이다. endian(:12)과 관련된 문제들때문에 가독성과 유지보수성이 떨어질수 있기 때문이다. 커널의 경우 네트워크 프로토콜(TCP/IP와 같은) 구조체 정의하기 위해서 일부 사용된다. 아래는 tcp(:12) 헤더 구조체이다. endian 문제를 해결하기 위해서 '''#if'''문을 사용하고 있다.
+{{{#!plain
+struct tcphdr
+{
+    u_int16_t th_sport;     /* source port */
+    u_int16_t th_dport;     /* destination port */
+    tcp_seq th_seq;     /* sequence number */
+    tcp_seq th_ack;     /* acknowledgement number */
+#  if __BYTE_ORDER == __LITTLE_ENDIAN
+    u_int8_t th_x2:4;       /* (unused) */
+    u_int8_t th_off:4;      /* data offset */
+#  endif
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    u_int8_t th_off:4;      /* data offset */
+    u_int8_t th_x2:4;       /* (unused) */
+#  endif
+    u_int8_t th_flags;
+#  define TH_FIN    0x01
+#  define TH_SYN    0x02
+#  define TH_RST    0x04
+#  define TH_PUSH   0x08
+#  define TH_ACK    0x10
+#  define TH_URG    0x20
+    u_int16_t th_win;       /* window */
+    u_int16_t th_sum;       /* checksum */
+    u_int16_t th_urp;       /* urgent pointer */
+};
+}}}
+
+위의 경우는 보기가 힘드니, 좀더 일반적인 경우를 보자.
+{{{#!plain
+#include <stdio.h>
+
+struct myStatus
+{
+	unsigned int watch_tv:1;
+	unsigned int reads_book:1;
+	unsigned int play_book:1;
+	unsigned int eat_book:1;
+};
+
+int main(int argc, char **argv)
+{
+	struct myStatus mstatus;
+	mstatus.watch_tv = 1;
+	mstatus.reads_book = 1;
+	printf("Size of %ld\n",sizeof(struct myStatus));
+
+	if(mstatus.watch_tv)
+	{
+		printf("I'm watch TV\n");
+	}
+}
+}}}

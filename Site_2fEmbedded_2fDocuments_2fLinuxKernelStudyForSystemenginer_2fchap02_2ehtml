@@ -1,0 +1,262 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Makefile 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="커널 테스트 및 설치"
+HREF="kernel-install-test.html"><LINK
+REL="NEXT"
+TITLE="부팅 과정의 이해부팅에 관한 좀더 자세한 정보는 LILO의 README를
+		참조하기 바란다."
+HREF="understanding-booting-process.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="kernel-install-test.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="understanding-booting-process.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="MAKEFILE-ANALYSIS"
+>2장. Makefile 분석</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>차례</B
+></DT
+><DT
+>2.1. <A
+HREF="understanding-booting-process.html"
+>부팅 과정의 이해<A
+NAME="AEN455"
+HREF="#FTN.AEN455"
+>[1]</A
+></A
+></DT
+><DT
+>2.2. <A
+HREF="kernel-image-file-structure.html"
+>커널 이미지 파일의 구조</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1. <A
+HREF="kernel-image-file-structure.html#AEN488"
+>커널의 부팅</A
+></DT
+><DT
+>2.2.2. <A
+HREF="kernel-image-file-structure.html#ZIMAGE-BZIMAGE-DIFF"
+>zimage와 bzImage의 차이</A
+></DT
+></DL
+></DD
+><DT
+>2.3. <A
+HREF="tracing-bzimage-makeing.html"
+>bzimage가 만들어지는 과정 추적-Makefile 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-MAKEFILE"
+>$(topDIR)/Makefile</A
+></DT
+><DT
+>2.3.2. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-MAKEFILE"
+>$(topDIR)/arch/i386/Makefile</A
+></DT
+><DT
+>2.3.3. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-MAKEFILE"
+>$(topDIR)/arch/i386/boot/Makefile</A
+></DT
+><DT
+>2.3.4. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-COMPRESSED-MAKEFILE"
+>$(topDIR)/arch/i386/boot/compressed/Makefile</A
+></DT
+><DT
+>2.3.5. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-TOOLS-BUILD.C"
+>$(topDIR)/arch/i386/boot/tools/build.c</A
+></DT
+></DL
+></DD
+><DT
+>2.4. <A
+HREF="tracing-bzimage-log.html"
+>bzImage가 만들어지는 과정 추적-Log 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.4.1. <A
+HREF="tracing-bzimage-log.html#MAKE-BZIMAGE-ORDER"
+>make bzImage 순서 정리</A
+></DT
+><DT
+>2.4.2. <A
+HREF="tracing-bzimage-log.html#MAKE-BZIMAGE-LOG"
+>Log</A
+></DT
+></DL
+></DD
+><DT
+>2.5. <A
+HREF="detail-analysis-of-each-stage.html"
+>단계별 자세한 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.5.1. <A
+HREF="detail-analysis-of-each-stage.html#TEXT-SECTION-START-ADDR"
+>-Ttext 0x0의 의미</A
+></DT
+><DT
+>2.5.2. <A
+HREF="detail-analysis-of-each-stage.html#DETAIL-ANALYSIS-OF-EACH-STAGE-START"
+>분석</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><P
+>		필자는 리눅스를 공부하면서 처음엔 소스 코드를 찾아 스케쥴링부터 보고 다음엔 시스템 콜을 보고
+		하는 식으로 접근했다. 그러나 실제 임베디드 시스템에 적용하는데는 그런 단계가 먼저 필요한
+		것이 아니라 커널 이미지가 어떻게 구성됐으며 부팅 과정에서 어떤 식으로 실행되고 어떤 절차를
+		거쳐 리눅스란 os를 구성하는가가 먼저 필요하단 것을 느꼈다.	
+	</P
+><P
+>		이런 생각은 자연스레 커널을 만들 때 어떤 식으로 커널이 만들어지는지를 알고 있어야 다른
+		임베디드 시스템에 커널을 만들어 넣을 때도 쉽게 접근할 수 있다는 생각을 갖게 만들었다.
+	</P
+><P
+>		이 장에선 커널 이미지 파일의 구조와 Makefile을 통해 커널이 만들어지는 과정을 추적해 본다.
+	</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="kernel-install-test.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="understanding-booting-process.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>커널 테스트 및 설치</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>부팅 과정의 이해<A
+NAME="AEN455"
+HREF="#FTN.AEN455"
+>[1]</A
+></TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

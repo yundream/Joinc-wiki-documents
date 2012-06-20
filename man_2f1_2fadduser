@@ -1,0 +1,109 @@
+#title Linux man page : adduser - 시스템에 그룹이나 유저를 추가한다. 
+
+=== 사용법 ===
+{{{#!plain
+adduser  [options]  [--home  DIR] [--shell|-s SHELL] [--no-create-home]
+[--uid ID] [--firstuid ID] [--lastuid ID] [--ingroup GROUP | --gid  ID]
+[--disabled-password]      [--disabled-login]      [--gecos      GECOS]
+[--add_extra_groups] user
+
+adduser --system [options] [--home DIR] [--shell  SHELL]  [--no-create-
+home]  [--uid  ID]  [--group | --ingroup GROUP | --gid ID] [--disabled-
+password] [--disabled-login] [--gecos GECOS] user
+
+addgroup [options] [--gid ID] group
+
+addgroup --system [options] [--gid ID] group
+
+adduser [options] user group
+}}}
+
+==== 공통 옵션 ====
+{{{#!plain
+ [--quiet] [--debug] [--force-badname] [--help|-h]  [--version]  [--confFILE]
+}}}
+
+=== 설명 ===
+adduser(1)와 addgroup(1)는 명령행 옵션 과 ''/etc/adduser.conf'' 파일의 설정내용을 참고하여, 유저와 그룹을 추가하는 작업을 한다. 이 프로그램들은 '''useradd, groupadd 와 usermod'''와 같은 낮은 수준의 프로그램을 좀더 사용자 친화적으로 개선이 되어있다. 이들 낮은 수준 프로그램의 front end 프로그램이라고 보면된다. 기본적으로 하나의 유저를 추가하기 위해서는 UID와 GID를 결정하고, home 디렉토리의 생성, 사용자 스크립트의 작성, 패스워드(:12)입력, 기타 부가정보 작성등과 같은 일을 해야 한다. adduser 과 addgroup는 이러한 일들을 한번에 끝낼 수 있도록 도와준다.  
+
+==== 일반 유저 추가 ====
+--system, --group를 비롯하여 어떠한 옵션없이 adduser(1)를 실행할 경우 일반유저를 생성하게 된다.
+
+생성되는 유저를 위한 UID(:12)는 설정파일의 정보를 참고해서 결정하게 된다.
+{{{#!plain
+# /etc/adduser.conf
+# UID는 1000과 29999 사이에서 결정된다.
+FIRST_UID=1000
+LAST_UID=29999
+}}}
+ * --uid
+   uid를 강제로 결장할 수 있다.
+ * --firstuid
+   uid를 일정한 범위내에서 자동적으로 결정하도록 한다. --lastuid 와 함께 사용한다.
+ * --disabled-login 
+    계정이 생성은 되지만 패스워드를 설정하기 전까지는 '''비활성 계정'''상태에 놓이게 된다. ''--disabled-password'''옵션을 사용하면, 패스워드를 설정하지 않은 상태로 계정을 만들 수 있다. 이경우 패스워드를 통한 로그인은 불가능하게 된다. 단 SSH RSA등을 이용한 로그인은 가능하다.
+
+유저를 생성하게 되면, 유저가 포함될 그룹도 결정을 해야 하는데, GNU/Linux는 전통적으로 유저이름과 동일한 그룹을 만들어서 그룹에 포함을 시킨다.
+
+adduser(1)는 설정파일의 '''DHOME''', '''GROUPHOMES''', '''LETTERHOMES''' 정보를 이용해서 홈디렉토리를 생성한다. '''--home''' 옵션을 이용해서, 홈디렉토리를 강제로 결정할 수도 있다. '''USERGROUPS'''를 ''yes''로 하면, 유저의 홈디렉토리에 생성되는 파일들에 대해서 그룹의 접근권한을 허용하게 된다.
+==== 시스템 계정 생성 ====
+--system 옵션으로 adduser를 실행할 경우 시스템 계정을 생성한다. 
+
+시스템 uid의 범위는 설정파일의 '''FIRST_SYSTEM_UID'''와 '''LAST_SYSTEM_UID'''사이에서 결정된다. '''--uid'''옵션을 이용하면, 강제로 UID를 설정할 수 있다.
+ * --gid
+    기본적으로 시스템 유저는 '''nogroup'''그룹에 포함된다. 이 옵션을 혹은 '''--ingroup'''을 사용하면, 다른 그룹에 포함되도록 그룹을 지정 할 수 있다. 
+ * --group
+     시스템 유저를 만들면서, 시스템 유저의 ID와 동일한 이름을 가지는 그룹을 만든다.
+
+홈디렉토리는 일반 계정과 동일한 규칙을 따른다. 시스템 유저는 '''/bin/false'''를 사용자 shell(:12)로 가지게 된다.
+
+=== 사용자 그룹 추가 ===
+ * --group
+   --system 옵션없이 사용할경우, 일반 사용자 그룹을 생성한다. addgroup(1)명령을 사용할 수도 있다.
+ * --gid
+   GID(:12)는 설정파일의 유저 UIDS의 범위 내에서 결정된다. 이 옵션을 이용하면 GID를 직접 결정할 수 있다. 
+사용자 그룹을 추가한다고 해서, 유저가 생성되지는 않는다.
+
+=== 시스템 그룹 추가 ===
+ * --system
+   addgroup(1)에 --system 옵션을 주고 실행하면, 시스템 그룹이 생성된다. 
+ * --gid
+   GID는 설정파일의 system GIDS의 범위내에서 결정된다. 이 옵션을 이용하면 system GID를 직접 결정할 수 있다.
+시스템 그룹을 추가한다고 해서, 유저가 생성되지는 않는다.
+
+=== 기타 옵션들 ===
+ * --conf FILE
+   /etc/adduser.conf 대신 FILE을 설정파일로 사용한다.
+ * --disabled-login
+   패스워드 없이 계정이 생성된다. 패스워드가 설정되기 전까지는 계정이 활성화 되지 않는다.
+ * --disabled-password
+   --disable-login과 비슷하지만, SSH(:12) RSA(:12) 키등을 이용한 로그인은 가능하다.
+ * --force-badname
+   기본적으로 이름을 만들때 유저와 그룹이름은 설정파일의 '''NAME_REGEX'''의 정규표현(:12)규칙을 체크한다. 이 옵션을 사용하면, 설정파일의 이름규칙 체크를 하지 않게 된다. 단지 최소한의 이름체크만 한다. 
+ * --gid ID
+    그룹을 생성할때, GID를 '''ID'''로 지정한다.
+ * --home DIR
+    유저의 홈 디렉토리를 '''DIR'''로 설정한다. 이 옵션을 사용하지 않을 경우 설정파일에 정의된 경로를 홈디렉토리로 한다.
+ * --shell SHELL
+    유저가 사용할 shell(:12)을 '''SHELL'''로 설정한다. 이 옵션을 사용하지 않을 경우 설정파일에 정의된 shell(:12)를 유저 쉘로 사용한다.
+ * --ingroup GROUP 
+    새로운 유저를 추가하면, 유저는 동일한 이름의 그룹에 포함된다. 이 옵션을 사용하면 '''GROUP'''그룹에 포함되도록 강제할 수 있다.  
+ * --no-create-home
+    홈디렉토리를 생성하지 않는다.
+ * --system
+    시스템 유저 혹은 시스템 그룹을 생성한다.
+ * --uid ID
+    사용자 UID를 설정에 지정된 범위가 아닌 '''ID'''로 강제 지정한다.
+ * --firstuid ID
+    사용자 UID의 시작 범위를 지정
+ * --lastuid ID
+    사용자 UID의 마지막 범위를 지정. 유저를 추가하게 되면 firstuid 와 lastuid 범위 사이에서 UID가 결정된다.
+ * --version
+    버전정보를 출력한다.
+
+=== 파일 ===
+  /etc/adduser.conf
+    adduser(1)가 실행될때, 위의 파일에 있는 설정정보를 참고한다.
+    
+=== 관련글 ===
+ * [wiki:Site/system_programing/Unix_Env/user_info 사용자 계정 정보 가져오기]

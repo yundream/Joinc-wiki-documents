@@ -1,0 +1,440 @@
+#title flock(2)함수 사전.. 
+'''목차'''
+[[TableOfContents]]
+
+== HTML 문서 ==
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>flock(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. flock(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN37"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN40"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN49"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>열려진 파일에 대하여 권고잠금을 걸거나 해제한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/file.h&#62;
+
+int flock(int fd, int operation)
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		열려진 파일<B
+CLASS="EMPHASIS"
+>fd</B
+>에 권고 잠금을 적용하거나 제거한다. 
+		<B
+CLASS="EMPHASIS"
+>operation</B
+>은 잠금과 관련된 연산으로 다음과 같은 
+		종류의 연산을 지원한다. 
+	</P
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+><B
+CLASS="EMPHASIS"
+>LOCK_SH</B
+></DT
+><DD
+><P
+>					공유잠금. 한개 이상의 프로세스들이 주어진 시간에 파일에 대한
+					공유 잠금을 하도록 한다. 
+				</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>LOCK_EX</B
+></DT
+><DD
+><P
+>					배타(exclusive)잠금. 주어진 시간에 단지 하나의 프로세스만 파일에 
+					대하여 잠금을 얻을 수 있도록 한다.
+				</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>LOCK_UN</B
+></DT
+><DD
+><P
+>					잠금 해제
+				</P
+></DD
+><DT
+><B
+CLASS="EMPHASIS"
+>LOCK_NB</B
+></DT
+><DD
+><P
+>					잠금일 때 블럭하지 않고 바로 리턴된다. 다른 연산과 
+					<B
+CLASS="EMPHASIS"
+>or</B
+>할 수 있다. 
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+><P
+>		한 파일에 대해서 공유잠금과 배타잠금을 동시에 할 수는 없다. 잠금은 
+		파일 기술자가 아닌 inode에 대해서 일어나게 된다. 그래서 dup와 fork는 
+		중복된 잠금을 만들어 내지 않는다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공시 0이 리턴된다. 에러시 -1이 리턴된다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EWOULDBLOCK</DT
+><DD
+><P
+>	
+					파일이 잠겨 있고 <B
+CLASS="EMPHASIS"
+>LOCK_NB</B
+>플래그가 선택되어 있을 경우
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN49"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;sys/file.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+
+int main(int argc, char **argv)
+{
+    int fd;
+    int id;
+    int i;
+    char *file_name = "lock.file";
+
+    id = atoi(argv[1]);
+    fd = open(file_name, O_RDONLY);
+    sleep(1);
+    if (flock(fd, LOCK_EX) != 0)
+    {
+        printf("flock error&#92;n");
+        exit(0);
+    }
+
+    for (i =0; i &#60; 5; i++)
+    {
+        printf("OK File FD %d : %d&#92;n", id,i);
+        sleep(1);
+    }
+    if (flock(fd, LOCK_UN) != 0)
+    {
+        printf("filue un lock error&#92;n");
+    }
+    close(fd);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+
+}}}
+
+== [docbook] 원본문서 ==
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2003/12/18           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>flock(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+열려진 파일에 대하여 권고잠금을 걸거나 해제한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/file.h&gt;
+
+int flock(int fd, int operation)
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		열려진 파일<emphasis>fd</emphasis>에 권고 잠금을 적용하거나 제거한다. 
+		<emphasis>operation</emphasis>은 잠금과 관련된 연산으로 다음과 같은 
+		종류의 연산을 지원한다. 
+	</para>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term><emphasis>LOCK_SH</emphasis></term>	
+			<listitem>
+				<para>
+					공유잠금. 한개 이상의 프로세스들이 주어진 시간에 파일에 대한
+					공유 잠금을 하도록 한다. 
+				</para>
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term><emphasis>LOCK_EX</emphasis></term>	
+			<listitem>
+				<para>
+					배타(exclusive)잠금. 주어진 시간에 단지 하나의 프로세스만 파일에 
+					대하여 잠금을 얻을 수 있도록 한다.
+				</para>
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term><emphasis>LOCK_UN</emphasis></term>	
+			<listitem>
+				<para>
+					잠금 해제
+				</para>
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term><emphasis>LOCK_NB</emphasis></term>	
+			<listitem>
+				<para>
+					잠금일 때 블럭하지 않고 바로 리턴된다. 다른 연산과 
+					<emphasis>or</emphasis>할 수 있다. 
+				</para>
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+	<para>
+		한 파일에 대해서 공유잠금과 배타잠금을 동시에 할 수는 없다. 잠금은 
+		파일 기술자가 아닌 inode에 대해서 일어나게 된다. 그래서 dup와 fork는 
+		중복된 잠금을 만들어 내지 않는다. 
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공시 0이 리턴된다. 에러시 -1이 리턴된다.
+	</para>
+</section>
+
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EWOULDBLOCK</term>	
+			<listitem>
+				<para>	
+					파일이 잠겨 있고 <emphasis>LOCK_NB</emphasis>플래그가 선택되어 있을 경우
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+
+int main(int argc, char **argv)
+{
+    int fd;
+    int id;
+    int i;
+    char *file_name = "lock.file";
+
+    id = atoi(argv[1]);
+    fd = open(file_name, O_RDONLY);
+    sleep(1);
+    if (flock(fd, LOCK_EX) != 0)
+    {
+        printf("flock error\n");
+        exit(0);
+    }
+
+    for (i =0; i &lt; 5; i++)
+    {
+        printf("OK File FD %d : %d\n", id,i);
+        sleep(1);
+    }
+    if (flock(fd, LOCK_UN) != 0)
+    {
+        printf("filue un lock error\n");
+    }
+    close(fd);
+}
+		</screen>
+	</para>
+</section>
+</chapter>
+}}}
+
+== 변경사항 ==

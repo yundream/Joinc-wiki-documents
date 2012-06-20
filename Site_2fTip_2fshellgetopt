@@ -1,0 +1,111 @@
+#title bash shell에서 실행인자 처리하기 
+
+== 실행인자 다루기 ==
+C언어는 프로그램 실행인자를 처리하기 위해서 getopt(:3)와 getopt_long(:3)같은 함수를 제공합니다. 이 함수들로 비교적 쉽게 실행인자를 처리할 수 있습니다.
+
+shell에서는 어떨까요. 아마 shell에도 이러한 실행인자를 처리하는 방법이 있을 겁니다만, 저는 오랫동안 단순하게 처리해왔습니다. 프로그램을 일정시간 간격으로 실행하고 그 결과를 표준 출력하는 shell 프로그램을 개발한다고 가정해 보겠습니다. 이 프로그램의 이름은 watch.sh로 하겠습니다. 이 프로그램은 ''실행할 명령'''과 '''시간 간격'''을 실행인자로 받을 겁니다.
+{{{#!plain
+#!/bin/bash
+
+# 첫번째 실행인자는 실행 명령
+# 두번째 실행인자는 시간 간격 
+command=$1
+interval=$2
+
+# 루프를 돌면서 interval 간격으로 명령을 실행한다.
+while [ 1 ]
+do
+    $command
+    sleep $interval 
+done
+}}}
+
+이 프로그램을 사용하는 사람은 프로그램의 실행인자와 순서를 기억하고 있어야합니다. 그닥 맘에 들지 않습니다. 프로그램 사용방법을 주석으로 적어주면 좀 더 낫긴하겠네요.
+{{{#!plain
+# 첫번째 인자는 실행 명령입니다.
+# 두번째 인자는 시간 간격입니다.
+}}}
+
+하지만 여전히 맘에 들지 않습니다. 그래서 프로그램의 실행인자의 갯수를 확인해서, 도움말을 출력하도록 프로그램을 개선했습니다.
+{{{#!plain
+#!/bin/bash
+
+help()
+{
+    echo "Usage: $0 [command] [interval]"
+}
+
+
+if [ $# -ne 2 ]
+then
+    help
+    exit 0
+fi
+
+command=$1
+interval=$2
+
+while [ 1 ]
+do
+    cdate=`date`
+    echo "Command : $command $cdate"
+    $command
+    sleep $interval
+done
+}}}
+훨씬 나아졌지만 역시 깔끔하진 않습니다. 
+
+== getopts로 실행인자 다루기 ==
+bash shell은 getopts를 제공합니다. 엄밀히 말하면 bash shell에서 제공한다고 할 수는 없겠네요. shell의 내장 명령어는 아니니까요. 아뭏든..
+
+{{{#!plain
+#!/bin/bash
+
+help()
+{
+    echo "Usae : $0 -c [command] -i [interval]"
+}
+
+command=""
+interval=0
+
+# -c와 -i를 처리합니다. 
+# 옵션이름 뒤에 :이 붙은 것은 값을 필요로 함을 의미합니다.
+while getopts c:i: opt
+do
+    case $opt in
+        c)
+            command=$OPTARG
+            ;;
+        i)
+            interval=$OPTARG
+            ;;
+        # -c -i 이외의 옵션이 오면 도움말을 출력하고 종료합니다.
+        *)  
+            help
+            exit 0
+            ;;
+    esac
+done
+
+# 명령 문자열의 길이가 0이거나 interval이 0이면
+# 도움말을 출력하고 종료합니다. 
+if [ -z $command ] || [ $interval -eq 0 ]
+then
+    help
+    exit 0
+fi
+
+
+while [ 1 ]
+do
+    $command
+    sleep $interval
+done
+}}}
+
+== 참고 ==
+  1. [wiki:Site/Development/Env/BeginningBashScript/index.html bash shell 프로그래밍 howto]
+
+[[tag(shell,bash,getopt)]]
+[[category(220)]]

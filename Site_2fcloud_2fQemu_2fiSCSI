@@ -1,0 +1,63 @@
+#title iSCSI 볼륨 만들기
+
+[[TableOfContents]]
+== iSCSI를 이용한 VM Root Disk와 Data Disk 제공 ==
+VM을 위한 Volume을 제공하는 가장 쉬운 방법은 Local Disk를 이용하는 것이다. 로컬 파일 시스템 위에 적당한 크기의 image 파일을 만들어서 사용하면 되겠다. 가상화 환경구축까지는 Local Disk를 사용해도 충분하지 싶다.
+
+하지만 Cloud 환경을 구축하려고 한다면, 필요에 따라서 원격 Storage에서 볼륨을 만들어야 할 필요가 생긴다. 원격 Storage에 볼륨을 만들면 VM HA, 마이그레이션, EIP 서비스등 유연한 네트워크 서비스가 가능하기 때문이다.  
+
+iSCSI은 SCSI를 인터넷으로 확장한 것으로 인터넷을 가로질러서 스토리지를 연결할 수 있다. 전통적인 파이버 채널은 특수한 목적의 케이블링을 요구했으며, 물리적인 제약이 있었다. iSCSI는 IP 기반이기 때문에 물리적인 제약을 극복하며, 비교적 저렴하게 중앙 집중화된 스토리지를 구성할 수 있다. 
+
+=== 테스트 환경 구축 ===
+나는 KVM을 클라우드 환경에서 사용하기를 원하며, iSCSI를 이용해서 원격 storage 서버에 관리하는 걸 테스트 하려한다.
+
+완전한 테스트를 위해서는 별도의 스토리지 서버를 구축해야 하겠으나 자원이 충분하지 않은 관계로 가상환경으로 구축하기로 했다. 테스트 환경은 대략 다음과 같다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1jBoC3558OBDescuQKi3YucNyI0lgFfgTSuX4O7Vp4W0&amp;w=567&amp;h=329">
+}}}
+
+Guest VM을 하나 만들어서 iSCSI Target으로 만든다  이 Guest VM은 두 개의 disk를 가지는데, 이중 하나를 iSCSI 볼륨으로 제공한다. Host 운영체제는 iSCSI initiator로 Target에 접근해서 iSCSI disk 볼륨을 만든다. Test VM은 iSCSI disk 볼륨을 Root Disk volume으로 사용한다.
+
+Hypervisor로는 KVM을 사용했다.
+
+== iSCSI Target 및 initiator 설정 ==
+자세한 iSCSI Target/initiator 설정은 [wiki:Site/System_management/iSCSI Linux iSCSI 설정] 문서를 참고한다. 여기에서는 설정내용만 공유한다.
+
+=== iSCSI Target ===
+다음과 같이 kvm을 이용해서 iSCSI Target Guest VM을 실행 했다. attach_volume01.raw가 iSCSI 볼륨으로 사용할 disk다.
+{{{#!plain
+# qemu-system-x86_64 -m 512 -hda iscsc_target_guest.img -hdb attach_volume01.raw -net nic,model=virtio -net tap,ifname=tap1,script=no
+}}}
+iscsc target 운영체제는 Ubuntu 12.04 server 버전이다. 다음은 iSCSI Target 설정이다.
+{{{#!plain
+# tgtadm --lld iscsi --op new --mode target --tid 1 -T iqn.joinc.com.example:storage.disk1 
+# tgtadm --lld iscsi --op new --mode logicalunit --tid 1 --lun 1 -b /dev/sdb 
+# tgtadm --lld iscsi --op bind --mode target --tid 1 -I ALL 
+}}}
+
+=== iSCSI initiator  ===
+Host 운영체제가 가 iSCSI initiator 역할을 한다. 
+{{{#!plain
+# iscsiadm --mode discovery --type sendtargets --portal 10.24.23.1
+10.24.23.1:3260,1 iqn.joinc.com.example:storage.disk1
+
+#  iscsiadm --mode node --targetname iqn.joinc.com.example:storage.disk1 --portal 10.24.23.1 --login
+Logging in to [iface: default, target: iqn.joinc.com.example:storage.disk1, portal: 10.24.23.1,3260]
+Login to [iface: default, target: iqn.joinc.com.example:storage.disk1, portal: 10.24.23.1,3260]: successful
+}}}
+fdisk 로 새로운 블럭 디바이스가 /dev/sdd (디바이스 이름은 테스트 환경에 따라 다를 수 있다.)가 붙은 걸 확인할 수 있다. 
+
+== iSCSI를 KVM 볼륨으로 ==
+iSCSI 디바이스 이름은 /dev/sdd다. 설치 guest 운영체제는 Centos로 했다. 
+{{{#!plain
+# sudo kvm -m 512 -cdrom ../CentOS-6.2-x86_64-minimal.iso -drive file=/dev/sdd -boot d
+# kvm -drive file=/dev/sdd -net nic -net user
+}}}
+운영체제 설치 실행 모두 잘 된다. 
+
+== 히스토리 ==
+  * 2012년 6월 16일
+
+[[Tag(KVM,iSCSI,Storage)]]
+[[Category(50)]]

@@ -1,0 +1,167 @@
+#title 윈속 API : WSAWaitForMultipleEvents - 지정된 이벤트 객체의 하나 혹은 모두가 신호 상태를 기다린다. 혹은 제한 시간이 지났는지 확인한다.
+
+== WSAWaitForMultipleEvents ==
+WSAWaitForMultipleEvents 함수는 이벤트 객체의 전부 혹은 하나의 신호 상태, 제한 시간 혹은 완료 루틴 (completion routine)의 실행시 반환 한다.
+
+=== 사용 법 ===
+{{{#!plain
+DWORD WSAWaitForMultipleEvents(
+  __in  DWORD cEvents,
+  __in  const WSAEVENT *lphEvents,
+  __in  BOOL fWaitAll,
+  __in  DWORD dwTimeout,
+  __in  BOOL fAlertable
+);
+}}}
+
+=== 매개 변수 ===
+ * cEvents
+    이벤트 핸들러 배열을 가리키는 포인터 lphEvents에 있는 이벤트 객체의 개수. 이벤트 객체 핸들의 최대 개수는 WAS_MAXIMUM_WAIT_EVENTS 만큼이다. 반드시 하나 이상의 이벤트 객체가 지정 되어야 한다.
+  * lphEvents
+    이벤트 객체 핸들러 배열의 포인터. 이 배열에는 서로 다른 타입의 이벤트 객체가 포함될 수 있다.
+  * fwaitAll
+    기다리는 방식을 지지어한다. TRUE라면 lphEvents 배열에 포함된 모든 이벤트 객체가 신호 상태가 되어야 반환한다. FALSE라면 배열에 포함된 이벤트 객체 중 하나라도 신호 상태가 되면 반환한다.
+  * dwTimeout
+     시간 제한을 지정한다. 단위는 밀리세컨드이다. 제한 시간을 지나면 이벤트 객체가 신호상태가 되지 않았더라도 반환 한다.
+  * fAlertable
+     시스템이 완료 루틴을 실행시킬 수 있게 되었을 때, alert wait 하고 있는 쓰레드를 깨운다. 만약 TRUE라면 시스템 완료 루틴이 실행될 때, alterable wait 상태에 있는 쓰레드의 WASWaitForMultipleEvents 함수가 반환한다. 이 경우 WSA_WAIT_IO_COMPLETION이 반환된다. 만약 FALSE 라면 쓰레드는 altertable wait 상태에 놓이지 않고 완료 루틴도 실행되지 않는다.
+
+=== 반환 값 ===
+성공하면 아래의 값들 중 하나를 반환한다.
+  * WSA_WAIT_EVENT_0 에서 (WSA_WAIT_EVENT_0 + Events - 1)
+     fWaitAll 매개 변수가 FALSE 이면, 신호 상태가 된 이벤트 객체의 배열 인덱스를 반환한다.
+  * WAIT_IO_COMPLETION
+     한개 이상의 완료 루틴이 실행 준비가 되었다.
+  * WAS_WAIT_TIMEOUT
+     fwaitAll 조건을 만족시키지 못한 상태에서 타임 아웃이 발생 했다.
+
+실패하면 WSA_WAIT_FAILED를 반환 한다. 에러 코드는 WSAGetLastError(:4100)함수로 가져올 수 있다.
+
+=== 설명 ===
+WSAWaitForMultipleEvents 함수는 만족 하는 조건을 기다리기 위해서 사용한다. 만약 조건이 충족되지 않는다면, 함수를 호출한 쓰레드는 기다림 상태에 놓이게 된다.
+
+=== 예제 ===
+MSDN 예제 그대로 썼음. 에코 서버 예제 하나 만들어야 겠음.
+{{{#!plain
+#include <windows.h>
+#include <stdio.h>
+#include "winsock2.h"
+
+#define DATA_BUFSIZE 4096
+
+void main() {
+  //-----------------------------------------
+  // Declare and initialize variables
+  WSABUF DataBuf;
+  char buffer[DATA_BUFSIZE];
+  DWORD EventTotal = 0, 
+    RecvBytes = 0, 
+    Flags = 0, 
+    BytesTransferred = 0, 
+    CallBack = 0;
+  WSAEVENT EventArray[WSA_MAXIMUM_WAIT_EVENTS];
+  WSAOVERLAPPED AcceptOverlapped;
+  SOCKET ListenSocket, AcceptSocket;
+
+  //-----------------------------------------
+  // Initialize Winsock
+  WSADATA wsaData;
+  WSAStartup(MAKEWORD(2,2), &wsaData);
+
+  //-----------------------------------------
+  // Create a listening socket bound to a local
+  // IP address and the port specified
+  ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  u_short port = 27015;
+  char* ip;
+  sockaddr_in service;
+  service.sin_family = AF_INET;
+  service.sin_port = htons(port);
+  hostent* thisHost;
+  thisHost = gethostbyname("");
+  ip = inet_ntoa (*(struct in_addr *)*thisHost->h_addr_list);
+	
+  service.sin_addr.s_addr = inet_addr(ip);
+
+  //-----------------------------------------
+  // Bind the listening socket to the local IP address
+  // and port number
+  bind(ListenSocket, (SOCKADDR *) &service, sizeof(SOCKADDR));
+
+  //-----------------------------------------
+  // Set the socket to listen for incoming
+  // connection requests
+  listen(ListenSocket, 1);
+  printf("Listening...\n");
+
+  //-----------------------------------------
+  // Accept and incoming connection request
+  AcceptSocket = accept(ListenSocket, NULL, NULL);
+  printf("Client Accepted...\n");
+
+  //-----------------------------------------
+  // Create an event handle and setup an overlapped structure.
+  EventArray[EventTotal] = WSACreateEvent();
+  ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
+  AcceptOverlapped.hEvent = EventArray[EventTotal];
+  DataBuf.len = DATA_BUFSIZE;
+  DataBuf.buf = buffer;
+  EventTotal++;
+
+  //-----------------------------------------
+  // Call WSARecv to receive data into DataBuf on 
+  // the accepted socket in overlapped I/O mode
+  if (WSARecv(AcceptSocket, &DataBuf, 1, &RecvBytes, &Flags, &AcceptOverlapped, NULL) == SOCKET_ERROR) {
+    if (WSAGetLastError() != WSA_IO_PENDING)
+      printf("Error occurred at WSARecv()\n");
+  }
+
+  //-----------------------------------------
+  // Process overlapped receives on the socket
+  while (1) {
+    DWORD Index;
+
+    //-----------------------------------------
+    // Wait for the overlapped I/O call to complete
+    Index = WSAWaitForMultipleEvents(EventTotal, EventArray, FALSE, WSA_INFINITE, FALSE);
+
+    //-----------------------------------------
+    // Reset the signaled event
+    WSAResetEvent(EventArray[Index - WSA_WAIT_EVENT_0]);
+
+    //-----------------------------------------
+    // Determine the status of the overlapped event
+    WSAGetOverlappedResult(AcceptSocket, &AcceptOverlapped, &BytesTransferred, FALSE, &Flags);
+
+    //-----------------------------------------
+    // If the connection has been closed, close the accepted socket
+    if (BytesTransferred == 0) {
+      printf("Closing Socket %d\n", AcceptSocket);
+      closesocket(AcceptSocket);
+      WSACloseEvent(EventArray[Index - WSA_WAIT_EVENT_0]);
+      return;
+    }
+
+    //-----------------------------------------
+    // If data has been received, echo the received data
+    // from DataBuf back to the client
+    if (WSASend(AcceptSocket, &DataBuf, 1, &RecvBytes, Flags, &AcceptOverlapped, NULL) == SOCKET_ERROR)
+      printf("WSASend() is busted\n");
+
+    //-----------------------------------------		
+    // Reset the changed flags and overlapped structure
+    Flags = 0;
+    ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
+
+    AcceptOverlapped.hEvent = EventArray[Index - WSA_WAIT_EVENT_0];
+
+    //-----------------------------------------
+    // Reset the data buffer
+    DataBuf.len = DATA_BUFSIZE;
+    DataBuf.buf = buffer;
+  }
+}
+
+}}}
+
+[[tag(윈도 네트워크 프로그래밍,네트워크 프로그래밍,윈속)]]

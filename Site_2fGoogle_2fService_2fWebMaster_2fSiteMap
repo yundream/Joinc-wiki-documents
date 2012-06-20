@@ -1,0 +1,145 @@
+#title 구글 사이트 관리자 도구 : Google Sitemap
+[[UploadFile]]
+[[Uploadedfiles]]
+
+== 소개 ==
+검색엔진의 경쟁력은 얼마나 많은 양질의 웹문서에 대한 Index(색인)결과를 가지고 있느냐에 달려있다. 구글이 세계최고의 회사중 하나가 된데에는 방대한 양의 웹색인 문서를 가지고 있기 때문이다. 구글 연구소에서 개발된 선도적인 기술들 덕분이다. 
+ 
+그러나 문제가 있다. 워낙에 방대한 양의 문서들이 생기기 때문에, 웹문서를 '''crawling''''하기가 점점더 힘들어 지고 있다는 점이다. 문서의 양이 방대한 만큼 흔히 말하는 '''쓰레기 정보'''들이 범람하기 때문이다. 좋은 검색서비스를 제공하기 위해서는 가능한 수많은 문서 중에서 비교적 쓸만한 문서를 '''더욱 자주''', '''더 높은 가중치를 줘서''' 수집할 필요가 있다.  
+ 
+구글은 이러한 문제를 해결하기 위해서 adsense(:12)와 '''sitemap''' 서비스를 제공하고 있다. adsense? 그건 광고 서비스 아닌가? 라고 생각할 수 있겠다. 물론 그렇긴 하지만, adsense는 검색광고 서비스로 돈을 벌어다 주는 동시에, 더 좋은 '''검색'''을 위한 수단이 되기도 한다. 적어도 adsesne가 게제된 사이트라면 '''나름대로 관리가 되는'''사이트라는 걸 어느정도는 보장할 수 있기 때문이다.  
+ 
+웹은 망구조를 가지고 있으므로 딱히 시작지점이라고 할 만한 곳이 없다. 그런데 문서를 수집하기 위한 crawling 과정에서 가장 중요한게 '''검색의 시작점'''을 찾는 일이다. 시작점을 잘못 찾으면 무한루프에 빠지거나, 아주 비효율적인 탐색경로를 찾게되거나, 망의 일부분을 crawling하지 못하는 경우가 생기기 때문이다. adsense를 게제한 사이트는 crawling의 시작위치로 선택할 수 있다. 반드시 그렇지는 않겠지만 adsense사용자는 자신의 페이지를 전체 웹공간에 잘 배치하기 위해서 꽤나 노력을 하고 있을거라고 생각할 수 있기 때문이다.  이런점에서 '''adsense'''를 고안해낸 개발자는 꽤나 똑똑한 사람이란걸 짐작할 수 있다.  
+ 
+구글 '''SiteMap'''역시 이러한 전략에서 시작된 서비스다. SiteMap은 Google에 어느 페이지를 얼마나 자주 크롤링해야 하는지, 중요도는 어떠한지 등에 대한 정보를 주게 됨으로써 협력적인 crawling가 가능하도록 한다.  
+ 
+이를테면 사이트 관리자는 자신의 사이트를 잘 알릴 수 있는 기회를 만들어서 좋고, 구글은 양질의 사이트를 효과적으로 crawling할 수 있는 정보를 얻을 수 있어서 좋은 것이다. 누이좋고 매부좋고... 
+ 
+== SiteMap 이용 == 
+'''Sitemap'''은 사이트 관리자가 구글에 '''변경되거나 새로추가된 문서''', '''더 나은 우선순위를 가지는 문서'''에 대한 정보를 제공하는 것으로 시작한다. 이러한 정보의 교환을 위해서 Google은 '''SiteMap'''이라는 XML(:12)형식으로 된 오픈소스 프로토콜을 제공하고 있다.  
+ 
+사이트 관리자는 '''SiteMap 프로토콜''' 규약에 맞추어, '''문서'''에 대한 변경/추가/삭제/가중치 등에 대한 정보를 넣은다음, 이를 특정 URL위치에 파일 형태로 저장한다음 구글에 알려주면 된다. 그럼 구글은 해당 URL을 crawling 할때 SiteMap 파일을 읽어들여서, 해당 정척에 따라 Crawling를 하게 되는 것이다. robot.txt와 비슷한 방식이라고 보면 될거 같다.  
+ 
+=== SiteMap Tag 정의 === 
+'''SiteMap 프로토콜'''은 다음과 같은 포맷을 가지고 있으며, 직관적으로 사용가능하다. 
+{{{#!plain 
+<?xml version="1.0" encoding="UTF-8"?> 
+ 
+<urlset xmlns="http://www.google.com/schemas/sitemap/0.84"> 
+ <url> 
+ <loc>http://www.example.com/</loc> 
+ <lastmod>2005-01-01</lastmod> 
+ <changefreq>monthly</changefreq> 
+ <priority>0.8</priority> 
+ </url>  
+</urlset>  
+}}} 
+ * <urlset>로 시작해서 </urlset>로 끝난다. 
+ * <url>은 Crawling할 문서들에 대한 하위 정보를 포함한다. 
+ * <loc>은 Crawling할 문서의 URL정보를 가진다. 
+ 
+다음은 SiteMap에서 사용하는 태그들에 대한 설명이다. 
+ || <urlset> || 필수 || 사용하는 프로토콜에 대한 정보를 가진 파일의 위치 ||
+ || <url> || 필수 || URL정보를 포함한 하위 태그에 대한 부모 태그 ||
+ || <loc> || 필수 || 크롤링할 URL의 정보, http와 같은 프로토콜을 반드시 명시해야 한다. ||
+ || <lastmod> || 옵션 || 파일이 최근변경된 시간 '''YYYY-MM-DD''' 형식 ||
+ || <changefreq> || 옵션 || 페이지가 얼마나 자주 변경되는지에 대한 정보로, 검색엔진에게 얼마나 자주 crawling해야 하는지에대한 정보를 준다 ||
+ || <priority> || 옵션 || 관리하는 URL사이트에서 문서가 가지는 중요도. 0.0에서 1.0 사이의 값을 가진다. 이 값은 해당 URL 사이트내에서의 중요도이다. 다른 사이트와 비교되는 값이 아니다. 기본값은 0.5다.||
+
+<changefreq>에 쓸수 있는 값들은 다음과 같다.
+ * always
+ * hourly
+ * daily
+ * weekly
+ * monthly
+ * yearly
+ * never
+ 
+=== escape 문자의 처리 === 
+Sitemap파일은 UTF-8 encode를 지원한다. euc_kr등의 문서는 encode과정을 거쳐야 한다. 또한 XML파일이기 때문에, URL정보에 다음과 같은 문자들은 변환해주어야 한다. 
+ || & || &amp;amp; ||
+ || ' || &amp;pos; ||
+ || " || &amp;quot; ||
+ || > || &amp;gt; ||
+ || < || &amp;lt; ||
+ 
+=== Sitemap 예제 === 
+{{{#!plain 
+<?xml version="1.0" encoding="UTF-8"?> 
+<urlset xmlns="http://www.google.com/schemas/sitemap/0.84"> 
+ 
+ <url> 
+ <loc>http://www.example.com/</loc> 
+ <lastmod>2005-01-01</lastmod> 
+ <changefreq>monthly</changefreq> 
+ <priority>0.8</priority> 
+ </url> 
+ <url> 
+ <loc>http://www.example.com/catalog?item=12&desc=vacation_hawaii</loc> 
+ <changefreq>weekly</changefreq> 
+ </url> 
+ <url> 
+ <loc>http://www.example.com/catalog?item=73&desc=vacation_new_zealand</loc> 
+ <lastmod>2004-12-23</lastmod> 
+ <changefreq>weekly</changefreq> 
+ </url> 
+ <url> 
+ <loc>http://www.example.com/catalog?item=74&desc=vacation_newfoundland</loc> 
+ <lastmod>2004-12-23T18:00:15+00:00</lastmod> 
+ <priority>0.3</priority> 
+ </url> 
+ <url> 
+ <loc>http://www.example.com/catalog?item=83&desc=vacation_usa</loc> 
+ <lastmod>2004-11-23</lastmod> 
+ </url> 
+</urlset> 
+}}} 
+ 
+== 구글에 SiteMap 파일의 등록하기 == 
+위의 형식으로 SiteMap 파일을 만들었다면, 적당한 URL(일반적으로 ROOT)에 배치하고 Google SiteMap 사이트에 접속해서, 정보를 입력해 주면 된다. 
+ 
+http://www.google.com/webmasters/ 에서 '''웹마스터도구'''를 선택하고 로그인 과정을 거치면 된다.
+
+로그인과정을 거친 후 아래의 입력상자에 관리할 사이트의 URL(:12)에 입력하면 된다. 일단 사이트가 등록되면, 웹페이지가 언제 얼마나 색인되었는지의 정보와 함께, 어떤 검색어를 통해서 유저가 방문했는등의 통계정보도 확인할 수 있다. 아래는 개인적으로 운영하는 http://www.joinc.co.kr 의 검색어 통계다. 사이트 최적화를 위해서 매우 유용하게 사용할만한 도구임을 알 수 있다.
+
+
+'''관리 사이트 등록화면'''
+
+attachment:sitemap2.png
+
+'''관리 사이트의 통계정보'''
+
+attachment:sitemap3.png
+
+입력상자에 관리할 사이트의 URL을 입력했다면, 다음과 같은 관리탭이 생성되는걸 확인할 수 있을 것이다. 이제 '''sitemap'''탭을 클랙해서 sitemap을 등록시켜 주면 된다. 일단 여기까지 진행했다면, 등록시키는 과정은 간단하니 따로 설명하지 않도록 하겠다. 다음은 필자의 또다른 사이트인 http://wiki.joinc.co.kr 의 사이트맵 파일 정보다. 아주 간단하게 작성했는데, 그냥 참고삼아서 읽어보기 바란다. sitemap 페이지는 http://wiki.joinc.co.kr/sitemap.php 로 확인할 수 있다.
+
+attachment:sitemap5.png
+{{{#!plain
+<?
+header("Content-Type: text/xml");
+echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+?>
+
+<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">
+ <url>
+ <loc>http://wiki.joinc.co.kr/</loc>
+ <lastmod>2007-05-18</lastmod>";
+ <changefreq>weekly</changefreq>
+ <priority>0.6</priority>
+ </url>
+
+ <url>
+ <loc>http://wiki.joinc.co.kr/wiki.php/FrontPage</loc>
+ <lastmod>2007-05-18</lastmod>";
+ <changefreq>weekly</changefreq>
+ <priority>0.7</priority>
+ </url>
+
+ <url>
+ <loc>http://wiki.joinc.co.kr/wiki.php/Site</loc>
+ <lastmod>2007-05-18</lastmod>";
+ <changefreq>weekly</changefreq>
+ <priority>0.8</priority>
+ </url>
+</urlset>
+}}}

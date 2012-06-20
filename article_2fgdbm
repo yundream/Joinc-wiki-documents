@@ -1,0 +1,274 @@
+#title GDBM을 이용한 간단한 DB프로그래밍
+
+{{{#!html
+요즘 사이트에 있어서 mysql, oracle, postgresql 등 RDBMS 가 쓰이지
+않는 곳이 거의 없을정도로 많은 인기를 끌고 있다. <br>
+그 반면 NIS, BIND, sendmal, LDAP 등 많은 프로그램들이
+각각의 자료를 관리하기 위해서 굳이 RDBMS 를 쓰지 않고 ndbm, dbm, gdbm 을
+사용하고 있다. 왜 막강한 RDBMS를 쓰지 않고 이러한 간단한 dbm 을 쓰는걸까 ?
+<br>
+그 이유는 간단한 일을 하기 위해서 RDBMS 는 너무 크고 너무 거추장 스럽다는
+것이다. 소규모(1000 에서 10000 건) 정도의 전화번호부를 관리한다거나,
+sendmail 에서 수백건 미만의 hosts(relay 허용등) db를 관리하는데에는 실지로
+RDBMS의 기능의 10%도 필요하지 않다. 이러한 간단한 DB를 유지하려고,
+서버에 RDBMS 를 설치하고, 운용하고, 프로그래밍을 하고,
+복잡한 SQL을 사용하는건 너무 소모적인 일이다.
+그래서 이러한
+간단한 소규모의 데이타를 관리하기 위해서 dbm 이 존재한다.<br><br>
+dbm 은 관계형 데이타 구조 모델을 가지지 않고, HASH 데이타 구조 모델을
+가진다. HASH 는 Key(키), Value(값) 의 한쌍으로 이루어지는 데이타의
+집합으로써 키를 이용해서 데이타를 저장하고, 검색하고, 삭제하는 작업을 한다.<br>
+어찌 보면 C 에서의 pointer 개념과 비슷하다고 할수 있는데, Value 를 Key 가
+가르킨다고 보면 무난할듯 하다.<br>
+RDBMS 와는 달리 
+하나하나의 데이타가 다른 데이타와는 별개로 존재하므로 RDBMS 처럼
+데이타간의 관계에 의한 질의 언어가 필요없이 간단하게 Key만을 호출하면,
+그 키에 연결된 값을 가져올수 있게된다. 기능의 한계가 명확하므로,
+배워서 구현하기가 매우 쉬우며, 작고 또한 빠르다라는 장점을 가진다.
+<br><br>
+GDBM 은 GNU database mansger 로써 전통적으로 Unix 쪽에서 쓰이던 dbm 의
+확장형이다.<br>
+아래의 예제는 간단한 주소록이다.
+비록 간단하지만 세련된 코드는 아니지만 데이타의 입력, 검색, 삭제 등 dbm 으로써
+가져야할 기본적인 기능을 살펴보는데 어려움은 없을것으로 생각된다.
+<br><br>
+<b>예제 : address.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;gdbm/gdbm.h&gt;
+
+<b><font COLOR=#0000ff>const</font></b> <b><font COLOR=#0000ff>int</font></b> FALSE = <font COLOR=#a900a9>0</font>;
+<b><font COLOR=#0000ff>const</font></b> <b><font COLOR=#0000ff>int</font></b> TRUE  = <font COLOR=#a900a9>1</font>;
+
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    datum key_data;
+    datum value_data;
+    datum return_data;
+
+    <b><font COLOR=#0000ff>char</font></b> cmd_char;
+    <b><font COLOR=#0000ff>int</font></b> done = FALSE;
+
+    GDBM_FILE dbf;
+
+
+    <b><font COLOR=#0000ff>int</font></b> block_size = <font COLOR=#a900a9>0</font>;
+
+    <b><font COLOR=#0000ff>int</font></b> temp;
+
+    <b><font COLOR=#0000ff>char</font></b> key_line[<font COLOR=#a900a9>80</font>];
+    <b><font COLOR=#0000ff>char</font></b> value_line[<font COLOR=#a900a9>255</font>];
+
+    key_data.dptr = NULL;
+    value_data.dptr = value_line;
+
+    <b><font COLOR=#0000ff>if</font></b> (access(<font COLOR=#ff0000>"/tmp/my_dic"</font>, F_OK) != <font COLOR=#a900a9>0</font>)
+    {
+        printf( <font COLOR=#ff0000>"사전 DB 파일이 존재 하지 않습니다"</font>
+                <font COLOR=#ff0000>"영어 사전  DB 파일을 새로 만들겠습니까 (y/n)? "</font>);
+        cmd_char = getchar();
+
+        <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+        {
+            <b><font COLOR=#0000ff>if</font></b> (cmd_char != '')
+            {
+                <b><font COLOR=#0000ff>char</font></b> temp;
+                <b><font COLOR=#0000ff>do</font></b>
+                    temp=getchar();
+                <b><font COLOR=#0000ff>while</font></b> (temp != '' && temp != EOF);
+            }
+
+            <b><font COLOR=#0000ff>if</font></b> (cmd_char == EOF) cmd_char = 'n';
+            <b><font COLOR=#0000ff>switch</font></b>(cmd_char)
+            {
+                <b><font COLOR=#0000ff>case</font></b> 'y':
+                    dbf = gdbm_open (<font COLOR=#ff0000>"/tmp/my_dic"</font>, block_size, GDBM_WRCREAT|GDBM_FAST, <font COLOR=#a900a9>00664</font>, NULL);
+                    <b><font COLOR=#0000ff>if</font></b> (dbf == NULL)
+                    {
+                        perror(<font COLOR=#ff0000>"db file open error : "</font>);
+                        exit(<font COLOR=#a900a9>0</font>); 
+                    }
+                    <b><font COLOR=#0000ff>break</font></b>;
+                <b><font COLOR=#0000ff>case</font></b> 'n':
+                    <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>1</font>;
+                    <b><font COLOR=#0000ff>break</font></b>;
+            }
+
+            <b><font COLOR=#0000ff>if</font></b> (cmd_char == 'y')
+                <b><font COLOR=#0000ff>break</font></b>;
+        }
+
+    }
+    else
+    {
+        dbf = gdbm_open (<font COLOR=#ff0000>"/tmp/my_dic"</font>, block_size, GDBM_READER|GDBM_WRITER, <font COLOR=#a900a9>00664</font>, NULL);
+        <b><font COLOR=#0000ff>if</font></b> (dbf == NULL)
+        {
+            perror(<font COLOR=#ff0000>"db file open error : "</font>);
+            exit(<font COLOR=#a900a9>0</font>);
+        }
+    }
+
+
+    printf(<font COLOR=#ff0000>"주소 관리 프로그램입니다. "</font>
+           <font COLOR=#ff0000>"사용법이 궁금하시면 ? 를 입력하세요"</font>);
+    // 사용자의 키보드 입력문자열을 받아서 필요한 
+    // 행동을 취한다.
+    <b><font COLOR=#0000ff>while</font></b>(!done)
+    {
+        printf(<font COLOR=#ff0000>"com -&gt; "</font>);
+        cmd_char = getchar();
+
+        <b><font COLOR=#0000ff>if</font></b> (cmd_char != '')
+        {
+            <b><font COLOR=#0000ff>char</font></b> temp;
+            do
+                temp = getchar();
+            <b><font COLOR=#0000ff>while</font></b> (temp != '' && temp != EOF);
+        }
+        <b><font COLOR=#0000ff>if</font></b> (cmd_char == EOF) cmd_char = 'q';
+
+        <b><font COLOR=#0000ff>switch</font></b> (cmd_char)
+        {
+            <b><font COLOR=#0000ff>case</font></b> 'q':
+                done = TRUE;
+                <b><font COLOR=#0000ff>break</font></b>;
+            <b><font COLOR=#0000ff>case</font></b> '?':
+                printf(<font COLOR=#ff0000>"i -- insert data"</font>
+                       <font COLOR=#ff0000>"f -- fetch data"</font>
+                       <font COLOR=#ff0000>"c -- data num"</font>
+                       <font COLOR=#ff0000>"d -- data delete"</font>
+                       <font COLOR=#ff0000>"q -- quit"</font>);
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            <b><font COLOR=#0000ff>case</font></b> '':
+                printf(<font COLOR=#ff0000>""</font>);
+                <b><font COLOR=#0000ff>break</font></b>;
+            <b><font COLOR=#0000ff>case</font></b> 'i':
+                <b><font COLOR=#0000ff>if</font></b> (key_data.dptr != NULL) free(key_data.dptr);
+                printf(<font COLOR=#ff0000>"Key -&gt; "</font>);
+                fgets (key_line, <font COLOR=#a900a9>80</font>, stdin);
+                key_line[strlen(key_line) - <font COLOR=#a900a9>1</font>] = '<font COLOR=#a900a9>0</font>';
+
+                key_data.dptr = key_line;
+                key_data.dsize = strlen(key_line) + <font COLOR=#a900a9>1</font>;
+
+                printf(<font COLOR=#ff0000>"Value -&gt; "</font>);
+                fgets(value_line, <font COLOR=#a900a9>255</font>, stdin); 
+
+                value_data.dsize = strlen(value_line) + <font COLOR=#a900a9>1</font>;
+                <b><font COLOR=#0000ff>if</font></b> (gdbm_store (dbf, key_data, value_data, GDBM_REPLACE) != <font COLOR=#a900a9>0</font>)
+                    printf(<font COLOR=#ff0000>"Item no inserted "</font>);
+                printf(<font COLOR=#ff0000>""</font>);
+                key_data.dptr = NULL;
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            <b><font COLOR=#0000ff>case</font></b> 'f':
+                <b><font COLOR=#0000ff>if</font></b> (key_data.dptr != NULL) free(key_data.dptr);
+                printf(<font COLOR=#ff0000>"Key -&gt; "</font>);
+                fgets (key_line, <font COLOR=#a900a9>80</font>, stdin);
+                key_line[strlen(key_line) -<font COLOR=#a900a9>1</font>] = <font COLOR=#a900a9>0</font>;
+                key_data.dptr = key_line;
+                key_data.dsize = strlen(key_line) + <font COLOR=#a900a9>1</font>;
+
+                return_data = gdbm_fetch(dbf, key_data);
+                <b><font COLOR=#0000ff>if</font></b> (return_data.dptr != NULL)
+                {
+                    printf(<font COLOR=#ff0000>"data -&gt; %s"</font>, return_data.dptr);
+                    free(return_data.dptr);
+                }
+
+                <b><font COLOR=#0000ff>else</font></b>
+                    printf(<font COLOR=#ff0000>"No Such item found. "</font>);
+                key_data.dptr = NULL;
+                <b><font COLOR=#0000ff>break</font></b>;
+            <b><font COLOR=#0000ff>case</font></b> 'c':
+                temp = <font COLOR=#a900a9>0</font>;
+
+                <b><font COLOR=#0000ff>if</font></b> (key_data.dptr != NULL) free (key_data.dptr);
+                return_data =  gdbm_firstkey(dbf);
+                <b><font COLOR=#0000ff>while</font></b>(return_data.dptr != NULL)
+                {
+                    temp ++;
+                    key_data = return_data;
+                    return_data = gdbm_nextkey(dbf, key_data);
+                    free(key_data.dptr);
+                }
+                printf(<font COLOR=#ff0000>"%d 개의 자료가 있습니다"</font>, temp);
+                key_data.dptr = NULL;
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            <b><font COLOR=#0000ff>case</font></b> 'a':
+                key_data = gdbm_firstkey(dbf);
+                <b><font COLOR=#0000ff>if</font></b> (key_data.dptr == NULL)
+                {
+                    printf(<font COLOR=#ff0000>"No one tiem found"</font>);
+                    <b><font COLOR=#0000ff>break</font></b>;
+                }
+                else
+                {
+                    printf(<font COLOR=#ff0000>"%s =&gt; "</font>, key_data.dptr);
+                    return_data = gdbm_fetch(dbf, key_data);
+                    printf(<font COLOR=#ff0000>"%s"</font>, return_data.dptr);
+                    free(return_data.dptr);
+                }
+                <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+                {
+                    return_data = gdbm_nextkey(dbf, key_data);
+                    <b><font COLOR=#0000ff>if</font></b> (return_data.dptr != NULL)
+                    {
+                        free(key_data.dptr);
+                        key_data = return_data;
+                        printf(<font COLOR=#ff0000>"%s =&gt; "</font>, key_data.dptr);
+                        return_data = gdbm_fetch(dbf, key_data);
+                        printf(<font COLOR=#ff0000>"%s"</font>, return_data.dptr);
+                        free(return_data.dptr);
+                    }
+                    else
+                    {
+                        printf(<font COLOR=#ff0000>"No such item found."</font>);
+                        <b><font COLOR=#0000ff>break</font></b>;
+                    }
+                }
+                key_data.dptr = NULL;
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            <b><font COLOR=#0000ff>case</font></b> 'd':
+                <b><font COLOR=#0000ff>if</font></b> (key_data.dptr != NULL) free (key_data.dptr);
+
+                printf(<font COLOR=#ff0000>"Key -&gt; "</font>);
+                fgets (key_line, <font COLOR=#a900a9>80</font>, stdin);
+                key_line[strlen(key_line) -<font COLOR=#a900a9>1</font>] = <font COLOR=#a900a9>0</font>;
+                key_data.dptr = key_line;
+                key_data.dsize = strlen(key_line) + <font COLOR=#a900a9>1</font>;
+                <b><font COLOR=#0000ff>if</font></b>(gdbm_delete (dbf, key_data) != <font COLOR=#a900a9>0</font>)
+                    printf(<font COLOR=#ff0000>"Item not found or deleted"</font>);
+                key_data.dptr = NULL;
+                <b><font COLOR=#0000ff>break</font></b>;
+        }
+    }
+
+    printf(<font COLOR=#ff0000>"bye bye"</font>);
+    <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>0</font>;
+}
+
+</pre>
+</td></tr>
+</table>
+datum 의 dptr 멤버는 malloc 를 이용해서 메모리를 할당하고, 자동으로 해제시켜주지 않는다. 그러므로
+반드시 필요없다고 생각되는 곳에서 free 를 해줘야 메모리 누수 및 오류를 방지할수 있다.<br>
+위 코드는 매우 명확해 보이므로 별도로 설명을하진 않을 생각이다. 아리송하더라도 한번 정도 컴파일
+해서 사용해보면서 코드를 보면 쉽게 이해가 될것이다.<br>
+gdbm 에 대한 자세한 내용은 man 페이지를 참고하라<br>
+컴파일 방법은 아래와 같다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+[yundream@localhost test]# gcc -o address address.c -lgdbm
+</td></tr>
+</table>
+}}}

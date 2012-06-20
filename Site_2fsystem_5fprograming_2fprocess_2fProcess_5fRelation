@@ -1,0 +1,301 @@
+#title 프로세스 관계
+[[tag(시스템프로그래밍,pork,pstree)]]
+{{{#!html
+<b>프로세스</b><br>
+지금 터미널에서 ps 명령을 실행하면 수많은 프로세스가 떠 있음을 알수 있다. 
+프로세스란 시스템상에서 어떠한 명령을 실행함으로써 사용자와 OS, OS 와 시스템 
+간의 대화가 가능하도록 해주는 실행 객체이다. <br>
+이러한 프로세스는 여러분이 이미지를 보거나, 웹서핑을 하거나, 음악을 듣거나 
+혹은 웹서비스를 하는등 각 객체의 특성에 따라 다양한 업무를 수행하게 된다. <br>
+<pre>
+[root@localhost root]# ps -aux 
+USER       PID %CPU %MEM   VSZ  RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.2  1384  520 ?        S    21:37   0:04 init
+root         2  0.0  0.0     0    0 ?        SW   21:37   0:00 [keventd]
+root         3  0.0  0.0     0    0 ?        SW   21:37   0:00 [kapm-idled]
+root         4  0.0  0.0     0    0 ?        SWN  21:37   0:00 [ksoftirqd_CPU0]
+root         5  0.0  0.0     0    0 ?        SW   21:37   0:00 [kswapd]
+...
+root       930  0.0  0.3  2920 1016 tty1     S    21:39   0:00 /bin/sh /usr/X11R
+root       937  0.0  0.2  2320  672 tty1     S    21:39   0:00 xinit /etc/X11/xi
+root       938  0.7  5.9 74844 15056 ?       S&lt;   21:39   0:34 /etc/X11/X :0
+root       946  0.0  0.4  2956 1108 tty1     S    21:39   0:00 /bin/bash /usr/bi
+root      1011  0.0  1.9 16044 5020 ?        S    21:39   0:00 kdeinit: Running.
+...
+</pre>
+그런데 이러한 프로세스가 어느순간 갑자기 생기진 않았을것이다. 최초의 어느한 시작점이 
+있을것이다. 이 시작점에 대해서 알아보자 
+<br><br>
+<b>init 프로세스</b><br>
+모든 프로세스는 위에서 처럼 PID를 가지고 또한 PPID 를 가진다. 
+PID란 프로세스자신을 가리키는 일련의 번호이며 PPID란 자신을 실행시킨 부모프로세스의 PID를 
+가리킨다. <br> 
+그렇다면 자신의 부모 프로세스를 실행시킨 프로세스가 존재할것이고, 또 그 부모 프로세스를 
+실행한 프로세스가 존재할것이다. <br> 
+이런 식으로 유추해서 생각해 보면 결국 최초의 조상 프로세스가 존재할것이라는 결론에 
+도달할수 있을것인데(인류로 생각해보자면, "아담" 정도), 그것이 바로  
+PID 1번을 가지는 init 프로세스이다. <br> 
+모든 프로세스는 init 로부터 fork &amp; exec 과정을 거쳐서 독립된 프로세스로 임무를 
+수행하게 된다.
+<br><br>
+
+<b>fork 와 exec</b><br>
+그럼 fork 와 exec 에 대해서 좀 알아보도록 하겠다. <br> 
+fork 와 exec 는 둘다 유닉스 시스템에서 새로운 프로세스를 생성시키기 위해서 
+사용하는 System Call 함수들이다. <br>
+둘다 새로운 프로세스를 생성하는데 그 행동이 약간 다르다.<br>  
+fork 의 경우는 어떤 프로세스에서 fork 를 실행하게 되면, 자신의 
+프로세스와 똑같은 프로세스를 copy-on-write 형식으로 실행하게 되며, 
+이때 생성된 프로세는 자신만의 PID를 가지고 독자적인 길을 가게 된다. 
+물론 이때 생성된 프로세서의 부모 프로세스는 최초에 실행된 프로세스가 될것이다. <br>
+우리는 이러한 최초의 프로세스를 부모 프로세스라고 하고 fork 되어서 만들어진 프로세스를 
+자식 프로세스라고 한다. <br><br>
+
+<b>예제 fork.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> pid;
+    
+    pid = fork();
+
+    <b><font COLOR=#0000ff>if</font></b> (pid == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"fork error "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    // 자식프로세스일경우 
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (pid == <font COLOR=#a900a9>0</font>)
+    {
+        printf(<font COLOR=#ff0000>"자식&#92;n"</font>);
+        pause();
+    }
+    // 부모프로세스의 경우
+    <b><font COLOR=#0000ff>else</font></b>
+    {
+        printf(<font COLOR=#ff0000>"부모&#92;n"</font>);
+        pause();
+    }
+}
+</pre>
+</td></tr>
+</table>
+위의 프로그램을 실행시키고 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost test]# ./fork
+부모
+자식
+</pre>
+</td></tr>
+</table>
+ps 를 이용해서 확인해 보면 아래와 같은 ps 상태를 보여줄것이다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost root]# ps -efjc | grep fork | grep -v fork
+UID        PID  PPID  PGID   SID   CLS PRI STIME TTY          TIME CMD
+root      2375  1963  2375  1963     -  30 23:20 pts/6    00:00:00 ./fork
+root      2376  2375  2375  1963     -  30 23:20 pts/6    00:00:00 ./fork
+</pre>
+</td></tr>
+</table>
+보면 알겠지만 똑같은 이름의 프로세스가 2개 생성되었음을 알수 있으며, 
+2375 가 부모프로세스이고, 2376 이 2375 의 자식프로세스임을 PPID 정보를 
+이용해서 알수 있을것이다. <br>  
+이처럼 fork 는 프로세스의 복사본을 만들때 사용한다.<br>
+이러한 fork 의 특성으로 다수의 클라이언트 연결을 처리해야 하는 네트웍서버 
+를 제작할때 매우 흔히 사용된다.<br>
+fork 함수를 실행하면 int 형의 정수를 넘겨주게 되는데, 자식 프로세스에서는 0이 반환되고, 
+부모 프로세스에서는 0보다 큰 정수가 반환된다.<br>  
+여러가지 이유로 fork 가 실패한다면 -1 을 돌려주게 될것이다. 
+
+<br><br>
+<b>exec</b><br>
+exec 는 흔히 exec 계열함수군에 의해서 구현되며, exec 함수군에는 
+execl(3), execlp, execle.. 등이 있다. 모두 같은 일을 하며, 단지 
+프로그램실행 아규먼트를 다루는데 약간씩의 차이를 가지고 있을 뿐이다.<br> 
+exec 역시 fork 와 마찬가지로 새로운 프로새스를 생성시키지만, fork 와 
+같이 copy-on-write 를 이용한 전혀 새로운 프로세스를 실행시키지 않고, 
+현재의 프로세스이미지를 새로운 프로세스 이미지가 덮어써 버린다.<br> 
+다음의 예제를 컴파일한후 실행하면 이해가 쉬울것이다. 
+<br><br>
+<b>myexec.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    printf(<font COLOR=#ff0000>"원래 프로세스 : %d&#92;n"</font>, getpid());
+    sleep(<font COLOR=#a900a9>1</font>);
+
+    execl(<font COLOR=#ff0000>"/bin/sh"</font>, <font COLOR=#ff0000>"sh"</font>, NULL);
+    printf(<font COLOR=#ff0000>"I will be back&#92;n"</font>);    // 실행될까 ?
+    exit(<font COLOR=#a900a9>0</font>);
+}
+</pre>
+</td></tr>
+</table>
+위의 프로그램을 컴파일한후 실행시키면 "/bin/sh" 가 실행되고 쉘 프롬프트가 
+사용자 입력을 기다리는걸 볼수 있을것이다. <br>
+여기에서 exit 명령을 사용해서 쉘을 종료하면 어떻게 될까 ?<br>
+다음 의 printf 행을 실행해서 "I will be back" 라는 문장을 볼수 있게 될까 ?<br>
+대답은 아니오 이다. 이유는 위에서 설명했듯이, execl 함수를 호출해서 /bin/sh 를 
+수행한순간 myexec 프로세스를 /bin/sh 가 덮어써 버리기 때문이다.<br> 
+ps 를 이용해서 한번 확인을 해보도록 하자. <br> 
+먼저  ./myexec 를 실행시키고 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost test]# ./myexec
+원래 프로세스 : 2447
+sh-2.05# 
+</pre>
+</td></tr>
+</table>
+ps 를 이용해서 myexec 라는 이름의 process 라는 이름의 프로세스가 생성되었는지 
+알아보자.  
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost root]# ps -aux | grep myexec
+
+</pre>
+</table>
+나타나지 않음을 알수 있다. 그러면 pid 2447 번이 존재하는지 한번 확인해 보도록 
+하자. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost root]# ps -aux | grep 2447
+root      2447  0.0  0.5  3280 1356 pts/6    S    23:39   0:00 sh
+</pre>
+</table>
+위의 결과를 보면 알겠지만 myexec 대신 execl 함수를 이용해서 실행시킨 sh 가 
+2447 프로세스를 완전히 덮어써 버렸음을 알수 있을것이다. 
+<br><br>
+참 그리고 system(3) 이라는 새로운 프로세스를 시키는 함수도 있는데, 
+fork &amp; exec 의 다른 구현으로 보면 될것이며, 실제로 system 을 사용하지
+않고, fork &amp; exec 를 통하여 구현하는 경우도 있다.  
+<br><br>
+<b></b>
+<br>
+위의 fork 와  exec 의 개념을 완전히 이해했다면 이제 
+단지 하나의 init 프로세스에서 다른 모든 프로세스가 
+fork &amp; exec 방식으로 어떻게 파생되어서 실행되는지 
+감을 잡을수 있을것이다.<br> 
+init 프로세스에게 어떤 프로세스를 실행시켜라는 메시지가 전달되면, 
+init 는 fork 를 이용해서 자기자신을 복사한 자식 프로세스를 하나 
+실행시키게 될것이다. 그리고 나서 복사된 자식프로세스에서 exec 를 써서 
+새로운 프로세스를 실행시키면 init 는 새로운 프로세스로 대체실행되는 
+것이다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+ new_process 를 실행하라
+     |
+     V
+ +---------+ fork  +---------+ exec(new_process)   +-------------+
+ | init(1) |----->>| init(?) |-------------------->| new_process |
+ +---------+       +---------+                     +-------------+
+</pre>
+</td></tr>
+</table>
+<br><br>
+<b>프로세스의 집단(group)과 세션(session)</b><br>
+우주를 예로 들어보면 행성 하나하나를 프로세스라고 생각할수 있을것이다, 
+그런데 보통 행성은 하나의 항성계에 포함되게 된다. 태양계와 같은 
+것이 일반적인 경우가 될것이며, 이러한 항성계는 다시 은하계라는 더욱 큰 
+규모의 천체에 속하게 된다. <br> 
+프로세스도 마찬가지이다. 각각의 프로세스는 어떠한 집단에 포함될수 있으며, 
+각각의 집단은 더욱큰 집단에 포함될수 있는데, 이러한 각각의 집단을 우리는 
+Group 라고 부르며, 여러개의 Gruop을 포함하는 더큰 그룹을 세션이라고 
+부른다.<br>  
+보통 그룹은 어떠한 작업을 하기 위해서 공통의 목적으로 생성된 프로세스들의 
+집단을 말하는데, 가장 일반적인 예가 fork 로 생성된 자식 부모간의 프로세스 
+그룹이 될것이다.  
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost yundream]$ ps -efjc | grep httpd
+UID        PID  PPID  PGID   SID   CLS PRI STIME TTY          TIME CMD
+root     29635     1 29635 29635     -  30 Mar20 ?        00:00:00 httpd
+nobody   29636 29635 29635 29635     -  30 Mar20 ?        00:00:09 httpd
+nobody   29637 29635 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+nobody   29638 29635 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+nobody   29639 29635 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+</pre>
+</td></tr>
+<table width=100%>
+위는 fork 를 사용하는 대표적인 서버프로그램인 httpd의 ps 결과 이다.
+보면 알겠지만 29635 프로세스가 최초에 생성되고, 나머지 프로세스들이 29635 를 
+부모로 가지는 자식프로세스로 생성되었음을 알수 있다(PPID를 확인인하라).<br>
+그리고 이들은 동일한 그룹(PGID를 확인하라)으로 묶여 있음을 알수 있다. <br>
+이들프로세스가 바로 하나의 프로세스 그룹이 되는것이다.<br>  
+모든 그룹에는 지도자가 있다(태양계의 지도자가 태양? 이듯이). 
+프로세스 집단도 마찬가지로 지도자(집단을 최초 생성한)가 있기 마련이다. 
+PID와 PGID 가 같은 프로세스가 그 프로세스 집단의 지도자이며, 위에서 29635 번 
+프로세스가 PGID 29635 집단의 지도자 프로세스임을 알수 있다. 같은 프로세스
+집단에 속하는 프로세스들은 pipe 등을 통하여서 서로간에 통신이 가능하며, 
+signal 등을 처리함에 있어서 그룹내의 프로세스는 동일한 액션을 취한다.<br> 
+예를 들어서 29635 프로세스를 죽이면, 해당 그룹에 포함되어 있는 모든
+자식프로세스도 그에 대한 영향을 받는다.   
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost yundream]$ kill -9 29635 
+[yundream@localhost yundream]$ ps -efjc | grep httpd
+UID        PID  PPID  PGID   SID   CLS PRI STIME TTY          TIME CMD
+nobody   29636     1 29635 29635     -  30 Mar20 ?        00:00:09 httpd
+nobody   29637     1 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+nobody   29638     1 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+nobody   29639     1 29635 29635     -  30 Mar20 ?        00:00:07 httpd
+</pre>
+</td></tr>
+<table width=100%>
+<br>
+세션은 그룹을 포함하는 그룹이라고 생각하면 된다. 
+하나의 세션은 여러개의 그룹을 가질수 있으며, 보통 
+login 시 생성된다. 다른경우로 데몬과 같이 자기 자신이 세션을 
+가져야하는 경우가 있는데 그러한 경우에 세션이 생성되기도 한다.   
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost yundream]$ ps -efjc | grep 945 | grep -v grep
+UID        PID  PPID  PGID   SID   CLS PRI STIME TTY          TIME CMD
+root       945     1   945   945     -  30 Mar13 tty3     00:00:00 login -- root
+root     21604   945 21604   945     -  30 11:47 tty3     00:00:00 -bash
+root     23964 21604 23964   945     -  30 13:27 tty3     00:00:00 ./fork
+root     23965 23964 23964   945     -  30 13:27 tty3     00:00:00 ./fork
+</pre>
+</td></tr>
+<table width=100%>
+위의 ps 화면은 root 유저로 새로 로그인 해서 ./fork 를 실행시킨 과정
+을 통해서 세션이 어떻게 생성되는지를 보여주고 있다. ./fork 프로그램은 
+fork 를 통해서 부모자식 프로세스를 생성한것이며, 이들은 
+PGID-23964 의 그룹식별자를 가지는 같은 그룹으로 묶이게 된다. 또한 이 그룹은 
+세션아이디 945 를 가지는 세션에 묶이게 된다. <br>  
+결론적으로 945 세션은 945, 21604, 23946 세개의 그룹을 가지게 된다. 세션역시 
+그룹과 마찬가지로 세션지도자를 가지며, 세션지도자는 그 세션을 최후에 만든 
+프로세스로 PID 와 SID가 같게 된다(자신의 PID번호로 SID를 만든다).<br>
+만약에 세션지도자 프로세스를 kill 시키면 어떻게 될까 ?
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[root@localhost root]$ ps -efjc | grep 945 | grep -v grep
+</pre>
+</td></tr>
+<table width=100%>
+세션 프로세스가 사라지자 그와 관련된 모든 프로세스가 kill 되었음을 알수 
+있다.<br>
+}}}

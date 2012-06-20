@@ -1,0 +1,1909 @@
+#title lex and yacc howto
+ * [wiki:docbook/lex_yacc_howto Docbook 원문]
+ * [wiki:article/regex 정규표현]
+ * 해야할 일들
+   1. 아직 미완성
+   1. 문맥을 전체적으로 다듬어야 함
+   1. 용어 정리및 yacc, lex의 기본이론에 대한 내용 추가
+   1. 실행파일 까지 만들어내는 간단한 컴파일러 만들기
+
+{{{#!html
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML
+><HEAD
+><TITLE
+>Flex and Bison Howto</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.7"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Flex and Bison Howto</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				<CODE
+CLASS="EMAIL"
+>&#60;<A
+HREF="mailto:www.joinc.co.kr"
+>www.joinc.co.kr</A
+>&#62;</CODE
+><br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44256;&#52828; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.890.88</TD
+><TD
+ALIGN="LEFT"
+>2004년 07월 25일 13시2004년 07월 25일 04시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>오타 수정계산기 예제 추가</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.85</TD
+><TD
+ALIGN="LEFT"
+>2004년 07월 22일 09시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>번역에서 문서 참고 스타일 변경</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.82</TD
+><TD
+ALIGN="LEFT"
+>2004년 07월 21일 09시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>lex/yacc를 flex/bision 기반으로 변경, 4장 추가</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.81</TD
+><TD
+ALIGN="LEFT"
+>2004년 07월 20일 09시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>번역시작 1-3장</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2002년 04월 20일 19시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>원본 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1. <A
+HREF="#AEN33"
+>소개</A
+></DT
+><DD
+><DL
+><DT
+>1.1. <A
+HREF="#AEN40"
+>이 문서에서 할 수 없는 것</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN44"
+>문서의 다운로드</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN47"
+>Flex와 Bison</A
+></DT
+></DL
+></DD
+><DT
+>2. <A
+HREF="#AEN76"
+>Flex</A
+></DT
+><DD
+><DL
+><DT
+>2.1. <A
+HREF="#AEN87"
+>정규표현을 이용한 매칭</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1. <A
+HREF="#AEN98"
+>꼭 필요한 정규표현</A
+></DT
+></DL
+></DD
+><DT
+>2.2. <A
+HREF="#AEN185"
+>복잡한 문장의 파싱</A
+></DT
+><DT
+>2.3. <A
+HREF="#AEN206"
+>flex에 미리 정의된 변수들</A
+></DT
+><DT
+>2.4. <A
+HREF="#AEN243"
+>지금까지 다룬 내용들</A
+></DT
+></DL
+></DD
+><DT
+>3. <A
+HREF="#AEN246"
+>Bison</A
+></DT
+><DD
+><DL
+><DT
+>3.1. <A
+HREF="#AEN250"
+>간단한 온도 조절기</A
+></DT
+><DD
+><DL
+><DT
+>3.1.1. <A
+HREF="#AEN263"
+>완전한 Bison 파일</A
+></DT
+></DL
+></DD
+><DT
+>3.2. <A
+HREF="#AEN273"
+>온도조절 프로그램의 업그레이드</A
+></DT
+><DT
+>3.3. <A
+HREF="#AEN284"
+>계산기를 만들어 보자</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>1. 소개</A
+></H2
+><P
+>		문서의 많은 부분은 <A
+HREF="http://www.tldp.org/HOWTO/Lex-YACC-HOWTO.html"
+TARGET="_top"
+>Lex, Yacc Howto</A
+>와 
+		<A
+HREF="http://epaperpress.com/lexandyacc/"
+TARGET="_top"
+>Compact Guide to Lex &#38; Yacc</A
+>를 참고하고 있습니다. 
+	</P
+><P
+>		만약 당신이 오랜시간동안 유닉스 환경에서 프로그래밍을 해왔다면 LEX와 YACC라는
+		이름의 다소 신비스러운 느낌을 주는 프로그램에 대해서 들어 봤을 것이다. 
+		혹 당신이 GNU/Linux에 더 친숙하다면 Flex와 Bison이라는 프로그램에 대해서도 
+		몇번 정도는 들어 봤을 것이다. Flex는 Vern Paxon에 의해서 만들어진 lex(12)의 확장
+		도구격인 프로그램이며, Bison은 YACC의 GNU버젼격인 프로그램이다. 여기에서는 
+		Lex와 yacc(12)의 화갖어전이라고 할수 있는 Bison과 Flex에 대해서 다룰 것이다.
+		원조격인 Yacc와 Lex와의 차이점이 거의 없으므로 호환에 문제가 생기지는 
+		않을 것이다. 
+		어쨋든 GNU환경에서의 개발은 GNU툴은 Bison과 flex가 좀더 자연스럽다.
+	</P
+><P
+>		이들 프로그램은 당신이 매우 중요하게 사용하는 C 컴파일러와 같은 프로그램의 
+		작성에 중요하게 사용되는데, 그 중요성에 비해서 man 페이지는 썩 훌륭하지 
+		못해서 이것만 을 가지고는 이들 도구를 사용할 수가 없다. 여기에서는 이들 도구를
+		실질적으로 사용할 수 있도록 좀더 실용적 관점에서 다룰 것이다.  	
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.1. 이 문서에서 할 수 없는 것</A
+></H3
+><P
+>			시중에는 이미 다양한 종류의 Lex와 Yacc를 주제로 하고 있는 좋은 책들이 
+			나와 있다.(워낙에나 Flex/Bison과 비슷하기 때문에, 저들 책을 가지고
+			Flex와 Bison을 학습하기도 한다.) 
+			비록 이 문서가 Bison과 Flex를 학습하는데 많은 도움을 주긴 하겠지만, 
+			이들 책보다 더 낳은 정보를 제공해주긴 힘들 것이다. 
+			이들 책은 대부분의 경우 책임감을 가지고 작성되었기 때문에 이 문서에서 
+			제시하지 못한 다른 중요한 정보들을 가지고 있을 것이다. 
+			이 문서는 Flex와 Bison을 좀더 쉽게 접할 수 있기 위한 
+			입문서 정도로 활용을 해주길 바란다.    
+		</P
+><P
+>			또한 이문서를 작성한 저자는 Flex/Bison 전문가가 아니며, 공부하면서 
+			이 문서를 작성했다. 이점을 염두에 두고 이 문서를 읽기 바란다. 대부분의 예제들은 
+			돌아가는지 확인하기 위한 간단한 수준에서 작성될 것이다. 좀더 현실감 있는 예제를 
+			추가하길 원한
+			다면 언제든지 이 문서의 원본을 수정하는 정도로 참가할 수 있을 것이다.   
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN44"
+>1.2. 문서의 다운로드</A
+></H3
+><P
+>		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN47"
+>1.3. Flex와 Bison</A
+></H3
+><P
+>			필자가 한살이던 1975년경 무렵 컴파일러를 작성하는 것은 사람의 애간장을 
+			녹이는 인간의 인내력이 어디까지인가를 테스트하는 고도의 참을성과 집중력을 
+			필요로 하는 작업이었다. 이러한 일련의 작업을 좀더 쉽게 하기위해서 
+			Johnson과 Lesk란 사람들이 lex와 yacc라는 도구를 만들게 되었다. 이 도구는 
+			컴파일러의 작성을 매우 간단하게 처리할 수 있는 훌륭한 기능을 가지고 있었으며
+			계속 발전을 해서 1986년경 지금 우리가 사용하는 현대적인 기능을 가진 
+			lex와 yacc가 발표되게 되었다. lex와 yacc는 매우 훌륭한 도구 였기 때문에 
+			아래와 같은 다른 많은 버젼들이 만들어지게 되었다.	
+			<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					Mortice Kern Systems(MKS), http://www.mks.com
+				</P
+></LI
+><LI
+><P
+>					(우리가 다루고자 하는)GNU flex, bison
+				</P
+></LI
+><LI
+><P
+>					Ming, http://www.mingw.org		
+				</P
+></LI
+><LI
+><P
+>				 	또다른 lex, yacc버젼, http://www.epaperpress.com	
+				</P
+></LI
+></OL
+>
+			이중 주목할 만한것으로는 높은 품질을 제공하는 상용제품인 MKS와 
+			GNU라이센스하에서 배포되는 flex,bison이다. flex, bison은 현재 버전 1.24인데, 
+			상용으로도 결코 손색없는 기능을 제공하고 있다. Ming와 Cygwin은 윈도우 
+			시스템에서 GNU소프트웨어를 포팅하기 위해서 사용된다. 여기에는 gcc와 g++같은
+			컴파일러가 포함되어 있으며 상당한 수준의 GNU개발 환경을 제공한다.	
+		</P
+><P
+>			여기에서는 lex와 yacc의 원리에 대해 간단하게 소개하도록 할 것이다. 
+			우리의 목적이 Flex와 Bison의 사용방법이긴 하지만 워낙에 lex와 yacc의 
+			역사적 의미가 깊은 관계로 lex, yacc를 기준으로 했다. 그러나 도구의 이름이 
+			틀리고 만들어내는 파일의 이름이 틀린 외에는 동일함으로 문제될건 없을 
+			것이다.  
+		</P
+><P
+>			lex는 어휘분석과 scanner를 위한 C코드를 생성한다. lex는 입력된 문자에서 
+			매칭되는 문자열의 패턴을 이용해서 문자열을 토큰으로 변환한다. 토큰은 
+			문법적으로 더이상 나눌 수 없는 기본적인 언어 요소를 말한다. 
+			다음은 컴파일이 이루어지는 일반적인 과정이다. 토큰을 만들어내는 과정을 
+		 	주의 깊게 보기 바란다.	
+		</P
+><P
+>			심볼 테이블을 이용해서 lex는 입력되는 문자열의 특징을 가져온다. 
+			심볼 테이블은 문자열이 숫자인지 단어인지와 같은 타입에 대한 정보와 
+			어떤 변수를 통해 메모리에 접근할 수 있을 것인지 등을 정의 한다. 	
+		</P
+><P
+>			<DIV
+CLASS="FIGURE"
+><A
+NAME="PIC1"
+></A
+><P
+><B
+>&#44536;&#47548; 1. 컴파일 과정</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/ajv.png"></P
+></DIV
+>
+			Yacc는 구문분석과 파서를 위한 C코드를 생성한다. yacc는 lex로 부터 
+			토큰을 받아들이고 이것을 문법룰에 넣고 돌려서 구문트리(syntax tree)를 
+			생성한다. 구문트리는 토큰구조체의의 계층적인 구조를 만들게 된다. 
+			위의 그림을 보면 연산자와 값에 따라 계층 구조를 볼 수 있을 것이다.	
+			다음 단계에서 코드를 생성(code generator)하게 된다. 코드 생성은 
+			깊이 우선으로 이루어지게 된다. 만들어지는 코드는 시스템의 어셈블러가 
+			해석가능한 어셈블리코드 혹은 기계어 코드가 된다.  
+		</P
+><P
+>			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN67"
+></A
+><P
+><B
+>&#44536;&#47548; 2. lex와 yacc로 부터 컴파일러를 작성하는 과정</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/ajw.png"></P
+></DIV
+>
+			위의 그림은 lex와 yacc에 의해서 사용되는 파일 이름의 규칙이다. 
+			예를 들어 BASIC 컴파일러를 만든다고 가정해 보자. 먼저 우리는 패턴매칭 
+			규칙을 가진 bas.i라는 lex파일을 만들 것이다. 그리고 문법규칙을 
+			위해서 basy.y라는 yacc파일을 만들 것이다. 그리고 마지막으로 gcc를 
+			이용해서 basc 라는 컴파일러를 만들게 된다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>yacc -d bas.y                  # create y.tab.h, y.tab.c
+lex bas.l                      # create lex.yy.c 
+gcc lex.yy.c y.tab.c -o basc   # compile/link
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			yacc는 bas.y로 부터 문법 규칙을 읽어내고 파서를 생성한다. 파서의 이름은 
+			y.tab.c인데 여기에는 <B
+CLASS="EMPHASIS"
+>yyparse</B
+>라는 함수를 가지고 있다.
+			-d 옵션은 토큰에 대한 각종 선언을 가진 헤더파일인 y.tab.h를 생성시키기 
+			위해서 필요한 옵션이다. 이 헤더퍼일은 lex에서 yacc를 연결하기 위해서 
+			사용된다. lex는 어휘분석기역할을 하는 <B
+CLASS="EMPHASIS"
+>yylex</B
+>함수를 
+			포함하는 <B
+CLASS="EMPHASIS"
+>lex.yy.c</B
+> 파일을 생성한다. 
+		</P
+><P
+>			마지막으로 gcc에 의해서 lexer와 parser이 컴파일 된후 링크되어서 
+			<B
+CLASS="EMPHASIS"
+>basc</B
+>실행파일을 만들게 된다. 작성된 컴파일러를 
+			실행 시키면 main함수에서 yyparse를 호출하고 yyparse는 자동적으로 yylex를 
+			호출해서 토큰을 얻어낸다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN76"
+>2. Flex</A
+></H2
+><P
+>		Flex의 원조는 Lex로 흔히 Lex generate라고 하며 'Lexer'라고 부르기도 한다. 
+		GNU버젼은 여기에 F(Fast)를 붙여서 이전 버젼의 Lex와 구분하고 있다.
+		주로 문자열을 받아들이고 문자열중에서 원하는 형식의 문자의 조합이 있는지 
+		확인해서 어떤 함수(작업)를 실행시키는 일을 한다. 다음은 간단한 예제이다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+%}
+
+%%
+stop printf("Stop command receive\n");
+start printf("Start command receive\n");
+%%
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		첫번째 섹션을 보면 %{와 %}를 한쌍으로 하고 그 안에 include가 들어가 
+		있는 것을 확인할 수 있다. 이것은 나중에 사용될 printf(3)함수를 위해서 
+		사용된다. 아시다 시피 printf함수는 stdio.h에 선언되어 있다. 
+	</P
+><P
+>		다음 섹션은 %%를 구분자로 해서 시작되는데, 첫번째는 'stop'이라는 문자열을 
+		키로 시작하고 있다. 이것은 문자열의 입력중에 'stop'문자열을 대면할 경우 
+		뒤에 있는 printf()를 실행하라는 의미를 가진다.
+	</P
+><P
+>		stop과 마찬가지로 'start'에 대해서도 printf()문을 실행하라고 선언되어 있다.
+	</P
+><P
+>		위의 문법은 lex에서 사용될 수 있는 문법으로, 이걸 실제 사용하기 위해서는 
+		C가 인식할 수 있는 문법으로 변경시켜줘야 한다. 이러한일 역시 lex가 담당한다.
+		일종의 선처리기 라고 할 수 있다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># flex example1.l
+# gcc lex.yy.c -o example1 -lfl 
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>			만약 flex대신에 lex를 사용하길 원한다면 -lfl 대신 -ll을 사용하면 된다. 
+			</P
+></BLOCKQUOTE
+></DIV
+>
+		이제 example1라는 실행파일이 생성될 것이다. 이 파일을 실행시키면 표준입력을
+		받아들이는데, stop/start와 같은 문자열을 만났을 때 lex문에서 정의한 printf()
+		문을 실행시키는걸 확인할 수 있을 것이다. 입력을 중단하고 싶을 때는 (^D)를 
+		입력하도록 한다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./example1 
+start program
+Start command receive
+ program
+stopped
+Stop command receive
+ped
+^D
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN87"
+>2.1. 정규표현을 이용한 매칭</A
+></H3
+><P
+>			이번 예제는 아마도 매우 유용하게 응용할 수 있는 예제로 lex에서의 정규표현
+			지원에 대한 방법을 담고 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+%}
+
+%%
+[0123456789]+           printf("NUMBER\n");
+[a-zA-Z][a-zA-Z0-9]*    printf("WORD\n");
+%%
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 Lex 파일은 "문자열(WORD)"와 "숫자"(NUMBER) 2종류에 대한 매칭 정보를
+			가지고 있다. 일반적으로 이러한 검사를 (소위말하는)손코딩으로 구현할려고 
+			하면 상당히 귀찮은 작업이 필요하겠지만 여기에서는 유닉스에서 일반적으로 
+			사용하는 정규표현패턴을 이용해서 간단하게 처리하고있다. Lex는 숫자에 
+			대한 매칭을 검사하기 위해서 다음과 같은 정규표현식을 사용하고 있다.    
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[0123456789]+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이것은 0123456789의 그룹에 대해서 하나이상이 발견되었을 때 만족시키라는 
+			의미로 다음과 같이 단순하게 표현할 수도 있다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[0-9]+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			문자에 대한 매칭을 위한 정규표현식은 다음과 같이 사용할 수 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[a-zA-Z][a-zA-Z0-9]* 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			첫번째 부분은 'a'에서 'z'소문자 하나혹은 'A'에서 'Z'까지의 문자즉 모든 
+			영문 알파벳 단어를 뜻한다. 두번째 부분은 모든영문자와 숫자까지를 
+			뜻한다. 마지막의 별표("*")는 0개 이상의 발견을 뜻한다.
+			결론적으로 하나이상의 영문과 숫자로 구성된 단어들중 에서 처음 첫글자가
+			영문으로 시작하는 단어를 "문자열"로 보고 매칭을 시키겠다는 의미가 된다. 
+		</P
+><P
+>			위의 정규표현에서 "+"와 "*"의 차이를 분명히 해둘필요가 있다. "+"는 
+			하나 이상 발견되어야 하는걸 의미하며, "*"는 0개 이상 발견되어야 함을 
+			의미한다.
+		</P
+><P
+>			위 Lex파일을 example2.l로 저장한다음 컴파일해서 실행시켜 보자.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./example1 
+foo
+WORD
+
+bar
+WORD
+
+123
+NUMBER
+
+bar123
+WORD
+
+123bar
+NUMBER
+WORD
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			입력중에 공백문자(스페이스바)를 포함시키면 공백문자는 그대로 출력됨을 
+			알 수 있다. 이유는 모든 whitespace는 어떤 것과도 매칭시키지 않기 때문이다.
+			이들 문자는 단순 출력시킨다.
+		</P
+><P
+>			Flex를 제대로 다루기 위해서는 정규표현에 대한 어느정도의 지식을 가지고 
+			있어야한다. 정규표현을 효과적으로 익히는 가장 좋은 방법은 Perl 언어를 
+			이용해서 정규표현 관련 프로그램을 만들어 보는게 될것이다. 또한 시중의 
+			많은 Perl관련 책들이 상당부분을 정규표현에 할애하고 있으므로 이들 책을
+			구입해서 학습하는 것도 좋은 방법이 될것이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN98"
+>2.1.1. 꼭 필요한 정규표현</A
+></H4
+><P
+>				정규표현은 매우 광범위한 주제임으로 여기에서는 반드시 필요한 정규표현
+				규칙에 대해서만 간단히 정리하기로 하겠다. 정규표현에 대한 자세한 정보는  
+				<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_regex"
+TARGET="_top"
+>정규표현</A
+>을
+				참고하기 바란다.	
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN102"
+></A
+><P
+><B
+>&#54364; 1. 자주 사용되는 패턴매칭</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><COL><COL><TBODY
+><TR
+><TD
+>.</TD
+><TD
+>개행문자를 제외한 모든 문자</TD
+></TR
+><TR
+><TD
+>\n</TD
+><TD
+>개행문자</TD
+></TR
+><TR
+><TD
+>*</TD
+><TD
+>0혹은 그 이상의 일치</TD
+></TR
+><TR
+><TD
+>+</TD
+><TD
+>한번 혹은 그 이상의 일치</TD
+></TR
+><TR
+><TD
+>?</TD
+><TD
+>0혹은 한번의 일치</TD
+></TR
+><TR
+><TD
+>^</TD
+><TD
+>라인의 처음에서 일치</TD
+></TR
+><TR
+><TD
+>$</TD
+><TD
+>라인의 끝에서 일치</TD
+></TR
+><TR
+><TD
+>a|b</TD
+><TD
+>a 또는 b</TD
+></TR
+><TR
+><TD
+>(ab)+</TD
+><TD
+>ab와 하나이상 일치</TD
+></TR
+><TR
+><TD
+>[]</TD
+><TD
+>문자 클래스의 지정</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN136"
+></A
+><P
+><B
+>&#54364; 2. 패턴미칭의 사용 예</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><COL><COL><TBODY
+><TR
+><TD
+>표현</TD
+><TD
+>매칭</TD
+></TR
+><TR
+><TD
+>abc</TD
+><TD
+>abc</TD
+></TR
+><TR
+><TD
+>abc*</TD
+><TD
+>ab abc abcc abccc ...</TD
+></TR
+><TR
+><TD
+>a(bc)+</TD
+><TD
+>abc abcbc abcbcbc ...</TD
+></TR
+><TR
+><TD
+>a(bc)?</TD
+><TD
+>a abc</TD
+></TR
+><TR
+><TD
+>[abc]</TD
+><TD
+>a b c</TD
+></TR
+><TR
+><TD
+>[a-z]</TD
+><TD
+>a에서 z까지</TD
+></TR
+><TR
+><TD
+>[a\-z]</TD
+><TD
+>a, -, z 중 하나</TD
+></TR
+><TR
+><TD
+>[a\-z]</TD
+><TD
+>a, -, z 중 하나</TD
+></TR
+><TR
+><TD
+>[-az]</TD
+><TD
+>-, a, z 중 하나</TD
+></TR
+><TR
+><TD
+>[a-zA-Z0-9]+</TD
+><TD
+>하나이상의 모든 영문자와 숫자</TD
+></TR
+><TR
+><TD
+>[\t\n]+</TD
+><TD
+>whitespace 문자</TD
+></TR
+><TR
+><TD
+>[^ab]</TD
+><TD
+>a와 b를 제외한 모든</TD
+></TR
+><TR
+><TD
+>[a^b]</TD
+><TD
+>a, ^, b 중 하나</TD
+></TR
+><TR
+><TD
+>[a|b]</TD
+><TD
+>a, |, b 중 하나</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+				flex를 제대로 사용하기 위해서는 위의 표에 정리된 자주사용되는 패턴매칭의
+				내용들은 기본적으로 숙지하고 있어야 한다. 두번째 표에 있는건 패턴매칭의
+				사용예이다.   
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN185"
+>2.2. 복잡한 문장의 파싱</A
+></H3
+><P
+>			이번에는 아래와 같은 좀더 복잡한 문장을 파싱해 보도록 하겠다.(bind를 위한
+			설정파일의 일부분이다)
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>logging {
+	category lame-servers { null; };
+	category cname { null; };
+};
+
+zone "." {
+	type hint;
+	file "/etc/bind/db.root";
+};
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			Flex문을 확실히 작성하기 위해서 위의 분석문자열에서 사용되고 있는 
+			토큰들에 대한 카테고리를 만들 필요가 있다.
+			<P
+></P
+><UL
+><LI
+><P
+>					'zone', 'type' 같은 문자열
+				</P
+></LI
+><LI
+><P
+>					'/etc/bind/db.root' 같은 파일이름	
+				</P
+></LI
+><LI
+><P
+>					파일이름을 감싸는데 사용하는 쿼터(") 문자
+				</P
+></LI
+><LI
+><P
+>					{, 중괄호 열기
+				</P
+></LI
+><LI
+><P
+>					}, 중괄호 닫기 
+				</P
+></LI
+><LI
+><P
+>					;, 세미콜론
+				</P
+></LI
+></UL
+>
+		</P
+><P
+>			다음은 위의 카테고리를 만족시키는 Lex파일이다. 파일명은 example3.l로 
+			하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+%}
+
+%%
+[a-zA-Z][a-zA-Z0-9]*    printf("WORD ");
+[a-zA-Z0-9\/.-]+        printf("FILENAME ");
+\"                      printf("QUOTE ");
+\{                      printf("OBRACE ");
+\}                      printf("EBRACE ");
+;                       printf("SEMICOLON ");
+\n                      printf("\n");
+[ \t]+                  /* ignore whitespace */;
+%%
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 lex 파일을 컴파일한뒤에 테스트해보면 다음과 같은 결과를 확인할 수 
+			있을 것이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./example3 &#60; test.txt
+WORD OBRACE 
+WORD FILENAME OBRACE WORD SEMICOLON EBRACE SEMICOLON 
+WORD WORD OBRACE WORD SEMICOLON EBRACE SEMICOLON 
+EBRACE SEMICOLON 
+
+WORD QUOTE FILENAME QUOTE OBRACE 
+WORD WORD SEMICOLON 
+WORD QUOTE FILENAME QUOTE SEMICOLON 
+EBRACE SEMICOLON 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 결과에서 확인할 수 있듯이 일반설정파일 형식을 가지는 꽤 복잡한 
+			문장도 어렵지 않게 파싱됨을 알 수 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN206"
+>2.3. flex에 미리 정의된 변수들</A
+></H3
+><P
+>			지금까지의 내용을 보면 몇개 flex에서 정의해서 사용하는 변수와 함수들이 
+			보일 것이다. 이것들을 표로 정리해 두었으니 참고하기 바란다. 
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN209"
+></A
+><P
+><B
+>&#54364; 3. flex에서 미리 정의된 값들</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><COL><COL><TBODY
+><TR
+><TD
+>int yylex(void)</TD
+><TD
+>lexer를 호출하고 토큰을 리턴한다.</TD
+></TR
+><TR
+><TD
+>char *yytext</TD
+><TD
+>매칭된 문자열의 포인터</TD
+></TR
+><TR
+><TD
+>yyleng</TD
+><TD
+>매칭된 문자열의 길이</TD
+></TR
+><TR
+><TD
+>yylval</TD
+><TD
+>토큰에 대한 정보 값</TD
+></TR
+><TR
+><TD
+>int yywrap(void)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+>FILE *yyout</TD
+><TD
+>출력 파일</TD
+></TR
+><TR
+><TD
+>FILE *yyin</TD
+><TD
+>입력 파일</TD
+></TR
+><TR
+><TD
+>INITIAL</TD
+><TD
+>initial start condition</TD
+></TR
+><TR
+><TD
+>BEGIN</TD
+><TD
+>condition switch start condition</TD
+></TR
+><TR
+><TD
+>ECHO</TD
+><TD
+>매칭된 문자열을 쓴다.</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN243"
+>2.4. 지금까지 다룬 내용들</A
+></H3
+><P
+>			지금까지의 내용들을 통하여 Lex는 임의의 입력을 받아들여서 각각의 부분을
+			의미를 결정할 수 있음을 알았다. 이러한 것을 'Tokenizing'라고 한다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN246"
+>3. Bison</A
+></H2
+><P
+>		Bison의 원조격인 YACC에 대해서 먼저 알아보기로 하자. YACC는  
+		Yet Another Compiler Compiler의 약자로 컴파일러를 생성을 위한 프로그램
+		이다. compiler-generator 혹은 compiler-compiler이라고 부르기도 한다. 	
+		yacc는 lex에 의해서 얻어진 token들의 관계를 구성하는 "구문분석기"를 생성하는 
+		툴이다. yacc가 내부적으로 token을 얻기 위해서 lex를 사용하는데, 
+		lex와 yacc, flex와 bison을 한 묶음으로 해서 다루는 이유가 된다. 
+		lex를 호출하기 때문에 lex의 상위에 위치하게 된다. Bison은 이러한 일을 하는
+		YACC의 GNU버젼이며, 하는일 옵션등에 있어서 거의 동일하다. 
+	</P
+><P
+>		Bison(yacc)는 BNF (Backus Naur Form)을 이용해서 필요한 일을 수행한다. 
+		이 기술은 John Backus 와 Peter Naur에 의해서 만들어 졌으며 ALGOL60 언어를 
+		제작하는데 사용되었다. BNF 문법은 자유로운 문맥(context-free) 언어를 
+		표현하는데 유용하게 사용할 수 있다. 현대의 대부분의 프로그래밍 언어는 
+		BNF를 이용해서 문맥을 표현하고 있다.      
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN250"
+>3.1. 간단한 온도 조절기</A
+></H3
+><P
+>			Bison의 용도를 확인하기 위해서 간단한 온도 조절기를 위한 언어를 만드는
+			과정을 예로 들어 보겠다. 온도 조절기를 만들기 위해서는 다음과 같이 
+			3개의 세션이 필요할 것이다.	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>heat on
+	Heater on !
+heat off
+	Heater off !
+target temperature 22
+	New temperature set !
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위에서 얻을 수 있는 token은 heat, on/off(상태), target, temperature, 
+			숫자(온도 설정용) 임을 알 수 있다.
+		</P
+><P
+>			위의 토큰을 분리하기 위해서 다음과 같은 lex 파일을 작성하고 example4.l로 
+			저장하도록 한다.	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+#include "example4.tab.h"
+%}
+%%
+[0-9]+                  return NUMBER;
+heat                    return TOKHEAT;
+on|off                  return STATE;
+target                  return TOKTARGET;
+temperature             return TOKTEMPERATURE;
+\n                      /* ignore end of line */;
+[ \t]+                  /* ignore whitespace */;
+%%
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 코드에서 기존과 크게 달라진 점을 두가지 발견할 수 있을 것이다. 
+			우선 example.tab.h 라는 파일이 인클루드 되어 있다. 그리고 printf()대신에 
+			token의 이름을 리턴하고 있다. 이렇게 토큰의 값을 리턴하는 이유는 bision이
+			token의 정보를 받아서 이를 처리할 수 있도록 하기 위함이다. 
+			example4.tab.h에는 각 token에 대해서 bison이 어떻게 처리해야 할것인지에 
+			대한 정보가 들어간다. 
+		</P
+><P
+>			bison 코드는 크게 3가지 부분으로 이루어진다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>... 정의(definitions) ...
+%%
+... 규칙(rules) ...
+%%
+... 함수들(subroutines) ...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			정의 부분에서는 토큰과 각종 상수를 선언한다. 그리고 C코드를 
+			포함시킬수 있는데, 이럴경우 %{와 %} 사이에 해당 C코드를 포함시키면 된다. 
+			BNF 문법은 rule 섹션에 위치하며, 함수 섹션에 사용자 정의 함수를 추가시킬
+			수 있다.   
+		</P
+><P
+>			example4.tab.h에 대해서 우리가 신경쓸 필요는 없다. bison문법파일을 
+			규칙대로 작성해주고나서 bison를 돌리면 example4.tab.h는 자동적으로 생성되기 
+			때문이다. 다음은 위의 토큰의 정보를 처리할 수 있도록 작성된 bison 문법
+			파일이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>commands: /* empty */
+        | commands command
+        ;
+
+command:
+        heat_switch
+        |
+        target_set
+        ;
+
+heat_switch:
+        TOKHEAT STATE
+        {
+                printf("\tHeat turned on or off\n");
+        }
+        ;
+
+target_set:
+        TOKTARGET TOKTEMPERATURE NUMBER
+        {
+                printf("\tTemperature set\n");
+        }
+        ;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			첫번째 부분을 'root'라고 부르도록 하겠다. 여기에서 우리는 commands 라는 
+			룰 사용했으며, 구성요소로 command를 가지고 있다.  		
+		</P
+><P
+>			두번째 룰에서는 command에 대해서 정의하고 있다. 여기에서는 heat_switch와
+			target_set두개의 명령만을 정의한다. 이들 명령을 선언하는데 
+			'|'이 사용되고 있는데, 이는 command가 heat_switch 또는 target_set를 
+			구성요소로 가지고 있음을 의미한다.
+		</P
+><P
+>			heat_switch는 HEAT token에 대한 처리를 담당하는 구성요소로 'heat'와 
+			state 토큰이 올 경우 이를 실행하도록 했다. 
+			이는 히터를 키고 켤때 2개의 토큰으로 이루어지기 때문이다.	
+		</P
+><P
+>			온도를 설정하는 명령은 'target'과 target으로 
+			지정할 '객체', 그리고 '값'의 3개의 객체로 이루어진다. 이를 위해서 
+			3개의 토큰이 만족할 때 target_set이 실행되도록 룰을 만들었다.   
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN263"
+>3.1.1. 완전한 Bison 파일</A
+></H4
+><P
+>	
+				다음은 이상의 모든 내용을 종합한 Bison 파일이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+ 
+void yyerror(const char *str)
+{
+	fprintf(stderr,"error: %s\n",str);
+}
+ 
+int yywrap()
+{
+	return 1;
+} 
+  
+main()
+{
+	yyparse();
+} 
+%}
+
+%token NUMBER TOKHEAT STATE TOKTARGET TOKTEMPERATURE
+%%
+commands: /* empty */
+	| commands command
+	;
+
+command:
+	heat_switch
+	|
+	target_set
+	;
+
+heat_switch:
+	TOKHEAT STATE
+	{
+		printf("\tHeat turned on or off\n");
+	}
+	;
+
+target_set:
+	TOKTARGET TOKTEMPERATURE NUMBER
+	{
+		printf("\tTemperature set\n");
+	}
+	;
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				yyerror()함수는 Bison에서 에러를 발견했을 때, 에러를 되돌려준다.
+				인자로 주어지는 str을 출력해 봄으로써 우리는 간단하게 에러의 내용을
+				확인할 수 있다. 
+			</P
+><P
+>	
+				yywrap()는 다른 파일로 부터 계속적으로 읽기를 수행하고자 할때 
+				사용한다. 
+			</P
+><P
+>				main함수가 호출되었다. main함수는 단지 yyparse만을 
+				호출하지만 우리가 지금까지 만들었던 룰을 이용해서 입력되는 문자열을 
+				이용해서 작업을 수행한다. 	
+			</P
+><P
+>				마지막으로 우리가 사용하게될 토큰을 선언하였다. 지금까지의 
+				모든내용은 yacc 를 -d 옵션을 주고 실행함으로써, y.tab.h에 쓰여지게 
+				된다. 
+			</P
+><P
+>				컴파일은 아래와 같이 이루어진다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># flex example4.l
+# bison -d example4.y
+# gcc lex.yy.c example4.tab.c -o example4
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이제 우리가 만든 프로그램이 제대로 작동하는지 테스트 해보도록 하자.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./example4 
+heat on
+        Heat turned on or off
+heat off
+        Heat turned on or off
+target temperature 10
+        Temperature set
+target humidity 20
+error: parse error
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				우리가 만든 프로그램은 그럭 저럭 돌아가지만 아직 완벽하지 않음을 
+				알 수 있다. 다음절에서는 좀더 그럴듯하게 작동하는 프로그램을 
+				만들 것이다.
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN273"
+>3.2. 온도조절 프로그램의 업그레이드</A
+></H3
+><P
+>			어쨋든 우리는 문장을 파싱해서 원하는 루틴을 실행가능한 프로그램을 
+			만들어 냈다. 그러나 좀더 완벽하게 작동하기 위해서는 단지 
+			"무엇을 파싱 했다"가 아닌 "파싱한 정보가 무엇"이다라는 값을 얻어 올 수 
+			있어야 한다. 예를 들자면 'heat'는 온도조절기를 켜거나 끄는데, 이를 
+			위해서는 heat 토큰 다음의 'on', 'off' 토큰을 가져올 수 있어야 한다.
+		</P
+><P
+>			또한 온도 설정을 위한 target temperature의 경우 온도 값을 읽어올 수 
+			있어야 한다.  		
+		</P
+><P
+>			Flex는 매칭된 단어의 문자열을 'yytex'라는 변수에 저장한다. 또한 'yylval'에 
+			리턴값을 되돌려줄 수도 있다. 이를 이용하면 패턴매칭의 결과를 넘길 수가 
+			있다. 아래와 같이 작성하고 example5.l 로 저장하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdio.h&#62;
+#include "y.tab.h"
+%}
+%%
+[0-9]+                  yylval=atoi(yytext); return NUMBER;
+heat                    return TOKHEAT;
+on|off                  yylval=!strcmp(yytext,"on"); return STATE;
+target                  return TOKTARGET;
+temperature             return TOKTEMPERATURE;
+\n                      /* ignore end of line */;
+[ \t]+                  /* ignore whitespace */;
+%%
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			토큰이 숫자일 경우 atoi를 통해서 받아온 토큰(yytext)를 숫자로 변환했음을
+			알수 있다. 변환된 값은 yylval을 통해서 bison코드에서 사용할 수 있도록 
+			리턴변수 NUMBER을 통해서 리턴한다.
+		 	또한 "on"을 만났을 경우 1을 리턴하도록 했다.  
+		</P
+><P
+>			이제 Bison 코드에서 yylval을 통해서 넘어온 값을 이용해서 어떤 작업을 
+			가능하도록 코딩해 주기만 하면 된다. 다른 부분은 모두 동일하니 아래의 부분만
+			수정하면 된다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>heat_switch:
+    TOKHEAT STATE
+    {
+        if($2)
+            printf("\tHeat turned on\n");
+        else
+            printf("\tHeat turned off\n");
+    }
+    ;
+
+target_set:
+    TOKTARGET TOKTEMPERATURE NUMBER
+    {
+        printf("\tTemperature set %d\n", $3);
+    }
+    ;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이해는 쉬울 것이다. 토큰의 각 이름의 순서대로 $1, $2.. 해주는 정도로 
+			토큰이 넘겨주는 값을 받아올 수 있다. heat_switch의 경우 두번째 토큰값인 
+			STATE로 값이 넘어오므로 "$2"를 이용하면 받아올 수 있다. 처리코드는 
+			간단하다. 1이면 on, 2면 off관련 메시지를 뿌려주도록 만들었다.
+		</P
+><P
+>			tatget_set 역시 동일한 방법으로 수정했다. 온도 값은 NUMBER 토큰값으로 
+			넘어옴으로 $3를 이용해서 받아서 이를 출력했다.	  
+		</P
+><P
+>			컴파일 테스트를 하면 다음과 같은 결과를 확인할 수 있을 것이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./example5
+heat on
+  Heat turned on
+heat off
+  Heat turned off
+target temperature 50
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN284"
+>3.3. 계산기를 만들어 보자</A
+></H3
+><P
+>			이번에는 계산기 프로그램을 만들어 보도록 하자. 앞서의 
+			예제처럼 flex와 bison의 작동방식도 함께 설명하도록 하겠다. 
+		</P
+><P
+>			계산기 프로그램은 사칙연산을 하는데, "()"도 처리를 할 것이다. 
+			또한 값을 변수에 저장하는 기능까지를 추가할 것이다. 아시겠지만
+			계산기 프로그램을 작성함에 있어서 ()처리를 한다는게 그리 간단한게 
+			아니라는걸 이해 할것이다. 그러나 이 예제를 통해서 flex와 bison을 쓴다면 
+			그리 어렵지 않게 작성 가능하다는 것을 알 수 잇을 것이다. 
+		</P
+><P
+>			계산기 프로그램에서는 토큰으로 INTEGER와 VARIABLE를 선언한다. 
+			INTEGER은 피연산자에 대한 토큰을 만났을 때 사용하는 토큰값이며, 
+			VARIABLE는 변수를 만났을 때 사용할 토큰 값이다.  
+			여러분이 bison를 
+			실행 시킨다면 cal.tab.h 파일을 볼 수 있을 건데, 다음과 같은 코드를 
+			포함하고 있을 것이다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#ifndef YYSTYPE
+#define YYSTYPE int
+#endif
+#define INTEGER 258
+extern YYSTYPE yylval;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			bison은 이 인클루드 파일을 포함해서 선언된 토큰값을 이용할 수 있게 된다. 
+			토큰을 얻기 위해서 bison는 yylex를 호출하게 된다. yylex는 int값을 
+			리턴하는데 바로 위에서 정의된 토큰에 대한 int형 값을 리턴하게 된다.   
+			토큰에 대한 값은 온도계예제 에서 설명했듯이 yylval을 통해서 리턴
+			할 수 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[0-9]+     {
+               yylval = atoi(yytext);
+               return INTEGER;
+           }
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			yylval에는 int형 데이터가 저장되고, 토큰값으로 INTEGER를 리턴하게 된다. 
+			yylvalu은 YYSTYPE로 선언되어 있다. 토큰값은 0-255까지 사용가능 하다.  
+		</P
+><P
+>			이제 연산자들과 ()에 대한 토큰을 얻어와야 한다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[-+()=/*\n]   {return *yytext;}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그리고 변수에 대한 토큰도 얻어와야 한다. 변수명은 영문 문자 하나만 
+			사용할 수 있도록 제한하도록 하겠다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[a-z]  {
+          yylval = *yytext - 'a';
+          return VARIABLE  
+       }
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			bison 문법에서의 핵심은 각 연산자에 맞도록 연산을 실행하고, 
+			괄호를 만났을 경우 우선 연산할 수 있어야 한다는 점이다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>expr:
+		INTEGER
+		| VARIABLE       { $$ = sym[$1]; }
+		| expr '+' expr  { $$ = $1 + $3; }
+		| expr '-' expr  { $$ = $1 + $3; }
+		| expr '*' expr  { $$ = $1 + $3; }
+		| expr '/' expr  { $$ = $1 / $3; }
+		| '(' expr ')'   { $$ = $2; }
+		;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			하나의 연산 문장에는 a + c - d * c 와 같은 여러개의 연산자가 사용될 수 
+			있으므로 이문제를 해결하기 위해서는 left-recursion을 응용해서 개행문자를 
+			만날때까지 연산자와 피연사자를 검사하면서 계산을 해야 한다.    
+			<A
+HREF="#PIC1"
+>&#44536;&#47548; 1</A
+>을 보면 이러한 과정이 이해가 갈것이다. 우리는 
+			이 문제를 해결하기 위해서 우선 parse 스택을 만든후 스택의 가장 
+			아래(위라고 해도 관계 없다)에서 부터 차례대로 연산을 해야 한다. 
+			이러한 스택만드는 작업은 물론 프로그래머가
+			직접할 필요 없다. 문법만 잘 만들어 주면 bison에서 알아서 해준다. 
+			스택에 밀어 넣기 위해서 expr:룰을 사용한다. 만들어진 스택에 밀어 넣기 
+			위해서 expr '+' expr 를 사용하면 된다. 오른 쪽에 있는 expr은 스택의 
+			오른쪽 값이고, 왼쪽의 expr은 스택의 왼쪽 값이된다. C 코드에서는 
+			이 값들을 $1과 $3를 통해서 얻어올 수 있다. $2에는 연산자가 들어 가게 
+			된다. $$은 계산된 값을 스택의 가장 아래로 밀어 넣으라는 표시다. 
+		</P
+><P
+>			()를 만났을 경우 이 연산은 우선적으로 이루어 져야 한다. 그러므로 ()안에 
+			있는 연산들 자체를 스택의 가장 아래로 밀어 넣어야 할 것이다. 이를 
+			위해서 '(' expr ')' {$$ = $2;}가 사용하고 있다. 
+		</P
+><P
+>			다음은 flex와 bison의 완전한 코드로 파일이름은 cal.l, cal.y로 하며, 
+			위에서 빠진 몇가지 내용들은 주석을 통해서 설명하도록 하겠다.
+		</P
+><P
+>			예제 : cal.l
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%{
+#include &#60;stdlib.h&#62;
+void yyerror(char *);
+#include "mycal.tab.h"
+%}
+
+%%
+ /* 변수명을 위한 VARIABLE 토큰을 되돌려 준다 */
+ /* 변수명은 a-z 까지 사용될 수 있다.         */ 
+ /* 리턴된 값은 cal.y에서 sym테이블을 만들기 위해서 사용된다. */ 
+[a-z]   {
+          yylval = *yytext - 'a';
+          return VARIABLE;
+        }
+ 
+ /* 숫자를 만났을 때 */
+[0-9]+  {
+          yylval = atoi(yytext);
+          return INTEGER;
+        }
+ /* 연산자를 만났을 때 */
+[-+()=/*\n] {return *yytext;}
+
+[ \t]   ;     /* 무시한다 */
+
+.       yyerror("invalid character");
+%%
+
+int yywrap(void)
+{
+  return 1;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			예제 : cal.y
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%token INTEGER VARIABLE
+%left '+' '-'
+%left '*' '/'
+
+%{
+  void yyerror(char *);
+  int yylex(void);
+  int sym[26];
+%}
+
+%%
+
+program:
+    program statement '\n'
+    |
+    ;
+
+ /* 변수를 만났을 경우                                */
+ /* 변수명의 토큰값을 이용해서 심볼릭 테이블을 만든다 */ 
+ /* 만약 변수명이 'a'라면 토큰값은 0이 리턴되고       */
+ /* sym[0] 에 연산결과가 들어가게 된다.               */   
+statement:
+    expr                  { printf("계산결과 %d\n", $1); }
+    | VARIABLE '=' expr   { sym[$1] = $3; }
+    ;
+
+expr:
+    INTEGER
+    | VARIABLE            { $$ = sym[$1]; }
+    | expr '+' expr       { $$ = $1 + $3; }
+    | expr '-' expr       { $$ = $1 - $3; }
+    | expr '*' expr       { $$ = $1 * $3; }
+    | expr '/' expr       { $$ = $1 / $3; }
+    | '(' expr ')'        { $$ = $2; }
+    ;
+
+%%
+void yyerror(char *s)
+{
+  printf("%s\n", s);
+  return 0;
+}
+
+int main(void)
+{
+  yyparse();
+  return 0;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 테스트 결과다. 괄호를 통한 연산은 물론이고 다중의 괄호까지
+			처리하고 있음을 알 수 잇다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./cal 
+a=5*(10+20)
+a
+계산 결과 150
+a=10+5+2 +(2*10)
+a
+계산 결과 37
+(10*12)/(3*2)
+계산 결과 20
+b=((52+32)/(2*1)+(16*3))+(22*2)
+b
+계산 결과 134
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

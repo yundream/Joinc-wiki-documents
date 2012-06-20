@@ -1,0 +1,458 @@
+#title pthread_cond_wait(3)
+[wiki:docbook_pthread_cond_wait(3) Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>pthread_cond_wait(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. pthread_cond_wait(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN30"
+>취소(CANCELLATITON)</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN34"
+>반환값</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN37"
+>에러</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN58"
+>예제</A
+></DT
+><DT
+>1.7. <A
+HREF="#AEN62"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	조건변수 관련 연산</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int pthread_cond_signal(pthread_cond_t *cond);
+int pthread_cond_signal(pthread_cond_t *cond, pthread_condattr_t *cond_attr);
+int pthread_cond_broadcast(pthread_cond_t *cond);
+int pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime);
+int pthread_cond_destroy(pthread_cond_t *cond);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		조건변수는 쓰레드간 동기화를 위해서 사용하는 장치로써, 공유되는 
+		데이터의 안정을 보장하기 위한 용도로 주로 사용된다. 조건변수의 
+		기본적인 작동방식은 다음과 같다. 하나의 쓰레드는 조건변수에 
+		시그널이 전달될 때까지 특정영역에서 대기 상태에 놓이게 된다. 만약 
+		다른 쓰레드가 조건변수에 시그널을 보낸다면 대기 상태에서 풀리고 
+		다음 코드로 넘어가게 된다.  
+	</P
+><P
+>		조견변수는 race condition을 피해야하므로 반드시 뮤텍스(mutex)와 
+		함께 사용되어야 한다. 
+	</P
+><P
+>		pthread_cond_init()는 조건벼수 <B
+CLASS="EMPHASIS"
+>cond</B
+>를 초기화하기
+		위해서 사용되며, <B
+CLASS="EMPHASIS"
+>cond_attr</B
+>를 이용해서 조건변수의
+		특성을 결정할 수 있다. NULL을 사용하면 기본특성이 사용된다. 리눅스의
+		경우 cond_attr은 무시된다.     
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>pthread_cond_t</B
+>는 상수 PTHREAD_COND_INITIALIZER을 
+		이용해서 static하게 초기화 시킬 수 있다. 
+	</P
+><P
+>		pthread_cond_signal()은 조건변수<B
+CLASS="EMPHASIS"
+>cond</B
+>에 시그널을 
+		보내어서 다른 (조건변수 cond에서 기다리는)쓰레드를 깨운다. 만약 
+		cond에서 기다리는 쓰레드가 없다면 아무런 일도 일어나지 않게 된다. 
+		만약 여러개의 쓰레드가 cond에서 기다리고 있다면 정확히 이중 하나가 
+		깨어나게 된다. 그러나 어떤게 깨어날지는 알 수 없다. 
+	</P
+><P
+>		pthread_cond_broadcast()는 조건변수<B
+CLASS="EMPHASIS"
+>cond</B
+>에서 
+		기다리는 모든 쓰레드를 깨운다. 기다리는 쓰레드가 없다면 아무런 일도 
+		일어나지 않는다.    
+	</P
+><P
+>		pthread_cond_wait()는 조건변수 <B
+CLASS="EMPHASIS"
+>cond</B
+>로 시그널이 
+		전달되기를 기다린다. 이 함수는 호출되면 자동적으로 
+		<B
+CLASS="EMPHASIS"
+>mutex</B
+>잠금을 되돌려준다 - 내부적으로 
+		pthread_unlock_mutex()를 호출한다. -. 이 함수를 호출한 쓰레드는 
+		조건변수에 시그널이 전달될 때까지 기다리며, 이때 CPU는 소비하지 
+		않는다. 시그널을 전달받아서 쓰레드가 깨어나면 자동적으로 
+		<B
+CLASS="EMPHASIS"
+>mutex</B
+>잠금을 얻는다 - pthread_lock_mutex()를 사용-.
+	</P
+><P
+>		pthread_cond_timedwait()는 pthread_cond_wait()의 시간제한 버젼으로 
+		<B
+CLASS="EMPHASIS"
+>abstime</B
+>를 이용해서 제한시간이 지날 때까지 시그널이
+		전달되지 않았을경우 리턴된다는 것을 제외하고는 pthread_cond_wait()와 
+		동일하게 작동한다. 제한시간이 지나서 리턴되었을 경우 errno로  
+		<B
+CLASS="EMPHASIS"
+>ETIMEOUT</B
+>을 설정한다. <B
+CLASS="EMPHASIS"
+>abstime</B
+>에
+		대해서는 time(2)와, gettimeofday(2)를 참고하기 바란다. 
+	</P
+><P
+>		pthread_cond_destroy()는 조건변수를 삭제해서 자원을 되돌려준다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN30"
+></A
+>1.3. 취소(CANCELLATITON)</H1
+><P
+>		pthread_cond_wait()와 pthread_cond_timedwait()는 취소상태함수 이다. 
+		이에 대한 자세한 내용은 
+		<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/thread_cancellation"
+TARGET="_top"
+>Thread 취소와 종료</A
+>를 참고하기 바란다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN34"
+></A
+>1.4. 반환값</H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN37"
+></A
+>1.5. 에러</H1
+><P
+>		pthread_cond_init(), pthread_cond_signal(), pthread_cond_broadcast(),
+		pthread_cond_wait()는 에러코드를 리턴하지 않는다.
+	</P
+><P
+>		pthread_cond_timewait()의 경우 다음과 같은 에러코드를 리턴한다.
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>ETIMEDOUT</DT
+><DD
+><P
+>	
+					시간초과 검사를 위해 지정된 <B
+CLASS="EMPHASIS"
+>abstime</B
+>를
+					초과해서 시그널이 발생하지 않았을 때.	
+				</P
+></DD
+><DT
+>EINTR</DT
+><DD
+><P
+>					(유닉스 POSIX)시그널등에 의해서 인터럽트가 발생했을 때
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+><P
+>		pthread_cond_destory()함수는 다음과 같은 에러코드를 리턴한다.
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EBUSY</DT
+><DD
+><P
+>	
+					<B
+CLASS="EMPHASIS"
+>cond</B
+>에 기다리고 있는 쓰레드가 남아있다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN58"
+></A
+>1.6. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;vector&#62;
+#include &#60;iostream&#62;
+
+using namespace std;
+
+void *ping(void *);
+void *pong(void *);
+
+pthread_mutex_t sync_mutex;
+pthread_cond_t  sync_cond;
+
+pthread_mutex_t gmutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  gcond  = PTHREAD_COND_INITIALIZER;
+                                                   
+int main()
+{
+    vector&#60;void *(*)(void *)&#62; thread_list;
+    vector&#60;pthread_t&#62; tident(10);
+    int thresult;
+    int status;
+    int i;
+                                          
+    pthread_mutex_init(&#38;sync_mutex, NULL);
+    pthread_cond_init(&#38;sync_cond, NULL);
+
+    thread_list.push_back(pong);
+    thread_list.push_back(ping);
+
+    for(i = 0; i &#60; thread_list.size(); i++ )
+    {
+        pthread_mutex_lock(&#38;sync_mutex);
+        if (pthread_create(&#38;tident[i], NULL, thread_list[i], (void *)NULL) &#60;0)
+        {
+            perror("error:");
+            exit(0);
+        }
+        pthread_cond_wait(&#38;sync_cond, &#38;sync_mutex);
+        pthread_mutex_unlock(&#38;sync_mutex);
+    }
+    for (i = 0; i &#60; tident.size(); i++)
+    {
+        pthread_join(tident[i], (void **)&#38;status);
+    }
+}
+                         
+void *ping(void *data)
+{
+    int i=0;
+    pthread_mutex_lock(&#38;sync_mutex);
+    pthread_cond_signal(&#38;sync_cond);
+    pthread_mutex_unlock(&#38;sync_mutex);
+    while(1)
+    {
+        pthread_mutex_lock(&#38;gmutex);
+        printf("%d : ping\n", i);
+        pthread_cond_signal(&#38;gcond);
+        pthread_cond_wait(&#38;gcond, &#38;gmutex);
+        pthread_mutex_unlock(&#38;gmutex);
+        usleep(random()%100);
+        i++;
+    }
+}
+                                                   
+void *pong(void *data)
+{
+    int i = 0;
+    pthread_mutex_lock(&#38;sync_mutex);
+    sleep(1);
+    pthread_cond_signal(&#38;sync_cond);
+    pthread_mutex_unlock(&#38;sync_mutex);
+    while(1)                              
+    {
+        pthread_mutex_lock(&#38;gmutex);
+        pthread_cond_wait(&#38;gcond, &#38;gmutex);
+        printf("%d : pong\n", i);
+        pthread_cond_signal(&#38;gcond);
+        pthread_mutex_unlock(&#38;gmutex);
+        i++;
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위의 예제는 ping&#38;pong 프로그램으로 ping 쓰레드와 pong쓰레드가 
+		번갈아 가면서 "ping", "pong"를 날리는 프로그램이다. 쓰레드 동기화를 
+		위해서 pthread_cond_wait()관련 함수들이 사용되고 있다. 	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN62"
+></A
+>1.7. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/thread_cancellation"
+TARGET="_top"
+>Thread 취소와 종료</A
+>
+			</P
+></LI
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/Pthread_API_Reference"
+TARGET="_top"
+>Pthread API</A
+>
+			</P
+></LI
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/Pthread_더_깊이"
+TARGET="_top"
+>Pthread 더 깊이</A
+>
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

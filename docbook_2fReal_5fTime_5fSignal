@@ -1,0 +1,838 @@
+#title Real Time Signal
+[wiki:article_Real_Time_Signal HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--  http://squid.visolve.com/developments/squid_rt_whitepaper.htm -->
+<articleinfo>
+	<title>Real Time Signal</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>yundream@www.joinc.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>1.1</revnumber>
+			<date>2003년 8월 25일 23시</date>
+			<revremark>프로세스간 RTS전달 추가</revremark>
+		</revision>
+		<revision>
+			<revnumber>1.0</revnumber>
+			<date>2003년 8월 23일 23시</date>
+			<revremark>sigqueue함수 설명 추가</revremark>
+		</revision>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2003년 8월 13일 23시</date>
+			<revremark>최초 문서작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>
+		이 사이트의 네트워크 프로그래밍 관련 문서들을 몇개 읽어 보았다면 
+		분명 RealTime signal(이하 RTS)에 대해서 들어 보았을 것이다. 
+		지금까지의 네트워크 프로그래밍에서 사용되었던 기술들은 
+		polling기반이였다. 즉 메시지가 도착하기를 계속 체크하는 방식으로 
+		입출력을 처리하는 방식이다. 이러한 입출력방식(주로 select(2)와 poll(2)
+		을 응용한)으로도 대부분의 네트워크 입출력을 처리하기에는 충분하지만 
+		최근 인터넷상에서 처리해야할 데이터의 양이 늘어남에 따라 
+		몇몇 경우에 있어서 고전적인 방법으로 한계를 드러내게 되었다.
+	</para>
+	<para>
+		그래서 제안된 방법이 RTS를 이용한 시그널 기반의 입출력 처리 기법이다. 
+		RTS는 시그널의 확장판이다. 기존의 시그널이 큐잉이 되지 않으며, 
+		전달 되었을 때 아무런 정보를 알려주지 않는 반면 RTS는 시그널 처럼 
+		(거의) 실시간에 전달되며 입출력 데어터의 원할한 처리를 위한 필요한 
+		정보들까지 함께 전달한다. 게다가 시그널의 대기열(큐)를 유지해서 
+		여러개의 시그널이 짧은 시간에 도착하더라도 시그널을 잃어 버리는 
+		문제를 해결 했다.  
+	</para>
+	<para>
+		이 문서는 RTS에 대한 개념소개와 응용을 담고 있다. 특성상 
+		poll(2)와 같은 함수와 자주 비교될 것이다.  
+	</para>
+</section>
+
+<section>
+	<title>poll(2)을 이용한 이벤트 통지</title>
+	<section>
+		<title>poll(2)의 인터페이스</title>
+		<para>
+			네트워크 상에서의 많은 클라이언트로 부터의 데이터의 처리를 
+			위해서 사용되는 전통적인 방법은 select(2)나 poll(2)을 이용해서 
+			소켓(파일)로 부터의 이벤트를 검사하는 방법이다. 
+			다음은 poll(2)의 일반적인 인터페이스 이다.  
+			<screen>
+/* Flags to indicate socket events. 0 indicates no event. */
+
+#define POLLIN      0x0001    /* There is data to read */
+#define POLLPRI     0x0002    /* There is urgent data to read */
+#define POLLOUT     0x0004    /* Writing now will not block */
+#define POLLERR     0x0008    /* Error condition */
+#define POLLHUP     0x0010    /* Hung up */
+#define POLLNVAL    0x0020    /* Invalid request: fd not open */
+
+struct pollfd {
+  int fd;
+  short events;
+  short revents;
+};
+
+int poll(struct pollfd *pfds, int number, int timeout);
+			</screen>
+			대략적인 작동 방식은 pfds에 등록된 파일(소켓)에 어떤 이벤트가 
+			있는지 검사를 해서, 이벤트가 발생되었다면 이를 리턴하는 식이다.
+			자세한 내용은 <ulink url=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=26http://www.joinc.co.kr/modules.php?name=News&file=article&sid=26>다중연결서버 만들기 (3)</ulink>를 
+			참고하기 바란다.  
+		</para>
+		<section>
+			<title>poll(2)의 문제점</title>
+			<para>
+				poll(2)함수는 다음과 같은 몇 가지의 단점을 가지게 되고, 이러한 
+				단점들 때문에 동시에 많은 수의 클라이언트를 다루는데 
+				비효율이라는 문제점을 가지게 된다. 
+				<itemizedlist>
+					<listitem>
+					<para>
+						pool(2)시스템 콜은 이벤트를 받기 위해서 커널 스페이스에서 
+						유저 스페이스로 이벤트를 복사한다. 그리고 업데이트된 이벤트 리스트를
+						유저 스페이스에서 커널 스페이스로 다시 복사한다. 
+						즉 하나의 이벤트를 전달받기 위해서 2번의 복사가 발생한다. 
+						일반적으로 복사는 상당히 많은 자원을 소모한다.  
+					</para>
+					</listitem>
+					<listitem>
+					<para>
+						커널과 어플리케이션 양쪽 모두 이벤트가 발생한 소켓을 검사하기 
+						위해서 열린 소켓모두를 검사해야 한다.  
+					</para>
+					</listitem>
+					<listitem>
+					<para>
+						보통 연결된 소켓중에서 단 10%에서 20%만이 활동하고 있는 소켓이다. 
+						poll(2)은 이 10%에서20%의 활성화된 소켓, 그중에서도 단지 몇개의 
+						이벤트 발생한 소켓을 찾아내기 위해서 수십 혹은 수백개의 소켓을 
+						뒤지는 작업을 반복해야 한다.  
+					</para>
+					</listitem>
+				</itemizedlist>
+			</para>
+			<para>
+			</para>
+		</section>
+	</section>
+</section>
+
+<section>
+	<title>POSIX RTS</title>
+	<para>
+		이러한 poll()과 select()의 문제를 해결하기 위해서 몇가지 새로운 방법들이 
+		제안되었다. declare_interest()와 get_next_event()와 같이 이벤트가 발생한 
+		소켓을 등록하고 되돌려주는 함수, 커널과 유저사이의 데이터 복사를 줄이는 
+		방식으로 poll()을 좀더 향상시킨 /dev/poll등이 만들어져 있다. 그리고 
+		FreeBSD운영체제의 kqueue와 같은 것들이 있다. /dev/poll은 poll()보다 
+		성능적으로 향상되어 있지만 여전히 커널 레벨에서 모든 열린 
+		소켓을 뒤져야 한다는 문제점을 가지고 있다. kqueue는 poll()에서 발생할 수 
+		있는 성능 저하 문제를 해결하면서도 RTS가 가지는 사용상의 어려움까지 
+		해결한(쉽게 사용할 수 있는)매우 매력적인 도구이다.
+		안타깝게도 현재 리눅스 정식커널 2.4.x에서는 kqueue를 지원하지 않고 있다. 
+		그러나 이미 관련된 패치가 나오고 있으니 아마 2.6.x에서는 정식으로 
+		지원할 것같다. 
+	</para>
+	<para>
+		이 문서에서는 현재 정식으로 지원되고 있는 RTS만을 설명 할 것이다. 이하 
+		RTS란 POSIX RTS를 칭한다.
+	</para>
+	<section>
+		<title>RTS란</title>
+		<para>
+			RTS는 비동기(asynchronous) 이벤트를 전달하기 위한 목적으로 만들어 
+			졌으며, 주로 네트워크 애플리케이션 작성시 소켓 이벤트를 통보하기 위해서 
+			사용한다. RTS는 네트워크 입출력에 있어서 polling에 비해 월등한 성능 
+			향상을 보장해 준다.
+		</para>
+		<para>
+			시그널의 장점인 실시간성을 유지하면서 단점인 대기열부재의 문제를 해결한 
+			향상된 시그널도구라고 이해할 수 있다.  
+		</para>
+	</section>
+	<section>
+		<title>RTS와 표준 시그널(signal)과의 비교</title>	
+		<para>
+			RTS는 다음의 두가지 점에 있어서 유닉스 표준 시그널과 크게 다르다. 
+			<itemizedlist>
+				<listitem>
+				<para>
+					유닉스 표준 시그널은 시그널 발생시 단지 시그널이 전달되었다는 
+					사실과 전달된 시그널의 번호만을 알 수 있다. 반면 RTS는 
+					siginfo_t 구조체에 시그널에 관련된 여러가지 정보까지 함께 전달 
+					된다.     
+					<screen>
+typedef struct siginfo {
+   int si_signo;     /* Signal number */
+   int si_errno;     /* Error code */
+   int si_code;
+   pid_t si_pid;
+   uid_t si_uid;
+   void *si_addr; 
+   union sigval si_value;
+   union {
+      /* Skipping other fields */
+      struct {
+         int _band;  /* Socket event flags (similar to poll) */
+         int _fd;    /* Socket fd where event occurred */
+      } _sigpoll;
+   } _sifields;
+}  siginfo_t;
+
+#define si_fd     _sifields._sigpoll._fd 
+					</screen>
+					위의 구조체를 보면 시그널 번호는 물론이고, 어떤 소켓에서 
+					이벤트를 발생시켰는지에 관한 기타 여러가지 정보들을 
+					가지고 있음을 알 수 있다. RTS를 사용하면 시그널과 함께 
+					이러한 부가 정보들까지 함께 전달 받는다. 
+					다음은 siginfo_t멤버들에 대한 상세 설명이다.  
+					<variablelist>
+					<varlistentry>
+						<term>si_signo</term>
+						<listitem>
+							<para>
+								시그널 번호이다. 이 시그널 번호는 시그널핸들러에도
+								동일하게 전달된다.  
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_errno</term>
+						<listitem>
+							<para>
+								errno값
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_code</term>
+						<listitem>
+							<para>
+								시그널을 받았을 때 어떤이유로 시그널이 발생했는지 
+								관련된 값이다.
+								<table>
+								<title>SI_CODE 종류</title>
+								<tgroup cols=2>
+								<tbody>	
+								<row>
+									<entry>값</entry>	
+									<entry>설명</entry>
+								</row>
+								<row>
+									<entry>SI_ASYNCIO</entry>
+									<entry>소켓으로 비동기 입출력 이벤트 발생, 가장 관심있어 하는 시그널이다.</entry>
+								</row>
+								<row>
+									<entry>SI_QUEUE</entry>
+									<entry>sigqueue()함수를 통한 시그널 발생</entry>
+								</row>
+								<row>
+									<entry>SI_TIMER</entry>
+									<entry>시간 초과</entry>
+								</row>
+								<row>
+									<entry>SI_USER</entry>
+									<entry>kill()함수등에 의한 시그널 발생</entry>
+								</row>
+								</tbody>	
+								</tgroup>
+								</table>
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_pid</term>
+						<listitem>
+							<para>
+								시그널을 발생시킨 프로세스의 아이디(PID)
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_uid</term>
+						<listitem>
+							<para>
+								시그널을 발생시킨 프로세스의 UID로 si_code가 SI_USER일 경우에만 
+								값이 설정된다. 
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_status</term>
+						<listitem>
+							<para>
+								자식 프로세스에서 SIGCHLD시그널이 발생시키고 종료했을 경우 
+								자식 프로세스의 종료값
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_value</term>
+						<listitem>
+							<para>
+								sigqueue()함수를 이용해서 시그널을 발생시킬 경우 사용자가 보낸 
+								값이 저장되어 있다.  
+								<screen>
+typedef union sigval
+{
+    int sival_int;
+    void *sival_ptr;
+} sigval_t;
+								</screen>
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_addr</term>
+						<listitem>
+							<para>
+								메모리 참조주소의 포인터를 포함한다. 이것은 SIGSEGV, SIGBUS, SIGILL,
+								SIGFPE 등이 발생했을 때만 적용된다. 
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>si_fd</term>
+						<listitem>
+							<para>
+								이벤트를 발생시킨 파일지정자.
+							</para>
+						</listitem>
+					</varlistentry>
+					</variablelist>
+				</para>
+				</listitem>
+				<listitem>
+				<para>
+					표준 시그널은 시그널의 대기열을 유지할 수 없다. 만약 시그널핸들러가 
+					리턴되기전에 여러개의 동일한 시그널이 전달된다면 그 중 하나의 시그널만 
+					전달될 뿐이다. 나머지 시그널은 잃어 버린다. 반면 
+					RTS는 시그널의 대기열을 유지할 수 있으므로, 동시에 여러개의 시그널이 
+					전달된다고 하더라도 이들을 대기열에 담아둘 수 있다. 
+				</para>
+				</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	<section>
+		<title>RTS 대기열의 크기</title>
+		<para>
+			아직 테스트 해보진 않았지만 이론적으로나마 RTS는 대기열을 
+			가질 수 있다고 배웠다. 그렇다면 RTS대기열의 크기가 어느정도 인지 
+			궁금할 것이다. 만약 RTS대기열의 크기가 충분히 크지 않다면, 
+			바쁜서버의 경우 빠른시간에 대기열이 가득 차버리는 문제가 발생할 수도 
+			있기 때문이다. 이러한 문제에 대해서는 다음 기사에서 다루도록 하겠다.  
+		</para>
+	</section>
+	<section>
+		<title>RTS와 poll과의 비교</title>
+		<para>
+			앞장에서 poll에 대해서 간단히 살펴보았다. poll과 RTS모두 이벤트를 받아서 
+			처리한다는 점에서는 매우 비슷하지만 성능에서는 많은 차이가 난다. 
+			poll에서는 빈번한 데이터 복사가 일어나며 이벤트가 발생한 파일을 찾기 위해서 
+			열린 파일을 모두 검사해야 하기 때문이다. 열린 파일이 열몇개 정도라면 별문제 
+			없겠지만 수백에서 천에 육박하게 되면 이벤트가 발생한 파일을 찾는데 드는 비용도 
+			결코 무시할 수 없게 된다.  
+		</para>
+		<para>
+			RTS는 이벤트 통지시 어떤 파일에 이벤트가 발생했는지에 대한 정보까지 
+			되돌려 주므로 부가적인 작업없이 해당파일을 통한 작업이 가능하다.   
+			<figure>
+				<title>poll과 RTS에서의 파일 이벤트 체크</title>
+				<graphic fileref=http://www.joinc.co.kr/albums/album01/adh.gif>
+			</figure>
+		</para>
+	</section>
+	<section>
+		<title>RTS지원 확인</title>
+		<para>
+			최신의 대부분의 유닉스 운영체제들은 RTS를 지원한다. RTS를 지원하는지 
+			확인하는 가장 확실한 방법은 kill명령을 이용해서 커널에서 지원하는 
+			시그널 목록을 확인하는 방법이다. 
+			<screen>
+[root@joinc /root]# kill -l
+ 1) SIGHUP       2) SIGINT       3) SIGQUIT      4) SIGILL
+ 5) SIGTRAP      6) SIGABRT      7) SIGBUS       8) SIGFPE
+ 9) SIGKILL     10) SIGUSR1     11) SIGSEGV     12) SIGUSR2
+13) SIGPIPE     14) SIGALRM     15) SIGTERM     17) SIGCHLD
+18) SIGCONT     19) SIGSTOP     20) SIGTSTP     21) SIGTTIN
+22) SIGTTOU     23) SIGURG      24) SIGXCPU     25) SIGXFSZ
+26) SIGVTALRM   27) SIGPROF     28) SIGWINCH    29) SIGIO
+30) SIGPWR      31) SIGSYS      32) SIGRTMIN    33) SIGRTMIN+1
+34) SIGRTMIN+2  35) SIGRTMIN+3  36) SIGRTMIN+4  37) SIGRTMIN+5
+38) SIGRTMIN+6  39) SIGRTMIN+7  40) SIGRTMIN+8  41) SIGRTMIN+9
+42) SIGRTMIN+10 43) SIGRTMIN+11 44) SIGRTMIN+12 45) SIGRTMIN+13
+46) SIGRTMIN+14 47) SIGRTMIN+15 48) SIGRTMAX-15 49) SIGRTMAX-14
+50) SIGRTMAX-13 51) SIGRTMAX-12 52) SIGRTMAX-11 53) SIGRTMAX-10
+54) SIGRTMAX-9  55) SIGRTMAX-8  56) SIGRTMAX-7  57) SIGRTMAX-6
+58) SIGRTMAX-5  59) SIGRTMAX-4  60) SIGRTMAX-3  61) SIGRTMAX-2
+62) SIGRTMAX-1  63) SIGRTMAX
+			</screen>
+			1-31까지는 유닉스 표준 시그널을 위해 예약된 영역이며,
+			32번 부터 63번 까지가 RTS를 위해 예약된 영역이다. RTS를 위해 
+			예약된 시그널의 갯수는 운영체제마다 약간씩 틀리다. RTS를 사용하기 
+			원한다면 이들 준비된 시그널중 하나를 사용하면 된다.   
+		</para>
+	</section>
+	<section>
+		<title>RTS를 이용한 네트워크 입출력 처리</title>
+		<para>
+			그럼 RTS를 이용해서 소켓에서 발생한 이벤트를 통지 받는 방법에 대해서 
+			알아 보도록 하자. 
+		</para>
+		<para>
+			가장 먼저 해야 할일은 소켓파일이 RTS에 반응하도록 설정하는 일이다. 
+			이것은 파일특성조작 함수인 fcntl(2)을 통해서 이루어진다. fcntl()함수를 
+			이용 해당 소켓을 논블럭,비동기 모드로 작동하도록 세팅한후, 
+			시그널 번호가 SIGRTMIN보다 클경우 해당 소켓으로 전달되도록 세팅한다.   
+			<screen>
+int sockfd = accept(..);
+
+// 소켓을 논블럭,비동기로 설정한다.
+fcntl(sockfd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC);
+// SIGRTMIN보다 더 큰 RTS시그널이 전달되도록 한다. 
+fcntl(sockfd, F_SETSIG, SIGRTMIN);
+// 시그널을 보낼 프로세스 ID를 설정한다. 
+// 여기에서는 자기 프로세스로 보내도록 했다. 
+fcntl(sockfd, F_SETOWN, getpid());
+fcntl(sockfd, F_SETAUXFL, O_ONESIGFD);
+			</screen>
+			소켓에 RTS가 통지되도록 했다면 소켓에 RTS가 통지되었을 때 필요한 
+			작업을 하도록 코드를 추가하면 된다. 일단은 RTS가 통지되었는지 
+			확인하는 함수가 필요할 것이다. 유닉스는 sigwaitinfo()와 
+			sigtimedwait()함수를 제공하며, 이 함수들을 이용해서 RTS통지를 확인할 수 
+			있다. 
+			<screen>
+#include &lt;signal.h&gt;
+
+int sigwaitinfo(const sigset_t *set, siginfo_t *info);
+int sigtimedwait(const sigset_t *set, siginfo_t *info, const
+      struct timespec *timeout);
+int sigqueue(pid_tpid, int sig, const union sigval value);
+			</screen>
+			<emphasis>set</emphasis>은 기다릴 시그널정보가 설정되는 구조체이며, 
+			시그널이 통지 되면 해당 정보가 <emphasis>info</emphasis>에 복사된다. 
+			sigtimewait()는 기다리는 시간을 설정할 수 있다는 점을 제외하고는 
+			sigwaitinfo()와 완전히 동일 하다. 다음은 이들 함수를 통해서 
+			시그널을 받고 필요한 일을 처리하는 전형적인 코드의 모습을 보여준다. 
+			<screen>
+sigset_t signalset;
+siginfo_t siginfo;
+int signum, sockfd, revents;
+
+sigemptyset(&amp;signalset);
+sigaddset(&amp;signalset, SIGRTMIN);
+
+signum = sigwaitinfo (&amp;signalset, &amp;siginfo); 
+if (signum == SIGRTMIN)
+{
+    sockfd = siginfo.si_fd;
+    revents = siginfo.si_band;
+    // sockfd와 revents를 이용해서 필요한 작업을 한다. 
+}
+			</screen>
+			다른 프로세스로 (nonrealtime)시그널을 보내기 위해서 kill(2)을 사용할 수 
+			있는 것처럼 RTS를 다른 프로세스로 보낼 수 있는데, 이때 사용하는 
+			함수가 <emphasis>sigqueue(2)</emphasis>이다. 보내는 측에서는 
+			3번째 인자인 <emphasis>sgval</emphasis>를 통해서 부가적인 정보까지 
+			함께 전송할 수 있다. 이 점을 이용하면 IPC용도로도 사용 가능할 것이다. 
+			<xref linkend="rtsipc">에서 자세히 다루고 있으니 참고하기 바란다.
+		</para>
+	</section>
+	<section>
+		<title>RTS 네트워크 예제 작성</title>
+		<para>
+			그럼 RTS예제를 만들어 보도록 하겠다. 지금까지는 RTS의 장점에 대해서만 
+			얘기 했었는데, RTS에도 한가지 단점이 있는데, 그것은 제대로 다루려면 
+			꽤 복잡한 코딩 과정을 거쳐야 한다는 점이다. 이런 이유로 제대로된 
+			RTS응용 프로그램을 작성하려면 꽤나 많은 신경써야 할것들이 존재한다.    
+		</para>
+		<para>
+			이번예제는 이러한 복잡한 과정을 제외하고 RTS의 기능을 맛보고 테스트할 
+			수 있는 간단한 응용으로 할 것이다.  
+		</para>
+		<para>
+			만들고자 하는 프로그램은 
+			 <ulink url=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=63>UDP 프로그래밍의 기초</ulink>에서 다루었던 덧셈연산 서버 프로그램을 
+			RTS를 이용해서 작동하도록 재작성하도록 할 것이다. 
+			클라이언트 프로그램은 그대로 재사용 하도록 하겠다. 다만 
+			여기서 제작하는 서버는 RTS의 특성을 확인하기 위해서 2개의 포트를 
+			만들것이다. 그러므로 클라이언트 프로그램역시 서로 다른 포트로 
+			접근할 수 있도록 약간의 수정을 해주어야 한다. 포트번호를 인자로 
+			받아서 처리하도록 수정해 주기바란다.   
+		</para>
+		<para>
+			코드는 단순하지만 제대로 이해하기 
+			위해서는 시그널과 네트워크 프로그래밍에 대한 기본적으로 이해하고 
+			있어야 한다. 이런 기본적인 내용은 이해하고 있다고 가정하고 
+			대부분의 설명은 주석으로 대신하도록 하겠다.  
+		</para>
+		<para>
+			<emphasis>예제 : sum_server_rts.c</emphasis>
+			<screen>
+#include &lt;signal.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;sys/types.h&gt;
+
+// F_SETSIG의 이용을 위해서 __USE_GNU를 디파인 한다. 
+#ifndef __USE_GNU
+#define __USE_GNU
+#endif
+
+#include &lt;fcntl.h&gt;
+
+/*
+ * 클라이언트와 통신에 사용할 데이터
+ */  
+struct data
+{
+    int a;
+    int b;
+    int sum;
+};
+
+/*
+ * 인자로 주어진 파일 지정자에 대허서   
+ * 비봉쇄(NONBLOCK), 비동기(ASYNC)로 지정하고
+ * 리얼타임 시그널(SIGRTMIN)에 대응하도록 작업한다. 
+ */
+int setup_sigio(int fd)
+{
+    if (fcntl(fd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC) &lt; 0)
+    {
+        printf("Couldn't setup nonblocking io %d\n", fd);
+        return -1;
+    }
+    if (fcntl(fd, F_SETSIG, SIGRTMIN) &lt; 0)
+    {
+        printf("Couldn't set signal %d on %d\n", SIGRTMIN, fd);
+        return -1;
+    }    
+    if (fcntl(fd, F_SETOWN, getpid()) &lt; 0)
+    {
+        printf("Couldn't set owner %d on %d\n", getpid(), fd);
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * setup_sigio()에 대한 포장함수
+ */
+void setup_sigio_listeners(fd)
+{
+    if (setup_sigio(fd) != 0)
+    {
+        printf("setup_sigio_listners error : %d\n", fd);
+        exit(0);
+    }
+    else
+    {
+    }
+}
+
+/*
+ * 해당 포트를 이용해서 
+ * UDP소켓을 작성하고
+ * 소켓 지정자를 리턴한다.
+ */
+int get_listener_fd(int port)
+{
+    int sockfd;
+    int clilen;
+    int state;
+    struct sockaddr_in serveraddr;
+
+    clilen = sizeof(serveraddr);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd &lt; 0)
+    {
+        printf("Socket create error\n");
+        exit(0);
+    }
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(port);
+
+    state = bind(sockfd, (struct sockaddr *)&amp;serveraddr, sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+
+    return sockfd;
+}
+
+int main()
+{
+    struct siginfo si; 
+    sigset_t set;
+    int ret;
+    int resockfd;
+    int sockfd1, sockfd2;
+    struct data add_data;
+    struct sockaddr_in clientaddr; 
+    int clilen;
+
+    // 1.
+    // 리얼 타임시그널에 대해서 SIG_BLOCK로 
+    // 작동하도록 설정한다. 
+    sigemptyset(&amp;set);
+    sigaddset(&amp;set, SIGRTMIN); 
+    sigprocmask(SIG_BLOCK, &amp;set, NULL);
+
+    // 2.
+    // 포트번호 1234, 1235로 2개의 UDP 소켓을 
+    // 만들고 이들 소켓이 RTS에 대응하도록 한다. 
+    sockfd1 = get_listener_fd(1234);
+    setup_sigio_listeners(sockfd1);
+
+    sockfd2 = get_listener_fd(1235);
+    setup_sigio_listeners(sockfd2);
+
+    while(1)
+    {
+        clilen = sizeof(clientaddr);
+
+        // 3. RTS를 기다린다.  
+        printf("Sig wait\n");    
+        ret = sigwaitinfo(&amp;set, &amp;si);
+
+        // 4.
+        // 만약 RTS가 도착했다면
+        // siginfo구조체의 값을 검사해서 어느 소켓으로 부터 
+        // 데이터가 왔는지 확인하고, 해당 소켓을 통해 
+        // 클라이언트와 통신한다.  
+        if(ret == SIGRTMIN)
+        {
+            // select를 쓰지 않고도 이벤트가 발생한 
+            // 소켓을 알아낼 수 있다.
+            printf("=========================\n");
+            printf("RTS I/O socket  %d\n", si.si_fd);
+            printf("RTS I/O revents %d\n", si.si_band);
+            printf("=========================\n");
+            resockfd = si.si_fd;
+            recvfrom(resockfd, (void *)&amp;add_data, sizeof(add_data), 0, 
+                            (struct sockaddr *)&amp;clientaddr, &amp;clilen);
+            add_data.sum = add_data.a + add_data.b; 
+            sendto(resockfd, (void *)&amp;add_data, sizeof(add_data), 0,
+                            (struct sockaddr *)&amp;clientaddr, clilen);
+            // 5.
+            // 디버깅용 : 필요에 따라 주석을 풀고 테스트 해본다. 
+            // printf("sleep\n");
+            // sleep(10);
+        }
+    }
+}
+
+			</screen>
+		</para>
+		<para>
+			<emphasis>1</emphasis>.에서 RTS를 사용하도록 세팅한다. 
+			sigaddset()를 이용해서 RTS를 
+			대응하도록 설정한다. 그후 sigprocmask()를 이용해서 동일한 RTS가 
+			들어왔을 경우 인터럽트가 걸리지 않고 블럭되도록 설정한다. 
+			만약 sigprocmask()를 이용해서 RTS를 블럭하지 않는다면 
+			sigwaitinfo()가 호출되어서 RTS를 기다리기 전에 RTS가 프로세스로 
+			전달될경우 프로세스에 인터럽트가 걸리고 프로세스는 종료되어 버릴 
+			것이다.    
+		</para>
+		<para>
+			유닉스 표준 시그널에서는 시그널이 블럭될 경우 하나의 시그널만 
+			유지하고 나머지 시그널은 모두 잃어 버리지만 RTS는 블럭되더라도 
+			시그널의 열을 유지한다. 실제 유지되는지는 잠시 후에 테스트 
+			해보도록 하겠다.   
+		</para>
+		<para>
+			<emphasis>2</emphasis>.에서 2개의 UDP소켓을 만들어서 
+			각각의 소켓에 대해서 setup_sigio_listeners()를 이용해서 RTS에 
+			대응하도록 만들었다. 파일에 대한 RTS대응에는 fcntl()이 매우 
+			중요한 역할을 한다. 
+		</para>
+		<para>
+			<emphasis>3</emphasis>.에서 sigwaitinfo()를 이용해서 RTS를 기다린다. 	
+			만약 UDP소켓에 이벤트가 발생하면 RTS가 전달 되고, sigwaitinfo()는 
+			리턴하게 된다. 리턴할때 2번째 인자인 si(siginfo)를 채워주게 되는데, 
+			siginfo에는 이벤트 발생한 파일과 이벤트 정보등이 담겨져 있다.  
+		</para>
+		<para>
+			<emphasis>4</emphasis>.에서 siginfo구조체의 내용을 이용해서 
+			어느 소켓으로 어떤 이벤트가 발생했는지 확인할 수 있으며, 
+			recvfrom(), sendto()함수를 이용해서 데이터 통신을 하면 된다.  
+		</para>
+		<para>
+			<emphasis>5</emphasis>.는 디버깅용이다. 
+			sleep()를 걸어 놓고 10초 사이에 2번 이상 클라이언트를 이용해서 
+			데이터 통신 테스트를 해보면 시그널정보가 대기열에 쌓이는 것을 
+			확실히 확인할 수 있을 것이다. 	 
+		</para>
+	</section>
+	<section id="rtsipc">
+		<title>프로세스간 신호전달</title>
+		<para>
+			RTS는 파일에 대한 이벤트 전달을 위한 좋은 도구이며, 실제로 거의 대부분 
+			네트워크 프로그래밍을 위한 도구로 사용되지만 프로세스간 신호 전달을 위한 
+			목적으로도 사용할 수 있다. 
+		</para>
+		<para>
+			프로세스간 신호전달용으로 사용할 때 얻을 수 있는 장점은 시그널이 대기열에 
+			쌓이므로 잃어버릴 염려가 없다는 점과 부가적인 정보를 전달할 수도 있다는 점이다.  
+			다른 프로세스로의 RTS전달은 <emphasis>sigqueue(2)</emphasis>함수를 이용한다. 
+		</para>
+		<para>
+			부가적인 정보의 전달은 sifinfo_t구조체의 sigvalue를 통해서 이루어진다. 
+			sigvalue는 다음과 같은 멤버를 가진다.  
+			<screen>
+union sigval
+{
+    int sival_int;
+    void *sival_ptr;
+}
+			</screen>
+			sival_int는 int형 값을 전달하기 위해서 사용된다. 메뉴얼을 보면 sival_ptr의 
+			경우 주소값을 전달하기 위해서 사용한다고 되어있는데, 실제 어디에 사용가능한지 
+			확인 할 수 없었다. 아는 사람이 있으면 댓글을 달아주기 바란다.  
+		</para>
+		<para>
+			RTS에 대응하도록 애플리케이션을 만드는 방법은 일반 유닉스 표준 시그널을 
+			다루는 프로그램과 크게 다를바 없다. 
+			sigaction의 sa_flags를 SA_SIGINFO로 설정하고 적당한 시그널 핸들러를 
+			등록하기만 하면 된다. 그리고 RTS가 전달되었을 경우 si_code가 SI_QUEUE인지를 
+			확인하고 원하는 작업을 하면 된다. SI_QUEUE인지를 확인하는 이유는 
+			RTS가 아닌 표준 시그널이 도착할 수 있고, 이를 구별해서 작업해야할 
+			필요가 있기 때문이다. 
+			다음은 RTS에 반응하는 애플리케이션이다.   
+		</para>
+		<para>
+			<emphasis>예제 : rcv_rts.c</emphasis>
+			<screen>
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+
+/* 
+ * 시그널 핸들러
+ * si_code가 SI_QUEUE 인지를 확인한후 원하는 작업을 한다.  
+ * SI_QUEUE일 경우 RTS형식으로 전달된 시그널이며 
+ * 그렇지 않을경우 표준 유닉스 시그널이다.  
+ */
+void sighandler(int signo, siginfo_t *si)
+{
+    if(si->si_code == SI_QUEUE)
+    {
+        printf("User RTS signal %d\n", si->si_pid);
+        printf("Sig  Number %d\n",     si->si_signo);
+        printf("User Data is %d\n",    si->si_value.sival_int);
+        // 시그널이 큐잉되는지 확인하기 위한 코드
+        getchar();
+    }
+    else
+    {
+        // kill등을 이용해서 표준 유닉스 시그널을 보냈을 경우
+        // 실행되는 루틴 
+        printf("Get none realtime signal %d\n", signo); 
+    }
+}
+
+int main()
+{
+    struct sigaction sigact;
+
+    printf("My pid %d\n", getpid());
+
+    /*
+     * sa_flags를 SA_SIGINFO로 설정하고 
+     * 시그널 핸들러를 등록한다. 
+     */
+    sigemptyset(&amp;sigact.sa_mask);
+    sigact.sa_flags     = SA_SIGINFO;
+    sigact.sa_restorer  = NULL; 
+    sigact.sa_sigaction = sighandler; 
+
+    /*
+     * RTS시그널에 대한 핸들러를 설치한다.  
+     */
+    if (sigaction(SIGRTMIN, &amp;sigact, 0) == 1)
+    {
+        printf("signal error\n");
+        exit(0);
+    }   
+    while(1)
+    {
+        sleep(1);
+    }   
+}   
+			</screen>
+		</para>
+		<para>
+			다음은 RTS를 발생시키는 예제 프로그램이다.    
+		</para>
+		<para>
+			<emphasis>예제 : snd_rts.c</emphasis>
+			<screen>
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+
+/*
+ * argv[1]은 보내고자 하는 프로세스의 PID  
+ * argv[2]는 보내고자 하는 값이다.   
+ * SIGUSR1을 RTS로 전송한다. 
+ */  
+int main(int argc, char **argv)
+{
+    union sigval sv;
+
+    sv.sival_int = atoi(argv[2]);
+    sigqueue(atoi(argv[1]), SIGRTMIN, sv);
+}
+			</screen>
+			이제 rcv_rts를 띄우고 나서 snd_rts로 테스트 해보기 바란다. 
+			snd_rts로 테스트 했을경우 RTS를 받는걸 확인 할 수 있다. rcv_rts에서 
+			키보드입력이 없다면 getchar()에서 블럭될 건데, 이때 snd_rts를 여러번 
+			실행하면 시그널이 대기열에 쌓이는 특성도 확인 할 수 있다.  
+		</para>
+		<para>
+			그렇지 않고 kill을 이용해서 표준 유닉스 시그널을 보낼수도 있는데,  
+			그럴 경우 표준 유닉스 시그널 처리 루틴으로 넘어가는걸 확인할 수 있을 것이다.   
+		</para>
+	</section>
+</section>
+<section>
+	<title>결론</title>
+	<para>
+		이상 RTS에 대해서 간단히 알아보았다. 여기에서 다룬내용은 말그대로 RTS의 
+		개념이해를 위한 맛보기일 뿐이다. 
+		실제 RTS를 응용한 네트워크 프로그래밍의 작성에는 신경써줘야 할 
+		많은 문제들이 있다. 이러한 내용들은 다음 문서를 통해 다루도록 할것이다.  
+	</para>
+</section>
+
+</article>
+}}}

@@ -1,0 +1,50 @@
+#title 간단 Hash 함수
+
+----
+ 1. hash 
+ 1. 간단한 해쉬 함수 
+ 1. [yundream]
+ 1. Version 0.2 
+ 1. 2004/02/03
+----
+
+=== 설명 ===
+간단한 해쉬 함수입니다. 범용해쉬 함수는 아닙니다. 저 같은 경우 ip주소의 해쉬 테이블을 만들기 위해서 주로 사용합니다. 인터넷 돌아다니다 주은 코든데, 출처가 기억나질 않는군요. 
+
+=== 사용방법 ===
+{{{#!plain
+int hash(unsigned long key);
+}}}
+ 1. key     : 해쉬를 적용할 값    
+ 1. 리턴값  : key에 대한 해쉬값 
+
+{{{#!plain
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include "hash.h"
+
+int main()
+{
+    printf("%d\n", hash(inet_addr("127.0.0.1")));
+    printf("%d\n", hash(inet_addr("248.251.2.1")));
+}
+}}}
+
+=== 코드 ===
+{{{#!plain
+
+#define HASH_SIZE   1024
+int hash(unsigned long key)
+{
+    key += ~(key << 15);
+    key ^=  (key >> 10);
+    key +=  (key << 3);
+    key ^=  (key >> 6);
+    key += ~(key << 11);
+    key ^=  (key >> 16);
+    return key%HASH_SIZE;
+}
+}}}
+
+=== 변경사항 ===

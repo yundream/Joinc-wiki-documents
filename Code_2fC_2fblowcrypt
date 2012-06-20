@@ -1,0 +1,175 @@
+#title blowfish 알고리즘을 이용한 데이터 암호화
+----
+ 1. blowcrypt 
+ 1. blowfish 알고리즘을 이용한 데이터 암호화 
+ 1. [yundream]
+ 1. Version 0.2
+ 1. 2004/03/30
+----
+
+=== 설명 ===
+openssh에서 제공하는 blowfish 알고리즘을 이용해서 데이터를 암호화 합니다. blowfish는 데이터의 암호화와 복호화를 위해서 동일한 키를 사용하는 대칭 알고리즘을 사용하고 있습니다. 
+
+암호화와 복호화를 위해 다른키를 사용하는 RSA알고리즘에 비해서 사용하기가 간단하고, 더 빠른 수행능력을 보여준다는 장점을 가집니다.  
+=== 사용방법 ===
+{{{#!plain
+int keygen(struct mykey *key);
+int cryptinit();
+int encrypt(unsigned char *data, size_t n,unsigned char *buf, struct mykey *lkey)
+int decrypt(char *cryptmessage, unsigned char *outbuf, struct mykey *lkey, size_t n);
+}}}
+ * keygen은 암/복호화에 사용될 키를 생성한다. 만들어진 키는 '''key'''에 복사된다. key는 다음과 같이 정의되어있다.   
+  {{{#!plain
+struct mykey
+{
+    unsigned char key[16];
+    unsigned char vec[8];
+};
+}}}
+ * '''cryptinit'''는 chiper를 초기화 시킨다. chiper는 전역으로 선언되어 있다.   
+ * '''encrypt'''는 주어진 '''data'''에서 '''n''' 바이트만큼을 암호화 해서 '''buf'''에 저장한다. 암호화는 '''lkey'''를 통해서 이루어진다. 암호화된 데이터 크기가 리턴된다. 
+ * '''decrypt'''는 암호화된 데이터 '''cryptmessage'''에서 n 바이트만큼을 '''lkey'''를 이용해서 복호화 한다. 
+=== 코드 ===
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <string.h>
+#include <time.h>
+
+#include <openssl/ssl.h>
+#include <openssl/evp.h>
+#include <openssl/crypto.h>
+
+struct mykey
+{
+    unsigned char key[16];
+    unsigned char vec[8];
+};
+
+// chipteer 초기화 
+EVP_CIPHER_CTX ctx;
+
+// 랜덤값을 얻는다. 
+// 필요에 따라서 /dev/random을 사용해도 된다.
+int getrandom(char *rand, size_t size)
+{
+    struct timeval tp;
+    int i = 0;
+    int ran;
+
+    gettimeofday(&tp, NULL);
+    srandom(tp.tv_sec | tp.tv_usec);
+
+    while(1)
+    {
+        if (!(size / (4*(i+1)))) break;
+
+        ran = random();
+        memcpy(rand+(i*4), (void *)&ran, 4);
+        //memcpy(rand, (void *)&ran, 4);
+        i++;
+    }
+}
+
+// 키 생성기
+int keygen(struct mykey *lkey)
+{
+    int i = 0;
+    char keyseed[24];
+    getrandom(keyseed, 24);
+    memcpy((void *)lkey->key, keyseed,   16);
+    memcpy((void *)lkey->vec, keyseed+16, 8);
+}
+
+// chiper를 초기화 한다.
+int cryptinit()
+{
+    EVP_CIPHER_CTX_init(&ctx);
+}
+
+// data를 lkey를 이용해서 암호화 한다.
+int encrypt(unsigned char *data, size_t n, unsigned char *buf, struct mykey *lkey)
+{
+    int olen = 0, tlen, i;
+
+    char test[256] = {0x00,};
+    printf("msg size is %d\n", n);
+    EVP_EncryptInit(&ctx, EVP_bf_cbc(), lkey->key, lkey->vec);
+    if (EVP_EncryptUpdate(&ctx, buf, &olen, data, n+4) != 1)
+    {
+        printf("Error in encrypt update\n");
+        return -1;
+    }
+
+
+    if (EVP_EncryptFinal(&ctx, buf+olen, &tlen) != 1)
+    {
+        printf("Error in encrypt final\n");
+        return -1;
+    }
+    printf("Encrypt size=%d, %d\n", olen, tlen);
+    EVP_CIPHER_CTX_cleanup(&ctx);
+    return olen+tlen;
+}
+
+// 주어진 암호화된 데이터를 lkey를 이용해서 복호화 한다.
+int decrypt(char *cryptmessage, unsigned char *outbuf, struct mykey *lkey, size_t n)
+{
+    int olen, tlen;
+
+    EVP_DecryptInit(&ctx, EVP_bf_cbc(), lkey->key, lkey->vec);
+    if(EVP_DecryptUpdate(&ctx, outbuf, &olen, (unsigned char *)cryptmessage, n) != 1)
+    {
+        printf("error in decrypt \n");
+        return -1;
+    }
+
+    if(EVP_DecryptFinal(&ctx, outbuf+olen, &tlen) != 1)
+    {
+        printf("error in decrypt final\n");
+        return -1;
+    }
+    return olen+tlen;
+}
+
+int main()
+{
+    int i;
+    struct mykey lkey;
+    unsigned char buf[256] = {0x00,};
+    unsigned char buf2[256] = {0x00,};
+    unsigned char hello[256] = {0x00,};
+    unsigned char hello2[256] = {0x00,};
+    int n;
+
+    strcpy((char *)hello, "hellow world test test test\n");
+    strcpy((char *)hello2, "안녕하세요 세상들아..\n");
+    keygen(&lkey);
+    cryptinit();
+
+    n = encrypt(hello, strlen((char *)hello), buf, &lkey);
+    decrypt((char *)buf, buf2, &lkey, n);
+    printf("%s\n",  buf2);
+    printf("====================");
+
+    n = encrypt(hello2, strlen((char *)hello2), buf, &lkey);
+    decrypt((char *)buf, buf2, &lkey, n);
+    printf("%s\n",  buf2);
+}
+}}}
+
+다음과 같이 컴파일 한다.
+{{{#!plain
+# gcc -o blowfish blowfish.c -I/usr/local/ssl/include -ldl -lcrypto
+}}}
+
+=== 참고문헌 ===
+ 1. [wiki:article_Openssl을_이용한_파일_암호화 Openssl을 이용한 파일 암호화]
+ 1. [wiki:Code_C_random_read random을 이용한 random값 생성]	 
+ 1. [wiki:article_random /dev/random을 이용한 random값 생성]
+
+=== 변경사항 ===
+
+==== 2004/03/30 ====

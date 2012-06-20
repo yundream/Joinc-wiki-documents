@@ -1,0 +1,407 @@
+#title SWT Study
+
+[[TableOfContents]]
+=== 소개 ===
+[wiki:Site_SmartDic SmartDic]프로젝트를 진행하기 위해서 java(12)의 GUI(12)라이브러리인 SWT(12)를 필요로 한다. 아직까지 SWT를 다루어 본적이 없으므로 프로젝트의 원할한 진행을 위해서 SWT에 대한 스터디를 수행하기로 했다. 
+
+
+
+예제들은 Eclipse(12)를 이용해서 작성하고 테스트하도록 하겠다. Eclipse의 사용방법은 [wiki:article_SWT_Study SWT 스터디 위키]를 참고하기 바란다.
+==== SWT에 대해서 ====
+java에서 GUI를 지원하기 위한 도구로 sun에서 개발한 Swing이 널리 사용되고 있었는데, IBM에서 통합개발 플랫폼인 Eclipse(12)를 개발하면서 Swing 대신 자체적으로 개발한 GUI라이브러리를 제작한다. 이게 '''SWT''' 이다.  
+
+ * Swing : J2SE를 위한 GUI 툴킷 
+ * SWT : IBM의 공개 프로젝트인 Eclipse 플랫폼의 제작을 위해 별도로 개발된 라이브러리
+
+SWT는 Standard Widget Toolkit의 줄임말로 각 운영체제자체에서 제공되는 위젯 툴킷을 통합한 그래픽 라이브러리다. 이는 각 타겟 플렛폼에 꽤나 의존적이 될 수도 있음을 의미하지만, OS독립적인 API를 제공함으로써 이 문제를 해결하고 있다. 이들 API는 목표가 되는 운영체제 시스템의 GUI코드를 wrapper함으로써 개발자 입장에서는 운영체제에 신경쓰지 않고 동일한 코드를 유지할 수 있게 된다.  
+
+덧붙여 설명하자면, Swing은 모든 위젯이 운영체제와 별개를 사용하는데(자바의 모토가 One make All use 아니던가) 그렇기때문에 Swing의 GUI는 웬지 눈에 낯설고 어색해 보이는 면이 있어왔다. 그러나 SWT는 가능한한 사용할 수있는 모든 Native Widget은 사용하고, 그러하지 않는 부분만 자바의 자체 위젯을 사용한다. 때문에 최대한 그 OS의 Native GUI와 비슷한 모습을 보여주는것이다.(Native에서 제공하지 않는 자체 위젯까지 포함하므로 때론 더 이쁠수도 있겠다. 물론 반대인 경우도 있겠지만). 
+
+그럼 자바가 시스템에 독립적이지 않은게 아닌가? 하고 반문할지 모르지만 위에 설명된 바와같이 공통적인 API를 사용하므로서 (Abstract Layer라고 볼 수 도 있겠다) OS가 다르다고 해서 소스코드의 변경을 필요로 하지 않는것이다. (VM차원에서 Native Widget를 해당 API로 랩핑해주므로)
+
+다음은 현재 java에서 사용중인 GUI라이브러리에 대한 비교다.
+|| Component				|| SWT	|| Swing	|| AWT	||
+|| Button						|| X		|| X			|| X		||
+|| Advanced Button	|| X		|| X			||			||
+|| Label						|| X		|| X			|| X		||
+|| List							|| X		|| X			|| X		||
+|| Progress Bar			|| X		|| X			||  		||
+|| Sash							|| X		|| X			|| 			||
+|| Scale						|| X		|| X			|| 			||
+|| Sash							|| X		|| X			|| 			||
+|| Slider						|| X		|| X			|| 			||
+|| Text Area				|| X		|| X			|| X		||
+|| Advanced Text Area	|| X		|| X			|| 			||
+|| Tree							|| X		|| X			|| 			||
+|| Menu							|| X		|| X			|| 			||
+|| Tab Folder				|| X		|| X			|| X		||
+|| Toolbar					|| X		|| X			|| 			||
+|| Spinner					|| X		|| X			|| 			||
+|| Tabler						|| X		|| X			|| X		||
+|| Advanced Table		|| X		|| X			|| 			||
+
+=== SWT 프로그래밍 화경 구축 및 맛보기 === 
+==== 환경 구축 ====
+우선은 개발환경을 구축해야 한다. 기본 개발환경은 Linux, JDK1.4기반이며 스터디를 위해서 Eclipse를 설치하기로 했다. 아무래도 SWT가 Eclipse의 일부로 개발된 측면이 있기 때문에 자연스러운 학습을 위해서 Eclipse가 필요하다고 판단되었기 때문이다.  
+
+Eclipse는 http://www.eclipse.org에서 최신버전 3.0 (04/7/27일 현재)받을 수 있다. 설치는 압축푸는 걸로 끝이다. 이클립스와 함께 SWT개발과 관련된 라이브러리도 받아야 한다. 역시 위 사이트에서 받을 수 있다. SWT라이브러리를 받은다음 이클립스를 설치한 곳에 적당한 디렉토리를 만들어서 압축을 풀도록 하자. 필자의 경우 이클립스 설치디렉토리는 /usr/eclipse에 SWT는 /usr/eclipse/jar에 풀었다.   
+
+다음은 이클립스를 통한 개발 모습이다.
+
+{{{#!html
+<a href=http://www.joinc.co.kr/modules.php?op=modload&name=gallery&file=index&set_albumName=album01&id=ajy&include=view_photo.php&full=1><img src=http://www.joinc.co.kr/albums/album01/ajy.sized.png border=0></a>
+}}}
+
+==== Hello World를 통해서 익히는 Eclipse+SWT 개발 ====
+자바플렛폼에서의 개발이 그리 익숙치 않은 관계로 우선 SWT버젼의 Hello world출력 애플리케이션을 만들어 보기로 했다. 
+
+===== 프로젝트 생성 =====
+이클립스가 실행되었다면, 새로운 '''File > New > Project''' 를 이용해서 새로운 프로젝트를 생성해야 한다. 그러면 아래와 같은 Project 생성 Wizard가 뜨게 된다.  
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/ajz.sized.png>
+}}}
+
+여기에서 '''java > java project''' 를 선택하고 '''Next''' 버튼을 클릭하도록 한다. 이제 프로젝트의 이름을 선택해 주어야 하는데, HelloWorld로 하자. 그다음 Finish 버튼을 누른다. 그럼 아래의 그림과 같이 '''HelloWorld''' 프로젝트가 생성된걸 확인할 수 있다.
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/aka.png>
+}}}
+
+===== 코드 생성 =====
+프로젝트도 만들어지고 했으니 이제 코드를 생성해 보기로 하자. '''HelloWorld''' 프로젝트 이름을 마우스로 클릭한후 오른쪽 버튼을 클릭하면 팝업메뉴가 뜨는데 여기에서 New > Class를 선택하도록 한다. 그러면 Java Class 생성화면이 나오는데 Name에 HelloWorld를 넣고 Finish버튼을 클릭해서 새로운 클래스를 만들어 내도록 한다. 
+
+그러면 아래와 같이 HelloWorld.java 에디터 화면이 생성된걸 확인할 수 있다.
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/akb.sized.png>
+}}}
+
+이제 코드를 완성하도록 하자. 다음은 HelloWorld출력을 위한 코드다.
+{{{#!plain
+import org.eclipse.swt.widgets.*;
+import org.eclipse.swt.*;
+	
+
+public class HelloWorld{
+  public static void main(String[] args) {
+  	Display display = new Display();
+  	Shell shell = new Shell(display);
+  	Label label = new Label(shell, SWT.NONE);
+	label.setText("Hello World!");
+	
+	shell.pack();
+	label.pack();
+  	shell.open();
+  	while(!shell.isDisposed())
+  		if(!display.readAndDispatch())
+  			display.sleep();
+  		
+  	display.dispose();
+  	label.dispose();
+  }
+}
+}}}
+
+그데 몇몇라인을 보면 빨간색 밑줄이 그어져 있는 것을 볼 수 있을 것이다. 이는 코드에 문제가 있다는 건데, 우리가 swt관련 패키지를 지원할 수 있도록 포함시키지 않았기 때문에 발생하는 에러다. C로 말하자면 -l"라이브러리" 를 하여 라이브러리를 링킹하지 않은것과 비슷하다고 볼 수 있겠다.
+
+이문제의 해결을 위해서는 프로젝트에 swt와 관련된 JAR파일을 추가시켜줘야 한다. 추가시키는 방법은 : 프로젝트 이름을 선택하고 마우스 왼쪽 버튼 클릭후 Properties를 클릭하도록 한다. 여기에서 java Build Path > Libraries를 선택하도록 한다. 그다음 Add External Jars를 클릭해서 SWT관련 JAR파일을 추가시켜주면 된다.   
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/akc.sized.png>
+}}}
+
+===== 실행 시키기 =====
+이제 실행시키는 일만 남았다. 마찬가지로 우선 HelloWorld 프로젝트를 선택한다음 Run > Run 을 선택하도록 하자. 
+
+그러면 다음과 Run환경 설정창이 뜬다. 이 화면을 통해서 우리는 각종 실행 인자와 환경변수와 같은 실행환경을 설정할 수 있다. C코드로 부터 실행파일을 만들때 가장 마지막으로 하는 일이 필요한 오브젝트나 라이브러리를 링크하는 작업이 있다. 마찬가지로 java환경에서도 이러한 작업이 필요로 한다. 우리가 만든 '''Hello World'''프로그램의 경우 SWT패키지를 사용하고 있으므로 SWT라이브러리를 사용하라고 알려줄 필요가 있다. 
+
+이것은 다음과 같이 VM arguments 에 SWT라이브러리의 경로를 명시해줌으로써 알려줄 수 있다. 경로는 자신의 eclipse 설치 디렉토리에 따라 달라질 수 있다. 
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/akd.sized.png>
+}}}
+
+swt관련 라이브러리의 경로는 리눅스를 기준으로 ./eclipse/plugins/org.eclipse.swt.gtk_3.0.0/os/linux/x86이다. 참고하기 바란다.
+
+이제 '''Run''' 버튼을 클릭해서 실행하도록 하자. 다음과 같은 실행결과물을 확인할 수 있을 것이다.
+
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/ake.png>
+}}}
+
+=== SWT 프로그래밍 일반 === 
+==== SWT 애플리케이션의 기본 구조 ====
+SWT 애플리케이션은 블럭구조를 가지며 Display, Shell, Widget의 기본 블럭들로 이루어진다. Dispalys는 이벤트 loop를 관리하고 UI 쓰레드와 다른 쓰레드들간의 통신을 제어한다. Shell은 OS의 윈도우 메니저에 의해서 생성되는 윈도우 창을 관리한다. 모든 SWT 애플리케이션은 적어도 하나의 Dispaly와 하나 혹은 그 이상의 Shell 인스턴스를 필요로 한다.
+
+http://www.developer.com/img/articles/2004/03/25/figure_01.gif
+
+위 그림은 SWT 애플리케이션의 대략적인 구성을 서로 다른 관점을 통해서 보여주고 있다. 첫번째 다이아 그램은 UI 객체의 상속관계를 나타내고 있다. 두번째 다이아 그램은 UI 객체의 컨태이너 구조체를 보여주고 있다. 세번째 다이아 그램은 만들어진 UI를 보여준다.    
+
+만약 애플리케이션이 다중 쓰레드를 이용한다면 각각의 쓰레드는 자신의 Display 인스턴스를 만들게 된다. 프로그래머는 Display.getCurrent()메서드를 이용해서 최근 활성화된 Dispaly의 인스턴스를 가져올 수 있다.    
+
+Shell은 운영체제에서 윈도우를 나타내기 위해서 사용된다. shell은 maximized, normail, minimized 형태를 가질수 있다. shell 두가지 타입이 있다. 하나는 top-level shell로 자식을 생성하며 Display의 메인 윈도우가 된다. 다른 하나는 dialog shell로 다른 shell과 독립된다.
+
+shell의 타입은 쉘의 생성자에 의해서 넘겨지는 style bit 값에 의존적이다. 기본적으로 쉘은 DialogShell 타입이 된다. 이는 아무런 인자 없이 만들경우 DialogShell이 만들어진다는 뜻이다. 
+
+몇몇 위젯의 특성(properties)는 반드시 생성시간에 설정되어야 한다. 이러한 위젯 특성을 style bits라고 부른다. Style bits는 SWT 클래스에 상수로 정의되어 있다. 예를들자면 Button button = new Button(shell, <styleBits>)형식으로 사용할 수 있다. sytle bits는 OR연산자 |를 이용할 수 있다. 만약 테두리가 있는 입력버튼을 만들기를 원한다면 SWT.PUSH | SWT.BORDER 해주면 된다. 
+
+==== SWT 애플리케이션 제작 ====
+SWT 애플리 케이션은 다음과 같은 순서로 만들어 진다.
+ * Display 생성
+ * 하나 이상의 shell 생성
+ * shell의 레이아웃 설정
+ * shell에 포함될 위젯 생성
+ * shell windows을 연다.
+ * event dispatching loop 작성
+ * display의 배치 
+
+다음은 SWT 애플리케이션의 일반적인 구성이다. 
+{{{#!plain
+import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Shell;
+
+public class SliderExample
+{
+	public static void main(String args[])
+	{
+		Display display = new Display();     // 1
+		Shell shell = new Shell(display);    // 2
+		shell.setLayout( new RowLayout());   // 3
+		// -------------------------------
+		// 여기에 적당한 코드를 넣는다. 
+		// -------------------------------
+		shell.pack();
+		shell.open();                        // 4
+		while( !shell.isDisposed())          // 5
+		{
+			if(!display.readAndDispatch()) 
+			display.sleep();
+		}
+		display.dispose();                   // 6 
+	}
+}
+}}}
+
+위 예제는 실제 코드가 없기 때문에 비어있는 윈도우를 생성한다. 이를테면 SWT애플리케이션 제작을 위한 템플릿 코드정도로 생각하면 된다.
+
+ 1. 모든 SWT애플리케이션은 Dispaly와 
+ 1. 하나 이상의 Shell을 필요로 한다. shell은 객체의 조합이다. 
+ 1. 만약 layout을 잡지 않는다면, 추가된 위젯은 보이지 않게 된다.   
+ 1. 만들어진 shell을 연다.
+ 1. 이벤트 핸들링 루프를 만들고 GUI 이벤트를 읽는다.  
+ 1. 사용되지 않는 display를 버린다. 
+
+==== SWT 패키지들 ====
+SWT는 여러개의 패키지로 구성되어 있다. 이들 패키지에 대한 자세한 내용은 Eclipse API 문서에 정의되어 있다. 여기에서는 중요한 패키지들을 간단하게 설명하도록 하겠다.
+
+ * org.eclipse.swt : SWT 클래스에 의해서 사용되는 상수와 예외값들이 정의되어 있다. SWT패키지는 SWT, SWTException, SWTError 3개의 클래스로 구성되어 있다. SWT는 keyboard, error, color, layout, text sylte, button등과 같은 가장 자주 사용되는 라이브러리들을 포함하고 있다.  
+ * org.eclipse.swt.widgets : 핵심 SWT 위젯 컴포넌트들과 위젯을 지원하기 위한 인터페이스와 클래스들을 포함하고 있다.
+ * org.eclipse.swt.events: SWT 컴포넌트들에 의해 사용되는 이벤트 타입과, 리스너, 이벤트들을 정의하고 있다. 이 패키지는 Listener interfaces, Adapter class, Event class를 포함하고 있다.
+ * org.eclipse.swt.dnd : SWT 위제에서 drag-and-drop을 지원하기 위한 클래스를 포함한다. 
+ * org.eclipse.swt.layout : SWT위젯의 자동크기변화와 위치지정과 관련된 클래스를 포함한다. 
+ * org.eclipse.swt.print : 출력을 위한 클래스 포함  
+ * org.eclipse.swt.graphics : 점, 선, 면, 색, 커서, 폰트, Graphics context등 이미지와 관련된 클래스를 제공한다.
+ *
+
+==== 다이얼로그 ====
+다이얼로그는 운영체제의 윈도우 환경에서 지원하는 것을 사용한다. 예를들어 리눅스라면 GTK에서 지원하는 다이얼로그를 사용하게 된다. SWT의 다이얼로그는 Dialog 클래스로 부터 파생된다. dialog는 위젯이 아니지만 위젯을 포함할 수 있다. 
+
+http://www.developer.com/img/articles/2004/03/25/figure_02.gif
+
+어떤 다이얼로그들은 properties 를 조정할 수 있다. 다이얼로그는 아래와 같이 사용할 수 있다.
+{{{#!plain
+MessageBox messageBox = 
+new MessageBox(shell, SWT.OK|SWT.CANCEL);
+if (messageBox.open() == SWT.OK)
+{
+	System.out.println("Ok is pressed.");
+}
+}}}
+각 다이얼로그는 open()메서드를 이용해서 다른 타입을 리턴받을 수 있다. 예를 들어서 MessageBox dialog는 open()메서드로 부터 int 값을 리턴받는다. 그러므로 각각의 다이얼로그 마다 리턴되는 타입에 맞도록 처리를 해주어야 한다. 
+
+ColorDialog는 색선택 창을 보여주는데, RGB 객체를 리턴한다.   
+
+DirectoryDialog는 디렉토리 선택을 위한 창을 보여주는데, open()메서드를 사용할 경우 선택된 디렉토리의 이름(문자열)을 리턴한다.   
+
+Font dialog는 시스템에서 제공하는 모든폰트에 대한 목록을 제공하고 선택할 수 있도록 한다. FontData 객체가 리턴된다.  
+
+FileDialog는 파일선택 창을 띄운다. 여기에 더해서 확장자 필터, 경로 필터, 파일이름 필터등을 적용할 수 있다. 다이얼로그는 다음과 같은 타입을 가지고 있다. 
+
+|| SWT.OPEN		|| Open 버튼을 보여준다. 파일을 열고자 할때 사용한다.	||
+|| SWT.SAVE		|| Save 버튼을 보여준다. 파일을 저장할때 사용한다.		||
+
+PrintDialog는 프린트와 관련된 여러가지 조작을 할 수 있는 창을 보여준다. open()메서드를 호출했을 경우 PrintData 객체를 리턴한다.    
+
+MessageBox 다이얼로그는 사용자와 상호작용하기 위해서 사용할 수 있다. 다이얼로그는 목적에 따라서 여러가지 타입을 가질 수 있는데, 아래와 같이 | 연산을 통해서 다양한 타입을 만들어 낼 수 있다.
+{{{#!plain
+MessageBox messageBox = new MessageBox(shell,
+			SWT.OK|
+			SWT.CANCEL|
+			SWT.ICON_WARNING);
+			messageBox.setMessage("www.korayguclu.de");
+			messageBox.open();
+}}} 이렇게 해서 만들어진 다이얼로그는 다음과 같이 보일 것이다. 아래 그림은 리눅스에서 실행시킨 경우다.  http://www.joinc.co.kr/albums/album01/akl.png MessageBox에서 사용할 수 있느 아이콘은 아래에 정리해 두었으니 참고하기 바란다.  || SWT.ICON_ERROR		|| http://www.developer.com/img/articles/2004/03/25/image_01.gif			||
+|| SWT.ICON_INFORMATION	|| http://www.developer.com/img/articles/2004/03/25/image_02.gif			||
+|| SWT.ICON_QUESTION	|| http://www.developer.com/img/articles/2004/03/25/image_03.gif			||
+|| SWT.ICON_WARNING		|| http://www.developer.com/img/articles/2004/03/25/image_04.gif			||
+|| SWT.ICON_WORKING		|| http://www.developer.com/img/articles/2004/03/25/image_02.gif			||
+
+==== Widgets ====
+위젯은 윈도우를 구성하는 공통 GUI객체다. 버튼, 체크박스, 팝업메뉴, 슬라이드바, 스핀박스, 텍스트 입력창등이 여기에 포함된다. 
+
+SWT GUI 객체는 widget과 Control 클래스로 부터 파생된다. 위젯 객체는 모든 공통 GUI클래스를 위한 기본 클래스와 메서드를 정의하고 있다. Control 클래스는 모든 windowed GUI 클래스의 기본 클래스로 윈도우와 다이얼로그의 display와 관련된 제어를 맡는다. 
+
+다음은 위젯의 계층구조를 나타낸 그림이다.  
+
+http://www.developer.com/img/articles/2004/03/25/figure_04.gif
+
+===== 위젯 이벤트 =====
+===== 자주사용하는 위젯 =====
+http://www.developer.com/img/articles/2004/03/25/figure_05.gif
+
+모든 Control 클래스는 border를 가질 수 있다. border는 SWT.BORDER 상수를 이용해서 추가 시킬 수 있다. 
+
+===== 버튼 =====
+버튼은 다양한 스타일을 가지고 있으며 bit값에 의해서 설정할 수 있다. 아래의 테이블은 버튼과 그 스타일을 정리한 테이블이다. 
+
+|| 상수			|| 사용예			|| 설명			||
+|| SWT.ARROW	|| http://www.developer.com/img/articles/2004/03/25/image_05.gif || popup메뉴등을 위해서 사용한다.	||
+|| SWT.CHECK	|| http://www.developer.com/img/articles/2004/03/25/image_06.gif || 체크박스 ||
+|| SWT.PUSH		|| http://www.developer.com/img/articles/2004/03/25/image_07.gif || 푸쉬버튼 ||
+|| SWT.RADIO	|| http://www.developer.com/img/articles/2004/03/25/image_08.gif || 라디오 버튼 ||
+|| SWT.TOGGLE	|| http://www.developer.com/img/articles/2004/03/25/image_06.gif || 푸쉬버튼과 비슷하지만 버튼을 누르면 이전의 누름버튼은 원상태로 된다. ||
+
+===== slider, scale, progressBar 위젯 =====
+scale는 연속된 범위내에서 특정한 값을 선택하기 위해서 사용하는 위젯이다. 범위는 Scale 클래스의 setMinimum()과 setMaximum()메서드를 이용해서 정할 수 있다. 선택된 값은 getSelection()메서드를 이용하면 된다. scale는 한번에 하나의 값만을 가져올 수 있다.   
+
+http://www.developer.com/img/articles/2004/03/25/figure_06.gif
+
+생성자를 통해서 넘기는 인자를 통하여 다른 모양의 scale와 slider위젯을 생성할 수 있다. slider와 scale를 위해서 사용되는 상수는 아래와 같다.  
+
+|| SWT.HORIZONTAL		|| 수평으로 배치		||
+|| SWT.VERTICAL			|| 수직으로 배치		||
+
+옵션으로 SWT.BORDER 상수를 이용해서 scale주변에 테두리를 만들어 줄수 있다.   
+{{{#!plain
+ final Slider slider =
+   new Slider(shell,SWT.VERTICAL);
+ slider.setMinimum(0);
+ slider.setMaximum(100);
+ slider.setIncrement(5);
+ slider.setPageIncrement(10);
+ slider.setSelection(25);
+ slider.addSelectionListener(
+  new SelectionAdapter()
+  {
+    public void widgetSelected(SelectionEvent e)
+    {
+      System.out.println("Selection:"+
+                          slider.getSelection());
+    }
+  }
+ );
+}}}
+
+ProgressBar 위젯은 Slider, Scale 위젯과 비슷하다. 그러나 선택이 불가능하다. 이것은 어떤 작업의 진척정도를 나타내기 위해서 사용한다. SWT.SMOOTH와 SWT.INTERMINATE 상수를 이용해서 ProgressBar 위젯을 변경할 수 있다.    
+
+===== 텍스트 위젯 =====
+Text 위젯은 텍스트 편집창을 만들기 위해서 사용한다. 필요에 따라서는 하나의 편집창에서 서로 다른 폰트와 색을 동시에 출력하는 기능을 가진 StypleText 위젯을 사용할 수도 있다.. 이 위젯을 사용하면 전경색, 배경색과 폰트를 문자단위로 지정해 줄 수 있다. 
+
+http://www.developer.com/img/articles/2004/03/25/figure_07.gif
+
+다음은 text 편집창을 만드는 예제 코드다. 
+{{{#!plain
+import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.MessageBox;
+import org.eclipse.swt.widgets.Slider;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.widgets.Text;
+
+public class SliderExample {
+     public static void main(String args[])
+      {
+     Display display = new Display();
+     Shell shell = new Shell(display);
+     shell.setLayout( new RowLayout());
+     Text text =
+        new Text(shell, SWT.MULTI|SWT.WRAP);
+     text.setText("Hello world!!");
+     
+     shell.pack();
+     shell.open();
+     while( !shell.isDisposed())
+        {
+          if(!display.readAndDispatch()) 
+          display.sleep();
+        }
+     display.dispose();
+      }
+}
+}}}
+
+===== List 위젯 =====
+List widget은 목록중에서 하나의 원소를 선택할 수 있는 인터페이스르 제공한다. 만약에 요소들중 하나를 선택하게 되면 이벤트 리스너에게 신호를 보내게 된다([wiki:Site_QT QT]의 슬롯,시그널 개념과 비슷하다.). SWT.SINGLE와 SWT.MULTI를 이용해서 단일 혹은 다중 선택이 가능하다. 리스트 위젯은 기본적으로 스크롤이 가능한 위젯임으로 SWT.H_SCROLL과 SWT.V_SCROLL 상수를 이용할 수 있다.
+
+http://www.developer.com/img/articles/2004/03/25/figure_08.gif
+
+{{{#!plain
+ final List list = new List(shell,SWT.MULTI);
+ for (int i = 1; i < 11; i++) 
+ {
+   list.add(i+".)www.korayguclu.de");
+ }
+ list.addSelectionListener(
+   new SelectionAdapter()
+   {
+     public void widgetSelected(SelectionEvent e)
+     {
+       List list = (List) e.getSource();
+       String[] str = list.getSelection();
+       for (int i = 0; i < str.length; i++)
+       {
+         System.out.println("Selection: "+str[i]);
+       }
+     }
+  }
+ );
+}}}
+
+===== Sash 위젯 =====
+Sash 위젯은 여러개의 위젯이 포함되었을 때, 서로의 영역을 변경할 수 있도록 만들어 준다. 마우스를 Sash 경계에 가져가면 좌우 화살표 혹은 상하 화살표로 바뀌면서 영역의 크기를 조정할 수 있도록 만들어준다. 
+
+http://www.developer.com/img/articles/2004/03/25/figure_09.gif
+
+{{{#!plain
+Button button = new Button(shell,SWT.PUSH);
+button.setText("Button0");
+
+Sash sash = new Sash(shell, SWT.VERTICAL);
+
+Button button1 = new Button(shell,SWT.PUSH);
+button1.setText("Button1");
+}}}
+
+==== Composite 위젯 ====
+Composite 위젯은 다른 위젯들을 포함해서 그룹화하고 배열시키기 위한 일종의 Container 위젯이다. 또한 위젯 뿐만 아니라 Composite위젯 클래스 자체를 포함시킬 수도 있다. SWT의 Composite는 Swing의 그것다는 달리 add 메서드를 제공하지 않는다. 대신 생성자를 통해서 필요한 위젯을 배치시켜줘야만 한다. 
+
+그리고 아래 그림에서 처럼 Shell 자체를 포함시킬 수도 있다. 
+
+http://www.developer.com/img/articles/2004/03/25/figure_10.gif
+
+Composite 위젯은 스크롤 가능한 위젯으로 상수 SWT.H_SCROLL 과 SWT.V_SCROLL을 이용해서 스크롤을 추가시킬 수도 있다.
+
+===== Table 위젯 =====
+테이블 위젯은 문자열이나 이미지를 출력하기 위한 위젯이다.
+
+=== 관련 위키 ===
+ 1. [wiki:Site/eclipse 이클립스 미니사이트]
+ 1. [wiki:Site/eclipse/documents/CDT 이클립스에서 C/C++ 개발환경 만들기]
+ 1. [http://dev.eclipse.org/viewcvs/index.cgi/platform-swt-home/dev.html?rev=1.118#snippets 샘플코드1] 
+ 1. [http://www.java2s.com/Code/Java/SWT-JFace-Eclipse/CatalogSWT-JFace-Eclipse.htm 샘플코드2]
+
+
+

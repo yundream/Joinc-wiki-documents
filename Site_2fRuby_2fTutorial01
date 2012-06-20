@@ -1,0 +1,1089 @@
+#title Ruby Tutorial - 루비 언어 기본
+
+[[TableOfContents]]
+== 소개 ==
+책을 사기는 귀찮고, 언어에 대한 기본적인 이해는 있다고 생각되니 Tutorial로 쉽게 언어를 익히는게 좋겠다고 생각 적당한 Tutorial 문서를 찾아서 구글 검색을 해봤더니.. [http://www.troubleshooters.com/codecorn/ruby/basictutorial.htm Ruby Tutorial]이 첫번째로 검색되는군요.
+
+이것 저것 생각하기 귀찮아서 이 문서로 공부 해 보기로 했습니다. 이 문서는 C든 C++, Java, Perl, Python이든 다루어본적이 있어서 언어에 대한 기본적인 이해는 가지고 있다는 가정하에 작성했습니다. 
+
+== 공부 환경 ==
+언제나 그렇듯이 우분투 리눅스(:12)에서 공부를 합니다. 공부하는 지금 (2011년 7월 26일) 우분투 버전이 10.10, Ruby 버전이 1.8.7 이네요.
+{{{#!plain
+$ cat /etc/issue
+Ubuntu 10.10 \n \l
+$ ruby --version
+ruby 1.8.7 (2010-06-23 patchlevel 299) [i686-linux]
+}}}
+설치는 apt-get 이용하면 되겠는데요. 설치돼 있어서 신경쓸 필요도 없네요. 역시 리눅스가 공부하긴 짱이죠.
+
+== Hello World ==
+루비는 Perl(:12), Python(:12)과 interpreted language입니다. 컴파일 과정없이 해석기를 이용해서 즉시 실행하고 그 결과를 확인해 볼 수 있죠. 먼저 hello world를 찍어 봤습니다. 프로그램의 이름은 hello.rb로 했습니다.
+{{{#!plain
+#!/usr/bin/ruby
+print "Hello World\n"
+}}}
+print는 문자열을 표준출력(:12)하기 위해서 사용하는 ruby 내장 함수입니다.
+
+실행 방법은 두 가지 입니다. 첫번째는 ruby를 호출해서 hello.rb를 해석하게 하는 방법이구요. 두번째는 hello.rb에 실행권한을 주는 거죠. 파일에 실행권한이 있으면, shell(:12)은 첫번째 라인에 명시된 프로그램을 호출합니다. 이 경우에 /usr/bin/ruby 를 호출하겠죠.  
+{{{#!plain
+# ruby hello.rb
+
+# chmo +x hello.rb
+# ./hello.rb
+}}}
+
+== 변수 ==
+변수의 사용방법은 다루지 않겠습니다. 문서를 읽다 보면 자연스럽게 접하는 변수들이 많습니다. 굳이 전부 이해하고 넘어갈 필요는 없습니다.
+=== 일반 변수들 ===
+|| $         || 전역 변수                                     ||
+|| @         || 인스턴스 변수 이해하기 쉽게 클래스 멤버 변수  ||
+|| [a-z_]    || 지역 변수                                     ||
+|| [A-Z]     || 상수                                          ||
+
+=== 특수 변수들 ===
+|| $!      || 마지막 에러 메시지                                   ||
+|| $@      || 에러 위치                                            ||
+|| $_      || 가장 최근에 gets로 읽은 문자열                       ||
+|| $.      || 코드의 줄 번호                                       ||
+|| $&      || regexp로 마지막에 매칭된 문자열                      ||
+|| $~      || the last regexp match, as an array of subexpressions ||
+|| $''n''  || n번째로 매칭된 문자열                                ||
+|| $=      || case-insensitivity flag                              ||
+|| $/      || input record separator                               ||
+|| $\      || output record separator                              ||
+|| $0      || 실행 프로그램 이름                                   ||
+|| $*      || 명령 행 인자들                                       ||
+|| $$      || 프로세스 아이디                                      ||
+|| $?      || 최근 실행한 자식 프로세스의 종료 번호                ||
+|| ARGV[n] || n 번째 명령 행 인자                                  ||
+|| $DEBUG  || 디버깅 메시지 -d를 키면 활성화                       ||
+|| $stderr || 표준에러                                             ||
+|| $stdin  || 표준입력                                             ||
+|| $stdout || 표준출력                                             ||
+|| $:      || 스크립트가 로드한 모듈 이름들                        ||
+
+{{{#!plain
+#!/usr/bin/ruby
+
+print "Script Name : ", $0, "\n"
+print "Process ID : ", $$, "\n"
+
+ARGV.each do |a| 
+  print "Argument ", a, "\n"
+end
+
+x = 10
+puts defined? x
+
+$x = 10
+puts defined? x
+}}}
+
+== 루프 ==
+아뭏든 컴퓨터는 단순 반복작업에는 짱입니다. 단순 반복작업에 사용할 수 있는 루프 문입니다. C(:12)나 C++언어에서 사용하는 루프 보다 유연한 문법을 제공합니다. C 같은 언어를 미리 공부했다면, 이런 유연함이 오히려 낯설게 느껴질 수도 있겠네요. 
+{{{#!plain
+#!/usr/bin/ruby
+for ss in 1...10
+  print ss, " Hello\n";
+end
+}}}
+"..."은 범위를 측정하기 위해서 사용한다. 1부터 시작해서 10까지 돌아란 의미가 되겠습니다.
+{{{#!plain
+#! ./
+1 Hello
+2 Hello
+3 Hello
+4 Hello
+5 Hello
+6 Hello
+7 Hello
+8 Hello
+9 Hello
+}}}
+'''주의할 점은 마지막의 10은 포함하지 않는 다는 것.''' 루프를 이용할 때 주의할 점이죠. 그런점에서 보면 C에서 사용하는 for 문이 좀 더 명시적이여서 실수를 줄일 수 있어 보이긴 합니다. C라면 for (ss = 1; ss < 11; ss++) 요렇게 되겠죠.
+
+배열의 순환을 위해서도 사용할 수 있는데요.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+for ss in 0...presidents.length
+	print ss, ": ", presidents[ss], "\n";
+end
+}}}
+배열의 사용은 perl(:12)과 비슷하군요. presiendts.length는 배열 presidents의 크기이겠구요. 아 참고로 ruby는 모든 것이 객체라고 합니다. C 같은 경우 배열은 원시자료형이지만 ruby는 배열도 객체이니, 배열을 다루기 위한 메서드를 사용할 수 있습니다.
+
+배열에 대한 접근은 다른 언어와 마찬가지로 첨자로 접근하면 됩니다. presidents.lengths는 6이 되겠죠. 결국 ss에는 0부터 5가 들어가고, 이 값을 첨자로 해서 배열의 값을 가져옵니다.  
+{{{#!plain
+$ ./loop_for.rb 
+0: Ford
+1: Carter
+2: Reagan
+3: Bush1
+4: Clinton
+5: Bush2
+}}}
+
+배열의 뒤에서 앞으로 순환하려면 ? C 스타일로 아래와 같이 단순하게 (그렇지만 좀 지저분하게) 코드를 만들 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+for ss in 0...presidents.length
+  print ss, ": ", presidents[presidents.length-ss-1],"\n"
+end
+}}}
+하지만 python(:12)과 마찬가지로 음수를 이용해서 역순으로 순환할 수 있습니다. - 1은 배열의 마지막이죠. 그러니 다음과 같이 바꿀 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+for ss in 0...presidents.length
+  print ss, ": ", presidents[-ss-1],"\n"
+end
+}}}
+
+C로 하려면.. 뭐.. 지저분한 ? 증감연산자를 써줘야죠. 
+
+== Iterators and Blocks ==
+Iterator는 순환자로 알려져 있습죠. 데이터를 순환하기 위한 순환객체 정도로 이해하는게 보통입니다. 루비는 배열도 Iterator을 가지고 있습니다. '''.each'''죠.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+presidents.each {|prez| puts prez}
+}}}
+블럭에 쌓인 '''prez'''은 지금 배열의 요소 여기에선 presidents 배열의 요소들이겠죠. 그래서 puts를 이용해서 출력을 한다. 그런 이야기죠. 출력 결과는 아래와 같습니다. 
+{{{#!plain
+Ford
+Carter
+Reagan
+Bush1
+Clinton
+Bush2
+}}}
+
+아래와 같은 사용방법도 있내요
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+presidents.each do
+	|prez|
+	puts prez
+end
+}}}
+쉘 스크립트의 do done 느낌을 받습니다.
+
+개인적으로 do/end를 사용한게 명료해 보입니다. C/C++/Perl/Bash를 사용해 왔기 때문인듯. "|"를 이용한 것은 눈에 꽂히질 않네요.
+
+{{{#!plain
+i=-100
+puts "Before i : "+i.to_s
+(1...10).each{|i| puts i}
+puts "After i :"+i.to_s
+}}}
+음.. 모든걸 객체로 다룬다더니 이런 것도 가능합니다 그려. (1...10)이런 것도 객체로 다룰 수 있네요. 그리고 변수 i를 미리 선언했는데요. 이렇게 하면 성능에서 이득을 얻을 수 있다네요. 미리 선언하지 않을 경우, Iterator는 모든 사이클에서 변수를 만들기 때문이라고 합니다.  정말 성능향상이 있는 건지 알 수 없지만, 사용할 변수를 미리 선언한다고 손해볼 건 없으니 선언후 사용하렵니다.
+{{{#!plain
+Before: -99
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+After : 10
+}}}
+
+== {}과 do/end의 차이 ==
+요것 {} 과 do/end 요것 사이에 차이가 있다고 하네요. 음.
+{{{#!plain
+#!/usr/bin/ruby
+my_array = ["alpha", "beta", "gamma"]
+puts my_array.collect {
+    |word|
+    word.capitalize
+}
+puts "======================"
+puts my_array.collect do
+    |word|
+    word.capitalize
+end
+}}}
+.capitalize는 문자열의 첫 번째 글자를 대문자로 변환해 줍니다. 실행했더니
+{{{#!plain
+Alpha
+Beta
+Gamma
+======================
+alpha
+beta
+gamma
+}}}
+차이가 있군요.
+
+{} 는 Iterator의 결과를 적용한다고 합니다. do/end를 사용하면 Iterator에만 적용을 한다고 합니다. 
+
+Iterator에 적용한 결과를 new_array에 복사하도록 수정했습니다.
+{{{#!plain
+my_array = ["alpha", "beta", "gamma"]
+puts my_array.collect {
+    |word|
+    word.capitalize
+}
+puts "======================"
+new_array = my_array.collect do
+    |word|
+    word.capitalize
+end
+}}}
+{{{#!plain
+Alpha
+Beta
+Gamma
+======================
+Alpha
+Beta
+Gamma
+}}}
+음.. 그래서 iterator의 수행 결과를 직접 적용하려면 {}를 적용한 결과를 따로 저장하려면 do/end를 사용하는게 더 나을 까요 ? 라는 생각이
+
+== while Loop ==
+while이라면 너무 친숙하다. C/C++/perl/bash/python을 비롯한 모든 언어에서 지원하는 그 while 이겠지. 
+{{{#!plain
+ss = 4
+while ss > 0
+  puts ss
+  ss -= 1
+end
+}}}
+더 이상 설명할 필요 없을 듯.
+
+== Branching ==
+루프는 흐름을 제어합니다 . 흐름을 제어하기 위한 또다른 장치는 branching이 있습니다. branching는 음 가지치기 정도로 번역할 수 있을 것 같은데, 흐름을 분기 하기 위한 방편으로 사용합니다.
+
+{{{#!plain
+}}}
+
+== Containers ==
+컨테이너는 데이터를 보관하기 위한 객체의 총칭입니다. C++의 STL(:12) 컨테이너들이 그것이죠. vector(:12), list(:12), map(:12), set(:12)등입니다. 자료구조를 일반화 한 거라고 생각해도 되겠네요. 
+
+루비는 배열, hash 두개의 기본 컨테이너를 제공합니다. 
+
+=== 배열 - Array ===
+배열 이젠 헷갈린다. perl, python, ruby 비슷한듯 하면서도 차이가 있어서..
+
+ruby는 배열객체다. 그래서 몇가지 메서드들만 알면 쉽게 배열을 조작할 수 있습니다. 
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+last = presidents.pop
+presidents.pop
+presidents.pop
+presidents.each { |i| print i, "\n"}
+puts "==========="
+print "Last : ",last,"\n"
+}}}
+'''pop''' 메서드는 배열의 마지막 원소를 꺼낼 때 사용한다. pop을 세번 호출했으니 뒤의 3개 원소가 삭제되겠죠. pop으로 꺼낸 원소는 변수로 저장할 도 있습니다. 
+{{{#!plain
+Ford
+Carter
+Reagan
+===========
+Last : Bush2
+}}}
+
+unshift를 이용하면 고정크기의 queue(:12)에 원소를 집어 넣는 작업을 할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+presidents.pop
+presidents.pop
+presidents.pop
+presidents.unshift("Nixon")
+presidents.unshift("Johnson")
+presidents.unshift("Kennedy")
+presidents.each { |i| print i, "\n"}
+}}}
+unshift를 하면 첫번째 배열로 값이 들어가고, 뒤의 모든 배열들은 하나씩 밀립니다 . 크기가 고정돼 있기 때문에 마지막 배열의 원소는 배열에서 제거되겠죠. 
+
+그러니 아래와 같은 결과가 나옵니다. 
+{{{#!plain
+Kennedy
+Johnson
+Nixon
+Ford
+Carter
+Reagan
+}}}
+
+이렇게 해도 되요.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+presidents.pop
+presidents.pop
+presidents.pop
+presidents.unshift("Kennedy", "Johnson", "Nixon")
+presidents.each { |i| print i, "\n"}
+}}}
+
+이 외에 아래의 메서드를 지원합니다. 필요에 따라서 적절히 사용하세요.
+|| 메서드   || 설명                             || 매개변수  || 반환 값                ||
+|| push     || 배열의 끝에 원소 추가            || 원소      || 배열의 모든 원소 출력  ||
+|| pop      || 배열의 마지막 원소 꺼내고 삭제함 || 없음      || 마지막 원소              ||
+|| shift    || pop의 반대, 배열의 첫번째 원소를 꺼냄 뒤의 모든 원소들은 앞으로 이동 || 없음  || 첫번째 원소  ||
+|| unshift  || 배열의 첫번째에 원소를 추가  모든 원소들은 뒤로 이동, 마지막 원소 삭제 || 원소 || 배열의 모든 원소 ||
+
+다른 인터프리터 언어들이 그렇듯이 배열은 자유롭게 조작할 수 있습니다. C/C++에서는 이래 저래 제약이 심하죠.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = []
+presidents[2] = "Adams"
+presidents[4] = "Madison"
+presidents[6] = "Adams"
+presidents.each {|i| print i, "\n"}
+print "=======================\n"
+presidents[6] = "John Quincy Adams"
+presidents.each {|i| print i, "\n"}
+print "\n"
+}}}
+배열의 원소는 순서에 관계없이 자유롭게 삽입이 가능합니다. 자유롭게 삽입할 경우 배열에 빈곳이 생길 건데, 이경우 nil로 초기화 해줍니다. nil은 사람이름이 아니고 null의 다른 이름입니다.
+{{{#!plain
+nil
+nil
+Adams
+nil
+Madison
+nil
+Adams
+=======================
+nil
+nil
+Adams
+nil
+Madison
+nil
+John Quincy Adams
+}}}
+
+배열의 일부를 다른 배열로 복사하는 코드입니다. 
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+p123=presidents[1..3]
+p123.each { |i| print i, "\n"}
+}}}
+
+대략 감이 잡힐 겁니다. presidents 배열의 1,2,3 원소를 p123에 복사하라는 명령입니다. "..."은 범위를 의미합니다.
+{{{#!plain
+Carter
+Reagan
+Bush1
+}}}
+
+"..."은 점을 무려 3개나 찍어야 합니다. 이게 귀찮다면 ","를 써도 됩니다.
+{{{#!plain
+#!/usr/bin/ruby
+presidents = ["Ford", "Carter", "Reagan", "Bush1", "Clinton", "Bush2"]
+p123=presidents[1,3]
+p123.each { |i| print i, "\n"}
+}}}
+
+자유로운 배열 조작을 이용해서 배열의 일부를 치환하는 코드도 간단히 만들 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+numbers = ["one", "two", "3", "4", "5", "seven"]
+numbers.each { |i| print i, "\n"}
+print "=====================\n"
+numbers[2,3]=["three", "four", "five", "six"]
+numbers.each { |i| print i, "\n"}
+}}}
+number에는 one, two, 3, 4, 5, seven의 원소가 들어가 있다. 3, 4, 5를 three, four, five로 치환하는 코드다. 참 쉽다. 
+
+아래는 배열의 중간에 추가하는 코드입니다. 
+{{{#!plain
+#!/usr/bin/ruby
+numbers = ["one", "two", "five"]
+numbers.each { |i| print i, "\n"}
+print "=====================\n"
+numbers[2,0]=["three", "four"]
+numbers.each { |i| print i, "\n"}
+}}}
+
+치환이 아닌 삽입임.
+{{{#!plain
+one
+two
+five
+=====================
+one
+two
+three
+four
+five
+}}}
+
+괄호를 이용한 범위를 배열에 입력할 수도 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+myArray = (0..9)
+myArray.each{|i| puts i}
+}}}
+
+중요한 것은 이러 이러하게 사용할 수 있다는게 아닙니다. 자유스럽게 사용할 수 있다는 게 중요하죠. 상상력을 발휘하세요.
+{{{#!html
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+}}}
+
+루비는 모든 것을 객체로 다룹니다. 배열도 마찬가지구요. 그래서 아래와 같은 코드를 만들 수 있습니다. 객체를 직접 만듦으로서 좀 더 객체지향적으로 보이는 코드입니다.
+{{{#!plain
+numbers = Array.new
+numbers[3] = "Three";
+numbers[4] = nil
+
+print "Class =", numbers.class,"\n"
+print "Length = ", numbers.length, "\n"
+numbers.each{ |i| print i, "\n"}
+}}}
+
+=== Hash ===
+Python은 hash를 원시 자료형으로 지원합니다. hash는 {key=>value}의 쌍으로 이루어지는 자료구조인데, 배열과는 달리 문자열 객체를 사용할 수 있죠. 문자열 뿐만 아니라 다른 객체들도 사용할 수 있을 겁니다. 아마도 ?. 이건 확인을 해봐야 할것 같습니다. 
+
+Hash 사용은 간단합니다. PHP, Perl, Python.. 언어를 막론하고 Hash 사용방법이 대동소이하거든요.
+{{{#!plain
+litt = {"lname"=>"Litt", "fname"=>"Steve", "ssno"=>"123456789"}
+print "Lastname              : ", litt["lname"], "\n"
+print "Firstname             : ", litt["fname"], "\n"
+print "Social Security Number: ", litt["ssno"], "\n"
+print "\n"
+litt["gender"] = "male"
+litt["ssno"] = "987654321"
+print "Corrected Social Security Number: ", litt["ssno"], "\n"
+print "Gender                          : ", litt["gender"], "\n"
+print "\n"
+print "Hash length is ", litt.length, "\n"
+print "Hash class  is ", litt.class, "\n"
+}}}
+ 
+{{{#!plain
+Lastname              : Litt
+Firstname             : Steve 
+Social Security Number: 123456789
+
+Corrected Social Security Number: 987654321
+Gender                          : male
+
+Hash length is 4
+Hash class  is Hash
+}}}
+
+위의 hash는 개인의 정보를 저장합니다. 아주 간단한 데이터베이스라고 할 수 있을 건데요. 데이터베이스라고 하기엔 좀 미안하죠. 데이터 베이스라면 여러개의 레코드를 저장할 수 있어야 하겠죠. '''hash의 hash'''를 이용하면 좀더 그럴듯한 데이터베이스를 만들 수 있을 겁니다. 
+
+{{{#!plain
+people = {
+  "torvalds"=>{"lname"=>"Torvalds", "fname"=>"Linus", "job"=>"maintainer"},
+  "matsumoto"=>{"lname"=>"Matsumoto", "fname"=>"Yukihiro", "job"=>"Ruby originator"},
+  "litt"=>{"lname"=>"Litt", "fname"=>"Steve", "job"=>"troubleshooter"}
+  }
+
+keys = people.keys
+
+for key in 0...keys.length
+  print "key  : ", keys[key], "\n"
+  print "lname: ", people[keys[key]]["lname"], "\n"
+  print "fname: ", people[keys[key]]["fname"], "\n"
+  print "job  : ", people[keys[key]]["job"], "\n"
+  print "\n\n"
+end
+}}}
+이름을 key로 하고, value를 hash로 했습니다. 이렇게 해서 여러 개의 레코드를 가지는 데이터베이스 프로그램을 만들었습니다. 사용하기 편하기는 한데.. 음.. C의 구조체 처럼 좀 명시적으로 코드를 만들면 어떨까라는 생각이 드네요. value가 객체가 되도 상관 없을 려나.. 한번 테스트를 해보기로 했습니다. 
+{{{#!plain
+class Person
+  attr_accessor :lname, :fname, :job
+  def initialize(alname, afname, ajob)
+    @lname =alname
+    @fname =afname
+    @job = ajob
+  end
+end
+
+people = Hash.new 
+people["torvalds"] = Person.new("torvalds","Linus", "maintainer")
+keys = people.keys
+
+for key in 0...keys.length
+  print "key      : ", keys[key], "\n"
+  print "lname  : ", people[keys[key]].fname, "\n"
+  print "Job      : ", people[keys[key]].job, "\n"
+  print "\n\n"
+end
+}}}
+네, 당연히 잘 되네요. hash의 hash보다 훨씬 보기가 좋습니다. 실수할 가능성도 줄어들고요.
+
+=== Hash 정렬 ===
+hash는 key 혹은 value를 가지고 정렬할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby -w 
+
+h = Hash.new
+h['size'] = 'big'
+h['color'] = 'reg'
+h['brand'] = 'ford'
+
+av = h.sort{|a,b| a[1] <=> b[1]}
+ak = h.sort{|a,b| a[0] <=> b[0]}
+
+ak.each do
+  |pair|
+  print pair[0], "=>", pair[1]
+  puts
+end
+
+puts "==================="
+
+av.each do
+  |pair|
+  print pair[0], "=>", pair[1]
+  puts
+end
+}}}
+음.. 굉장히 간단한거 같지만 왠지 헛갈립니다. sort는 개발자가 함수를 정의해서 사용합니다. C++의 STL(:12)에서 map 이나 set 같은 컨테이너에 대한 경험이 있다면, 쉽게 이해 하실 수 있을 겁니다. 여기에 들어가는 함수는 결국 비교 연산입니다. 여기에서는 두 개의 매개 면수 a와 b를 비교하고 있습니다. '''av'''는 a[1]과 b[1]을 비교하고 있는데요. 즉 value를 가지고 비교를 하겠다 그런의미가 되겠습니다. 비교를 해서 a가 더크면 1, b가 더 크면 -1 같으면 0을 반환합니다. ruby는 이 반환값을 이용해서 정렬합니다.
+
+사용자 정의 함수를 넣을 수 있을 건데, 그 방법은 아직 모르겠구요. 나중에 찾게 되면 테스트해보고 적을 생각입니다.
+
+=== Hash 내용을 확인하고 테스트 하기 ===
+  * has_key? : hah.has_key?(key) -> true 혹은 false 
+    hsh에 key가 있으면 true를 반환한다.
+  * has_value? : hah.has_value?(value) -> true 혹은 false
+    hah에 value가 '''value'''인 원소가 있으면 true를 반환한다.
+  * empty?: hah.empty? -> true 혹은 false 
+    hah가 비어 있으면 true를 반환한다. 
+  * index : hah.index(value) -> hah의 key
+    value를 가진 hah의 key를 반환한다. 만약 존재하지 않으면 기본 값을 반환한다. 
+  * invert : hah.invert 
+    hah의 key와 value를 서로 바꾼다.
+  * length : hah.length
+    hah의 원소 (key/value 쌍)의 개수를 반환한다.
+
+== string ==
+Ruby는 문자열을 string이라는 객체로 다룹니다. C로 말하자면 원시자료형의 하나로 지원한다고 하면 될것 같네요. 무진장 많은 메서드들을 다룬다고 하는데, 지금은 주요한 메서드들과 특징을 살펴볼 생각입니다. 나중에 string도 따로 다뤄야지
+{{{#!plain
+#!/usr/bin/ruby
+
+myname = "yundream"
+myname_cpy = myname
+
+myname_copy = myname
+print "myname      = ", myname, "\n"
+print "myname_copy = ", myname_copy, "\n"
+print "\n=========================\n"
+myname << "t"
+print "myname      = ", myname, "\n"
+print "myname_copy = ", myname_copy, "\n"
+}}}
+
+결과를 보면 좀 헛갈릴 수 있을 것 같네요. string 대입은 value의 복사가아닌 레퍼런스 복사이기 때문에, 두개 변수 모두 값이 변한다. c++의 string을 사용하던 입장에서 헛갈릴 수 있을 듯. 
+
+레퍼런스가 아닌 독립된 두 개의 객체로 다루기 위해서는 String.new를 이용해야 한다. 
+{{{#!plain
+#!/usr/bin/ruby
+myname = "Steve Lit"
+myname_copy = String.new(myname)
+print "myname      = ", myname, "\n"
+print "myname_copy = ", myname_copy, "\n"
+print "\n=========================\n"
+myname << "t"
+print "myname      = ", myname, "\n"
+print "myname_copy = ", myname_copy, "\n"
+}}}
+
+{{{#!plain
+myname      = Steve Lit
+myname_copy = Steve Lit
+
+=========================
+myname      = Steve Litt
+myname_copy = Steve Lit
+[slitt@mydesk slitt]$
+}}}
+
+문자열 치환도 쉽습니다.
+{{{#!plain
+#!/usr/bin/ruby
+myname = "Steve was here"
+print myname[6, 3], "\n"
+myname[6, 3] = "is"
+print myname, "\n"
+}}}
+
+{{{#!plain
+was
+Steve is here
+}}}
+
+문자열을 제어하는 프로그램에서 문자열 치환은 문자열을 찾은 다음 변경하는 방식으로 이루어지죠. c++의 string이라면 다음의 방법을 따를겁니다. 
+  1. 먼저 find 메서드를 이용해서 문자열의 위치를 찾아야 겠죠. 
+  1. replace메서드를 이용해서 문자열을 대체하겠죠. 
+ruby라고 해서 다를 건 없습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+myname = "Steve was here"
+puts myname
+
+nidle = "was"
+start_pos = myname.index(nidle)
+myname[start_pos, nidle.length] = "is"
+puts myname
+}}}
+
+물론 문자열끼리의 + 연산도 되고요.
+{{{#!plain
+#!/usr/bin/ruby
+
+myname = "My"+" "+"name" + " " + "is" + " " + "yundream"
+puts myname
+}}}
+
+'''*'''연산도 됩니다.
+{{{#!plain
+#!/usr/bin/ruby
+mystring = "Cool " * 3
+print mystring, "\n"
+}}}
+결과는 다음과 같습니다.
+{{{#!plain
+Cool Cool Cool
+}}}
+
+c의 printf 계열 함수에서 지원하는 형식화된 출력도 지원합니다. C를 사용한다면 쉽게 사용할 수 있을 것 같네요.
+{{{#!plain
+mystring = "There are %6d people in %s " % [1500, "the Grand Ballroom"]
+puts mystring
+}}}
+
+문자열 비교도 가능합니다.
+{{{#!plain
+print "frank" <=> "frank", "\n"
+print "frank" <=> "fred", "\n"
+print "frank" <=> "FRANK", "\n"
+}}}
+
+{{{#!plain
+0
+-1
+1
+}}}
+같으면 0, 작으면 -1, 크면 1입니다.
+
+기타 string과 관련된 주요 메서드들 입니다.
+|| string.capitalize            || 문자열의 첫번째 문자를 대문자로 변경합니다.                     ||
+|| string.chomp                 || 문자열 마지막의 CR LF 문자를 삭제한 문자열을 반환 합니다.       ||
+|| string.index(substr)         || substr이 처음 발견된 위치                    ||
+|| string.rindex(substr)        || substr이 마지막 발견된 위치                  ||
+|| string.reverse               || 문자열을 뒤집습니다.                         ||
+|| string.split(pattern, limit) || pattern으로 문자열을 나눠서 배열로 만듭니다. ||
+|| string.upcase                || 문자열의 모든 문자를 대문자로 변환합니다.    ||
+|| string.downcase              || 문자열의 모든 문자를 소문자로 변환합니다.    ||
+|| string.strip                 || 문자열의 처음과 마지막의 공백문자 CR RF를 삭제합니다. ||
+|| string.to_f                  || 문자열을 부동 소숫점 숫자로 변환                      ||
+|| string.to_i                  || 문자열을 정수로 변환                                  ||
+chomp, reverse, upcase, downcase 메서드는 각각 chmop!, reverse!, upcase!, downcase! 메서드가 존재합니다. !이 붙으면 string을 직접 변경합니다. 
+
+배열에 있는 문자열들을 join 하는 연산도 할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+mystring=""
+presidents = ["reagan", "bush1", "clinton", "bush2"]
+presidents.each {|i| mystring << i+","}
+mystring.strip
+print mystring, "\n"
+}}}
+
+{{{#!plain
+reagan,bush1,clinton,bush2, 
+}}}
+결과는 썩 마음에 들지 않네요. 마지막에 ,이 붙었기 때문입니다. array.length -1 만큼 루프를 돌면 되겠죠 모. 
+
+== 정규표현 ==
+정규표현은 썩 눈에 잘 들어오는 모습은 아닙니다. 하지만 일단 정규표현(:12)을 익히고 나면, 정규표현 없이 어떻게 문자 데이터를 처리해왔나라는 생각이 들게 마련이죠. 여기에서는 정규표현식에 대한 내용은 다루지 않을 겁니다. 정규표현 관련 내용은 [wiki:man/12/정규표현 링크]를 참고하세요. 정규표현은 언어를 막론하고 대략 비슷하니까 한번 익혀 놓으면 두고두고 써먹을 수 있을 겁니다. 특히 Perl을 주로 사용해왔다면 쉽게 사용할 수 있을 겁니다.
+
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "Steve was here"
+print "find pattern : e.*e\n" if string1 =~ /e.*e/
+print "find pattern : Sh.*e\n" if string1 =~ /Sh.*e/
+}}}
+간단히 설명하자면 "e다음에 아무 문자가 하나이상 오고 그다음에 e가 오면 만족하는 패턴"입니다. ee, e123e, eabce 뭐 이런 패턴을 만족하죠. 
+
+문자열 패턴을 찾아서 조건을 분기해서 처리하는 일반적인 방법입니다.
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "I will drill for a well in walla walla washington."
+if string1 =~ /(w.ll)/
+    print "Matched on ", $1, "\n"
+else
+    puts "NO MATCH"
+end
+}}}
+일치된 패턴을 가진 문자열은 $1, $2... $n으로 가져올 수 있습니다.
+{{{#!plain
+Matched on will
+}}}
+
+정규표현을 객체로 다룰 수도 있습니다. 이렇게 하면 OOP(:12)적인 코드를 만들 수 있겠죠.
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "I will drill for a well in walla walla washington."
+regex = Regexp.new(/w.ll/)
+matchdata = regex.match(string1)
+if matchdata
+  puts matchdata[0]
+  puts matchdata[1]
+else
+  puts "NO MATCH"
+end
+}}}
+Regexp 객체를 이용하면 됩니다. 매개 변수로 정규표현식을 주면 되고요. 그다음 match 메서드를 이용해서 문자열에 정규표현식을 적용하면 됩니다.
+
+위 코드는 그리 깔끔하지 않습니다. 매칭된 문자열의 개수만큼 루프를 돌면서 출력하는게 낫겠죠. for 루프를 이용해서 코드를 다듬어봤습니다. 그리고 정규표현식도 좀 다양하게 해봤습니다. 정규표현식에 대한 설명은 생략.  
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "I will drill for a well in walla walla washington."
+regex = Regexp.new(/(w.ll).*(in).*(w.ll)/)
+matchdata = regex.match(string1)
+if matchdata
+	for ss in 0...matchdata.length
+		puts matchdata[ss]
+	end
+else
+	puts "NO MATCH"
+end
+}}}
+{{{#!plain
+will drill for a well in walla wall
+will
+in
+wall
+}}}
+배열의 0번째 값은 매턴매칭된 문자열입니다. 1, 2, 3은 각각 괄호에 매칭된 값들이죠. 
+
+/w.ll/에 매칭되는 모든 문자열을 가져오고 싶다면 아래와 같이 하면 됩니다. perl(:12) 정규표현식으로 하자면 /w.ll/g 정도가 되겠죠. 
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "I will drill for a well in walla walla washington."
+regex = Regexp.new(/w.ll/)
+matchdata = regex.match(string1)
+while matchdata != nil 
+  puts matchdata[0]
+  string1 = matchdata.post_match
+  matchdata = regex.match(string1)
+end
+}}}
+post_match 메서드를 이용해서 다음 매칭되는 패턴 문자열을 찾는 방식이군요.
+
+=== 치환 ===
+루비는 gsub메서드로 치환을 할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+string1 = "I will drill for a well in walla walla washington."
+string1.gsub!(/(w.ll)/){$1.upcase}
+puts string1
+}}}
+위코드는 string1에서 패턴에 일치하는 문자열을 대문자로 바꿉니다.
+{{{#!plain
+I WILL drill for a WELL in WALLa WALLa washington.
+}}}
+
+아 귀찮다. 치환은 천천히 알아봐야지.
+
+== 서브루틴 ==
+서브루틴은 '''def'''로 시작하며 '''end'''로 끝납니다. python과 비슷하네요. return 키워드를 이용해서 값을 반환할 수 있고요. 서브루틴에서 선언되는 변수들은 모두 지역변수입니다.
+{{{#!plain
+#!/usr/bin/ruby
+def passback
+	howIfeel="good"
+	return howIfeel
+end
+
+howIfeel="excellent"
+puts howIfeel
+mystring = passback
+puts howIfeel
+puts mystring
+}}}
+지역변수에 대해서는 굳이 설명하지 않겠습니다.
+
+보통 서브루틴은 매개 변수를 가지죠. 매개 변수는 다른 언어들과 마찬가지로 괄호로 정의하면 됩니다.
+{{{#!plain
+#!/usr/bin/ruby
+def mult(one, two)
+  return one * two
+end
+
+num1 = 4
+num2 = 5
+result = mult(4, 5)
+
+print "num1 is ", num1, "\n"
+print "num2 is ", num2, "\n"
+print "result is ", result, "\n"
+}}}
+
+== 예외 ==
+C에서 에러 핸들은 함수의 반환 값을 검사하는 방식으로 이루어집니다. 이 방식으로 에러처리하는 것은 복잡다단하기 때문에 왠만큼 부지런하지 않고서는 모든 부분에 대한 에러 처리가 쉽지가 않습니다. 당연히 코드의 견고함이 떨어지게 되구요.  
+
+현대적인 언어들은 '''예외'''로 에러를 처리하는 방법을 사용합니다. 루비역시 마찬가지입니다. 
+
+예외 처리에는 두 가지 방법이 있는데요. '''handle an exception'''과 '''raise an exception'''입니다. 루비에서 제공하는 대부분의 시스템 호출은 예외를 발생하는 데요. 이것이 handle an exception입니다. 이 외에 프로그래머가 직접 예외를 발생할 수도 있는데요 이걸 rasie an exception 이라고 합니다.  
+
+다음은 handle an excepiton 처리의 일반적인 방법입니다.
+{{{#!plain
+#!/usr/bin/ruby
+begin
+	input = File.new("/etc/resolv.conf", "r")
+rescue 
+	print "Failed to open /etc/fstab for input. ", $!, "\n"
+end	
+input.each {
+	|i|
+	puts i;
+	}
+input.close()
+}}}
+begin 영역에 평가하려는 코드를 둡니다. 이 영역에서 예외가 발생하면 rescue 영역의 코드가 실행이 되죠. rescue 영역에는 적절한 에러 처리 코드를 두면 됩니다.
+
+위 코드는 아마 제대로 실행될겁니다. 존재하지 않는 파일을 열려고 하면 다음과 같이 에외 코드를 실행할 겁니다.
+{{{#!plain
+Failed to open /etc/fstab for input. No such file or directory - /etc/resolX.conf
+./hello.rb:7: undefined method `each' for nil:NilClass (NoMethodError)
+}}}
+
+루비는 예외도 객체로 다루며, 상황에 따라 다양한 종류의 예외를 준비하고 있습니다. 다음은 주요 예외들입니다.  
+  * ArgumentError
+  * IndexError
+  * Interrupt
+  * LoadError
+  * NameError
+  * NoMemoryError
+  * NoMethodError
+  * NotImplementedError
+  * RangeError
+  * RuntimeError
+  * ScriptError
+  * SecurityError
+  * SignalException
+  * StandardError
+  * SyntaxError
+  * SystemCallError
+  * SystemExit
+  * TypeError
+
+예외 처리를 위한 일반적인 코드는 다음과 같습니다.
+{{{#!plain
+begin
+	# 여기에 평가하고자 하는 코드를 둡니다. 
+rescue SyntaxError => mySyntaxError
+	print "Unknown syntax error. ", mySyntaxError, "\n"
+	# 에러를 처리하기 위한 코드를 둡니다. 
+rescue StandardError => myStandardError
+	print "Unknown general error. ", myStandardError, "\n"
+	# 에러를 처리하기 위한 코드를 둡니다. 
+else
+	# 에러가 발생할 경우에 실행하는 코드입니다. 
+ensure
+	# 에러가 발생하지 않았을 때 실행하는 코드입니다. 
+end
+}}}
+다음은 루비에서 제공하는 예외의 모든 계층 구조를 보여주는 그림입니다.
+
+http://rubyonrailsthrissur.files.wordpress.com/2011/06/exception.png?w=495&h=596
+
+=== Raising an exception ===
+프로그램을 만들다 보면, 운영체제(:12)가 감지할 수 없는 에러가 발생하기도 합니다. 이런 경우에는 프로그래머가 직접 예외를 발생해야 합니다. 65세 이상 노인을 대상으로 하는 의료보험 서비스 프로그램을 만든다고 가정을 해보겠습니다. 만약 65세 미만의 사람이 의료보험 서비스를 이용하려고 한다면, 이 프로그램을 에러를 발생해야 할겁니다. 이런 예외는 운영체제가 알 수 없으므로, 프로그래머가 다음과 같이 예외를 발생해야 합니다.   
+
+{{{#!plain
+#!/usr/bin/ruby
+age = 18
+raise if age < 66
+print "Age is ", age, ". This happens after the exception was raised\n"
+}}}
+실행결과는 다음과 같습니다.
+{{{#!plain
+./hello.rb:3: unhandled exception
+}}}
+
+처리하지 않은 예외가 발생했다는 메시지가 나오는 군요. 처리를 해줍시다. 
+{{{#!plain
+#!/usr/bin/ruby
+age = 18
+raise "Must be 65 or older for Medicare." if age < 66
+print "Age is ", age, ". This happens after the exception was raised\n"
+}}}
+{{{#!plain
+./hello.rb:3: Must be 65 or older for Medicare. (RuntimeError)
+}}}
+
+처음 코드 보다 낫긴하지만 RuntimeError이라고 하니, 어떤 종류의 에러인지가 명확하지 않습니다. RangeError 예외를 발생하도록 하면 에러의 종류가 좀 더 명확해지겠죠.
+{{{#!plain
+#!/usr/bin/ruby
+age = 18
+raise RangeError, "Must be 65 or older for Medicare", caller if age < 66
+print "Age is ", age, ". This happens after the exception was raised\n"
+}}}
+예외 객체 명만으로도 입력범위에 오류가 생겼음을 쉽게 알 수 있습니다.
+{{{#!plain
+./hello.rb:3: Must be 65 or older for Medicare (RangeError)
+}}}
+'''어떤 종류의 에러가 발생했는지 한눈에 파악하도록 하라''' 에러 처리의 핵심이죠.
+
+에러를 처리하는 가장 좋은 방법은 애플리케이션의 특성에 맞추어 예외 클래스를 제작해서 사용하는 겁니다. 
+{{{#!plain
+#!/usr/bin/ruby
+class MedicareEligibilityException < RuntimeError
+end
+
+age = 18
+raise MedicareEligibilityException , "Must be 65 or older for Medicare", caller if age < 66
+print "Age is ", age, ". This happens after the exception was raised\n"
+}}}
+{{{#!plain
+./hello.rb:6: Must be 65 or older for Medicare (MedicareEligibilityException)
+}}}
+
+이제 본격적으로 예외 처리를 위한 클래스를 만들어서 프로그램에 적용해 보겠습니다. 이 프로그램은 의료보험을 받으려는 사용자의 데이터 베이스를 유지합니다. 이름과 나이 인데요. 이름과 나이를 받아서 의료보험 대상인지를 처리를 하죠. 나이가 66세 미만이면, 예외 처리를 하는데요. 이때, 예외 클래스는 예외가 발생한 사용자 데이터를 넘겨 받습니다. 그럼 어떤 사용자를 처리하다가 에러가 발생했는지 확인할 수 있죠. 필요하다면 log 파일 형식으로 남길 수도 있을 겁니다. 
+
+{{{#!plain
+#!/usr/bin/ruby
+class MedicareEligibilityException < RuntimeError
+    def initialize(name, age)
+        @name = name
+        @age = age
+    end
+    def getName
+        return @name
+    end
+    def getAge
+        return @age
+    end
+end
+
+def writeToDatabase(name, age)
+    # This is a stub routine
+    print "Diagnostic: ", name, ", age ", age, " is signed up.\n"
+end
+
+def signHimUp(name, age)
+    # 65세 이상이면 데이터 베이스에 쓴다.
+    if age >= 65
+        writeToDatabase(name, age)
+    else
+        # 그렇지 않으면 예외를 발생한다.
+        myException = MedicareEligibilityException.new(name, age)
+        raise myException , "Must be 65 or older for Medicare", caller
+    end
+end
+
+# Main routine
+begin
+    signHimUp("Oliver Oldster", 78)
+    signHimUp("Billy Boywonder", 18)
+    signHimUp("Cindy Centurinarian", 100)
+    signHimUp("Bob Baby", 2)
+
+rescue MedicareEligibilityException => elg
+    print elg.getName, " is ", elg.getAge, ", which is too young.\n"
+    print "You must obtain an exception from your supervisor. ", elg, "\n"
+
+end
+
+print "This happens after signHimUp was called.\n"
+}}}
+
+== 터미널 입출력 ==
+터미널 입출력은 표준입력(:12), 표준에러(:12), 표준출력(:12) 제어와 관련된 것들이다. 표준출력은 print와 puts 를 이용하면 된다.
+{{{#!plain
+print "This is the first half of Line 1. "
+print "This is the second half.", "\n"
+puts "This is line 2, no newline necessary."
+}}}
+print는 문자열을 그대로 출력하는 반면 puts는 개행문자를 붙여서 출력한다는 점이 다르다.
+
+C의 printf(:3) 함수와 비슷한 일을 하는 printf를 제공한다.
+{{{#!plain
+#!/usr/bin/ruby
+printf "There were %7d people at the %s.\n", 439, "Avalanche Auditorium"
+}}}
+
+입력은 gets 함수를 이용하면 된다.
+{{{#!plain
+#!/usr/bin/ruby
+print "Name please=>"
+name = gets
+print "Your name is ", name, "\n"
+}}}
+
+== 파일 입출력 ==
+파일 입출력은 파일 객체를 이용합니다. 사용방법은 아주 단순합니다. 사실 파일관련 작업이야 파일 열고,읽고,쓰고,파일 닫고 하는 것을 기본으로 하니 복잡할리가 없긴 하겠지만 C(:12)언어에서 파일 입출력은 그리 쉽다고 말하기가 그렇거둔요. 루비는 파일 입출력 작업을 위한 추상화된 객체를 제공하니 훨씬 수월하게 파일 작업을 할 수 있습니다.
+
+파일 관련 루비 인터페이스를 보니 저수준의 인터페이스가 있던데, 여기에서는 파일 객체를 이용한 것으로 공부해보려 합니다.
+
+파일을 복사하는 간단한 프로그램입니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+if ARGV.length != 2
+  print "Usage : ",$0," [src file] [dest file]\n"
+  exit(1)
+end
+
+srcfile = ARGV[0]
+destfile = ARGV[1]
+
+if srcfile == destfile
+  puts "src file == dest file"
+  exit(1)
+end
+
+infile = File.new(srcfile, "r")
+outfile = File.new(destfile, "w")
+
+infile.each {
+  |i| 
+  outfile.write i
+}
+
+infile.close()
+outfile.close()
+}}}
+지극히 C 스타일의 코드입니다만 파일 입출력 방식은 잘 보여주고 있습니다.
+
+한 바이트씩 읽을 때는 아래와 같이 하면 됩니다.
+{{{#!plain
+#!/usr/bin/ruby
+infile = File.new("/etc/resolv.conf", "r")
+until infile.eof
+	i = infile.readchar
+	if i.chr == "e"
+		print("!")
+	else
+		print(i.chr)
+	end
+end
+infile.close
+}}}
+이 코드는 eof 즉 파일의 끝을 만날 때까지 until ~ end 블럭을 수행합니다. readchar 메서드는 한 바이트씩 읽겠다는 의미입니다. 읽은 바이트가 "e"라면 !를 출력합니다. 결과적으로 e를 !로 치환하게 되겠죠.
+
+== 루비와 객체지향 ==
+루비를 이용한 객체지향 프로그래밍은 [wiki:Site/Ruby/Tutorial02 루비 클래스 사용]에서 따로 다룰 겁니다.

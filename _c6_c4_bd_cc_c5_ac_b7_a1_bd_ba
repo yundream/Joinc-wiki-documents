@@ -1,0 +1,790 @@
+ * 개요
+
+ 찾아야할 단어 내지는 문장들이 수십, 수백개가 있고 주어진 문서에서 일치하는것이 있을때 각각에서 주어진 메소드를 실행하는 파싱클래스이다. 이것은, 네이버 웹사전의 html소스를 모바일소스로 실시간변환하기 위하여 만들어졌으며 파싱트리 구현과 각각에 해당하는 다른 메소드를 빠르게 수행하는 기법이 비슷한 프로젝트 개발에 도움이 될 것이다.
+
+
+
+ * 깊이 우선탐색
+
+ ab, abcd, abcefg, abde ....  이런식의 찾아야할 단어들이 있다면 ab까지 비교했을때 일치했는데 c에서 틀렸다면 abc로 시작하는 abcd, abcefg는 검사할 필요도 없다(정렬된 경우) 그래서 바로 abde로 넘어가서 다음 비교를 수행하게 되는 방식이다. 또한 그러하다가 일치하는 단어(내지는 문장)을 찾았을때 그에 해당하는 어떤 일(메소드)을 미리 준비해놓고 빠르게 바로 그 메소드를 수행할 수 있는 기반도 같이 갖추게 되는 소스이다.
+
+
+
+ * 소스는 자바로 된 클래스이나 C++나 기타 다른소스로 포팅하는데 별 어려움이 없을것이다. 가장 중요한 소스는 parse.java 이니 그것을 깊이 분석해 보길 바란다.
+
+
+
+ * Constants.java
+{{{#!vim java
+/*
+ * Created on 2003. 6. 19.
+ *
+ */
+package com.karlly.filter;
+
+/** 모바일사전에 있어서의 의미있는 여러 상수를 선언
+ * @author 산하
+ */
+public interface Constants {
+	static final int NOTHING = 0;						/** 어떤 의미의 단어인지 아직 발견못한 상태 */
+	static final int VALID = -1;							/** 유효한 단어일때와 파서트리에서 일치하는 노드를 발견했을때 */
+	static final int INVALID = -2;						/** 잘못된 단어와, 파서트리에서 일치하는 노드가 없을때 */
+	static final int SEVERAL = -3;						/** 단어의 뜻이 여러가지 일때 */
+	static final int RETRY = -4;						/** 단어가 의미있는 경우라서 docid를 다시 받아와야 할때와 파서트리에서 한 문자가 일치하여 계속 추적해 들어갈때 */
+	static final int ERROR = -5;						/** 파싱중 IndexOutOfBoundsException 이 발생했을때는 네이버 소스가 바뀐경우이다 */
+}
+}}}
+
+ * DicParse.java
+{{{#!vim java
+/*
+ * Created on 2003. 6. 28.
+ *
+ */
+package com.karlly.filter;
+
+import com.karlly.Log.*;
+import java.util.Stack;
+import java.util.Vector;
+
+/**
+ * 웹사전의 HTML 소스에서 해석부분만 모바일소스로 변환하기 위한 클래스
+ *  @author 산하
+ */
+public class DicParse implements ParseTree {
+	
+	private int index;																	// 전체 HTML 소스의 인덱스
+	private int result;																	// parsing 메소드의 반환값을 위한 변수
+	private char readOne; 															// HTML 소스에서 읽은 한 문자
+	private boolean space;														// 더블스페이스 처리를 위한 변수
+	private String htmlS = new String();										// 주어지는 html 소스
+	private String realAddress = new String();								// 유효한 단어일때 진짜 docid를 저장하는 변수
+	private String soundFile = new String();									// 사운드파일명을 넣는 변수
+	private StringBuffer mobileSource = new StringBuffer();		// 모바일로 보내주기 위한 해석부분의 소스
+	private Vector docid = new Vector();										// 여러뜻일때 docid를 넣어두는 벡터
+	private Stack fontTag = new Stack();										// 이중태그처리를 위한 스택
+	private boolean analysis;														// 해석 시작부분인지 아닌지 판단위함
+	private DoSomething[] doMethod = new DoSomething[11]; //  파서트리에서 일치하는 노드가 있을시에 각각에 맞는 메소드를 바로 호출하기 위한 객체배열
+	private ErrorLog elogger;														// 예외발생시 로그를 남기기 위함
+		
+	/**
+	 * 모바일소스에 특정 문자열을 무조건 추가만 하면 되는 메소드
+	 */
+	class OnlyAdd extends DoSomething {
+		public void isSame(String tag) {
+			mobileSource.append(tag);
+		}
+	}
+	
+	/**
+	 * HTML 소스중 font 로 시작되는 태그들의 처리를 위해 스택에 넣고 모바일소스에 추가하는 메소드
+	 */
+	class ColorTag extends DoSomething {
+		public void isSame(String tag) {
+			fontTag.push(tag);
+			mobileSource.append(tag);	
+		}
+	}
+
+	/**
+	 * 공백문자가 연속으로 있으면 하나만 추가해주는 메소드
+	 */
+	class DoubleSpace extends DoSomething {
+		public void isSame(String tag) {
+			if (space) return;
+			mobileSource.append(' ');
+			space = true;	
+		}
+	}
+
+	/**
+	 * font로 끝나는 태그가 있을시에 이중태그 처리를 위하여 스택에 적재하였던 모바일태그를 
+	 * 하나 제거하고 그 다음에 있는 태그를 읽어와서 모바일소스에 추가하는 메소드
+	 */
+	class EndFontTag extends DoSomething {
+		public void isSame(String tag) {
+			fontTag.pop();
+			mobileSource.append(fontTag.peek());
+		}
+	}
+
+	/**
+	* \n, \t, \r 같은 문자가 있을시엔 무시하는 메소드
+	*/
+	class OnlyReturn extends DoSomething {
+		public void isSame(String tag) {
+			return;
+		}
+	}
+	
+	/**
+	 * 유효한 단어일때 사운드 파일명을 읽어오는 메소드
+	 */
+	class FindSound extends DoSomething {
+		public void isSame(String tag) {
+			soundFile = untilChar(')');
+		}
+	}
+	
+	/**
+	 * 단어의 유형에 대한 결과값을 저장하는 메소드 (-1:VALID, -2:INVALID, -3:SEVERAL) 
+	 */
+	class FindResult extends DoSomething {
+		public void isSame(String tag) {
+			result = Integer.parseInt(tag);								// String -1, -2, -3 값을 int 형으로 변환 후 저장
+			if (result == SEVERAL) {										// 단어의 유형이 여러뜻인 경우라면 Docid 를 추출해 나간다.
+				while ( (index = htmlS.indexOf("<a href=/endic.php?docid=", index)) != -1) {  // 더이상 docid 를 찾지못할때까지 루프
+					index += 25;  												// 숫자있는 위치까지 이동
+					docid.add((String) untilChar('>'));				// 태그가 끝날때까지 읽어들인다
+				}
+			}
+		}
+	}
+
+	/**
+	 * 해석부분의 시작과 끝을 판단하기 위한 flag 셋팅하는 메소드 
+	 */
+	class Anaylsys extends DoSomething {
+		public void isSame(String tag) {							// 현재 index가 해석부분이 아니면 false, 해석부분이면 true 넣는다 
+			Boolean temp = new Boolean(tag);						// String 형을 boolean에 대입하기 위하여 Boolean 객체생성
+			analysis = temp.booleanValue();
+		}
+	}
+	
+	/**
+	 * HTML Symbolic, Numberic Entity 들이 나올때의 처리
+	 */
+	class HtmlEntity extends DoSomething {
+		public void isSame(String tag) {
+			mobileSource.append(tag);
+			if (htmlS.charAt(index) == ';') index++;					// Html Entity 들은 ';' 을 포함하기도 하고, 하지않기도 하기 때문에 이를 처리한다
+		}
+	}
+	
+	/**
+	 * font 로 시작하는 태그일때 color 속성만 모바일 소스 처리하고 나머지는 스택 처리만 하기위한 메소드
+	 */
+	class FontTag extends DoSomething {
+		public void isSame(String tag) {
+			if (traceTree(colorTag, 's') == INVALID) fontTag.push("");	// color 속성이 아니라면 빈 값을 스택에 넣는다
+		}
+	}
+	
+	/**
+	 * '<' 로 시작할때 태그인지 판단 후 태그라면 파싱하고 아니라면 모바일소스에 더하는 메소드
+	 */
+	class IsTag extends DoSomething {
+		public void isSame(String tag) {
+			if (isTag(htmlS.charAt(index)) ) {														// 태그인지 아닌지 판별위해 '<' 뒤의 한 문자를 판별메소드에 대입
+					traceTree(tagNode, 's');															// 태그라면 대소문자 구분없애기 위해 오버로딩된 메소드 호출
+					if (readOne != '>') index = htmlS.indexOf('>', index) + 1;			// 파서트리 추적종료후  태그의 끝이 아니라면 태그가 끝나는 곳까지 바로 이동한다
+			} else mobileSource.append('<');													// 태그가 아니라면 단순 문자이므로 모바일소스에 더한다
+		}
+	}
+		
+	public DicParse() {
+		this.doMethod[0] = new OnlyAdd();
+		this.doMethod[1] = new ColorTag();
+		this.doMethod[2] = new DoubleSpace();
+		this.doMethod[3] = new EndFontTag();
+		this.doMethod[4] = new OnlyReturn();
+		this.doMethod[5] = new FindSound();
+		this.doMethod[6] = new FindResult();
+		this.doMethod[7] = new Anaylsys();
+		this.doMethod[8]  = new HtmlEntity();
+		this.doMethod[9] = new FontTag();
+		this.doMethod[10] = new IsTag();
+	}
+	
+	/** 파서트리에서 해당하는 각각의 경우에 맞는 메소드를 인덱스를 이용하여 바로 호출하기 위하여 생성한
+	*    예외 발생시 로그파일에 기록을 남기기 위하여 에러객체를 인자로 넘겨받음
+	*    @param elogger
+	*    추상클래스 객체배열에 각각의 메소드를 구현한 파생클래스들을 생성자에서 할당함
+	*/
+	public DicParse(ErrorLog elogger) {
+		this.elogger = elogger;
+		this.doMethod[0] = new OnlyAdd();
+		this.doMethod[1] = new ColorTag();
+		this.doMethod[2] = new DoubleSpace();
+		this.doMethod[3] = new EndFontTag();
+		this.doMethod[4] = new OnlyReturn();
+		this.doMethod[5] = new FindSound();
+		this.doMethod[6] = new FindResult();
+		this.doMethod[7] = new Anaylsys();
+		this.doMethod[8]  = new HtmlEntity();
+		this.doMethod[9] = new FontTag();
+		this.doMethod[10] = new IsTag();
+	}
+	
+	/** 유효한 단어일때 진짜 해석페이지의 docid를 리턴한다
+	 * @return	진짜 해석페이지의 docid
+	 */
+	public String getAddress() {
+		return realAddress;	
+	}
+	
+	/** 웹사전의 HTML을 모바일소스로 변환시킨 문자열을 리턴한다
+	 * @return	모바일 소스
+	 */
+	public String getMobileSource() {
+		return mobileSource.toString();
+	}
+	
+	/** 여러가지 뜻이 있을때 그 각각의 docid 를 리턴한다
+	 * @return	각 여러뜻의 docid
+	 */
+	public String[] getDocid() {
+		return (String[]) docid.toArray(new String[0]);							// 벡터를 문자열배열로 리턴
+	}
+	
+	/** 영어단어의 원어민발음 파일명을 리턴한다
+	 * @return	영어단어 발음 파일명
+	 */
+	public String getSoundFile() {
+		return soundFile;
+	}
+	
+	/** 특정문자가 나올때까지 계속 문자를 읽어들여 하나의 String 으로 반환하는 메소드
+	 * @param until  이 문자가 나올때까지 계속 읽어나간다
+	 * @return 읽어들였던 문자들을 합해서 반환하는 String
+	 */
+	private String untilChar(char until) {
+		String plus = new String();
+		while ( (readOne =htmlS.charAt(index++)) != until) 	plus = plus + readOne;
+		return plus;	
+	}
+		
+	public boolean notHanja (char one) {
+		return (one > 40879) || (one < 19968);
+	}
+	
+	
+	/** 유효한 HTML 태그인지 아닌지 검증하는 메소드
+	 * @param one '<' 뒤에 나오는 첫번째 문자
+	 * @return 태그이면 true, 태그가 아니면 false 반환
+	 */
+	public boolean isTag (char one) {							// if 문 연산횟수를 최대한 줄이기 위하여 자주 나오는 순서대로 판단한다
+		if ( (one >= 97) && (one <= 122) ) return true;			// 소문자 알파벳이 오면 태그			
+		if ( one == '/' ) return true;									// '/' 가 오면 태그 (태그 닫을때 사용)
+		if ( one == '!' ) return true;										// '!' 가 오면 태그 (주석에 사용)
+		if ( (one >= 65) && (one <= 90)) return true;			// 대문자 알파벳이 오면 태그
+		return false;															// 위의 if에 해당이 없으면 태그가 아님
+	}
+	
+	/** 여러 변수들을 초기화하는 메소드
+	 */
+	private void initValue() {
+		index = 0;
+		space = true;															// 네이버 웹사전의 해석이 처음부터 공백으로 시작하므로 휴대폰의 공간절약과 미관을 위해 더블스페이스 처리
+		analysis = false;
+		realAddress = "";
+		mobileSource.delete(0,mobileSource.length());		// 모바일소스 문자열버퍼를 비움
+		soundFile = "";
+		docid.clear();
+		result = NOTHING;
+		fontTag.clear();
+		fontTag.push("$#D");												// 다중태그 (컬러,사이즈) 를 위한 스택의 디폴트값 (검은색)
+	}
+
+	/** 파서트리를 추적하며 파싱을 하고 그 결과에 따른 처리를 하기 위한 메소드
+	 * @param tree	파서객체를 인자로 넘겨받음
+	 * @return	파싱의 결과를 넘겨줌
+	 */
+	public int traceTree (Parse tree) {
+		int v;
+		do {
+			readOne = htmlS.charAt(index++);										// HTML소스에서 한문자씩 읽어들어감
+			v = tree.parsing(readOne);													// 파서트리를 추적하고 그 결과값 저장
+		} while (v == RETRY);																// 추적이 계속 성공하는 동안 루프를 돈다
+		if (v == INVALID) return INVALID;												// 파서트리에서 일치하는게 없다면 메소드 탈출
+		else {
+			doMethod[tree.getKey(v)].isSame(tree.getValue(v)); 			// 노드를 찾았다면 해당메소드를 실행시키며 필요한 데이터를 인자로 넘김
+			return VALID;
+		}
+	}
+	
+	/** 태그일때의 대소구분없는 판단을 위해 traceTree 메소드 오버로딩 함
+	 * @param tree	파서객체
+	 * @param tag	입력문자를 대소문자 구분없앨것인지 여부
+	 * @return	파싱의 결과를 넘겨줌
+	 */
+	
+	public int traceTree (Parse tree, char tag) {
+		int v;
+		do {
+			readOne = Character.toLowerCase(htmlS.charAt(index++));
+			v = tree.parsing(readOne);													// 파서트리 추적의 결과값 저장
+		} while (v == RETRY);																// 추적이 계속 성공하는 동안 루프를 돈다
+		if (v == INVALID) return INVALID;												// 파서트리에서 일치하는게 없다면 메소드 탈출
+		else {
+			doMethod[tree.getKey(v)].isSame(tree.getValue(v)); 			// 노드를 찾았다면 해당메소드를 실행시키며 필요한 데이터를 인자로 넘김
+			return VALID;
+		}
+	}	
+	
+	/** 파싱을 하는 주 메소드
+	 * @param html	파싱을 하기위해 입력받는 웹사전 html소스
+	 * @return 파싱의 결과값을 반환함 (VALID= -1, INVALID= -2, SEVERAL= -3, RETRY= -4)
+	 */
+	public int parsing(String html) {
+		initValue();
+		htmlS = html;
+		try {
+			while (result == NOTHING) traceTree(howWord);					// 1단계 : 어떤 유형의 단어인지 알아낸다
+		} catch (IndexOutOfBoundsException e) {
+			elogger.log("Can't analysis what kind of word");
+			return ERROR;
+		}
+		switch (result) {
+			case (RETRY) :																	// 유효한 단어라서 docid 를 다시 보내야 할 경우라면
+				try {
+					while ( (readOne=htmlS.charAt(index++)) != '\"') realAddress += readOne;		// docid 추출
+				} catch (IndexOutOfBoundsException e) {
+					elogger.log("Can't find real docid");
+					return ERROR;
+				}
+				break;
+			case (VALID) :																	// 유효한 해석이라면
+				try {
+					while (!analysis) traceTree(soundBegin);						// 2단계 : 해석이 시작되는 곳까지 추적하면서 발음파일 있으면 추출해놓음
+				} catch (IndexOutOfBoundsException e) {
+					elogger.log("Can't find spot of beginning translation");
+					return ERROR;
+				}
+				try {
+					while (analysis) {															// 해석이 끝나는 부분까지 추적한다
+						if (traceTree(mainNode) == INVALID) {							// 3단계 : 파서트리를 점진적으로 추적해 파싱해 들어가며 모바일 태그로 바꾼다
+							if (notHanja(readOne))	mobileSource.append(readOne);		// 특별한 노드를 발견 못했을시엔 한자가 아닌 평범한 문자라면 모바일소스에 더한다
+							space = false;														// 더블스페이스 처리를 위함
+						}
+					}
+				} catch (IndexOutOfBoundsException e) {
+					elogger.log("Can't find spot of endding translation");
+					return ERROR;
+				}
+				break;
+		} 
+		return result;
+	}
+	
+}
+}}}
+
+ * DoSomething.java
+{{{#!vim java
+/*
+ * Created on 2003. 7. 2.
+ *
+ */
+package com.karlly.filter;
+
+/**
+ *  파서트리에서 일치하는 노드를 찾았을때 객체배열과 추상메소드를 이용하여 각각에 맞는 메소드를 인덱스로 바로 호출하기 위한 추상클래스
+ * @author 산하
+ */
+public abstract class DoSomething {
+	public abstract void isSame(String tag);
+}
+}}}
+
+ * NodeData.java
+{{{#!vim java
+/*
+ * Created on 2003. 6. 28.
+ *
+ */
+package com.karlly.filter;
+
+	/**
+	 * 파서트리에서 파싱후 결과값, 실행해야할 메소드 인덱스, 보내줘야할 스트링을 포함하는 객체를 리턴하기 위한 클래스
+	 * 특정 멤버를 기준으로 객체정렬을 하기 위하여 Comparable 인터페이스 구현함 
+	 */
+public	class NodeData implements Comparable { 
+	
+	String node;																		// 파싱해야할 노드
+	int key;																			// 수행해야할 특정 메소드로 바로가는 인덱스
+	String value;																	// 파싱이 VALID 가 되었을때 그 노드의 처리에 필요한 데이터를 보내준다
+
+	public NodeData (String node) {
+		this.node = node;
+	}
+	
+	public NodeData (String node, String key) {
+		this.node = node;
+		this.key = Integer.parseInt(key);
+	}
+	
+	public NodeData (String node, String key, String value) {
+		this.node = node;
+		this.key = Integer.parseInt(key);
+		this.value = value;
+	}
+
+	/* node 를 기준으로 객체정렬을 수행하기 위하여 Comparable 인터페이스의 추상메소드 compareTo 를 정의함
+	 * @see java.lang.Comparable#compareTo(java.lang.Object)
+	 */
+	public int compareTo (Object reV) {
+		return node.compareTo(((NodeData) reV).node);
+	}
+		
+}
+}}}
+
+ * Parse.java
+{{{#!vim java
+/*
+ * Created on 2003. 6. 18.
+ *
+ */
+package com.karlly.filter;
+
+import java.util.Arrays;
+
+/**
+ * 노드와 상응하는 데이터들을 받은 후 파서트리 와 각 트리깊이 및 데이터인덱스를 생성하는 클래스  
+ * * @author 산하
+ */
+
+public class Parse implements Constants {
+	
+	private NodeData[] data;													// 노드를 찾았을때 해당하는 key 와 value를 넘겨주기 위한 객체배열
+	private StringBuffer parseTree = new StringBuffer();			// 노드들을 파서트리로 만든것
+	private int[] depthTree = new int[1000];							// 파서트리의 각 줄기의 깊이, 줄기수는 최대 1024개 (나중에 Vector로 바꿀것임)
+	private int [] nodeIndex = new int[1000];							// 리턴객체의 인덱스를 찾기 위하여 파서트리에서 노드가 끝나는 지점에 그 노드의 인덱스 저장
+	private int parseTreeX = 0;												// 파서트리의 인덱스
+	private int scope = 0;															// 파서트리 추적의 범위 (부모줄기를 벗어날 수 없다)
+
+	/** 파서클래스 생성시 노드를 중심으로 정렬하고 파서트리를 생성한다
+	 * @param n	파서트리를 생성하기 위한 노드들과 해당 노드발견시 실행해야할 메소드의 인덱스와 메소드에 넘겨줄 데이터를 포함하는 스트링 2차원배열
+	 */
+	public Parse (String[][] n) {				
+		int i;
+		int t = n.length;																							// 총 노드의 갯수
+		this.data = new NodeData[t];																		// 노드-데이터 객체를 총 노드수만큼 생성
+		for (i = 0; i < t; i++) {																						// 노드수 만큼 루프
+			switch (n[i].length) {																				// 노드-데이터 객체에 값을 할당한다
+				case (1) :
+					this.data[i] = new NodeData(n[i][0]);											// node 만 있는 경우
+					break;
+				case (2)	:
+					this.data[i] = new NodeData(n[i][0], n[i][1]);								// key 까지 있는 경우
+					break;
+				case (3) :
+					this.data[i] = new NodeData(n[i][0], n[i][1], n[i][2]);				// value 까지 있는경우
+					break;
+			}
+		}	
+		Arrays.sort(data);																						// 노드-데이터 객체들을 노드 중심으로 정렬한다
+		this.makeParseTree(data);																			// 노드들을 파서트리로 생성 - 깊이, 노드인덱스 등도 같이 생성된다
+		this.scope = parseTree.length();																// 초기 파싱범위를 전체트리로 설정
+	}
+	
+	/** 일치하는 노드를 발견시 실행해야할 메소드의 인덱스를 넘겨받는다
+	 * @param index	넘겨줄 노드-데이터 객체의 인덱스
+	 * @return	실행해야할 메소드의 인덱스를 의미하는 key를 넘겨준다
+	 */
+	public int getKey(int index) {
+		return data[index].key;
+	}
+	
+	/** 일치하는 노드를 발견시 실행해야할 메소드에 넘겨줄 데이터를 넘겨받는다
+	 * @param index	넘겨줄 노드-데이터 객체의 인덱스
+	 * @return	실행해야할 메소드에 넘겨줄 데이터를 의미하는 value를 넘겨준다
+	 */
+	public String getValue(int index) {
+		return data[index].value;
+	}
+		
+	/** 입력된 노드들을 가지고 파서트리를 생성한다
+	 * @param nodeD  파서클래스 생성시 입력된 스트링배열을 가지고 만든 노드-데이터 객체배열
+	 */
+	public void makeParseTree(NodeData[] nodeD) {
+		int t = 0;
+		int i;
+		int allNodeX;																										// 전체노드 인덱스
+		int oneNodeX;																										// 한 노드의 인덱스
+		char readNode;																									// 노드에서 읽어들어가는 문자
+		boolean branch;																								// 파서트리 생성시 줄기가 파생되는지 여부 
+		StringBuffer parentTree = new StringBuffer();														// 파서트리에서 각 줄기의 깊이 증가 여부를 결정하기 위하여 부모가지이면 True 셋팅
+		for (allNodeX = 0; allNodeX < nodeD.length; allNodeX++) {									// 전체 노드의 갯수만큼 반복 
+			branch = false;																								// 새 가지가 생긴다면  true
+			for (oneNodeX = 0; oneNodeX < nodeD[allNodeX].node.length(); oneNodeX++) {	// 각 노드에서 노드 끝까지 반복
+				readNode = nodeD[allNodeX].node.charAt(oneNodeX);										// 노드에서 한 문자 읽어오기
+				if ( !branch && (parsing(readNode) ==  RETRY) ) {										// 아직 가지가 파생되지 않았고 읽은 문자가 맞다면 
+					parentTree.setCharAt(parseTreeX - 1, 'T' );											// 현재의 문자는 부모트리가 되므로 true (상위문자와 일치함)
+				} else { 										 
+				branch = true;																								// 줄기 파생이 됨 (상위노드와 틀리는 문자가 시작됨)
+				parseTree.append(readNode);																	// 파서트리에 새로운 문자 추가 (새로운 가지이기도 함)
+				parentTree.append('T');																				// 자기 노드도 1의 깊이를 가지고 하부 트리가 있다면 부모트리가 됨
+				for (i = 0; i < parseTree.length(); i++) if ( parentTree.charAt(i) == 'T') depthTree[i]++;		// 모든 부모트리들의 깊이 증가
+				}
+			}
+			t = parseTree.length();																						// 현재 파서트리의 크기
+			nodeIndex[t -1] = allNodeX;																			// 현재 노드-데이터 객체의 인덱스를 파서트리의 노드끝점에 저장
+			scope = t;																										// 파싱범위를 전체 파서트리로 넓힘 - 초기화
+			for (i = 0; i < t; i++) parentTree.setCharAt(i, 'F');												// 한 노드가 끝날때마다 부모트리 판단배열 False로 셋팅
+		}
+	} 
+		
+	/** 파서트리를 추적해 들어가며 일치하는 노드가 있으면 해당 노드-객체의 인덱스를 돌려주고 없으면 INVALID(-2)를 돌려준다
+	 * @param input	파서트리를 추적해 들어가기 위하여 입력하는 한 문자
+	 * @return	0보다 크면 해당 파서-데이터 객체의 인덱스이고  -1이면 VALID이고 -2 이면 INVALID, -4 이면 한 문자가 일치했으므로 다음 문자를 요청하는 RETRY 이다
+	 */
+	public int parsing (char input) {
+		char readTree;																								// 파서트리에서 읽는 한 문자
+		while (parseTreeX < scope) {																		// 파서인덱스가 추적범위안에 있는 동안 루프
+			readTree = parseTree.charAt(parseTreeX);												// 파서트리에서 한 문자 읽어들임
+			if (readTree != input) parseTreeX += depthTree[parseTreeX];					// 입력문자와 파서트리문자가 일치하지 않는다면 파서트리 깊이만큼 인덱스 증가
+			else if (depthTree[parseTreeX] == 1) {														// 일치하면서 파서트리 깊이가 1이라면 노드를 찾은것이므로
+				scope = parseTree.length();																	// 추적범위를 전체로 초기화
+				int r = nodeIndex[parseTreeX];																// 파서트리 인덱스를 초기화 하기 전에 리턴 인덱스 임시저장
+				parseTreeX = 0;																						// 파서트리 인덱스 초기화
+				return r;																									// 노드를 찾았으므로 해당하는 객체-데이터 의 인덱스를 리턴					
+			} else {																										// 일치는 하나 아직 노드를 찾은건 아니라면
+				scope = parseTreeX +  depthTree[parseTreeX];									// 추적범위를 일치해가고 있는 부모트리로 한정함
+				parseTreeX++;																							// 아직 파싱중이므로 파서트리 인덱스 증가
+				return RETRY;																						// 다음 문자 입력을 받기위해 RETRY (-4) 리턴
+			}
+		}																														// 추적범위를 벗어났다는것은 아무 노드도 발견못한 INVALID 이다
+		scope = parseTree.length();																			// 추적범위를 다시 전체로 초기화
+		parseTreeX =0;																								// 파서트리 인덱스 초기화
+		return INVALID;																								// INVALID (-2) 를 리턴
+	}		
+
+}
+}}}
+
+ * ParseTree.java
+{{{#!vim java
+/*
+ * Created on 2003. 6. 28.
+ *
+ */
+package com.karlly.filter;
+
+/** 파싱에 필요한 노드들과 그에 해당하는 메소드를 불러오기 위한 인덱스와 그 메소드에 넘겨주기 위한 데이터로 구성된다
+ * { "찾아야 할 문자열", "실행해야 할 메소드의 인덱스", "넘겨줘야할 데이터들" } 로 파서객체를 생성한다 
+ * @author 산하
+ */
+public interface ParseTree extends Constants {
+
+	static final Parse howWord = new Parse ( new String[][] {		// 어떤 유형의 단어인지 알아내기 위한 각각의 특징 문자열
+		{"<!-- start : 키워드 --", "6", "-1"},													// Valid 인경우
+		{"<!--- Start :  0건 메세지 ---", "6", "-2"},										// Invalid 인 경우
+		{"<!-- start  단어 타이틀 --", "6", "-3"},  										// Several 인 경우
+		{"<META HTTP-EQUIV=REFRESH CONTENT=\"0;url=/endic.php?docid=", "6", "-4"}	// Retry 인 경우
+	} );
+	
+	static final Parse soundBegin = new Parse ( new String[][] {	// 해석시작부분까지 파싱하면서 사운드 파일있으면 추출함
+		{"<a href=javascript:OpenSound(", "5"},										// 사운드파일 찾기
+		{"<!-- content -->", "7", "true"}														// 해석의 시작 부분
+	} );
+
+	static final Parse colorTag = new Parse ( new String[][] {		// color 만 대소구분없이 추가하고 나머지는 스택처리하기 위한 별도 객체
+		{"color=blue", "1", "$#B"},
+		{"color=purple", "1", "$#P"},
+		{"color=red", "1","$#R"},
+		{"color=rgb(00,80,00)", "1", "$#G"},
+		{"color=rgb(0,0,255)", "1", "$#B"}
+	} );	
+	
+	static final Parse mainNode = new Parse ( new String[][] {		// 메인에서 파싱해야 할 노드들
+		{" ", "2"},																						// 이중공백처리를 위하여 파싱에 포함한다
+		{"$", "0", "$$"},																				// 모바일태그 시작문자인 '$'가 나오면 그 자체를 표현하기 위해 '$$' 로 치환
+		{"<", "10"},																					// 태그시작문자인 '<' 가 있으면 태그인지 아닌지 판단을 위해 2차 파싱 들어감
+		{"\n", "4"},
+		{"\t", "4"},
+		{"\r","4"},
+		{"&nbsp", "8", " "},
+		{"&quot", "8", "\""},
+		{"&amp", "8", "&"},																			// HTML Symbolic Entity 들
+		{"&lt", "8", "<"},
+		{"&gt", "8", ">"},
+		{"&#0040", "8", "("},																		// 심볼릭과 넘버릭 엔터티는 뒤에 세미콜론이 올 수 도 있기 때문에 메소드 처리
+		{"&#0047", "8", "/"},
+		{"&#0058", "8", ":"},
+		{"&#12298", "8", "《"},																	// HTML Numberic Entity 들
+		{"&#12299", "8", "》"},
+		{"&#12304", "8", "【"},
+		{"&#12305", "8", "】"},
+		{"&#183", "8", "$@8804"},
+		{"&#201", "8", "$@8906"},
+		{"&#224", "8", "$@4106"},
+		{"&#225", "8", "$@4006"},
+		{"&#230", "8", "$@9009"},
+		{"&#232", "8", "$@2706"},
+		{"&#233", "8", "$@2606"},
+		{"&#236", "8", "$@2506"},
+		{"&#237", "8", "$@2406"},
+		{"&#242", "8", "$@3306"},
+		{"&#243", "8", "$@3206"},
+		{"&#249", "8", "$@2906"},
+		{"&#250", "8", "$@2806"},
+		{"&#331", "8", "$@3506"},
+		{"&#335", "8", "$@9106"},
+		{"&#47", "8", "/"},
+		{"&#509", "8", "$@4809"},
+		{"&#58", "8", ":"},
+		{"&#8706", "8", "$@0806"},
+		{"&#941", "8", "$@3106"},
+		{"&#949", "8", "$@3006"}
+	} );
+	
+	static final Parse tagNode = new Parse ( new String[][] {
+		{"br", "0", "$##"},
+		{"font ", "9"},																						// color만 추가하고 나머지는 스택처리만 하기 위하여 2차 파싱 들어감 
+		{"/font", "3"},
+		{"!-- end of content --", "7", "false"},												// 해석의 끝 부분
+		{"sup", "0", "$&1"},																			// 여러뜻일때의 첨자 처리
+		{"/sup", "0", "$&2"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/b/b/n/8592.gif", "0", "$*B3906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/b/b/n/9445.gif", "0", "$*B0706"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/b/n/n/12423.gif", "0", "$@7918"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/b/n/n/12608.gif", "0", "$@5312"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/12669.gif", "0", "$@2006"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/12682.gif", "0", "$@2106"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/12686.gif", "0", "$@2206"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/8567.gif", "0", "$@0104"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9322.gif", "0", "$@0003"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9386.gif", "0", "$@0206"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9389.gif", "0", "$@0306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9396.gif", "0", "$@0406"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9430.gif", "0", "$@0506"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9443.gif", "0", "$@0606"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9445.gif", "0", "$@0706"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9513.gif", "0", "$@0906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9514.gif", "0", "$@1006"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9519.gif", "0", "$@1106"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9542.gif", "0", "$@1306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9638.gif", "0", "$@4309"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9734.gif", "0", "$@1506"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9742.gif", "0", "$@1606"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/g/n/n/9829.gif", "0", "$@1706"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/b/n/8592.gif", "0", "$@3906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12382.gif", "0", "$@4912"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12465.gif", "0", "$@3612"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12518.gif", "0", "$@3712"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12526.gif", "0", "$@3812"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12669.gif", "0", "$*D2006"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/12682.gif", "0", "$*D2106"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20353.gif", "0", "$@5012"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20369.gif", "0", "$@6712"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20374.gif", "0", "$@6812"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20376.gif", "0", "$@6912"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20379.gif", "0", "$@7012"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20381.gif", "0", "$@7112"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20398.gif", "0", "$@7212"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20508.gif", "0", "$@4412"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20510.gif", "0", "$@1812"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20625.gif", "0", "$@4512"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/20840.gif", "0", "$@4709"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/8592.gif", "0", "$@3906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/9322.gif", "0", "$*D0003"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/9386.gif", "0", "$*D0206"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/9430.gif", "0", "$*D0506"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/k/n/n/9445.gif", "0", "$*D0706"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/p/b/n/8592.gif", "0", "$@3906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/p/n/n/8592.gif", "0", "$@3906"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/p/n/n/9445.gif", "0", "$*D0706"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/12365.gif", "0", "$@8124"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/12531.gif", "0", "$@8424"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/12532.gif", "0", "$@8524"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/20995.gif", "0", "$@7612"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/20998.gif", "0", "$@7712"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/b/n/20999.gif", "0", "$@7812"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12358.gif", "0", "$@8730"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12359.gif", "0", "$@8024"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12365.gif", "0", "$@8124"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12390.gif", "0", "$@5112"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12400.gif", "0", "$@8224"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12401.gif", "0", "$@8324"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12424.gif", "0", "$@5212"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12486.gif", "0", "$@5412"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12516.gif", "0", "$@5512"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12531.gif", "0", "$@8424"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12532.gif", "0", "$@8524"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12656.gif", "0", "$@5612"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12658.gif", "0", "$@5712"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12659.gif", "0", "$@5812"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12660.gif", "0", "$@5912"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12661.gif", "0", "$@6012"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12663.gif", "0", "$@6112"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12664.gif", "0", "$@6212"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12800.gif", "0", "$@6312"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12816.gif", "0", "$@6412"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12897.gif", "0", "$@6512"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/12907.gif", "0", "$@6612"},
+		{"img src=http://searchimage.naver.com/dic/en/font/2k/r/n/n/20995.gif", "0", "$@7612"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/b/b/n/61793.gif", "0", "$*B2306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/b/n/n/61793.gif", "0", "$*B2306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/k/b/n/61793.gif", "0", "$@2306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/k/n/n/61793.gif", "0", "$@2306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/k/n/n/61832.gif", "0", "$@3406"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/p/n/n/61793.gif", "0", "$@2306"},
+		{"img src=http://searchimage.naver.com/dic/en/font/proun/r/n/n/61722.gif", "0", "$@4633"}
+	 } );
+
+}
+}}}
+
+ * TestFilter.java
+{{{#!vim java
+/*
+ * Created on 2003. 4. 29.
+ *
+ */
+
+
+/**
+ * @author 산하
+ *
+ */
+
+package com.karlly.filter;
+
+import java.io.*;
+
+public class TestFilter {
+
+	String s;
+	File f;
+	public TestFilter(String fileName) throws IOException  {
+		f = new File(fileName);
+		int size = (int) f.length();
+		int byte_read = 0;
+		FileInputStream in = new FileInputStream(f);
+		byte[] data = new byte[size];
+		byte_read = in.read(data, 0, size - byte_read);
+		s = new String(data);
+	}
+			
+	public static void main (String argv[])  throws IOException {
+		
+		int r1, r2;
+		String[] v;
+		TestFilter t[] = new TestFilter[5];
+		t[0] = new TestFilter("cool.txt");  // 올바른 단어(wool) - html 소스파일 읽기
+		//t[1] = new TestFilter("invalid-zxe.txt");	// 잘못된 단어(abefe)
+		//t[2] = new TestFilter("several-sound.txt");	// 뜻이 여러개인 경우 (can)
+		//t[3] = new TestFilter("sound-1.txt");			// sound 에서 첫번째 해석
+		//t[4] = new TestFilter("nosound-a.txt");		// 발음파일이 없는경우
+		
+		DicParse d = new DicParse();
+		
+		for (r1 = 0; r1 < 1; r1++) {
+		long i = System.currentTimeMillis();
+		for (int z=0; z<1; z++) {
+				System.out.println("단어의 상태 = " + d.parsing(t[r1].s));
+		}
+		long j = System.currentTimeMillis();
+		System.out.println("사운드 파일 = " + d.getSoundFile());
+		v = d.getDocid();
+		for (r2 = 0; r2 < v.length; r2++) System.out.println("docid[" + r2 + "]" + v[r2]);
+		
+		System.out.println("모바일소스 = " + d.getMobileSource());
+		System.out.println("파싱에 걸린 시간 = " + (j-i) + "/1000 초\n" );
+		
+		}   
+	}	
+}
+}}}

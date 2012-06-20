@@ -1,0 +1,40 @@
+#title linux man page : syslog - system logger를 이용한 메시지 전송 
+
+== syslog ==
+메시지를 전송하기 위한 로깅 시스템
+=== 사용 법 ===
+{{{#!plain
+#include <syslog.h>
+
+void openlog(const char *ident, int option, int facility);
+void syslog(int priority, const char *format, ...);
+void closelog(void);
+
+#include <stdarg.h>
+
+void vsyslog(int priority, const char *format, va_list ap);
+}}}
+
+=== 설명 ===
+syslog는 유닉스에서 제공하는 시스템 로거 (system logger)로, 유닉스 시스템이 관리하는 로그 시스템이다. 이 로그 시스템은 원격의 다른 유닉스 시스템에도 전달할 수 있다.
+
+closelog 함수는 시스템 로거를 닫기 위해서 사용한다. 
+
+openlog 함수는 프로그램을 시스템 로거에 연결하기 위해서 사용한다. 시스템 로거는 시스템 전역적인 로깅 시스템으로 유닉스 시스템의 모든 프로세스가 사용할 수 있다. 그러므로 자신의 로그를 확인하기 위한 장치가 필요하다. __ident__는 자신의 메시지를 확인하기 위한 장치로 보통 프로그램의 이름을 설정한다. 매개변수 __option__는 openlog(:3)함수와 syslog(:3)함수의 호출시 이들을 다루기 위한 플래그 값이다. __facility__는 syslog(:3)함수 호출에서 기본 facility 값으로 사용된다. openlog 함수는 필수 함수가 아니다. 만약 openlog 함수는 단지 ident, option, facility를 애플리케이션 전역 값으로 설정하기 위해서 사용한다. 만약 openlog 함수를 호출하지 않고 syslog 함수를 사용한다면, inden는 NULL로 다른 값들은 기본 값으로 설정된ㄷ.
+
+syslog 함수는 로그 메시지를 생성한다. 이 로그 메시지는 syslogd(:12) 데몬(:12)에 의해서 배포된다. 매개변수 __priority__ 는 __facility__와 __level__의 OR연산 값이다. __format__ 매개변수는 printf(3)에서 문자열 형식을 지정하기 위해서 사용하는 __format__와 동일한 목적으로 사용한다. 
+
+  '''option''' :  __option__ 매개변수는 다음 값의 OR 연산 결과이다.
+    '''LOG_CONS''' 로그를 보내는 중에 에러가 발생했다면, 시스템 콘솔로 즉시 내용을 출력한다.
+    '''LOG_NDELAY''' 로그 기술자에 즉시 연결한다. 일반적으로 첫 메시지가 로깅될때, 기술자가 열린다.
+    '''LOG_ODELAY''' 첫 메시지가 로깅될때까지, 로그 기술자가 연결되는걸 미룬다. 기본설정이다.
+    '''LOG_PERROR''' 로그 메시지를 표준:::에러(:12)로 출력 한다.
+    '''LOG_PID''' 각각의 메시지에 PID(:12)를 포함시킨다.
+
+  '''facility''' : facility 매개변수는 로그의 범주를 지정하기 위한 목적으로 사용한다. 이 값을 다르게 하므로써, 어떤 종류의 로그인지를 대략 구분할 수 있다. 자세한 정보는 [wiki:Site/system_programing/Unix_Env/syslog_1 syslog 사용하기]를 참고한다.
+  
+  '''level''' : 로그 메시지의 중요도를 판단하기 위한 정보로 사용한다. 자세한 정보는 [wiki:Site/system_programing/Unix_Env/syslog_1 syslog 사용하기]를 참고한다.
+
+=== 예제 ===
+  1. [wiki:Site/system_programing/Unix_Env/syslog_1 syslog 사용하기]참고
+

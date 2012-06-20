@@ -1,0 +1,152 @@
+#title chown(2)
+[wiki:man/2/chown HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/01/27           -->
+<!-- 연락처 : yundream@joinc.co.kr --> 
+
+<!-- 함수 이름을 입력합니다 -->
+<title>chown(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	파일에 대한 소유권을 바꾸기 위해서 사용된다. 유사한 류의 함수로 fchown(2), lchown(2) 함수들이 있다
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+
+int chown(const char *path, uid_t owner, gid_t group);
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		chown(2) 계열의 함수들은 <emphasis>path</emphasis>에 지정되어있는 
+		파일 혹은 fd(파일지정자)가 가르키는 파일의 소유(및 그룹)권한을 
+		변경하기 위해 사용된다. chown(2)을 이용해서 파일의 권한을 
+		변경하기 위해서는 
+		해당 파일에 대한 권한을 가지고 있어야 한다. 슈퍼유저는 임의로 
+		권한의 변경이 가능하다. 	
+	</para>
+	<para>
+		lchown(2)은 심볼링 링크(sybolic links)에 대한 소유 권한을 변경 하기 
+		위한 목적으로 과거(2.1.x)에 사용되었었다. 
+		그러나 최근의 커널들은 심볼릭 
+		링크에 대한 권한 변경을 허용하지 않는다. lchown(2)역시 내부적으로 
+		chown(2)와 동일한 시스템 콜을 사용한다.  
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EPERM</term>	
+			<listitem>
+				<para>	
+					유효 UID가 파일의 소유자와 일치하지 않으며 0이 아닐 경우, 
+					혹은 소유자나 그룹이 정확히 지정되지 않았을 경우
+				</para>	
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term>EROFS</term>
+			<listitem>
+				<para>
+					소유권을 변경하고자 하는 파일이 읽기전용 파일시스템에 
+					있을 경우로 cd-rom 혹은 읽기 전용의 samba, NFS 파일 시스템
+					등에서 발생할 수 있다. 
+				</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOENT</term>
+			<listitem>
+				<para>
+					파일이 존재하지 않는다.
+				</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOMEM</term>
+			<listitem>
+				<para>
+					커널 메모리가 충분하지 않을 때
+				</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EACCESS</term>
+			<listitem>
+				<para>
+					파일을 찾기 위한 디렉토리 권한이 거부되었을 때
+				</para>
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		/home/test/my.txt 파일의 유저권한을 yundream 그룹권한을 post 로 
+		변경하기 원할때
+		<screen>
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;pwd.h&gt;
+#include &lt;grp.h&gt;
+#include &lt;sys/types.h&gt;
+
+int main()
+{
+    struct passwd *u_info;
+    struct group  *g_info;
+
+    u_info = getpwnam("yundream");
+    g_info = getgrnam("post");
+
+    chown("/home/test/my.txt", u_info-&gt;pw_uid, g_info-&gt;gr_gid);
+}
+		</screen>
+		getpwnam(3) 과 getgrnam(3) 은 각각 유저의 정보와 그룹의 정보를 
+		이름으로 가져오기 위해서 사용하는 함수이다. getpwnam 은 /etc/passwd 
+		파일을, getgrnam 은 /etc/group 파일을 참조하여서 각각의 
+		정보를 가져온다. 
+	</para>
+</section>
+</chapter>
+}}}

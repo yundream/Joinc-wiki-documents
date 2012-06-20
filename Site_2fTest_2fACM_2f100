@@ -1,0 +1,262 @@
+#title 100번 문제 : 3n+1
+
+[[TableOfContents]]
+
+== 개 요 ==
+
+ * 문제 카테고리: Volume I
+ * 문제 번호: 100
+ * 문제 제목: The 3n + 1 problem
+ * [http://acm.uva.es/p/v1/100.html 문제 원문]
+ * [http://acm.uva.es/p/problemstat.php?p=:100 Ranklist]
+ * Top Rank
+   * CPU Time: 0:00.000
+   * Memory: 64
+
+
+== 문제 설명 ==
+
+
+=== 배경지식 ===
+
+컴퓨터 과학에서는 어떤 입력에 대해서 가능한 모든 값을 출력하는 알고리즘의 작성이 필요한 경우가 많다. 이러한 문제의 해결을 위해서 NP, Unsolvable, Recursive등의 기법을 사용한다.  
+
+주어진 알고리즘은 다음과 같은 프로시져 코드로 표현될 수 있다.
+
+{{{#!plain
+1.          input n
+2.          print n
+3.          if n = 1 then STOP
+4.                   if n is odd 
+5.                   then 
+6.                      n = 3n+1
+7.                   else   
+8.                      n = n/2;
+9.          GOTO 2
+}}}
+
+위 알고리즘에 22를 입력하면, '''22 11 34 17 52 26 13 40 20 10 5 16 8 4 2 1'''의 일련의 숫자를 출력할 것이다.
+
+알고리즘은 쉽게 이해할 수 있을 것이다. 주어진 값이 홀수라면 '''n*3+1'''을 하고 짝수라면 '''n/2'''를 한다. n이 1이 될때까지 위의 연산을 반복한다. 입력값이 주어진 상태에서 일련의 출력값을 얻어내는건 매우 쉽다. 
+
+우리는 위의 알고리즘에서 입력값 '''n'''을 입력하면 '''22'''의 cycle length '''16'''이라는 것을 알아낼 수 있다.
+
+
+=== 입력값 ===
+
+ * '''i'''와 '''j'''의 두개의 int형 값이 주어진다. 
+ * 두개의 값은 1,000,000과 0사이에 존재해야 한다.
+당신은 i와 j 값 사이에 있는 숫자들중 가장 많은 cycle length를 가지는 숫자를 얻어내야 한다.
+
+==== 온라인 판정시 ====
+
+ * 입력값의 각 라인은 '\n'으로 끝나며 입력이 끝난 후 마지막 라인의 시작은 EOF이다. 예를들자면
+ {{{#!plain
+1 10
+100 200
+201 210
+900 1000
+EOF (알파벳 EOF가 아니다! -.-)
+}}}
+
+
+=== 출력값 ===
+
+'''i''' 와 '''j''' 그리고 둘 사이의 숫자중 가장 많은 cycle length를 가지는 숫자를 출력한다. 
+
+ * 입력값 예
+ {{{#!plain
+1 10
+100 200
+201 210
+900 1000
+}}}
+
+ * 출력값 예
+ {{{#!plain
+1 10 20
+100 200 125
+201 210 89
+900 1000 174
+}}}
+
+==== 온라인 판정시 ====
+
+ * 출력값에도 입력시처럼 모든 출력값이 끝난후 마지막 라인의 시작에 EOF를 붙여야 하는건지는 테스트를 해 볼 필요가 있다.
+
+
+== 문제 풀이 ==
+
+=== [wiki:minzkn] ===
+
+==== 설 명 ====
+
+저는 이 문제에 대해서 계산에 대한 최적화는 못하였지만 반복적인 루프를 줄이고자 이전값을 cache 해두고 일치하는 시점에서 cache 된 값을 더하여 루프 횟수를 줄이는 방법을 고안하였습니다. 값의 범위가 0 ~ 1000000 사이인경우 최대 cache 크기는 sizeof(int) * 1000000 = 4000000 = 약 4MBytes 의 메모리가 소요되는 단점이 있지만 그만큼 속도는 ...
+
+==== 소 스 ====
+
+ {{{#!vim c
+/*
+ Copyright (C) Information Equipment co.,LTD.
+ All rights reserved.
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+
+ ID="$Id: Site_2fTest_2fACM_2f100,v 1.1 2007/01/09 02:46:19 root Exp root $"
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef unsigned int t_cycle_value;
+
+struct ts_cycle_report
+{
+ t_cycle_value min, max; /* range */
+ t_cycle_value *cache;
+ t_cycle_value index, value;
+ t_cycle_value result;
+};
+
+static __inline void cycle_length(struct ts_cycle_report *s_context)
+{
+ t_cycle_value s_value = s_context->value;
+ s_context->cache[s_context->index] = s_value > 0;
+ while(s_value > 1)
+ {
+  if(s_value & 1)s_value = (s_value << 1) + s_value + 1;
+  else s_value >>= 1;
+  if((s_value < s_context->value) && (s_value >= s_context->min))
+  {
+   s_context->cache[s_context->index] += s_context->cache[s_value - s_context->min];
+   break;
+  }
+  s_context->cache[s_context->index]++;
+ }
+ if(s_context->result < s_context->cache[s_context->index])s_context->result = s_context->cache[s_context->index];
+}
+
+int main(int s_argc, char *s_argv[])
+{
+ unsigned int i, j;
+ struct ts_cycle_report s_context;
+
+ if(s_argc >= 3)
+ { /* arg input */
+  i = (unsigned int)atoi(s_argv[1]);
+  j = (unsigned int)atoi(s_argv[2]);
+ }
+ else
+ {
+  do
+  { /* input */
+   (void)fprintf(stdout, "input : ");
+   (void)fflush(stdout);
+  }while(scanf("%u %u", &i, &j) != 2);
+ }
+
+ if(i > j){ i ^= j; j ^= i; i ^= j; } /* swap */
+
+ s_context.min = (t_cycle_value)i, s_context.max = (t_cycle_value)j;
+ s_context.cache = (t_cycle_value *)malloc(sizeof(t_cycle_value) * ((j - i) + 1));
+ if(s_context.cache == ((t_cycle_value *)0))
+ {
+  (void)fprintf(stdout, "not enough memory\n");
+  return(1);
+ }
+
+ s_context.result = 0;
+ for(s_context.index = 0, s_context.value = i;s_context.value <= j;s_context.index++, s_context.value++)
+ {
+  cycle_length((struct ts_cycle_report *)(&s_context));
+ }
+
+ if(s_context.cache != ((t_cycle_value *)0))free((void *)s_context.cache);
+
+ (void)fprintf(stdout, "%u ~ %u => %u\n", s_context.min, s_context.max, s_context.result);
+
+ return(0);
+}
+
+/* End of source */
+}}}
+==== 대 화 ====
+
+=== 답안 ===
+[[subindex(Site/Test/ACM/100,1)]]
+
+
+== 문제 풀이 ==
+
+=== [wiki:무파이] ===
+
+==== 설 명 ====
+
+예전에 그냥 무식한 방법으로 풀었지만, java 버전이 없길래 한 번 올려봅니다. 
+속도 개선의 여지가 많을 듯... 
+
+==== 소 스 ====
+
+ {{{#!plain
+/*
+ Copyright (C) Information Equipment co.,LTD.
+ All rights reserved.
+ Code by JongAm oh <mailto:muphy78@empal.com>
+
+*/
+
+public class ACM1 {
+      
+              private static int getCycleLen(int in) {
+                      int cycleLen = 1;
+                      int init = in;
+                      while(init != 1) {
+                              if(init%2 == 1) {
+                                      init = 3*init+1;
+                              } else {
+                                      init = init/2;
+                              }
+                              cycleLen++;
+                      } 
+                      return cycleLen;
+              }
+              private static int[] getCycleLenArray(int _start, int _end) {
+                      int start = _start;
+                      int end = _end;
+                      int i = 0;
+                      if(_start < 0 || _end < 0 ) return null;
+                      int[] cycleLenArray = new int[end-start+1];
+                      for(int j = start ; start <= end; j++) {
+                              cycleLenArray[i] = getCycleLen(start);
+                              i++;
+                              start++;
+                      }
+                      return cycleLenArray;
+              }
+              
+              private static int getMax(int[] in) {
+                      int MAX = 0;
+                      if(in == null) return 0;
+                      for(int i =0; i<in.length;i++) {
+                              if(MAX < in[i])
+                                MAX = in[i];
+                      }
+                      return MAX;
+              }
+              
+              private static void printOneLine(int _start, int _end) {
+                      System.out.println(_start+"        "+_end+"        "+getMax(getCycleLenArray(_start,_end)));
+              }
+              
+              public static void main(String args[]) {
+                      printOneLine(900,1000);
+              }
+      } 
+/* End of source */
+}}}
+==== 대 화 ====
+
+=== 답안 ===
+
+
+

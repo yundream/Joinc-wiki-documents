@@ -1,0 +1,469 @@
+#title 뮤텍스와 조건변수의 사용
+
+ * 대폭 수정 필요 함 : 20110/2/19
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Pthread(4) - mutex &#38; 조건변수</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Pthread(4) - mutex &#38; 조건변수</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				yundream@joinc.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN17"
+>Mutex 잠금과 조건변수 테스트</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN19"
+>테스트용 어플리케이션 개요</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>조건변수를 통해 얻는 프로그래밍 상의 이점</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN32"
+>작동 프로세스</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN37"
+>코딩</A
+></DT
+><DT
+>2.5&#51208;. <A
+HREF="#AEN44"
+>조건변수 사용시 주의해야될 사항</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		그동안 
+		<A
+HREF="article.php?sid=31"
+TARGET="_top"
+>Pthread_1</A
+>,
+		<A
+HREF="article.php?sid=39"
+TARGET="_top"
+>Pthread_2</A
+>,
+		<A
+HREF="article.php?sid=39"
+TARGET="_top"
+>Pthread_3</A
+>,
+		을 통해서 pthread(:12) 에 대한 몇가지 기본적인 내용들에 대해서 알아 
+		보았다. 
+	</P
+><P
+>		그중 Pthread_3 에서 조건변수와, mutex(:12) 잠금에 대한 설명이 있었는데, 
+		설명만 있었고 실질적인 예를 이용한 테스트는 없었다. 
+	</P
+><P
+>		이번에는 mutex 잠금과 조건변수(:12)에 대한 이해를 도울수 있는 
+		간단한 어플리케이션을 제작해보고 어떠한 문제점을 가질수 있는지에 
+		대한 테스트도 하게 될것이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2&#51208;. Mutex 잠금과 조건변수 테스트</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.1&#51208;. 테스트용 어플리케이션 개요</A
+></H2
+><P
+>			테스트용 어플리케이션의 이름은 mutex_con.c 로 하도록 하겠다. 
+			이 프로그램은 3개의 쓰레드로 이루어진다. 
+			첫 번째 쓰레드는 main 쓰레드로 나머지 2개의 쓰레드(thread 1, thread 2)
+			를 생성하고 
+			(pthread_create) join 하는 일을 하게 될것이다(즉 특별히 하는일 없다). 
+			2번째 쓰레드는 2개의 int 형 멤버변수를 가지는 구조체에 접근해서 
+			특정한 숫자를 입력하게 된다. 3번째 쓰레드는 이 구조체에 접근해서 
+			멤버변수의 값을 읽어와서 "뎃셈" 하고 이를 화면에 출력시켜주는 
+			일을한다. 
+		</P
+><P
+>			이때 이 구조체는 2번 쓰레드와 3번쓰레드 모두가 접근하게 되므로 
+			mutex 잠금을 이용해서 한번에 하나의 쓰레드만 접근하도록 제어해야 될것이다. 
+		</P
+><P
+>			mutex 잠금을 이용한 접근제어 외에도, 3번째 쓰레드는 2번째 쓰레드에 
+			의해서 구조체의 값이 변경되었다는걸 감지하고, 값이 변경된 시점에서 
+			구조체에 접근해야 한다. 즉 구조체의 값이 변경될때까지 기다려야 한다. 
+			이 "기다림" 을 위해서 조건변수를 사용하게 된다.   
+		</P
+><P
+>			이 조건변수라는 것은 간단히 말해서 신호(signal)를 주고 받는 개념이다. 
+			한쪽에서는 신호를 기다리다가, 신호가 오면 신호를 감지해서 필요한 
+			일을 하게 되는 개념이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 조건변수를 통해 얻는 프로그래밍 상의 이점</A
+></H2
+><P
+>			조건변수를 사용하지 않는 다면 어떻게 될까. (물론 조건변수 대신 
+			세마포어(:12)를 사용할수도 있으나 이는 논외로 하자.) 
+			그렇다면 thread 2 에서는 구조체의 정보가 변경되었는지 알수 없음으로 
+			구조체의 정보가 변경되었는지 확인하기 위해서 busy wait(바쁜대기 상태)에 
+			놓이면서 지속적으로 값이 변경되었는지를 확인해야 할것이다. 
+		</P
+><P
+>			하지만 이건 좋은 방법이 아니다. busy:::wait(:12) 상태란 점도 맘에 들지 않지만 
+			실제로 thread 1 에서 값을 변경했는데 기존의 값과 같을수도 있기 때문이다. 
+			기존의 값과 같든지 아니든지 간에 thread 2 에서는 값을 읽어들여야 하는데, 
+			값의 변경을 확인하는 방법으론 체크자체가 불가능해 질수가 있다. 
+		</P
+><P
+>			위의 문제를 해결하기 위해서 별도의 변수를 하나더 둘수 있을것이다. 
+			그래서 thread 1 에서 구조체의 값을 변경시켰다면 이 별도의 준비한 변수의 
+			값을 변경하는 것이다. 그리고 thread 2 에서는 바쁜 대기 상태에서 이 변수의 
+			값이 변경되었는지 확인해서 구조체의 값을 가져오는 것이다. 이 방법을 
+			사용하면 위의 문제를 해결할수 있겠지만, 역시 바쁜 대기 상태에 놓이게 된다는 
+			단점을 가지게 된다. 
+		</P
+><P
+>			조건 변수를 사용하면 이러한 모든 문제를 해결할수 있다. 조건 변수를 사용하게 
+			되면 thread 2 에서는 thread 1 에서 조건변수를 통해서 시그널(:12)을 보내기 전까지 
+			대기 상태에 놓일수 있을것이기 때문이다. 
+		</P
+><P
+>			조건변수는 메모리 buffer 처리등에 유용하게 사용될수 있을것이다. 
+			조건변수를 사용함으로써, 만약에 메모리 buffer 에 처리해야될 자료가 없다면 
+			busy wait 상태에 놓일 필요 없이 signal 을 기다리면 될것이기 때문이다. 
+			그래서 signal 이 도착하면 메모리 buffer 에 엑세스를 시도해서 최근의 
+			정보를 가져오면 될것이다. 이 외에도 조건변수는 쓰레드간 동기화등과 
+			같은 다른 영역에도 매우 유용하게 사용할수 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN32"
+>2.3&#51208;. 작동 프로세스</A
+></H2
+><P
+>			작동 프로세스는 어떻게 mutex 잠금과 조건변수를 이용해서 
+			임계영역을 보호하고 구조체의 값의 변경시점을 알수 있는지에 
+			대한 내용을 중심으로 해서 기술할것이다. 
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  thread 2  
+  while (1) 
+  {
+      mutex 잠금을 얻는다. 
+      // 임계영역 시작 ----------------------------------------------
+      구조체에 접근해서 값을 가져온다.  
+      구조체 멤버변수의 값을 변경한다.(2씩 더한다)
+      pthrad_cond_signal 를 이용해서 조건변수를 통해 신호를 보낸다. 
+      // 임계영역 끝 ------------------------------------------------
+      mutex 잠금을 돌려준다.
+	  sleep(1);
+  } 
+
+  thread 3
+  while(1)
+  {
+      mutex 잠금을 얻는다. 
+      // 임계영역 시작 ----------------------------------------------
+      pthread_cond_wait 를 이용해서 조건변수를 통해 신호가 오는지 기다린다.   
+      if (신호가 도착한다면)
+          두개의 구조체 멤버변수의 값을 덧셈 하고 이를 출력한다. 
+      // 임계영역 끝 ------------------------------------------------
+      mutex 잠금을 돌려준다.
+  }
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>2.4&#51208;. 코딩</A
+></H2
+><P
+>			이제 작동프로세스까지 만들어졌으니, 코딩에 들어가도록 한다. 
+			코딩에 들어가기 위해서는 작동프로세스 외에도 설계서가 필요할것이지만, 
+			이러한 경우 매우 간단한 프로그램으로 작동프로세스 자체가 설계서나 
+			마찬가지임으로 설계서 이런건 생략하도록 하겠다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : mutex_con.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pthread.h&#62;
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+
+pthread_mutex_t mutex_lock   = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t   thread_cond  = PTHREAD_COND_INITIALIZER;
+
+struct com_data
+{
+    int a;
+    int b;
+};
+
+struct com_data mydata;
+
+void *do_write(void *data)
+{
+    mydata.a = 0;
+    mydata.b = 0;
+    while(1)
+    {
+        pthread_mutex_lock(&#38;mutex_lock);
+        mydata.a = random() % 6000;
+        mydata.b = random() % 6000;
+        pthread_cond_signal(&#38;thread_cond);
+        pthread_mutex_unlock(&#38;mutex_lock);
+        sleep(2);
+    }
+}
+
+void *do_read(void *data)
+{
+    while(1)
+    {
+        pthread_mutex_lock(&#38;mutex_lock);
+        pthread_cond_wait(&#38;thread_cond, &#38;mutex_lock);
+        printf("%4d + %4d = %4d&#92;n", mydata.a, mydata.b, mydata.a + mydata.b); 
+        pthread_mutex_unlock(&#38;mutex_lock);
+    }
+}
+
+int main()
+{
+    pthread_t p_thread[2];
+    int thr_id;
+    int status;
+    int a = 1;
+    int b = 2;
+
+    thr_id = pthread_create(&#38;p_thread[0], NULL, do_write, (void *)&#38;a); 
+    thr_id = pthread_create(&#38;p_thread[1], NULL, do_read, (void *)&#38;b);
+
+    pthread_join(p_thread[0], (void **) status);
+    pthread_join(p_thread[1], (void **) status);
+
+    return 0;
+}
+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			프로그램자체는 매우 간단하지만 조건변수의 기본적인 사용방법을 
+			알수 있을것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN44"
+>2.5&#51208;. 조건변수 사용시 주의해야될 사항</A
+></H2
+><P
+>			조건변수에는 pthread_cond_signal(3) 과 ptherad_cond_wait(3) 를 이용해서 
+			신호를 주고, 기다리는 방식을 사용한다고 했다. 그렇다면 생각할수 있는게, 
+			과연 신호가 실시간으로 전달이 될것이란걸 믿을수 있을까?   
+		</P
+><P
+>			실시간으로 전달되는지 아닌지가 중요한 이유는 쓰레드가 신호를 보내고 
+			나서 신호를 잘받았는지 기다리지 않고 바로 다음으로 넘어가 버리기 때문이다. 
+		</P
+><P
+>			이건 꽤 중요한 문제가 될수도 있다. 왜냐하면 만약 신호가 실시간으로 전달되지 
+			않는다면 신호가 미쳐 전달되기 전에 어떤 데이타가 변경되어 버리는 경우가 
+			발생할수 있기 때문이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>            쓰레드 공유변수 A = 0
+
+ thread 1                                    thread 2
+ while(1)                                    while(1)
+ {                                           {
+     쓰레드 공유변수 A++      
+     신호 보냄           ------------------&#62;     신호  기다림
+  }                                           } 
+                                           
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 상황을 생각해 보자 최초 공유변수 A 에 0 이 들어간다. 
+			thread 1 에서 여기에 1 을 증가시키고 신호를 보낸다. thread 2 는 신호를 
+			받고 A 의 값을 읽어 들여서 이것을 100 으로 나눈다. 
+            그런데 신호가 늦게 보내져서 - thread 1 의 loop 회전속도가 신호를 보내는 
+			시간보다 빠른경우 - thread 2 에서 신호를 미쳐 받기전에 A ++ 이 한번더 
+			실행되고 A 의 값은 2가 될것이다. 이때 서야 thread 2 로 신호가 전달되었다면 
+			결국 thread 1 에서는 2번의 데이타를 보냈는데 thread 1 는 한번의 연산만 
+			실행한것으로 데이타 하나를 잃어 버린것과 같은 문제가 발생해 버린다. 
+		</P
+><P
+>			신호는 매우 빠른 시간에 전달됨으로 보통의 경우 신호전달시간을 
+			염두에 두어야 하는 경우는 발생하지 않을것이다. 하지만 불행하게도 
+			염두에 두어야 하는 경우가 발생하기도 한다.  
+		</P
+><P
+>			물론 우리 프로그래머들의 사전에 불가능이란 없으므로 위의 문제도 간단하게 
+			해결가능 하다. 조건변수를 2개 쓰면 된다. thread 1 에서 신호를 보냈다면, 
+			thread 1 은 다음 루틴으로 넘어가기 전에 thread 2 에서 넘어오는 신호를 
+			기다리도록 하면 될것이다. thread 2 는 thread 1의 신호를 받은뒤 thread 1으로 
+			신호를 보내게 될것임으로 반드시 신호가 전달될것을 확신할수 있을것이다. 
+			2개의 조건변수를 지원하기 위해서 
+			2개의 mutex 잠금이 필요할것이다. 여기에서는 그 구현까지 설명하지는 
+			않을것이다. 조금만 생각해보면 간단하게 구현 가능할것이기 때문이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> thread 1                                    thread 2
+ while(1)                                    while(1)
+ {                                           {
+     쓰레드 공유변수 A++      
+     신호 1 보냄           -----------------&#62;     신호 1 기다림
+	 신호 2 기다림         &#60;----------------      신호 2 보냄
+     ....                                            ....
+ }                                           } 
+  			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			신호의 전달에 걸리는 시간은 운영체제에 따라 상당한 차이를 보인다. 
+			그러므로 이러한 오차시간까지도 염두에 두어야할 상황이 발생한다면 
+			시간테스트를 해야할것이다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

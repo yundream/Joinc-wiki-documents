@@ -1,0 +1,79 @@
+#title struct sockaddr, sockaddr_in, sockaddr_un
+
+== 사용 == 
+bind(), connect()를 사용하는 socket(:12) 네트워크:::프로그래밍(:12)에서 주소와 포트정보를 저장하기 위해서 사용한다. 
+{{{#!plain
+<</usr/include/bits/socket.h>>
+struct sockaddr 
+{
+	unsigned short sa_family;  // Address family and length
+	char sa_data[14];            // Address data
+}
+}}}
+
+위의 네트워크 관련 함수들은 기본 데이터형으로 sockaddr 을 받아들인다. 그런데 sockaddr 로는 다양한 유형의 socket을 받아들일 수 없다. 예를 들어 AF_INET 소켓도 있고 AF_UNIX 소켓이 있는데 이들은 구조자체가 완전히 다르기 때문이다. 
+
+AF_INET의 경우에는 struct sockaddr_in 을 사용하고 AF_UNIX 의 경우에는 struct sockaddr_un 을 사용한다. 그러므로 실제 소켓 프로그래밍에서는 sockaddr 로 형변환을 해서 사용해야 한다. 형변환된 데이터를 받아들인 함수는 sa_family 값을 이용해서 데이터의 종류를 알아낼 수 있다.
+
+'''AF_UNIX'''에서의 사용
+{{{#!plain
+struct sockaddr_un serveraddr; 
+
+bzero(&serveraddr, sizeof(serveraddr));
+serveraddr.sun_family = AF_UNIX;
+strcpy(serveraddr.sun_path, argv[1]);
+
+if (bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0)
+{
+    perror("bind error : ");
+    exit(0);
+}
+clilen  = sizeof(clientaddr); 
+}}}
+
+'''AF_INET'''에서의 사용
+{{{#!plain
+struct sockaddr_in serveraddr;
+
+server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+serveraddr.sin_family = AF_INET;
+serveraddr.sin_addr.s_addr = inet_addr("218.234.19.87");
+serveraddr.sin_port = htons(atoi(argv[1]));
+
+client_len = sizeof(serveraddr);
+
+if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len) < 0)
+{
+    perror("connect error :");
+    exit(0);
+}
+}}}
+
+===  struct sockaddr_in ===
+AF_INET 도메인의 소켓에서 사용하는 구조체
+{{{#!plain
+<</usr/include/netinet/in.h
+struct sockaddr_in
+  {
+    __SOCKADDR_COMMON (sin_);  /* sa_family_t sin_family */
+    in_port_t sin_port;                 /* Port number.  */
+    struct in_addr sin_addr;            /* Internet address.  */
+
+    /* Pad to size of `struct sockaddr'.  */
+    /* 결국 8 byte */
+    unsigned char sin_zero[sizeof (struct sockaddr) -
+                           __SOCKADDR_COMMON_SIZE -
+                           sizeof (in_port_t) -
+                           sizeof (struct in_addr)];
+  };
+}}}
+
+=== struct sockaddr_un ===
+{{{#!plain
+<</usr/include/sys/un.h>>
+struct sockaddr_un
+  {
+    __SOCKADDR_COMMON (sun_);
+    char sun_path[108];         /* Path name.  */
+  };
+}}}

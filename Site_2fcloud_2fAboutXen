@@ -1,0 +1,35 @@
+#title Xen Hypervisor
+
+== Xen에 대해서 ==
+Xen 하이퍼바이저는 하나의 컴퓨터에서 여러 개의 운영체제를 동시에 실행하도록 도와주는 소프트웨어 계층이다. 3가지 요소로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=128IRmlhyzjvb3kXexVTGLf7Ev9wTMxEsCeR6nvdjhvg&amp;w=439&amp;h=340">
+}}}
+
+'''Xen 하이퍼바이저'''
+    Xen 하이퍼바이저는 CPU, I/O, 디스크등의 하드웨어 자원에 직접 접근 할수 있으며, 자원에 접근할 수 있는 인터페이스를 제공한다. guest 운영체제는 Xen 하이퍼바이저게 제공하는 인터페이스를 이용해서 하드웨어에 접근할 수 있다. 
+
+'''Domain 0'''
+    Dom0라고 부른다. 시스템이 부팅하면 하이퍼바이저에 의해서 실행되며, 윈도우를 제외한 guest 운영체제를 실행할 수 있다. Dom0는 하이퍼바이저를 직접제어할 수 있는 권한을 가지는 특수한 guest 운영체제로, 다른 guest 운영체제를 실행하고 종료하고 I/O요청을 실행하는 등의 관리 작업을 수행한다. 시스템 관리자는 Dom0에 접근해서 guest 운영체제를 관리할 수 있다.
+
+'''Domain U'''
+    DomU라고 부른다. 하이퍼바이저 위에서 작동하는 guest vm이다. 리눅스, 윈도우와 같은 일반적인 운영체제로 하드웨어에 - 메모리, 디스크 등 - 직접 접근할 수 없고, DomO에 요청하는 식으로 하드웨어를 사용할 수 있다. Xen은 paravirtuirtualizatio과 HVM 모두를 지원한다. paravirtualization 방식으로 작동하기 위해서는 운영체제를 수정해야 한다. 때문에 소스코드를 수정할 수 없는 윈도우즈 운영체제의 경우 HVM 방식으로 실행할 수 있다. 커널을 수정할 수 있는 리눅스 같은 운영체제는 paravirtualization과 HVM 모두 작동이 가능하다.    
+
+== 가상화 종류 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1_E_Zx60xDJQNnn0-oa2VsLYt_YR5uOnyIQpM4ZmU5Bo&amp;w=467&amp;h=456">
+}}} 
+''' Paravirtualization'''
+    운영체제가 system call을 호출해서 하드웨어에 직접 요청하는 대신, hyper call을 이용해서 하이퍼바이저에 요청하는 방식으로 작동한다. 리눅스의 경우 2.6.39 이후의 커널 버전에 Dom0와 DomU 모두에서 동작하기 위해 필요한 Xen 컴포넌트가 모두 포함된다. 
+
+'''HVM - Hardware Virtual Machine''' 
+    HVM은 fullvirtualization이의 다른 이름이다. HVM 가상화를 하려면 Intel-VT나 AMD-V 기술이 적용된 CPU를 사용해야 한다. Xen은 BIOS, IDE 디스크 컨트롤러, VGA 그래픽 어댑터, USB 컨트롤러 등의 모든 하드웨를 애뮬레이션 하는 Qemu를 제공한다. guest 운영체제가 명령을 내리면 0x80 인터럽트 대신 0x82 인터럽트가 발생하는데, Qemu가 이 명령을 가로챈다. Qemu는 명령을 해석 해서 Hypervisor에 전달을 한다. 커널 수정 없이 guest 운영체제를 올릴 수 있으므로 사용 운영체제는 HVM 모드로 실행한다. 
+
+== 참고 문헌 ==
+ 1. http://www.2virt.com/blog/?p=122
+ 1. http://blog.xen.org/index.php/2011/06/02/xen-celebrates-full-dom0-and-domu-support-in-linux-3-0/
+ 1. http://serverfault.com/questions/222010/difference-between-xen-pv-xen-kvm-and-hvm
+ 1. http://en.wikipedia.org/wiki/Xen
+ 1. http://wiki.qemu.org/Main_Page
+ 1. http://virtualhive.tistory.com/36

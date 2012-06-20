@@ -1,0 +1,93 @@
+#title winsock api : WSASocket
+
+== WSASocket ==
+Transport-service provider 기반의 소켓을 만들기 위해서 사용하는 함수
+
+=== 사용 법 ===
+{{{#!plain
+SOCKET WSASocket(
+  __in  int af,
+  __in  int type,
+  __in  int protocol,
+  __in  LPWSAPROTOCOL_INFO lpProtocolInfo,
+  __in  GROUP g,
+  __in  DWORD dwFlags
+);
+}}}
+
+기본적인 사용 방법은 BSD:::소켓(:12) 생성함수인 socket(:2)함수와 비슷하다. 윈속의 확장 기능을 사용할 수 있다. 예를 들어 Overlapped(:12) I/O 와 win32 Event 매커니즘을 활용할 수 있다.
+=== 매개 변수 ===
+매개 변수 af, type, protocol은 socket함수와 동일하다. 
+  1. af : 사용할 주소영역을 명시한다. 
+        || AF_UNSPEC || 0  || 정의되지 않은 주소영역   ||
+        || AF_INET         || 2  || IPv4 주소영역                    ||
+        || AF_IPX            || 6  || IPX/SPX 주소영역에서 사용된다. windows vista 이후 부터는 지원하지 않는다.  ||
+        || AF_APPLETALK  || 17 || AppleTalk 에서 사용된다. vista 이후부터는 지원하지 않는다.  ||
+        || AF_NETBIOS   || 17 ||  NetBIOS 주소영역에서 사용된다. ||
+        || AF_INET6         || 23 || Internet Protocol version 6 (IPv6) 주소영역에서 사용된다.  ||
+        || AF_IRDA           || 26 || Infrared Data Association 주소영역에서 사용한다.    ||
+        || AF_BTH             || 32 || bluttooth 주소영역에서 사용한다. windows xp with SP2 이후 버전부터 지원한다. ||
+  1. type :  소켓 형식을 지정한다.
+        || SOCK_STREAM   || 1 || 연결지향, 양방향의 TCP/IP 기반의 통신을 위해서 사용된다.   ||
+        || SOCK_DGRAM    || 2 || UDP/IP 기반의 통신을 위해 사용한다. ||
+        || SOCK_RAW          || 3 || IP 헤더를 직접 제어하기 위한목적으로 사용한다.         ||
+  1. '''protocol''' : 사용할 프로토콜을 지정한다.
+        || BTHPROTO_RFCOMM  || 3 || Bluetooth Radio Frequency 통신을 위해서 사용한다. SOCK_STREAM과 함께 사용한다. ||
+        || IPPROTO_TCP      || 6 || TCP를 사용한다. AF_INET 혹은 AF_INET6 af와 SOCK_STREAM type과 함께 사용한다. ||
+        || IPPROTO_UDP      || 6 || UDP를 사용한다. AF_INET 혹은 AF_INET6 af와 SOCK_DGRAM type과 함께 사용한다. ||
+  1. lpProtocolInfo : 만들어지는 소켓의 특성을 정의한 WSAPROTOCOL_INFO(:4300) 구조체에 대한 포인터(:12)
+  1. g : 소켓 그룹의 식별자로 예약된 매개 변수.
+  1. dwFlags : 소켓 속성을 지정한다.  
+
+=== 설명 ===
+WSASocket 함수는 소켓 기술자를 얻어내고, 관련된 리소스를 할당받는 Transport-service provicer의 제어를 받는 함수다. 기본적으로 중첩 (overlapped)속성을 가지지 않는 소켓을 만든다.
+
+만약 '''lpProtocolInfo'''가 NULL이라면, 처음 3개의 매개 변수로 소켓의 특성을 정의 한다. lpProtocolInfo가 NULL이 아니라면, WSAPROTOCOL_INFO를 바탕으로 소켓 특성을 정의 한다.  
+
+매개 변수 dwFlags는 아래의 값들을 사용할 수 있다. OR연산으로 여러 속성을 지정할 수 있다.
+ || WSA_FLAG_OVERLAPPED   || 중첩 소켓을 만든다. 중첩 소켓은 WSASend, WSASendTo, WSARecv, WSARecvFrom, WSAIoctl등의 함수를 사용할 수 있다. 이 값을 명시하지 않으면 비 중첩 소켓으로 만들어진다. ||
+ || WSA_FLAG_MULTIPOINT_C_ROOT  || 만들어진 소켓이 멀티 포인트 세션에서 c_root가 될 것을 알려 준다. ||
+ || WSA_FLAG_MULTIPOINT_C_LEAF  || 만들어진 소켓이 멀티캐스트 세션에서 c_leaf가 될 것을 알려 준다.  ||
+ || WSA_FLAG_MULTIPOINT_D_ROOT  || 만들어진 소켓이 멀티 포인트 세션에서 d_root가 될 것을 알려 준다. ||
+ || WSA_FLAG_MULTIPOINT_D_LEAF  || 만들어진 소켓이 멀티 포인트 세션에서 d_leaf가 될 것을 알려 준다.  ||
+
+SOCK_STREAM과 같은 연결 지향 소켓은 전 이중 통신을 지원한다. 연결을 위해서 connect(:4100), WSAConnect(:4100) 함수를 사용할 수 있다. 읽고 쓰기 위해서는 각각 recv(:4100), WSARecv(:4100)과 send(:4100), WSASend(:4100)를 쓸 수 있다. 만약 SOCK_DGRAM과 같은 비 연결지향, 데이터 그램 지향 소켓이라면 sendto(:4100), WSASendTo(:4100) 과 recvfrom(:4100), WSARecvFrom(:4100)함수를 쓰면 된다. 
+
+=== 예제 ===
+우선은 MSDN의 예제로 하고, 나중에 완전히 작동하는 예제 프로그램을 만들어 보자.
+{{{#!plain
+#include <windows.h>
+#include <winsock2.h>
+#include <stdio.h>
+
+int main() {
+  WSADATA wsaData;
+  SOCKET RecvSocket;
+
+  int iResult;
+
+  //-----------------------------------------------
+  // Initialize Winsock
+  iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+  if (iResult != 0) {
+      printf("WSAStartup failed: %d\n", iResult);
+      return 1;
+  }
+
+
+  //-----------------------------------------------
+  // Create a socket 
+  RecvSocket = WSASocket(AF_INET, 
+    SOCK_DGRAM, 
+    IPPROTO_UDP, 
+    NULL, 
+    0, 
+    WSA_FLAG_OVERLAPPED);
+
+  if (RecvSocket == INVALID_SOCKET) {
+      printf("WSASocket call failed with error: %ld\n", WSAGetLastError());
+      WSACleanup();
+      return 1;
+  }
+}
+}}}

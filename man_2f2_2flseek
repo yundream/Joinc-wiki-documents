@@ -1,0 +1,84 @@
+#title linux man page : lseek - 파일의 위치를 재지정한다.
+
+[[TableOfcontents]]
+== lseek ==
+읽기및 쓰기를 위해서 파일의 위치를 재지정
+
+=== 사용법 ===
+{{{#!plain
+#include <sys/types.h>
+#include <unistd.h>
+
+off_t lseek(int fildes, off_t offset, int whence);
+}}}
+
+=== 설명 ===
+lseek()는 열린 파일 지정자 fildes로 부터 offset만큼 위치를 변경한다. 위치 변경시 기준점을 정할 수 있는데 whence를 이용해서 지정할 수 있다.
+
+  * SEEK_SET
+     파일의 처음을 기준으로 offset을 계산한다.
+  * SEEK_CUR
+     파일의 현재 위치를 기준으로 offset을 계산한다.
+  * SEEK_END
+     파일의 마지막을 기준으로 offset을 계산한다.
+
+실수로 파일의 마지막을 초과해서 lseek를 사용했을 경우 lseek에서 리턴을 하지는 않지만 write()혹은 read()에서 에러를 발생하게 되므로 주의 해야 한다.
+
+=== 반환값 ===
+성공했을 경우 파일의 시작으로 부터 떨어진 byte만큼의 offset을 리턴한다. 실패했을 경우 -1을 리턴한다.
+
+=== 에러 ===
+  * EBADF
+     Fildes가 열린 파일 지정자가 아니다.
+  * ESPIPE
+     Fildes가 파이프, 소켓 혹은 FIFO이다.
+  * EINVAL
+     Whence가 유효한 값이 아니다.
+
+=== 예제 ===
+{{{#!plain
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+int main(int argc, char **argv)
+{
+    int fd;
+    int i, buf;
+    fd = open("num.dat", O_RDWR|O_CREAT);
+    if (fd < 0)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    for (i = 1000; i < 1010; i++)
+    {
+        write(fd, (void *)&i, sizeof(i));
+    }
+    // 파일의 처음으로 이동한 다음 데이터를 읽는다.
+    lseek(fd, 0, SEEK_SET);
+    read(fd, (void *)&buf, sizeof(i));
+    printf("%d\n", buf);
+
+    // 파일의 처음이로 이동한 다음 4번째 입력된 숫자를
+    // 읽는다.
+    lseek(fd, 4*sizeof(i), SEEK_SET);
+    read(fd, (void *)&buf, sizeof(i));
+    printf("%d\n", buf);
+}
+}}}
+
+아래와 같은 방법으로 쓰기버퍼를 비울 수도 있다.
+{{{#!plain
+write(fd, buf, strlen(buf));
+lseek(wfd, 0, SEEK_SET);
+}}}
+
+=== 참고문헌 ===
+  1. [wiki:Site/system_programing/File/seek seek를 이용한 파일내 위치이동]
+
+ * 큰 파일(2GBytes 이상)을 다루고자 해야 하는 문제에 봉착하는 분들을 위해서 LFS를 참고자료로 다루었으면 좋겠습니다. [http://www.suse.de/~aj/linux_lfs.html LFS 참고링크] - [minzkn]
+  * 요약하면 컴파일 옵션에 "'''-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE'''"을 주고 open/creat 함수에서 O_LARGEFILE을 사용하고 off_t 의 확장에 대한 고려등에 대해서 다루어졌으면 합니다.
+  * 오늘 집에가서 관련 내용을 살펴보고 테스트 후 문서를 업데이트 시키도록 하겠습니다. 재미있을 것 같군요 :-) 좋은 정보 감사합니다. -[yundream] 

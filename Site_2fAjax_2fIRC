@@ -1,0 +1,130 @@
+#title Ajax를 이용한 IRC 웹클라이언트 구현
+
+[[TableOfContents]]
+=== 이유 ===
+ 1. 심심해서
+ 1. 재미있을 거 같아서.
+ 1. 그냥
+
+=== 목적 ===
+ 1. 웹에서 굴러가는 Ajax IRC 클라이언트 구현
+ 1. irc.nuri.net에서의 커뮤니케이션 용도 
+
+=== IRC 프로토콜 ===
+==== IRC COMMAND ====
+일단 IRC 프로토콜에 대해서 테스트를 해보기로 했다. 일단 다음의 프로토콜들만 알고 있다면, 최소한의 커뮤니케이션이 가능하다.
+  1. '''NICK [사용자별명]''' : IRC에서 사용할 별명을 정의 한다. 해당 별명이 이미 사용중이라면 에러메시지를 출력한다. 그렇지 않다면 PING 응답을 보낸다. 
+    {{{#!plain
+NICK yundream
+:iz4u.hanirc.org 433 * yundream :Nickname is already in use.
+NICK yundream4
+PING :1965583264
+}}}
+  1. '''PONG ''' : 서버로부터의 PING 에 대해서 응답을 한다. PONG 메시지는 반드시 보내야 한다. PING는 대화 중간중간 유저가 대화에 참여하고 있는지를 확인하기 위해여 보내는데, 일정시간 응답이 없으면 연결을 끊게 된다. 그러므로 PING에 대해서는 자동으로 PONG를 응답을 해줘야 한다. 
+    {{{#!plain
+NICK yundream4
+PONG :1965583264
+}}}
+  1. '''USER [aliase] [host] [domain] :[real name]''' : 사용자를 등록한다. IRC 서비스를 위해서는 반드시 사용자 등록을 해야 한다.
+    {{{#!plain
+USER yundream localhost irc.joinc.co.kr :yun dream
+}}}
+  1. '''JOIN [channel]''' : 참여할 채널이름
+    {{{#!plain
+JOIN #joinc
+}}}
+  1. '''PRIVMSG [channel] [:message] : 해당 채널로 메시지 보내기
+    {{{#!plain
+PRIVMSG #joinc :안녕
+}}}
+  1. '''QUIT''' : IRC 종료 
+
+==== IRC Message ====
+사용자 IRC 메시지형식은 다음과 같다.
+{{{#!plain
+:[nick]![id@hostname] [Command] [channel] :[message]
+}}}
+
+시스템 IRC 메시지 형식은 다음과 같다.
+{{{#!plain
+:[hostname] [code] [NICK] :[message]
+}}}
+
+==== telnet를 이용한 프로토콜 테스트 ====
+telnet 를 이용해서 간단하게 IRC 프로토콜 테스트를 수행해 보았다. 쓸데 없다고 생각되는 메시지는 제외했다.
+{{{#!plain
+#telnet irc.nuri.net 6667
+Trying 222.122.43.50...
+Connected to irc.nuri.net.
+Escape character is '^]'.
+NOTICE AUTH :*** Looking up your hostname
+NOTICE AUTH :*** Checking Ident
+NOTICE AUTH :*** Couldn't look up your hostname
+NOTICE AUTH :*** No ident response
+USER yundream4
+:iz4u.hanirc.org 461 * USER :Not enough parameters
+NICK yundream4
+PING :2761629310
+PONG :2761629310
+USER yundream localhost irc.joinc.co.kr :yun dream
+JOIN #joinc
+:yundream4!~yundream@218.234.19.87 JOIN #프겔
+:iz4u.hanirc.org 332 yundream4 #joinc :하악하악 joinc 입니다. 
+:youwin@211.159.64.114 PRIVMSG #joinc :배고파
+:yundream4@111.111.111.111 PRIVMSG #프겔 :그럴땐 밥을 먹으라구
+}}}
+
+=== 구현 제안 ===
+==== 전체구조 ====
+attachment:irc.png
+  * Display 와 Input 은 서로 분리된다.
+  * Input은 Post 방식으로 비동기로 데이터를 쓴다. 
+  * Display는 RelayServer와 연결되며, Session은 유지된다. 
+RelayServer는 중계서버로 작동한다.
+  * 유저데이터를 받아서 IRC서버의 해당 channel에 연결한다. 
+  * IRC서버의 리턴값을 Display에 쓴다. 
+
+==== RelayServer ====
+
+==== 처리 프로토콜 ====
+최소 대화수준으로 다음의 프로토콜만을 처리한다.
+     || NICK    || 별명 정의            ||
+     || USER    || 유저 상세 정보 정의  ||
+     || PONG    || PING에 대한 응답     ||
+     || JOIN    || 채널 참여            ||
+     || PRIVMSG || 메시지 전송          ||
+     || QUIT    || IRC 종료             ||
+
+==== 구현 환경 ====
+ 1. RelayServer : C(:12) 혹은 C++로 구현 
+ 1. Display & Input : HTML, JavaScript, AJAX, php(:12) 
+ 1. RTS(Real Time Signal)이용
+ 1. PORT : 변경될 수 있음.
+    * 7000 : Display Port 
+    * 7200 : Input Port 
+
+=== Display & Input 구현 프로세스 ===
+==== RelayServer 구현 프로세스 ====
+'''RelayServer'''는 C(:12) 혹은 C++을 이용해서 구현할 것이다. 대략 다음과 같은 프로세스를 가질 것이다. 
+  1. Display와 Input는 하나의 Session을 구성하게 된다. RelayServer은 Display와 Input을 위한 2개의 포트를 가진다.  
+  1. irc 연결을 위한 유저정보 즉 irc host 이름과 NIC, USER, JOIN 에 대응되는 정보들을 받는다. 
+  1. RelayServer는 Display와 Input의 User Session 과 User Data를 이용해서 데이터를 주고 받는다. 
+  1. Input 으로 부터 데이터를 받으면, User Data 정보에 근거하여, 해당 IRC Server로 데이터를 전달한다. 전달받은 데이터는 User Session 정보와 User Data 정보에 근거하여, 해당 Display로 전달한다.
+
+=== 테스트 프로그램 만들기 ===
+간단한 테스트 프로그램을 만들어보기로 했다. 우선 Display와 Input을 위한 Ajax 응용을 만들어볼 계획이다. 독립된 2개의 페이지를 유지할 것인가, 아니면 하나의 페이지에서 2개를 모두 나타낼 수 있는지를 확인하기 위함이다. 가능할것 같기는 한데, 확실히 테스트해볼 필요가 있을것 같다. 하나의 페이지로 구성가능하다면 편할 것이다. 
+{{{#!plain
+  +---------------+
+  | +-----------+ |
+  | | Display   | |
+  | |           | |
+  | |           | |
+  | +-----------+ |
+  | +-----------+ |
+  | | Input     | |
+  | +-----------+ |
+  +---------------+
+}}}
+
+=== 관련문서 ===
+ * http://www.subbu.org/weblogs/main/2006/04/dissecting_ajax_1.html

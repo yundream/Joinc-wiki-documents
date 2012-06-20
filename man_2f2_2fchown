@@ -1,0 +1,242 @@
+#title chown - 파일의 소유자를 변경한다.  
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>chown(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. chown(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN13"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN16"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN40"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	파일에 대한 소유권을 바꾸기 위해서 사용된다. 유사한 류의 함수로 fchown(2), lchown(2) 함수들이 있다</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+
+int chown(const char *path, uid_t owner, gid_t group);
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		chown(2) 계열의 함수들은 <B
+CLASS="EMPHASIS"
+>path</B
+>에 지정되어있는 
+		파일 혹은 fd(파일지정자)가 가르키는 파일의 소유(및 그룹)권한을 
+		변경하기 위해 사용된다. chown(2)을 이용해서 파일의 권한을 
+		변경하기 위해서는 
+		해당 파일에 대한 권한을 가지고 있어야 한다. 슈퍼유저는 임의로 
+		권한의 변경이 가능하다. 	
+	</P
+><P
+>		lchown(2)은 심볼링 링크(sybolic links)에 대한 소유 권한을 변경 하기 
+		위한 목적으로 과거(2.1.x)에 사용되었었다. 
+		그러나 최근의 커널들은 심볼릭 
+		링크에 대한 권한 변경을 허용하지 않는다. lchown(2)역시 내부적으로 
+		chown(2)와 동일한 시스템 콜을 사용한다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+></A
+>1.3. 반환값</H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EPERM</DT
+><DD
+><P
+>	
+					유효 UID가 파일의 소유자와 일치하지 않으며 0이 아닐 경우, 
+					혹은 소유자나 그룹이 정확히 지정되지 않았을 경우
+				</P
+></DD
+><DT
+>EROFS</DT
+><DD
+><P
+>					소유권을 변경하고자 하는 파일이 읽기전용 파일시스템에 
+					있을 경우로 cd-rom 혹은 읽기 전용의 samba, NFS 파일 시스템
+					등에서 발생할 수 있다. 
+				</P
+></DD
+><DT
+>ENOENT</DT
+><DD
+><P
+>					파일이 존재하지 않는다.
+				</P
+></DD
+><DT
+>ENOMEM</DT
+><DD
+><P
+>					커널 메모리가 충분하지 않을 때
+				</P
+></DD
+><DT
+>EACCESS</DT
+><DD
+><P
+>					파일을 찾기 위한 디렉토리 권한이 거부되었을 때
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN40"
+></A
+>1.5. 예제</H1
+><P
+>		/home/test/my.txt 파일의 유저권한을 yundream 그룹권한을 post 로 
+		변경하기 원할때
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;pwd.h&#62;
+#include &#60;grp.h&#62;
+#include &#60;sys/types.h&#62;
+
+int main()
+{
+    struct passwd *u_info;
+    struct group  *g_info;
+
+    u_info = getpwnam("yundream");
+    g_info = getgrnam("post");
+
+    chown("/home/test/my.txt", u_info-&#62;pw_uid, g_info-&#62;gr_gid);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		getpwnam(3) 과 getgrnam(3) 은 각각 유저의 정보와 그룹의 정보를 
+		이름으로 가져오기 위해서 사용하는 함수이다. getpwnam 은 /etc/passwd 
+		파일을, getgrnam 은 /etc/group 파일을 참조하여서 각각의 
+		정보를 가져온다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

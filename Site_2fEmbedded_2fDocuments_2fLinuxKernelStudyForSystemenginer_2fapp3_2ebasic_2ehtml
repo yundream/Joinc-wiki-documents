@@ -1,0 +1,857 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>인라인 어셈블리 기초</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Inline Assembly"
+HREF="app3.html"><LINK
+REL="PREVIOUS"
+TITLE="Inline Assembly"
+HREF="app3.html"><LINK
+REL="NEXT"
+TITLE="사례 분석"
+HREF="app3.analysis.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="app3.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>부록 C. Inline Assembly</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="app3.analysis.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="APP3.BASIC"
+>C.1. 인라인 어셈블리 기초</A
+></H1
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="APP3.BASIC.BASE"
+>C.1.1. 알아야할 것 들</A
+></H2
+><P
+>				인라인 어셈블리를 사용할 땐 다음과 같은 것을 명시해 줘야한다. 물론 빼고 사용할 수도 있다.
+			</P
+><P
+>				<P
+></P
+><UL
+><LI
+><P
+>어셈블리 코드</P
+></LI
+><LI
+><P
+>output 변수</P
+></LI
+><LI
+><P
+>input 변수</P
+></LI
+><LI
+><P
+>값이 바뀌는 레지스터</P
+></LI
+></UL
+>
+			</P
+><P
+>				그리고 사용되는 문법의 형태는 다음과 같다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>__asm__ __volatile__ (asms : output : input : clobber);</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>__asm__</DT
+><DD
+><P
+>							다음에 나오는 것이 인라인 어셈블리 임을 나타낸다. ANSI엔 __asm__ 으로만 정으되어 있으므로
+							asm 과 같은 키워드는 사용하지 않는 것이 바람직하다.
+						</P
+></DD
+><DT
+>__volatile__</DT
+><DD
+><P
+>							이 키워드를 사용하면 컴파일러는 프로그래머가 입력한 그래도 남겨두게 된다. 즉 최적화
+							나 위치를 옮기는 등의 일을 하지 않는다. 예를 들어 output 변수중 하나가 인라인
+							어셈블리엔 명시되어 있지만 다른 곳에서 사용되지 않는다고 판단되면 컴파일러는 이 변수를
+							알아서 잘 없애주기도 한다. 이런 경우 이런 것을 고려해 프로그램을 짰다면 상관 없겠지만
+							만에 하나 컴파일러가 자동으로 해준 일 때문에 버그가 발생할 수도 있다.
+							그러므로 __volatile__ 키워드를 사용해 주는 것이 좋다.	
+						</P
+></DD
+><DT
+>asms</DT
+><DD
+><P
+>							따옴표로 둘러싸인 어셈블리 코드. 코드 내에서는 %x과 같은 형태로 input, output
+							파라미터를 사용할 수 있으며 컴파일 하면 파라미터가 치환된 대로 어셈블리 코드로
+							나타난다.
+						</P
+></DD
+><DT
+>output</DT
+><DD
+><P
+>							변수들을 적어 주고 각각은 쉼표고 구분된다. 결과 값을 출력하는 변수를 적는다.
+						</P
+></DD
+><DT
+>input</DT
+><DD
+><P
+>							output과 같은 방식으로 사용하고 인라인 어셈블리 코드에 넘겨주는 파라미터를 적는다.
+						</P
+></DD
+><DT
+>clobber</DT
+><DD
+><P
+>							output, input에 명시되어 있진 않지만 asms를 실행해서 값이 변하는 것을 적어 준다.
+							각 변수는 쉼표로 구분되고 각각을 따옴표로 감싸준다.
+						</P
+></DD
+></DL
+></DIV
+><P
+>				asms는 반드시 있어야하지만 output, input, clobber는 각각 없을 수도 있다. 만약 clobber가 없는 경우
+				라면 clobber와 바로 앞의 콜론(:)을 같이 쓰지 않아도 된다. 마찬가지로 input, clobber가 없다면 
+				output까지만 쓰면 된다.
+			</P
+><P
+>				그러나 output, clobber는 있고 input이 없는 경우엔 다음과 같이 input 만을 제외한 나머지는 반드시
+				써줘야한다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>__asm__ __volatile__ (asms : output : : clobber);</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				중간에 있는 것이 없는 경우엔 해당 항목만을 없애고 콜론은 그대로 내버려둬야 다음 필드가 어떤 것을
+				의미하는지 나타내게 된다.
+			</P
+><P
+>				인라인 어셈블리가 사용된 예를 들어보자. include/asm-i386/bitops.h에 정의되어 있는 함수다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/**
+ * test_and_set_bit - Set a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is atomic and cannot be reordered.  
+ * It also implies a memory barrier.
+ */
+static __inline__ int test_and_set_bit(int nr, volatile void * addr)
+{
+	int oldbit;
+
+	__asm__ __volatile__( LOCK_PREFIX
+		"btsl %2,%1\n\tsbbl %0,%0"
+		:"=r" (oldbit),"=m" (ADDR)
+		:"Ir" (nr) : "memory");
+	return oldbit;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="APP3.BASIC.ASSEMBLY"
+>C.1.2. 어셈블리</A
+></H2
+><P
+>				인라인 어셈블리 중 asms에 해당하는 실제 코드를 적는 부분은 AT&#38;T 어셈블리 문법을 따르고 여기에 
+				적인 그대로가 컴파일 후 gasm에 넘겨지기 때문에 gasm의 문법을 따라야한다. 
+			</P
+><P
+>				명령의 구분은 세미콜론(;)이나 개행문자(\n)으로 한다.
+			</P
+><P
+>				그리고 gasm의 문법에서 주의할 것은 레지스터를 %ax과 같은 식으로 쓴다는 것과 인텔 어셈블리와는
+				달리 destination이 뒤에 나온다는 것이다. 그러므로 인텔 문법에 익숙한 사람은 사고의 전환이 필요할
+				것이다.
+			</P
+><P
+>				인라인 어셈블리에선 %0, %1등을 사용해 input, output 오퍼랜드를 나타낸다. output에서 부터 시작해
+				input에 나열된 변수들의 순서 대로 %0, %1, ... 으로 번호가 매겨진다.
+			</P
+><P
+>				모든 코드는 따옴표 안에 있어야하기 때문에 많은 수의 명령을 한줄로 쓰면 보기도 않좋기 때문에
+				명령 수가 많아지면 각 명령을 따옴표로 감싸고 뒤에  \t\n을 넣고 다음 줄에 다시 명령을 따옴표로
+				적으면 된다. 아래의 예를 보면 이해가 쉬울 것이다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>static __inline__ int find_first_zero_bit(void * addr, unsigned size)
+{
+	int d0, d1, d2;
+	int res;
+
+	if (!size)
+		return 0;
+	/* This looks at memory. Mark it volatile to tell gcc not to move it around */
+	__asm__ __volatile__(
+		"movl $-1,%%eax\n\t"
+		"xorl %%edx,%%edx\n\t"
+		"repe; scasl\n\t"
+		"je 1f\n\t"
+		"xorl -4(%%edi),%%eax\n\t"
+		"subl $4,%%edi\n\t"
+		"bsfl %%eax,%%edx\n"
+		"1:\tsubl %%ebx,%%edi\n\t"
+		"shll $3,%%edi\n\t"
+		"addl %%edi,%%edx"
+		:"=d" (res), "=&#38;c" (d0), "=&#38;D" (d1), "=&#38;a" (d2)
+		:"1" ((size + 31) &#62;&#62; 5), "2" (addr), "b" (addr));
+	return res;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				바로 위의 예에서 %eax가 아니라 %%eax라고 씌어진 것이 있는데 %%는 gasm에 넘겨질 때 %로 해석되 넘겨진다.
+				즉 output, input에 레지스터를 직접 지정할 때 이렇게 쓴다. 그러나 output, input에 아무 것도 지정되어
+				있지 않다면 %%는 %로 바뀌지 않는다. 그러므로 %eax와 같이 써야만 한다.
+			</P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="APP3.BASIC.INOUTPUT"
+>C.1.3. Output/Input</A
+></H2
+><P
+>				이전의 예들에서 보면 output, input에 지정된 것이 무척 어렵게 되어 있는데 output, input은
+				constraints와 변수 이름이 쉼표로 구분된 리스트로 이루어져 있다.
+			</P
+><P
+>				constraints는 의미를 나타내는 문자와 몇가지 modifier를 조합해 만들어진다. 자세한 내용은 'info gcc'
+				를 해서 ::Constraints 항목에서 찾길 바란다. 아래 열거된 것은 몇 가지만을 간추린 것이다.
+			</P
+><DIV
+CLASS="SECT3"
+><H3
+CLASS="SECT3"
+><A
+NAME="AEN2778"
+>C.1.3.1. Constraints</A
+></H3
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>'m'</DT
+><DD
+><P
+>								아키텍쳐가 지원하는 모든 종류의 메모리 어드레스를 사용하는 오퍼랜드
+							</P
+></DD
+><DT
+>'o'</DT
+><DD
+><P
+>								옵셋화 가능한 어드레스를 사용하는 메모리 오퍼랜드
+							</P
+></DD
+><DT
+>'V'</DT
+><DD
+><P
+>								옵셋화 불가능한 어드레스를 사용하는 메모리 오퍼랜드
+							</P
+></DD
+><DT
+>'&#60;'</DT
+><DD
+><P
+>								자동 감소(미리 감소하거나 나중에 감소한다) 어드레스용 메모리 오퍼랜드
+							</P
+></DD
+><DT
+>'&#62;'</DT
+><DD
+><P
+>								자동 증가(미리 증가하거나 나중에 증가한다) 어드레스용 메모리 오퍼랜드
+							</P
+></DD
+><DT
+>'r'</DT
+><DD
+><P
+>								일반 레지스터 사용 오퍼랜드
+							</P
+></DD
+><DT
+>'d', 'a', 'f', ...</DT
+><DD
+><P
+>								시스템에 따른 레지스터를 나타내는 다른 오퍼랜드로 d, a, f는 각각 68000/68020에서
+								데이터, 어드레스, 플로팅포인트 레지스터를 나타낸다.
+							</P
+></DD
+><DT
+>'i'</DT
+><DD
+><P
+>								immediate 정수 값을 나타내는 오퍼랜드. 심볼로된 상수도 여기에 해당한다.
+							</P
+></DD
+><DT
+>'n'</DT
+><DD
+><P
+>								immediate 정수 값으로 알려진 정수 값을 나타낸다. 많은 시스템이 어셈블할 때 한 워드 이하의
+								오퍼랜드용 상수를 지원하지 않으므로 'i'보단 'n'을 사용하는 것이 바람직하다.
+							</P
+></DD
+><DT
+>'I', 'J', 'K', ... 'P'</DT
+><DD
+><P
+>								시스템에 따라 특정 범위 내의 값을 나타내는 오퍼랜드. 68000에선 'I'가 1에서 8까지의
+								값을 나타낸다. 이것은 시프트 명령에서 허용된 시프트 카운트의 범위다.
+							</P
+></DD
+><DT
+>'E'</DT
+><DD
+><P
+>								immediate 플로팅 오퍼랜드로 호스트와 같은 타겟 플로팅 포인트 포맷인 경우에만 사용 가능.
+							</P
+></DD
+><DT
+>'F'</DT
+><DD
+><P
+>								immediate 플로팅 오퍼랜드.
+							</P
+></DD
+><DT
+>'G', 'H'</DT
+><DD
+><P
+>								특정 범위 내의 값을 나타내는 플로팅 오퍼랜드로 시스템에 따라 다르다.
+							</P
+></DD
+><DT
+>'s'</DT
+><DD
+><P
+>								값이 명확히 정해지지 않은 immediate 정수를 나타내는 오퍼랜드
+							</P
+></DD
+><DT
+>'s'</DT
+><DD
+><P
+>								값이 명확히 정해지지 않은 immediate 정수를 나타내는 오퍼랜드. 's'를 'i'? 대신 쓰는 이유는
+								좀더 좋은 코드를 만들어낼 수도 있기 때문이다.
+							</P
+></DD
+><DT
+>'g'</DT
+><DD
+><P
+>								특수 레지스터를 제외한 일반 레지스터, 메모리 혹은 immediate 정수 중 아무것이나
+								나타내는 오퍼랜드.
+							</P
+></DD
+><DT
+>'0', '1', '2', ... '9'</DT
+><DD
+><P
+>								같이 사용된 오퍼랜드의 번호를 나타냄.
+							</P
+></DD
+><DT
+>'p'</DT
+><DD
+><P
+>								올바른 메모리 어드레스를 나타내는 오퍼랜드. "load address"와 "push address" 명령을
+								위한 것.
+							</P
+></DD
+><DT
+>'Q', 'R', 'S', ... 'U'</DT
+><DD
+><P
+>								Q에서 U까지의 문자는 시스템에 따라 변하는 여러 다른 오퍼랜드를 의미한다.
+							</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECT3"
+><H3
+CLASS="SECT3"
+><A
+NAME="AEN2857"
+>C.1.3.2. Modifier</A
+></H3
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>'='</DT
+><DD
+><P
+>								오퍼랜드가 쓰기 전용임을 나타냄. 이전 값은 없어지고 새로운 값으로 교체됨.
+							</P
+></DD
+><DT
+>'+'</DT
+><DD
+><P
+>								읽기, 쓰기 모두 가능. '='는 보통 output용 '+'는 input/output 모두에 사용 가능하다.
+								나머지 다른 모든 오퍼랜드는 input 전용으로 간주된다.
+							</P
+></DD
+><DT
+>'&#38;'</DT
+><DD
+><P
+>								"earlyclobber" 오퍼랜드를 나타내고 input 오퍼랜드를 사용하는 명령이 끝나기 전에 변경
+								된다는 것을 의미한다. 그래서 input 오퍼랜드나 메모리 어드레스의 일부을 나타내는
+								레지스터엔 못 쓴다. 
+							</P
+><P
+>								gcc는 input 변수가 다 사용되고 나면 output에 사용된다고 가정하기 때문에 input에 사용된
+								변수가 output과 같게 되고 또 output이 input 보다 먼저 사용되는 경우가 발생할 수 있다.
+								이런 경우를 막기 위해 output에 사용된 변수가 input이 모두 사용되기 전에 변경될 수도
+								있다고 알려줘야만 input과 output이 같아져 생기는 에러를 막을 수 있다.
+							</P
+></DD
+><DT
+>'%'</DT
+><DD
+><P
+>								%뒤에 따라오는 오퍼랜드로 대체 가능함을 나타낸다. 직접 레지스터를 명시하고 사용할 때
+								%%eax 등과 같이 하는 것을 기억하는가?
+							</P
+></DD
+><DT
+>'#'</DT
+><DD
+><P
+>								# 이후의 쉼표가 나올 때 까지의 모든 문자를 constraints로 취급하지 않는다.
+							</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECT3"
+><H3
+CLASS="SECT3"
+><A
+NAME="AEN2881"
+>C.1.3.3. ARM Family Constraints</A
+></H3
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>'f'</DT
+><DD
+><P
+>								플로팅 포인트 레지스터
+							</P
+></DD
+><DT
+>'F'</DT
+><DD
+><P
+>								0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0 중의 하나를 나타내는 플로팅 포인트 상수
+							</P
+></DD
+><DT
+>'G'</DT
+><DD
+><P
+>								음수 값인 경우의 'F'
+							</P
+></DD
+><DT
+>'I'</DT
+><DD
+><P
+>								데이터 프로세싱 명령에서 유효한 immediate 정수 값 오퍼랜드. 0에서 255사이의 2의 배수
+								값을 나타낸다.
+							</P
+></DD
+><DT
+>'J'</DT
+><DD
+><P
+>								-4095에서 4095 사이의 정수
+							</P
+></DD
+><DT
+>'K'</DT
+><DD
+><P
+>								'I'를 만족하는 값을 1의 보수 취한 것
+							</P
+></DD
+><DT
+>'L'</DT
+><DD
+><P
+>								'I'를 만족하는 값을 음수로 취한 값(2의 보수)
+							</P
+></DD
+><DT
+>'M'</DT
+><DD
+><P
+>								0에서 32 사이의 정수 값
+							</P
+></DD
+><DT
+>'Q'</DT
+><DD
+><P
+>								한 레지스터에 담겨있는 정확한 어드레스를 나태내는 메모리
+							</P
+></DD
+><DT
+>'R'</DT
+><DD
+><P
+>								constalt pool 내의 아이템
+							</P
+></DD
+><DT
+>'S'</DT
+><DD
+><P
+>								현재 파일의 텍스트 세그먼트 내의 심볼
+							</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECT3"
+><H3
+CLASS="SECT3"
+><A
+NAME="AEN2928"
+>C.1.3.4. i386 Family Constraints</A
+></H3
+><P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>'q'</DT
+><DD
+><P
+>								'a', 'b', 'c', 'd' 레지스터
+							</P
+></DD
+><DT
+>'A'</DT
+><DD
+><P
+>								'a' 또는 'd' 레지스터 (64비트 정수 용)
+							</P
+></DD
+><DT
+>'f'</DT
+><DD
+><P
+>								플로팅 포인트 레지스터
+							</P
+></DD
+><DT
+>'t'</DT
+><DD
+><P
+>								첫번째(스택의 최상위) 플로팅 포인트 레지스터
+							</P
+></DD
+><DT
+>'u'</DT
+><DD
+><P
+>								두번째 플로팅 포인트 레지스터
+							</P
+></DD
+><DT
+>'a'</DT
+><DD
+><P
+>								'a' 레지스터
+							</P
+></DD
+><DT
+>'b'</DT
+><DD
+><P
+>								'b' 레지스터
+							</P
+></DD
+><DT
+>'c'</DT
+><DD
+><P
+>								'c' 레지스터
+							</P
+></DD
+><DT
+>'d'</DT
+><DD
+><P
+>								'd' 레지스터
+							</P
+></DD
+><DT
+>'D'</DT
+><DD
+><P
+>								'di' 레지스터
+							</P
+></DD
+><DT
+>'S'</DT
+><DD
+><P
+>								'si' 레지스터
+							</P
+></DD
+><DT
+>'I'</DT
+><DD
+><P
+>								0에서 31 사이의 상수(32비트 시프트용)
+							</P
+></DD
+><DT
+>'J'</DT
+><DD
+><P
+>								0에서 63 사이의 상수(64비트 시프트용)
+							</P
+></DD
+><DT
+>'K'</DT
+><DD
+><P
+>								'0xff'
+							</P
+></DD
+><DT
+>'L'</DT
+><DD
+><P
+>								'0xffff'
+							</P
+></DD
+><DT
+>'M'</DT
+><DD
+><P
+>								0, 1, 2, 3 (lea 명령을 위한 시프트)
+							</P
+></DD
+><DT
+>'N'</DT
+><DD
+><P
+>								0에서 255 사이의 값(out 명령 용)
+							</P
+></DD
+><DT
+>'G'</DT
+><DD
+><P
+>								80387 플로팅 포인트 상수를 나타냄
+							</P
+></DD
+></DL
+></DIV
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="app3.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="app3.analysis.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>Inline Assembly</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="app3.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>사례 분석</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,153 @@
+#title Joinc APM 설치 정보
+
+
+[[TableOfContents]]
+
+=== 소개 ===
+최근에 [JOINC_검색엔진]프로젝트를 시작하게 되었는데, 프로젝트 진행및 결과 테스트를 위해서 개인 PC서버에 별도의 APM(:12)환경을 만들어야될 필요성을 느꼈다. joinc서버에서 직접 테스트를 하기에는 아무래도 부담이 되기 때문이다. 이 문서는 APM환경을 만들기 까지의 과정을 담고 있다. 
+
+
+=== APM 설치 (Apache 1.3.x) ===
+필자는 예전부터 서버프로그램의 경우 rpm보다는 직접 컴파일하는 걸 선호 했었다. APM역시 모든 프로그램들을 컴파일해서 설치하도록 할것이다.   
+
+Mysql->PHP->Apache 순서로 설치한다.
+ 
+==== Mysql 설치 ====
+현재 joinc의 서버환경에 맞추어서 다음과 같은 mysql-3.23.57버젼을 설치하기로 했다. mysql(:12)소스는 [http://www.mysql.org]에서 다운로드 받을 수 있다. 
+
+일단 다운로드 받은 파일을 /usr/src로 옮긴다음에 압축을 풀고 ./configure, make, make install의 방법으로 설치를 했다.   
+{{{#!plain
+$ ./configure --with-charset=euc_kr
+$ make 
+$ make install
+}}}
+문자셋을 '''ecu_kr'''로 설정한것을 빼놓고는 별다른 설정을 하지 않았다. 이경우 다음과 같은 경로로 서버 환경이 설정된다.
+ 1. 실행파일 경로 : /usr/local/bin
+ 1. DB파일 경로 : /usr/local/var
+
+make install까지 해서 설치를 마쳤다면 '''mysql'''계정을 만들어 줘야 한다. mysql서버는 보안상의 이유로 반드시 '''mysql'''계정을 필요로 한다. 유저를 생성시켰다면 mysql_install_db를 이용해서 db파일 시스템을 만들도록 한다.      
+{{{#!plain
+$ adduser mysql
+$ mysql_install_db
+}}}
+이제 mysql서버를 가동하고 mysql root패스워드를 생성하도록 하자. 서버를 가동하게 되면 자동적으로 mysql유저로 스위치 유저하게 되는데 이런 이유로 DB파일들이 위치하는 /usr/local/var에 대해서 mysql유저가 액세스할 수 있도록 권한을 만들어 줘야 한다.     
+{{{#!plain
+$ chown mysql.mysql -R  /usr/local/var 
+$ safe_mysqld& 
+$ mysqladmin -u root password '111111'
+}}}
+
+==== Apache + PHP 설치 ====
+Apache 1.3.29와 PHP(:12) 4.3.4를 설치하기로 했다. 각각 [http://www.apache.org]와 http://www.php.net]에서 다운로드 받도록 하자. 
+
+Apache는 DSO를 지원하도록 아래와 같이 컴파일 후 설치했다.
+{{{#!plain
+$ ./configure --prefix=/usr/local/apache --enable-shared=max --enable-rule=SHARED_CORE --enable-module=most
+$ make
+$ make install
+}}}
+
+다음 php를 설치하도록 한다. 여기에서는 mysql만 지원하도록 설정하고 있는데, 필요에 따라서 gd, oracle, pgsql등의 지원확장이 가능하다. 자세한 내용은 ./configure --help를 이용하기 바란다. 
+{{{#!plain
+$ ./configure --prefix=/usr/local/php --with-mysql \
+--with-config-file-path=/usr/local/apache/conf \
+--with-apxs=/usr/local/apache/bin/apxs \
+--with-charset=euc_kr --with-language=korean 
+$ make
+$ make install
+}}}
+
+==== SQLite 지원 ====
+개인적으로 SQLite(:12)에 대한 관심을 가지고 있었던 관계로 만약을 대비해서 SQLite(:12)도 지원하도록 php를 빌드하기로 했다. php 4.x 버젼의 경우 아직 sqlite를 정식으로 지원하지 않는 이유로 다른 여러가지 부가작업을 필요로 했다. 
+
+위의 부가 작업들이 귀찮아서 sqlite를 직접 지원하는 php5.x를 설치하기로 했다. 다음은 sqlite를 지원하기 위해서 약간 변경된 빌드 과정이다. 4.x에 비해서 빌드하는데 꽤 많은 시간이 걸렸다.  
+{{{#!plain
+$ ./configure --prefix=/usr/local/php --with-mysql \
+--with-config-file-path=/usr/local/apache/conf \
+--with-apxs=/usr/local/apache/bin/apxs \
+--with-charset=euc_kr --with-language=korean \
+--with-sqlite
+$ make
+$ make install
+}}}
+
+php5.x의 경우 libxml2-2.5.10 이상의 버젼을 필요로 했다. 현재 RedHat9 배포판의 경우 libxml2 버젼이 이에 미치지 못한 관계로 최신 버젼으로 업데이트 시켰다. libxml2와 관련된 소스와 rpm은 [http://xmlsoft.org xmlsoft]에서 다운로드 받을 수 있다.  
+
+==== Apache 서버의 가동 및 테스트 ====
+Apache 서버를 가동시키기 위해서 설정파일(httpd.conf)에 아래의 내용을 추가하도록 한다. 
+{{{#!plain
+# LoadModule php4_module modules/libphp4.so <-- php4 버젼의 경우
+LoadModule php5_module modules/libphp5.so
+ 
+AddType application/x-httpd-php .html .htm .php .inc 
+AddType application/x-httpd-php-source .phps
+}}}
+
+이제 아파치를 실행 시키고 테스트를 하면 된다.
+{{{#!plain
+$ /usr/local/apache/bin/apachectl start
+}}}
+
+=== APM 설치 (Apache 2.x) ===
+Unix환경에서의 시스템관리자나 프로그래머의 경우 새로운 툴을 이용하는데 있어서 약간 보수적인 경향이 있다. 그런 이유로 최신의 툴이 나온다고 하더라도 어느정도 검증이 되었다고 판단 되는 시점에서 해당 툴을 테스트하고 이용하는 경우가 일반적이다. (물론 귀차니즘도 한몫하지만)
+
+필자 역시 여러가지 이유로 Apache(:12) 1.x, Mysql(:12) 3.x, PHP(:12) 4.x의 구버전을 사용해왔었는데, 노트북에 리눅스를 설치한 기념으로 최신의 APM 환경을 구축하고 테스트 해보기로 했다. 노트북에 설치할 APM 환경은 다음과 같다.
+  * httpd-2.0.54  
+  * php 5.5
+  * sqlite 3.2.7
+  * Mysql 4.1.14
+  * gd-2.0.28 
+==== mysql 설치 ====
+mysql 서버데몬의 실행을 위한 프로그램의 이름이 '''safe_mysqld''' 에서 '''mysqld_safe'''로 변경되었다는 점을 제외하고는 동일한 방법으로 설치 가능하다. 
+==== sqlite 설치 ====
+아주 간단하다. 굳이 구구절절이 설명하지 않겠다.
+{{{#!plain
+# ./configure 
+...
+# make
+# make install
+}}}
+
+==== apache 설치 ====
+DSO를 지원하도록 했다. 아래와 같은 옵션을 주고 configure를 실행시켰다. 결론적으로 apache 1.x와 동일한 옵션을 사용하고 있다. 
+{{{#!plain
+$ ./configure --prefix=/usr/local/apache --enable-shared=max --enable-rule=SHARED_CORE --enable-module=most
+$ make
+$ make install
+}}}
+
+==== Error Documnet 설정 ====
+404 에러에 대해서 사용자 설정페이지가 뜨도록 했다. 사용자 설정페이지가 뜨게하는 것은 간단하다.
+{{{#!plain
+ErrorDocument 404 http://www.yourdomain.com/error_404.html
+}}}
+
+=== php 설치 ===
+--with-apxs2 를 사용한다는 것을 제외하고는 php4.x 버젼과 동일한 과정을 거쳐서 설치할 수 있다.
+{{{#!plain
+$ ./configure --prefix=/usr/local/php --with-mysql
+--with-config-file-path=/usr/local/apache/conf
+--with-apxs2=/usr/local/apache/bin/apxs --with-charset=euc_kr
+--with-language=korean --with-zlib-dir --with-gd --enable-gd-native-ttf
+$ make
+$ make install
+}}}
+
+=== tattertools를 위한 mod_rewrite ===
+tattertools를 설치하려고 하면 mod_rewrite를 올려줘야 한다. 설정은 간단하다.
+{{{#!plain
+$ ./configure --prefix=/usr/local/apache --enable-shared=max --enable-rule=SHARED_CORE --enable-module=most --enable-rewrite
+$ make
+$ make install
+}}}
+
+=== apache2.2.9로 업그레이드 ===
+ * URL의 마지막이 Perl(:12)로 끝나면 파일을 제대로 읽어들이지 못한다. 2.2.4의 버그인것 같다. 2.2.9로 업그레이드 했더니 해결..
+
+=== 앞으로의 계획 ===
+ * 노트북에 설치된 최신 APM을 테스트해서 조인씨 사이트의 APM을 업그레이드 시킬 수 있도록 한다.
+ * Apache 2.x, Mysql 4.x, PHP 5.x의 장점들에 대해서 정리한다. 
+=== 참고문헌 ===
+ 1. [http://www.joinc.co.kr 조인씨]
+ 1. [wiki:Site/Mysql Mysql 미니홈페이지]
+

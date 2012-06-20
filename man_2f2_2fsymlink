@@ -1,0 +1,277 @@
+#title linux man page : symlink - 파일에 대한 심볼릭링크를 만든다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>symlink(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. symlink(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN12"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN15"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN43"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>파일에 대한 심볼릭 링크를 만든다. </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int symlink(const char *oldpath, const char *newpath);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		oldpath 파일에 대한 심볼릭 링크 newpath 를 만든다. 
+	</P
+><P
+>		만일 심볼릭 링크 newpath가 이미 존재한다면 이를 덮어쓰지 
+		않는다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN12"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EPERM</DT
+><DD
+><P
+>	
+					newpath 를 포함하는 파일 시스템이 심볼릭 링크를 지원하지 
+					않을경우
+				</P
+></DD
+><DT
+>EFAULT</DT
+><DD
+><P
+>					oldpath 또는 newpath가 접근할수 있는 주소 공간외를 
+					가르키고 있을경우
+				</P
+></DD
+><DT
+>EACCESS</DT
+><DD
+><P
+>					newpath 를 포함하는 디렉토리에 대해 쓰기 접근이나 
+					실행권한이 허용되지 않았을경우
+				</P
+></DD
+><DT
+>ENOTDIR</DT
+><DD
+><P
+>					newpath 에서 디렉토리로 사용된 요소가 디렉토리(:12)가 
+					아닐경우
+				</P
+></DD
+><DT
+>EROFS</DT
+><DD
+><P
+>					newpath 가 읽기-전용 파일 시스템일경우
+				</P
+></DD
+><DT
+>EEXIST</DT
+><DD
+><P
+>					newpath 가 이미 존재할 경우
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR>
+}}}
+[[adsense]]
+{{{#!html
+<H1
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    int opt;
+
+    if ( argc &#60; 3)
+    {
+        printf ("Usage: ./link [s|h|d] [원본파일] [복사파일]&#92;n");
+        return -1;
+    }   
+
+    if(access(argv[2], F_OK) != 0)  
+    {
+        printf("원본파일이 없습니다&#92;n");
+        return -1;
+    }
+
+
+    while((opt = getopt(argc, argv, "shd")) != -1)
+    {
+        switch(opt)
+        {
+            case 's':
+                if(access(argv[3], F_OK) == 0)
+                {
+                    printf("이미파일이 존재합니다&#92;n");
+                    return -1;
+                }
+                printf("심볼릭 링크&#92;n");
+                symlink(argv[2], argv[3]);
+                break;
+
+            case 'h':
+                if(access(argv[3], F_OK) == 0)
+                {
+                    printf("이미파일이 존재합니다&#92;n");
+                    return -1;
+                }
+                printf("하드링크&#92;n");
+                link(argv[2], argv[3]);
+                break;
+            case 'd':
+                printf("링크해제&#92;n");
+                unlink(argv[2]);    
+                break;
+        }
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위 예제는 심볼릭링크나 하드링크를 만들거나 링크를 삭제하는 
+		일을한다. getopt(3)을 이용해서 아규먼트를 분석해서 '-s' 일경우 
+		원본파일에 대한 심볼릭링크를 만든다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+'''관련글'''
+  시스템프로그래밍(:12), C(:12), link(:12), 링크(:12)

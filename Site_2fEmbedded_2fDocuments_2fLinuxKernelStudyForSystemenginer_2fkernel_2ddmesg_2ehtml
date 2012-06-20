@@ -1,0 +1,1144 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>dmesg 정리</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="PREVIOUS"
+TITLE="init"
+HREF="start.kernel.initprocess.html"><LINK
+REL="NEXT"
+TITLE="디바이스 드라이버"
+HREF="chap06.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="start.kernel.initprocess.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>5장. 리눅스 커널 부팅</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="chap06.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="KERNEL-DMESG"
+>5.8. dmesg 정리</A
+></H1
+><P
+>			/var/log/dmesg는 부팅하는 동안 커널의 기록을 남겨 놓은 파일이다. 이 파일의 출력을 구분지어 어느
+			단계에서 어떤 메시지가 출력되는지 보자. 
+		</P
+><P
+>			단계를 구분지어 놓으면 start_kernel()을 분석하는데 많은 도움이 될 것이고 커널 부팅 중에 에러가
+			났다면 어느 단계에서 에러 났는지 범위를 좁히고 찾아내는데 많은 도움이 될 것이다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+><A
+NAME="DMESG.BANNER"
+><B
+>(1)</B
+></A
+>
+Linux version 2.4.16 (root@halite) (gcc version 2.95.3 20010315 (release)) #22 2002. 02. 27. (수) 13:30:14 KST
+<A
+NAME="DMESG.BIOS"
+><B
+>(2)</B
+></A
+>
+BIOS-provided physical RAM map:
+ BIOS-e820: 0000000000000000 - 000000000009fc00 (usable)
+ BIOS-e820: 000000000009fc00 - 00000000000a0000 (reserved)
+ BIOS-e820: 00000000000f0000 - 0000000000100000 (reserved)
+ BIOS-e820: 0000000000100000 - 000000001ffec000 (usable)
+ BIOS-e820: 000000001ffec000 - 000000001ffef000 (ACPI data)
+ BIOS-e820: 000000001ffef000 - 000000001ffff000 (reserved)
+ BIOS-e820: 000000001ffff000 - 0000000020000000 (ACPI NVS)
+ BIOS-e820: 00000000ffff0000 - 0000000100000000 (reserved)
+<A
+NAME="DMESG.PAGEINIT"
+><B
+>(3)</B
+></A
+>
+On node 0 totalpages: 131052
+zone(0): 4096 pages.
+zone(1): 126956 pages.
+zone(2): 0 pages.
+<A
+NAME="DMESG.LOCALACPI"
+><B
+>(4)</B
+></A
+>
+Local APIC disabled by BIOS -- reenabling.
+Found and enabled local APIC!
+<A
+NAME="DMESG.COMMANDLINE"
+><B
+>(5)</B
+></A
+>
+Kernel command line: BOOT_IMAGE=linux ro root=301 mem=nopentium hdd=ide-scsi
+ide_setup: hdd=ide-scsi
+<A
+NAME="DMESG.INITCPU"
+><B
+>(6)</B
+></A
+>
+Initializing CPU#0
+<A
+NAME="DMESG.MHZ"
+><B
+>(7)</B
+></A
+>
+Detected 1009.016 MHz processor.
+<A
+NAME="DMESG.CONSOLE"
+><B
+>(8)</B
+></A
+>
+Console: colour VGA+ 132x43
+<A
+NAME="DMESG.BOGOMIPS"
+><B
+>(9)</B
+></A
+>
+Calibrating delay loop... 2011.95 BogoMIPS
+<A
+NAME="DMESG.MEMORY"
+><B
+>(10)</B
+></A
+>
+Memory: 512920k/524208k available (1213k kernel code, 10900k reserved, 482k data, 228k init, 0k highmem)
+Checking if this processor honours the WP bit even in supervisor mode... Ok.
+<A
+NAME="DMESG.DCACHE"
+><B
+>(11)</B
+></A
+>
+Dentry-cache hash table entries: 65536 (order: 7, 524288 bytes)
+<A
+NAME="DMESG.INODE"
+><B
+>(12)</B
+></A
+>
+Inode-cache hash table entries: 32768 (order: 6, 262144 bytes)
+<A
+NAME="DMESG.MOUNT"
+><B
+>(13)</B
+></A
+>
+Mount-cache hash table entries: 8192 (order: 4, 65536 bytes)
+<A
+NAME="DMESG.BUFFER"
+><B
+>(14)</B
+></A
+>
+Buffer-cache hash table entries: 32768 (order: 5, 131072 bytes)
+<A
+NAME="DMESG.PAGECACHE"
+><B
+>(15)</B
+></A
+>
+Page-cache hash table entries: 131072 (order: 7, 524288 bytes)
+<A
+NAME="DMESG.CPUID"
+><B
+>(16)</B
+></A
+>
+CPU: Before vendor init, caps: 0183fbff c1c7fbff 00000000, vendor = 2
+Intel machine check architecture supported.
+Intel machine check reporting enabled on CPU#0.
+CPU: L1 I Cache: 64K (64 bytes/line), D cache 64K (64 bytes/line)
+CPU: L2 Cache: 256K (64 bytes/line)
+CPU: After vendor init, caps: 0183fbff c1c7fbff 00000000 00000000
+CPU:     After generic, caps: 0183fbff c1c7fbff 00000000 00000000
+CPU:             Common caps: 0183fbff c1c7fbff 00000000 00000000
+CPU: AMD Athlon(tm) Processor stepping 02
+Enabling fast FPU save and restore... done.
+Checking 'hlt' instruction... OK.
+<A
+NAME="DMESG.POSIX"
+><B
+>(17)</B
+></A
+>
+POSIX conformance testing by UNIFIX
+<A
+NAME="DMESG.LOCALAPIC"
+><B
+>(18)</B
+></A
+>
+enabled ExtINT on CPU#0
+ESR value before enabling vector: 00000000
+ESR value after enabling vector: 00000000
+<A
+NAME="DMESG.LOCALAPICTIMER"
+><B
+>(19)</B
+></A
+>
+Using local APIC timer interrupts.
+<A
+NAME="DMESG.APICTIMER"
+><B
+>(20)</B
+></A
+>
+calibrating APIC timer ...
+..... CPU clock speed is 1009.0421 MHz.
+..... host bus clock speed is 201.8084 MHz.
+<A
+NAME="DMESG.APICCPU"
+><B
+>(21)</B
+></A
+>
+cpu: 0, clocks: 2018084, slice: 1009042
+CPU0&#60;T0:2018080,T1:1009024,D:14,S:1009042,C:2018084&#62;
+<A
+NAME="DMESG.MTRR"
+><B
+>(22)</B
+></A
+>
+mtrr: v1.40 (20010327) Richard Gooch (rgooch@atnf.csiro.au)
+mtrr: detected mtrr type: Intel
+<A
+NAME="DMESG.PCIBIOS"
+><B
+>(23)</B
+></A
+>
+PCI: PCI BIOS revision 2.10 entry at 0xf1180, last bus=1
+<A
+NAME="DMESG.PCIBIOSDIRECT"
+><B
+>(24)</B
+></A
+>
+PCI: Using configuration type 1
+<A
+NAME="DMESG.PCIBIOSPROBING"
+><B
+>(25)</B
+></A
+>
+PCI: Probing PCI hardware
+<A
+NAME="DMESG.PCIBRIDGE"
+><B
+>(26)</B
+></A
+>
+Unknown bridge resource 0: assuming transparent
+<A
+NAME="DMESG.PCIIRQ"
+><B
+>(27)</B
+></A
+>
+PCI: Using IRQ router VIA [1106/0686] at 00:04.0
+PCI: Found IRQ 10 for device 00:0b.0
+PCI: Sharing IRQ 10 with 00:11.0
+PCI: Found IRQ 5 for device 00:0d.0
+PCI: Sharing IRQ 5 with 00:04.2
+PCI: Sharing IRQ 5 with 00:04.3
+PCI: Disabling Via external APIC routing
+<A
+NAME="DMESG.ISAPNP"
+><B
+>(28)</B
+></A
+>
+isapnp: Scanning for PnP cards...
+isapnp: No Plug &#38; Play device found
+<A
+NAME="DMESG.SOCKET"
+><B
+>(29)</B
+></A
+>
+Linux NET4.0 for Linux 2.4
+Based upon Swansea University Computer Society NET3.039
+<A
+NAME="DMESG.RTNETLINKSOCKET"
+><B
+>(30)</B
+></A
+>
+Initializing RT netlink socket
+<A
+NAME="DMESG.APM"
+><B
+>(31)</B
+></A
+>
+apm: BIOS version 1.2 Flags 0x03 (Driver version 1.15)
+<A
+NAME="DMESG.KSWAPD"
+><B
+>(32)</B
+></A
+>
+Starting kswapd
+JFS development version: $Name:  $
+<A
+NAME="DMESG.ACPI"
+><B
+>(33)</B
+></A
+>
+ACPI: APM is already active, exiting
+<A
+NAME="DMESG.PTY"
+><B
+>(34)</B
+></A
+>
+pty: 256 Unix98 ptys configured
+<A
+NAME="DMESG.SERIAL"
+><B
+>(35)</B
+></A
+>
+Serial driver version 5.05c (2001-07-08) with MANY_PORTS SHARE_IRQ SERIAL_PCI ISAPNP enabled
+ttyS01 at 0x02f8 (irq = 3) is a 16550A
+<A
+NAME="DMESG.BLOCK"
+><B
+>(36)</B
+></A
+>
+block: 128 slots per queue, batch=32
+<A
+NAME="DMESG.IDE"
+><B
+>(37)</B
+></A
+>
+Uniform Multi-Platform E-IDE driver Revision: 6.31
+<A
+NAME="DMESG.IDEBUSSPEED"
+><B
+>(38)</B
+></A
+>
+ide: Assuming 33MHz system bus speed for PIO modes; override with idebus=xx
+<A
+NAME="DMESG.VIA"
+><B
+>(39)</B
+></A
+>
+VP_IDE: IDE controller on PCI bus 00 dev 21
+VP_IDE: chipset revision 16
+VP_IDE: not 100% native mode: will probe irqs later
+VP_IDE: VIA vt82c686a (rev 22) IDE UDMA66 controller on pci00:04.1
+    ide0: BM-DMA at 0xd800-0xd807, BIOS settings: hda:DMA, hdb:DMA
+    ide1: BM-DMA at 0xd808-0xd80f, BIOS settings: hdc:DMA, hdd:DMA
+<A
+NAME="DMESG.PROMISE"
+><B
+>(40)</B
+></A
+>
+PDC20265: IDE controller on PCI bus 00 dev 88
+PCI: Found IRQ 10 for device 00:11.0
+PCI: Sharing IRQ 10 with 00:0b.0
+PDC20265: chipset revision 2
+PDC20265: not 100% native mode: will probe irqs later
+    ide2: BM-DMA at 0x8000-0x8007, BIOS settings: hde:DMA, hdf:DMA
+    ide3: BM-DMA at 0x8008-0x800f, BIOS settings: hdg:DMA, hdh:pio
+<A
+NAME="DMESG.HDD"
+><B
+>(41)</B
+></A
+>
+hda: Maxtor 4W080H6, ATA DISK drive
+hdb: IC35L040AVER07-0, ATA DISK drive
+hdc: QUANTUM FIREBALLlct15 20, ATA DISK drive
+hdd: LG CD-RW CED-8080B, ATAPI CD/DVD-ROM drive
+<A
+NAME="DMESG.HDDIRQ"
+><B
+>(42)</B
+></A
+>
+ide0 at 0x1f0-0x1f7,0x3f6 on irq 14
+ide1 at 0x170-0x177,0x376 on irq 15
+hda: 160086528 sectors (81964 MB) w/2048KiB Cache, CHS=9964/255/63, UDMA(33)
+hdb: 80418240 sectors (41174 MB) w/1916KiB Cache, CHS=5005/255/63, UDMA(33)
+hdc: 39876480 sectors (20417 MB) w/418KiB Cache, CHS=39560/16/63, UDMA(33)
+<A
+NAME="DMESG.HDDPARTITION"
+><B
+>(43)</B
+></A
+>
+Partition check:
+ hda: hda1 hda2
+ hdb: hdb1
+ hdc: [PTBL] [2482/255/63] hdc1 hdc2 hdc3
+<A
+NAME="DMESG.FLOPPY"
+><B
+>(44)</B
+></A
+>
+Floppy drive(s): fd0 is 1.44M
+FDC 0 is a post-1991 82077
+<A
+NAME="DMESG.AGP"
+><B
+>(45)</B
+></A
+>
+Linux agpgart interface v0.99 (c) Jeff Hartmann
+agpgart: Maximum main memory to use for agp memory: 439M
+agpgart: Detected Via Apollo Pro KT133 chipset
+agpgart: AGP aperture is 128M @ 0xe0000000
+[drm] AGP 0.99 on VIA Apollo KT133 @ 0xe0000000 128MB
+[drm] Initialized mga 3.0.2 20010321 on minor 0
+<A
+NAME="DMESG.CS"
+><B
+>(46)</B
+></A
+>
+Linux Kernel Card Services 3.1.22
+  options:  [pci] [cardbus] [pm]
+<A
+NAME="DMESG.INET"
+><B
+>(47)</B
+></A
+>
+NET4: Linux TCP/IP 1.0 for NET4.0
+IP Protocols: ICMP, UDP, TCP, IGMP
+IP: routing cache hash table of 4096 buckets, 32Kbytes
+TCP: Hash tables configured (established 32768 bind 32768)
+NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.
+<A
+NAME="DMESG.DS"
+><B
+>(48)</B
+></A
+>
+ds: no socket drivers loaded!
+<A
+NAME="DMESG.NLS"
+><B
+>(49)</B
+></A
+>
+request_module[nls_EUC-KR]: Root fs not mounted
+Unable to load NLS charset EUC-KR
+<A
+NAME="DMESG.VFS"
+><B
+>(50)</B
+></A
+>
+VFS: Mounted root (jfs filesystem) readonly.
+<A
+NAME="DMESG.FKM"
+><B
+>(51)</B
+></A
+>
+Freeing unused kernel memory: 228k freed</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.BANNER"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.BIOS"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						setup_memory_region()/setup_arch()/start_kerenel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PAGEINIT"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						free_area_init_core()/free_area_init()/paging_init()/setup_arch()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.LOCALACPI"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						detect_init_APIC()/init_apic_mappings()/setup_arch()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.COMMANDLINE"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.INITCPU"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						cpu_init()/trap_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.MHZ"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>						time_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.CONSOLE"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>						con_init()/console_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.BOGOMIPS"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>						calibrate_delay()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.MEMORY"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>						mem_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.DCACHE"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>						dcache_init()/vfs_caches_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.INODE"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>						inode_init()/vfs_caches_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.MOUNT"
+><B
+>(13)</B
+></A
+></DT
+><DD
+>						mnt_init()/vfs_caches_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.BUFFER"
+><B
+>(14)</B
+></A
+></DT
+><DD
+>						buffer_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PAGECACHE"
+><B
+>(15)</B
+></A
+></DT
+><DD
+>						page_cache_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.CPUID"
+><B
+>(16)</B
+></A
+></DT
+><DD
+>						identify_cpu()/check_bugs()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.POSIX"
+><B
+>(17)</B
+></A
+></DT
+><DD
+>						start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.LOCALAPIC"
+><B
+>(18)</B
+></A
+></DT
+><DD
+>						 setup_local_APIC()/APIC_init_uniprocessor()/smp_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.LOCALAPICTIMER"
+><B
+>(19)</B
+></A
+></DT
+><DD
+>						setup_APIC_clocks()/APIC_init_uniprocessor/smp_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.APICTIMER"
+><B
+>(20)</B
+></A
+></DT
+><DD
+>						calibrate_APIC_clock()/setup_APIC_clocks()/APIC_init_uniprocessor/smp_init()/
+						start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.APICCPU"
+><B
+>(21)</B
+></A
+></DT
+><DD
+>						setup_APIC_timer()/setup_APIC_clocks()/APIC_init_uniprocessor/smp_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.MTRR"
+><B
+>(22)</B
+></A
+></DT
+><DD
+>						mtrr_setup()/mtrr_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PCIBIOS"
+><B
+>(23)</B
+></A
+></DT
+><DD
+>						check_pcibios()/pci_find_bios()/pcibios_config_init()/pcibios_init()/pci_init()/
+						do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PCIBIOSDIRECT"
+><B
+>(24)</B
+></A
+></DT
+><DD
+>						pci_check_direct()/pcibios_config_init()/pcibios_init()/pci_init()/
+						do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PCIBIOSPROBING"
+><B
+>(25)</B
+></A
+></DT
+><DD
+>						pcibios_init()/pci_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PCIBRIDGE"
+><B
+>(26)</B
+></A
+></DT
+><DD
+>						pci_read_bridge_bases()/pcibios_fixup_bus()/pci_do_scan_bus()/pci_scan_bus()/
+						pcibios_init()/pci_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PCIIRQ"
+><B
+>(27)</B
+></A
+></DT
+><DD
+>						pirq_find_router()/pcibios_irq_init()/
+						pcibios_init()/pci_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.ISAPNP"
+><B
+>(28)</B
+></A
+></DT
+><DD
+>						isapnp_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.SOCKET"
+><B
+>(29)</B
+></A
+></DT
+><DD
+>						sock_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.RTNETLINKSOCKET"
+><B
+>(30)</B
+></A
+></DT
+><DD
+>						rtnetlink_init()/sock_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.KSWAPD"
+><B
+>(32)</B
+></A
+></DT
+><DD
+>						kswapd_init()/do_initcalls()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.ACPI"
+><B
+>(33)</B
+></A
+></DT
+><DD
+>						acpi_init()/do_initcalls()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PTY"
+><B
+>(34)</B
+></A
+></DT
+><DD
+>						pty_init()/do_initcalls()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.SERIAL"
+><B
+>(35)</B
+></A
+></DT
+><DD
+>						show_serial_version()/rs_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.BLOCK"
+><B
+>(36)</B
+></A
+></DT
+><DD
+>						blk_dev_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.IDE"
+><B
+>(37)</B
+></A
+></DT
+><DD
+>						ide_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.IDEBUSSPEED"
+><B
+>(38)</B
+></A
+></DT
+><DD
+>						ide_system_bus_speed()/ide_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.VIA"
+><B
+>(39)</B
+></A
+></DT
+><DD
+>						ide_scan_pcidev()/ide_scan_pcibus()/probe_for_hwifs()/ide_init_builtin_drivers()/
+						ide_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.PROMISE"
+><B
+>(40)</B
+></A
+></DT
+><DD
+>						ide_setup_pci_device()/ide_scan_pcidev()/ide_scan_pcibus()/probe_for_hwifs()/
+						ide_init_builtin_drivers()/ide_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.HDD"
+><B
+>(41)</B
+></A
+></DT
+><DD
+>						do_identify()/actual_try_to_identify()/try_to_identify()/do_probe()/probe_for_drive()/
+						probe_hwif()/ideprobe_init()/init_module()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.HDDIRQ"
+><B
+>(42)</B
+></A
+></DT
+><DD
+>						init_irq()/hwif_init()/ideprobe_init()/init_module()/do_basic_setup()/init()/rest_init()/
+						start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.HDDPARTITION"
+><B
+>(43)</B
+></A
+></DT
+><DD
+>						check_partition()/grok_partitions()/idedisk_revalidate/init_module()/do_basic_setup()/
+						init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.FLOPPY"
+><B
+>(44)</B
+></A
+></DT
+><DD
+>						config_types()/floppy_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.AGP"
+><B
+>(45)</B
+></A
+></DT
+><DD
+>						agp_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.CS"
+><B
+>(46)</B
+></A
+></DT
+><DD
+>						init_pcmcia_cs()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.INET"
+><B
+>(47)</B
+></A
+></DT
+><DD
+>						inet_init()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.DS"
+><B
+>(48)</B
+></A
+></DT
+><DD
+>						init_pcmcia_ds()/do_basic_setup()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.NLS"
+><B
+>(49)</B
+></A
+></DT
+><DD
+>						request_module()/load_nls()/init_nls_euc_kr()/do_basic_setup()/init()/
+						rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.VFS"
+><B
+>(50)</B
+></A
+></DT
+><DD
+>						mount_root()/prepare_namespace()/init()/rest_init()/start_kernel()
+					</DD
+><DT
+><A
+HREF="kernel-dmesg.html#DMESG.FKM"
+><B
+>(51)</B
+></A
+></DT
+><DD
+>						free_initmem()/init()/rest_init()/start_kernel()
+					</DD
+></DL
+></DIV
+>
+		</P
+><P
+>			커널의 초기화 동안 등록된 드라이버들이 자동으로 실행되고 초기화 되도록 하는데,
+			커널을 어떻게 설정하는가에 따라 커널에 포함되는 것이 다르므로 일일히 기록하는 대신에 자동으로
+			커널 컴파일하는 동안 포함되도록 할 수 있다. 필요한 모듈에 __init란 속성을 사용하고 
+			module_init()를 사용해 이런 일이 가능하도록 한다.
+		</P
+><P
+>			module_init()는 include/linux/init.h에 다음과 같이 정의되어 있다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#define module_init(x)  __initcall(x);</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			__initcall(x)는 module로 지정됐는가 아닌가에 따라 정의가 달라지는데 어찌됐든 .initcall.init란
+			섹션에 속하게 된다. 여기에 속하면 커널의 링킹 동안 모아진 .initcall.init가 do_basic_setup()
+			혹은 do_initcalls()에 의해 자동으로 불려지게 된다(vmlinux.lds를 보면 .initcall.init를 모아주는
+			부분이 있다).
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="start.kernel.initprocess.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="chap06.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>init()</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>디바이스 드라이버</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

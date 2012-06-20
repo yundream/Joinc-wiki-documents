@@ -1,0 +1,136 @@
+#title RRD를 이용한 CPU 사용량 모니터링
+
+== 소개 ==
+[wiki:Site/Joinc 운영자용 위키페이지]를 완성하기 위한 목적으로 만들어진 위키페이지로, [wiki:Site/Joinc/AdminInfo/SMSInfo 디스크 사용정보 모니터링]에 이어서 '''CPU사용량 모니터'''를 위한 시스템을 만들 것이다. 
+
+모니터링 하는 CPU정보는 다음과 같다.
+ 1. CPU Load Average : 1분, 5분 15분
+
+== CPU정보 얻어오기 ==
+CPU정보를 얻어오기 위해서 proc파일을 분석하는 간단한 C(:12)프로그램을 만들도록 하겠다. 이 프로그램은 '''/proc/loadavg'''파일을 분석해서 '''Load Average'''를 얻어온다.
+
+{{{#!plain
+#include <stdio.h>
+
+#define PROCFILE "/proc/loadavg"
+
+struct loadavg
+{
+  float avg1;
+  float avg5;
+  float avg15;
+};
+int main(int argc, char **argv)
+{
+  FILE *fp;
+  char buf[256];
+  struct loadavg Avg;
+
+  fp = fopen(PROCFILE, "r");
+  if (fp == NULL)
+    return 1;
+  fgets(buf, 255, fp);
+  sscanf(buf, "%f %f %f", &Avg.avg1, &Avg.avg5, &Avg.avg15);
+  fclose(fp);
+  printf("%1.2f:%1.2f:%1.2f\n", Avg.avg1, Avg.avg5, Avg.avg15);
+}
+}}}
+
+=== 데이터 입력 ===
+이제 '''cron'''을 이용해서, 5분간격으로 위의 프로그램을 실행시켜서 얻어온 값을, rrdtool을 이용 DB에 적재하도록 하면 된다.
+
+그전에 적재할 DB를 생성한다.
+{{{#!plain
+rrdtool create rrd_cpuload.rrd --start 1164710336 --step 300 \
+DS:1min:GAUGE:600:U:U \
+DS:5min:GAUGE:600:U:U \
+DS:15min:GAUGE:600:U:U \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797
+}}}
+
+cron을 이용해서 실행할 스크립트는 다음과 같다.
+{{{#!plain
+#!/bin/sh
+
+TIME=`date +%s`
+VALUE=`/usr/local/bin/cpurrd`
+/usr/local/bin/rrdtool update /usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd $TIME:$VALUE
+}}}
+[[sadsense(click)]]
+=== 그래프 생성 ===
+역시 corn을 이용해서 5분간격으로 그래프를 생성할 것이다.
+{{{#!plain
+#!/bin/sh
+CUTIME=`date +%s`
+# 6 hour
+FROM=`echo "$CUTIME - (3600*6)" | bc`
+/usr/local/bin/rrdtool graph /usr/local/mutihost/joinc/modules/rrd/images/cpu.png \
+-s $FROM --vertical-label "Cpu Load Average" \
+DEF:linea=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:1min:AVERAGE \
+STACK:linea#54EB48:"1min" \
+"GPRINT:linea:LAST:%1.2lf" \
+DEF:lineb=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:5min:AVERAGE \
+STACK:lineb#EBD648:"5min" \
+"GPRINT:lineb:LAST:%1.2lf" \
+DEF:linec=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:15min:AVERAGE \
+STACK:linec#EB9C48:"15min" \
+"GPRINT:linec:LAST:%1.2lf" \
+HRULE:0.8#FF0000:"Maximum allowed"
+
+# 24 hour
+FROM=`echo "$CUTIME - (3600*24)" | bc`
+/usr/local/bin/rrdtool graph /usr/local/mutihost/joinc/modules/rrd/images/cpuday.png \
+-s $FROM --vertical-label "Cpu Load Average" \
+DEF:linea=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:1min:AVERAGE \
+STACK:linea#54EB48:"1min" \
+"GPRINT:linea:LAST:%1.2lf" \
+DEF:lineb=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:5min:AVERAGE \
+STACK:lineb#EBD648:"5min" \
+"GPRINT:lineb:LAST:%1.2lf" \
+DEF:linec=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:15min:AVERAGE \
+STACK:linec#EB9C48:"15min" \
+"GPRINT:linec:LAST:%1.2lf" \
+HRULE:0.8#FF0000:"Maximum allowed"
+
+# 1mon
+FROM=`echo "$CUTIME - (3600*24*31)" | bc`
+/usr/local/bin/rrdtool graph /usr/local/mutihost/joinc/modules/rrd/images/cpumon.png \
+-s $FROM --vertical-label "Cpu Load Average" \
+DEF:linea=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:1min:AVERAGE \
+STACK:linea#54EB48:"1min" \
+"GPRINT:linea:LAST:%1.2lf" \
+DEF:lineb=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:5min:AVERAGE \
+STACK:lineb#EBD648:"5min" \
+"GPRINT:lineb:LAST:%1.2lf" \
+DEF:linec=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:15min:AVERAGE \
+STACK:linec#EB9C48:"15min" \
+"GPRINT:linec:LAST:%1.2lf" \
+HRULE:0.8#FF0000:"Maximum allowed"
+
+# 1year
+FROM=`echo "$CUTIME - (3600*24*31*12)" | bc`
+/usr/local/bin/rrdtool graph /usr/local/mutihost/joinc/modules/rrd/images/cpuyear.png \
+-s $FROM --vertical-label "Cpu Load Average" \
+DEF:linea=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:1min:AVERAGE \
+STACK:linea#54EB48:"1min" \
+"GPRINT:linea:LAST:%1.2lf" \
+DEF:lineb=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:5min:AVERAGE \
+STACK:lineb#EBD648:"5min" \
+"GPRINT:lineb:LAST:%1.2lf" \
+DEF:linec=/usr/local/mutihost/joinc/modules/rrd/rrd_cpuload.rrd:15min:AVERAGE \
+STACK:linec#EB9C48:"15min" \
+"GPRINT:linec:LAST:%1.2lf" \
+HRULE:0.8#FF0000:"Maximum allowed"
+}}}
+다음은 생성된 그래프들이다.
+
+=== 최근 6시간 ===
+http://www.joinc.co.kr/modules/rrd/images/cpu.png
+
+=== 최근 하루 ===
+http://www.joinc.co.kr/modules/rrd/images/cpuday.png
+
+자세한 출력결과물은 [wiki:Site/Joinc/AdminInfo/SMSInfo Joinc 시스템정보]페이지를 확인하기 바란다.

@@ -1,0 +1,158 @@
+#title none type 
+
+=== 런타임시 자료형 정의 하기 ===
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=31129&forum=1)]]
+
+완벽하게 런타임으로 자료구조를 정의 하고 사용하기 위한 코드는 아니지만, 약간만 응용하면 충분히 가능하다는걸 알 수 있을 겁니다.
+
+대충대충 짠겁니다. -.-;
+{{{#!plain
+#include <unistd.h>
+#include <stdlib.h>
+#include <vector>
+#include <string>
+#include <iostream>
+
+/*
+사용할 자료구조
++----------+-----------+
+| ID       | int       |
+| NAME     | char (12) |
+| AGE      | int       |
+| ADDRESS  | char (80) |
++----------+-----------+
+*/
+using namespace std;
+#define TYPE_INT  1
+#define TYPE_CHAR 2
+#define SIZE_INT 12
+
+// 레코드의 각 필드의 타입과 크기를 저장하기 위한 구조체
+typedef struct _fieldattr
+{
+  string name;
+  int type;
+  int size;
+}fieldattr;
+
+vector<void *> datalist;
+
+void InputData(vector<string> data, vector<fieldattr> *fattrlist)
+{
+  void *inputrecord;
+  int record_size = 0;
+  vector<fieldattr>::iterator vi;
+
+  vi = fattrlist->begin();
+  while(vi != fattrlist->end())
+  {
+    record_size += vi->size;
+    vi++;
+  }
+
+  inputrecord = (void *)malloc(record_size);
+  memset(inputrecord, 0x00, record_size);
+  vi = fattrlist->begin();
+  for (int i = 0, index = 0; i < data.size(); i++)
+  {
+    memcpy((char *)inputrecord+index, data[i].c_str(), strlen(data[i].c_str()));
+    index += vi->size;
+    vi++;
+  }
+  datalist.push_back(inputrecord);
+}
+
+void PrintData(vector<fieldattr> *fattrlist)
+{
+  vector<fieldattr>::iterator vi;
+
+  vi = fattrlist->begin();
+  while(vi != fattrlist->end())
+  {
+    string type;
+    switch (vi->type)
+    {
+      case(TYPE_INT):
+        type = "int";
+        break;
+      case(TYPE_CHAR):
+        type = "char";
+        break;
+    }
+    printf("%s  ", vi->name.c_str());
+    vi++;
+  }
+  printf("\n");
+
+  for (int i = 0; i < datalist.size(); i++)
+  {
+    vi = fattrlist->begin();
+    for (int j = 0, offset = 0; j < fattrlist->size(); j++)
+    {
+      printf("%s  ", (char *)datalist[i]+offset);
+      offset += vi->size;
+      vi++;
+    }
+    printf("\n");
+  }
+}
+
+int main(int argc, char **argv)
+{
+  fieldattr lfattr;
+
+  // 레코드의 필드별 속성을 저장하기 위한 vector
+  // 4개의 필드를 가진다.
+  vector<fieldattr> fattrlist;
+
+  // ID 필드를 위한 속성 정의
+  lfattr.type = TYPE_INT;
+  lfattr.size = SIZE_INT;
+  lfattr.name = "ID";
+  fattrlist.push_back(lfattr);
+
+  // NAME 필드를 위한 속성 정의
+  lfattr.type = TYPE_CHAR;
+  lfattr.size = 12;
+  lfattr.name = "NAME";
+  fattrlist.push_back(lfattr);
+
+  // AGE 필드를 위한 속성 정의
+  lfattr.type = TYPE_INT;
+  lfattr.size = SIZE_INT;
+  lfattr.name = "AGE";
+  fattrlist.push_back(lfattr);
+
+  // ADDRESS 필드를 위한 속성 정의
+  lfattr.type = TYPE_CHAR;
+  lfattr.size = 80;
+  lfattr.name = "ADDRESS";
+  fattrlist.push_back(lfattr);
+
+
+  vector<string> data;
+  data.push_back("388");
+  data.push_back("홍길동");
+  data.push_back("28");
+  data.push_back("서울시 방이동");
+  InputData(data, &fattrlist);
+
+  data.clear();
+  data.push_back("389");
+  data.push_back("김홍만");
+  data.push_back("32");
+  data.push_back("광주시 우리동");
+  InputData(data, &fattrlist);
+
+  PrintData(&fattrlist);
+}
+}}}
+ 
+자료구조(주로 배열)을 만들기가 귀찮아서 vector을 이용했습니다. 런타임시에 필요한 데이터와 데이터의 속성을 저장하기 위한 키포인트는 다음의 세 가지 정도가 될것 같군요.
+ 1. 데이터 속성을 저장하기 위한 구조체를 유지한다. 
+    데이터를 저장하기 전에 데이터의 속성(타입/크기)를 위한 profile(Table)을 만든다는 점에서 DB시스템의 '''create table'''과 비슷하다고 볼 수 있겠습니다. 
+ 1. 데이터는 void * 형으로 저장한다. 
+    어차피 데이터의 각 필드별 속성을 알고 있으니, 꺼내올때 형변환만 해주면 되죠.
+ 1. 데이터를 읽어들일 때는 데이터 속성 구조체에서 각 필드의 타입을 얻어오고 적당히 형변환 한다.
+
+유연한 프로그램을 만들려면 RDBMS에서의 SQL 처럼 Query를 처리할 수 있도록 해주면 되겠죠. bison(12), yacc(12)등을 이용하면 간단한 DB관리 프로그램을 만들 수도 있겠네요.

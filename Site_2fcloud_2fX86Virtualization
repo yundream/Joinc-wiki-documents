@@ -1,0 +1,119 @@
+#title X86 virtualization
+
+[[TableOfContents]]
+== X86 가상화 ==
+X86 가상화는 x86기반의 호스트 운영체제에서 (커널의 수정 없이 혹은 최소한의 수정만으로)다른 x86기반의 게스트 운영체제를 운영하는 기술을 말한다. vmware는 1999년경 이 기술을 시장에 처음 (상품으로서)소개한 기업이다. 내가 처음 vmware를 설치한게 아마 2002년 때쯤인 ? 것으로 기억한다. 당시 리눅스를 데스크탑으로 사용하고 있었는데, 부팅없이 윈도우 운영체제를 실행하려는 목적으로 설치했다. 너무 느려서 포기했다. 신기한 기술이긴 하지만 이걸 어디에 써먹을 수 있지 ? 이런 느낌이었다. 
+
+20004년 까지는 vmware의 독주였는데, Linux 기반의 가상화 솔루션인 Xen과 Kvm등이 나오면서 시장의 양상이 달라지기 시작한다. 현재 시장은 vmware와 xen이 주도하는 것으로 보인다. 가상화 솔류션을 간단히 정리했다.
+  1. 1998 
+     * VMware 설립
+  1. 1999 
+     * workstation
+  1. 2000 
+     * VMware Server
+  1. 2001 
+     * ESX Server
+  1. 2002 
+     * 백만 VMware 유저 달성 
+  1. 2003 
+     * VirtualCenter 
+  1. 2004 
+     * Xen Linux v1 - 반가상화 
+     * VMotion
+  1. 2005  
+     * Xen Linux v2 - 반가상화
+  1. 2007
+     * Xen Linux v3 - 전가상화를 지원하면서 윈도우등 상용 운영체제 지원
+     * innoteck : VirtualBox OSE (Open Source edition)
+  1. 2008
+     * RedHat Linux KVM
+  1. 2009
+     * Citrix : Xen 을 기반으로한 상용 솔류션 XenServer
+     * Sun Microsystems : innotek로 부터 VirtualBox 획득 
+  1. 2010
+     * Oracle : Sun을 인수하면서 Oracle VM VirtualBox로 제품명 변경   
+  1. 2011
+     * Linux 커널 2.6.37 부터 Xen 정식 포함
+     * Qemu(:12)의 안정버전 1.0
+
+== 가상화 란 ==
+컴퓨터 자원을 추상화하는 기술을 일컫는다. 예를 들어 하나의 물리적인 CPU를 논리적인 CPU로 추상화 함으로써 마치 여러 CPU인 것처럼 보이게 할 수 있다. 이렇게 해서 하나의 물리적인 컴퓨터 호스트를 여러 개의 (논리적) 컴퓨터로 구성할 수 있으며, 각 논리적 컴퓨터 위에 여러 개의 운영체제를 동시에 운용할 수 있다. 
+
+=== 가상화의 원리 ===
+==== user 모드와 kernel 모드 ====
+CPU 명령모드는 user 모드로 kernel 모드로 나뉜다. kenel 모드에서 작동 할때만 컴퓨터 자원에 접근할 수 있다. 일반 애플리케이션은 유저 모드로 작동하며, 커널만이 커널모드로 작동한다. 유저 애플리케이션이 하드웨어 자원을 사용해야 할 경우, 커널에 자원 사용을 요청하는 과정을 거쳐야 한다. 
+
+==== virtualizable mode 와 non-virtualizable mode ====
+유저 애플리케이션은 virtualizable 모드에서 작동하니다. 추상화된 논리적인 환경이므로 여러 개의 애플리케이션을 실행할 수 있습니다. 반면 OS는 non-virtualizable 모드에서 작동합니다. 특권 모드라고도 부르는 이 모드는 오직 하나의 OS만 올라갈 수 있습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1qBuTKGE7ERjkmmR9QvOtDUf25BZDzOqpKAwX62oe-i0&amp;w=678&amp;h=307">
+}}}
+
+가상화는 특권 모드에 운영체제가 대신 Hypervisor가 놓입니다. 운영체제는 virtualizable mode로 올려버리고, 운영체제로 하여금 특권모드에 있는 것처럼 착각하게 만듭니다. 이렇게 해서 마치 애플리케이션 처럼 여러 개의 운영체제를 올리는 겁니다. 운영체제를 어떻게 올리는지에 따라서 가상화 종류가 분류됩니다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10KyzIfDvXT_hC8aphZUJPni0ScUiMIKKkbB5aBeIFzk&amp;w=671&amp;h=385">
+}}}
+
+== 가상화 종류 ==
+
+=== Hypervisor ===
+호스트 컴퓨터에서 다수의 운영체제를 동시에 실행할 수 있는 환경을 만들어주는 플랫폼입니다. VMM (Virtual machine monitor)이라고 부르기도 합니다. 간단히 VMM과 하이퍼바이저는 같은거라고 생각하시면 됩니다. 
+
+=== Ring ===
+Protection Ring는 컴퓨터의 자원을 보호하기 위한 계층적 권한 메커니즘을 제공합니다. Ring은 Ring 0에서 Ring 3까지 4 계층의 권한 단계를 가지고 있습니다. 
+
+x86은 4개의 ring을 가지고 있습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1XawfC5eH7g2NvwvcyOnbHSNxhH0ItFsfb-pBWDMDfoE&amp;w=479&amp;h=395">
+}}}
+
+Ring 0이 특권 계층으로 컴퓨터 하드웨어에 직접 접근할 수 있는 권한을 가집니다. 운영체제가 Ring 0에 위치합니다.  일반 응용 애플리케이션은 Ring 3 단계에서 실행 됩니다. Ring 1과 Ring 2는 Device Drivers를 위해 남겨둔 권한 계층입니다. 
+
+=== Paravirtualization ===
+게스트 운영체제는 Hypercall이라는 가상화 호출을 Virtualization Layer로 전송합니다. Virtualization Layer는 Hypercall을 실제적인 OS 명령을 호출합니다. 반가상화라고도 부르는 Paravirtualization 기술을 사용하려면 운영체제가 Hypercall를 호출하도록 커널을 수정해야 합니다. 그러므로 윈도우와 같은 상용 운영체제에는 적용할 수 없습니다. 커널을 자유롭게 수정할 수 있는 리눅스 계열의 운영체제에 주로 사용하는 가상화 기술입니다. 오버헤드가 적어서 효율적으로 작동한다는 장점이 있습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1G7W7p5OLIBn1MfY0hiIEON7PhbZ6VOssvySAppOPZDw&amp;w=468&amp;h=435">
+}}}}
+
+=== Full Virtualization ===
+Full virtualization (완전가상화)는 게스트 운영체제와 하드웨어 사이에 VMM을 배치합니다. VMM이 게스트 운영체제와 하드웨어사이를 중재하는 거죠. 하이퍼 바이저가 명령을 중재하기 때문에 소스코드를 수정할 필요 없이 게스트 운영체제를 가상화할 수 있습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=11AXyxFbIZ0c149G77vt0wPyqXoZwj07dN0QrbMqD2-c&amp;w=457&amp;h=405">
+}}}
+
+=== Hardware Virtualization ===
+가상화가 대세가 되자 하드웨어 벤드들도 가상화 기술 확보에 눈을 돌립니다. 그 결과 AMD-V와 VT-X와 같은 가상화 기술이 탄생했습니다.이 두 기술은 기존의 CPU 아키텍처에 새로운 실행모드를 추가했습니다. 기존의 CPU 아키텍처의 가장 밑바닥에는 Ring 0가 있었는데, 여기에 Root Mode Privilege Levels라는 것을 하나 더 추가했습니다. 이제 Ring 0까지가 비특권 모드가 되어서 하나 이상의 운영체제가 올라갈 수 있게 된겁니다. 새로 추가된 특권계층에는 VMM이 올라갑니다. Intel에서는 추가된 모드를 VMX 루트 모드라고 부릅니다.
+
+VMM은 게스트 운영체제의 요청을 가로채서 대신 처리를 합니다. Xen, VirtualBox, KVM 등이 VMM으로 (공개 하드웨어 애뮬레이션인)Qemu를 이용합니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1R1g4ENnwdfdl6Sfo6kgslYxypyaiu6QaLM5RCnjzCDU&amp;w=528&amp;h=465">
+}}}
+
+운영체제의 커널을 수정할 필요 없이 가상화 할 수 있다는 장점이 있습니다. 
+=== Type-I 하이퍼바이저 ===
+하드웨어 바로 위에 실행되는 하이퍼 바이저로 '''Native 하이퍼바이저''' 혹은 '''Bare-metal 하이퍼바이저'''라고 부릅니다. Type-I 방식의 하이퍼바이저는 1960년대 IBM이 개발한 CP/CMS에서 시작됐습니다. VMware ESX Server, Xen이 이 방식을 사용하고 있습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=18RigfnHYPIYU3Fj3HHHyAQts-T6aTZuGpmTV4LzS758&amp;w=358&amp;h=281">
+}}}
+
+=== Type-II 하이퍼바이저 ===
+OS 위에서 실행되는 하이퍼 바이저로 '''Hosted 하이퍼바이저'''라고도 합니다. 친숙한 OS위에서 다른 운영체제를 호출할 수 있기 때문에, 일반 사용자도 쉽게 사용할 수 있다는 장점이 있습니다. 하지만 운영체제 위에서 실행하는 만큼 효율적이지 않다는 단점이 있습니다. VirtualBox와 VMware Server, KVM이 대표적인 Type-II 가상화 도구입니다.     
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1GVUVxXbqLSHjy6l_aSKpTokbIFG3Zh08EdsiYKeZ3mI&amp;w=370&amp;h=336">
+}}}
+
+KVM의 가상화 방법을 설명하는 그림입니다. QEMU로 하드웨어를 애뮬레이션 하고 그 위에 게스트 운영체제가 올라갑니다.  
+
+== 히스토리 ==
+  1. 작성일 : 2011년 12월 2일 
+
+[[tag(가상화,Qemu,KVM,Xen,VirtualBox,20111202)]]
+[[Category(50)]]

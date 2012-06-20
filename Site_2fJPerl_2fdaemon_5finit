@@ -1,0 +1,23 @@
+#title Perl에서 데몬 프로세스 만들기
+
+Perl을 이용해서 네트워크 서버 프로그램을 만들어야될 일이 생겼다. 그동안 서버프로그램은 C(:12)만을 이용왔다. 이번에도 C를 이용해서 만들려고 했는데, 이게 여러장비로 자동배포되어야될 프로그램인지라 배포관리 차원에서 Perl을 이용하기로 했다.
+
+다음은 [wiki:Site/JPerl perl]을 이용해서 daemon(:12) 프로세스를 만드는 방법이다. fork(:12)한후 부모프로세스를 exit(2) 하고 setsid() 하는 것, 마지막으로 표준입력(:12),표준출력,표준에러를 닫아주는 것 까지 C로 했을 때와 큰 차이는 없다. 하긴 시스템프로그래밍(:12)영역이니 언어에 따른 차이가 있을리는 없겠지만.  
+{{{#!plain
+#!/usr/bin/perl
+use POSIX 'setsid';
+use Cwd 'chdir';
+
+sub daemon_init
+{
+    my $pid = fork;
+    exit 0 if $pid;
+    exit 1 if not defined $pid;
+    setsid();
+    close $_ for @_;
+}
+
+daemon_init( *STDERR, *STDOUT, *STDIN);
+}}}
+
+음.. perl은 문법이 참 자유롭단 말이야. 알아먹기 어려운 코드라고 욕을 좀 먹긴 하지만.

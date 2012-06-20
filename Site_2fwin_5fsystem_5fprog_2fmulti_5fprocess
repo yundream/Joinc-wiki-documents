@@ -1,0 +1,78 @@
+#title 윈도우즈 멀티프로세스 프로그래밍
+
+윈도우즈에서의 프로세스를 다루는 방법들에 대해서 알아볼 생각이다.
+
+== 윈도우즈 환경에서의 멀티 프로세스 프로그래밍 ==
+음 윈도우는 fork() 를 제공하지 않는다는 것을 알았다. 인터넷을 뒤져서 '''CreateProcess'''라는 비슷한 함수를 제공하고 있다는 것을 알았다. 
+
+그런데, 문서를 읽어보니 프로세스를 복사해서 분기시키는 fork()의 개념이 아닌 새로운 프로세스 이미지를 생성하는 execl()과 오히려 비슷하다는 느낌을 받게 되었다.
+
+{{{#!plain
+BOOL WINAPI CreateProcess(
+  __in_opt     LPCTSTR lpApplicationName,
+  __inout_opt  LPTSTR lpCommandLine,
+  __in_opt     LPSECURITY_ATTRIBUTES lpProcessAttributes,
+  __in_opt     LPSECURITY_ATTRIBUTES lpThreadAttributes,
+  __in         BOOL bInheritHandles,
+  __in         DWORD dwCreationFlags,
+  __in_opt     LPVOID lpEnvironment,
+  __in_opt     LPCTSTR lpCurrentDirectory,
+  __in         LPSTARTUPINFO lpStartupInfo,
+  __out        LPPROCESS_INFORMATION lpProcessInformation
+);
+}}}
+ 1. '''lpApplicationName'''
+     실행시킬 모듈의 이름으로 윈도우즈기반의 애플리케이션 이름을 의미한다. 여기에서 execl()과 비슷한 일을 함수라는 걸 직감할 수 있다. 그렇다고 execl()과 동일하다고 볼 수도 없다. execl()의 경우 프로세스의 이미지를 덮어써 버리는데, CreateProcess는 독립적인 새로운 프로세스를 생성시킨다. 그런점에서 [wiki:Site/system_programing/process/Process_Relation fork & execl]의 조합과 비슷하다고 봐야 할 것 같다.
+ 1. '''lpCommandLine''' 
+   실행시킬 애플리케이션에 넘길 '''명령행 인자'''를 명시하기 위해서 사용한다. 예를들어 C:\Myapp.exe를 Parm1, Parm2 명령행 인자와 함께 실행시키기 위한 방법이다.
+   {{{#!plain
+CreateProcess("C:\Myapp.exe", "Parm1 Parm2", ....);
+}}}
+ 1. lpProcessAttributes
+    '''SECURITY_ATTRIBUTES'''구조체의 포인터로 Process Object 핸들을 자식 프로세스에 상속할지를 결정한다. NULL을 지정하면 Process Object 핸들을 상속하지 않는다. 
+ 1. '''lpThreadAttributes'''
+   '''SECURITY_ATTRIBUTES'''구조체의 포인터로 Thread Kernel Object 핸들을 자식 프로세스에 상속 할지를 결정한다. NULL을 지정하면 Thread Krenel Object 핸들을 상속하지 않는다.
+ 1. '''bInheritHandles''' 
+   TRUE이면 자식 프로세스에 핸들을 상속한다. 만약 FALSE이면 핸들을 상속하지 않는다. 
+ 1. '''dwCreationFlags'''
+   프로세스가 생성될 때 추가할 플래그다. 
+ 1. '''lpEnvironment''' 
+ 1. '''lpCurrentDirectory'''
+ 1. '''lpStartupInfo'''
+ 1. '''lpProcessInformation'''
+    새로 만들어진 프로세스의 정보를 포함한 PROCESS_INFORMATION 구조체의 포인터를 돌려준다. 프로세스가 종료되면 PROCESS_INFORMATION이 가지고 있는 핸들을 CloseHandle(:4100)함수로 종료시켜줘야 한다.
+
+== 예제 ==
+{{{#!plain
+#include <windows.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	memset((void *)&si, 0x00, sizeof(si));
+	memset((void *)&pi, 0x00, sizeof(pi));
+	CreateProcess("C:\\windows\\notepad.exe",
+		" c:\\mytest.txt",
+		NULL,
+		NULL,
+		0,
+		NORMAL_PRIORITY_CLASS,
+		NULL,
+		NULL,
+		&si,
+		&pi);
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	printf("End\n");
+	return 1;
+
+}
+}}}
+
+== 관련 글 ==
+ * [wiki:Site/win_system_prog/IPC/anonymous_pipe 윈도 익명 파이프]
+ * http://msdn.microsoft.com/en-us/library/ms682425%28VS.85%29.aspx
+ * http://www.ibm.com/developerworks/kr/library/l-rt7/index.html
+ * [http://micingamja.egloos.com/3480522 미친감자의 프로그래밍 이야기 ::: CreateProcess]

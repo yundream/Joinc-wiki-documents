@@ -1,0 +1,93 @@
+#title Nexentastor : nmc command
+
+[[TableOfContents]]
+== NMC ==
+'''N'''exenta '''M'''anagement '''C'''onsole의 줄임말입니다. 넥센터에 접근하면 bash 쉘 대신뜨는데, 넥센터에서 제공하는 전용 쉘이라고 보시면 됩니다. 탭키를 누르는 것만으로 명령이 지원하는 옵션을 보여주기 때문에, 비교적 쉽게 명령을 사용할 수 있습니다.
+
+웹용 인터페이스인 NMV도 있습니다. 처음엔 NMV를 주로 사용했는데 반응 속도와 작업 속도, 기타 자잘한 버그들 때문에 자연스롭게 nmc로 넘어가게 되더군요.
+
+=== 테스트 환경 ===
+nmc 명령의 테스트 환경입니다.
+  * nexentstor version 3.0.5 
+
+=== Bash 쉘로 전환 ===
+expert mode로 전환한다음, !bash를 실행하면 Bash 쉘로 전환할 수 있습니다. nmc는 넥세타를 관리하기에는 편하기는 하지만, 시스템 명령을 사용할 수는 없기 때문에 시스템 명령을 사용하려면 bash쉘로 전환해야 합니다.
+{{{#!plain
+nmc@yundream:/$ option expert_mode=y                                                          
+
+nmc@yundream:/$ !bash                                                                         
+You are about to enter the Unix ("raw") shell and execute low-level Unix command(s).
+CAUTION: NexentaStor appliance is not a general purpose operating system: managing the
+appliance via Unix shell is NOT recommended. This management console (NMC) is the
+command-line interface (CLI) of the appliance, specifically designed for all
+command-line interactions. Using Unix shell without authorization of your support
+provider may not be supported and MAY VOID your license agreement. To display the
+agreement, please use 'show appliance license agreement'.
+Proceed anyway? (type No to return to the management console)  Yes
+}}}
+
+프롬프트의  '''nmc@'''로 nmc 상태인지, bash 쉘 상태인지 확인할 수 있습니다.
+
+== NMC Command ==
+유닉스나 오픈 솔라리스에 익숙하다면, NMC를 이용하지 않고 쉘에서 많은 작업들을 할 수 있다. 쉘에서 빠른 작업이 가능하긴 하지만, NMC와의 설정이 꼬여서 예상치 못한 문제가 발생할 수 있으므로 가능한 NMC로 관리하는 걸 권장한다. 
+
+=== command class ===
+NMC는 다음의 명령어 클래스를 가지고 있습니다. 데이터셋은 네트워크, 볼륨, 폴더, 인터넷 서비스, 볼륨 서비스 등을 의미합니다.
+  1. create    
+    데이터셋를 생성하기 위한 명령어 집합 
+  1. setup 
+    이미 생성한 데이터셋의 값을 변경하기 위한 명령어 집합 
+  1. show 
+    데이터셋의 상태 값을 보여주기 위한 명령어 집합
+  1. share 
+    데이터를 공유하기 위한 명령어 집합
+  1. destroy
+    데이터셋를 제거하기 위한 명령어 집합
+  1. 기타 명령어들
+    df, ls, find, cp와 같은 유틸리티 명령어들
+
+명령어는 탭키로 선택할 수 있습니다. nmc에서 create를 입력하고 tab키를 누르면 create 명령과 옵션들이 출력됩니다.
+
+=== network ===
+네트워크 관련 명령들을 정리
+==== create network aggregation ====
+aggregation 네트워크를 생성합니다. LACP(Aggretation Control Protocol)을 이용해서 두 개 이상의 네트워크 인터페이스를 하나로 만들 수 있습니다. 주로 대역폭을 높이기 위해서 사용합니다. 예를 들어 10G 이더넷 인터페이스 4개를 묶어서 40G의 대역폭으로 만들 수 있습니다. switch도 LACP를 지원해야 합니다. 많은 트래픽을 처리해야 하는 스토리지 장비의 특성상 중요한 옵션이라고 할 수 있습니다. 
+
+Ethernet Bonding 이라고 하기도 합니다. 리눅스에서라면 설정하는데 좀 고생을 하겠지만, nmc에서는 묶을 인터페이스를 선택하고 네트워크 설정해 주면 그걸로 끝입니다. 
+
+참고 : [http://www.debianadmin.com/linux-ethernet-bonding-configuration.html Linux ethernet bonding 설정]
+
+==== create iscsi target ====
+원격으로 스토리지를 서비스할때 NFS와 함께 가장 널리 사용하는 프로토콜이 [wiki:Site/System_management/iSCSI iscsi] 입니다. 
+
+=== volume ===
+볼륨 관련 명령들을 정리
+
+==== create volume ====
+볼륨을 만들기 위해서 사용합니다. 디바이스를 선택하는 정도로 간단하게 볼륨을 만들 수 있습니다. zfs에서 지원하는 볼륨형식을 모두 지원합니다.
+  1. RAIDZ
+  1. RAIDZ-2
+  1. pool 
+  1. mirror
+
+==== create folder ====
+
+=== appliance ===
+어플라이언스 장비 설정 관련 명령들을 정리
+
+==== setup appliance domain ====
+
+==== setup appliance hostname ====
+어플라이언스의 도메인 이름과 호스트 이름을 설정한다. 이들 정보는 /etc/hosts에 기록 된다.
+
+=== disk ===
+vdev 관련 명령들을 정리
+
+==== show lun ====
+물리적인 disk 정보를 확인할 수 있다.
+
+===== show lun lunname blink =====
+수십개의 디스크가 꽂혀 있는 JBOD를 관리할 경우, 문제의 디스크를 찾는데 어려움을 겪을 수 있다. blink는 디스크 이름이 lunname인 disk의 in/out 램프를 특정 패턴으로 점멸해서, 디스크의 위치를 찾을 수 있게 해준다. blink 기능을 몰라서 디스크에 포스트 잇을 붙이는 삽질을 한 아픈 기억이 있다. 
+ 
+== 히스토리 ==
+  1. 2012년 1월 5일 작성 시작

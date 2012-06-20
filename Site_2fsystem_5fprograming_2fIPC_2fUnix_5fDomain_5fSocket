@@ -1,0 +1,255 @@
+#title Unix Domain Socket
+
+{{{#!html
+Unix Domain Socket(이하 UDS) 는 socket API를 수정없이 이용며, 
+port 기반의 Inernet Domain Socket에 비해서 로컬 시스템의 파일시스템을 
+이용해서 내부프로세스간의 통신을 위해 사용한다는 점이 다르다고 할수 있다. 
+<br><br>
+ls 를 이용해서 통신을 위해서 만들어진 파일을 보면 다음과 같은 모습을 
+보인다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost tmp]$ ls -al
+srwx------    1 root     nobody          0 12월 14 21:16 .fam_socket
+</pre>
+</td></tr>
+</table>
+보면 파일타입에 "s" 가 붙어 있는걸 알수 있으며, 파일사이즈가 0으로 되어 있는
+걸 알수 있다. 왜냐하면 FIFO와 마찬가지로 메시지가 파일로 쌓이지 않고 
+커널로 전달되어서 커널에서 처리하기 때문이다.<br><br> 
+파일을 통해서 통신을 하며, 커널내부에서 메시지를 관리한다는 점에서 
+FIFO와 매우 유사한면을 보여주지만, FIFO와는 달리 양방향 통신이 가능하다는 
+특징을 가지고 있다. 그러므로 다중의 클라이언트를 받아들이는 서버/클라이언트 
+모델을 만들기가 매우 쉽다.<br>
+또한 Inet 소켓을 통한 외부통신에 비해서 2배 이상의 효율을 보여준다라는 
+장점을 가지고 있다. <br><br> 
+많은 경우 약간 복잡한 내부프로세스간 통신을 해야된다고 했을때 UDS을 많이 
+사용한다. INET 계층에서의 통신이 TCP/IP 4계층을 모두 거치는것과는 
+다르게, UDS 은 어플리케이션 계층에서 TCP 계층까지만 메시지가 전달되고, 
+다시 곧바로 어플리케이션 계층으로 메시지가 올라가게 된다. TCP/IP 계층에 대한 
+자세한 내용은 <a href=http://www.joinc.co.kr/article.php?sid=33>TCP/IP 개요(2)</a>를 참고 하기 바란다.<br><br> 
+위에서 INET 소켓보다 2배이상의 효율을 가진다고 했는데,  
+4계층의 레이어를 모두 거쳐야하는 INET 소켓에 비해서 단지 2개의 레이어만 
+사용한다는 점도 그 이유중 하나로 작용한다.<br><br>
+쏘쓰 코드는 <a href=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=20>다중연결서버 만들기(1)</a>의 zipcode_multi.c 와 
+<a href=http://www.joinc.co.kr/article.php?sid=11>셈플로 알아보는 소켓프로그래밍(1)</a>의 zipcode_cli.c 를 사용하도록할것이다.<br><br>  
+<b>예제: zipcode_local.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/un.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>int</font></b> server_sockfd, client_sockfd;
+    <b><font COLOR=#0000ff>int</font></b> state, client_len;
+    pid_t pid;
+
+    FILE *fp;
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_un clientaddr, serveraddr;
+
+    <b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>char</font></b> line[<font COLOR=#a900a9>255</font>];
+
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font>)
+    {
+        printf(<font COLOR=#ff0000>"Usage : ./zipcode [file_name]&#92;n"</font>);
+        printf(<font COLOR=#ff0000>"예    : ./zipcode /tmp/mysocket&#92;n"</font>); 
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    memset(line, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+    state = <font COLOR=#a900a9>0</font>;
+
+    <b><font COLOR=#0000ff>if</font></b> (access(argv[<font COLOR=#a900a9>1</font>], F_OK) == <font COLOR=#a900a9>0</font>)
+    {
+        unlink(argv[<font COLOR=#a900a9>1</font>]);
+    }
+    // 주소 파일을 읽어들인다. 
+    client_len = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+    <b><font COLOR=#0000ff>if</font></b>((fp = fopen(<font COLOR=#ff0000>"zipcode.txt"</font>, <font COLOR=#ff0000>"r"</font>)) == NULL)
+    {
+        perror(<font COLOR=#ff0000>"file open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    // internet 기반의 스트림 소켓을 만들도록 한다. 
+    <b><font COLOR=#0000ff>if</font></b> ((server_sockfd = socket(AF_UNIX, SOCK_STREAM, <font COLOR=#a900a9>0</font>)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"socket error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    bzero(&amp;serveraddr, <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr));
+    serveraddr.sun_family = AF_UNIX;
+    strcpy(serveraddr.sun_path, argv[<font COLOR=#a900a9>1</font>]);
+
+
+    state = bind(server_sockfd , (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&amp;serveraddr, 
+            <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr));
+    <b><font COLOR=#0000ff>if</font></b> (state == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"bind error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    state = listen(server_sockfd, <font COLOR=#a900a9>5</font>);
+    <b><font COLOR=#0000ff>if</font></b> (state == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"listen error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    printf(<font COLOR=#ff0000>"accept : &#92;n"</font>);
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        client_sockfd = accept(server_sockfd, (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&amp;clientaddr, 
+                               &amp;client_len);
+        printf(<font COLOR=#ff0000>"test test&#92;n"</font>);
+        pid = fork();
+        <b><font COLOR=#0000ff>if</font></b> (pid == <font COLOR=#a900a9>0</font>)
+        {
+            <b><font COLOR=#0000ff>if</font></b> (client_sockfd == -<font COLOR=#a900a9>1</font>)
+            {
+                perror(<font COLOR=#ff0000>"Accept error : "</font>);
+                exit(<font COLOR=#a900a9>0</font>);
+            }
+            <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+            {
+                memset(buf, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+                <b><font COLOR=#0000ff>if</font></b> (read(client_sockfd, buf, <font COLOR=#a900a9>255</font>) &lt;= <font COLOR=#a900a9>0</font>)
+                {
+                    close(client_sockfd);
+                    fclose(fp);
+                    exit(<font COLOR=#a900a9>0</font>);
+                }
+
+                <b><font COLOR=#0000ff>if</font></b> (strncmp(buf, <font COLOR=#ff0000>"quit"</font>,<font COLOR=#a900a9>4</font>) == <font COLOR=#a900a9>0</font>)
+                {
+                    write(client_sockfd, <font COLOR=#ff0000>"bye bye&#92;n"</font>, <font COLOR=#a900a9>8</font>);  
+                    close(client_sockfd);
+                    fclose(fp);
+                    <b><font COLOR=#0000ff>break</font></b>;
+                }
+
+                <b><font COLOR=#0000ff>while</font></b>(fgets(line,<font COLOR=#a900a9>255</font>,fp) != NULL)
+                {
+                    <b><font COLOR=#0000ff>if</font></b> (strstr(line, buf) != NULL)
+                        write(client_sockfd, line, <font COLOR=#a900a9>255</font>);
+                    memset(line, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+                }
+                write(client_sockfd, <font COLOR=#ff0000>"end"</font>, <font COLOR=#a900a9>255</font>);
+                printf(<font COLOR=#ff0000>"send end&#92;n"</font>);
+                rewind(fp);
+            }
+        }
+    }
+    close(client_sockfd);
+}
+</pre>
+</td></tr>
+</table>
+<br><br>
+다음은 클라이언트 프로그램이다.<br>
+<b>예제: zipcode_cli_local.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;sys/un.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+
+    <b><font COLOR=#0000ff>int</font></b> client_len;
+    <b><font COLOR=#0000ff>int</font></b> client_sockfd;
+
+    FILE *fp_in;
+    <b><font COLOR=#0000ff>char</font></b> buf_in[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>char</font></b> buf_get[<font COLOR=#a900a9>255</font>];
+
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_un clientaddr;
+
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font>)
+    {       
+        printf(<font COLOR=#ff0000>"Usage : ./zipcode_cl [file_name]&#92;n"</font>);
+        printf(<font COLOR=#ff0000>"예    : ./zipcode_cl /tmp/mysocket&#92;n"</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }       
+
+
+    client_sockfd = socket(AF_UNIX, SOCK_STREAM, <font COLOR=#a900a9>0</font>);
+    <b><font COLOR=#0000ff>if</font></b> (client_sockfd == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    bzero(&amp;clientaddr, <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr));
+    clientaddr.sun_family = AF_UNIX;
+    strcpy(clientaddr.sun_path, argv[<font COLOR=#a900a9>1</font>]);
+    client_len = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+    <b><font COLOR=#0000ff>if</font></b> (connect(client_sockfd, (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&amp;clientaddr, client_len) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"Connect error: "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        printf(<font COLOR=#ff0000>"지역이름 입력 : "</font>);
+        fgets(buf_in, <font COLOR=#a900a9>255</font>,stdin);
+
+        buf_in[strlen(buf_in) - <font COLOR=#a900a9>1</font>] = '<font COLOR=#a900a9>0</font>';
+        write(client_sockfd, buf_in, <font COLOR=#a900a9>255</font>);
+        <b><font COLOR=#0000ff>if</font></b> (strncmp(buf_in, <font COLOR=#ff0000>"quit"</font>, <font COLOR=#a900a9>4</font>) == <font COLOR=#a900a9>0</font>)
+        {
+            close(client_sockfd);
+            exit(<font COLOR=#a900a9>0</font>);
+        }
+        <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+        {
+            read(client_sockfd, buf_get, <font COLOR=#a900a9>255</font>); 
+            <b><font COLOR=#0000ff>if</font></b> (strncmp(buf_get, <font COLOR=#ff0000>"end"</font>, <font COLOR=#a900a9>3</font>) == <font COLOR=#a900a9>0</font>)
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            printf(<font COLOR=#ff0000>"%s"</font>, buf_get);
+        }
+    }
+
+    close(client_sockfd);
+    exit(<font COLOR=#a900a9>0</font>);
+}
+</pre>
+</td></tr>
+</table>
+<br><br>
+
+기존의 INET 버젼의 프로그램과 비교해 보면 고작 3줄 정도만 수정되었음을 
+알수 있을것이다. 단지 소켓 구조체가 sockaddr_un 으로 바뀌고, 
+AF_INET 대신 AF_UNIX 를 그리고 port 번호대신에 파일명을 사용했음을 
+알수 있다.<br><br>
+나머지의 모든 코드는 INET 코드와 완전히 같다. 그러므로 
+Unix Domain Socket 를 사용하면 Inet Domain Socket 와 코드 일관성을 
+유지할수 있으며, 동일한 기술을 사용해서 프로그래밍을 할수 있다.  <br><br> 
+또한 다른 대부분의 IPC 설비들이, 범용적으로 사용하기에는 부족한 여러가지 
+단점들을 가진반면(단방향 이거나, 읽기만 가능하다거나, 제어하기가 어려운) 
+UDS는 매우 범용적인 IPC 로써 사용가능하다라는 장점을 가지고 있다.<br><br>
+실제로 X 서버 같은경우에 외부에서의 접근시에는 INET 연결을 내부에서의 
+연결을 위해서는 UDS 를 사용한다. 이밖에도 mysql, pgsql, KDE, Gnome 과 같은 
+대부분의 서버프로그램이 내부통신을 위해서 UDS 를 사용한다. 
+}}}
+

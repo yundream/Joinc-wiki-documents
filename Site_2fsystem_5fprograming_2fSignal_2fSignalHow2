@@ -1,0 +1,376 @@
+#title signal 기초문서 - 2
+
+{{{#!html
+<h4>시그널의 특징 : 시그널은 대기열이 없다</h4>
+시그널은 한 프로세스에 대해서 발생하는 시그널을 큐잉 하지 못한다(대부분의 유닉스). 
+특정 프로세스에 보내는 시그널은 커널에서 관리하는데 이때 커널은 프로세스에게 보낼 
+시그널을 한개 이상 유지할수 없다.   
+<br><br>
+시그널을 받게 되면, 프로세스는 시그널 핸들러(신호 처리기)를 이용해서 
+시그널에 대한 처리를 하게 된다. 이때 즉 시그널 에 대한 처리가 끝나지 않은 상태에서 
+시그널이 발생되면 어떻게 될까 ?
+<br><br>     
+시그널 처리중 동일한 시그널이 들어온다면 이 시그널은 블럭(보류)되었다가 핸들러가 
+처리를 끝나면 바로 전달된다. 이유는 시그널 이 발생되어서 해당 시그널에 대한 핸들러가 
+실행되면, 핸들러 실행이 종료되기까지 발생된 시그널에 대해서 block 을 하기 때문이다. 
+그런데 동일한 시그널이 2개가 발생을 한다면? <br>
+커널은 시그널의 대기열을 유지할수 없으므로 마지막에 도착한 시그널은 사라지게 된다.   
+<br><br>  
+만약 다른 종류의 시그널이 발생한다면, 그 즉시 시그널이 전달된다.
+기존 시그널 핸들러가 작업중이던 말던 그 시점에서 새로운 시그널을 받아들이고, 
+핸들러를 빠져나가게 된다. 그리고 다시 복귀하지 않는다.
+
+<h4>그럼 시그널은 신뢰하기 힘들겠군요?</h4> 
+시그널이 큐잉 되지 않는다는 점은 짧은 시간에 여러개의 시그널이 발생할때 
+시그널을 잃어버릴수도 있다라는 것을 의미한다. 물론 하나의 프로세스에 대해서 
+매우 짧은 시간에 시그널이 다수 발생하는 일은 그리 흔하지 않긴 하겠지만 
+가끔은 문제가 될소지가 있다. 우리가 일반 시그널이 큐잉 되도록 
+커널을 뜯어 고칠수는 없는 문제이므로,  이걸 완벽하게 해결할수는 없다. 
+그러나 핸들러를 최소한 아토믹 한 코드로 만듬으로써 이러한 문제의 발생을 
+줄일수는 있을것이다. 그렇지 않고 커널차원에서 이러한 문제를 해결하고자 
+한다면 리얼타임 시그널을 사용해야 할것이다. 
+<br><br> 
+가장 큰 문제는 시그널핸들러 처리중에 다른 종류의 시그널이 발생했을때이다. 
+위에서 말했듯이 
+이럴경우 핸들러 처리도중에 빠져나가게 되고, 다시 핸들러로 복귀하지 않게 된다. 
+이건 꽤 심각할수 있는데, 시그널을 받아서 어떠한 파일 작업을 하고 있는데, 도중에 
+다른 시그널이 들어와 버리면, 제대로된 파일작업결과를 보증할수 없을것이다.  
+<br><br>
+다행히 Unix 에서는 위의 문제들을 해결할수 있는 시그널 제어 관련 함수들을 제공한다. 
+이문서의 뒷부분에서 이에 대한 내용을 다루게 될것이다.  
+다음은 시그널의 이러한 특징을 테스트하기 위한 예제 코드이다.<br>
+<b>예제: sigint.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;signal.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+
+<b><font COLOR=#0000ff>void</font></b> sig_int();
+<b><font COLOR=#0000ff>void</font></b> sig_usr();
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>int</font></b> i= <font COLOR=#a900a9>0</font>;
+
+    <b><font COLOR=#0000ff>if</font></b> ((signal(SIGINT, sig_int)) == SIG_ERR)
+    {
+        perror(<font COLOR=#ff0000>"signal setting error : "</font>);
+        exit(<font COLOR=#a900a9>1</font>);
+    }
+    <b><font COLOR=#0000ff>if</font></b> ((signal(SIGUSR2, sig_usr)) == SIG_ERR)
+    {
+        perror(<font COLOR=#ff0000>"signal setting error : "</font>);
+        exit(<font COLOR=#a900a9>1</font>);
+    }
+
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        printf(<font COLOR=#ff0000>"%d&#92;n"</font>, i);
+        sleep(<font COLOR=#a900a9>1</font>);
+        i++;
+    }
+
+}
+
+<b><font COLOR=#0000ff>void</font></b> sig_int()
+{
+    fprintf(stderr, <font COLOR=#ff0000>"SIGINT !!!!&#92;n"</font>);
+    sleep(<font COLOR=#a900a9>5</font>);
+}
+
+<b><font COLOR=#0000ff>void</font></b> sig_usr()
+{
+    fprintf(stderr, <font COLOR=#ff0000>"SIGUSR !!!!&#92;n"</font>);
+}
+
+</pre>
+</td></tr>
+</table>
+위 프로그램을 컴파일해서 실행을 시켜보자
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost test]# ./sigtest
+1
+2
+3
+</pre>
+</td></tr>
+</table>
+이제 CTRL+C 를 입력해서 SIGINT 를 발생시켜보자. 그러면 프로세스는 SIGINT 신호를 
+받게 되고 시그널핸들러인 sig_int 를 호출할것이다. sig_int 는 "SIGINT !!!!&#92;n" 을 호출하고 
+5초동안 잠들게 되는데, 이때 계속 해서 CTRL+C 를 한 10번 정도 입력해보자. 그럼 
+5초후에 프로세스에 다시 SIGINT 가 발생함을 알수 있을것이다. 여기서 다시 5초를 기다리면 
+시그널이 다시 전달될까 ? 물론 전달되지 않는다. 단지 같은 시그널에 대해서 한번에 하나의 시그널만 
+block(대기) 할수 있기 때문에, 나머지 9개의 시그널은 전무 무시되어 버린다.
+<br><br>
+그럼 이제 sig_int 핸들러를 호출하고 있는도중에 SIGUSR2 시그널을 발생시키면 어떻게 될까 ?  
+이 테스트는 ./sigtest 를 실행시키고 CTRL+C 를 입력 SIGINT 를 발생시키고, 핸들러를 호출하는 
+중에 쉘에서 kill 명령을 써서 sigtest 의 pid 로 SIGUSR2 시그널을 보내면 될것이다.
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+[yundream@localhost test]# ps -aux | grep sigtest
+yundream      2176  0.0  0.1  1348  344 pts/5    S    23:48   0:00 ./sigtest
+[yundream@localhost test]# kill -SIGUSR2 2176 
+</pre>
+</td></tr>
+</table>
+물론 kill 을 통해 시그널을 발생시키기 전에 ./sigtest 에서 SIGINT를 발생시켜야 한다. 
+위와 같이 해서 SIGUSR2 시그널을 발생시키면 어떻게 될까 ? sig_int 핸들러가 작업을 끝낼때 
+까지 기다리고 나서 SIGUSR2 가 전달될까 ? 답은 그 즉시 전달된다 이다. sig_int 핸들러가 
+수행중이건 아니건 곧바로 SIGUSR2 가 전달되고 sig_usr 핸들러가 실행됨을 볼수 있을것이다.<br><br>
+이러한 문제들의 대한 해법은 이문서의 뒷부분에서 다루도록 하겠다. 
+
+<h3>signal 관렴함수</h3>
+지금까지 시그널의 개론적인 면을 살펴봤으니 실제 시그널을 보내고/받고/제어하기 위한 
+어떤 함수들이 있는지 살펴보도록 하겠다.  
+<h4>신호 보내기 함수</h4>
+Unix 에서는 다음과 같은 신호를 보내기 위한 함수를 제공한다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+#include <sys/types.h>
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+int raise(int sig);
+</pre>
+</td></tr>
+</table>
+kill 은 프로세스 그룹 혹은 프로세스에 시그널을 보낼때 사용된다. 
+pid 가 0보다 큰 양수이면 해당 pid 를 가지는 프로세스에게 sig 시그널을 보내며, 
+pid 가 0이면 현재 프로세스가 속한 프로세스 그룹의 모든 프로세스에게 시그널을 보낸다. 
+pid 가 -1이면 1번 프로세스를 제외한 모든 프로세스에게, -1 보다 작으면 자신이 가지는 
+프로세스 그룹의 모든 프로세스에게 시그널을 보낸다.<br><br> 
+raise 는 자기자신에게 sig 시그널을 보내는데, kill(getpid(), sig)로 동일한 일을 
+할수 있다. 
+
+<h4>신호 제어 함수</h4>
+지난번 기사인 
+<a href=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=37&mode=&order=0&thold=0>
+signal다루기(1)</a>에서 에제 sig_hup.c 를 컴파일 해서 테스트 해보았다면 새로 execl 된 프로세스에서는 
+시그널 작동이 제대로 되지 않는다는 것을 알수 있을것이다. 이유는 오늘 내용을 조금 생각해 보면서 읽었다면 
+충분히 알아낼수 있을것이다. sig_hup 에서 SIGHUP시그널을 전달받아 sig_handler 를 실행시키면,  
+핸들러가 끝나기 전가지 SIGHUP 를 블럭시키게 된다. 핸들러에서 execl 을 호출하므로 이 핸들러는 절대 
+종료될수가 없게 된다. 당연히 SIGHUP 시그널은 계속 블럭 된채로 남게 되고, 새로 들어오는 SIGHUP 는 모두 
+무시되게 된다.  
+<br><br>
+이 문제를 해결하기 위해서는 코드가 시작될때 해당 시그널이 블럭되어 있는지 확인해서 블럭을 해제시켜
+주면 될것이다. 또한 시그널을 그룹지워서 관리하면 
+여러개의 시그널을 동시에 관리할수 있음으로 편리할것이다. 
+이러한 시그널 제어와 그룹핑을 위해서 Unix 는 다음과 같은 함수들을 제공한다.  
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+// 시그널 그룹관리를 위한 함수
+int sigemptyset(sigset_t *set);
+int sigfillset(sigset_t *set);
+int sigaddset(sigset_t *set, int signum);
+int sigdelset(sigset_t *set, int signum);
+int sigismember(const sigset-t *set, int signum);
+
+// 시그널(그룹) 제어를 위한 함수
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigsuspend(const sigset_t *mask);
+</pre>
+</td></tr>
+</table>
+<br><br>
+<b>sigemptyset</b> 은 set 이 가르키는 시그널 집합을 초기화 한다. 
+<br>
+<b>sigfillset</b> 은 set 이 모든 신호를 포함하도록 초기화 한다.   
+<br>
+<b>sigaddset</b> 은 set에 시그널 signum 을 추가한다. 
+<br>
+<b>sigdelset</b> 은 set에서 시그널 signum 을 삭제한다.  
+<br>
+<b>sigismember</b> 은 set에 시그널 signum 이 포함되어 있는지 검사한다.  
+<br><br>
+<b>sigprocmask</b> 은 시그널 마스크를 검사하고 변경하기 위해서 사용된다. 
+간단히 말해서 해당 시그널에 대해서 BLOCK, UNBLOCK 를 하기 위해서 사용한다.  
+<br>
+<b>sigpending</b> 은 전달된 시그널(대기하고 있는시그널)에 대한 검사를 하기 위해서 사용된다.  
+<br>
+<b>sigsuspend</b> 해당 신호가 발생할때까지 프로세스를 중단시킨다.
+<br><br>  
+이상 시그널 그룹관리와 이의 제어를 위한 함수를 알아봤는데, 이 사이트의 목적인 
+"예제를 통한 이해" 를 위해서 간단한 예제를 준비했다. 이 예제는 
+<a href=http://www.joinc.co.kr/modules.php?name=News&file=article&sid=37&mode=&order=0&thold=0>signal다루기(1)</a>
+의 sig_hup 에서 발견되었던 "시그널블럭" 문제를 위의 함수들을 이용해서 해결하도록 할것이다.<br>
+<b>예제: sig_hup2.c</b>
+<table width=100%>  
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;signal.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+
+<b><font COLOR=#0000ff>void</font></b> sig_handler(<b><font COLOR=#0000ff>int</font></b> signo);
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> i = <font COLOR=#a900a9>0</font>;
+    sigset_t newmask, oldmask;
+
+    printf(<font COLOR=#ff0000>"Program start&#92;n"</font>);
+
+    <b><font COLOR=#0000ff>if</font></b> (signal(SIGHUP, (<b><font COLOR=#0000ff>void</font></b> *)sig_handler) == SIG_ERR)
+    {
+        perror(<font COLOR=#ff0000>"signal set error "</font>);
+        exit(<font COLOR=#a900a9>0</font>)    ;
+    }
+
+    sigemptyset(&amp;newmask);
+    sigaddset(&amp;newmask, SIGHUP);
+    <b><font COLOR=#0000ff>if</font></b> (sigprocmask(SIG_UNBLOCK, &amp;newmask, &amp;oldmask) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"sigmask error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        printf(<font COLOR=#ff0000>"%d&#92;n"</font>, i);
+        i++;
+        sleep(<font COLOR=#a900a9>1</font>);
+    }
+    <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>1</font>;
+}
+
+<b><font COLOR=#0000ff>void</font></b> sig_handler(<b><font COLOR=#0000ff>int</font></b> signo)
+{
+    execl(<font COLOR=#ff0000>"./sig_hup2"</font>, <font COLOR=#a900a9>0</font>);
+}
+
+</pre>
+</td></tr>
+</table>
+코드는 간단하다. 먼저 sigemptyset를 이용해서 newmaskset 을 비우고, 
+sigaddset 를 이용해서 여기에 SIGHUP를 추가 시켰다. 
+그리고 sigprocmask 를 이용해서 newmaskset 에 포함된 시그널들에 대해서 
+블럭을 해제하도록 했다. 그러므로 핸들러가 종료되지 않아서 시그널이 
+블럭된 상태라도, 블럭해제가 되고 코드는 문제없이 작동하게 될것이다.
+
+<h4>신호 받기 함수</h4>
+지금까지 우리는 신호를 받기 위해서 signal 이라는 함수를 사용했었다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+#include <signal.h>
+void (*signal(int signum, void (*handler)(int)))(int);
+</pre>
+</td></tr>
+</table>
+signal 의 원형은 위와 같다. 사용방법은 몇개의 예제에서 이미 보아왔음으로 따로 
+설명하지 않겠다. 
+<br><br>
+그러나 현재는 위의 signal 은쓰지 않고 대신 sigaction 함수를 사용한다. 
+signal 은 ANSI C 에 의해서 정의된 함수인데, 신호에 대한 정의가 애매한 불안정한 
+함수이다. 그러므로 예전쏘쓰와의 호환을 위한 목적이 아니면 사용하지 않도록 한다. 
+<br><br>
+sigaction 은 POSIX.1 에 의해서 제안된 안정된 신호체제를 제공한다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+#include <signal.h>
+int sigaction(int signum,  const  struct  sigaction  *act, struct sigaction *oldact);
+</pre>
+</td></tr>
+</table>
+signum 은 명시될 시그널 번호이다. struct sigaction 은 다음과 같이 정의 된다. 
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+struct sigaction
+{
+    void (*sa_handler)(int);     // signum 과 관련된 핸들러 함수
+    void (*sa_sigaction)(int, siginfo_t *, void *);
+    sigset_t sa_mask;           // 시그널 처리동안 블럭되어야할 시그널의 마스크
+    int sa_flags;               // 시그널의 처리 행위 조절을 위한 플래그
+    void (*sa_restorer)(void);  // 사용되지 않는다. 
+}
+</pre>
+</td></tr>
+</table>
+위의 구조체에서처럼 단지 시그널번호와 핸들러만을 넘겨주는 signal 과 달리 구조체 멤버를 
+통해서 다양한 정보를 넘겨주게 되며, 이러한 특성을 이용해서 시그널마스킹, 관리, 핸들러를 
+유기적으로 묶어줄수 있게 된다.  
+<br><br>
+마지막으로 "예제: sigint.c" 를 sigaction 버젼으로 작성하고 sigint.c 의 문제점이였던, 
+시그널 핸들러 실행중 다른 시그널이 들어왔을경우 중단되어 버리는 문제를 해결하도록 코드를 
+재 작성하였다.  <br>
+<b>예제: sigint2.c</b>
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;signal.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;string.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+
+<b><font COLOR=#0000ff>void</font></b> sig_int(int signo);
+<b><font COLOR=#0000ff>void</font></b> sig_usr(<b><font COLOR=#0000ff>int</font></b> signo);
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b> i = <font COLOR=#a900a9>0</font>;
+    <b><font COLOR=#0000ff>struct</font></b> sigaction intsig, usrsig;
+
+    usrsig.sa_handler = sig_usr;
+    sigemptyset(&amp;usrsig.sa_mask);
+    usrsig.sa_flags = <font COLOR=#a900a9>0</font>;
+
+    intsig.sa_handler = sig_int;
+    sigemptyset(&amp;intsig.sa_mask);
+    intsig.sa_flags = <font COLOR=#a900a9>0</font>;
+
+    <b><font COLOR=#0000ff>if</font></b> (sigaction(SIGINT, &amp;intsig, <font COLOR=#a900a9>0</font>) == -<font COLOR=#a900a9>1</font>)
+    {
+        printf (<font COLOR=#ff0000>"signal(SIGALRM) error"</font>);
+        <b><font COLOR=#0000ff>return</font></b> -<font COLOR=#a900a9>1</font>;
+    }    
+
+    <b><font COLOR=#0000ff>if</font></b> (sigaction(SIGUSR2, &amp;usrsig, <font COLOR=#a900a9>0</font>) == -<font COLOR=#a900a9>1</font>)
+    {
+        printf (<font COLOR=#ff0000>"signal(SIGUSR2) error"</font>);
+        <b><font COLOR=#0000ff>return</font></b> -<font COLOR=#a900a9>1</font>;
+    }    
+
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        printf(<font COLOR=#ff0000>"%d&#92;n"</font>, i);
+        i++;
+        sleep(<font COLOR=#a900a9>1</font>);
+    }
+}
+
+<b><font COLOR=#0000ff>void</font></b> sig_int(int signo)
+{
+    sigset_t sigset, oldset;
+    sigfillset(&amp;sigset);
+    // 새로들어오는 모든 시그널에 대해서 block 한다. 
+    <b><font COLOR=#0000ff>if</font></b> (sigprocmask(SIG_BLOCK, &amp;sigset, &amp;oldset) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        printf(<font COLOR=#ff0000>"sigprocmask %d error &#92;n"</font>, signo);
+    }
+    fprintf(stderr, <font COLOR=#ff0000>"SIGINT !!!!&#92;n"</font>);
+    sleep(<font COLOR=#a900a9>5</font>);
+}
+
+<b><font COLOR=#0000ff>void</font></b> sig_usr(<b><font COLOR=#0000ff>int</font></b> signo)
+{
+    printf(<font COLOR=#ff0000>"sig_usr2&#92;n"</font>);
+}
+</pre>
+</td></tr>
+</table>
+sig_int 핸들러를 호출하게 되면 sigfillset 를 이용해서 모든 시그널을 sigset 에 입력하고, 
+여기에 대해서 블럭을 하게 된다. 
+그러므로 새로 도착한 시그널은 현재 핸들러가 끝나서 블럭을 해제하기 전까지
+대기하게 된다.  
+}}}
+

@@ -1,0 +1,104 @@
+#title Zenoss 설치문서
+
+=== 소개 ===
+최근 QOS(:12) 관련작업을 하면서, IT 모니터링 솔류션에 관심을 가지게 되었다. 최초에 접한 것은 zabbix(:12)인데, zenoss가 더 뛰어나다는 지인의 소개로 비교/사용 해보기로 했다.
+  * Zenoss는 공개 모니터링 시스템으로 시스템/네트워크/로그/트래픽 자원을 모니터링 할 수 있다.
+  * 데이터관리 툴인 RRD(:12)를 지원 : 좀더 좋은 모니터링 환경 제공
+  * Python, Zope 기반
+  * SSH를 이용한 PlugIn(:12) 방식의 확장 지원 : SSH(:12), SCP(:12)를 이용해서 원격 호스트에서 수집 프로그램을 실행하고 결과를 얻어오는 방식으로 생각됨.
+  * Event 관리 
+  * Version 2.0.3
+  * 테스트 운영체제 : Ubuntu 7.0, Kernel(:12) 2.6.20, Python(:12) 2.4, Mysql 5.0.38
+  * 비용을 지불할 경우, 컨설팅 받을 수 있음 : 별 필요 없다고 생각되지만
+  * 관련 기관으로 부터 수상경력이 있음. 믿음이 가는 기분
+     http://www.zenoss.com/site-images/clearchoiceaward_05.gif
+
+=== 장점 ===
+  * 시스템/네트워크 관리를 위한 프로세스가 잘 녹아 있다.
+     * 체계적인 Event, 성능 관리
+     * 상속가능한 설정들
+     * 사용자 정의 가능한 Event 클래스
+  * 뛰어난 확장성
+     * 간단한 프로그래밍을 통해서, 기능을 확장시킬 수 있다.
+  * Full SNMP 지원
+  * 자체적인 웹서버
+
+=== 단점 ===
+  * 간단히 사용하기에는 상대적으로 어렵다. 말그대로 본격적인 IT Mornitoring 시스템이다. 간단히 사용하기 원한다면 Zabbix(:12)를 사용하는게 좋을 것이다.
+
+=== 스크린샷 ===
+  * [wiki:Site/QOS/Monitering_Tool/zenoss/screen_shot 스크린샷 보기]
+=== 설치 ===
+윈도우즈 환경에서의 경우 Vmware를 필요로 한다. 리눅스(:12)는 그냥 설치하면 된다. rpm이 준비되어 있었지만, Ubuntu 인 관계로 소스를 다운로드 받아서 설치하기로 했다.
+  * 최소 요구 환경
+     1. python 2.4, 2.3 : Ubuntu 7은 python 2.5 버전인데, 설치가 안되었다. 패키지 메니저를 이용해서 python 2.4를 깔았다.
+     1. mysql 5.0 >
+     1. SWIG : python용 C(:12) 모듈 개발을 도와주는 툴이다. [wiki:article/Swig Swig를 이용한 개발]문서 참고
+  * 다운로드 : http://www.zenoss.com/download/form?c=download
+
+mysql을 설치한다. mysql의 설치에 관련된 내용은 APM(:12)을 참고하기 바란다. 소스컴파일이 아닌 패키지형식의 설치를 원한다면 apt-get 을 이용해도 된다.
+{{{#!plain
+# apt-get install mysql-server mysql-client libmysqlclient15-dev
+}}}
+
+zenoss 유저를 만든다.
+{{{#!plain
+# adduser zenoss
+}}}
+
+zenoss설치 디렉토리를 만든다.
+{{{#!plain
+# mkdir /usr/local/zenoss
+# chown zenoss.zenoss /usr/local/zenoss
+}}}
+
+다음과 같이 zenoss 유저의 환경설정을 하도록 하자. bash(:12) 쉘을 사용한다면 '''.bash_profile''' 을 수정하면 된다.
+{{{#!plain
+export ZENHOME=/usr/local/zenoss
+export PYTHONPATH=$ZENHOME/lib/python
+export PATH=$ZENHOME/bin:$PATH
+}}}
+
+zenoss 계정으로 로그인 한 다음 Zenoss install:::script(:12)를 실행한다.
+{{{#!plain
+# ./install.sh
+}}}
+
+zenoss는 ICMP(:12) 체크와 같은 몇개 기능을 위해서 raw:::socket(:12)를 사용한다. 때문에 관련 프로그램에대한 setuid(2) 작업이 필요하다.
+{{{#!plain
+# chown root.zenoss /usr/local/zenoss/bin/zensocket
+# chmod 04750 /usr/local/zenoss/bin/zensocket
+}}}
+
+이제 웹브라우저(:12)를 이용해서 Zenoss 포탈에 접근한다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5103683248904382946"><img src="http://lh5.google.co.kr/yundream/RtPs39kOqeI/AAAAAAAAAas/uZkt8ncqVRk/s288/login.jpg" /></a>
+}}}
+  * http://hostname:8080/zport/dmd
+  * username 은 "admin"
+  * 패스워드는 zenoss 설치시 입력했던 값을 사용한다.
+
+=== 데몬 실행 ===
+이제 Zenoss Daemon(:12)을 실행한다.
+{{{#!plain
+# zenoss start
+}}}
+{{{#!plain
+$ zenoss status
+Daemon: zeoctl program running; pid=16207
+Daemon: zopectl program running; pid=16218
+Daemon: zenhub program running; pid=16460
+Daemon: zenping program running; pid=16468
+Daemon: zensyslog program running; pid=16476
+Daemon: zenstatus program running; pid=16485
+Daemon: zenactions program running; pid=16491
+Daemon: zentrap program running; pid=16507
+Daemon: zenmodeler program running; pid=16521
+Daemon: zenperfsnmp program running; pid=16536
+Daemon: zencommand program running; pid=16542
+Daemon: zenprocess program running; pid=16558
+Daemon: zenwin program running; pid=16564
+Daemon: zeneventlog program running; pid=16570
+Daemon: zenwinmodeler program running; pid=16576
+}}}
+

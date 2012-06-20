@@ -1,0 +1,112 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>tomcat 설치</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+>
+<H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>tomcat 설치</A
+></H1
+>
+</html>
+}}}
+[[TableOfContents]]
+ * 작성자 : 이태용 ([mailto:pawang23@hotmail.com])
+= mod_jk2설치 =
+== configure ==
+mod_jk2는 apache와 apache2둘다 사용가능하며 module를 사용하기 위해서는 Binary와 Source둘중 하나를 사용할수 있다.
+=== Binary ===
+Bina{{{{{{ry의 경우 다운받아서 apache의 modules디렉토리에 넣고 아파치 연동을 시키면 된다.
+
+
+다운위치 - http://mirror.apache.or.kr/jakarta/tomcat-connectors/jk2/
+=== Source ===
+http://mirror.apache.or.kr/jakarta/tomcat-connectors/jk2/ 에서 소스를 다운 받는다. 
+압축을 푼후 컴파일을 시작하자.
+{{{#!plain
+tar xzvf jakarta-tomcat-connectors-jk-2.x.x-src.tar.gz
+cd jk
+cd native2
+./configure --with-apxs2=/usr/local/httpd/bin/apxs \
+--with-java-home=/usr/local/java
+make
+}}}
+주설정에 관한 설정은 다음과 같다.
+||--with-apxs2||Apache2 를 위한 옵션이다. Apache 의 bin 디렉토리의 apxs 의 ?FullPath 를 써야 한다. Apache 1.x 의 버전인 경우 --with-apxs 를 사용해야 한다.||
+||--with-apache2||Apache 를 ./configure 한후에 이 방법으로 컴파일하여 Apache 에 static 으로 넣어버리는 방법인데 권장하고 싶지 않다. 역시 Apache 1.x 버전의 경우 --with-apache 로 대체(이유: ?Apache를 구동할때 속도는 빠르나 유연성이 떨어진다. mod_jk2 나 Apache 중 하나를 업그레이드 할때 둘다 업그레이드해야 한다.)||
+||--with-java-home||Java 가 설치된 디렉토리, 환경변수 $JAVA_HOME 이 설정된 경우 안 써줘도 상관없다.||
+make가 끝난후 jk/build/jk2/apache 또는 jk/build/apache2등 자신의 apache버전에 맞는 디렉토리에 가면 mod_jk2.so파일이 보인다. 이것이 보이면 성공적으로 컴파일을 맞친것이다.
+
+이제 mod_jk2를 생성하는 과정은 끝났다.
+== apache2와 연동 ==
+=== LoadModule ===
+자신이 생성한 mod_jk2.so파일을 apache의 modules디렉토리에 복사한다.
+
+이 모율을 apache가 구동할때 loading되게 하려면 아래와 같은 설정이 필요하다.
+{{{#!plain
+LoadModule jk2_module modules/mod_jk2.so
+}}}
+위의 내용을 적당한 LoadModule의 항목이 있는곳에 적어주자.
+
+apache를 시동한후 아래와 같이 테스트해본다.
+{{{#!plain
+www:/etc# telnet localhost 80
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+ 
+HEAD / HTTP/1.0
+ 
+HTTP/1.1 200 OK
+Date: Sun, 07 Dec 2003 14:32:49 GMT
+Server: Apache/2.0.48 (Unix) mod_ssl/2.0.48 OpenSSL/0.9.6c DAV/2 PHP/4.3.4 mod_jk/2.0.2
+X-Powered-By: PHP/4.3.4
+Connection: close
+Content-Type: text/html; charset=EUC-KR
+}}}
+위의 내용과 같이 mod_jk라는 글씨가 보이면 mod_jk2의 로딩은 성공한것이다.
+=== apache와 tomcat의 설정 ===
+==== jk2.properties ====
+{{{#!plain
+handler.list=channelSocket,request
+channelSocket.prot=8009
+}}}
+==== httpd.conf ====
+{{{#!plain
+LoadModule jk2_module modules/mod_jk2.so
+JKSet config.file /etc/httpd/workers2.properties
+}}}
+workers2.properties는 apache가 어떤 디렉토리에서 어떤 파일을 읽었을때 apache가 그것을 처리하지 않고 톰캣으로 넘어가도록 하는 파일이다.
+==== workers2.properties ====
+이 파일을 apache에서 어떤 파일을 tomcat으로 처리하게 할지를 설정하는 파일이다. 위치는 위의 httpd.conf에서 경로를 적어주므로 특별히 상관이 없으나 관리의 편의성을 위하여 apache환경설정파일과 같이 두면된다.
+{{{#!plain
+[shm:]
+disabled=1
+file=/usr/local/httpd/logs/shm.file
+size=1048576
+                                                                                
+[channel.socket:localhost:8009]
+tomcatId=localhost:8009
+                                                                                
+[ajp13:localhost:8009]
+channel=channel.socket:localhost:8009
+                                                                                
+# http://domain.com/jsp 에서 처리되는 파일중 *.jsp 를 Tomcat 으로 처리하고 싶을때
+[uri:/jsp/*.jsp]
+
+# http://domain.com/abc 에서 처리되는 파일을 모두 Tomcat 으로 처리하고 싶을때
+[uri:/abc/*]
+}}}
+uri는 톰캣의 server.xml파일의 내용과 일치하여야 한다.
+{{{#!plain
+/*fh TMaus index.jsp등이 없을때 파일 index가 보이게 된다.하지만 /*.jsp로 쓰면 파일이름을 정확하게 쓰지 않으면 아무것도 보이지 않게 된다.
+}}}

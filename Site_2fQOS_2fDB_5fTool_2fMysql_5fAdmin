@@ -1,0 +1,176 @@
+#title Mysql 품질관리 : Admin 정보
+
+=== mysqladmin ===
+mysql(12)을 설치하면 제공되는 프로그램인 '''mysqladmin'''을 이용하면 다음과 같은 관리정보들을 얻을 수 있다. Joinc 에서 얻어낸 결과들이다.
+{{{#!plain
+# mysqladmin -u madmin -p stat
+Enter password: ******
+Uptime: 2279298  Threads: 1  Questions: 33334217  Slow queries: 864  Opens: 119884  \
+Flush tables: 1  Open tables: 64 Queries per second avg: 14.625
+}}}
+extend-stat 옵션을 이용하면 더 자세한 결과를 얻어올 수 있다.
+{{{#!plain
+# mysqladmin -u madmin -p extend-stat
++--------------------------+------------+
+| Variable_name            | Value      |
++--------------------------+------------+
+| Aborted_clients          | 1          |
+| Aborted_connects         | 907        |
+| Bytes_received           | 2568707188 |
+| Bytes_sent               | 2462068009 |
+| Com_admin_commands       | 1          |
+| Com_alter_table          | 0          |
+| Com_analyze              | 0          |
+| Com_backup_table         | 0          |
+| Com_begin                | 0          |
+| Com_change_db            | 1526427    |
+| Com_change_master        | 0          |
+| Com_check                | 0          |
+| Com_commit               | 0          |
+| Com_create_db            | 0          |
+| Com_create_function      | 0          |
+| Com_create_index         | 0          |
+| Com_create_table         | 41         |
+| Com_delete               | 133788     |
+.....
+}}}
+중요한 정보는 '''stat''' 옵션만으로 얻어올 수 있으니, '''stat'''를 기준으로 설명하도록 하겠다. stat를 이용해서 얻을 수 있는 정보는 아래표와 같다.
+  || Uptime    || Mysql이 실행된 시간     ||
+  || Threads  || 생성된 thread의 갯수로 연결된 클라이언트의 수를 알 수 있다 ||
+  || sloq queries || 응답에 long_query_time을 초과한 쿼리 ||
+  || opens     || 얼마나 많은 테이블이 열렸었는지   ||
+  || flush tables  || flush, refresh, reload 명령이 실행된 횟수   ||
+  || open table   || 현재 열린 테이블 ||
+  || query per seconds || 초당 쿼리  ||
+위의 결과를 간단한 스크립트를 이용해서 분석하고, RRD(:12)를 이용해서 DB화 하면, 관리가능한 정보로 가공할 수 있을 것이다. 
+
+내 목적은 스크립트를 이용하는게 아닌, mysql C(:12) API 를 이용한 관리 프로그램의 작성이므로 C를 이용해서 재 작성하도록 할 것이다. 
+
+=== Mysql C API를 이용한 관리정보 획득 프로그램 작성 ===
+ * mysql_stat() 함수를 이용하면, mysqladmin -stat 와 동일한 정보를 얻을 수 있다.
+ * 여기에 덤으로 mysql_ping() 함수를 이용해서, mysql의 Alive 체크도 수행하도록 하겠다.
+
+이 문서는 시스템/네트워크 모니터링 프로그램을 위한 준비단계 형식으로 작성이 되고 있다. 때문에 코드는 나중에 Agent에 붙일 수 있는 '''모듈'''형태로 만들것이다. 전체적인 구성은 [wiki:Site/SoftWare_engineering/Extensible_Agent_Manager 확장 가능한 Agent Manager 시스템 개발]문서를 참고하기 바란다. 공유라이브러리 형태의 소스코드이긴 하지만 참고하는데에는 문제가 없을 것이다.
+
+또한 설정라이브러리도 포함하고 있는데, 이것은 [http://www.joinc.co.kr/modules/moniwiki/wiki.php/Code/C++/Simple_Config_Reader 간단한 설정파일 읽기 함수]를 이용할 것이다.
+
+Agent/Manager 시스템에서, 이 프로그램은 공유라이브러리(:12)로 동적으로 적재되어서, 공통인터페이스 함수인 '''Read'''를 호출하면 mysql_stat 정보를 Agent에게 리턴할 것이다. 이 값을 받은 Agent는 그대로 Manager에 보낸다.
+{{{#!plain
+// Standard C++ Library
+#include <iostream>
+#include <string>
+
+// Standard C Library
+#include <stdlib.h>
+#include <mysql.h>
+#include <stdio.h>
+
+// Agent Library
+#include <cinterface.h>
+#include <common.h>
+#include <qosconfig.h>
+
+using namespace std;
+/*
+ * Global Variable
+ */
+MYSQL *connection = NULL, conn;
+MYSQL_RES *sql_result;
+MYSQL_ROW *sql_row;
+
+struct QosFile myFile;
+
+char *SndData = NULL;
+
+int Init()
+{
+  int rtv = 0;
+  char *rootDir;
+
+  Config *moduleCfg;
+  string uname;
+  string passwd;
+  string host;
+  const char *mysqlinfo;
+  int port;
+
+  moduleCfg = new Config();
+
+  rtv = moduleCfg->openCfg("config.cfg");
+  host = moduleCfg->getValue("MSA", "host");
+  uname = moduleCfg->getValue("MSA", "user");
+  passwd = moduleCfg->getValue("MSA", "password");
+  port = atoi(moduleCfg->getValue("MSA", "port"));
+
+  mysql_init(&conn);
+  connection = mysql_real_connect(&conn, host.c_str(),
+                                uname.c_str(), passwd.c_str(),
+                                "mysql", port,
+                                NULL, 0);
+  if (connection == NULL)
+  {
+    printf("Mysql connection error : %s\n", mysql_error(&conn));
+    return 0;
+  }
+
+  return 1;
+}
+
+char *Read()
+{
+  int rtv;
+  rtv = 0;
+  return mysql_stat(connection);
+}
+
+int Clean()
+{
+  if (connection != NULL)
+  {
+    mysql_close(connection);
+    connection = NULL;
+  }
+  return 1;
+}
+}}}
+
+Agent에 동적으로 적재될 코드이지만, 그전에 테스트해볼 필요가 있을 것이다. 그래서 main 함수를 포함한 간단한 프로그램을 만들어서 테스트를 해보기로 했다.
+{{{#!plain
+// Standard C++ Library
+#include <iostream>
+#include <string>
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <cinterface.h>
+
+using namespace std;
+
+int main(int argc, char *argv[])
+{
+    int rtv;
+    char *rdata;
+    rtv = Init();
+    if (rtv == 0)
+    {
+        printf("Init Error");
+        return 0;
+    }
+
+    while(1)
+    {
+        rdata = Read();
+        printf("Stat : %s\n", rdata);
+        sleep(1);
+    }
+    Clean();
+}
+}}}
+다음은 실행결과다.
+{{{#!plain
+Stat : Uptime: 2797731  Threads: 2  Questions: 41503995  Slow queries: 1042  \
+Opens: 150491  Flush tables: 1  Open tables: 64 Queries per second avg: 14.835
+}}}
+
+=== 관련글 ===
+ * [wiki:Code/JPerl/mysql_status Perl로 만든 Mysql status 얻어오는 코드]

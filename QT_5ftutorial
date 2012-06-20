@@ -1,0 +1,486 @@
+#title QT tutorial
+
+이 문서는 QT툴킷을 이용한 GUI 프로그래밍의 소개를 위해 작성되었다. QT프로그래밍에 이제 막 입문하려는 개발자에게 도움이 될 것이다. QT를 아직 접해 본적이 없다면  이 문서를 읽기 전에 [wiki:QT_Whitepaper QT Whitepaper]을 먼저 읽어 보기바란다.
+
+이문서를 QT Assistant와 함께 읽으면 많은 도움이 될것이다. QT Assistant에 대한 내용은 [wiki:QT_Whitepaper QT Whitepaper]을 참고하기 바란다.
+
+[wiki:Site_QT QT 미니사이트로]
+[[TableOfContents]]
+=== 안녕 세상! === 
+처음 작성할 프로그램은 저 유명한 '''hello world'''출력의 QT버젼이다. 그러나 hello world로 하면 너무 심심할것 같아서 '''안녕 세상!'''을 출력하도록 했다. 다음은 실행시킨 프로그램의 스크린 샷이다. 
+
+http://www.joinc.co.kr/albums/album01/aha.png 
+
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <qstring.h>
+
+int main(int argc, char **argv)
+{
+    QApplication a(argc, argv);
+    QPushButton hello(QString::fromLocal8Bit("안녕 세상!"), 0);
+    hello.resize(100, 30);
+
+    a.setMainWidget(&hello);
+    hello.show();
+    return a.exec();
+}
+}}}
+
+==== 줄단위 설명 ====
+{{{#!plain
+#include <qapplication.h>
+}}}
+'''QApplication''' 클래스가 선언된 인클루드 파일이다. QT를 이용하는 모든 애플리케이션은 '''QApplication'''을 필요로 한다. 그러므로 반드시 포함되어야할 인클루드 파일이다. QApplication은 기본폰트와, 커서와 같은 애플리케이션 전역적인 자원들을 관리하게 된다.   
+
+{{{#!plain
+#include <qpushbutton.h>
+}}}
+'''QPushButton'''클래스가 선언된 인클루드 파일이다. 
+
+QPushButton은 푸쉬 버튼을 구현하기 위해서 사용되는 클래스다. 이것은 다른 모든 위젯이 그러하듯이 자신만의 look and feel을 관리할 수 있다. 프로그래머는 색과 같은 요소들을 조정함으로써 푸쉬 버튼의 look and feel을 조정할 수 있다. 출력되는 문자는 단순한 텍스트도 가능하며 QPixmap의 이용도 가능하다.    
+
+{{{#!plain
+int main(int argc, char **argv)
+{
+}}}
+main()함수는 모든 프로그램에서 필요로 한다. QT라이브러리를 호출하기전에 필요한 여러가지 초기화 값등을 전달하기 위해서 사용한다. 
+
+argc는 명령행 인자의 갯수이고 argv는 명령행 인자의 배열이다. 이것들은 C/C++의 기본적인 모습으로, QT에 특화된 모습은 아니다. 어쨋든 QT 애플리케이션은 반드시 이들 변수를 필요로 한다. 
+{{{#!plain
+QApplication a(argc, argv);
+}}}
+a는 이 프로그램의 '''QApplication'''이다.
+
+{{{#!plain
+QPushButton hello(QString::fromLocal8Bit("안녕 세상!"), 0);
+}}}
+QApplication후에 처음 등장하는 윈도우 시스템 코드로 푸쉬 버튼을 생성한다. 이 푸쉬버튼은 "안녕 세상!"을출력하게 된다. 두번째 인자로 주어진 0은 푸쉬버튼 자신이 부모 윈도우가 된다는 뜻이다. 푸쉬 버튼의 크기를 변경하기 위해서 아래의 코드를 사용했다.
+{{{#!plain
+hello.resize(100,30);
+}}}
+이 버튼은 100pixel의 넓이와 30pixel의 높이를 가지게 된다. 
+
+{{{#!plain
+a.setMainWidget(&hello);
+}}}
+푸쉬버튼을 애플리케이션의 메인 위젯으로 선언한다. 만약 유저가 메인 위젯을 닫게 되면 애플리케이션은 종료하게 될 것이다.
+
+메인 위젯을 생성했다면 이것을 출력할것을 명시한다.
+{{{#!plain
+hello.show();
+}}}
+setMainWidget를 이용해서 메인 위젯을 만들었다고 해서 이것이 즉시 화면에 출력되지는 않는다 반드시 show()를 호출해야지만 비로서 화면에 출력이 된다.
+
+{{{#!plain
+return a.exec();
+}}}
+QT의 제어권을 main()에 넘긴다. 이때 애플리케이션의 종료 값도 넘겨주게 된다.
+
+==== 컴파일 ====
+{{{#!plain
+# g++ -c -pipe -Wall -W -O2 -DNO_DEBUG -I/usr/lib/qt-3.2/include -o hello.o hello.cc
+# g++  -o hello hello.o   -L/usr/lib/qt-3.2/lib -L/usr/X11R6/lib -lqt -lXext -lX11 -l
+}}}
+위와 같은 방법으로 수고스럽게 컴파일 할 수 있겠지만, 여기에서는 Makefile을 이용할 것이다. Makefile의 작성과 사용방법은 [wiki:article_make_use2 Make 사용하기 (2)]를 참고하기 바란다. 
+
+==== 연습 ====
+윈도우의 크기를 벼경해보자. 버튼을 눌러보자. 만약 X Windows 상에서 출력한다면 -geometry 옵션을 이용해서 실행시켜 보도록 하자.(예: -geometry 100x200+10+20)
+
+=== 종료버튼의 작성 ===
+앞장에서 우리는 버튼 위젯만으로 구성된 아주 간단한 애플리케이션을 작성했다. 이번에는 버튼에 액션을 추가해서 버튼을 클릭할경우 종료(quit)하는 애플리케이션을 작성해 보도록 하겠다. 이 애플리케이션을 작성하면서 우리는 QT에서 제공하는 시그널 슬롯 개념에 대해서 배우게 된다.  
+
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <string.h>
+
+#define print8(str) QString::fromLocal8Bit(str)
+
+int main(int argc, char **argv)
+{
+    QApplication a (argc, argv);
+
+    QPushButton quit(print8("종료"), 0); 
+    quit.resize(130, 60);
+    quit.setFont(QFont("baekmuk headline", 20, QFont::Bold));
+
+    QObject::connect(&quit, SIGNAL(clicked()), &a, SLOT(quit()));
+
+    a.setMainWidget(&quit);
+    quit.show();
+    return a.exec();
+}
+}}}
+
+다음은 실행 결과이다.
+
+http://www.joinc.co.kr/albums/album01/ahj.gif
+
+==== 줄단위 설명 ====
+{{{#!plain
+#include <qfont.h>
+}}}
+이 프로그램은 QFont를 이용해서 출력되는 폰트의 모양을 조정한다. 이를 위해서 qfont.h 헤더파일을 추가해야 한다. QT의 폰트 추상은 경악의 수준인 X에서 제공하는 폰트와 다른 방법을 사용한다. 이를 이용해서 좀더 미려한 폰트의 출력이 가능하다. 
+{{{#!plain
+QPushButton quit(print8("종료"), 0); 
+}}}
+이번에는 "종료"메시지를 보내는 푸쉬버튼 위젯을 만들었다. 이 버튼은 최상위 부모 위젯으로 사용 될 것이므로 '''0'''을 사용하고 있다.  
+{{{#!plain
+quit.resize(130, 60);
+}}}
+버튼의 크기는 폰트의 크기와 길이에 맞도록 130X60으로 지정했다.
+
+{{{#!plain
+quit.setFont(QFont("baekmuk headline", 20, QFont::Bold));
+}}}
+폰트를 백묵에서 제공하는 '''baekmuk headline'''로 선택하고 크기는 20을 가지는 두꺼운(Bold)폰트로 결정했다. QApplication::setFont()를 사용하면 애플리케이션에서 사용되는 기본 폰트를 지정할 수 있다. 
+
+{{{#!plain
+QObject::connect(&quit, SIGNAL(clicked()), &a, SLOT(quit()));
+}}}
+connect()는 QT에서 제공하는 가장 주요한 기능중의 하나이다. connect()는 QObject의 static 함수임을 주의하기 바란다. 소켓 라이브러리에서 제공하는 connect()와는 전혀다르다.  
+
+이 코드는 두개의 QT 객채를 단방향으로 연결하는 일을 한다(객체는 QObject에서 직간접적으로 상속된 것들이다.). 모든 QT 객체들은 메시지를 보내기 위한 시그널과 메시지를 받기 위한 슬롯을 가지고 있다. 모든 위젯은 QT 객체가 된다.     
+
+여기에서 우리가 quit버튼(위젯)의 의 clicked()시그널은 quit()슬롯과 연결되어 있다. clicked()시그널은 버튼을 클릭할 때 발생한다. 그러므로 우리가 버튼을 클릭하게 되면 메시지가 quit()슬롯으로 전달되고 애플리케이션이 종료하게 된다. 
+
+==== 연습 ====
+윈도의 크기를 변경하라. 버튼을 클릭했을 때 종료되는 대신 "웁스!"문자열을 출력하도록 코드를 수정해 보라.  
+
+QPushButton의 다른 시그널을 quit에 연결해보도록 하자. 힌트 QPushButton은 QButton으로 부터 상속된다.
+
+=== (위젯 관계)Family Values ===
+지금까지의 예제는 단지 하나의 위젯만이 사용되었고, 당연히 이 위젯이 부모 위젯이 되었다. 이번에 작성하는 프로그램은 부모위젯과 자식위젯을 가지는 좀더 실질적인 GUI애플리케이션의 모습을 보여준다.
+{{{#!plain
+#include <qpushbutton.h>
+#include <qfont.h>
+#include <qvbox.h>
+
+#define print8(str) QString::fromLocal8Bit(str)
+
+int main(int argc, char **argv)
+{
+    QApplication a(argc, argv);
+
+    QVBox box;
+    box.resize(200, 120);
+
+    QPushButton quit(print8("종료"), &box);
+    quit.setFont(QFont("baekmuk gulim", 18, QFont::Bold));
+
+    QObject::connect(&quit, SIGNAL(clicked()), &a, SLOT(quit()));
+
+    a.setMainWidget(&box);
+    box.show();
+
+    return a.exec();
+}
+}}}
+
+==== 줄단위 분석 ====
+http://www.joinc.co.kr/albums/album01/ahl.gif
+
+{{{#!plain
+#include <qvbox.h>
+}}}
+이 코드는 자식위젯을 배치하기 위해서 레이아웃(layout) 클래스를 사용한다. 이를 위해서 qbox.h를 인클루드 시켰다.  
+{{{#!plain
+QVBox box;
+}}}
+이 클래스는 수직으로 위젯을 배열할수 있는 간단한 컨테이너를 생성한다. QVBox는 자식위젯을 자동적으로 수직 정열한다. 위젯의 크기는 자식위젯의 크기(QWidget::sizePolicy())정책에 따라 달라질 수 있다. 
+{{{#!plain
+box.resize(200, 120);
+}}}
+가로 200, 세로 120 픽셀의 크기를 가지는 QVBox 컨테이너를 생성한다.
+
+{{{#!plain
+QPushButton quit("종료", &box);
+}}}
+이제 자식 위젯이 만들어 졌다. 
+
+QPushButton은 "종료"문자열을 가지며, box를 부모위젯으로 해서 생성된다. 자식 위젯은 언제나 부모 위젯 위에 놓이게 된다.
+
+부모 위젯인 QVBox는 자신의 위에 놓이는 위젯을 자동적으로 (세로방향으로)중앙에 놓이도록 한다 
+
+{{{#!plain
+box.show();
+}}}
+부모위젯이 보이게될때, show()를 호출해야지 자신의 자식 위젯들이 보여지게 된다. 
+
+이제 버튼은 더이상 위젯 전체를 채우지 안게 된다. 버튼은 부모위젯 위에서 높여서 일정한 크기를 유지하게 된다. 사용되는 버튼의 크기와 위치의 대한 정책은 QWidget::sizeHint()와 QWidget::setSizePolicy()의 함수를 통해서 알아낼 수 있다.
+
+==== 연습 ====
+윈도우의 크기를 변경해 보자. 버튼의 크기가 어떻게 변경되는지.. 버튼의 위치가 어떻게 변경되는지.. 그리고 폰트의 크기가 변할경우 버튼이 어떻게 변하는지 등에 대해서 테스트 해보도록 하자. 
+
+=== 위젯 가지고 놀기 ===
+이번 예제는 사용자 위젯을 작성하는 방법을 알려줄 것이다. 어떻게 위젯의 최대/최소 크기를 변경할 수 있는지등에 대해서 알아 볼 것이다. 
+
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <qfont.h>
+
+#define print8(str) QString::fromLocal8Bit(str)
+
+class MyWidget : public QWidget
+{
+    public:
+        MyWidget(QWidget *parent=0, const char *name = 0);
+};
+
+MyWidget::MyWidget(QWidget *parent, const char *name)
+        : QWidget(parent, name)
+{
+    setMinimumSize(200, 120);
+    setMaximumSize(200, 120);
+
+    QPushButton *quit = new QPushButton(print8("종료"), this, "quit");
+    quit->setFont(QFont("baekmuk gulim", 18, QFont::Bold));
+    quit->setGeometry(62,60,75,30);
+
+    connect(quit, SIGNAL(clicked()), qApp, SLOT(quit()) );
+}
+
+int main(int argc, char **argv)
+{
+    QApplication a (argc, argv);
+
+    MyWidget w;
+    w.setGeometry(100,100,200,120);
+    a.setMainWidget(&w);
+    w.show();
+    return a.exec();
+}
+}}}
+
+http://www.joinc.co.kr/albums/album01/ahm.gif
+
+==== 줄단위 설명 ====
+{{{#!plain 
+class MyWidget : public QWidget 
+{
+	public:
+		MyWidget(QWidget *parent=0, const char *name=0);
+}
+}}}
+우리는 MyWidget라는 새로운 클래스를 생성했다. 이 클래스는 QWidget로 부터 상속된 클래스 이므로 최상위 레벨윈도우와 자식 위젯모두로 사용될 수 있다.  
+
+이 클래스는 단지 하나의 맴버인 생성자만을 가지고 있다(이 뱀버는 QWidget로 부터상속된 멤버에 더해지게 된다.). 생성자는 표준 QT위젯 생성자이다. 여러분이 사용자 정의 위젯을 만들고자 할때 생성자는 위와 비슷한 모습을 가지게 된다.   
+
+첫번째 인자는 부모위젯을 지정하기 위해서 사용하는데, 부모위젯으로 사용될 수 있으므로 NULL이 사용되어지고 있다. 이 위젯은 기본적으로 취상위 윈도우의 위젯으로 생성된다. 
+
+두번째 인자는 위젯의 이름이다. 이것은 윈도우나 버튼에 나오는 문자들이 아니다. 이 이름은 나중에 여러개의 위젯이 사용될 경우 이들을 쉽게 구분해서 분리하기 위해서 혹은 디버깅을 위한 목적으로 사용된다. 
+
+{{{#!plain
+{
+    setMinimumSize(200, 120);
+    setMaximumSize(200, 120);
+}}}
+이 위젯은 크기를 변경할 수 없도록 만들것이다. 그러므로 위젯의 최대크기와 최소크기를 동일하게 하는 방법으로 변경 불가능하게 만들었다. 다음 장에서 우리는 유저로 부터 위젯의 크기 변경등에 대한 요청을 받았을 때 어떻게 반응할지에 대해서 알아 볼 것이다.  
+
+{{{#!plain
+    QPushButton *quit = new QPushButton(print8("종료"), this, "quit");
+    quit->setFont(QFont("baekmuk gulim", 18, QFont::Bold));
+    quit->setGeometry(62,60,75,30);
+}}}
+우리는 여기에서 "quit"라는 이름을 가지는 자식 버튼 위젯을 생성했다. 이 버튼은 "종료"라고 표시되며, 사용되는 폰트로 gulim을 설정했다.   
+
+{{{#!plain
+    connect(quit, SIGNAL(clicked()), qApp, SLOT(quit()) );
+}}}
+MyWidget클래스는 애플리케이션의 객체를 알 수 없으므로 연결될 객체가 qApp임을 명시하고 있다.  
+
+{{{#!plain
+int main(int argc, char **argv)
+{
+    QApplication a (argc, argv);
+
+    MyWidget w;
+    w.setGeometry(100,100,200,120);
+    a.setMainWidget(&w);
+    w.show();
+    return a.exec();
+}
+}}}
+여기에서 우리가 만든 위젯을 메인위젯으로 해서 애플리케이션을 실행시켰다.
+
+이 프로그램은 앞서만들어 보았던 프로그램과 비슷하다. 다른 점이 있다면 위젯을 생성하기 위한 몇가지 부분들일 것이다. 
+
+==== 연습 ====
+ 1. main()에서 MyWidget를 하나더 생성해 보자. 어떤일이 알어나는가 ?
+ 1. QPushButton이외에 다른 위젯을 추가해보자.
+
+=== 블럭의 생성 ===
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/aim.png border=0>
+}}}
+
+이번 예제는 여러개의 위젯을 생성하고, 각 위젯에서의 시그널과 슬롯을 어떻게 제어하는지와 윈도우즈의 크기변경 이벤트를 처리하는 방법을 다룬다. 
+
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <qslider.h>
+#include <qlcdnumber.h>
+#include <qfont.h>
+#include <qvbox.h>
+
+#define LocalKor(str) QString::fromLocal8Bit(str)
+
+class MyWidget : public QVBox
+{
+	public :
+		MyWidget(QWidget *parent=0, const char *name=0);
+};
+
+MyWidget::MyWidget(QWidget *parent, const char *name)
+		: QVBox(parent, name)
+{
+	QPushButton *quit = new QPushButton(LocalKor("종료"), this, "quit");
+	quit->setFont(QFont("baekmuk headline", 18, QFont::Bold));
+
+	connect(quit, SIGNAL(clicked()), qApp, SLOT(quit()));
+
+	QLCDNumber *lcd = new QLCDNumber(2, this, "lcd");
+
+	QSlider *slider = new QSlider(Horizontal, this, "slider");
+	slider->setRange(0,99);
+	slider->setValue(0);
+
+	connect(slider, SIGNAL(valueChanged(int)), lcd, SLOT(display(int)));
+}
+
+int main(int argc, char **argv)
+{
+	QApplication a(argc, argv);
+
+	MyWidget w;
+	a.setMainWidget(&w);
+	w.show();
+	return a.exec();
+}
+}}}
+
+==== 줄단위 분석 ====
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <qslider.h>
+#include <qlcdnumber.h>
+#include <qfont.h>
+#include <qvbox.h>
+}}}
+qslider.h, qlcdnumber.h 의 새로운 헤더파일이 인클루드 되었다. 이들 헤더파일은 '''QSlider'''와 '''QLCDNumber'''위젯을 사용하기 위해서 필요하다. qvbox.h 는 QT에서 자동적인 레이아웃의 지원을 위해서 사용한다.  
+
+{{{#!plain
+class MyWidget : public QVBox
+{
+	public :
+		MyWidget(QWidget *parent=0, const char *name=0);
+};
+
+MyWidget::MyWidget(QWidget *parent, const char *name)
+		: QVBox(parent, name)
+{
+
+}}}
+MyWidet는 QWidget가 아닌 '''QVBox'''로 부터 상속되었다. QVBox는 포함하고 있는 자식위젯을 자동적으로 (수직방향으로) 레이아웃을 잡아준다. 또한 위젯의 크기변경과 같은 이벤트가 발생했을 때도 자식 자신의 위젯크기에 맞도록 위젯의 크기를 알아서 변경시켜준다.      
+{{{#!plain
+QLCDNumber *lcd = new QLCDNumber(2, this, "lcd");
+}}}
+'''QLCDNumber'''는 LCD와 같은 모양의 숫자표시를 지원하는 위젯이다. '''lcd'''는 2개의 숫자판을 가지고 생성되도록 만들었다. 이름은 '''lcd'''로 했다. 이 이름은 나중에 위젯을 가리키기 위한 목적으로 사용된다. 
+
+{{{#!plain
+QSlider *slider = new QSlider(Horizontal, this, "slider");
+slider->setRange(0,99);
+slider->setValue(0);
+}}}
+'''QSlider'''는 슬라이더바를 구현하기 위해 사용되는 클래스다. 이 위젯은 슬라이더 버튼을 드래그하면 설정된 범위(최대,최소) 내에서 정수값을 변경할 수 있다. 여기에서는 수평방향으로 0에서 99까지의 범위를 가지며 초기 값은 0인 슬라이더 위젯을 생성했다. 범위는 QSlider::setRange()를, 초기화는 QSlider::setRange()를 이용했다. 이 위젯의 이름은 slider로 했다. 
+
+{{{#!plain
+connect( slider, SIGNAL(valueChanged(int)), lcd, SLOT(display(int)) );
+}}}
+우리가 만들고자 하는 프로그램은 슬라이더바의 버튼을 드래그해서 값이 변경되면 LCD에 출력시키는 일을 한다. 그렇다면 슬라이더의 변경값이 LCD에 전달되어야 할건데, 시그널/슬록 을 이용해서 이룰 구현했다. '''slider'''에서 값의 변경(valueChange)가 발생하면, 변경된 정보를 '''lcd'''위젯의 '''display'''에 전달하라는 뜻이다.  
+
+이상의 내용을 보면 슬롯은 대략 C++멤버 함수를 엑세스할 수 있는 일반적인 인터페이스를 제공하고 있음을 알 수 있다. 
+
+==== 작동 테스트 ====
+슬라이더바를 움직이면 그 갑에 맞도록 LCD 번호가 출력되는걸 확인 할 수 있다. 그리고 위젯(윈도우)의 크기를 변경하면 거기에 맞추어서 LCD와 슬라이더 위젯의 크기도 변경됨을 확인할 수 있다.  
+
+==== 연습 ====
+ 1. 슬라이더의 범위를 변경시켜 보자. 
+ 1. LCD 번호가 지정된 범위를 초과되어 버릴경우 종료하도록 코드를 수정해 보자. 
+
+=== 많은 블럭의 제작과 배열 ===
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album01/aio.png>
+}}}
+
+이번 예제는 두개의 위젯을 컴포넌트화 시키는 방법과, 많은 수의 위젯을 어떻게 다룰수 있는지를 보여준다. 이를 위해서 우리는 자식 위젯으로 사용자 정의 위젯을 이용할 것이다.  
+{{{#!plain
+#include <qapplication.h>
+#include <qpushbutton.h>
+#include <qslider.h>
+#include <qlcdnumber.h>
+#include <qfont.h>
+#include <qvbox.h>
+#include <qgrid.h>
+
+class LCDRange : public QVBox
+{
+	public:
+		LCDRange(QWidget *parent=0, const char *name=0);
+};
+
+LCDRange::LCDRange(QWidget *parent, const char *name)
+	: QVBox(parent, name)
+{
+	QLCDNumber *lcd = new QLCDNumber(2, this, "lcd");
+	QSlider *slider = new QSlider(Horizontal, this, "slider");
+	slider->setRange(0, 99);
+	slider->setValue(0);
+	connect(slider, SIGNAL(valueChanged(int)), lcd, SLOT(display(int)));
+}
+
+class MyWidget:public QVBox
+{
+	public :
+		MyWidget(QWidget *parent = 0, const char *name=0);
+};
+
+MyWidget::MyWidget(QWidget *parent, const char *name)
+		:QVBox(parent, name)
+{
+	QPushButton *quit = new QPushButton("Quit", this, "quit");
+	quit->setFont(QFont("Times", 18, QFont::Bold));
+	connect(quit, SIGNAL(clicked()), qApp, SLOT(quit()));
+
+	QGrid *grid = new QGrid(4, this);
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 4; j++)
+			new LCDRange(grid);
+	}
+}
+
+int main(int argc, char **argv)
+{
+	QApplication a(argc, argv);
+
+	MyWidget w;
+	a.setMainWidget(&w);
+	w.show();
+	return a.exec();
+}
+}}}
+
+==== 줄단위 설명 ====
+{{{#!plain
+class MyWidget:public QVBox
+{
+	public :
+		MyWidget(QWidget *parent = 0, const char *name=0);
+};
+}}}

@@ -1,0 +1,279 @@
+#title linux man page - wait : 프로세스의 종료를 기다린다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>wait(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. wait(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN14"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN17"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN37"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	프로세스 종료를 기다린다. </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+
+#include &#60;sys/wait.h&#62;
+
+pid_t <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=wait">wait</a>(int *status);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		주로 fork() 를 이용해서 자식 프로세스(:12)를 생성했을때 사용한다. 
+		wait() 를 쓰면 자식프로세스가 종료할때까지 해당영역에서 
+		부모프로스쓰가 sleep() 모드로 기다리게 된다. 
+		이는 자식프로세스와 부모프로세스의 동기화를 위한목적으로 
+		부모프로세스가 자식프로세스보다 먼저 종료되어서 자식프로세스가 
+		고아 프로세스(PPID 가 1)인 프로세스가 되는걸 방지하기 위한 
+		목적이다.
+	</P
+><P
+>		만약 자식 프로세스가 종료되었다면 함수는 즉시 리턴되며, 
+		자식이 사용한 모든 시스템자원을 해제한다. 
+	</P
+><P
+>		그런데 어떤이유로 부모가 wait()를 호출하기 전에 자식 프로세스가 
+		종료버리는 경우도 있다(잘못된 메모리 연산등으로 인한 죽음, 
+		혹은 정상적으로), 이럴경우 
+		자식프로세스는 좀비(:12)프로세스가 되는데, wait()함수는 즉시 
+		리턴하도록 되어있다.   
+	</P
+><P
+>		wait()의 인자 status 를 통하여 자식 프로세스의 상태를 받아올수 
+		있는데, 자식프로세스의 상태값은 자식프로세스의 종료값 * 256(FF) 이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		종료된 자식의 프로세스 ID는 에러일경우 -1 그렇지 않을경우 
+		0을 반환한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		다양한 원인에 의해서 에러가 발생할수 있으며 아래와 같은 에러 메시지들이 있다. 
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>ECHILD</DT
+><DD
+><P
+>	                        기다리는 자식프로세스가 더이상 존재하지 않을 경우
+				</P
+></DD
+><DT
+>ENOTSOCK</DT
+><DD
+><P
+>					s 가 소켓(:12)이 아닌 파일일경우
+				</P
+></DD
+><DT
+>ENOTCONN</DT
+><DD
+><P
+>					소켓이 연결되어 있지 않을경우
+				</P
+></DD
+><DT
+>ENOBUFS</DT
+><DD
+><P
+>					시스템에 연산을 위해서 이용할수 있는 자원이 부족할때
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+
+#include &#60;sys/wait.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+
+int main()
+{
+    int pid;
+    int status;
+
+    pid = fork();
+    // 자식 프로세스 
+    if (pid &#60; 0)
+    {
+        perror("FORK ERROR :");
+        exit(0);
+    }    
+
+    if (pid == 0)
+    {
+        int i;
+        for (i = 0; i &#60; 5; i++) 
+        {
+            printf("Child : %d\n", i);
+            sleep(2);
+        }
+        exit(3);
+    }
+    else
+    {
+        // 부모프로세스는 자식프로세스가 
+        // 종료할때까지 기다린다. 
+        printf("I wait Child(%d)\n", pid);
+        wait(&#38;status);
+        printf("Child is exit (%d)\n", status);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위의 예제를 컴파일후 실행시키면 다음과 같은 결과를 보여준다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c_source]# ./wait
+I wait Child(12128)
+Child : 0
+Child : 1
+Child : 2
+Child : 3
+Child : 4
+Child is exit (768)
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+참고문헌 :
+  * waitpid(2), fork(2), 좀비(:12), 시스템프로그래밍(:12)

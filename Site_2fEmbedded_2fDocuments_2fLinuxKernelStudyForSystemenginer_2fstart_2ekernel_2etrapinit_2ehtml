@@ -1,0 +1,289 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>trap_init()</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="PREVIOUS"
+TITLE="setup_arch ()"
+HREF="start.kernel.setuparch.html"><LINK
+REL="NEXT"
+TITLE="init_IRQ ()"
+HREF="start.kernel.irq.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="start.kernel.setuparch.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>5장. 리눅스 커널 부팅</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="start.kernel.irq.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="START.KERNEL.TRAPINIT"
+>5.4. trap_init()</A
+></H1
+><P
+>			트랩은 인터럽트와는 달리 정해진 곳으로 분기하도록 되어 있고 번호로 정해져 있다. 아래는 i386에서
+			정해져 있는 트랩의 일부를 열거한 것이다.
+		</P
+><P
+></P
+><UL
+><LI
+><P
+>0 - divide_error</P
+></LI
+><LI
+><P
+>1 - debug</P
+></LI
+><LI
+><P
+>2 - nmi</P
+></LI
+><LI
+><P
+>3 - int3</P
+></LI
+><LI
+><P
+>4 - overflow</P
+></LI
+><LI
+><P
+>5 - bounds</P
+></LI
+><LI
+><P
+>6 - invalid_op</P
+></LI
+><LI
+><P
+>7 - device_not_available</P
+></LI
+><LI
+><P
+>8 - double_fault</P
+></LI
+><LI
+><P
+>9 - coprocessor_segment_overrun</P
+></LI
+><LI
+><P
+>10 - invalid_TSS</P
+></LI
+><LI
+><P
+>11 - segment_not_present</P
+></LI
+><LI
+><P
+>12 - stack_segment</P
+></LI
+><LI
+><P
+>13 - general_protection</P
+></LI
+><LI
+><P
+>14 - page_fault</P
+></LI
+><LI
+><P
+>15 - spurious_interrupt_bug</P
+></LI
+><LI
+><P
+>16 - coprocessor_error</P
+></LI
+><LI
+><P
+>17 - alignment_check</P
+></LI
+><LI
+><P
+>18 - machine_check</P
+></LI
+><LI
+><P
+>19 - simd_coprocessor_error</P
+></LI
+></UL
+><P
+>			trap_init()에선 시스템 콜을 위한 초기화도 실행해 0x80을 시스템 콜에 사용하도록 해놓는다.
+		</P
+><P
+>			그리고 CPU를 초기화 한다. CPU 초기화에선 페이지, gdt, ldt, idt, tss 등이 설정되고 이를 사용할
+			수 있는 상태로 만들어 본격적인 커널 실행에 들어간다. /var/log/dmesg의
+			<A
+HREF="kernel-dmesg.html#DMESG.INITCPU"
+><A
+HREF="kernel-dmesg.html#DMESG.INITCPU"
+><B
+>(6)</B
+></A
+></A
+>에 출력된 한 줄이 CPU의 초기화를 의미한다.
+		</P
+><P
+>			i386에서 trap을 초기화하는 함수인 _set_gate()는 <A
+HREF="app3.analysis.html#APP3.ANALYSIS.SETGATE"
+>C.2.2절</A
+>를
+			참조 하기 바란다.
+		</P
+><P
+>			ARM 프로세서의 trap은 arch/arm/kernel/entry-armv.S나 arch/arm/kernel/entry-armo.S에
+			정의되어 있고 내용은 다음과 같다. 앞의 값은 vector의 offset을 말한다.
+		</P
+><P
+></P
+><UL
+><LI
+><P
+>0x00000000 - reset</P
+></LI
+><LI
+><P
+>0x00000004 - Undefined instruction</P
+></LI
+><LI
+><P
+>0x00000008 - Software Interrupt(SWI)</P
+></LI
+><LI
+><P
+>0x0000000C - Prefetch Abort(Instruction fetch memory abort)</P
+></LI
+><LI
+><P
+>0x00000010 - Data Abort(Data Access memory abort)</P
+></LI
+><LI
+><P
+>0x00000018 - IRQ(Interrupt)</P
+></LI
+><LI
+><P
+>0x0000001C - FIQ(Fast Interrupt)</P
+></LI
+></UL
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="start.kernel.setuparch.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="start.kernel.irq.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>setup_arch()</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>init_IRQ()</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

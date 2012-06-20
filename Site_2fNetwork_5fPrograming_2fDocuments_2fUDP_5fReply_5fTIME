@@ -1,0 +1,144 @@
+#title UDP 응답시간 체크하기.
+
+이글은  TCP(:12), IP(:12), UDP(:12) 그리고 libpcap(:12)에 대한 내용을 알고 있을 것이라는 가정하에 작성되었다. 
+
+TCP 프로토콜과는 달리 UDP(:12) 프로토콜은 별도의 연결과정을 거치지 않고, 그냥 데이터를 전송하고 받는다. 또한 흐름제어를 위한 SQE ACK, ACK를 가지지 않는다. 그러므로 단지 Src IP, Src Port, Dst IP, Dst Port 만을 가지고 응답시간을 체크해야한다. pcap 라이브러리(:12)를 이용하면 다음과 같이 간단하게 UDP 패킷의 정보를 얻어오는 프로그램을 만들 수 있다.
+
+{{{#!plain
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+// Unix Standard Library
+#include <time.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <iostream>
+
+#include <pcap.h>
+
+#include <net/bpf.h>
+#include <netinet/in.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
+
+#include <net/if.h>
+#include <net/ethernet.h>
+#include <arpa/inet.h>
+
+#include <sys/socket.h>
+
+
+#define TCPHEADERSIZE 6*4
+
+using namespace std;
+
+enum MODE{NONPROMISCUOUS, PROMISCOUS};
+
+struct _connect_Info
+{
+  struct timeval start_Time;
+  int flag;
+};
+
+int main(int argc, char *argv[])
+{
+  char errbuf[256];
+  int ret;
+  struct _connect_Info  *connect_Info;
+
+  bpf_u_int32 netp;
+  bpf_u_int32 maskp;
+
+  char *dev;
+
+  struct pcap_pkthdr hdr;
+  struct ether_header *ep;
+  struct tcphdr    *tcph;
+  struct udphdr    *udph;
+  struct ip *iph;
+
+  struct timeval current_time;
+
+  struct sockaddr_in *sin;
+
+  const u_char *packet;
+
+  unsigned short ether_type;
+  pcap_t *pcd;
+
+  // 65536개 만큼의 Src Port를 저장할 수 있는 자료공간을 만든다.
+  connect_Info = (struct _connect_Info *)malloc(sizeof(struct _connect_Info) * 65536);
+
+  dev = pcap_lookupdev(errbuf);
+  if (dev == NULL)
+  {
+    printf("%s\n", errbuf);
+    return 1;
+  }
+
+  // Non Promiscous 모드로 이더넷 장치를 연다.
+  pcd = pcap_open_live(dev, BUFSIZ, NONPROMISCUOUS, -1, errbuf);
+  if (pcd == NULL)
+  {
+    printf("%s\n", errbuf);
+    return 1;
+  }
+
+  // 패킷을 읽어들인다.
+  for (;packet=(const unsigned char *)pcap_next(pcd, &hdr);)
+  {
+    ep = (struct ether_header *)packet;
+    packet += sizeof(struct ether_header);
+    ether_type = ntohs(ep->ether_type);
+    // UDP/IP 패킷인 경우에만 분석한다.
+    if (ether_type == ETHERTYPE_IP)
+    {
+      iph = (struct ip *)packet;
+      if(iph->ip_p == IPPROTO_UDP)
+      {
+        udph = (struct udphdr *)(packet + iph->ip_hl *4);
+        printf("%16s(%06d) -> %16s(%d06) : %d, %d\n",
+              inet_ntoa(iph->ip_src),
+              ntohs(udph->source),
+              inet_ntoa(iph->ip_dst),
+              ntohs(udph->dest),
+              ntohs(udph->len),
+              ntohs(iph->ip_id));
+      }
+    }
+  }
+  return EXIT_SUCCESS;
+}
+}}}
+
+다음은 실행시킨 결과다. 
+{{{#!plain
+# ./pcap
+  218.234.17.184(000138) ->   218.234.17.184(13806) : 200, 264
+  218.234.17.196(000138) ->   218.234.17.196(13806) : 182, 27542
+  218.234.17.196(000137) ->   218.234.17.196(13706) : 58, 27543
+  218.234.17.194(000138) ->   218.234.17.194(13806) : 209, 265
+  218.234.17.184(000138) ->   218.234.17.184(13806) : 209, 266
+  218.234.17.225(000138) ->   218.234.17.225(13806) : 182, 5887
+  218.234.17.225(000137) ->   218.234.17.225(13706) : 58, 5888
+  218.234.17.196(000137) ->   218.234.17.196(13706) : 58, 27545
+  218.234.17.227(000138) ->   218.234.17.227(13806) : 182, 19602
+  218.234.17.227(000137) ->   218.234.17.227(13706) : 58, 19603
+}}}
+이제 gettimeofday(2) 함수를 이용하면, 쉽게 응답시간을 구할 수 있을 것이다. 이러한 정보는 서비스의 품질을 높이기 위한 QOS(:12) 시스템등에 유용하게 활용할 수 있을 것이다.
+
+=== 관련글 ===
+  * [wiki:Site/Network_Programing/Documents/Three_Way_HandShake TCP 연결시간 구하기]
+  * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/IP_%C0%DA%BC%BC%C8%F7_%BA%B8%B1%E2 IP자세히 보기] 
+  * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/TCP_%C0%DA%BC%BC%C8%F7_%BA%B8%B1%E2 TCP자세히 보기]
+  * [http://joinc.co.kr/modules/moniwiki/wiki.php/article/libpcap%C0%BB_%C0%CC%BF%EB%C7%D1_%C7%C1%B7%CE%B1%D7%B7%A1%B9%D6 libpcap 프로그래밍]
+  * [wiki:Site/QOS 인터넷 플랫폼을 위한 QOS]

@@ -1,0 +1,215 @@
+#title 색인 DB의 생성 
+
+[[TableofContents]]
+ * 이글은 [wiki:Site/Joinc/Project/Related_Link Related Link 프로젝트]를 위한 준비단계의 문서다. 가볍게 읽으면 될 것 같다. 오래전에 작성한 글이라서 수정해야 될 곳이 많지만 귀찮으니 그냥 이대로 유지.
+=== Index(색인)이 왜 필요한가? ===
+검색엔진은 단어단위로 이루어진다. 우리가 '''Linux'''라는 단어를 검색 keyword로 사용한다함은 Linux란 단어를 포함한 문서명과 링크정보를 검색시스템에 요구하는 것이다. 그러므로 검색시스템은 각 단어별로 해당 단어를 포함하고 있는 문서의 정보를 DB화 해서 관리하고 있어야 한다.
+
+국어사전에서 단어로된 목차페이지가 없을경우를 상상해보도록 하자.
+
+=== 색인 DB의 구축에 대해서 ===
+간단하게 생각하자면 오라클이나 Mysql(:12)과 같은 RDB를 이용해서 색인DB를 구축할 수도 있을 것이다. 실제 몇몇 검색엔진은 이러한 RDB를 이용해서 색인DB를 구축하기도 한다. 이들 RDB를 사용할 경우, DB시스템을 새로 만들 필요가 없으므로 개발시간을 단축시킬 수 있긴 하겠지만 아래와 같은 문제에 직면하게 된다. 
+ * 데이터의양이 많아질 수록 느려진다.  
+   RDB는 일반적인 DB시스템이다. 다양한 형태의 정보를 일반적인 방법으로 DB화 할 수 있다. 그러나 일반적인 방법으로 DB화 할경우 비효율적인 형태의 정보들도 있다. 
+   예를 들어서 모든 인터넷 서비스에 대한 5분동안의 통계 데이터를 유지해서, 각 서비스에 대한 변화 추이를 살피는 시스템을 개발한다고 했을 때, RDB를 사용할경우 5분동안 카운팅된 모든 네트워크 서비스에 대한 정보를 5분단위로 기록해야 한다. 평균 100건의 네트워크 서비스에 대한 카운팅이 일어난다면, 하루에 28800의 레코드가 쌓이게 된다. 게다가 서비스의 범위는 대략 60000정도가 된다. 이렇게 무식하게? DB화 한다음에, 쌓여진 DB로부터 일간, 주간, 월간, 년간 통계를 가져와야 된다고 가정을 해보자. 이것을 전용의 DB형태로 만든다면, 범용적이진 않지만 주어진 일을 하는데, 훨씬 효과적인 DB를 구축할 수 있다.   
+   검색엔진 역시 특성상 대량의 데이터를 다룰 수 밖에 없는데, RDB를 사용할경우 데이터가 충분히 누적되었을 때 문제가 발생할 수 밖에 없다. 물론 DB튜닝등을 통해서 효율성을 높일 수 있겠지만, 튜닝자체도 만만한 일이 아니며 그 결과 역시 장담할 수가 없다.
+
+ * 라이센스 비용
+   검색엔진은 대량의 데이터를 다루어야 하기 때문에, 분산환경에서 작동하는 경우가 많다. 이러한 상황에서 상용DB를 사용하게 될경우 비용문제를 고려해야 할 것이다.
+
+=== 색인DB의 구축 방법 ===
+우선 무엇을 색인할 것인지를 결정해야 한다. 국어사전이라면 "단어"가 색인이 되고, 색인의 정보로는 단어의 설명이 나와있는 페이지의 번호가 될 것이다.   
+
+검색엔진에서의 색인은 문서에서 원하는 단어를 추출해서 빠른시간에 해당단어를 포함하는 문서의 위치를 가지게 된다. 이러한 색인을 나들기 위해서는 단어를 추출해 낼 수 있어야 한다. 영문 문서를 기준으로 생각해 보면 단어추출 프로그램은 간단하게 만들 수 있다. 색인DB역시 가능하면 단어의 갯수가 적을 수록 효율적인 검색이 가능한 DB를 만들 수 있기 때문에 형태소 분석기가 사용된다. 특히 한글문서를 색인하고자 할경우 얼마나 좋은 형태소 분석기를 가지고 있느냐가 색인DB의 품질을 결정하게 된다.   
+예를 들어서 아래와 같은 내용을 포함한 4개의 문서가 있다고 가정해 보자.
+{{{#!plain
+Document 1 : Linux Programing language Perl, Python 
+Document 2 : Linux's Free mind 
+Document 3 : Hello World gnu mind 
+}}}
+단어추출기를 돌려서 다음과 같은 단어의 목록을 얻을 수 있을 것이다.
+{{{#!plain
+D1 = {linux, programing, language, perl, python}
+D2 = {linux, Free, mind}
+D3 = {hello, world, gnu, mind}
+}}}
+얻을 수 있는 단어는 유일한 키를 가지는 set형태의 자료구조가 되며, 다음과 같은 단어들을 포함하게 될것이다 - 간단히 말해서 합집합 -.
+{{{#!plain
+Terms = {linux, programing, language, perk, pytoh, free, mind, hello, world, gnu}
+}}}
+이러한 단어들은 다시, "어느 문서"에 포함되어 있는지에 대한 정보를 덧붙여줘야 한다. key/value를 가지는 map자료구조가 될 것이다.
+{{{#!plain
+map<string Terms, vector<string> Documents> IndexMap; 
+---
+linux = {Document 1, Document 2};
+perl = {Document 1};
+mind = {Document 2, Document 3};
+...
+}}}
+여기까지 진행되었다면 색인DB는 완성된 것으로 볼 수 있다 - 물론 제대로된 색인DB를 구축할려면 "중요도"등을 포함한 부가정보들이 더 추가되어야 하겠지만 -. 검색은 검색엔진에 맡기면 된다. 
+==== 테이블 구성 ====
+그럼 효과적인 색인 테이블을 구성하는 방법에 대해서 고민을 해보도록 하겠다. 색인DB에 들어가는 정보는 위에서 설명했듯이 map<string Terms, vector<string> Documents> 이다. 이를 두개의 필드로 구성하게 될경우, 첫번째 필드는 유니크한 단일 값이 되겠지만, 두번째 필드는 vector가 되어야 한다는 문제점이 있다. 이 문제는 Documents vector을 별도의 테이블로 구성하는 것으로 해결할 수 있다. 
+
+attachment:idx_table.png
+
+그림이 조잡하긴 하지만 이해하는데, 문제는 없으리라 생각된다. 
+
+위의 두개의 테이블이면 기본적인 요건을 충족하는 이를테면 학습의 용도를 위한 색인DB를 구축할 수 있다. 그러나 서비스가 가능한 수준이 되기 위해서는 "문서요약", "중요도", "데이터 갱신일"등의 부가정보가 정리되어야 한다. 이를 위해서는 별도의 summary 테이블이 필요할 것이다.  
+
+==== 단어 추출기 ====
+다음은 regex(:12)를 이용해서 만들어본 간단한 영문단어 추출기이다. 
+{{{#!plain
+#include <sys/types.h>
+#include <regex.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+
+int main(int argc, char **argv)
+{
+	FILE *fp;
+	int rtv;
+	regex_t preg;
+	char linebuf[1024];
+	char *tr;
+	char seps[] = " -.,()\";:";
+	char msg[64];
+
+	if (argc != 3)
+	{
+		printf("Usage : %s [filename] [pattern]\n", argv[0]);
+	}
+	fp = fopen(argv[1], "r");	
+	if (fp == NULL)
+	{
+		perror("Error ");
+		return 1;
+	}
+	rtv = regcomp(&preg, argv[2], REG_EXTENDED|REG_NOSUB); 
+	if(rtv != 0)
+	{
+		regerror(rtv, &preg, NULL, 0);
+		return 1;
+	}
+
+	while(fgets(linebuf, 1024, fp) != NULL)
+	{
+		linebuf[strlen(linebuf)-1] = '\0';
+		tr = strtok(linebuf, seps);
+		while(tr != NULL)
+		{
+			tr = strtok(NULL, seps);
+			if (tr != NULL)
+			{
+				if (regexec(&preg, tr, 0, NULL, 0) == 0)
+				{
+					printf("::%s\n", tr);
+				}
+			}
+		}
+	}
+}
+}}}
+다음과 같이 실행하면 된다.
+{{{#!plain
+# ./parser TestDoc/rfc1023.txt "[a-zA-Z]{2}+"
+}}}
+
+==== Indexer ====
+아래의 프로그램은 주어진 파일에서 단어를 추출해서 색인을 하는 프로그램이다.
+{{{#!plain down:indexer.cc
+#include <sys/types.h>
+#include <regex.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <map>
+#include <vector>
+#include <string>
+#include <set>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+	FILE *fp;
+	int rtv;
+	regex_t preg;
+	char linebuf[1024];
+	char *tr;
+	char seps[] = " -.,()\";:{}'+";
+	char msg[64];
+	map<string, set<string> > IndexMap;
+	map<string, set<string> >::iterator Mi;
+	vector<string> FileList; 
+
+	FileList.push_back("TestDoc/rfc1023.txt");
+	FileList.push_back("TestDoc/rfc1036.txt");
+
+	if (argc != 3)
+	{
+		printf("Usage : %s [filename] [pattern]\n", argv[0]);
+	}
+	rtv = regcomp(&preg, argv[2], REG_EXTENDED|REG_NOSUB); 
+	if(rtv != 0)
+	{
+		regerror(rtv, &preg, NULL, 0);
+		return 1;
+	}
+
+	for(int i = 0; i < FileList.size(); i++)
+	{
+		fp = fopen(FileList[i].c_str(), "r");	
+		if (fp == NULL)
+		{
+			perror("Error ");
+			return 1;
+		}
+  
+		while(fgets(linebuf, 1024, fp) != NULL)
+		{
+			linebuf[strlen(linebuf)-1] = '\0';
+			tr = strtok(linebuf, seps);
+			while(tr != NULL)
+			{
+				tr = strtok(NULL, seps);
+				if (tr != NULL)
+				{
+					if (regexec(&preg, tr, 0, NULL, 0) == 0)
+					{
+						Mi = IndexMap.find(tr);
+						IndexMap[tr].insert(FileList[i]);
+					}
+				}
+			}
+		}
+		fclose(fp);
+	}
+	printf("Term Size %d\n", IndexMap.size());
+
+	Mi = IndexMap.begin();
+	set<string>::iterator Si;
+	int inum;
+
+	// 색인결과 출력
+	while (Mi != IndexMap.end()) 
+	{
+		printf("==== %s ==== \n",  Mi->first.c_str());
+		Si = Mi->second.begin();
+		inum = 1;
+		while(Si != Mi->second.end())
+		{
+			printf("%02d : %s\n", inum, Si->c_str());
+			inum++;
+			*Si++;
+		}
+		*Mi++;
+	}
+}
+}}}
+
+=== 현재의 색인 DB가 가진 문제점과 해결방안 ===
+==== 참/거짓만을 판단할 수 있다 ====
+현재 만들어진 색인 DB는 불리언 모델을 따른다. 불리언 모델은 매우 빠르다라는 장점을 가지지만, 오로지 "참"과 "거짓"만을 넘겨준다는 단점이 있다. 해당 단어가 그 문서에 포함되어있으면 1, 그렇지 않으면 0을 넘겨주는 식인데, 단순히 해당문서에 단어가 포함되어 있다는 정도만을 가지고는 높은 질의 검색 서비스를 제공할 수 없다. 사용자는 중요도가 높은 문서를 찾기를 원하기 때문이다. 그러므로 색인 DB는 "중요도"등의 다른 기준으로 검색결과를 소트해서 결과를 되돌려줄 수 있어야 한다.  
+
+문서에 대한 중요도및 가중치 계산에 대한 내용은 따로 다루도록 하겠다.

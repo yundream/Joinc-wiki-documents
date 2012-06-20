@@ -1,0 +1,270 @@
+#title 파일 : 디렉토리 작업하기
+
+ 1. stat() 대신에 lstat()를 사용하도록 예제 변경, stat()를 사용할경우 심볼릭 링크를 설명할 수 없어진다. - [yundream] 2004/01/26 
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>디렉토리 리스트 검색</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>디렉토리 리스트 검색</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>디렉토리 정보 검색</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN11"
+>소개</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN15"
+>코드및 설명</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 디렉토리 정보 검색</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN11"
+>1.1&#51208;. 소개</A
+></H2
+><P
+>			아마도 이 사이트에 있는 문서를 읽어 보았다면, 파일과 
+			디렉토리에 관련된 몇개의 기사를 읽은 적이 있을것이다. 
+			이번에는 <A
+HREF="/article.php?sid=15"
+TARGET="_top"
+>file 정보(stat) 와 종류 알아내기</A
+> 의 내용을
+			약간 응용해서 하위 디렉토리의 파일을 트리 구조로 보여주고, 
+			모든 파일의 크기의 총합을 나타내주는 간단한 프로그램을 만들어 
+			보도록 하겟다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>1.2&#51208;. 코드및 설명</A
+></H2
+><P
+>			다음은 예제 코드이다. 코드에 대한 모든 설명은 
+			주석으로 대신하도록 할것이다. 간단한 프로그램이므로 이해하는 데에 
+			무리는 없을것이다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제: scandisk.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/stat.h&#62;
+#include &#60;dirent.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+// 파일의 크기를 저장하기 위한 변수
+long int total_size = 0;
+
+// 디렉토리 들여쓰기를 위한 디렉토리 depth 레벨 저장용
+int  indent = 0;
+
+// 함수는 인자로 디렉토리 이름을 입력받는다. 
+void dir_parser(char *wd)
+{
+    struct dirent **items;
+    int nitems, i, j;
+    struct stat fstat;
+    char per;
+
+    // 인자로 받은 디렉토리로 이동한다. 
+    if (chdir(wd) &#60; 0)
+    {
+        perror("chdir ");
+        exit(1);
+    }
+
+    // scandir 함수를 이용해서 현재 디렉토리의 
+    // 모든 파일과 디렉토리의 내용을 가져온다. 
+    nitems = scandir(".", &#38;items, NULL, alphasort);
+
+    // 디렉토리(파일포함) 항목의 갯수만큼 루프를 돌리며
+    // 만약 해당 파일이 디렉토리 일경우 
+    // dir_parser 함수를 재귀 호출한다. 
+    for (i = 0; i &#60; nitems; i++)
+    {
+        // 파일 상태를 저장하기 위한 구조체    
+        struct stat fstat;
+
+        // 현재디렉토리, 이전디렉토리 는 무시한다. 
+        if ( (!strcmp(items[i]-&#62;d_name, ".")) || (!strcmp(items[i]-&#62;d_name, "..")) )
+        {
+            continue;
+        }
+        // 파일의 상태를 얻어와서 fstat 로 저장한다. 
+        lstat(items[i]-&#62;d_name, &#38;fstat);
+
+        // 디렉토리의 depth 는 "&#92;t" 을 통해서 이루어진다. 
+        // 해당 뎁스의 크기만큼 "&#92;t" 를 반복해서 출력한다. 
+        for (j = 0; j &#60; indent; j++)
+        {
+            printf("&#92;t");
+        }
+        // 파일이름(디렉토리)이름과 크기를 출력하고 
+        // 총계를 내기 위해서 total_size 에 더해준다. 
+        printf("%s&#92;t%d&#92;n", items[i]-&#62;d_name, fstat.st_size);
+        total_size += fstat.st_size;
+
+        // 만약 파일이 디렉토리 이라면 
+        // dir_parser 을 재귀 호출한다. 
+        // 그리고 디렉토리의 depth 레벨을 1 증가 한다. 
+        if (S_ISDIR(fstat.st_mode) && S_ISLNK(fstat.st_mode))
+        {
+            indent ++;
+            dir_parser(items[i]-&#62;d_name);    
+        }
+    }
+    // 디렉토리의 depth 레벨을 1 감소시키고
+    // 하위 디렉토리로 이동한다. 
+    indent --;
+    chdir("..");
+}
+
+int main(int argc, char **argv)
+{
+    memset(direntry, 0x00, 255); 
+    dir_parser(argv[1]);
+    printf("size is %d byte&#92;n", total_size);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			위의 프로그램을 컴파일 한후 실행 시키면 아래와 같은 
+			결과물을 보여준다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@loclhost test]# ./scandisk ./ 
+syslog  4096
+    .memchecker.c.swp       12288
+    .memrecever.c.swp       12288
+    .select.c.swp   12288
+    memchecker      15456
+    memchecker.c    1681
+    memchecker.c.html       4794
+    memrecever      15460
+    memrecever.c    1480
+    memrecever.c.html       3421
+    select  14950
+    select.c        1415
+    select.c.html   3798
+    syslog22        4096
+        hello   0
+...
+size is 2354306 byte
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			프로그램의 인자로 넘긴 디렉토리의 모든 하위디렉토리의 파일들의 
+			이름과 크기를 검사해서 이를 출력해주고, 마지막에는 전체 파일의 크기를 
+			되돌려준다. 어떻게 보면 du(1)와 비슷한 일을 하는 프로그램 이라고 볼수도 
+			있을것이다.  
+		</P
+><P
+>			이 프로그램은 보면 알겠지만 완벽한 프로그램이 아니다. 그럭저럭 주어진 
+			업무를 수행하지만, 출력결과도 썩 만족스럽지 못하며, 좀 특수한 파일이 
+			디렉토리 네에 존재할경우 (/dev 같은) 작동을 제대로 못할수가 있다. 
+			출력결과를 보기좋게 만들고, 여러가지 예외처리를 하는등은 각자의 몫으로 
+			남기고 이 글은 여기서 끝내도록 하겠다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

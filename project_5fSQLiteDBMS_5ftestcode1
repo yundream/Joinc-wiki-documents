@@ -1,0 +1,99 @@
+ * 어떻게 하면 꼬이지 않고 쿼리를 처리할 수 있을까? 하고 고민하다가 아래와 같은 테스트 코드를 짜보았습니다.
+ * 결론은 vm 단위로 처리한다면 데이터는 꼬이지 않는다! 이구요.. 제가 쓰레드세잎하게 컴파일 되어서 그런지 모르겠지만 아래와 같은 코드를 처리하는데 아무런 문제가 발생되지 않았습니다.
+ * 아래의 코드는 2개의 쿼리문을 2개의 vm을 이용해 처리한 뒤 순서에 관계없이 출력을 하게 한 것 입니다. 그 중간에서 데이터 입력도 해보구요.
+ * DB당 1개의 쓰레드를 연 다음에 그 쓰레드는 sqlite_compile 로 vm까지만 생성하게 하고 _step 등은 응답하는 쓰레드에서 해도 별 문제 없지 않을까 싶습니다.
+ * 클라이언트에 응답하던 중에 에러가 난다면 _step를 더이상 진행하지 않고 끊게 되면 리소스도 보호할 수 있게 될테니까요~
+
+{{{#!plain
+[root@linux root]# sqlite testdb
+SQLite version 2.8.8
+Enter ".help" for instructions
+sqlite> .schema test
+create table test(id int, name text);
+sqlite> select * from test;
+1|신기배
+1|신기배
+1|신기배
+1|신기배
+2|신기배
+2|신기배
+2|신기배
+sqlite> .quit
+[root@linux root]# gcc test1.c -lsqlite -o test
+test1.c: In function `main':
+test1.c:21: warning: passing arg 3 of `sqlite_compile' from incompatible pointer type
+test1.c:22: warning: passing arg 3 of `sqlite_compile' from incompatible pointer type
+test1.c:24: warning: passing arg 3 of `sqlite_step' from incompatible pointer type
+test1.c:24: warning: passing arg 4 of `sqlite_step' from incompatible pointer type
+test1.c:34: warning: passing arg 3 of `sqlite_step' from incompatible pointer type
+test1.c:34: warning: passing arg 4 of `sqlite_step' from incompatible pointer type
+[root@linux root]# ./test
+1       신기배
+1       신기배
+1       신기배
+1       신기배
+2       신기배
+2       신기배
+2       신기배
+2       신기배
+}}}
+
+ * 이걸 보시면 vm이 순서에 관계 없이 상당히 유연하다는 걸 알 수 있습니다. 원래는 3개의 레코드가 발견되야 정상인 vm2는 vm이 생성된 후에 데이터가 입력되니까 그 데이터까지 포함되어서 _step시 찾아진다는 걸 볼 수 있습니다.
+
+{{{#!vim c
+#include <stdio.h>
+#include <sqlite.h>
+
+int main( int argc, char **argv )
+{
+	sqlite		*db;
+	sqlite_vm	*vm1;
+	sqlite_vm	*vm2;
+	char		*errmsg;
+	int			result;
+	char		*res1;
+	char		*res2;
+
+	char		**data;
+	char		**col;
+	int			cols;
+	int			i;
+
+	db = sqlite_open("testdb",0,&errmsg);
+
+	/* 여기서 미리 쿼리를 2번 날려놓습니다
+	   res1, res2 부분이 뭔지 모르겠음 */
+	result = sqlite_compile(db, "select * from test where id=1", &res1, &vm1, &errmsg);
+	result = sqlite_compile(db, "select * from test where id=2", &res2, &vm2, &errmsg);
+
+	/* 첫번째 쿼리를 출력하고 나서 */
+	while( (result = sqlite_step(vm1, &cols, &data, &col)) == 100 )
+	{
+		for (i=0; i < cols; i++)
+		{
+			printf("%s\t",data[i]);
+		}
+		printf("\n");
+	}
+
+	/* 데이터를 중간에 입력도 해봅니다 */
+	sqlite_exec(db, "insert into test values(2,'신기배')", 0, 0, &errmsg);
+
+	/* vm단위로 처리하면 아무 문제가 없다는 것을 알 수 있습니다 */
+	while( (result = sqlite_step(vm2, &cols, &data, &col)) == 100 )
+	{
+		for (i=0; i < cols; i++)
+		{
+			printf("%s\t",data[i]);
+		}
+		printf("\n");
+	}
+
+	sqlite_finalize(vm1, &errmsg);
+	sqlite_finalize(vm2, &errmsg);
+
+	sqlite_close(db);
+
+	return 0;
+}
+}}}

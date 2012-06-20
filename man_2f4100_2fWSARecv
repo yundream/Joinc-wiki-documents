@@ -1,0 +1,70 @@
+#title 윈속 api : WSARecv - 소켓에서 데이터를 읽는다.
+
+== WSARecv ==
+연결 소켓(:12)으로 부터 데이터를 읽는다.
+
+=== 사용 법 ===
+{{{#!plain
+int WSARecv(
+  __in     SOCKET s,
+  __inout  LPWSABUF lpBuffers,
+  __in     DWORD dwBufferCount,
+  __out    LPDWORD lpNumberOfBytesRecvd,
+  __inout  LPDWORD lpFlags,
+  __in     LPWSAOVERLAPPED lpOverlapped,
+  __in     LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+);
+}}}
+
+=== 매개 변수 ===
+  * s
+     연결 소켓을 가리키는 소켓 지정 번호
+  * lpBuffers
+     WSABUF(:4300) 구조체 배열을 가리키는 포인터. '''WSABUF'''구조체는 데이터 버퍼를 가리키는 포인터와 버퍼의 크기 정보를 가지고 있다.
+  * dwBufferCount
+     lpBuffers 배열에 있는 WSABUF 구조체의 개수.
+  * lpNumberOfBytesRecvd
+     데이터 입력이 완료된 경우, 읽은 데이터의 바이트 크기를 넘긴다.
+  * lpFlags
+     함수의 호출 방식을 지정한다.
+  * lpOverlapped
+     WSAOVERLAPPED(:4300) 구조체의 포인터로 만약  non overlapped(:12) 소켓이라면 무시한다.
+  * lpCompletionRoutine
+     데이터 입력이 완료 (completion)되었을 때, 호출할 루틴의 포인터다. non overlapped 소켓이라면 무시한다.
+
+=== 반환 값 ===
+에러가 발생하지않고 데이터 입력이 완료 되었다면 0을 반환한다. 이 경우 완료 루틴은 호출 쓰레드가 반응할 수 있는 상태로 호출되기 위한 준비를 갖추었다고 볼 수 있다. 에러가 발생하면 SOCKET_ERROR 이 반환 된다. 에러 코드는 WSAGetLastError(:4100)함수로 가져올 수 있다.
+
+다음은 에러 코드 목록이다.
+|| 에러 코드       || 에러 값 || 설명                                                                          ||
+|| WSAECONNABORTED || 10053  || 타임아웃 혹은 상대방의 접속종료들과 같은 소프트웨어적인 문제로 연결이 끊겼음.      ||
+|| WSAECONNRESET || 10054 || 연결이 원격 호스트에 의해 재설정되었음.             ||
+|| WSAEDISCON    || 10101 || 종료가 진행중임                       ||
+|| WSAEFAULT  || 10014     || 잘못된 주소를 사용했음                 ||
+|| WSAEINPROGRESS || 10036 || 블록화 함수가 진행되는 동안 부적절한 윈속 API함수가 호출.  ||
+|| WSAEINTR   || 10004     || WSACancelBlockingCall()에 의해 블록화 호출이 취소: Interrupted system call ||
+|| WSAEINVAL  || 10022     || 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때  ||
+|| WSAEMSGSIZE   || 10040 || 송수신에 사용된 데이터가 버퍼의 크기를 초과해서 크기에 맞게 잘렸음 ||
+|| WSAENETDOWN   || 10050 || 네트워크 서브 시스템에 문제가 있음. 네트워크 접속 끊김등. ||
+|| WSAENETRESET   || 10052 || 네트워크 재설정으로 연결이 끊어졌음.               ||
+|| WSAENOTCONN  || 10057 || 연결되지 않은 소켓임. 연결되지 않은 소켓에 읽고 쓰는 경우 ||
+|| WSAENOTSOCK   || 10038 || 잘못된 소켓기술자를 사용했음  ||
+|| WSAEOPNOTSUPP  || 10045 || 소켓이 지원하지 않는 명령을 사용했음. listen()함수를 데이터그램 통신 (SO_DGRAM)에서 호출  ||
+|| WSAESHUTDOWN || 10058 || 소켓이 종료되었음. 종료된 소켓에 데이터를 읽고 쓰려 경우  ||
+|| WSAETIMEDOUT  || 10060 || 접속시도 제한 시간 초과         ||
+|| WSAEWOULDBLOCK || 10035 || non overlapped 소켓 : 비 봉쇄 소켓에 아직 읽을 데이터가 없음, overlapped(:12) 소켓 : 너무 많은 중첩 입출력 요구가 있음 ||
+|| WSANOTINITIALISED || 10093 || WSAStartup() 함수가 성공적으로 실행되지 않은 상황에서 윈속 함수를 호출했을 때  ||
+|| WSA_IO_PENDING                    || 997  || Overlapped 연산은 나중에 완료될 것이다. 중첩 연산을 위한 준비가 되었으나, 즉시 완료되지 않았을 경우발생  ||
+|| WSA_OPERATION_ABORTED     || 995  || overlapped(:12) 연산이 중단 되었다.  ||
+
+=== 설명 ===
+WSARecv 함수는 BSD:::소켓의 socket(:2) 함수의 윈속 확장 버전으로, socket 함수에 비해서 다음과 같은 기능들이 추가되어 있다. 
+   * overlapped(중첩)소켓에 대해서 중첩 연산을 수행할 수 있다.
+   * 여러 개의 수신 버퍼를 이용해서 scatter/gathe 형식의 입력을 다루는 애플리케이션을 개발할 수 있다.
+   * 매개 변수 lpFlag는 입력과 출력의 매개 변수로 사용될 수 있다. 이 플래그로 MSG_PARTIAL 플래그 상태를 감지할 수 있다. 
+
+만약 lpOverlapped와 lpCompletionRoutine 매개 변수가 모두 NULL이면, 이 함수에 지정된 소켓은 비 중첩 소켓 처럼 다루어진다.
+
+비 중첩 소켓에 대해서 이 함수를 사용하면 recv(:4100)함수와 동일하게 봉쇄로 작동한다. 당연히 lpOverlapped 와 lpCompletionroutine는 무시된다. 
+=== 예제 ===
+  * [wiki:Site/win_network_prog/doc/overlapped Overlapped 소켓 프로그래밍]

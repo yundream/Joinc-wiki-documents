@@ -1,0 +1,230 @@
+#title Zenoss 운용 메뉴얼
+
+[[UploadFile]]
+== 사용자 메뉴얼 ==
+=== Zenoss Stop와 Start ===
+'''zenoss'''명령과 옵션들을 이용해서, zenoss 서버를 관리할 수 있다.
+
+ * 상태관리
+   {{{#!plain
+# zenoss status
+Daemon: zeoctl program running; pid=20272
+Daemon: zopectl program running; pid=20276
+Daemon: zenhub program running; pid=20281
+Daemon: zenping program running; pid=20288
+Daemon: zensyslog program running; pid=20296
+Daemon: zenstatus program running; pid=20305
+...
+}}}
+ * 시작하기
+   {{{#!plain
+# zenoss start
+Daemon: zeoctl . daemon process started, pid=20272
+Daemon: zopectl . daemon process started, pid=20276
+Daemon: zenhub starting...
+Daemon: zenping starting...
+Daemon: zensyslog starting...
+Daemon: zenstatus starting...
+Daemon: zenactions starting...
+Daemon: zentrap starting...
+...
+}}}
+ * 종료하기
+   {{{#!plain
+# zenoss stop
+}}}
+
+=== Dash Board ===
+처음 로그인을 하면 Dash Board가 당신을 맞이할 것이다. 인터페이스는 아래와 같다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092284049116447698"><img src="http://lh5.google.co.kr/yundream/RqttXNL5Q9I/AAAAAAAAAK4/VJdqiZ6Rpqw/s400/dashboard.jpg" /></a>
+}}}
+
+=== Device Add ===
+이제 모니터링할 장치를 등록시켜 보도록하자. zenoss는 모니터링할 장치를 '''Device'''로 부른다. Management > Device Add 에서 모니터링할 장치를 등록시킬 수 있다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092291105747715058"><img src="http://lh4.google.co.kr/yundream/Rqtzx9L5Q_I/AAAAAAAAALM/LVwtFbHbUE4/s400/device.jpg" /></a>
+}}}
+
+snmp 정보등 필요한 정보를 채워놓고 '''save'''하면 된다. 모니터링 대상은 개인적으로 사용하는 리눅스 시스템으로 했다. 이제 5분간격으로 모니터링 데이터가 수집되고 결과를 확인할 수 있을 것이다.
+
+Dash Board를 보면 다음과 같이 device가 추가된걸 확인할 수 있다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092787006966678530"><img src="http://lh3.google.co.kr/yundream/Rq02zNL5RAI/AAAAAAAAALc/uQ46JK-1WhU/s400/dashboard_1.jpg" /></a>
+}}}
+
+device가 추가되면, zenoss는 snmp(:12)를 이용해서, 시스템의 기본 구성정보들을 가져오고, 구성정보의 데이터를 기반으로 모니터링할 데이터를 수집하게 된다. '''classes > Devices'''를 타고 들어가면, 추가된 device의 전체적인 상황을 볼 수 있는 인터페이스를 볼 수 있다. 
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092787006966678546"><img src="http://lh3.google.co.kr/yundream/Rq02zNL5RBI/AAAAAAAAALk/VuAFPsPzhRg/s400/device.jpg" /></a>
+}}}
+
+=== 모니터링 ===
+'''os''' 탭을 클릭하면, Device의 전체적인 상황을 보여준다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092904637530981426"><img src="http://lh3.google.co.kr/yundream/Rq2hyNL5RDI/AAAAAAAAAL8/CnygzrKJ__M/s400/os.jpg" /></a>
+}}}
+
+NIC 정보, 프로세스 정보, TCP(:12) 서비스, 파일시스템 사용율은 물론이고, 자신이 포함된 네트워크의 상태들까지 보여준다. NIC를 클릭하면 아래와 같이 입출력 정보를 확인할 수 있다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5092902670435959842"><img src="http://lh5.google.co.kr/yundream/Rq2f_tL5RCI/AAAAAAAAAL0/PGkcGcBmDaw/s400/if.jpg" /></a>
+}}}
+
+위의 이미지는  NIC의 입출력 bps, pps의 5분단위 통계 그래프다. 그래프는 RRD(:12)를 이용해서 만들어지며, MRTG(:12)에 비해서 훨씬 좋은 이미지를 보여주고 있다.
+
+==== 성능 모니터링 ====
+'''Perf'''탭을 클릭하면 RRD(:12)로 표현된 '''성능'''정보를 볼 수 있다. 처음 선택했다면, Load:::Average(:12)와 CPU 사용율, 메모리 사용율만이 모니터링 된다.    
+
+여기에 간단히, 모니터링할 성능 구성요소를 추가할 수 있다. 탭메뉴 맨왼쪽의 역삼각형 메뉴의 '''More > Templates'''를 클릭해보자. 그럼 '''Perfomance Template'''가 뜨게 된다. 이제 리스트에서 템플릿 하나를 클릭하면, 다음과 같은 템플릿 설정페이지가 뜬다. 
+
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5095440420582278402"><img src="http://lh4.google.co.kr/yundream/RrakENL5RQI/AAAAAAAAAOo/z4QEmFZbI0E/s400/monit_add.jpg" /></a>
+}}}
+
+'''Data Sources'''는 모니터링 정보를 수집할 수 있는 구성요소의 리스트가 포함되어 있다. ''Data Sources'''의 탭메뉴를 이용하면, 더 많은 구성요소를 포함시킬 수 있다. SNMP의 모든 정보들이 Data Source가 될 수 있으며, 사용자가 직접 작성한 zencommand 프로그램을 등록시킬 수도 있다. 위의 Datasource를 보면, 웹페이지의 응답속도를 측정하기 위한 사용자 정의 Plugin 인, HttpMonitor이 포함되어 있는 것을 확인할 수 있다. SNMP로는 특정 웹페이지의 응답속도를 측정할 수 없기 때문에, 별도로 만들어서 추가시킨 것이다.
+
+그리고 '''Data Point'''라는게 보일 것이다. 이것은 RRD를 만들때 데이터로 사용할 요소들이다. '''Graphs'''를 그리기를 원할때, Data Point 를 선택하면 해당 Data Point의 정보가 수집되어서, RRD 그래프로 출력이 된다.
+
+사용자 정의 zencommand을 만드는 방법은 따로 설명을 하도록 하겠다.
+
+'''Data Sources'''밑에는 '''Threshold'''메뉴가 있다. 이 메뉴를 이용하면, 각 모니터링 구성요소별로 임계치를 지정할 수가 있다. 임계치는 '''MIN, MAX'''를 가지는 범위로 설정할 수 있으며, 이 범위를 넘어가게 될 경우 Event를 발생하게 된다. Tab메뉴의 '''Add Threshold'''를 클릭해서, 임계치를 적용할 구성요소를 선택하고 설정할 수 있다.
+
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5093998368132777122"><img src="http://lh5.google.co.kr/yundream/RrGEhtL5RKI/AAAAAAAAANk/yjN5wAfJZ3Y/s400/threshold.jpg" /></a>
+}}}
+
+'''Graphs'''는 모니터링을 위한 RRD 그래프 이미지를 만들기 위해서 사용한다. Data Sources에 등록된 Data Source를 선택해서 등록시키면 된다. 
+
+=== Event ===
+Zenoss 는 SNMP(:12), Syslog(;:12) 혹은 사용자 정의 모듈 - User Command - 로 부터 정보를 수집하고, 이 정보를 분석해서 Event를 발생시킨다. 이벤트는 상태정보들 뿐만 아니라, 성능정보 까지를 포함한다. 예를 들어서 Process의 갯수와 관련된 임계치 설정의 경우 최대값 과 최소값을 정의해서 이들 범위를 벗어날 경우 이벤트를 발생하도록 할 수 있다. Apache(:12)를 이용해서 웹서비스를 할경우 프로세스의 경우가 지나치게 많아져도 문제이지만, 죽어버리거나 일정 갯수 이하로 줄어드는 경우역시 문제가 발생한 것으로 파악할 수 있기 때문이다.
+
+이렇게 발생된 이벤트는 '''History''' DB로 보내어지며, SMTP(:12)를 이용해서 관리자에게 알려질 수도 있다. SMTP 뿐만 아니라, 별도의 외부프로그램을 실행시킬 수 있는데, 이를 이용해서 PIM이나 SMS로 보낼 수도 있다.
+==== 이벤트 Life Cycle ====
+이벤트는 다음과 같은 '''Life cycle'''를 가진다.
+
+attachment:life_cycle.png
+
+이벤트 라이프 사이클의 첫번재 단계는 이벤트가 발생하는 것이다. 발생된 이벤트는 기본적으로 '''New'''상태를 가진다. 이 이벤트는 event class Rule 에 따라서 '''Acknowledged, Suppressed''' 상태로 바뀔 수 있으며, '''Drop'''이 될 수도 있다. 이렇게 상태를 가진 이벤트는 4가지중 하나의 경로를 거쳐서 History 데이터 베이스에 쌓이게 된다. 
+
+==== 이벤트 중복 ====
+어떤 이유로 동일한 이벤트가 계속발생할 수 있을 것이다. Zenoss와 같은 모니터링 시스템은 일정주기로 성능정보를 수집하고 분석하기 때문이다. 이걸 그대로 둔다면 수백에서 수천개의 이벤트가 발생하게 될 것이다.
+
+예를 들어 Ping Down 이벤트를 관리한다고 했을때, 한번 Ping Down 한걸 가지고 Critical 이벤트를 발생하면 안될 것이다. 이 경우 동일한 이벤트에 대해서는 카운팅을 해서 연속해서 몇번이상 발생할경우 Critical 이벤트로 만드는 방법을 사용해야 할 것이다. 
+
+attachment:event_dedup.png
+
+==== 이벤트의 시작과 끝 ====
+이렇게 해서 Critical 이벤트가 만들어졌다고 가정해보자. 계속해서 Ping(:12) Down 상태라면, 새로운 Critical 이벤트는 발생하지 않고, 카운트만 증가하게 된다. 그러다가 시스템이 살아나서 Ping UP 상태가 되면, 문제가 해결되었음을 알려주는 '''Clear''' 이벤트가 발생해야 할것이다. Zenoss는 연관관계를 가지는 이벤트들에 대한 Life Cycle를 관리한다.
+
+attachment:correlation.png
+
+== 개발 ==
+=== Zen Command 모듈 개발 ===
+왠만한 시스템/네트워크 정보들은 zenoss의 snmp(:12) 관리기능 만으로 얻어올 수 있을 것이다. 그러나 관리 환경이 복잡해 지면 기본 기능외에 추가기능을 개발해야할 필요가 생긴다. zenoss는 Zenoss Command (이하 zencommand)를 이용한 모듈 개발환경을 지원한다. zencommand는 로컬(zenoss 서버)혹은 원격지 컴퓨터에 설치될 수 있는 프로그램 조각으로, 다음과 같이 작동한다.
+{{{#!plain
+  Zenoss System                  |           |    Monitoring System
+ +-------------+                 |           |   
+ | Zenoss Core |                 |    SSH    |   +--------------------+
+ |             |<----------------|-----------|-->| PlugIn Program     |
+ |             |  EXEC           |           |   +--------------------+
+ |             |<-----> Plugin   |           |
+ +-------------+        Program  |           |
+}}}
+  1. 원격지 : SSH(:12)로 연결해서 PlugIn 프로그램을 실행한다. 실행한 값을 String 형식으로 전달되고, Zenoss Core가 이를 분석한다. 
+  1. 로컬 : DNS 응답시간 체크와 같은 프로그램은 원격지에 설치할 필요가 없을 것이다. Zenoss System에 설치되어서, 주기적으로 DNS 서버에 연결해서 그 결과를 얻어오면 되기 때문이다. 이런 프로그램은 로컬에서 실행되고, 파이프로 그 값을 받아와서 분석한다.  
+
+=== 데이터 Format ===
+SSH와 EXEC를 통해서 전달되는 성능정보는 다음과 같은 포맷을 가진다. 모두 String 이다. 
+{{{#!plain
+Description|Key1=Value key2=value
+}}}
+
+위의 데이터 포맷에만 맞게 제작한다면, 아주 간단하게 필요한 기능을 추가시킬 수 있다.
+
+=== 간단 예제 : Dns Lookup Time ===
+다음은 간단한 프로그램으로 DNS(:12) 서버의 응답시간을 구한다. popen(2)을 이용해서 nslookup(:12) 프로그램을 호출하고 있다. 이 프로그램은 두개의 인자를 사용한다.
+  1. '''-h''' : DNS 이름을 얻어올 도메인 이름
+  1. '''-s''' : DNS 서버 이름
+{{{#!plain
+#include <sys/time.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+    FILE *fp;
+    char buf[256];
+    char command[256]={0x00,};
+    struct timeval ftime, stime;
+    int rtime = 0;
+    int opt;
+    char host[24] = {0x00,};
+    char server[24] = {0x00,};
+
+    if (argc != 5)
+    {
+      printf("Usage : %s -h 'HostName' -s 'ServerName'\n", argv[0]);
+      return 1;
+    }
+
+    while((opt = getopt(argc, argv, "h:s:")) != -1)
+    {
+      switch(opt)
+      {
+        case 'h':
+          memcpy(host, optarg,strlen(optarg));
+          break;
+        case 's':
+          memcpy(server, optarg,strlen(optarg));
+          break;
+      }
+    }
+    sprintf(command, "nslookup %s %s -sil", host, server);
+
+    gettimeofday(&ftime, NULL);
+    fp = popen(command, "r");
+    while(fgets(buf, 254, fp))
+    {
+      if (strstr(buf, "connect timed out") != NULL)
+      {
+        printf("ERROR");
+        return 1;
+      }
+    }
+    fclose(fp);
+    gettimeofday(&stime, NULL);
+
+    rtime = (stime.tv_sec - ftime.tv_sec)*1000000+(stime.tv_usec - ftime.tv_usec);
+    printf("DNS LOOKUP OK|time=%1.5lf\n", (float)(rtime)/1000000);
+}
+}}}
+이 프로그램의 이름은 check_mydns 로 하겠다.
+
+이제 이 프로그램을 $ZENHOME/libexec 밑에 놓은 다음, 아래의 과정을 거쳐서 '''More > Templates'''에 등록시켜서 사용하면 된다.
+  1. Data Sources의 탭메뉴에서 '''Add Data Source'''를 클릭한다.
+  1. Data source의 이름은 DnsCheck로 하자.
+  1. SourceType은 COMMAND를 선택한다.
+  1. component는 DnsCheck로
+  1. Cycle Time은 20으로
+  1. 이제 command template 필드를 채워야 한다. 여기에서는 DnsCheck를 위해서 호출할 명령어를 기술한다. 다음과 같이 호출하면 된다. 체크할 dns 서버는 www.joinc.co.kr 이고, 체크를 위한 도메인은 www.google.co.kr로 하겠다.
+      {{{#!plain
+check_mydns -h 'www.google.co.kr' -s 'www.joinc.co.kr'
+}}}
+  1. 이제 등록시킨 zencommand가 제대로 작동하는지를 확인해야 한다. 쉘에서 '''zencommand'''명령을 이용해서 확인할 수 있다. '''-d'''옵션은 테스트할 device 명을 명시하기 위해서 사용한다. 아래의 명령을 실행하면, 등록된 zencommand가 실행되는 것을 확인할 수 있을 것이다.
+      {{{#!plain
+# zencommand run -d joinc -v 10
+}}}
+
+
+다음은 ZenCommand를 등록시키기 위한 Templates 화면이다.
+{{{#!html
+<a href="http://picasaweb.google.co.kr/yundream/SystemManagement/photo#5095440420582278402"><img src="http://lh4.google.co.kr/yundream/RrakENL5RQI/AAAAAAAAAOo/z4QEmFZbI0E/s400/monit_add.jpg" /></a>
+}}}
+ 
+=== ZenCommand 로부터 데이터를 수집하기 ===
+zencommand를 위한 프로그램을 만들고 Data Sources에 등록시키는 것 까지 해보았다. 그러나 이것을 모듈을 등록시킨 것일 뿐, 아직 데이터를 수집하는 것은 아니다.
+
+데이터를 수집하고 그래프를 그리기 위해서는 '''Devices > More > Template'''에서 Graphs에 등록 시켜줘야 한다.
+   1. Devices 메뉴에서 작업할 장치를 선택한다음, 메뉴탭에서 '''More > Template'''를 클릭한다.
+   1. Data Sources 에서 DnsCheck 를 선택한다.
+   1. 밑에 보면 '''Data Point'''라는 메뉴가 보일 것이다. Data Point는 zencommand로 읽어들인 데이터에서, 어떤 값을 읽어들일지를 정하기 위해서 사용한다.  Add Data Point를 선택하면, 새로운 Data Point를 등록할 수 있다. 위의 check_mydns 의 경우 '''time=%1.5lf\n''' 형식으로 값을 출력하게 되어 있는데, '''name'''을 time로 주면된다.

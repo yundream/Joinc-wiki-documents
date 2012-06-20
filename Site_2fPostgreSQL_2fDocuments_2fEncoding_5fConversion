@@ -1,0 +1,263 @@
+'''DB 인코딩 컨버전'''
+[[br]]'''작성자: 신기배(소타) nonun@nate.com'''
+
+[[TableOfContents]]
+
+== 인코딩 ==
+ * PostgreSQL은 많은 언어 인코딩/컨버전을 지원한다.
+ * 한글과 관련되어 3가지의 인코딩을 지원한다. EUC_KR, UNICODE, UHC
+
+== 서버 인코딩 ==
+ {{{#!plain
+[root@linux root]# createdb --help
+createdb creates a PostgreSQL database.
+
+Usage:
+  createdb [OPTION]... [DBNAME] [DESCRIPTION]
+
+Options:
+  -D, --location=PATH       alternative place to store the database
+  -E, --encoding=ENCODING   encoding for the database
+  -O, --owner=OWNER         database user to own the new database
+  -T, --template=TEMPLATE   template database to copy
+  -e, --echo                show the commands being sent to the server
+  -q, --quiet               don't write any messages
+  --help                    show this help, then exit
+  --version                 output version information, then exit
+
+Connection options:
+  -h, --host=HOSTNAME       database server host or socket directory
+  -p, --port=PORT           database server port
+  -U, --username=USERNAME   user name to connect as
+  -W, --password            prompt for password
+
+By default, a database with the same name as the current user is created.
+
+Report bugs to <pgsql-bugs@postgresql.org>.
+}}}
+ * 잘 보시라. DB마다 인코딩을 다르게 설정할 수 있다.
+ {{{#!plain
+[root@linux root]# createdb -E UNICODE root
+CREATE DATABASE
+[root@linux root]# psql
+Welcome to psql 7.4.1, the PostgreSQL interactive terminal.
+
+Type:  \copyright for distribution terms
+       \h for help with SQL commands
+       \? for help on internal slash commands
+       \g or terminate with semicolon to execute query
+       \q to quit
+
+root=# SHOW server_encoding ;
+ server_encoding
+-----------------
+ UNICODE
+(1 row)
+}}}
+ * 유니코드로 DB가 만들어졌다.
+
+== 클라이언트 인코딩 ==
+ * 그렇다면 인코딩 컨버전은 언제 일어나는가?
+ * UNICODE로 생성된 DB는 UNICODE로 데이터를 입력해줘야만 한다. (적어도 다른 DBMS에서는 그럴 것이다.) 하지만 대부분의 경우에서 pgsql은 그럴 필요가 없다.
+
+ {{{#!plain
+root=# SHOW server_encoding ;
+ server_encoding
+-----------------
+ UNICODE
+(1 row)
+
+root=# SHOW client_encoding ;
+ client_encoding
+-----------------
+ UNICODE
+(1 row)
+}}}
+ * 보통 일반적인 상태로는 이렇다. 하지만 psql이나 다른 인터페이스(가령 웹)에서 uhc나 euc_kr 을 이용해 접근하려 한다면.
+ {{{#!plain
+root=# SET client_encoding='uhc';
+SET
+root=# SHOW client_encoding ;
+ client_encoding
+-----------------
+ uhc
+(1 row)
+}}}
+ * 이제 데이터를 입력해보자. uhc 인코딩의 데이터가 자연스럽게 UNICODE로 저장된다. 이것이 pgsql의 고유하면서 뛰어난 기능이다.
+
+ * 참고로 필자는 postgresql.conf 에 아예 client_encoding = uhc 로 해놓고 있다. psql, 웹을 포함한 모든 인터페이스에서 uhc로 입력하고 모든 DB는 UNICODE로 저장되고 있다. utf_encode, decode 이런 함수를 써본지 너무 오래 되었다.
+
+ * 클라이언트 인코딩을 바꾸는 방법은 2가지이다.
+ {{{#!plain
+root=# \encoding
+UNICODE
+root=# \encoding uhc
+root=# \encoding
+UHC
+root=# SET client_encoding='uhc';
+SET
+}}}
+
+== 인코딩 제약 ==
+ * "아&#54671;&#54671;" 이라는 단어는 uhc와 UNICODE에서는 유효하다. 하지만 euc_kr에서는 유효하지 않다. pgsql에 euc_kr로 DB를 생성하고 "아&#54671;&#54671;" 이라는 단어를 입력하면 올바르지 않은 캐릭터라는 에러만 &#48183;어 낸다. 언어 선택을 잘 해야 한다. UNICODE가 대세다. 그리고 대부분의 언어가 UNICODE와는 상호 컨버전 되고 있다.
+
+== 인코딩 변환 표 ==
+ * 모든 인코딩이 서로 변환되는 것은 아니다. 대부분 UNICODE와는 상호 변환 되지만 euc_kr과 uhc는 서로 호환되지 않는다.
+ || Server Character Set || Available Client Character Sets ||
+ || SQL_ASCII || SQL_ASCII, UNICODE, MULE_INTERNAL  ||
+ || EUC_JP || EUC_JP, SJIS, UNICODE, MULE_INTERNAL  ||
+ || EUC_CN || EUC_CN, UNICODE, MULE_INTERNAL  ||
+ || EUC_KR || EUC_KR, UNICODE, MULE_INTERNAL  ||
+ || JOHAB || JOHAB, UNICODE  ||
+ || EUC_TW || EUC_TW, BIG5, UNICODE, MULE_INTERNAL  ||
+ || LATIN1 || LATIN1, UNICODE MULE_INTERNAL  ||
+ || LATIN2 || LATIN2, WIN1250, UNICODE, MULE_INTERNAL  ||
+ || LATIN3 || LATIN3, UNICODE, MULE_INTERNAL  ||
+ || LATIN4 || LATIN4, UNICODE, MULE_INTERNAL  ||
+ || LATIN5 || LATIN5, UNICODE  ||
+ || LATIN6 || LATIN6, UNICODE, MULE_INTERNAL  ||
+ || LATIN7 || LATIN7, UNICODE, MULE_INTERNAL  ||
+ || LATIN8 || LATIN8, UNICODE, MULE_INTERNAL  ||
+ || LATIN9 || LATIN9, UNICODE, MULE_INTERNAL  ||
+ || LATIN10 || LATIN10, UNICODE, MULE_INTERNAL  ||
+ || ISO_8859_5 || ISO_8859_5, UNICODE, MULE_INTERNAL, WIN, ALT, KOI8  ||
+ || ISO_8859_6 || ISO_8859_6, UNICODE  ||
+ || ISO_8859_7 || ISO_8859_7, UNICODE  ||
+ || ISO_8859_8 || ISO_8859_8, UNICODE  ||
+ || UNICODE || EUC_JP, SJIS, EUC_KR, UHC, JOHAB, EUC_CN, GBK, EUC_TW, BIG5, LATIN1 to LATIN10, ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, WIN, ALT, KOI8, WIN1256, TCVN, WIN874, GB18030, WIN1250  ||
+ || MULE_INTERNAL || EUC_JP, SJIS, EUC_KR, EUC_CN, EUC_TW, BIG5, LATIN1 to LATIN5, WIN, ALT, WIN1250, BIG5, ISO_8859_5, KOI8 ||
+ || KOI8 || ISO_8859_5, WIN, ALT, KOI8, UNICODE, MULE_INTERNAL  ||
+ || WIN || ISO_8859_5, WIN, ALT, KOI8, UNICODE, MULE_INTERNAL  ||
+ || ALT || ISO_8859_5, WIN, ALT, KOI8, UNICODE, MULE_INTERNAL  ||
+ || WIN1256 || WIN1256, UNICODE  ||
+ || TCVN || TCVN, UNICODE  ||
+ || WIN874 || WIN874, UNICODE  ||
+----
+ || Conversion Name ||  Source Encoding || Destination Encoding ||
+ || ascii_to_mic || SQL_ASCII || MULE_INTERNAL ||
+ || ascii_to_utf_8 || SQL_ASCII || UNICODE ||
+ || big5_to_euc_tw || BIG5 || EUC_TW ||
+ || big5_to_mic || BIG5 || MULE_INTERNAL ||
+ || big5_to_utf_8 || BIG5 || UNICODE ||
+ || euc_cn_to_mic || EUC_CN || MULE_INTERNAL ||
+ || euc_cn_to_utf_8 || EUC_CN || UNICODE ||
+ || euc_jp_to_mic || EUC_JP || MULE_INTERNAL ||
+ || euc_jp_to_sjis || EUC_JP || SJIS ||
+ || euc_jp_to_utf_8 || EUC_JP || UNICODE ||
+ || euc_kr_to_mic || EUC_KR || MULE_INTERNAL ||
+ || euc_kr_to_utf_8 || EUC_KR || UNICODE ||
+ || euc_tw_to_big5 || EUC_TW || BIG5 ||
+ || euc_tw_to_mic || EUC_TW || MULE_INTERNAL ||
+ || euc_tw_to_utf_8 || EUC_TW || UNICODE ||
+ || gb18030_to_utf_8 || GB18030 || UNICODE ||
+ || gbk_to_utf_8 || GBK || UNICODE ||
+ || iso_8859_10_to_utf_8 || LATIN6 || UNICODE ||
+ || iso_8859_13_to_utf_8 || LATIN7 || UNICODE ||
+ || iso_8859_14_to_utf_8 || LATIN8 || UNICODE ||
+ || iso_8859_15_to_utf_8 || LATIN9 || UNICODE ||
+ || iso_8859_16_to_utf_8 || LATIN10 || UNICODE ||
+ || iso_8859_1_to_mic || LATIN1 || MULE_INTERNAL ||
+ || iso_8859_1_to_utf_8 || LATIN1 || UNICODE ||
+ || iso_8859_2_to_mic || LATIN2 || MULE_INTERNAL ||
+ || iso_8859_2_to_utf_8 || LATIN2 || UNICODE ||
+ || iso_8859_2_to_windows_1250 || LATIN2 || WIN1250 ||
+ || iso_8859_3_to_mic || LATIN3 || MULE_INTERNAL ||
+ || iso_8859_3_to_utf_8 || LATIN3 || UNICODE ||
+ || iso_8859_4_to_mic || LATIN4 || MULE_INTERNAL ||
+ || iso_8859_4_to_utf_8 || LATIN4 || UNICODE ||
+ || iso_8859_5_to_koi8_r || ISO_8859_5 || KOI8 ||
+ || iso_8859_5_to_mic || ISO_8859_5 || MULE_INTERNAL ||
+ || iso_8859_5_to_utf_8 || ISO_8859_5 || UNICODE ||
+ || iso_8859_5_to_windows_1251 || ISO_8859_5 || WIN ||
+ || iso_8859_5_to_windows_866 || ISO_8859_5 || ALT ||
+ || iso_8859_6_to_utf_8 || ISO_8859_6 || UNICODE ||
+ || iso_8859_7_to_utf_8 || ISO_8859_7 || UNICODE ||
+ || iso_8859_8_to_utf_8 || ISO_8859_8 || UNICODE ||
+ || iso_8859_9_to_utf_8 || LATIN5 || UNICODE ||
+ || johab_to_utf_8 || JOHAB || UNICODE ||
+ || koi8_r_to_iso_8859_5 || KOI8 || ISO_8859_5 ||
+ || koi8_r_to_mic || KOI8 || MULE_INTERNAL ||
+ || koi8_r_to_utf_8 || KOI8 || UNICODE ||
+ || koi8_r_to_windows_1251 || KOI8 || WIN ||
+ || koi8_r_to_windows_866 || KOI8 || ALT ||
+ || mic_to_ascii || MULE_INTERNAL || SQL_ASCII ||
+ || mic_to_big5 || MULE_INTERNAL || BIG5 ||
+ || mic_to_euc_cn || MULE_INTERNAL || EUC_CN ||
+ || mic_to_euc_jp || MULE_INTERNAL || EUC_JP ||
+ || mic_to_euc_kr || MULE_INTERNAL || EUC_KR ||
+ || mic_to_euc_tw || MULE_INTERNAL || EUC_TW ||
+ || mic_to_iso_8859_1 || MULE_INTERNAL || LATIN1 ||
+ || mic_to_iso_8859_2 || MULE_INTERNAL || LATIN2 ||
+ || mic_to_iso_8859_3 || MULE_INTERNAL || LATIN3 ||
+ || mic_to_iso_8859_4 || MULE_INTERNAL || LATIN4 ||
+ || mic_to_iso_8859_5 || MULE_INTERNAL || ISO_8859_5 ||
+ || mic_to_koi8_r || MULE_INTERNAL || KOI8 ||
+ || mic_to_sjis || MULE_INTERNAL || SJIS ||
+ || mic_to_windows_1250 || MULE_INTERNAL || WIN1250 ||
+ || mic_to_windows_1251 || MULE_INTERNAL || WIN ||
+ || mic_to_windows_866 || MULE_INTERNAL || ALT ||
+ || sjis_to_euc_jp || SJIS || EUC_JP ||
+ || sjis_to_mic || SJIS || MULE_INTERNAL ||
+ || sjis_to_utf_8 || SJIS || UNICODE ||
+ || tcvn_to_utf_8 || TCVN || UNICODE ||
+ || uhc_to_utf_8 || UHC || UNICODE ||
+ || utf_8_to_ascii || UNICODE || SQL_ASCII ||
+ || utf_8_to_big5 || UNICODE || BIG5 ||
+ || utf_8_to_euc_cn || UNICODE || EUC_CN ||
+ || utf_8_to_euc_jp || UNICODE || EUC_JP ||
+ || utf_8_to_euc_kr || UNICODE || EUC_KR ||
+ || utf_8_to_euc_tw || UNICODE || EUC_TW ||
+ || utf_8_to_gb18030 || UNICODE || GB18030 ||
+ || utf_8_to_gbk || UNICODE || GBK ||
+ || utf_8_to_iso_8859_1 || UNICODE || LATIN1 ||
+ || utf_8_to_iso_8859_10 || UNICODE || LATIN6 ||
+ || utf_8_to_iso_8859_13 || UNICODE || LATIN7 ||
+ || utf_8_to_iso_8859_14 || UNICODE || LATIN8 ||
+ || utf_8_to_iso_8859_15 || UNICODE || LATIN9 ||
+ || utf_8_to_iso_8859_16 || UNICODE || LATIN10 ||
+ || utf_8_to_iso_8859_2 || UNICODE || LATIN2 ||
+ || utf_8_to_iso_8859_3 || UNICODE || LATIN3 ||
+ || utf_8_to_iso_8859_4 || UNICODE || LATIN4 ||
+ || utf_8_to_iso_8859_5 || UNICODE || ISO_8859_5 ||
+ || utf_8_to_iso_8859_6 || UNICODE || ISO_8859_6 ||
+ || utf_8_to_iso_8859_7 || UNICODE || ISO_8859_7 ||
+ || utf_8_to_iso_8859_8 || UNICODE || ISO_8859_8 ||
+ || utf_8_to_iso_8859_9 || UNICODE || LATIN5 ||
+ || utf_8_to_johab || UNICODE || JOHAB ||
+ || utf_8_to_koi8_r || UNICODE || KOI8 ||
+ || utf_8_to_sjis || UNICODE || SJIS ||
+ || utf_8_to_tcvn || UNICODE || TCVN ||
+ || utf_8_to_uhc || UNICODE || UHC ||
+ || utf_8_to_windows_1250 || UNICODE || WIN1250 ||
+ || utf_8_to_windows_1251 || UNICODE || WIN ||
+ || utf_8_to_windows_1256 || UNICODE || WIN1256 ||
+ || utf_8_to_windows_866 || UNICODE || ALT ||
+ || utf_8_to_windows_874 || UNICODE || WIN874 ||
+ || windows_1250_to_iso_8859_2 || WIN1250 || LATIN2 ||
+ || windows_1250_to_mic || WIN1250 || MULE_INTERNAL ||
+ || windows_1250_to_utf_8 || WIN1250 || UNICODE ||
+ || windows_1251_to_iso_8859_5 || WIN || ISO_8859_5 ||
+ || windows_1251_to_koi8_r || WIN || KOI8 ||
+ || windows_1251_to_mic || WIN || MULE_INTERNAL ||
+ || windows_1251_to_utf_8 || WIN || UNICODE ||
+ || windows_1251_to_windows_866 || WIN || ALT ||
+ || windows_1256_to_utf_8 || WIN1256 || UNICODE ||
+ || windows_866_to_iso_8859_5 || ALT || ISO_8859_5 ||
+ || windows_866_to_koi8_r || ALT || KOI8 ||
+ || windows_866_to_mic || ALT || MULE_INTERNAL ||
+ || windows_866_to_utf_8 || ALT || UNICODE ||
+ || windows_866_to_windows_1251 || ALT || WIN ||
+ || windows_874_to_utf_8 || WIN874 || UNICODE ||
+
+== 참고 자료 ==
+ === libpq 인터페이스 ===
+ * 클라이언트 인코딩을 세팅한다.
+ || int PQsetClientEncoding(PGconn *conn, const char *encoding); || 리턴값은 성공은 0, 실패는 -1 ||
+ * 클라이언트 인코딩 설정을 가져온다.
+ || int PQclientEncoding(const PGconn *conn); || 리턴값은 클라이언트 인코딩 ID 이다. ||
+ * PQclientEncoding이 리턴한 인코딩 ID를 문자로 변경한다.
+ || char *pg_encoding_to_char(int encoding_id); || 리턴값은 클라이언트 인코딩 문자열이다. ||
+
+ === PostgreSQL 매뉴얼 ===
+ 1. 20.2. Character Set Support
+ 1. 9.4. String Functions and Operators (Table 9-8. Built-in Conversions)

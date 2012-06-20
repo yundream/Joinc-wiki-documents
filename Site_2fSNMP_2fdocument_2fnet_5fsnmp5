@@ -1,0 +1,71 @@
+#title Net SNMP 5.0 설치하기
+
+다음과 같은 환경에 net - snmp 을 설치하기로 했다.
+  * OS : Linux(:12) Kernel(:12) 2.6.20
+  * Ubuntu 7.0
+  * SNMP : net-snmp 5.2.3
+
+net-snmp는 Ubuntu의 synaptic 패키지 관리자를 이용해서 설치를 했다. 다음과 같은 패키지를 선택했다.
+  * snmp 5.2.3
+  * snmpd 5.2.3
+  * snmptrapfmt 5.2.3
+
+설치는 문제없으리라 생각된다. 그다음 /etc/snmpd.conf 를 다음과 같이 변경했다. 요는 public로 system 뿐만 아니라 모든 정보를 볼 수 있게 하라는 것이다.
+{{{#!plain
+#               sec.model  sec.name
+group MyROSystem v1        paranoid
+group MyROSystem v2c       paranoid
+group MyROSystem usm       paranoid
+group MyROGroup v1         readonly
+group MyROGroup v2c        readonly
+group MyROGroup usm        readonly
+group MyRWGroup v1         readwrite
+group MyRWGroup v2c        readwrite
+group MyRWGroup usm        readwrite
+
+####
+# Third, create a view for us to let the groups have rights to:
+
+#           incl/excl subtree                          mask
+view all    included  .1                               80
+view system included  .iso.org.dod.internet.mgmt.mib-2.system
+
+####
+# Finally, grant the 2 groups access to the 1 view with different
+# write permissions:
+
+#                context sec.model sec.level match  read   write  notif
+access MyROSystem ""     any       noauth    exact  all none   none   # 이부분이 변경
+access MyROGroup ""      any       noauth    exact  all    none   none
+access MyRWGroup ""      any       noauth    exact  all    all    none
+}}}
+
+root 계정(:12)으로 snmpd 를 띄우자.
+{{{#!plain
+# snmpd
+}}}
+
+이제 snmpwalk 를 이용해서, snmp정보를 제대로 얻어오는지 확인을 해보도록 하자.
+{{{#!plain
+# snmpwalk -v 2c -c public localhost
+SNMPv2-MIB::sysDescr.0 = STRING: Linux yundream-desktop 2.6.20-15-generic #2 SM
+P Sun Apr 15 07:36:31 UTC 2007 i686
+SNMPv2-MIB::sysObjectID.0 = OID: NET-SNMP-MIB::netSnmpAgentOIDs.10
+DISMAN-EVENT-MIB::sysUpTimeInstance = Timeticks: (106965) 0:17:49.65
+SNMPv2-MIB::sysContact.0 = STRING: Root <root@localhost> (configure /etc/snmp/s
+nmpd.local.conf)
+SNMPv2-MIB::sysName.0 = STRING: yundream-desktop
+SNMPv2-MIB::sysLocation.0 = STRING: Unknown (configure /etc/snmp/snmpd.local.co
+nf)
+SNMPv2-MIB::sysORLastChange.0 = Timeticks: (1) 0:00:00.01
+SNMPv2-MIB::sysORID.1 = OID: IF-MIB::ifMIB
+SNMPv2-MIB::sysORID.2 = OID: SNMPv2-MIB::snmpMIB
+SNMPv2-MIB::sysORID.3 = OID: TCP-MIB::tcpMIB
+SNMPv2-MIB::sysORID.4 = OID: IP-MIB::ip
+SNMPv2-MIB::sysORID.5 = OID: UDP-MIB::udpMIB
+SNMPv2-MIB::sysORID.6 = OID: SNMP-VIEW-BASED-ACM-MIB::vacmBasicGroup
+SNMPv2-MIB::sysORID.7 = OID: SNMP-FRAMEWORK-MIB::snmpFrameworkMIBCompliance
+SNMPv2-MIB::sysORID.8 = OID: SNMP-MPD-MIB::snmpMPDCompliance
+SNMPv2-MIB::sysORID.9 = OID: SNMP-USER-BASED-SM-MIB::usmMIBCompliance
+...
+}}}

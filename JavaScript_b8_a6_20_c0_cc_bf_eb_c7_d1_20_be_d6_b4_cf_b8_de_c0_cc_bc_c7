@@ -1,0 +1,265 @@
+[[TableOfContents]]
+
+= 시작하기 =
+ * 인터넷 브라우저에서 애니메이션을 구현하는 방법은 많다. flash를 이용하는 방법도 있고 HTML 기본 매크로를 이용하는 방법도 있다.
+ * 이 문서에서는 IE(Netscape에서는 동작하지 않는다)에서 JavaScript(JS)를 이용해 애니메이션을 구현하는 방법을 다루고 있다.
+
+= 몇가지 알아 둘 점 =
+
+== 자바스크립트는 변수의 이름에 대,소문자 구별을 한다 ==
+ * joinc, Joinc, jOiNc 는 모두 다른 변수명이며 함수 이름으로 쓰일 때 역시 모두 다른 함수로 쓰인다.
+
+== 자바스크립트는 브라우저안에서 1개의 쓰레드로 돌아간다 ==
+ * 이 부분은 처음 JS를 이용한 애니메이션을 구현했을 때 간과할 수 있는 부분이다.
+ * JS는 브라우저 내에서 1개의 쓰레드가 잡스케쥴 되어 동작한다.
+ * 1개의 트랜지션이 시피유를 독점한다면 다음 애니메이션은 보이지 않게 될 것이고, 한개의 애니메이션이 완벽하게 보인다고 해서 이를 간과한 설계를 한다면 동시에 여러개의 애니메이션이 이루어 질 때 낭패를 보게 될 것이다. (원하지 않은 위치로 이동, 떨림 현상 등)
+
+== 한 개의 function이 끝날때까지 화면에 적용 되지 않는다 ==
+ * 예를 들어 레이어를 여러 개의 지점으로 이동시키는 함수가 있다고 하자. 이 함수를 실행시키면 화면에 빠르게 레이어가 이동 할 것이라고 예상한다. 하지만 자바스크립트에서 그 함수가 완전히 끝난 후에 return 이 떨어져야만 화면의 변화가 일어난다. (재귀적으로 자신을 호출해도 역시 결과는 같다.)
+{{{#!vim html
+<script>
+function move()
+{
+  var div=document.body.all["box"];
+  div.style.left = "10px";
+  div.style.top = "10px";
+  div.style.left = "100px";
+  div.style.top = "100px";
+}
+</script>
+<body onload="move()">
+<div id="box" style="position:absolute;border:1px solid black;width:100px;height:100px">상자~</div>
+</body>
+}}}
+ * 위의 내용을 저장해서 브라우저로 보면 상자는 그냥 100, 100 의 위치로 이동한다. 절대 10, 10 으로 이동했다가 100, 100 으로 이동하지 않는다. 그럼 어떻게 해야 하는가! sleep()을 쓰면 될까? 아래를 보자..
+
+== 자바스크립트에는 sleep() 이 없다 ==
+ * sleep()는 대부분의 언어(스크립트 포함)들이 지원하는 함수이다. 하지만 자바스크립트에는 없다. sleep() 이라는건 설정된 시간동안 잠잔다는걸 의미한다. 위에서 얘기한대로 자바스크립트는 1개의 단일 쓰레드에서 동작한다. 1개의 function이 sleep() 한다고 해도 기다려 줄 수가 없는 것이다.
+ * 편법이 있지 않을까? 하는 사람이 있을 것이다. 본인이 이미 해봤다. 아래를 보자 -_-;
+|| 자바애플릿 || 자바스크립트 ||
+|| thread.sleep(); || {{{#!vim html
+<script>
+function plzplzplzplz_sleep()
+{
+  //자바애플릿의 thread.sleep()를 호출
+}
+</script>
+}}}
+ * plzplzplzplz_sleep()를 호출하면 sleep()과 같은 효과를 낼 수 있을까? 정답은 있다! 이다.
+ * 타이머가 생겼다. 뭘 할 수 있을까? 혹시 plzplzplzplz_sleep()에서 자바애플릿의 타이머를 호출하기 전과 후에 레이어의 위치를 이동시키면 애니메이션이 일어나지 않을까? 이번엔 NO 이다. 아까 말했듯이 한 개의 function이 완전히 완료 되야만 화면에 반영된다. 결론적으로 타이머가 있다고 해서 할 수 없었던 걸 할 수 있게 된 건 아니다.
+
+= 애니메이션을 구현하는 방법 =
+== 몇가지 필터들 ==
+ * CSS에는 filter 라는 property가 있다. 대부분의 DOM 오브젝트 들에는 filters 라는 객체가 있다. 이것들 중에서 자연스럽게 애니메이션을 구현 할 수 있는 필터들이 있다. (사실 이들은 transition들 이다.)
+ * 일단 아래의 필터들을 한번 보자.
+''''
+=== BlendTrans ===
+{{{#!vim html
+<script>
+function transition()
+{
+  document.all["transition_div"].style.filter="blendTrans(duration=1)";
+  document.all["transition_div"].filters.blendTrans.Stop();
+  document.all["transition_div"].filters.blendTrans.Apply();
+  document.all["transition_div"].style.backgroundColor="black";
+  document.all["transition_div"].filters.blendTrans.Play();
+}
+</script>
+<div id="transition_div" onmouseover="transition()" style="width:100px;height:100px">마우스를 올려놓으면 배경색이 바뀐다.</div>
+}}}
+
+=== RevealTrans ===
+{{{#!vim html
+<script>
+function transition()
+{
+	document.all["transition_div"].style.filter="revealTrans(duration=1,transition=23)";
+	document.all["transition_div"].filters.revealTrans.Stop();
+	document.all["transition_div"].filters.revealTrans.Apply();
+	document.all["transition_div"].style.backgroundColor="black";
+	document.all["transition_div"].filters.revealTrans.Play();
+}
+</script>
+<div id="transition_div" onmouseover="transition()" style="width:100px;height:100px">마우스를 올려놓으면 배경색이 바뀐다.</div>
+}}}
+
+ * blendTrans 는 서서히 오버레이 되듯 변화하고 revealTrans 는 transition 이라는 property의 값에 따라 변하는 모양이 다르다. 23은 랜덤한 모양으로 변화한다. transition 의 값들은 이 링크를 참고.
+ * http://msdn.microsoft.com/workshop/author/filter/filters.asp
+ * 둘다 지켜줘야 한다면 filters.FILTERNAME.Apply() 와 Play() 사이에 변화가 일어날 조건들을 넣어줘야 한다는 것이다. Stop()를 Apply() 전에 써준 것은 혹시나 이전에 애니메이션이 일어나고 있다면 멈추게 하려고 넣은 것이다. (사실 보다 안전한 방법이 있다. 애니메이션이 play 되고 있는지 아닌지를 판별하여 플레이 되고 있다면 멈추게도 할 수 있다. 각 필터마다 status 라는 property가 있다.)
+
+== 타이머를 이용한 애니메이션 ==
+ * 올것이 왔다...
+=== setInterval ===
+ * 이 함수의 원형이다. vCode에는 실행시킬 다른 함수, iMilliSeconds는 int형의 밀리초 단위의 시간을 넣어준다. 리턴되는 값은 자바스크립트 내부에서 알고 있는 이 타이머의 ID 이다.
+{{{''iTimerID'' = window.'''setInterval'''(''vCode'',''iMilliSeconds'' '''[''', ''sLanguage''''']''')}}}
+
+'''예제'''
+{{{#!vim html
+<script>
+var i=0;
+function plus()
+{
+	i++;
+	document.body.innerText=i;
+}
+setInterval("plus()",1000);
+</script>
+<body></body>
+}}}
+ * 이 놈이 하는 일은 iMilliSeconds 만큼의 시간마다 vCode를 호출 하는 것이다. 위의 예제는 애니메이션이 아니던가?
+
+'''예제'''
+{{{#!vim html
+<script>
+function move()
+{
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+}
+</script>
+<body onload="setInterval('move()',100)">
+<div style="position:absolute;border:1px solid black;top:1px">점점 커진다!!!!!</div>
+</body>
+}}}
+ * 속았죠? 무슨 말인지는 실행을.. 이번엔 상식적으로 이해가 가는 애니메이션 이었다.
+
+=== setTimeout ===
+{{{''iTimerID'' = window.'''setTimeout'''(''vCode'',''iMilliSeconds'' '''[''', ''sLanguage''''']''')}}}
+ * 위의 setInterval()과 똑같다! 그럼 뭐가 다른거지?
+ * setInterval()은 한번 호출되면 브라우저가 종료되거나 Timer가 클리어 되기 전까지 계속 설정된 시간마다 vCode를 호출한다. 결론부터 말하면 setInterval()은 글자나 레이어를 깜빡이는 식의 단순한 동작에나 가끔 쓰인다. setTimeout()은 설정된 시간후에 vCode를 한번 실행 시킨다. 자바스크립트에서의 에니메이션에서 가장 중요한 눔이 바로 setTimeout() 이다!!!
+ * 주의) setTimeout은 IE의 특정 버전에서 메모리릭 버그가 있다. 뉴스그룹을 뒤져보시라
+ * 흠흠 왜 중요하냐면 애니메이션은 항상 일어나는게 아니라 특정한 동작이 있을때만 일어나고 의도하는만큼 움직이고 멈춰서야 하기 때문이다. setTimeout()은 단발성이므로 애니메이션의 한프레임 단위의 컨트롤이 가능하다.
+
+'''예제'''
+{{{#!vim html
+<script>
+function move()
+{
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+}
+</script>
+<body onload="setTimeout('move()',100)">
+<div style="position:absolute;border:1px solid black;top:1px">점점 커진다!!!!!</div>
+</body>
+}}}
+ * 위의 코드를 실행하면 처음에 한번 움찔 하고 말 것이다. setInterval()과 동일한 효과를 주려면 어떻게 해야 할까?
+
+'''예제'''
+{{{#!vim html
+<script>
+function move()
+{
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+	setTimeout('move()',100);
+}
+</script>
+…
+}}}
+ * 똑같이 움직이는가? 이 문서를 잘! 읽은 사람이라면 질문을 할 것이다. 한 개의 function 내에서는 동작이 끝나야 화면에 적용된다는건 어디로 가버린거냐! 흥분하지 말고 아래를 보자
+|| move() 실행 || ||
+|| 레이어를 아래로 1 픽셀 이동한다 || ||
+|| 100ms 후에 move() 호출 예약 || ||
+|| move() 종료, 화면 반영|| ||
+|| || 100ms 후, move() 실행 ||
+|| || 레이어를 아래로 1 픽셀 이동한다 ||
+|| || 100ms 후에 move() 호출 예약 ||
+|| || move() 종료, 화면 반영||
+ * 이것의 반복이다.. setTimeout을 호출하고 function 는 종료 되는 것이다.. 당연히 화면에 반영된다.
+
+'''예제: 100픽셀만 아래로 내리기'''
+{{{#!vim html
+<script>
+function move()
+{
+	if (document.body.all[0].offsetTop >= 100) return;
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+	setTimeout('move()',100);
+}
+</script>
+…
+}}}
+ * 단 한줄이 추가되었다.
+{{{#!vim java
+if (document.body.all[0].offsetTop >= 100) return;
+}}}
+ * 레이어의 위치가 위에서 100 픽셀이라면 move() 함수가 바로 return 되버린다. 당연히 return 아래에 있는 setTimeout()은 호출되지 않고 애니메이션은 중지된다. 이를 이용한 무수한 조합은 DIY!
+
+=== ClearTimeout ===
+ * 중요하다! 위의 setTimeout() 으로 아무리 컨트롤을 잘 한다고 해도 예외는 항상 존재한다!!
+
+'''예제'''
+{{{#!vim html
+<script>
+function move()
+{
+	//레이어를 1픽셀씩 20까지 아래로 이동한다.
+	if (document.body.all[0].offsetTop == 20) return;
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+	setTimeout('move()',100);
+}
+function move2()
+{
+	//레이어를 화면 맨 위로 이동한다.
+	if (document.body.all[0].offsetTop == 0) return;
+	document.body.all[0].style.top=document.body.all[0].offsetTop-1;
+	setTimeout('move2()',100);
+}
+</script>
+<body onload="setTimeout('move()',50); setTimeout('move2()',100);">
+<div style="position:absolute;border:1px solid black;top:10px">점점 커진다!!!!!</div>
+</body>
+}}}
+ * 어떤가! -_-; 덜덜덜 떨고 있는 레이어가 보이시는가. 이 예제는 극적인 상황을 억지로 연출한 것이지만 실제로 이렇게 의도하지 않은 상황이 벌어질 수 있다. move()와 move2()가 서로 자신이 원하는 위치로 레이어를 움직이려고 힘을 쓰는 것이다. 아래의 예제에서는 950ms 후에 move2의 타이머를 클리어 해버림으로써 950ms 후에는 정상적으로 애니메이션된다.
+
+'''예제'''
+{{{#!vim html
+<script>
+var timer1, timer2;
+function move()
+{
+	if (document.body.all[0].offsetTop == 20) return;
+	document.body.all[0].style.top=document.body.all[0].offsetTop+1;
+	timer1=setTimeout('move()',100);
+}
+function move2()
+{
+	if (document.body.all[0].offsetTop == 0) return;
+	document.body.all[0].style.top=document.body.all[0].offsetTop-1;
+	timer2=setTimeout('move2()',100);
+}
+function kill_move()
+{
+	clearTimeout(timer2);
+}
+</script>
+<body onload="setTimeout('move()',50); setTimeout('move2()',100); setTimeout('kill_move()',950); ">
+<div style="position:absolute;border:1px solid black;top:10px">점점 커진다!!!!!</div>
+</body>
+}}}
+ * 저게 뭔소린가 하는 사람은 아래를 보라. (그리기 정말 귀찮다 ㅠ_ㅠ)
+
+|| 50ms || timer1 = move() || || ||
+|| 100ms || || timer2 = move2() || ||
+|| 150ms || timer1 = move() || || ||
+|| 200ms || || timer2 = move2() || ||
+|| 250ms || timer1 = move() || || ||
+|| 300ms || || timer2 = move2() || ||
+|| 350ms || timer1 = move() || || ||
+|| 400ms || || timer2 = move2() || ||
+|| 450ms || timer1 = move() || || ||
+|| 500ms || || timer2 = move2() || ||
+|| 550ms || timer1 = move() || || ||
+|| 600ms || || timer2 = move2() || ||
+|| 650ms || timer1 = move() || || ||
+|| 700ms || || timer2 = move2() || ||
+|| 750ms || timer1 = move() || || ||
+|| 800ms || || timer2 = move2() || ||
+|| 850ms || timer1 = move() || || ||
+|| 900ms || || timer2 = move2() || ||
+|| 950ms || timer1 = move() || || timer2를 clearTimeout으로 해제 ||
+|| 1000ms || || || move2()는 앞으로 실행되지 않는다 ||
+|| 1050ms || timer1 = move() || || ||
+
+ * 간단히 얘기하면 setTimeout 은 앞으로 몇ms 후에 어떤 작업을 하라고 예약하는 것이고 clearTimeout은 예약된 작업이 깨어나기 전에 작업 자체를 없애버리는 것이다.
+
+= 마치며 =
+ * 실제 JS를 이용한 개발 작업 중에는 위의 예제들 보다 많은 예외 상황을 고려해야 하며 예기치 못한 문제가 어디서 나올지 모른다. 몇가지 특성만을 잘 파악한다면 원하는 효과들을 구현하는데 문제가 없을 것이다.

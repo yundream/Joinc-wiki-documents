@@ -1,0 +1,40 @@
+#title MRTG
+
+attachment:mrtg-ti.png
+[[TableOfContents]]
+=== MRTG 란 ? ===
+MRTG(12) 를 확인하기 바란다.
+
+=== MRTG 설치하기 ===
+설치는 간단하다. http://people.ee.ethz.ch/~oetiker/webtools/mrtg 에서 자신의 운영체제에 적합한 패키지 혹은 소스를 다운 받아서 설치한다. 필자의 경우는 속편하게 http://fedora.redhat.com 에서 rpm을 다운 받아서 설치했다.
+{{{#!plain
+# rpm -Uvh mrtg-2.10.1501.i386
+}}}
+
+
+=== MRTG 설정하기 ===
+설정은 MRTG의 설치시 제공되는 cfgmaker라는 프로그램을 이용하면 손쇱게 설정파일을 만들어 낼 수 있다.
+{{{#!plain
+# cfgmaker --global 'WorkDir: /usr/local/apache/htdocs/mrtg' --output \
+/usr/local/apache/htdocs/mrtg/cfg/mrtg.cfg public@localhost
+}}}
+mrtg에 의해서 만들어지는 이미지와 html파일이 저장될 경로와 mrtg의 설정파일인 mrtg.cfg가 생성될 디렉토리를 지정해주면 된다. 물론 snmp agent에 접근하기 위해서 호스트명과 community명도 명시를 해주어야 한다. 
+
+=== MRTG 운용하기 ===
+{{{#!plain
+# mrtg /usr/local/apache/htdocs/mrtg/cfg/mrtg.cfg
+}}}
+실행방법은 간단하다. 실행이 성공적으로 이루어졌다면 WorkDir 아래에 이미지 파일들과 웹 페이지들이 생성된걸 확인할 수 있을 것이다.
+
+그러나 mrtg를 이용해서 지속적인 네트워크 트래픽 통계자료를 수집하기 위해서는 일정한 시간간격으로 트래픽 정보를 수집해야 할 것이다. cron을 이용하면 간단하게 이러한 일들을 할 수 있다.
+{{{#!plain
+ 0,5,10,15,20,25,30,35,40,45,50,55 * * * * /usr/bin/mrtg /usr/mrtg/cfg/mrtg.cfg \ 
+--logging /var/log/mrtg.log
+}}}
+
+=== MRTG 활용 예 ===
+ 1. [wiki:Site/Joinc/AdminInfo/MRTG Joinc MRTG 트래픽보기] 
+
+=== 해야할일 ===
+ 1. 다른 MIB값들에 대해서도 Check 하도록 mrtg.cfg 파일 조정
+   * CPU, DISK Storage, MEMORY 사용량

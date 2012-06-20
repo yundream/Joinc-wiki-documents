@@ -1,0 +1,98 @@
+#title google chart를 이용한 chart 생성
+
+=== google chart ===
+google chart 는 구글에서 제공하는 웹 chart 서비스로 복잡한 프로그래밍 과정 없이 간단하게 chart 그래프를 생성할 수 있도록 도와준다. 아주 세밀한 chart를 만들어낼 수는 없지만, 대부분의 경우에 문제 없이 사용할 수 있을 만한 정도의 기능은 제공한다. 아주 복잡한 그래프를 생성하지 않을거라면, google chart를 사용할 것을 강추한다.
+
+사용방법은 간단하다. 
+{{{#!plain
+<img src="http://chart.apis.google.com/chart?
+chs=250x100
+&chd=t:60,40
+&cht=p3
+&chl=Hello|World">
+}}}
+결과는 다음과 같다.
+{{{#!html
+<img src="http://chart.apis.google.com/chart?
+chs=250x100
+&chd=t:60,40
+&cht=p3
+&chl=Hello|World">
+}}}
+ * http://chart.apis.google.com/chart? : 구글 chart api를 호출한다.
+ * chs : chart의 크기 
+ * chd : chart에 사용될 데이터 
+ * cht : chart의 타입으로 p3는 3차원 파이그래프다.
+ * chl : chart에 사용될 라벨 
+chart 사용자는 위의 인자들의 값을 조절함으로써, 다양한 데이터 형식을 가지는 그래프를 생성할 수 있다. 이 글은 google chart의 레퍼런스 문서가 아니다. 실제 자세한 사용방법은 http://code.google.com/apis/chart 의 문서를 차근차근 읽어 보기 바란다. 누구든지 30분 정도면 왠만한 그래프는 만들어 낼 수 있을 것이다.  
+
+여기에서는 개인적인 활용경험을 중심으로 google chart를 설명할 것이다. 언제 시간이 되면, google chart의 레퍼런스 문서도 만들어 볼까라는 생각은 하고 있는 중이다. 언제가 될지는 기약할 수 없지만..
+
+=== RRD 데이터를 google chart로 ===
+RRD(Round Robin Data)는 시간을 축으로 하는 통계데이터의 생성에 최적화 된툴로, 통계 데이를 그래프로 만들어 주는 기능까지를 포함하고 있다. 그런데 RRD를이용해서 생성되는 그래프는 뭐라고나 할까, 너무 통계틱하다고나 할까 혹은 공대틱하다고나 할까 전혀 일반사용자 친화적인 모습을 보여주지는 않는다. 
+
+최근에 RRD(:12)를 이용해서, joinc(:12)의 모든 wikipage의 일/주/월/년간 접속 통계를 내는 시스템을 구축하고 있는데, RRD를 사용하지 않고 google chart를 이용해서 통계 그래프를 만들어 보기로 했다.
+
+joinc 위키 페이지 접속통게 프로젝트에 대한 내용은 [wiki:Site/RRD/BigLog_Analy_RRD RRD를 이용한 웹로그 분석]과 [wiki:Site/RRD/BigLog_Analy_RRD2 RRD를 이용한 웹로그 분석 : 구현]을 참고하기 바란다. 
+
+위의 방식대로 해서 RRD 데이터를 쌓는 것을 확인 했으며, 이제 그래프를 그리는 일만 남은 상태다.
+
+그래프를 그리기 위한 데이터는 다음과 같이 rrdtool을 통해서 얻어왔다. php(:12)에서 제공하는 popen()함수를 이용해서 간단하게 통계데이터를 얻어올 수 있었다.
+{{{#!plain
+# rrdtool fetch data/rrd/{$page}.rrd AVERAGE --start $lastoneday --end $limit
+}}}
+그래프는 다음과 같이 출력했다.
+{{{#!plain
+<img src="http://chart.apis.google.com/chart?
+chs=400x130
+&chd=t:{$y}
+&cht=lc
+&chxt=y
+&chxr=0,0,{$ymax}
+&chm={$chm}
+&chl={$x}"
+}}}
+ * chd: rrdtool fetch로 얻어온 통계 데이터들이 들어 있다. 각 데이터는 '''|'''로 구분된다.
+ * cht: 그래프 타입으로 '''l'''ine '''c'''hart 를 선택했다.
+ * chxt: 그래프의 라벨을 표시한다. 
+   * x = x축 아래
+   * t = x축 취
+   * y = y축 왼쪽
+   * r = y축 오른쪽
+ * chxr: 각축의 범위를 지정한다. 여기에서는 0에서 부터 $ymax까지를 지정했다. RRD에서 가져온 통계자료들 중에 가장 큰 값이 $ymax에 들어가 있다. 
+ * chm: 그래프의 각 라인의 라벨이다.
+ * chl: x축의 데이터라벨인데, x축에는 최근 날짜가 들어가도록 했다. 
+대략 다음과 같은 내용을 가지게 될 것이다.
+{{{#!plain
+<img src="http://chart.apis.google.com/chart?
+chs=400x130
+&chd=t:67,72,76,20,27,34,96,95
+&cht=lc
+&chxt=y
+&chxr=0,0,400
+&chm=t270,808080,0,0,10|t288,808080,0,1,10|t305,808080,0,2,10|t81,808080,0,3,10
+|t110,808080,0,4,10|t138,808080,0,5,10|t385,808080,0,6,10|t380,808080,0,7,10
+&chl=15|16|17|18|19|20|21|22"
+/>
+}}}
+실제 출력된 그래프의 모양이다.
+{{{#!html
+<img src="http://chart.apis.google.com/chart?
+chs=400x130
+&chd=t:67,72,76,20,27,34,96,95
+&cht=lc
+&chxt=y
+&chxr=0,0,400
+&chm=t270,808080,0,0,10|t288,808080,0,1,10|t305,808080,0,2,10|t81,808080,0,3,10|t110,808080,0,4,10|t138,808080,0,5,10|t385,808080,0,6,10|t380,808080,0,7,10
+&chl=15|16|17|18|19|20|21|22"
+/>
+<br>
+}}}
+실제 그래프에 사용되는 데이터 '''chd'''와 '''chm'''이 틀린데, 이는 google chart의 y축이 0부터 100으로 고정되어 있기 때문이다. 여기에서는 y축을 400으로 잡았기 때문에 원래 데이터 값을 400으로 나누어서 scale를 조정했다. 즉 원래 데이터는 270인데, 270/400 = 67 이런 식으로 scale를 조절했다.
+
+아래의 그래프는 지금보고 있는 이 페이지의 RRD 통계자료를 google chart를 이용해서 만들어냈다.
+{{{#!html
+<br>
+}}}
+
+[[Category(14)]]

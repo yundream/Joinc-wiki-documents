@@ -1,0 +1,243 @@
+#title 함수포인터의 사용
+
+[[TableOfContents]]
+
+== 함수포인터의 사용 ==
+=== 함수포인터란 ===
+요즘 C 하는 개발자를 찾기가 힘들던가요 ? 여기 저기 C언어 개발자를 소개시켜 달라는데, 사람이 없어서 난리입니다.
+
+C언어 하면 떠오르는게 포인터죠. '''데이터의 위치를 가리키는 데이터 타입'''라고 생각하면 간단한 개념이긴 한데, 개념이 단순할 뿐 잘 다루기는 쉽지 않습니다. 커널이 관리하는 메모리를 낮은 수준에서 직접 건드리기 때문입니다. 툭하면 다른 프로세스의 메모리 영역을 침범해서 프로그램이 뻗어 버리고, 좀 잘 돌아간다 싶으면 메모리를 해제하지 않아서 모든 메모리를 다 써버리는 문제가 발생합니다. 
+
+전혀 추상화 되 있지 않다는 얘기죠. 그러니 사람이 직접 추상화 해줘야 합니다. 예컨데 할당한 메모리를 초과하지 않게 하거나, 메모리 해제를 관리하는 코드를 추가하거나 하는 등이죠.
+
+함수 포인터는 데이터영역 대신에 함수를 가리키겠다는 것을 의미합니다. 어차피 컴퓨터는 코드든 데이터든 동일한 형태로 보기 때문에, 데이터를 가리키는 것과 그다지 차이는 없습니다.
+
+지나가는 얘기. 요즘 언어들은 포인터를 직접 사용하지 않습니다. 모두 추상화 되있죠. 개발자는 얼마만큼 메모리를 할당해야 하는지, 혹 다른 프로세스의 메모리 영역을 침범하지는 않을지 메모리 누수가 발생할지 등에 대해서 고민할 필요 없이 프로그램을 만들 수 있습니다.  
+
+요즘 같은 때에 C는 철지난 언어같아 보입니다. 하지만 여전히 Java와 함께 가장많이 사용하는 언어입니다. [wiki:Site/Development/Forum/manager/Rating_language 언어별 사용율 보러가기] 
+
+=== 함수 포인터 선언 ===
+다음은 함수포인터를 선언하기 위한 전형적인 방법이다.
+{{{#!plain
+return_type (*function)(arg1, arg2, ...);
+}}}
+가리키기 위한 함수의 매개 변수와 반환 값을 잘 맞춰주면 됩니다.
+			
+예를 int hello(char *) 라는 함수를 가리키는 함수포인터를 선언하고자 한다면 아래와 같이 선언하면 됩니다. 
+{{{#!plain
+int (*func_name)(char *);
+}}}
+
+다음은 간단한 함수 포인터 사용 예제입니다. 
+
+{{{#!plain
+#include <stdio.h>
+void hello(char *name)
+{
+    printf ("Hi %s\n", name);
+}
+
+int main()
+{
+    void (*Func)(char *);
+    Func = hello;
+    Func("test");
+}
+}}}
+간단한 코드입니다. void 반환 값을 가지고 매개 변수로로 캐릭터 포인터를 가지는 함수포인터 Func를 선언한 다음, hello 함수를 가리키게했습니다. 이제 함수 포인터가 가리키는 hello 함수를 호출할 수 있습니다. 
+
+=== 함수포인터사용 용도 ===
+함수 포인터의 문법은 비교적 쉽게 이해할 수 있습니다. 문제는 어디에 왜 사용하느냐 하는 거죠. 함수 포인터라는 것은 함수를 한단계 추상화 하겠다는 겁니다. 개발자에게는 인터페이스만 제공하고 용도에 맞게 사용하게 만드는게 목표입니다.  
+
+함수 포인터의 목적을 이해하면, 어디에 써야할지 감이 잡힐 겁니다.
+=== Generic 함수(알고리즘)의 개발 ===
+각 학생의 과목별 성적데이타가 있고, 과목별 최고 점수를 가져오는 프로그램이 있다고 가정하겠습니다 처음에 이 프로그램은 각 과목중 "국어"의 최고 점수만을 가져오도록 만들었습니다. 그런데 "수학" 최고 점수만을 가져오도록 변경하고 싶군요 떻게 해야 할까요 ? 혹은 최고 평점을 가져오기를 원할수도 있것 겁니다.
+
+물론 모든 경우에 대해서 고유의 작업을 하는 함수를 여럿 만들 됩니다만 유지/보수성이 떨어지겠죠. 이 경우 입력과 출력의 데이터 타입이 같으므로 '''일반적으로 사용할 수 있는 함수'''를 만든다면 좀 더 유지/보수가 용이한 코드를 만들 수 있을 겁니다. 함수 포인터를 이용해서 이런 일을 할 수 있습니다.
+
+{{{#!plain
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <vector>
+
+using namespace std;
+
+typedef struct _pinfo
+{
+    char name[12];  
+    int  math;
+    int  korean;
+    int  eng;
+} pinfo;
+
+void printmax(vector<pinfo> va, void (*SortFunc)(vector<pinfo>))
+{
+    printf("최고 성적 출력 프로그램\n");
+    SortFunc(va);
+}   
+
+void engmax(vector<pinfo> va)
+{
+    int max = 0;
+    int index = 0;
+    for (int i = 0; i < va.size(); i++)
+    {
+        if (va[i].eng > max)
+        {
+            max = va[i].eng;
+            index = i;
+        }
+    }
+    printf("영어 최고점수 획득자는 %s : %d\n", 
+        va[index].name,
+        va[index].eng);
+};
+
+int main()
+{
+    pinfo myinfo;
+    vector<pinfo> va;
+
+    myinfo.korean = 80;
+    myinfo.eng    = 65;
+    myinfo.math   = 99;
+    strncpy(myinfo.name, "yundream", 12);
+    va.push_back(myinfo);
+
+    myinfo.korean = 90;
+    myinfo.eng    = 65;
+    myinfo.math   = 74;
+    strncpy(myinfo.name, "kknd", 12);
+    va.push_back(myinfo);
+
+    myinfo.korean = 63;
+    myinfo.eng    = 88;
+    myinfo.math   = 55;
+    strncpy(myinfo.name, "junny", 12);
+    va.push_back(myinfo);
+
+    printmax(va, engmax);
+}
+}}}
+이 코드에는 printmax라는 함수가 있습니다. 이 함수는 최고 값을 출력하는 일을 합니다. 최고 값을 계산하는 코드를 포함하는 함수는 함수 포인터로 받기로 했습니다. 예제 프로그램에서는 engmax를 포인트 했습니다. 만약 최고 평점자에 대한 정보를 출력하길 원한다면 다음과 같은 함수를 만들어서 printmax에 매개 변수로 넘기면 됩니다. 
+
+{{{#!plain
+void avgmax(vector<pinfo> va)
+{
+    int max   = 0;
+    int total;
+    int index = 0;
+    for (int i = 0; i < va.size(); i++)
+    {
+        total = (va[i].eng + va[i].math + va[i].korean);
+        if ( total > max)
+        {
+            max = total;
+            index = i;
+        }
+    }
+    printf("최고평자 점정보 : \n");
+    printf("이름 : %s\n", va[index].name);
+    printf("영어 : %d\n", va[index].eng);
+    printf("국어 : %d\n", va[index].korean);
+    printf("수학 : %d\n", va[index].math);
+    printf("평점 : %.2f\n", (float)max/3.);
+}
+}}}
+아래와 같이 printmax 를 호출하면 됩니다. 
+{{{#!plain
+printmax(va, avgmax);
+}}}
+이처럼 함수 포인터를 넘김으로 인해서, 프로그래머는 필요에 따라 원 쏘쓰의 큰 변화없이 자기가 필요로 하는 코드만 추가하는 식으로 프로그램을 쉽게 확장시킬수 있습니다.
+
+=== 다른 활용 ===
+여기에서는 이러한 용도로도 사용이 가능하다는걸 보여주는 팁수준의 활용용도를 보여줄것이다.
+
+제가 프로그래밍을 할때 가끔 사용하는 방법인데, 코드를 깔끔하고 보기 쉽게 만들어줍니다. 쓰레드 함수를 함수 포인터를 값으로 하는 vector 에 등록해서 쓰레드 생성등에 사용하는 방법이다.
+
+이방법을 쓰면 비록 몇줄이긴 하지만 분명히 코딩량을 줄일 수 있습니다. 그리고 쓰레드 함수를 한영역에서 모아서 관리함으로 코드를 좀더 보기 쉽게 만들 수 있습니다. 
+
+{{{#!plain
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <vector>
+#include <iostream>
+
+#define MAX_THREAD_NUM 20
+
+using namespace std;
+
+void *func1(void *)
+{
+    printf("Thread 1\n");
+    pause();
+}
+void *func2(void *)
+{
+    printf("Thread 2\n");
+    pause();
+}
+void *func3(void *)
+{
+    printf("Thread 3\n");
+    pause();
+}
+void *func4(void *)
+{
+    printf("Thread 4\n");
+    pause();
+}
+
+int main()
+{
+    // 인자가 함수포인터인 vector 생성
+    vector<void *(*)(void *)> thread_list;
+    vector<pthread_t> tident(MAX_THREAD_NUM);
+    int status;
+
+    thread_list.push_back(func1);
+    thread_list.push_back(func2);
+    thread_list.push_back(func3);
+    thread_list.push_back(func4);
+
+    cout << "등록된 쓰레드 " << thread_list.size() << endl;
+    for (int i = 0; i < thread_list.size(); i++)
+    {
+        pthread_create(&tident[i], NULL, thread_list[i], (void *)NULL);
+    }
+
+    cout << "thread Join Wait" << endl;
+    for (int i = 0; i < tident.size(); i++)
+    {
+        pthread_join(tident[i], (void **)&status);
+    }
+    return 1;
+}
+}}}
+
+=== 전술패턴 응용 ===
+[wiki:Site/C/Documents/ProtocolFunction 함수 포인터로 전술 패턴구현하기] 참고
+
+=== 옵저버패턴 응용 ===
+정리 중
+
+== 결론 ==
+이상 간단하게 함수포인터의 사용방법에 대해서 알아봤습니다. 
+
+사용방법이 눈에 쉬 들어오지 않을 수도 있지만, 알아두면 많은 도움이 됩니다. C에서 객체지향을 위해서 널리 사용하고 있으니까요. 
+
+== 참고문헌 ==
+  * [wiki:Site/C/Documents/ProtocolFunction 함수 포인터로 전술 패턴구현하기]
+  * [wiki:Site/C/Documents/UsedPointer 다양한 포인터 활용]
+  * [wiki:Site/C/Documents/CprogramingForLinuxEnv/Ch10_Pointer 리눅스 C 프로그래밍 10장 포인터와 리눅스]
+  * http://alones.byus.net/tt/612 : alone님의 주옥같은 번역문서입니다.
+  * http://minzkn.wowdns.com:2744/tattertools/98
+
+== 히스토리 ==
+  1. 작성일 : 2003년 1월
+  1. 수정일
+      * 2011년 12월 26일

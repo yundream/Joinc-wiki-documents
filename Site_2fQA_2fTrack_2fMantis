@@ -1,0 +1,108 @@
+#title mantis 버그 추적 시스템
+
+[[TableOfContents]]
+== 소개 ==
+버그 추적 시스템을 구축해야 겠다는 생각이 바람에 스친다. 독립 서버 방식의 bugzilla가 있기는 한데... 독립 서비 방식이라는게 맘에 안든다. 게다가 perl 기반이라서 수정하기도 수월치 않을 것 같다. 개인적으로 선호하는 웹 애플리케이션 환경이 APM이라서, PHP 기반의 버그 추적 소프트웨어를 찾기로 했다.
+
+그래서 찾아낸게 mantis다. 이름은 꽤 들어본 것 같다. mantis 외에도 아주 멋져 보이는 버그 트랙 시스템을 몇개 찾아 내긴 했지만, 쓸데 없이 복잡한 프로그램이 많았다. 개인 적인 성향이 '''simple is best'''를 선호해서, 그냥 티켓 기반으로 필요한 일을 수행할 수 있으면 하는 도구를 찾기 원했고, mantis가 여기에 딱 들어 맞는 프로그램이였다.
+
+설치 환경은 다음과 같다.
+ * Ubuntu10 환경 
+ * DB Mysql 5.1.41
+ * Web Server : apache 2.2.x
+ * php : 5.2.x
+ * mantis-1.2.3
+
+예전에 [wiki:Site/Wiki/service_support Ticket 방식의 이슈 관리 시스템]을 만들어 본적이 있어서, 새롭게 만들어 볼까도 했으나 달려드는 귀차니즘...
+
+=== 설치 ===
+mantis는 APM(:12) 환경을 기반으로 한 프로그램이다. APM 환경은 알아서 갖추도록 하자. 요즘은 패키지 형태로 묶어서 나오지 설치에 전혀 어려움이 없을 것이다. '''Ubuntu 10.10'''의 경우 mantis를 패키지 형태로 설치할 수 있다. 
+{{{#!plain
+# sudo apt-get install mantis
+}}}
+그러나 설치해보고 걍 지웠다. 패키지로 설치할 기존의 애플리케이션 환경과 때때로 잘 맞아 떨어지지 않는다는게 문제가 될 수 있는데, 여기에서도 그런 문제가 발생했다. 예컨데, 내가 관리하는 웹 애플리케이션의 위치는 /var/www 인데, 패키지로 깔았더니, 전혀 엉뚱한 디렉토리에 생기는 거였다. apache 설정파일도 지맘대로 손대고, PHP 기반의 간단한 프로그램이니 그냥 압축파일 다운로드 받아서 직접 설치하기로했다. http://www.mantisbt.org 에서 다운로드 받자.
+
+먼저 압축 풀고
+{{{#!plain
+# tar -xvzf mantisbt-1.2.3.tar.gz
+}}}
+
+인스톨 페이지로 접근 해서 설정하면 된다.
+{{{#!plain
+# http://localhost/mantis/admin/install.php
+}}}
+
+설정은 아주 간단하다. 그냥 mysql db와 관련된 정보들만 잘 채워 넣어주면 된다. 설정을 마치고 적용 버튼을 누르면, config_inc.php 파일이 만들어 진다. 만약 mantis 설치 디렉토리에 대해서 파일 쓰기 권한이 없다면, 직접 설정 파일을 만들어야 한다. 설정 내용은 웹페이지에 표시되므로 copy & paste 하면 된다. 
+
+이제 접근하자 '''http://localhost/mantis'''. 그러면 로그인 화면이 뜨는데, 기본 관리자 계정인 administrator/root로 로그인 할 수 있다. 로그인 한다음, 패스워드를 바꿔주면 된다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="http://picasaweb.google.com/lh/photo/tXCM4R9YDgW9BkBTMvpMgA?feat=embedwebsite"><img src="http://lh3.ggpht.com/_Os5qf5urx_A/TMQYtUQRDqI/AAAAAAAABmY/hy2fB4HLgHE/s800/mantis_1.png" height="436" width="800" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="http://picasaweb.google.com/yundream/Linux?feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== 주요 설정 ===
+다음은 주요 설정으로, 내가 구축한 mantis 서버의 설정 환경을 기준으로 설명하겠다. 설정 파일 이름은 config_inc.php이다. 
+{{{#!plain
+$g_hostname = 'localhost';        // 호스트 이름
+$g_db_type = 'mysql';             // 데이터 베이스 타입
+$g_database_name = 'mantis';      // 데이터 베이스 이름
+$g_db_username = 'root';          // 데이터 베이스 루트 계정
+$g_db_password = '********';      // 데이터 베이스 루트 패스워드 (평문)
+$g_enable_email_notification    = ON;   // 이메일 알림 사용할 것인지.
+
+// gmail은 POP과 SMTP 모두를 지원한다.
+// gmail SMTP를 이용해서 메일을 전송하기로 했다. 
+$g_phpMailer_method             = PHPMAILER_METHOD_SMTP;
+$g_smtp_host                    = 'smtp.gmail.com:465';
+$g_smtp_connection_mode = 'ssl';
+$g_smtp_username = 'yundream@gmail.com';
+$g_smtp_password = 'gkwlak74';
+
+// OFF로 할경우 신규등록을 하면 공백 패스워드가 만들어진다.
+// ON이면 등록한 유저 메일 주소로 확인 메일이 발송된다.
+$g_allow_signup                 = ON;
+
+// 한국어도 지원한다.
+$g_default_language             = 'korean';
+}}}
+
+=== 사용기 ===
+대개의 Ticket 기반 이슈 관리 시스템이 그렇듯이 매우 단순하다. 또한 딱 이슈관리 기능만을 포함하고 있어서, 쉽게 사용할 수 있다. UI도 직관적이다. 뭐, 이런 단순한 시스템을 복잡하게 제공하는 게 더 어렵긴 하겠지만 말이다.
+
+이슈 관리는 아래의 전형적인 방식을 따른다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1n8XwFHRMmkuss0dM6DBKf2Hry0w2ijK47SBg3qmm9ww&amp;w=707&amp;h=232">
+}}}
+  1. 이슈가 발생하면
+  1. 새로운 티켓을 생성하고
+  1. 이것을 개발자에게 할당 한다.
+  1. 해결 되면 Close 한다.
+  1. 문제가 다시 발생하면 reopen, reassign 한다.
+
+다음은 티켓을 만드는 인터페이스와 자신에게 할당된 티켓의 목록을 보유주는 인터페이스를 보여준다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="http://picasaweb.google.com/lh/photo/K9i7L-n7If8AkNeYeKQxYA?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/TMQYtU8783I/AAAAAAAABmc/tfQcxJEggJU/s800/mantis_2.png" height="436" width="800" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="http://picasaweb.google.com/yundream/Linux?feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+{{{#!html
+<table style="width:auto;"><tr><td><a href="http://picasaweb.google.com/lh/photo/zgAB7hSaYNMQ_egXI76p6g?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/TMQYtsi-YDI/AAAAAAAABmg/uK6I2WAlzlM/s800/mantis_3.png" height="474" width="800" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="http://picasaweb.google.com/yundream/Linux?feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+버그만을 관리하기로 한다면, 상당히 쓸만한 도구다. 설치하기도 쉽고, 사용도 매우 직관적이다. 직관적이다라는 건 특히 나에게 중요했다. 왜냐하면 코쟁이 얘들이 만든 관리 프로그램들은 지나치게 추상적인 경우가 많았기 때문이다. 아마도 문화적인 차이에 기인한거 같다. 뭐든지 쪼개고 개인화 하고 분석하는데 지나치게 집착하는 서양식 문화 때문인지 몰라도, 그들의 관리도구는 때때로 지나치게 이해하기가 복잡하다. 예컨데 제대로 사용할려면 수백페이지의 문서는 물론이고, 관리 체계 부터 다시 배워야 하는 경우가 허다 했다.
+
+반면 mantis는 설치 즉시 사용가능 하다. 물론 아주 대규모의 프로젝트를 관리해야 할 경우에도 제대로 사용할 수 있을지 모르겠지만, 왠만해선 큰 문제가 없을 것 같다. 지나치게 도구를 고도화 하는 것 보다는, 도구의 부족함은 장인의 경험을 살려서 채워넣으면 되지 않겠는가 하는게 내 생각이다.
+
+== 위키 그리고 svn과의 통합 ==
+프로젝트 진행의 지원을 위해서 필요한 최소한의 도구라면 다음과 같은 것들이 있을 것이다.
+  * 이슈 츄적 시스템 : mantis, bugzilla와 같은 프로그램
+  * 문서화 시스템 : 요즘은 개발 문서도 wiki로 관리하는 곳이 많은 것 같다. 나는 모든 문서를 위키로 관리한다.
+  * 형상관리 시스템 : svn 혹은 cvs
+프로젝트 관리 시스템은 범위가 광범위 하기 때문에 여기에서 언급하지는 않았다. 좁은 의미로는 위의 3개 시스템을 더한 정도를 프로젝트 관리 시스템이라고 하기도 하고, 범위를 넓히면 일정관리/개발자 관리/프로그램 모듈관리를 포함한 모든 자원을 관리하기 위한 거대한 시스템을 프로젝트 관리 시스템이라고 한다. 전자와 같은 프로그램으로는 trac이 있다.
+
+프로젝트를 진행하게 되면, 항상 고민하는게 이들 3가지 시스템을 어떻게 통합 할 것인가 하는 거다. svn따로 wiki 따로 이슈추적 시스템이 따로 구성되는 경우가 많기 때문이다. trac과 같이 어느정도 통합한 툴이 있기는 한데, 글쎄 뭐라고 해야 할까. 어느 하나도 만족하지 못한 상태에서 얽혀 있다는 느낌이 든다고나 할까 ? 아뭏든 맘에 들지 않는다. 그나마 쉽게 기능을 확장시킬 수 있다면, 수정해서 쓸건데 쉽게 확장시키기도 힘든 것 같다. 아!! 확장에 어려움을 겪는 것은 APM 환경을 선호하는 개인적인 취향 때문일 수 있다.
+
+현재는 이 세가지를 모두 독립적인 시스템으로 구축하고 wiki(moniwiki)로 통합하는 방식을 사용하고 있다.
+
+앞에서 언급했듯이, moniwiki로 이 세가지를 모두 통합하고 싶긴 하다. (moniwiki는 기능의 확장이 매우 쉽다.)
+
+[[tag(svn,bugzilla,프로젝트,wiki)]]
+[[Category(14)]]

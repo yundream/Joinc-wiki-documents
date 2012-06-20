@@ -1,0 +1,449 @@
+#title Site/Ajax/Document/Sajax.php 소스 코드 분석 (자세한 한글 주석)
+
+== Sajax.php 소스코드 분석 ==
+제가 이해한 sajax는
+php(다른 언어도 지원됩니다.)로서 ajax와 관련된 서버와 클라이언트 역활을 동시에 
+가능하게 하는 프레임워크입니다.
+
+여기서 서버와클라이언트라는 개념은 거창한 것이 아니라
+정보의 전달과 처리 부분을 맏는 부분을 서버라 칭한것이고
+데이타를 요청하고 결과를 보여주는 부분을 클라이언트라 편의상 칭한것입니다.
+
+sajax.php는 크게 세가지 부분으로 나누어 집니다.
+ 1. 공통 변수(서버와 클라이언트에서 모두 사용되어지는) 선언부
+ 1. 서버측 사용 함수
+ 1. 클라이언트측 사용함수
+
+그리고 제가 이해를 돕기위해 함수의 순서 같은 것은 편의상 변경하였습니다.
+
+이해가 되지 않거나 sajax에 대해 더 알고 싶은 분은 
+http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Ajax/Document/Sajax
+를 참고하십시오,
+
+이하는 제가 주석을 단 전문입니다.
+
+{{{#!plain
+<?php  
+if (!isset($SAJAX_INCLUDED)) {//인클루드 중복을 막기 위한 처리
+
+  /*  
+   * 기본 변수 설정(초기화, 데이타형결정, 전역변수등록)
+   *
+   */ 
+  $GLOBALS['sajax_version'] = '0.12';  //sajax 버젼 정보
+  $GLOBALS['sajax_debug_mode'] = 0;//디버깅여부 결정, 0이 아닌값이 저장되어있을때 디버깅
+  $GLOBALS['sajax_export_list'] = array();//사용할 함수들의 이름을 배열로 저장
+  $GLOBALS['sajax_request_type'] = 'GET';//리퀘스트 타입 GET
+  $GLOBALS['sajax_remote_uri'] = '';//접속하여 정보를 가져올 uri
+  $GLOBALS['sajax_failure_redirect'] = '';//접속 실패시 이동할 uri
+  
+  /*
+   * CODE
+   *
+   */ 
+   
+  //
+  // sajax 구동을 위한 함수, 현재 비어있음
+  //
+  function sajax_init() {
+  }
+  
+  //
+  // 현재 페이지의 uri를 돌려준다.
+  // 
+  function sajax_get_my_uri() {
+    return $_SERVER["REQUEST_URI"];
+  }
+
+  //접속하여 정보를 가져올 uri에 현재 페이지 uri를 저장
+  $sajax_remote_uri = sajax_get_my_uri();
+
+  //sajax_get_common_js()의 실행여부, 기본 아작스 스크립트를 생성했는지 여부, 생성시 1
+  $sajax_js_has_been_shown = 0;
+
+
+  //이하 서버부의 함수
+
+  //
+  //함수에 넘겨진 인자의 갯수 만큼 $sajax_export_list 배열에 차례로 저장한다.
+  //인자는 사용자가 외부에 필요에 의해 만들어놓은 함수의 php함수명이다.
+  //
+  function sajax_export() {
+    global $sajax_export_list;
+    
+    $n = func_num_args();//넘겨진 인자의 개수를 돌려준다.
+    for ($i = 0; $i < $n; $i++) {
+      $sajax_export_list[] = func_get_arg($i);//해당 순번의 인자를 배열에 저장
+    }
+  }
+
+  //
+  //넘어온 인자의 갯수 만큼 $sajax_export_list 배열에 저장한다.
+  //인자는 사용될 함수명이다.
+  //
+  function sajax_handle_client_request() {
+    global $sajax_export_list;//사용할 함수명을 배열로 저장하고 있음
+    
+    $mode = "";//리퀘스트 타입
+    
+    if (! empty($_GET["rs"])) 
+      $mode = "get";
+    
+    if (!empty($_POST["rs"]))
+      $mode = "post";
+      
+    if (empty($mode)) //get이나 post로 rs란 것이 넘어오지 않았다면 함수종료, 클라이언트라는 의미
+      return;
+
+    //이하 서버의 역활
+    $target = "";
+    
+    if ($mode == "get") {
+      // 브라우져 캐쉬가 적용되지 않도록 헤더 전송
+      header ("Expires: Mon, 26 Jul 1997 05:00:00 GMT");    // Date in the past
+      header ("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+      // 항상 수정된 페이지 임을 나타내는 헤더 전송
+      header ("Cache-Control: no-cache, must-revalidate");  // HTTP/1.1
+      header ("Pragma: no-cache");                          // HTTP/1.0
+      $func_name = $_GET["rs"];//사용되어질 함수명
+      if (! empty($_GET["rsargs"])) 
+        $args = $_GET["rsargs"];//사용되어질 함수의 인자값, 배열임
+      else
+        $args = array();
+    }
+    else {//헤더전송부분제외하곤 get과 같음
+      $func_name = $_POST["rs"];
+      if (! empty($_POST["rsargs"])) 
+        $args = $_POST["rsargs"];
+      else
+        $args = array();
+    }
+    
+    //출력되는 2바이트는 값을 가지고 올때 정상적인 데이타인지 구분하는 구분자가 됨
+    if (! in_array($func_name, $sajax_export_list))//$sajax_export_list 에 저장된 함수명이 아닐경우 -: 출력
+      echo "-:$func_name not callable";
+    else {
+      echo "+:";//정상적인 경우 +: 출력
+      $result = call_user_func_array($func_name, $args);//사용자가 정의한 함수 실행
+      echo "var res = " . trim(sajax_get_js_repr($result)) . "; res;";//함수 실행후 리턴값을 자바 스크립트에서 사용할수 있도록 지정한 형태로 반환
+    }
+    exit;//서버 역활 종료 - 데이타의 저장 및 출력
+  }
+  
+  //
+  // 인자로 받은 값의 형을 분석하여 
+  // 자바스크립트에서 eval() 로서 변환할 문자열을 돌려준다.
+  // 재귀호출 함수임
+  // 
+  function sajax_get_js_repr($value) {
+    $type = gettype($value);
+    
+    if ($type == "boolean") {
+      return ($value) ? "Boolean(true)" : "Boolean(false)";
+    } 
+    elseif ($type == "integer") {
+      return "parseInt($value)";
+    } 
+    elseif ($type == "double") {
+      return "parseFloat($value)";
+    } 
+    elseif ($type == "array" || $type == "object" ) {
+      //
+      // 데이터형 타입이 배열이면서 해당 키들이 숫자형이 아닐경우
+      // 스크립트에서 문제가 발생함으로, 배열은 모두 객체로 변환해서 사용한다.
+      // 
+      $s = "{ ";
+      if ($type == "object") {
+        $value = get_object_vars($value);
+      } 
+      foreach ($value as $k=>$v) {
+        $esc_key = sajax_esc($k);
+        if (is_numeric($k)) 
+          $s .= "$k: " . sajax_get_js_repr($v) . ", ";
+        else
+          $s .= "\"$esc_key\": " . sajax_get_js_repr($v) . ", ";
+      }
+      if (count($value))
+        $s = substr($s, 0, -2);//끝에 ", "를 없애기 위한 처리
+      return $s . " }";
+    } 
+    else {
+      $esc_val = sajax_esc($value);
+      $s = "'$esc_val'";
+      return $s;
+    }
+  }
+  
+  //
+  // 넘어온 변수를 자바스크리트 "안에서 에스케이프 되도록 변환해서 리턴
+  //
+  function sajax_esc($val)
+  {
+    $val = str_replace("\\", "\\\\", $val);
+    $val = str_replace("\r", "\\r", $val);
+    $val = str_replace("\n", "\\n", $val);
+    $val = str_replace("'", "\\'", $val);
+    return str_replace('"', '\\"', $val);
+  }
+  
+
+
+  //이하 클라이언트부의 함수
+
+  //
+  //아작스 자바스크립트 코드 출력
+  //
+  function sajax_show_javascript()
+  {
+    echo sajax_get_javascript();
+  }
+  
+  //
+  //기본 아작스 코드와 사용자에 의해 생성된 함수 코드를 만들어서 문자열로 돌려준다.
+  //
+  function sajax_get_javascript()
+  {
+    global $sajax_js_has_been_shown;//sajax_get_common_js()의 실행여부
+    global $sajax_export_list;
+    
+    $html = "";
+    if (! $sajax_js_has_been_shown) {
+      $html .= sajax_get_common_js();//기본 아작스 코드 문자열 가져옴
+      $sajax_js_has_been_shown = 1;
+    }
+    foreach ($sajax_export_list as $func) {
+      $html .= sajax_get_one_stub($func);
+    }
+    return $html;
+  }
+
+  //
+  //기본 변수들의 값을 반영 시킨 기본 아작스 코드 문자열를 반환 
+  //
+  function sajax_get_common_js() {
+    global $sajax_debug_mode;
+    global $sajax_request_type;
+    global $sajax_remote_uri;
+    global $sajax_failure_redirect;
+    
+    $t = strtoupper($sajax_request_type);//리퀘스트 메소드를 대문자로 변환
+    if ($t != "" && $t != "GET" && $t != "POST") //GET이나 POST가 아니면 에러출력, 함수 종료
+      return "// Invalid type: $t.. \n\n";
+    
+    //기본 아작스 코드를 메모리에 담음
+    ob_start();
+    ?>
+    
+    //기본적인 AJAX코드
+    // remote scripting library
+    // (c) copyright 2005 modernmethod, inc
+    var sajax_debug_mode = <?php echo $sajax_debug_mode ? "true" : "false"; ?>;
+    var sajax_request_type = "<?php echo $t; ?>";
+    var sajax_target_id = "";//가져온 데이타를 집어넣어줄 태그 아이디
+    var sajax_failure_redirect = "<?php echo $sajax_failure_redirect; ?>";
+    
+    var sajax_requests = new Array();
+    
+    //
+    //정해진 uri에 정해진 방법으로 접속하여, 데이타를 전달하고 결과값을 받고, 
+    //경우에따라 타겟에 집어넣기도 하고, 콜백함수를 실행하기도 한다.
+    //
+    function sajax_do_call(func_name, args) {
+      var i, x, n;
+      var uri;//접속할 uri
+      var post_data;//리퀘스트 타입이 POST일경우 전송될 데이타
+      var target_id;//가져올 데이타를 집어넣어줄 태그 아이디
+      
+      //디버그모드가 활성화 되었을 경우 경고창 뛰움
+      sajax_debug("in sajax_do_call().." + sajax_request_type + "/" + sajax_target_id);
+
+      target_id = sajax_target_id;//가져온 데이터를 집어넣을 태그 아이디
+
+      if (typeof(sajax_request_type) == "undefined" || sajax_request_type == "") //리퀘스트 타입이 설정되지 않앗거나 값이 없을 경우 무조건 GET
+        sajax_request_type = "GET";
+      
+      uri = "<?php echo $sajax_remote_uri; ?>";//정보를 가져올 uri
+      if (sajax_request_type == "GET") {
+      
+        //기본 원격 uri에 urlencoding 시킨 함수명, 타겟아이디, 시도 시간을 추가한다.
+        if (uri.indexOf("?") == -1) //uri에 ?가 없을 경우
+          uri += "?rs=" + escape(func_name);
+        else
+          uri += "&rs=" + escape(func_name);
+        uri += "&rst=" + escape(sajax_target_id);
+        uri += "&rsrnd=" + new Date().getTime();
+        
+        //배열형태로 넘겨진 두번째 인자를 순서대로 uri에 urkencoding 시켜 추가한다.
+        for (i = 0; i < args.length-1; i++) 
+          uri += "&rsargs[]=" + escape(args[i]);
+
+        post_data = null;//리퀘스트 타입이 post가 아니므로 초기화
+      } 
+      else if (sajax_request_type == "POST") {//GET과는 다르게 uri는 그대로 사용하고,post_data에 같은 형식으로 연결시킨다.
+        post_data = "rs=" + escape(func_name);
+        post_data += "&rst=" + escape(sajax_target_id);
+        post_data += "&rsrnd=" + new Date().getTime();
+        
+        for (i = 0; i < args.length-1; i++) 
+          post_data = post_data + "&rsargs[]=" + escape(args[i]);
+      }
+      else {
+        alert("Illegal request type: " + sajax_request_type);//알수 없는 리퀘스트 타입일 경우 에러 출력
+      }
+      
+      x = sajax_init_object();
+      if (x == null) {//원격 접속 실패시
+        if (sajax_failure_redirect != "") {//uri가 지정되어있을 경우 이동
+          location.href = sajax_failure_redirect;
+          return false;
+        } else {//그렇지 않을경우 경고창
+          sajax_debug("NULL sajax object for user agent:\n" + navigator.userAgent);
+          return false;
+        }
+      } else {
+        x.open(sajax_request_type, uri, true);//연결된 접속에 값 전달, 이하 php 의  fsockopen과 비슷
+        // window.open(uri);
+        
+        //sajax_requests 배열에 연결된 객체를 저장
+        sajax_requests[sajax_requests.length] = x;
+        
+        if (sajax_request_type == "POST") {
+          x.setRequestHeader("Method", "POST " + uri + " HTTP/1.1");
+          x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        }
+      
+        x.onreadystatechange = function() {//데이타 전송 실패
+          if (x.readyState != 4) 
+            return;
+
+          sajax_debug("received " + x.responseText);
+        
+          var status;
+          var data;
+          var txt = x.responseText.replace(/^\s*|\s*$/g,"");//가져온 문자열에서 공백으로 시작되거나 공백로 끝나는 것은 없앰
+          status = txt.charAt(0);//가져온 문자열에서 첫번째 바이트를 status에 저장 + or -
+          data = txt.substring(2);//2바이트 이후의 모든 문자열을 데이타에 저장
+
+          if (status == "") {
+            // 정상적인 경우에는 +, - 이외의 값은 나올수가 없다.
+          } else if (status == "-") //지정된 함수 이외의 함수를 호출시 발생, 에러 출력
+            alert("Error: " + data);
+          else {
+            if (target_id != "") 
+              document.getElementById(target_id).innerHTML = eval(data);
+            else {
+              try {
+                var callback;
+                var extra_data = false;
+                if (typeof args[args.length-1] == "object") {//넘어온 인자의 마지막 요소가 객체일 경우
+                  callback = args[args.length-1].callback;//마지막 인자의 콜백함수를 콜백 함수로 등록
+                  extra_data = args[args.length-1].extra_data;
+                } else {//넘어온 인자의 마지막 요소가 객체가 아닐 경우
+                  callback = args[args.length-1];//마지막 인자를 콜백 함수로 등록
+                }
+                callback(eval(data), extra_data);//콜백 함수를 실행
+              } catch (e) {
+                sajax_debug("Caught error " + e + ": Could not eval " + data );
+              }
+            }
+          }
+        }
+      }
+      
+      sajax_debug(func_name + " uri = " + uri + "/post = " + post_data);
+      x.send(post_data);
+      sajax_debug(func_name + " waiting..");
+      delete x;
+      return true;
+    }
+    
+    //디버거, 디버그 모드가 활성화 되었을경우만 넘어온 문자열을 경고창으로 뛰운다.
+    function sajax_debug(text) {
+      if (sajax_debug_mode)
+        alert(text);
+    }
+    
+    //원격 페이지에 접속
+    function sajax_init_object() {
+
+      //디버그 모드 활성화 시 경고창
+      sajax_debug("sajax_init_object() called..")
+       
+      var A;
+
+      var msxmlhttp = new Array(
+      'Msxml2.XMLHTTP.5.0',
+      'Msxml2.XMLHTTP.4.0',
+      'Msxml2.XMLHTTP.3.0',
+      'Msxml2.XMLHTTP',
+      'Microsoft.XMLHTTP');
+      for (var i = 0; i < msxmlhttp.length; i++) {
+      try {
+        A = new ActiveXObject(msxmlhttp[i]);
+      } catch (e) {
+        A = null;
+      }
+      }
+
+      if(!A && typeof XMLHttpRequest != "undefined")
+      A = new XMLHttpRequest();
+      if (!A)
+      sajax_debug("Could not create connection object.");
+      return A;
+    }
+    
+    function sajax_cancel() {
+      for (var i = 0; i < sajax_requests.length; i++) 
+        sajax_requests[i].abort();
+    }
+    
+    <?php
+    $html = ob_get_contents();//메모리에 담은 내용을 변수에 저장
+    ob_end_clean();
+    return $html;
+  }
+
+  //
+  //인자로 받은 함수명으로 자바스크립트에서 사용될 함수를 생성하여 문자열로 돌려준다.
+  //새성된 함수의 함수명은 인자로 넘어온 값 앞에 접두사 x_ 를 붙인다.
+  //생성된 함수는 서버에서 정보를 처리할 같은 이름의 함수명을 넘기게 된다.
+  //
+  function sajax_get_one_stub($func_name) {
+    ob_start();  
+    ?>
+    
+    // wrapper for <?php echo $func_name; ?>
+    
+    function x_<?php echo $func_name; ?>() {
+      sajax_do_call("<?php echo $func_name; ?>",
+        x_<?php echo $func_name; ?>.arguments);
+    }
+    
+    <?php
+    $html = ob_get_contents();
+    ob_end_clean();
+    return $html;
+  }
+  
+  //만들어진 기본 아작스 코드를 출력
+  function sajax_show_common_js() {
+    echo sajax_get_common_js();
+  }
+  
+  //만들어진 자바스크립트 함수 코드 출력
+  function sajax_show_one_stub($func_name) {
+    echo sajax_get_one_stub($func_name);
+  }
+
+  
+  $SAJAX_INCLUDED = 1;
+}
+?>
+}}}
+
+
+좀더 나은 이해를 위해서는 
+
+http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/Ajax/Document/Sajax2 
+
+와 같은 예제와 예제 코드를 같이 병행해서 보는것이 좋을것 같습니다. 

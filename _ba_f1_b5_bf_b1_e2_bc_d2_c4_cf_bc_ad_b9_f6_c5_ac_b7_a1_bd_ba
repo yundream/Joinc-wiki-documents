@@ -1,0 +1,613 @@
+[wiki:비동기서버소켓클래스예제 아래의 클래스를 활용한 예제]
+
+* 개요
+
+ 대다수 네트웍서버에서 사용될 수 있는 비동기 다중 소켓 클래스이다. 기본적으로 소켓서버를 위해 구현되었으며 웹브라우저같은 다중접속 클라이언트로도 사용가능하며 중계서버같이 서버 및 다중 connect 겸용으로도 사용될 수 있다.(사실 이 목적으로 설계되었다)
+
+
+ * 사용법
+
+ asyncSocket을 상속받는 소켓서버 클래스를 만든다. 이때 가상함수 3개만 구현하면 된다. 또한 쓰레드 인터페이스와(다른 위키페이지에 있음) 다중 상속하여 비동기 소켓서버 쓰레드 객체를 손쉽게 만들수 있을것이다.
+
+
+ * 예정
+
+ 커널2.4.x 를 사용할 수 밖에 없는 서버에 사용될 예정이었으므로 poll을 이용해서 구현하였으나 커널2.6의 강력한 기능중 하나인 epoll로 poll부분을 대체할 것이다.
+
+
+ * 예제
+
+ 다른 위키페이지에서 이 클래스 라이버러리를 이용한 서버클라이언트 모델을 보여줄것이며, 또 다른 위키페이지에서 온전한 서버 모델 - 쓰레드 인터페이스와 IPC를 이용한 DB쓰레드+소켓쓰레드+Main Timer 로 구성된 - 을 보여줄것이다.
+
+
+ * 참고
+
+ 함수들의 에러발생시 syslogd를 이용하여 에러로그를 생성시키게 되어 있으나 테스트시엔 log.cpp의 syslog부분을 printf로 대체하여 사용하면 테스트하기 좋을것이다.
+
+
+ * sock.h
+{{{#!vim cpp
+/*  
+ *  기본 소켓 클래스 
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11. 23.
+ */
+
+#ifndef _SOCKET_
+#define _SOCKET_
+ 
+#include <netinet/in.h>
+
+class Sock {
+
+	private :
+		int flags;														// 소켓 상태 플래그
+		int fd;															// 소켓 기술자
+		struct sockaddr_in addr;									// 소켓주소 구조체
+		static socklen_t len;										// 소켓주소 구조체 크기
+		struct {															// sReadLine의 사용을 위해 한꺼번에 읽어놓는 임시버퍼 구조체
+			char *buff;													// 임시버퍼
+			size_t size;													// 임시버퍼의 크기
+			ssize_t num;												// 임시버퍼의 읽어놓은 데이터량
+			size_t index;												// 임시버퍼의 읽어야 하는 위치를 가리킴 
+		} tmpBuf;
+					
+	public :
+		Sock(void);
+		Sock(size_t tmpBufSize);									// sReadLine을 사용할때 필요
+		~Sock(void);
+		void setAddr(const char* ip, int port);				// 소켓주소 셋팅
+		int setSocket(int family, int type, int protocol);		// 소켓 생성
+		void sClose(void);											// 소켓 해제
+		int aConnect(int retry);										// 비봉쇄 connect시도 (POLLIN | POLLOUT 체크 필요)
+		int sConnect(int retry);										// retry 횟수만큼 connect시도
+		int saveFlags(void);										// 소켓 status 저장
+		int setFlags(long arg);										// 소켓 status 셋팅
+		int restoreFlags(void);										// 저장된 소켓 stauts 복원		
+		int sBind(void);												// 서버소켓 bind
+		int sListen(int backlog);									// 서버소켓 listen
+		int sAccept(int svrSock);									// 서버소켓 fd 를 accept 한다
+		int getFd(void);												// fd를 리턴한다
+		ssize_t sSend(const void* buff, size_t size, int flags);		// Send 포장함수
+		ssize_t sSendN(const void* buff, size_t size, int flags);	// Send 포장함수(size전송완료까지 재시도)
+		ssize_t sSendR(const void* buff, size_t size, int flags);	// 데이터크기+데이터로 된 패킷을 보내는 함수 
+		ssize_t sRecv(void* buff, size_t size, int flags);	// Recv 포장함수(MSG_WAITALL flag 사용으로 sRecvN 역할)		
+		ssize_t sRecvR(void* buff, int flags);					// 데이터크기+데이터로 된 패킷을 받는 함수 
+		ssize_t sRecvLine(void* buff);							// \n 이 나올때까지 읽어들임
+		int sGetSockOpt(int level, int optname, void* optval, socklen_t* optlen); // 비동기connect의 성공여부평가에 사용
+		in_addr_t getIP(void);										// addr의 IP 출력
+
+};
+
+#endif
+
+}}}
+
+ * sock.cpp
+{{{#!vim cpp
+/*  
+ *  기본 소켓 클래스 
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11. 23.
+ */
+ 
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include<arpa/inet.h>
+#include <errno.h>
+#include "sock.h"
+#include "log.h"
+
+#define INT_SIZE sizeof(size_t)
+
+socklen_t Sock :: len = sizeof(struct sockaddr_in);
+
+Sock :: Sock(void) {
+	tmpBuf.buff = NULL;
+	fd = -1;
+}
+
+Sock :: Sock(size_t tmpBufSize) {
+	tmpBuf.buff = new char[tmpBufSize];
+	tmpBuf.size = tmpBufSize;
+	tmpBuf.num = 0;
+	fd = -1;
+}	
+
+Sock :: ~Sock(void) {
+	if (tmpBuf.buff != NULL) delete[] tmpBuf.buff;
+}
+
+void Sock :: setAddr(const char* ip, int port) {
+	memset(&addr, 0, len);
+	addr.sin_family = AF_INET;
+	if (ip == "INADDR_ANY") {
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);			// 서버 소켓일때
+	} else {
+		inet_pton(AF_INET, ip, &addr.sin_addr);				// 클라이언트 소켓일때
+	}
+	addr.sin_port = htons(port);
+}
+
+int Sock :: setSocket(int family, int type, int protocol) {
+	if ((fd = socket(family, type, protocol)) < 0) {
+		writeError("Socket creation failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+void Sock :: sClose(void) {
+	if (close(fd) < 0) {
+		writeError("Close socket failed");
+	}
+	fd = -1;																// 사용중인 소켓과 구분을 위해 -1대입
+}
+
+int Sock :: aConnect(int retry) {
+	flags = fcntl(fd, F_GETFL, 0);										// socket status flags 백업
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);					// 비봉쇄 소켓설정	
+	while (retry-- > 0) {
+		if (connect(fd, (struct sockaddr*) &addr, len) == 0) {	// 즉각 연결되었다면
+			fcntl(fd, F_SETFL, flags);										// 봉쇄소켓으로 환원
+			return(1);
+		} else if (errno != EINPROGRESS) {							// 즉각 연결되진 않고 실패했다면
+			writeError("Socket Connection failed");
+			usleep(10000);													// 잠시 멈췄다가 다시 시도
+		} else {																	// 정상적인 connect 중이라면
+			return(0);
+		}
+	}
+	writeCrit("Socket connection times exceeded");
+	return(-1);
+}
+
+int Sock :: sConnect(int retry) {
+	while (retry-- > 0) {
+		if (connect(fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+			writeError("Socket connection failed");
+			usleep(10000);											// 딜레이를 잠깐 준다
+		} else {
+			return(0);
+		}
+	}
+	writeCrit("Socket connection timeout");
+	return(-1);
+}
+
+int Sock :: saveFlags(void) {
+	if ((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+		writeError("Get socket status flags failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+int Sock :: setFlags(long arg) {
+	if (fcntl(fd, F_SETFL, flags | arg) < 0) {
+		writeError("Set socket status flags failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+int Sock :: restoreFlags(void) {
+	if (fcntl(fd, F_SETFL, flags) < 0) {
+		writeError("Restore socket status flags failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+int Sock :: sBind(void) {
+	if (bind(fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+		writeError("Socket binding failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+int Sock :: sListen(int backlog) {
+	if (listen(fd, backlog) < 0) {
+		writeError("Socket listening failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+int Sock :: sAccept(int svrFd) {											// svrRd : 서버소켓 fd
+	fd = accept(svrFd, (struct sockaddr*) &addr, &len);
+	if (fd < 0) {
+		writeError("Socket acception failed");
+		return(-1);
+	} else {
+		return(0);
+	}
+}
+
+ssize_t Sock :: sRecv(void* buff, size_t size, int flags) {
+	ssize_t len;
+	if ((len = recv(fd, buff, size, flags)) < 0) {
+		writeError("Socket receive failed");
+	}
+	return(len);
+}
+
+ssize_t Sock :: sSend(const void* buff, size_t size, int flags) {
+	ssize_t len;
+	if ((len = send(fd, buff, size, flags)) < 0) {
+		writeError("Socket send failed");
+	}
+	return(len);
+}
+
+ssize_t Sock :: sSendN(const void* buff, size_t size, int flags) {
+	char* tmp;															// void* 의 증가를 위함
+	size_t leftN;														// 쓰야할 남은 데이터 양
+	ssize_t sendN;													// 쓰기에 성공한 데이터 양
+	tmp = (char*) buff;
+	leftN = size;
+	while (leftN > 0) {												// 쓸 데이터가 남아있는동안
+		if ((sendN = send(fd, tmp, leftN, flags)) <= 0) {
+			writeError("Socket send failed");
+			return(-1);
+		}
+		leftN -= sendN;												// 쓰야할 데이터량 감소
+		tmp += sendN;													// 쓰기 성공한 데이터까지 포인터이동
+	}
+	return(size);														// 전체 쓰기에 성공한 데이터량을 반환
+}
+
+ssize_t Sock :: sSendR(const void* buff, size_t size, int flags) {			// size : 데이터부분의 크기
+	size_t sz;
+	char temp[size + INT_SIZE];
+	sz = htonl(size);																// 네트웍 바이트 오더로 바꿈
+	memcpy(temp, &sz, INT_SIZE);											// 데이터 크기넣음
+	memcpy(temp + INT_SIZE, buff, size);									// 데이터 넣음
+	return(sSendN(temp, size + INT_SIZE, flags));						// 데이터크기+데이터 를 소켓에 보냄
+}
+
+ssize_t Sock :: sRecvR(void* buff, int flags) {
+	ssize_t len;																		// 읽은 크기
+	size_t dataSize;															  	// 실제 데이터부분의 크기
+	if ((len = sRecv(&dataSize, INT_SIZE, flags)) <= 0) {				// 데이터크기만 먼저 읽어온다
+		return(len);																// close신호이거나 에러라면 리턴
+	}
+	dataSize = ntohl(dataSize);												// 호스트 바이트 오더로 변경
+	return (sRecv(buff, dataSize, flags));									// 데이터크기만큼 다시 읽어온다
+}
+
+ssize_t Sock :: sRecvLine(void* buff) {
+	char* tmp;																		// void* 의 연산을 위함
+	size_t total = 0;
+	tmp = (char*) buff;
+	while (true) {
+		for (; tmpBuf.num > 0;) {												// 임시버퍼에 읽을 데이터가 있는 동안에
+			if (tmpBuf.buff[tmpBuf.index] == '\n') {
+				tmpBuf.num--;													// \n 을 읽었으므로 변수값 조정
+				tmpBuf.index++;					
+				return(total);														// buff에 \n 은 포함하지 않는다
+			}
+			*tmp++ = tmpBuf.buff[tmpBuf.index];
+			total++;
+			tmpBuf.num--;
+			tmpBuf.index++;
+		}
+		if ((tmpBuf.num = sRecv(tmpBuf.buff, tmpBuf.size, 0)) <= 0) {	// 임시버퍼가 비었으므로 bufSize만큼 읽어들임
+			return (tmpBuf.num);
+		}
+		tmpBuf.index = 0;
+	}
+}
+
+int Sock :: sGetSockOpt(int level, int optname, void* optval, socklen_t* optlen) {
+	return(getsockopt(fd, level, optname, optval, optlen));
+}
+
+int Sock :: getFd(void) {
+	return(fd);
+}
+
+in_addr_t Sock :: getIP(void) {
+	return (addr.sin_addr.s_addr);
+}
+
+}}}
+
+ * asyncSocket.h
+{{{#!vim cpp
+ /*
+ *  비동기 다중 소켓통신을 하는 소켓 인터페이스 
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11. 25.
+ */
+ 
+#ifndef _ASYNC_SOCKET_
+#define _ASYNC_SOCKET_
+
+#include <sys/poll.h>
+#include <time.h>
+#include "sock.h"
+
+class ConInfo {														// 소켓에 대한 상태 정보 클래스
+	public :
+		int status;														// connectting : 0, using : 1, not using : -1
+		time_t conTime;												// connect 할때의 시간 : connect timeout을 처리하기 위함
+		int timeout;														// connect 대기하는 최대시간
+};
+
+class AsyncSocket {
+
+	private :
+		int maxi;														// 관심있는 소켓중 최대 인덱스
+		int conNum;													// 연결되어 있는 전체 소켓 갯수
+		int maxFd;														// 최대 fd갯수
+		struct pollfd* pFd;											// pollfd 객체 배열
+		ConInfo* conSock;											// 비동기 connect 처리위함
+		void increaseSock(int i, bool increase);				// 소켓의 증감변화시 여러 관련 변수값을 수정하는 메소드
+		void initValue(int maxNum);								// 생성자 실행시 공통되는 초기화
+
+	public :
+		AsyncSocket(int maxNum);								// maxNum : 소켓 갯수
+		AsyncSocket(int maxNum, size_t tmpBuf);			// tmpBuf : sReadLine 사용시의 임시버퍼 크기
+		Sock* sock;													// 소켓 객체 배열
+		virtual ~AsyncSocket(void);
+		int aListen(int domain, int type, int protocol, const char* ip, int port, int backlog); // 서버소켓 (0번 인덱스사용)
+		int aConnect(int domain, int type, int protocol, const char* ip, int port, int retry, int t);	 // 소켓 인덱스 리턴
+		void aClose(int i);											// 연결되어 있던 소켓을 닫고 관련 변수값을 조정하는 메소드
+		int aPoll(int mSec);											// fd 들의 입출력 상태 감시
+		int getConNum(void);										// conNum 반환
+		int getSockStatus(int i);									// conSock.status 반환
+		virtual void atAccept(int i) = 0;							// accept 성공시에 실행될 가상함수
+		virtual void atConnect(int i) = 0;						// connect 성공시에 실행될 가상함수
+		virtual void atPollin(int i) = 0;							// 읽을 데이터가 있는 fd 를 처리하는 순수가상함수
+		/* 소켓이 닫힐때를 위하여 if (read(i) <= 0 ) aClose(i) 를 호출하는 부분을 반드시 구현하여야 한다 */
+	
+};
+
+#endif
+
+}}}
+
+ * asyncSocket.cpp
+{{{#!vim cpp
+/*
+ *  비동기 다중 소켓통신을 하는 소켓 인터페이스
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11. 25.
+ */
+ 
+#include <time.h>
+#include <sys/poll.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include "log.h"
+#include "asyncSocket.h"
+
+#include <iostream>
+
+using namespace std;
+
+AsyncSocket :: AsyncSocket(int maxNum) {
+	initValue(maxNum);
+	sock = new Sock[maxFd];
+}
+
+AsyncSocket :: AsyncSocket(int maxNum, size_t tmpBuf) {
+	initValue(maxNum);
+	sock = new Sock[maxFd](tmpBuf);					// sReadLine 사용시의 임시버퍼 메모리 할당
+}	
+
+AsyncSocket :: ~AsyncSocket(void) {
+	delete[] sock;
+	delete[] pFd;
+	delete[] conSock;
+}
+
+void AsyncSocket :: initValue(int maxNum) {
+	int i;
+	maxFd = maxNum;
+	maxi = -1;														// 연결된 갯수가 아니고 인덱스이므로 -1
+	conNum = 0;													// 연결된 갯수는 0 개
+	pFd = new struct pollfd[maxFd];
+	conSock = new ConInfo[maxFd];
+	for (i = 0; i < maxFd; i ++) {
+		pFd[i].fd = -1;											// pollfd 의 fd 를 -1로 초기화
+		conSock[i].status = -1;								// 사용중인 소켓이 아니다
+	}
+}
+
+void AsyncSocket :: increaseSock(int i, bool increase) {	// i : sock 의 인덱스, increase : 증가인가 감소인가
+	if (increase) {													// 소켓이 증가하였다면
+		conSock[i].status = 1;									// 사용중인 소켓으로 표시
+		conNum++;													// 연결된 소켓수 증가
+		if (i > maxi) maxi = i;									// 최대 인덱스 갱신
+		pFd[i].fd = sock[i].getFd();							// 감시하는 소켓으로 등록
+		pFd[i].events = POLLIN;
+	} else {															// 소켓이 감소하였다면
+		conNum--;													// 연결된 소켓수 감소
+		conSock[i].status = -1;								// 사용중이지 않는 소켓으로 표시
+		pFd[i].fd = -1;											// 감시해제
+		if (i == maxi) {											// 닫은소켓의 인덱스가 최대인덱스였다면
+			int r;
+			for (r = maxi - 1; r > -1; r--) {					// 거꾸로 검사해나간다
+				if (pFd[r].fd < 0) continue;					// 연결안된 소켓이라면 다음으로
+				break;												// 연결되어 있는 최대 인덱스일때 루프나감	
+			}
+			maxi = r;												// 인덱스 갱신
+		}
+	}
+}
+
+int AsyncSocket :: aListen(int domain, int type, int protocol, const char* ip, int port, int backlog) {
+	if (sock[0].setSocket(domain, type, protocol) < 0) return (-1);				// 소켓 생성
+	sock[0].setAddr(ip, port);																	// 주소 지정
+	if ((sock[0].sBind() < 0) || (sock[0].sListen(backlog) < 0)) {				// 소켓과 주소연결 및 접속대기 시작
+		sock[0].sClose();
+		return (-1);
+	}													
+	increaseSock(0, true);
+	return (0);
+}
+
+void AsyncSocket :: aClose(int i) {
+	sock[i].sClose();
+	increaseSock(i, false);
+}
+
+int AsyncSocket :: aConnect(int domain, int type, int protocol, const char* ip, int port, int retry, int t) {
+	int i;
+	for (i = 1; i < maxFd; i++) {															// 0 은 서버소켓에 사용
+		if (pFd[i].fd < 0) {																	// 사용중이지 않는 소켓이면
+			if (sock[i].setSocket(domain, type, protocol) < 0) return (-1);	// 소켓 생성
+			sock[i].setAddr(ip, port);														// 연결할 주소 지정
+			switch (sock[i].aConnect(retry)) {
+				case (0) :																// connect 중이다
+					increaseSock(i, true);
+					pFd[i].events = POLLIN | POLLOUT;
+					conSock[i].status = 0;											// 읽을 데이터 대기중인 소켓과 구분위함
+					conSock[i].conTime = time(NULL);						// timeout 처리위함
+					conSock[i].timeout = t;
+					return(i);
+				case (1) :																// 이미 연결됨
+					increaseSock(i, true);
+					return(i);
+				case (-1) :															// retry 횟수만큼 연결 실패함
+					sock[i].sClose();
+					return(-1);
+			}
+		}
+	}
+	writeEmerg("Max socket connected");										// 소켓이 꽉 찻다
+	return(-1);
+}
+
+int AsyncSocket :: aPoll(int mSec) {											// mSec: 이벤트 대기시간
+	socklen_t optLen;																// getsockopt 호출을 위함
+	int i, rdyNum, retValue, optVal;												// rdyNum: 이벤트 발생한 fd 갯수
+	rdyNum = poll(pFd, maxi + 1, mSec);
+	retValue = rdyNum;																//	rdyNum 리턴위함
+	if (rdyNum <= 0) return (retValue);											// 읽기준비된 소켓이 없거나 에러라면 리턴함
+	if (pFd[0].revents & POLLIN) {												// 서버소켓에 새로운 연결요청이 들어왔다면
+		rdyNum--;																		// 이벤트 발생건수 줄임
+		for (i = 1; i < maxFd; i++) {
+			if (pFd[i].fd < 0) {														// 사용하지 않는 빈 소켓이라면
+				if (sock[i].sAccept(sock[0].getFd()) == 0) {				// accept가 성공했다면
+					increaseSock(i, true);
+					atAccept(i);														// accept 성공시에 실행될 가상함수
+				}
+				break;
+			}
+		}
+		if (i == maxFd) writeCrit("Max Socket connected !!!");					// 소켓이 maxFd 까지 모두 사용되고 있음
+	}
+	if (rdyNum == 0) return(retValue);											// 더이상 처리할 이벤트 소켓이 없으면 리턴
+	for (i = 1; i <= maxi; i++) {													// 관심있는 소켓의 최대 인덱스까지
+		if (pFd[i].fd < 0) continue;												// 관심있는 소켓이 아니라면 다음 인덱스로
+		if (conSock[i].status == 0) {												// connect 중인 소켓이라면
+			if (pFd[i].revents & (POLLIN | POLLOUT)) {					// 성공:POLLOUT, 실패:POLLIN | POLLOUT
+				rdyNum--;																// 총 이벤트 갯수 감소
+				conSock[i].status = false;									// 일단 연결중인 소켓이라는 표시는 해제한다
+				sock[i].restoreFlags();												// 블러킹 소켓으로 환원
+				sock[i].sGetSockOpt(SOL_SOCKET, SO_ERROR, &optVal, &optLen);
+				if (optVal) {															// 0 이 아니면 connect 에러
+					errno = optVal;				
+					writeError("Socket connection failed");
+					aClose(i);
+				} else {																	// 0 이므로 connect 성공
+					conSock[i].status = 1;
+					pFd[i].events = POLLIN;										// 연결 성공이라면 일반적인 소켓 데이터 감시
+					atConnect(i);														// connect 성공시에 실행될 가상함수
+				}
+				if (rdyNum == 0) break;
+			} else if ((time(NULL) - conSock[i].conTime) > conSock[i].timeout) {	// connect timeout 이면
+				writeError("Socket connection time expired");
+				aClose(i);
+			}
+		} else if (pFd[i].revents & (POLLIN | POLLERR)) {				// 읽을 데이터가 도착했다면
+			rdyNum--;																	
+			atPollin(i);																// 연결된 소켓에서 POLLIN 시에 실행될 가상함수
+			if (rdyNum == 0) break;
+		}
+	}
+	return(retValue);
+}
+
+int AsyncSocket :: getConNum(void) {
+	return(conNum);
+}
+
+int AsyncSocket :: getSockStatus(int i) {
+	return(conSock[i].status);
+}
+
+}}}
+
+ * log.h
+{{{#!vim cpp
+/*
+ *  syslogd를 이용하여 레벨별 에러들을 로그처리
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11.23.
+ */ 
+
+void writeError(char* str);                // ERROR 레벨에 포함되는 에러들
+
+void writeCrit(char* str);                // CRIT 레벨에 포함되는 에러들 - 중요한 에러사항들
+
+void writeEmerg(char* str);            // EMERG 레벨에 포함되는 에러들 - 시스템을 중지시키는 에러사항들
+
+void writeNotice(char* str, char* ip);            // 비인증접속이나, 프로토콜에 위배된 데이터가 들어올때의 로그
+}}}
+
+
+ * log.cpp
+{{{#!vim cpp
+/*
+ *  syslogd를 이용하여 레벨별 에러들을 로그처리
+ * 
+ *  Copyright (c) KarlLy corp. All rights reserved. Code by SaNha - 2003. 11.23.
+ */ 
+
+#include <stdio.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+void writeError(char *str) {
+    char list[100];
+    sprintf(list, "%s : %s\n", str, strerror(errno));
+    syslog(LOG_ERR | LOG_LOCAL0, list);
+}
+
+void writeCrit(char *str) {
+    char list[100];
+    sprintf(list, "%s : %s\n", str, strerror(errno));
+    syslog(LOG_CRIT | LOG_LOCAL0, list);
+    // 관리자에게 문자메세지 전송
+}
+
+void writeEmerg(char *str) {
+    printf("%s\n", str);                // 예제에서 소켓갯수가 꽉 찻을때의 메세지를 보기 위하여 임시로 넣어놓았다
+    char list[100];
+    sprintf(list, "%s : %s\n", str, strerror(errno));
+    syslog(LOG_EMERG | LOG_LOCAL0, list);
+    // 관리자에게 문자메세지 전송
+
+}
+
+void writeNotice(char *str, char *ip) {                                // ip는 접속된 IP
+    char list[100];
+    sprintf(list, "%s : %s\n", str, ip);
+    syslog(LOG_NOTICE | LOG_LOCAL0, list);
+}
+}}}

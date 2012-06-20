@@ -1,0 +1,78 @@
+#title Perl : subroutine 레퍼런스이용
+
+== 상황 ==
+참고 : http://www.unix.com.ua/orelly/perl/advprog/ch04_02.htm
+
+개인적으로 C(:12)와 C++ 언어에서의 함수포인터(:12)는 주로 전술패턴(:12)을 적용하기 위한 목적으로 사용을 해왔었다. Perl(:12)의 경우에는 함수에 대한 레퍼런스가 가능하다는 사실은 알고 있었지만, 시스템 관리를 위한 보조언어로 사용해왔기 때문에, 굳이 함수레퍼런스를 사용할 필요성을 느끼지 못했었다. 
+
+그러다가 성능측정시스템을 구축하던 중, 다양한 성능측정 모듈을 작동시키기 위해서는 역시 함수레퍼런스를 사용하는게 좋겠구나라는 생각을 하게 되었고, 이를 개발하게 되었다.
+
+익숙한 C언어와 함수포인터를 이용해서 모듈을 만들 수도 있었겠지만, 배포상의 문제 때문에 perl(:12)을 사용하기로 했다. 
+
+이 성능측정 시스템은 다음과 같이 구성할 수 있을 것이다.
+
+attachment:dist_perf.png
+
+Master는 성능측정을 위한 Job Function을 배포하고, Slave는 Job Function을 실행하고 그 결과를 Master로 보낸다. Master는 관리하기가 용이하겠지만, Slave는 여러대의 상이한 운영체제가 설치된 시스템이 될 수 있으므로, 컴파일된 언어보다는 Perl, python과 같은 언어를 사용하는게 좋을 것이다.
+
+Slave는 다양한 Job Function이 등록되어 있으며, Master의 요구에 따라서 적당한 Job Function을 선택해서 실행시킬 수 있어야 한다. 또한 새로 배포되는 Job Function도 등록/실행 될 수 있어야 한다. 이러한 경우에 있어서 전술패턴을 유용하게 사용할 수 있을 것이다.
+
+== 레퍼런스를 이용한 전술패턴 구현 ==
+C의 함수포인터 버전과 그닥 차이는 없다. 간단한 코드다.  
+{{{#!plain
+#!/usr/bin/perl
+
+use Getopt::Std;
+
+// 곱하기 알고리즘이 적용된 함수
+sub mul
+{
+	my($arg1, $arg2) = @_;
+	print "Function Mul\n"; 
+	print "$arg1 * $arg2 = ", $arg1 * $arg2,"\n";
+}
+
+
+// 더하기 알고리즘이 적용된 함수
+sub sum 
+{
+	my($arg1, $arg2) = @_;
+	print "Function Sum\n"; 
+	print "$arg1 + $arg2 = ", $arg1 + $arg2,"\n";
+}
+
+
+#######################################
+# MAIN
+# 사용법 : ./myprg.pl -t [sum|mul] 
+#######################################
+my %SubRoutine = (
+  "mul" => \&mul,
+  "sum" => \&sum,
+);
+
+my %opts = ();
+my $algorithms;
+getopt("t:", \%opts);
+if (defined $opts{t})
+{
+  if (exists $SubRoutine{$opts{t}})
+  {
+    $algorithms = $SubRoutine{$opts{t}};
+    print "Algorithm $opts{t}";
+  }
+  else
+  {
+    print "Algorithm Failure : [send|receive]\n";
+  }
+}
+
+## 알맞은 알고리즘을 선택한다.
+&{$algorithms}(5, 10);
+print "Close\n";
+}}}
+실제 우리가 원하는 성능측정 시스템에 적용하기 위해서는 레퍼런스할 함수의 정보를 담은 설정파일과 함수를 담은 perl 패키지파일을 배포할 '''배포시스템'''이 필요할 것이다.
+
+배포시스템은 ssh(:12)의 rsa 공개키를 이용하면, 쉽게 구축할 수 있다. [wiki:JCvs/Search/Document/nutch/Hadoop Hadoop]문서를 참고하기 바란다. 이 문서는 배포시스템을 위한 아이디얼한 정보를 제공하는데, 제대로 배포시스템을 만들려면, 관리와 배포를 위한 관리자 인터페이스를 만들어야 할 것이다. 개인적으로는 위키(:12)를 이용해서 배포시스템을 만들었는데, 시간이 되면 자세히 다루어보도록 하겠다. 
+
+[[tag(패턴,알고리즘,perl)]]

@@ -1,0 +1,48 @@
+#title RSA, DSA Key 교환을 이용한 ssh 로그인
+
+=== RSA, DSA Key 교환으로 로그인 하기 ===
+perl 의 expect(:12)모듈을 이용해서 자동로그인 하는 프로그램을 만들 수도 있지만, 좀 많이 귀찮습니다. 게다가 보안에도 문제가 좀 있는 찜찜한 방법입니다. 다수의 서버를 관리하기에는 좋은 방법이 아닙니다. 
+
+ssh(:12)의 dsa/rsa 키를 이용하면 아이디/패스워드 입력 없이 안전한 로그인 환경을 만들 수 있습니다. 이 방법은 분산처리 시스템이나 클라우드 환경에서 유용하게 사용할 수 있습니다.
+
+=== 상황 ===
+아래는 dsa/rsa 키교환을 테스트하기 위한 네트워크 환경입니다. 클라이언트는 연결을 요청하는 시스템이고, 서버는 연결할 시스템입니다. 클라이언트 서버의 호스트명은 '''my_client_1'''이고 서버는 '''my_server_1''', '''my_server_2''', '''my_server_3'''입니다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/RDg-RWdEMenyFvE8dVauoQ?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uZG0Wh4LI/AAAAAAAABR4/wqIZm836c2E/s800/su4KPwr5c9lMJn0Ol86__fQ.png" /></a>
+}}}
+=== dsa / rsa 키 생성 ===
+my_client_1 에서 ssh-keygen 을 이용해서 dsa 키를 생성합니다.
+{{{#!plain
+# ssh-keygen -t dsa
+}}}
+이제 .ssh 디렉토리에 보면 '''id_dsa'''와 '''id_dsa.pub'''가 생긴것을 확인할 수 있다. id_dsa.pub 가 공개키인데, 각 서버에 복사하면 됩니다.
+
+rsa key를 만들고 싶다면 dsa 대신 rsa를 쓰면 된다.
+
+=== dsa / rsa 키 복사 ===
+이제 각 공개키를 접속을 원하는 서버에 복사를 해야 합니다. 복사할 대상 서버는 my_server_1, my_server_2, my_server_3 이고요. 접속에 사용할 계정은 '''yundream''' 으로 합니다. 
+
+물론 각 서버에 ssh(:12) 데몬(:12)은 떠있어야 하겠죠. my_server_1 의 /home/yundream 에 .ssh 디렉토리를 만들고 id_dsa.pub 파일 내용을 .ssh 디렉토리에 있는 '''authorized_keys'''파일에 추가하면 됩니다. 만약 authorized_keys 파일이 없다면 새로 만들면 되고요. 참고로 .ssh 와 authorized_keys 는 소유자 yundream 으로 0600의 권한을 가지고 있어야 합니다. ssh 서버 버전에 따라서 소유권한을 엄격히 검사하거든요. 
+
+이걸로 끝. 이제 로그인 과정 필요없이 접속할 수 있습니다.
+{{{#!plain
+# ssh yundream@my_server_1
+}}}
+
+로그인 과정을 거치지 않고 원격으로 명령들을 실행할 수도 있습니다.
+{{{#!plain
+# ssh yundream@my_server_1 ls -al
+}}}
+
+키를 여러개 만들어서 배포할 경우가 있는데요. -i 옵션으로 사용할 키를 명시할 수 있습니다.
+{{{#!plain
+# ssh yundream@my_server_1 -i .ssh/joinc_auth_key
+# ssh yundream@my_server_2 -i .ssh/admin_auth_key
+}}}
+
+== History ==
+  * 작성일 : 2008년 12월
+  * 최근수정일 : 2011년 9월 24일
+
+[[Tag(ssh,login)]]

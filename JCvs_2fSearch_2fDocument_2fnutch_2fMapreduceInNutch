@@ -1,0 +1,101 @@
+#title nutch에서의 MapReduce
+ <!> 문서의 내용은 완성된 상태가 아니다. nutch소스코드를 분석하면 완성된 문서가 만들어질 것이다.
+[[UploadFile]]
+[[TableOfContents]]
+== MapReduce 소개 ==
+MapReduce는 Google(:12)에 의해서 개발된 프로그래밍 모델이다. 아래의 정보를 확인하기 바란다. 
+ 1. http://labs.google.com/papers/mapreduce 
+ 1. [wiki:JCvs/Search/Document/ManReduce ManReduce Joinc 위키] 
+
+== MapReduce Diagram ==
+attachment:MapreduceDia.jpg
+
+== Nutch Algorithms ==
+MapReduce는 완성된 상태로 배포되는 라이브러리 혹은 프로그램이 아닌 모델이다. 그러므로 자신의 환경에 맞는 MapReduce 시스템을 만들어야 한다. Nutch 역시 MapReduce 모델을 따르는 시스템을 구성했다.
+
+Nutch는 crawl db에 URL을 삽입하는데에서 부터 시작하며, 아래와 같은 일련의 작업을 순환한다.
+ 1. crawl db로 부터 url의 목록을 생성한다.  
+ 1. segment에서 url의 목록을 fetch한다.  
+ 1. segment에서 fetch한 컨텐츠를 분석(parse) 한다. 
+ 1. 세그먼트로 부터 crawl db와 분석한 데이터를 업데이트 한다. 
+segments로 부터 invert 링크를 분석한다.  
+
+segment 문서와 anchor 문서에 대한 색인을 생성한다.
+즉 아래와 같은 작업을 반복적으로 수행한다.
+{{{#!plain
+   +--> generate -> fetch -> parser -> update ->invert links -> index -->--+ 
+   |                                                                       |
+   |                                                                       |
+   +----------------------------<------------------------------------------+   
+}}}
+이 문서에서는 각각의 작업을 수행하기 위한 알고리즘을 정리한다.
+== 자료구조 : CrawlDB ==
+CrawlDB는 디렉토리와 여기에 포함된 파일의 형태로 데이터를 DB화 한다. 
+{{{#!plain
+<URL, CrawlDatum>
+}}}
+CrawlDatum :
+{{{#!plain
+<status, date, interval, failures, linkCount, ...>
+}}}
+Status:
+{{{#!plain
+{db_unfetched, db_fetched, db_gone, linked, 
+ fetch_success, fetch_fail, fetch_gone}
+}}}
+
+== 알고리즘 ==
+=== Inject 알고리즘 ===
+ *  MapReduce 1 : 입력을 DB format으로 변환한다. 
+   * 입력 : Url에서 가져온 Text 파일  
+   * Map(line) -> <Url, CrawlDatum>; status=db_unfetched 
+   * Reduce()
+   * 출력 : 디렉토리 형식의 임시파일 
+ *  MapReduce 2 : 존재하는 DB와 통합한다. 
+   * Input : 1단계 출력파일과 존재하는 DB 파일 
+   * Map()
+   * Reduce: CrawlDatum에 단일 entry로 통합한다.  
+   * 출력 : 새로운 버젼의 DB
+=== Generate 알고리즘 ===
+ * MapReduce 1 : fetch할 Url을 선택한다.   
+   * 입력 : CrawlDB 파일
+   * Map() -> if date >= now, invert to <CrawIDatum, url>
+   * Reduce : Compare() 함수를 이용 CrawlDatum.linkCount로 소트해서 top-N의 entry만을 출력한다. 
+ * MapReduce 2 : fetch 준비 
+   * 출력 : 병렬적으로 패치를 수행한 결과 생성된 <url, CrawlDatum>데이터를 가지는 파일 
+=== Fetch 알고리즘 ===
+ * MapReduce : url의 패치 셋
+   * 입력 : <url, CrawlDatum> 호스트별로 hash소트
+   * Map(url,CrawlDatum) -> <url,FetcherOutput> : 다중쓰레드, 비동기 맵을 생성하며 Nutch protocol을 지원하는 외부 플러그인(:12)을 호출한다. 
+   * TetcherOutput : <CrawlDatum, Content> 
+   * 출력 : <url, CrawlDatum>, <url, Content>의 데이터 셋을 가지는 두개의 파일 
+=== Parse 알고리즘 ===
+ * MapReduce : Content 분석
+   * 입력 : <url, Content> 파일
+   * Map(url, Content) -> <url, Parse>, 외부 Nutch parser 플러그인을 호출한다.
+   * Parse : <ParseText, ParseData> 
+   * 출력 : <url,ParseText>, <url,ParseData>, <url,CrawlDatum> 
+=== Update CrawlDB 알고리즘 ===
+ * MapReduce : fetch와 db의 내용을 통합 
+   * 입력 : <url,CrawlDatum> fetch및 parse결과가 추가된 db 
+   * Reduce() : 새로추가된 모든 single entry와 기존의 entry들을 합병, 이전 DB에 쓰기모드로 덮어쓴다. 이전디비의 link count를 수정한다.  
+   * 출력 : 새로운 crawldb
+=== Invert Links 알고리즘 ===
+ * MapReduce : 모든 Url에 있는 inlink를 계산한다.  
+   * 입력 : <url, ParseData>, 페이지에서 외부로 나가는 outlink 
+   * Map(SrcUrl, ParseData> -> <destUrl, inlinks>
+   * 출력 : <url, inlinks>, Url로 향하는 모든 외부링크, 이 정보는 페이지 랭크를 결정하기 위한 정보로 사용한다.   
+=== Index(색인) 알고리즘 ===
+ * MapReduce : Lucene(:12) 인덱스를 생성한다.
+   * 입력 : <Class, Object>를 가진 파일들, 
+     <url, ParseData> : title, metadata등을 포함 
+     <url, ParseText> : Text를 포함
+     <url, Inlinks> : Url로 향하는 링크정보 
+     <url, CrawlDatum> : 
+   * Reduce() : Nutch indexing 플러그인을 이용해서 Lucene Document의 생성 
+   * 출력 : Lucen index 
+=== Search(검색) 알고리즘 ===
+ * Search에서는 MapReduce가 사용되지 않는다. 일반적인 Random access, Binary Search가 이루어진다. 자세한 내용은 [wiki:JCvs/Search/Document/nutch/query Nutch Query 및 Search]문서를 참고하기 바란다.
+
+== 참고 문헌 ==
+ 1. attachment:mapred.pdf

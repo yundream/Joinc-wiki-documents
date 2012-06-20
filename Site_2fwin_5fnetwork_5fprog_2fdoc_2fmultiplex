@@ -1,0 +1,473 @@
+#title 윈도 비동기 이벤트 기반 네트워크 프로그래밍
+
+[[TableOfContents]]
+== 입출력 다중화 모델 ==
+=== BSD select 입출력 다중화 ===
+입출력 다중화 기술은 유닉스 운영체제(:12) 시스템에서 하나 이상의 파일로 부터의 입력과 출력을 함께 관리하기 위해서 사용한다. 자세한 내용은 입출력:::다중화(:12)를 참고한다.
+
+윈도는 BSD:::socket(:12)의 입출력 다중화 인터페이스인 select(:2)함수를 그대로 사용하고 있다. 
+{{{#!plain
+int select(
+  __in     int nfds,
+  __inout  fd_set *readfds,
+  __inout  fd_set *writefds,
+  __inout  fd_set *exceptfds,
+  __in     const struct timeval *timeout
+);
+}}}
+몇 가지 다른 점은 nfds를 사용하지 않는 다는 점이다. 윈속에서 nfds는 BSD socket과의 호환을 위해서 남겨두었다. 이는 fd_set 구조체의 차이에 기인한다. BSD select의 fd_set과는 달리 윈속은 fd_set에 관리할 파일의 개수 정보를 저장하기 때문이다.
+{{{#!plain
+typedef struct fd_set {
+  u_int  fd_count;              // fd_array에 설정된 파일의 총 개수
+  SOCKET fd_array[FD_SETSIZE];
+} fd_set;
+}}}
+
+=== 파일 대응 ===
+윈도는 소켓과 파일을 다른 객체로 보기 때문에, select함수로 파일을 다룰 수는 없다. 리눅스는 표준입력과 소켓을 모두 select로 처리할 수 있기 때문에, 예컨데 콘솔 채팅 클라이언트도 단일 쓰레드 모델로 만들 수 있지만, 윈속 select로는 그렇게 할 수 없다. 어쩔 수 없이 멀티 쓰레드 프로그래밍 기술을 응용해야 한다.
+
+=== 지원 윈도 버전 ===
+ windows 2000 Professional, windows 2000 Server 이상에서 지원한다.
+
+=== 예제 ===
+{{{#!plain
+#include <stdio.h> 
+#include <winsock2.h> 
+ 
+#define MAX_LINE 1024 
+#define BACKLOG 5
+ 
+int main(int argc, char **argv) 
+{ 
+    WSADATA wsaData; 
+    SOCKET listen_fd, accept_fd, max_fd =0, sock_fd; 
+    struct sockaddr_in listen_addr, accept_addr; 
+    char buf[MAX_LINE]; 
+ 
+    int readn, addr_len; 
+	unsigned int i, fd_num=0;
+
+    fd_set old_fds, new_fds; 
+ 
+    if(argc != 2) 
+    { 
+        printf("Usage : %s [PORT]\n", argv[1]); 
+        return 1; 
+    } 
+ 
+    if(WSAStartup(MAKEWORD(2,2), &wsaData) != 0) 
+        return 1; 
+ 
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0); 
+    if(listen_fd == INVALID_SOCKET) 
+        return 1; 
+ 
+    memset((void *)&listen_addr, 0x00, sizeof(listen_addr)); 
+ 
+    listen_addr.sin_family = AF_INET; 
+    listen_addr.sin_port = htons(atoi(argv[1])); 
+    listen_addr.sin_addr.s_addr = htonl(INADDR_ANY); 
+ 
+    if( bind (listen_fd, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) == SOCKET_ERROR) 
+        return 1; 
+ 
+    if(listen(listen_fd, BACKLOG) == SOCKET_ERROR) 
+        return 1; 
+ 
+    FD_ZERO(&new_fds); 
+    FD_SET(listen_fd, &new_fds);  
+ 
+    while(1) 
+    { 
+		int testi = 0;
+        old_fds = new_fds; 
+ 
+		printf("accept wait %d\n", new_fds.fd_count);
+
+        fd_num = select(0, &old_fds, NULL, NULL, NULL); 
+        if(FD_ISSET(listen_fd, &old_fds)) 
+        { 
+            addr_len = sizeof(struct sockaddr_in); 
+            accept_fd = accept(listen_fd, (struct sockaddr *)&accept_addr, &addr_len);
+            if(accept_fd == INVALID_SOCKET) 
+            { 
+                continue; 
+            } 
+            FD_SET(accept_fd, &new_fds);
+        } 
+ 
+		for(i = 1; i <= new_fds.fd_count; i++) 
+        { 
+			sock_fd = new_fds.fd_array[i];
+			if(FD_ISSET(sock_fd, &old_fds)) 
+			{ 
+				memset(buf, 0x00, MAX_LINE); 
+				readn = recv(sock_fd, buf, MAX_LINE, 0); 
+				if(readn <= 0) 
+				{ 
+					printf("socket close\n"); 
+					closesocket(sock_fd); 
+					FD_CLR(sock_fd, &new_fds);
+				} 
+				else 
+				{ 
+					send(sock_fd, buf, readn, 0); 
+				} 
+				if (--fd_num <=0 ) break;
+			} 
+         } 
+    } 
+    closesocket(listen_fd); 
+    WSACleanup(); 
+    return 0; 
+}  
+}}}
+
+리눅스 프로그램 보다는 구조가 단순하다. 이는 fd_set 구조체의 차이에 기인한다. 비트 배열이 아닌 소켓 지시자를 저장하는 SOCK 배열로, 배열에 저장된 소켓의 크기를 알려 줄 뿐더러, 배열을 (마치 링크드:::리스트(:12) 처럼)직접 관리해 주기 때문이다. 리눅스(:12)라면 프로그래머가 직접 해야 할 일을 윈속(:12)에서 대신 처리해 준다.
+
+== WSAEventSelect 구현 ==
+윈도의 이벤트 객체를 이용해서 네트워크 이벤트를 감지한다. 각 소켓에 대해서 이벤트 객체를 설정하고, 이 이벤트 객체를 관찰한다. 이벤트의 타입이 다를 뿐, 이벤트를 기다린 다는 점에서 기본 원리는 BSD select를 이용한 방식과 동일하다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/9KPN_r4eNv9Fs88vWgczRw?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S7oPw8hMW4I/AAAAAAAABWo/6CFe46zEWeU/s800/event.png" /></a>
+}}}
+
+다음과 같은 흐름을 가진다.
+  1. WSACreateEvent(:4200)함수로 이벤트 객체를 생성한다.
+  1. WSAEventSelect(:4200)함수로 소켓과 이벤트를 짝 짓는다.  
+  1. WSAWaitForMultipleEvents(:4100)함수로 이벤트를 기다린다.
+  1. 이벤트가 발생하면, 이벤트의 종류를 확인해서 처리한다. 
+더 이상 사용하지 않는 이벤트는 WSACloseEvent(:4200)함수로 이벤트 객체를 제거한다. 
+
+WSAEventSelect 함수로 등록할 수 있는 소켓 이벤트는 다음과 같다.
+ || FD_READ            || 데이터가 수신되었을 때              ||
+ || FD_WRITE           || 데이터 전송이 준비되었을 때         ||
+ || FD_OOB             || OOB(out of band)데이터가 수신 되었을 때 ||
+ || FD_ACCEPT          || 접속 요구가 들어왔을 때             ||
+ || FD_CONNECT         || 접속이나, multi-point join 작업이 완료되었을 때 ||
+ || FD_CLOSE           || 상대방이 연결을 끊었을 때       ||
+ || FD_QOS             || QOS가 변경되었다는 메시지를 받았을 때      ||
+ || FD_GROUP_QOS       || 그룹 QOS가 변경되었다는 메시지를 받았을 때 ||
+ || FD_ROUTING_INTERFACE_CHANGE  || 지정된 목적지에 대해서 경로 배정 인터페이스가 변경되었을 때  ||
+ || FD_ADDRESS_LIST_CHANGE  || 소켓의 프로토콜 집합에 대한 로컬 어드레스 리스트가 변경되었을 때  ||
+
+{{{#!plain
+#include <winsock2.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+ 
+#define MAXLINE 1024 
+#define PORTNUM 3600 
+ 
+struct SOCKETINFO 
+{ 
+    SOCKET fd; 
+    char buf[MAXLINE]; 
+    int readn; 
+    int writen; 
+}; 
+ 
+WSAEVENT EventArray[WSA_MAXIMUM_WAIT_EVENTS]; 
+int EventTotal=0; 
+struct SOCKETINFO *socketArray[WSA_MAXIMUM_WAIT_EVENTS]; 
+ 
+int CreateSocketInfo(SOCKET s) 
+{ 
+    struct SOCKETINFO *sInfo; 
+ 
+    if((EventArray[EventTotal] = WSACreateEvent()) == WSA_INVALID_EVENT) 
+    { 
+		printf("Event Failure\n");
+        return -1; 
+    } 
+
+    sInfo = (void *)malloc(sizeof(struct SOCKETINFO)); 
+    memset((void *)sInfo, 0x00, sizeof(struct SOCKETINFO)); 
+    sInfo->fd = s; 
+	sInfo->readn = 0;
+	sInfo->writen = 0;
+    socketArray[EventTotal] = sInfo; 
+ 
+    EventTotal ++; 
+    return 1; 
+} 
+ 
+void freeSocketInfo(int eventIndex) 
+{ 
+    struct SOCKETINFO *si = socketArray[eventIndex]; 
+    int i; 
+ 
+    closesocket(si->fd); 
+    free((void *)si); 
+ 
+    if(WSACloseEvent(EventArray[eventIndex]) == TRUE) 
+    { 
+        printf("Event Close OK\n"); 
+    } 
+    else 
+    { 
+        printf("Event Close Failure\n"); 
+    } 
+    for(i = eventIndex; i < EventTotal; i++) 
+    { 
+        EventArray[i] = EventArray[i+1]; 
+        socketArray[i] = socketArray[i+1]; 
+    } 
+    EventTotal--; 
+} 
+ 
+int main(int argc, char **argv) 
+{ 
+    WSADATA wsaData; 
+    SOCKET sockfd, clientFd; 
+    WSANETWORKEVENTS networkEvents; 
+	char buf[MAXLINE];
+    int eventIndex; 
+    int flags; 
+ 
+    struct SOCKETINFO *socketInfo; 
+ 
+    struct sockaddr_in sockaddr; 
+ 
+    if(WSAStartup(MAKEWORD(2,2),&wsaData) != 0) 
+    { 
+        printf("dll load error\n"); 
+        return 1; 
+    } 
+ 
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+    if(sockfd == INVALID_SOCKET) 
+    { 
+        return 1; 
+    } 
+ 
+    sockaddr.sin_family = AF_INET; 
+    sockaddr.sin_port = htons(PORTNUM); 
+    sockaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
+ 
+    if (CreateSocketInfo(sockfd)== -1) 
+    { 
+        return 1; 
+    } 
+ 
+    if(WSAEventSelect(sockfd, EventArray[EventTotal - 1], FD_ACCEPT|FD_CLOSE) == SOCKET_ERROR) 
+    { 
+        return 1; 
+    } 
+ 
+    if(bind(sockfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == SOCKET_ERROR) 
+    { 
+        return 1; 
+    } 
+ 
+    listen(sockfd, 5); 
+ 
+    while(1) 
+    { 
+ 
+        eventIndex = WSAWaitForMultipleEvents(EventTotal, EventArray, FALSE, WSA_INFINITE, FALSE); 
+        if(eventIndex == WSA_WAIT_FAILED) 
+        { 
+            printf("Event Wait Failed\n"); 
+        } 
+        if(WSAEnumNetworkEvents(socketArray[eventIndex - WSA_WAIT_EVENT_0]->fd,  
+            EventArray[eventIndex - WSA_WAIT_EVENT_0], &networkEvents) == SOCKET_ERROR) 
+        { 
+            printf("Event Type Error\n"); 
+        } 
+ 
+        if(networkEvents.lNetworkEvents & FD_ACCEPT) 
+        { 
+            if(networkEvents.iErrorCode[FD_ACCEPT_BIT] != 0) 
+            { 
+                break; 
+            } 
+            if ((clientFd = accept(socketArray[eventIndex - WSA_WAIT_EVENT_0]->fd, NULL, NULL)) == INVALID_SOCKET) 
+            { 
+                break; 
+            } 
+            if(EventTotal > WSA_MAXIMUM_WAIT_EVENTS) 
+            { 
+                printf("Too many connections\n"); 
+                closesocket(clientFd); 
+            } 
+            CreateSocketInfo(clientFd); 
+ 
+            if( (WSAEventSelect(clientFd, EventArray[EventTotal -1], FD_READ|FD_CLOSE) == SOCKET_ERROR) == SOCKET_ERROR) 
+            { 
+                return 1; 
+            } 
+        } 
+ 
+        if(networkEvents.lNetworkEvents & FD_READ) 
+        { 
+            flags = 0;
+	        memset(buf, 0x00, MAXLINE);
+            socketInfo = socketArray[eventIndex - WSA_WAIT_EVENT_0];
+			socketInfo->readn = recv(socketInfo->fd, socketInfo->buf, MAXLINE, 0);
+			send(socketInfo->fd, socketInfo->buf, socketInfo->readn, 0);
+        } 
+ 
+        if(networkEvents.lNetworkEvents & FD_CLOSE) 
+        { 
+			printf("Socket Close\n");
+            freeSocketInfo(eventIndex-WSA_WAIT_EVENT_0); 
+        } 
+    } 
+} 
+}}}
+
+WSAEventSelect 함수를 호출하면 자동으로 소켓을 비동기/비봉쇄 모드로 설정한다. 때문에 이를 감안해서 recv/recv 함수를 호출해야 한다. 예를 들어 FD_READ 이벤트를 받고 나서 read(:4200)을 호출 했을 때, '''WSAEWOULDBLOCK'''에러가 발생할 수도 있다는 의미다. 견고한 애플리케이션을 만들려면 이러한 예외 사항을 처리해 주어야 한다. 위의 프로그램은 WSAEWOULDBLOCK 처리는 포함하지 않고 있다.
+
+== WSAAsyncSelect 구현 ==
+비동기 이벤트 방식 중 가장 널리 사용되는 방법중의 하나다. WSAEventSelect와 비슷한 매커니즘을 가진다. 차이점이라면 WSAEventSelect는 이벤트 객체를 사용해서 입출력을 다루고, WSAAsyncSelect함수는 윈도우 메시지 형태로 네트워크 이벤트를 처리한다는 점이다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/nrA7s5VKFgekWE88hcif_g?feat=embedwebsite"><img src="http://lh3.ggpht.com/_Os5qf5urx_A/S7oOs02N3zI/AAAAAAAABWg/4Z4dJ8yK2GY/s800/asyncselect.png" /></a>
+}}}
+
+WSAAsyncSelect를 이용한 데이터 처리 흐름이다. WSAEventSelect와 큰 차이가 없다.
+  1. 소켓에서 관심있는 네트워크 이벤트와 메시지를 핸들할 윈도 핸들러를 함께 등록한다.
+  1. 네트워크 이벤트가 발생하면, 윈도 메시지가 발생하고 윈도 프로시저가 호출된다. 이때 실행되는 윈도 프로시저의 이름은 WndProc이다.
+    {{{#!plain
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+...
+}
+}}}
+  1. 윈도 프로시저는 받은 메시지 종류에 따라 데이터를 처리한다.
+    WSAGETSELECTEVENT매크로를 이용해서 어떤 종류의 이벤트가 발생했는지를 확인할 수 있다.
+
+WSAAsyncSelect함수가 호출되면, 소켓은 자동적으로 비 봉쇄 소켓이된다.
+
+TCP 기반의 echo 서버 프로시져 코드. 나중에 실행 가능한 예제를 만들어봐야지 
+{{{#!plain
+#include <windows.h>
+#include <winsock2.h>
+
+#define MAXLINE 1024
+int main(int argc, char **argv)
+{
+	HWND Windows = NULL;
+	if(argc != 2)
+	{
+		printf("Usage : %s [port]\n", argv[0]);
+		return 0;
+	}
+	WSAStartup();
+	listen_fd = socket(AF_INET,,,);
+
+	Windows = CreateWindow(...);
+
+	// 듣기 소켓의 accept 이벤트와 close 이벤트 메시지를 
+	// Windows 핸들러가 가르키는 윈도의 프로시져가 처리하도록 한다.
+	WSAAsyncSelect(listen_fd, Windows, WM_SOCKET, FD_ACCEPT | FD_CLOSE);
+
+	bind();	
+	listen();
+
+	// 걍 루프돌면서 기다린다.
+	while(1)
+	{
+		Sleep(10000);
+	}
+}
+
+// 윈도 메시지를 처리할 프로시져 코드 
+LRESULT CALLBACK WinProc(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam)
+{
+	SOCKET client_fd;
+	// 메시지 타입이 소켓 메시지면
+	if(uMsg == WM_SOCKET)
+	{	
+		switch(WSAGETSELECTEVENT(lParm))
+		{
+			// accept 이벤트라면
+			case FD_ACCEPT:
+				client_fd = accept(wParam,);
+				WSAAsyncSelect(client_fd,,,);
+				break;
+			// read 이벤트라면
+			case FD_READ:
+				recv(wParm,,,);
+				send(wParm,,,);
+				break;
+			// 소켓 닫기 이벤트라면
+			case FD_CLOSE;
+				closesocket(wParm);
+				break;
+		}
+	}
+}
+}}}
+
+ * WSAAsyncSelect 모델 기반 서버 프로그램 : UDP
+ * http://qsoft.cjb.net 
+{{{#!plain
+#include <windows.h>
+#include "resource.h"
+
+#define APP_PORT 0x1983
+#define WM_SOCKETREAD (WM_APP + 100)
+
+SOCKADDR_IN saServer;
+SOCKET sock;
+
+BOOL CALLBACK DialogProc(HWND hDlg, UINT MSG, WPARAM wParam, LPARAM lParam)
+{
+	switch(MSG)
+	{
+	 case WM_INITDIALOG:
+		{
+			WSAAsyncSelect(sock, hDlg, WM_SOCKETREAD, FD_READ);
+		}break;
+		case WM_COMMAND:
+		{
+			switch(wParam)
+			{
+				case IDC_OK:
+				case IDC_CANCEL: EndDialog(hDlg, 0); break;
+			}
+		}break;
+		case WM_SOCKETREAD:
+		{
+			SOCKADDR from;
+			char buffer[256];
+			int len = sizeof(SOCKADDR);
+			memset(buffer, '\0', 256);
+			recvfrom(sock, buffer, sizeof(buffer)-1, 0, &from, &len);
+			SetDlgItemText(hDlg, IDC_MESSAGE, buffer);
+		}break;
+	}
+	return(0);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+    WSADATA data;
+    if (WSAStartup(MAKEWORD(2,2), &data) != 0) return(0);
+    int ret;
+    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (!sock)
+    {
+        WSACleanup();
+        return(0);
+   }
+    saServer.sin_family = AF_INET;
+    saServer.sin_addr.s_addr = INADDR_ANY;
+    saServer.sin_port = htons(APP_PORT);
+    ret = bind(sock, (SOCKADDR *)&saServer, sizeof(SOCKADDR));
+    if (ret)
+   {
+        WSACleanup();
+        return(false);
+   }
+
+    DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), NULL, DialogProc);
+   closesocket(sock);
+    WSACleanup();
+    return(1);
+}
+}}}
+[[tag(소켓,네트워크 프로그래밍,입출력 다중화,입출력 모델,select,윈속)]]
+[[category(5)]]

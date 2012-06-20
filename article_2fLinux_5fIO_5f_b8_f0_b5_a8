@@ -1,0 +1,421 @@
+#title Linux I/O 모델
+
+{{{#!html 
+<HTML
+><HEAD
+><TITLE
+>Linux I/O 모델</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Linux I/O 모델</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN12"
+>입출력 다중화</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN15"
+>입출력 다중화가 왜 필요한가</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN19"
+>이전에 배웠던 봉쇄/비봉쇄로 입출력 다중화를 구현할수 있는가?</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN24"
+>입출력 다중화 모델의 구현</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN28"
+>select 와 poll</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN41"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		지난번에 이어서 Linux I/O 모델의 2번째 문서이다. 
+		이번 문서에서는 리눅스 입출력 모델중 
+		I/O Multiplexing (이하 입출력다중화)와 signal driven I/O 에 
+		대해서 알아볼것이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN12"
+>2&#51208;. 입출력 다중화</A
+></H1
+><P
+>		지난번의 봉쇄/비봉쇄 모델에서 우리는 입력이나 출력이 단일한경우에 
+		대해서만 다루었다. 즉 2개나 그이상의 파일로 부터 동시에 읽거나, 
+		혹은 여러개의 소켓지정번호로 부터 데이타를 읽어야 할경우에 대해서는 
+		다루지 않았다. 그러나 프로그래밍을 할때 여러개의 입출력을 동시에 
+		다루어야 하는 경우가 생긴다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2.1&#51208;. 입출력 다중화가 왜 필요한가</A
+></H2
+><P
+>			우리가 일반적인 파일을 다루는 프로그래밍을 할경우에는 보통 단지 
+			한번에 하나의 파일만을 다루게 된다. 그러나 네트웍 프로그래밍이나 
+			Interactive 한 프로그램을 만들경우에는 동시에 여러개의 입력을 
+			처리해야하는 경우가 발생한다. 네트웍 서버의 경우에는 보통 
+			여러개의 클라이언트 연결을 동시에 처리해야 하므로 여러개의 입력을 
+			처리하는 것은 매우 일반적인 상황이다. 또한 상호대화 해야 하는 
+			프로그램의 예를들수 있다. 즉 화면에 어떤 데이타를 출력하면서 
+			동시에 입력을 기다려야 하는 경우에도 역시 동시에 
+			2개 이상의 입출력을 다룰수 있어야 한다. 
+		</P
+><P
+>			여러분은 또한 하나의 포트에 대하여 tcp와 udp 를 동시에 지원하는 
+			서버/클라이언트 프로그램을 본적이 있을것인데, 이럴때도 역시 
+			입출력 다중화를 이용해서 쉽게 구현이 가능할것이다.   
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.2&#51208;. 이전에 배웠던 봉쇄/비봉쇄로 입출력 다중화를 구현할수 있는가?</A
+></H2
+><P
+>			결론적으로 말하자면 봉쇄 모델로는 불가능하며, 비봉쇄 모델로는 
+			가능하다. 
+		</P
+><P
+>			비봉쇄 모델로 할경우는 가능할것이다. 여러개의 파일을 open 한다음에 
+			루프를 돌면서 입력을 검사하면 되기 때문이다. 다음은 
+			대략적인 흐름도이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>fd1 = open("file1", O_NONBLOCK);
+fd2 = open("file2", O_NONBLOCK);
+
+while(1)
+{
+    read(fd1, buf1, 255);	
+	만약 (fd1 에 읽을 데이타가 준비되어 있다면)
+    {
+        데이타를 읽어서 작업을 한다. 
+    } 
+    그렇지 않다면 바로 리턴한다.
+
+    read(fd2, buf2, 255);	
+	만약 (fd2 에 읽을 데이타가 준비되어 있다면)
+    {
+        데이타를 읽어서 작업을 한다. 
+    } 
+    그렇지 않다면 바로 리턴한다.
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그러나 위의 코드는 여러가지 문제를 가지고 있다. 
+			비봉쇄 모델자체의 문제점인데, 데이타가 준비가 되어있지 않았음에도 
+			이를 검사하기 위해서 계속 해서 loop 를 돌아야 하므로 매우 비효율적이고, 
+			깔끔하지 못한 코드를 생산한다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>2.3&#51208;. 입출력 다중화 모델의 구현</A
+></H2
+><P
+>			우선은 입출력 다중화 모델에 대해서 설명하도록 하겠다.  
+			다음은 입출력 다중화 모델을 설명한 그림? 이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>     application   
+
+     fd1,fd2,fd3 ...
+     select         ----------------------------&#62; no data ready +--+
+                                                      |            |
+                                                      |            |- 읽을 데이타가 있는지 검사
+                                                      |            |
+                                                      |            |
+      return       &#60;---------------------------- data ready     +--+
+
+      read          ----------------------------&#62; data copy  +--+
+                                                      |         |
+                                                      |         |- data 를 커널에서 유저로 복사
+                                                      |         |
+                                                      |         |
+       data         &#60;---------------------------- copy  완료 +--+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			커널은 여거래의 파일 지시자 fd1, fd2, fd3 에서 데이타가 있는지 확인하면서 
+			해당 영역에서 봉쇄된다. 그러다가 어느 하나의 파일디지시자에 읽을 데이타가 
+			준비된다면 곧바로 return 된다. 그러면 사용자는 어느 파일 지시자에 읽을 데이타가 
+			있는지 확인후 데이타를 읽어들여서 필요한 작업을 하면 된다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN28"
+>2.3.1&#51208;. select 와 poll</A
+></H3
+><P
+>				리눅스(Unix 포함)에서는 이러한 입출력 다중화를 위해서 select(2) 와 poll(2) 함수들을 
+				제공하며 이들을 통해서 여러개의 입출력을 동시에 다룰수 있다. 
+				이들 select 와 poll 함수에 대한 자세한 내용은 
+				<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=22"
+TARGET="_top"
+>select 를 통한 입출력 다중화</A
+> 를 참고하기 바란다. 
+			</P
+><P
+>				간단한 예를 하나 들어보도록 하겠다. 우리는 이전문서인 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=80&mode=nested&order=0&thold=0"
+TARGET="_top"
+>리눅스 I/O 모델</A
+>의 
+				첫번째 예제를 입출력 다중 모델을 적용시킨 버젼으로 변경시켜 보도록 하겠다. 
+				입출력 다중화의 구현을 위해서 select 를 사용하도록 할것이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : multiplex_test.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;sys/time.h&#62;
+#include &#60;errno.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main()
+{
+    int fd;
+    int i = 0;
+    char buf[80];
+    fd_set readfds;
+    int state;
+
+    struct timeval limit_time;
+
+    fd = 0;
+    if (fd &#60; 0)
+    {
+        perror("open error ");
+        exit(0);
+    }
+
+    printf("q 를 입력하면 프로그램을 종료합니다&#92;n");
+    while(1)
+    {
+        
+        FD_ZERO(&#38;readfds);
+        FD_SET(fd, &#38;readfds);
+        memset(buf, 0x00, 80);
+        
+        // polling 타임을 1초로 한다.
+        limit_time.tv_sec = 1;
+        limit_time.tv_usec = 10;
+
+        // 1초를 기다린다. 
+        // 만약 1초 내에 키보드로 부터 입력이 있다면, 0보다 큰숫자가 반환될것이다. 
+        // 1초내에 어떠한 키보드 입력도 없다면, 0이 리턴될것이다. 
+        state = select(fd+1, &#38;readfds, (fd_set *)0, (fd_set *)0, &#38;limit_time);
+        switch(state)
+        {
+            case -1:
+                perror("select error ");
+                exit(0);
+                break;
+
+            // 키보드 입력이 없으면 주어진 작업을 수행한다. 
+            case 0:
+                printf("--&#62;%d&#92;n", i);
+                i++;
+
+            // 키보드 입력이 있다면, 키값을 검사해서 
+            // q 를 입력했을경우 프로그램을 종료한다. 
+            default:
+                if (FD_ISSET(fd, &#38;readfds))
+                {
+                    memset(buf, 0x00, 80);
+                    read(fd, buf, 80);
+                    printf("키보드입력 : %s", buf);
+                    if (buf[0] == 'q')
+                        exit(0);
+                    // 만약 q 이외의 값을 입력했다면 
+					// 기본작업인 i++ 작업을 수행한다. 
+                	i++;
+                }
+        }
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 예제의 경우는 입출력 다중화를 위해서 검사하는 파일지시자가 단지 
+				하나(표준입력) 이지만, readfds 에 검사할 파일지시자를 충분한 숫자로 
+				지정가능하기때문에(보통 1024 개까지) 약간만 수정하면 다른 영역에도 응용
+				이 가능할것이다.  
+			</P
+><P
+>				그러나 뭐니뭐니 해도 역시 입출력 다중화가 가장 요긴하게 쓰이는 부분은 
+				네트웍 프로그래밍 쪽이다. 대부분의 서버는 다중의 클라이언트를 받아들이기 위해서 
+				여러개의 소켓을 생성하기 때문이다. 또한 클라이언트의 경우에도 
+				동시에 여러개의 서버에 연결하기 위해서 여러개의 소켓을 열어야 하는경우가 있기 
+				때문이다.   
+			</P
+><P
+>				이 문서에서는 네트웍 프로그래밍에서의 입출력 다중화의 구현은 설명하지 않을 
+				것이다. 이유는 <A
+HREF="http://www.joinc.co.kr/article.php?sid=25"
+TARGET="_top"
+>다중연결서버 만들기 (2)</A
+> 와 
+				<A
+HREF="http://www.joinc.co.kr/article.php?sid=26"
+TARGET="_top"
+>다중연결서버 만들기(3)</A
+>
+				에tj 충분히 자세하게 설명하고 있기 때문이다. 네트웍 상에서의 다중입출력 방법에 대해서 
+				알기를 원한다면 위의 링크된 문서들을 참고하기 바란다. 각각 select 와 poll 을 이용한 
+				입출력다중화의 구현방법에 대해서 설명하고 있다.  
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>3&#51208;. 결론</A
+></H1
+><P
+>		지금까지 봉쇄, 비봉쇄, 입출력 다중화의 3가지 I/O 모델에 대해서 알아보았다. 
+		원래 이번 장에서 Asynchronous(비동기 입출력) 모델까지를 다루려고 했으나, 
+		그렇게 하지 못했음을 양해해 주기 바란다. 
+	</P
+><P
+>		비동기 입출력에 관한 내용은 다음기회에 따로 다루도록 하겠다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

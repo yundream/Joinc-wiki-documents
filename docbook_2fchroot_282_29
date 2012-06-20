@@ -1,0 +1,188 @@
+#title chroot(2)
+[wiki:function_chroot(2) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/03/21           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>chroot(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	루트 디렉토리를 변경한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;unistd.h&gt;
+
+int chroot(const char *path);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		chroot()는 <emphasis>path</emphasis>가 지정한 곳으로 루트 디렉토리를 
+		변경한다. 디렉토리는 "/"로 시작하는 절대경로 이름을 사용한다. 
+		설정된 루트디렉토리는 현재 프로세스의 모든 자식 프로세스에게 상속된다.
+	</para>
+	<para>
+		단지 슈퍼유저만이 루트 디렉토리를 변경할 수 있다.
+	</para>
+	<para>
+		이 시스템 콜은 현재 작업 디렉토리를 바꾸지는 않는다. 그래서 
+		"."은 "/"로 지정된 루트 트리 밖의 위치가 될 수도 있다.
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공시 0이 리턴되고, 에러가 발생하면 -1이 리턴된다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EPERM</term>	
+			<listitem>
+				<para>	
+					유효 UID가 0이 아니다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EFAULT</term>	
+			<listitem>
+				<para>	
+					path가 접근할 수 없는 메모리 영역을 가리키고 있다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENAMETOOLONG</term>	
+			<listitem>
+				<para>	
+					path가 너무 길다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOENT</term>	
+			<listitem>
+				<para>	
+					파일이 존재하지 않는다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOMEM</term>	
+			<listitem>
+				<para>	
+					커널 메모리가 충분하지 않다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOTDIR</term>	
+			<listitem>
+				<para>	
+					path가 디렉토리가 아니다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EACCESS</term>	
+			<listitem>
+				<para>	
+					허가가 거부되었다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ELOOP</term>	
+			<listitem>
+				<para>	
+					path를 찾아가기 위해 너무 많은 심볼릭 링크가 존재한다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EIO</term>	
+			<listitem>
+				<para>	
+					I/O 에러가 발생했다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main()
+{
+    int pid;
+
+    if (chroot("/home/mydir") != 0)
+    {
+        perror("chroot");
+        exit(0);
+    }
+    if (execl("/bin/bash","bash", NULL) == -1) 
+    {
+        perror("error");
+    }
+}
+		</screen>
+		위 코드를 컴파일 후 실행 시키면 /home/mydir가 루트(/)디렉토리가 
+		되고 bash가 실행된다. 루트 디렉토리가 바켰으므로 /home/mydir/bin 밑에
+		bash쉘이 있어야 한다. 또한 bash를 실행시키기 위한 기본적인 라이브러리도
+		있어야 하는데 ldd 를 통해서 bash를 실행시키기 위해 필요한 라이브러리의 
+		목록을 알아낼 수 있다. /home/mydir/lib 디렉토리 밑에 필요한 라이브러리를
+		복사한다음 위 프로그램을 실행하도록 하자. 
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+				chdir(2)
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

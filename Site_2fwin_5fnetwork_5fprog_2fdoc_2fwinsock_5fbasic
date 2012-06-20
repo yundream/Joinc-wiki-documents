@@ -1,0 +1,327 @@
+#title 윈속 프로그래밍 기본
+
+[[TableOfContents]]
+== 윈속에 대해서 ==
+윈속(winsock)은 '''windows Socket API'''의 줄임말로, 윈도 운영체제(:12) 기반의 네트워크(:12) 프로그램을 개발하기 위한 기술요소들이 적용된 개발 도구다. BSD:::socket(:12)를 기반으로 하고 있어서, 리눅스(:12)환경에서 네트워크 프로그래밍 경험이 있다면 어렵지 않게 적응할 수 있다. 대부분의 소켓(:12) 함수도 그대로 사용한다.  
+
+=== BSD Socket와의 몇 가지 차이점 ===
+BSD Socket API의 거의 전부를 그대로 사용할 수 있지만 다음과 같은 몇 가지 차이점이 있다.
+  * dll 로드 : winsock.dll을 로딩해야 한다. 이를 위해 몇 개의 함수를 호출해야 한다.  
+  * 소켓 지정 번호 : 리눅스는 소켓 지정 번호가 곧 파일 지정 번호로 자료형은 signed int 이다. 윈속은 소켓을 가리키기 위해서 '''SOCKET'''을 사용하는데, unsigned int 형이다. 그러므로 포팅 작업을 쉽게 하기 위해서 int 형을 사용해도 큰 문제는 없다. 대신 컴파일러의 종류에 따라서 '''경고 메시지'''를 출력할 수도 있다. 가능하면 SOCKET 자료 형을 그대로 사용하는게 좋을 것 같다.  
+
+== 윈속 네트워크 프로그래밍 ==
+BSD 소켓과 동일 해서 [wiki:Site/Network_Programing 리눅스 네트워크 프로그래밍]과 많은 부분에서 중복되긴 하지만 그래도 다루어볼 생각이다. 소켓 API 레퍼런스 문서는 [wiki:Site/Network_Programing/Documents/SocketAPI BSD 소켓 API]문서를 참고하면 된다. 윈속 레퍼런스 문서는 아니지만 문제 없을 것이다. 윈속함수 대부분이 BSD 소켓함수와 동일하므로, 함수 설명은 비교적 간단히 넘어갈 것이다. 언제 시간이 되면 윈속 레퍼런스 문서도 만들고 싶다.
+
+=== 미리 알아 두면 좋은 정보들 ===
+소켓 프로그래밍을 처음 접하는 거라면, TCP/IP를 먼저 공부하는 걸 강추한다. [wiki:Site/TCP_IP TCP/IP]
+
+=== 소켓에 대해서 ===
+소켓은 인터넷(인터 네트워크)상에서 물리적으로 떨어져있는 소프트웨어와 소프트웨어간의 통신을 담당하는 "소프트웨어 통신 도구"다. 때때로 소켓은 컴퓨터와 컴퓨터를 연결하는 통신 도구라고 설명되기도 하지만, 정확히 언급할 필요가 있을 것 같다. 소켓은 인터넷의 종단에 위치하면서 소프트웨어와 소프트웨어를 연결한다.
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/oJSrUI_yhwTBSKChEjUwSg?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6ufCBiOKvI/AAAAAAAABSg/VXRg1Bp7dyU/s800/sy37yYCz9l8Bj7P6_NerHdA.png" /></a>
+}}}
+
+웹 서비스를 예로 들어보자면, 소켓은 클라이언트인 firefox(:12)와 서버인 apache(:12)가 서로 통신을 할 수 있도록 연결을 한다. 소켓을 이용해서 firefox는 apache서버로 웹 페이지 요청을 하고, apache 서번는 요청을 분석해서 웹페이지를 firefox에 전송한다. 
+
+==== 소켓 자료 형 ====
+유닉스는 모든 자원을 파일(:12)로 다룬다. 소켓역시 예외는 아니라서 파일로 다룬다. 그리고 모든 파일 관련 함수는 signed int 형의 '''파일 지정 번호'''를 이용해서 파일을 제어한다.
+
+이러한 유닉스의 특성으로 BSD:::소켓(:12)도 int형의 '''파일 지정 번호'''를 이용해서 소켓을 다룬다. 유닉스에서 파일 지정 번호는 소켓을 지시한다. 
+
+윈도는 자원을 파일이 아닌 각각의 독립된 커널 객체로 보며, 이들 객체는 '''파일 지정 번호'''가 아닌 '''HANDLE (핸들)'''이용 해서 제어한다. 예컨데, 객체의 인스턴스를 다루는 방식이다. 이런 윈도의 특성상 소켓 역시 소켓 핸들로 다루어야 하겠지만, BSD 소켓과의 호환을 유지하기 위해서 unsigned int 를 재 정의한 (소켓 지정 번호) '''SOCK'''으로 소켓을 다룬다. 소켓을 지시하기 때문에 '''소켓 지시자'''라고 부른다. 기본적으로 윈도는 파일과 소켓을 다른 객체로 본다.
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/yfND0KOY0oI_tnK6IwU3bQ?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uf6i8q1RI/AAAAAAAABSk/I-rBsLAVoHE/s800/sb_kd_L8BGRqeQbDhrPQdxw.png" /></a>
+}}}
+
+유닉스와 비교하면 signed 지정에 대한 차이만 있기 때문에, 유닉스로의 포팅을 고려한다면 SOCK 대신 signed int를 써도 무방하다고 할 수 있다. 다만 윈도에서 컴파일 할경우, 컴파일러의 종류에 따라서 경고 메시지가 발생할 수는 있다.   
+
+=== 소켓 만들기 ===
+통신을 하기 위해서는 socket(:4100)함수로 인터넷의 종단에 위치할 소켓을 만들어야 한다. 
+{{{#!plain
+SOCKET WSAAPI socket(
+  __in  int af,
+  __in  int type,
+  __in  int protocol
+);
+}}}
+  '''af''' 는 주소 영역을 지정하기 위해서 사용한다. 예컨데, 일반 인터넷 영역에서 통신할 건지, 아니면 IPX영역에서 통신할 건지 등을 결정하기 위해서 사용한다. 유별난 경우가 아니라면 인터넷 영역 통신을 위해서 '''AF_INET'''를 사용한다. 유닉스는 소켓을 IPC(내부 프로세스 통신) 용도로 사용을 할 수 있다. 이를 위해서 '''AF_UNIX'''를 사용할 수 있는데, 윈속은 내부 통신 매커니즘을 지원하지 않는다.
+
+  '''type'''는 소켓 타입을 지정하기 위해서 사용한다. 연결 지향의 TCP(:12) 통신이라면 SOCK_STREAM,, UDP를 이용한 데이타 그램 중심의 비 연결 지향 통신이라면 '''SOCK_DGRAM'''을 사용한다.
+
+  '''protocol'''는 소켓이 사용할 프로토콜을 지정한다. type와 함께 쌍으로 지정한다. SOCK_STREAM 이라면 IPPROTO_TCP, SOCK_DGRAM이라면 IPPROTO_UDP를 사용한다. 
+
+즉 연결지향의 인터넷 소켓을 사용할 거라면 다음과 같이 지정한다.
+{{{#!plain
+SOCKET sock;
+sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+}}}
+
+=== 소켓 특성 묶기 ===
+socket함수로 만든 소켓이 접점에 놓이기 전에, 소켓 특성을 묶어야 한다. 즉 어떤 인터넷 주소 영역에 대해서 어떤 포트(:12)번호로 기다릴 건지에 대한 정보를 소켓에 지정해 줘야 한다. bind(:4100)함수로 이 일을 할 수 있다.
+{{{#!plain
+int bind(
+  __in  SOCKET s,
+  __in  const struct sockaddr *name,
+  __in  int namelen
+);
+}}}
+소켓 지시자 '''s'''에 sockaddr 구조체의 정보를 지정한다. struct sockaddr 구조체는 다음과 같다. 
+{{{#!plain
+struct sockaddr {
+        ushort  sa_family;
+        char    sa_data[14];
+};
+
+struct sockaddr_in {
+        short   sin_family;
+        u_short sin_port;
+        struct  in_addr sin_addr;
+        char    sin_zero[8];
+};
+}}}
+sin_family와 sa_family는 서로 동일한 값으로 어떤 주소체계를 사용할 것인지를 명시한다. sa_family의 값에 따라서 sa_data에 대한 해석이 달라진다. 만약 sa_family가 '''AF_INET'''라면 인터넷 주소 체계 정보를 가지는 sockaddr_in 구조체가 사용된다. sockaddr_in 구조체에는 포트, 사용할 인터넷:::주소(:12) 정보를 포함하고 있다.
+{{{#!plain
+struct sockaddr_in SockInfo;
+
+... ....
+
+SockInfo.sin_family = AF_INET;  
+SockInfo.sin_port = htons( 1234 );  
+SockInfo.sin_addr.s_addr = htonl(INADDR_ANY);  
+
+status = bind( EndpointSocket, (struct sockaddr*)&SockInfo, sizeof( struct sockaddr_in) );  
+if( status == SOCKET_ERROR)   
+{  
+    printf("Bind Error\n");  
+    return 0;  
+}  
+}}}
+'''INADDR_ANY'''는 0.0.0.0 주소를 가리키는데, 모든 사용 가능한 주소로부터 기다리겠다는 의미다. 주로 모든 인터넷(:12) 주소로 기다려야 하는 서버에서 사용하는 값이다.
+
+bind함수는 서버 프로그램에서 주로 사용된다. 서비스 포트가 고정되어야 하는 서버 프로그래그램과 달리 클라이언트는 포트가 임의로 할당되기 때문에 굳이 bind함수로 주소 정보를 묶어 줄 필요가 없기 때문이다. bind함수를 사용하지 않을 경우, 운영체제(:12)가 알아서 포트를 할당한다.
+
+=== 연결 대기열 만들기 ===
+커널이 클라이언트로 부터 요청을 받으면, 우선 연결 대기열 (listen queue)로 연결이 들어간다. 프로그램은 클라이언트 연결을 직접 받는 것이 아니라, 연결 대기열의 가장 앞 부분에 있는 연결요청을 가져와서 클라이언트와의 연결을 만든다. 
+
+연결 대기열은 listen(:4100)함수로 만든다.
+{{{#!plain
+int listen(
+  __in  SOCKET s,
+  __in  int backlog
+);
+}}}
+대기열의 크기는 backlog로 정한다. 경험값으로 정해진 값은 없다. 일반적으로 5정도면 무난한 것 같다. 
+
+=== 원격 소켓에 연결 하기 ===
+클라이언트는 connect(:4100)함수로 원격 소켓에 연결할 수 있다.
+{{{#!plain
+int connect(
+  __in  SOCKET s,
+  __in  const struct sockaddr *name,
+  __in  int namelen
+);
+}}}
+sockaddr의 인터넷 주소/포트로의 연결을 시도한다.
+{{{#!plain
+serveraddr.sin_family = AF_INET; 
+serveraddr.sin_addr.s_addr = inet_addr("111.111.111.111"); 
+serveraddr.sin_port = htons(12345); 
+ 
+if (connect(ClientSocket, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) == SOCKET_ERROR) 
+{ 
+    WSACleanup(); 
+    return 1; 
+} 
+}}}
+인터넷 주소 111.111.111.111의 포트번호 12345에 연결된 프로그램에 연결을 시도하고 있다. 이 함수는 클라이언트에서 사용한다.
+
+=== 연결 요청 가져오기 ===
+서버는 connect함수로 연결을 요청하는 클라이언트를 기다린다. 클라이언트가 connect함수를 호출해서 연결이 만들어 지면, 이 연결은 '연결 대기열'에 들어가게 된다. 서버는 accept함수로 연결 대기열에 있는 요청을 가져와서 클라이언트와 통신에 사용할 '연결 소켓'을 만든다.   
+{{{#!plain
+SOCKET accept(
+  __in     SOCKET s,
+  __out    struct sockaddr *addr,
+  __inout  int *addrlen
+);
+}}}
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/69sKWwRKwpQiL6eK1ZnARw?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6zkbS88lBI/AAAAAAAABSs/nrffDjD324U/s800/sh-i3WG-_iPPJ5JVmaUrThA.png" /></a>
+}}}
+=== 소켓 통신 ===
+파일과 소켓을 다르게 보기 때문에, ReadFile(:4200), WriteFile(:4200)과 같은 파일 함수를 사용할 수 없다. 대신 윈속에서 제공하는 소켓 함수를 사용해야 한다. BSD 계열 함수인 recv(:4100)와 send(:4100)함수로 통신할 수 있다. 
+
+recv와 send함수는 연결 지향 소켓 통신을 위해서, recvfrom(:4100)와 sendto(:4100)함수는 데이터 그램 지향 소켓 통신을 위해서 사용된다.
+
+=== 소켓 닫기 ===
+closesocket함수로 닫는다. 더 이상 사용하지 않는 소켓은 반드시 닫아 주도록 한다. 
+
+=== winsock.dll 로딩 ===
+윈속을 이용하기 위해서는 초기 winsock.dll을 로딩 시켜줘야 한다. WSAStartup(:4100)함수로 윈속 dll을 로딩할 수 있다. 더 이상 윈속을 사용하지 않는다면, WSACleanup(:4100)함수로 윈속 dll을 제거한다.
+
+=== 서버 프로그램 흐름 ===
+전형적인 서버 프로그램은 socket()->bind()->listen()->accept() 의 순서를 따른다.
+
+=== 클라이언트 프로그램 흐름 ===
+클라이언트는 비교적 단순해서 socket()->connect()의 순서를 따른다.
+
+== 예제 ==
+=== 서버 예제 ===
+간단한 echo 서버 프로그램이다. 클라이언트의 메시지를 받아서 출력한 다음 소켓을 닫느다.
+{{{#!plain
+#include <winsock.h> 
+#include <stdio.h> 
+ 
+#define MAX_PACKETLEN 512 
+#define PORT 5552 
+ 
+int main() 
+{ 
+    WSADATA wsaData; 
+    int status; 
+    int SockLen; 
+    int Readn,Writen; 
+    SOCKET EndpointSocket, ClientSocket; 
+    struct sockaddr_in SockInfo, ClientSockInfo; 
+    char ReadBuffer[MAX_PACKETLEN]; 
+ 
+ 
+    if(WSAStartup(MAKEWORD(2,2),&wsaData)!= 0) 
+    { 
+        printf("error\r\n"); 
+        return 0; 
+    } 
+ 
+    EndpointSocket = socket( AF_INET, SOCK_STREAM, 0 ); 
+    if( EndpointSocket == INVALID_SOCKET ) 
+        return 1; 
+ 
+    printf("Success socket create\r\n"); 
+    ZeroMemory(&SockInfo, sizeof( struct sockaddr_in )); 
+ 
+    SockInfo.sin_family = AF_INET; 
+    SockInfo.sin_port = htons( PORT ); 
+    SockInfo.sin_addr.S_un.S_addr = htonl(INADDR_ANY); 
+ 
+    status = bind( EndpointSocket, (struct sockaddr*)&SockInfo, sizeof( struct sockaddr_in) ); 
+    if( status == SOCKET_ERROR)  
+    { 
+        printf("Bind Error\n"); 
+        return 0; 
+    } 
+    if( SOCKET_ERROR == listen( EndpointSocket, 5 )) 
+    { 
+        printf("listen Error\n"); 
+        return 0; 
+    } 
+ 
+    while(1) 
+    { 
+        ZeroMemory( &ClientSockInfo, sizeof( struct sockaddr_in ) ); 
+        SockLen = sizeof(struct sockaddr_in); 
+        ClientSocket = accept( EndpointSocket, (struct sockaddr*)&ClientSockInfo, &SockLen ); 
+        if(ClientSocket == INVALID_SOCKET) 
+        { 
+            printf("Accept Error\n"); 
+            closesocket(EndpointSocket); 
+            WSACleanup(); 
+            return 1; 
+        } 
+        printf("Accept Client\n"); 
+        Readn = recv( ClientSocket, ReadBuffer, MAX_PACKETLEN,0 ); 
+        if( Readn > 0 ) 
+        { 
+            Writen = send( ClientSocket, ReadBuffer, Readn, 0 ); 
+        } 
+        else 
+        { 
+            printf("read Error\n"); 
+        } 
+        closesocket(ClientSocket);  
+    } 
+    closesocket( EndpointSocket );  
+    WSACleanup(); 
+    return 0; 
+ 
+} 
+}}}
+
+=== 클라이언트 예제 ===
+echo 클라이언트 프로그램. POSIX(:12) 함수로 도배했다.
+{{{#!plain
+#include <stdio.h>
+#include <winsock2.h>
+
+#define PORT_NUM 3800
+#define MAXLEN 1024
+
+int main(int argc, char **argv)
+{
+	SOCKET sockfd;
+	WSADATA wsaData;
+	struct sockaddr_in addr;
+
+	char buf[MAXLEN];
+	char rbuf[MAXLEN];
+
+	if(argc !=2)
+	{
+		printf("Usage : %s [ip address]\n", argv[0]);
+		return 1;
+	}
+
+	if(WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)
+	{
+		return 1;
+	}
+
+	if((sockfd = socket(AF_INET,SOCK_STREAM, 0)) == INVALID_SOCKET) 
+	{
+		return 1;
+	}
+	memset((void *)&addr, 0x00, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = inet_addr(argv[1]);
+	addr.sin_port = htons(PORT_NUM);
+
+	if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR)
+	{
+		return 1;
+	}
+	while(1)
+	{
+		 printf("> ");
+		 fgets(buf, MAXLEN-1, stdin);
+		 if(strncmp(buf, "quit\n",5) == 0)
+	     {
+			  break;
+		 }
+
+		 send(sockfd, (void *)buf, strlen(buf), 0);
+		 memset(rbuf, 0x00, MAXLEN);
+  		 recv(sockfd, (void *)buf, MAXLEN, 0);
+		 printf("s -> %s\n", buf);
+	}
+	closesocket(sockfd);
+	WSACleanup();
+	return 0;
+}
+}}}
+
+== 윈속 확장 함수 ==
+윈도는 유닉스(:12)와 다른 철학을 가지고 만들어 졌다. 정치적인 이유일 수도 있고 다른 기술적인 이유가 있어서 일 수도 있지만 사용하는 기술의 형식 또한 많이 다르다. BSD 소켓은 유닉스 철학을 따르고 있으며, 특성상 운영체제에 깊이 관련되어 있다. 그러다보니 BSD 소켓 인터페이스는 윈도에 맞지 않는 경향이 있다. 그렇다고 BSD 소켓 인터페이스 지원을 포기할 수는 없는 일이다. 버리기엔 리스크가 너무 크기 때문이다. (실제 윈도는 몇몇 POSX(:12) 인터페이스는 지키지 않겠다고 선언하고 있다.)
+
+해서 BSD:::소켓(:12) 인터페이스는 그대로 두고, 윈속 확장 함수들을 만들었다. 이들 확장 함수는 기존 BSD:::소켓이름의 앞에 "WSA"를 접두사로 하고 있다. socket -> WSASocket, send -> WSASend, recv -> WSARecv 대략 이런 식이다.
+
+윈속 확장함수도 (소켓 지정 번호)SOCKET를 이용해서 작업을 한다. 그러므로 원론적으로 BSD 소켓 함수와 함께 사용할 수 있다. WSA 계열 함수와 BSD 계열 함수를 섞어쓰는걸 지양해야 한다는 의견도 있지만, 그다지 신경을 쓰지는 않는 것 같다.
+
+윈속 확장 함수는 윈도의 입출력 처리 기술인 중첩(:12) 입출력 모델을 사용할 수 있도록 한다. 
+
+=== 중첩 입출력 모델 ===
+[wiki:Site/win_network_prog/doc/overlapped 중첩 입출력 소켓 프로그래밍] 참고
+
+=== 비동기 소켓 프로그래밍 모델 ===
+[wiki:Site/win_network_prog/doc/multiplex 비동기 소켓 프로그래밍] 참고
+
+[[tag(TCP,IP,소켓,네트워크 프로그래밍,윈도 네트워크 프로그래밍,인터넷,입출력 모델)]]
+[[Category(5)]]

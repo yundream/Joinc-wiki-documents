@@ -1,0 +1,364 @@
+#title sigaction(2)
+[wiki:man/2/sigaction HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/04/27           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>sigaction(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	시그널 처리관련 함수
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;signal.h&gt;
+int sigaction(int signum,  const  struct  sigaction  *act,
+	struct sigaction *oldact);
+int  sigprocmask(int  how,  const  sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigsuspend(const sigset_t *mask);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		sigaction() 시스템 호출은 특정 시그널의 수신에 대해서 취할 액션을 
+		설정하거나 변경하기 위해서 사용된다. 
+	</para>
+	<para>
+		<emphasis>signum</emphasis>는 시그널을 명시한다. SIGKILL과 SIGSTOP를 
+		제외한 모든 시그널이 타당한 시그널이 될 수 있다. 
+	</para>
+	<para>
+		만약 <emphasis>act</emphasis>가 <emphasis>null</emphasis>이 아니라면 
+		signum번호를 가지는 시그널에 대해서 act함수가 설치된다. 
+		만약 <emphasis>oldact</emphasis>가 null이 아니라면 이전의 액션은 
+		<emphasis>oldact</emphasis>에 저장된다. 
+	</para>
+	<para>
+		<emphasis>sigaction</emphasis>구조체는 다음과 같이 정의되어 있다.
+		<screen>
+struct sigaction 
+{
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, siginfo_t *, void *);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer)(void);
+}
+		</screen>
+		<variablelist>	
+			<varlistentry>
+			<term>sa_handler</term>	
+			<listitem>
+				<para>	
+					signum번호를 가지는 시그널이 발생했을 때 실행된 함수를 
+					설치한다. 함수외에도 SIG_DFL과 SIG_IGN을 지정할 수 있다.
+					전자는 시그널에 대한 기본행동을 후자는 시그널을 무시하기 
+					위해서 사용한다.  
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>sa_mask</term>	
+			<listitem>
+				<para>	
+					sa_handler에 등록된 시그널 핸들러 함수가 실행되는 동안 
+					블럭되어야 하는 시그널의 마스크를 제공한다. SA_NOMASK가 
+					적용되어 있지 않다면  
+				</para>	
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term>sa_flags</term>	
+			<listitem>
+				<para>	
+					시그널 처리 프로세스의 행위를 수정하는 일련의 플래그들을 
+					명시한다. 다음중 하나 이상의 것들에 의해서 만들어 진다.   
+					<variablelist>	
+					<varlistentry>
+					<term>SA_NOCLDSTOP</term>	
+						<listitem>
+						<para>
+						만약 signum이 SIGCHLD라면, 자식 프로세스가 SIGSTOP, 
+						SIGTSTP, SIGTTIN, SIGTTOU등을 받아서 중단되었을 때 
+						이를 통지 받을 수 없게 된다. 
+						</para>	
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+					<term>SA_ONESHOT, SA_RESETHAND</term>	
+						<listitem>
+						<para>
+						일단 시그널 처리기가 호출되면, 기본 상태에 대한 
+						시그널 액션을 재 저장한다. 이는 signal(2)호출에 대한 
+						기본 행위이다. 
+						</para>	
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+					<term>SA_RESTART</term>	
+						<listitem>
+						<para>
+						일부 시스템 호출들이 시그널을 통해 재시작할 수 있도록 
+						함으로서 BSD 시그널과 호환되도록 한다.
+						</para>	
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+					<term>SA_NOMASK, SA_NODEFER</term>	
+						<listitem>
+						<para>
+						시그널이 자체 시그널 처리기로부터 수신 받지 않도록 한다.
+						</para>	
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+					<term>SA_SIGINFO</term>	
+						<listitem>
+						<para>
+						시그널 처리기가 하나가 아닌 3개의 인자를 취할경우 
+						sa_handler대신 sigaction의 siginfo_t를 이용할 수 
+						있다. siginto_t는 다음과 같이 정의된 구조체이다.  		
+						<screen>
+siginfo_t {
+    int      si_signo;  /* 시그널 넘버 */
+    int      si_errno;  /* errno 값 */
+    int      si_code;   /* 시그널 코드 */
+    pid_t    si_pid;    /* 프로세스 ID 보내기 */
+    uid_t    si_uid;    /* 프로세스를 전송하는 실제 사용자 ID */
+    int      si_status; /* Exit 값 또는 시그널 */
+    clock_t  si_utime;  /* 소모된 사용자 시간 */
+    clock_t  si_stime;  /* 소모된 시스템 시간 */
+    sigval_t si_value;  /* 시그널 값 */
+    int      si_int;    /* POSIX.1b 시그널 */
+    void *   si_ptr;    /* POSIX.1b 시그널 */
+    void *   si_addr;   /* 실패를 초래한 메모리 위치 */
+    int      si_band;   /* 밴드 이벤트 */
+    int      si_fd;     /* 파일 기술자 */
+}
+						</screen>
+						SIGCHLD 시그널은 si_pid, si_uid, si_status, si_utime,
+						si_stime를 채운다. si_int, si_ptr은 시그널의 송신자에 
+						의해서 명시될 수 있다.  
+						</para>
+						<para>
+						si_code는 왜 시그널이 보내졌는지를 지시한다. 
+						</para>
+						</listitem>
+					</varlistentry>
+					</variablelist>	
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+	<para>
+		sigprocmask()는 현재 블록된 시그널들을 변경시키기 위해서 사용한다. 
+		호출의 행위는 <emphasis>how</emphasis> 값들에 대해서 의존적이 된다. 
+		how는 다음중 하나를 선택할 수 있다.  
+		<variablelist>	
+			<varlistentry>
+			<term>SIG_BLOCK</term>
+			<listitem>
+			<para>
+				<emphasis>set</emphasis>에 설정된 시그널을 블럭 시그널셋에 
+				추가시킨다. 
+			</para>
+			</listitem>
+			</varlistentry>
+
+			<varlistentry>
+			<term>SIG_UNBLOCK</term>
+			<listitem>
+			<para>
+				시그널 셋<emphasis>set</emphasis>의 시그널을 현재의 블럭된 
+				시그널에서 삭제한다. 
+			</para>
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>SIG_SETMASK</term>
+			<listitem>
+			<para>
+				시그널 셋<emphasis>set</emphasis>의 시그널을 블럭화된 시그널로
+				지정한다.
+			</para>
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+		<emphasis>oldset</emphasis>이 null이 아니면, 시그널 마스크의 이전 값은
+		oldset에 저장된다.	
+	</para>
+	<para>
+		sigpending()함수는 전달 시그널들에 대한 검사를 허용한다. 전달 시그널들의
+		마스크는 <emphasis>set</emphasis>에 저장된다. 
+	</para>
+	<para>
+		sigsuspend()는 프로세스의 시그널 마스크를 일시적으로 
+		<emphasis>mask</emphasis>로 대체하고, 시그널이 수신될때까지 프로세스를
+		중지시킨다.
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공하면 0을 실패하면 -1을 리턴한다.
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					부적절한 시그널이 지정되거나. 무시할 수 없는 SIGKILL
+					SIGSTOP에 대한 액션을 변경하고자 할 경우
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EFAULT</term>	
+			<listitem>
+				<para>	
+					act, oldact, set, oldset 이 타당하지 않은 메모리 영역을 
+					가리킬 경우
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINTR</term>	
+			<listitem>
+				<para>	
+					시스템 호출이 인터럽트 되었다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;signal.h&gt; 
+#include &lt;unistd.h&gt; 
+#include &lt;string.h&gt; 
+#include &lt;stdio.h&gt; 
+
+void sig_int(int signo);
+void sig_usr(int signo);
+
+int main()
+{
+    int i = 0;
+    struct sigaction intsig, usrsig;
+
+    usrsig.sa_handler = sig_usr;
+    sigemptyset(&amp;usrsig.sa_mask);
+    usrsig.sa_flags = 0;
+
+    intsig.sa_handler = sig_int;
+    sigemptyset(&amp;intsig.sa_mask);
+    intsig.sa_flags = 0;
+
+	// SIGINT에 대해서 sig_int를 등록한다. 
+    if (sigaction(SIGINT, &amp;intsig, 0) == -1)
+    {
+        printf ("signal(SIGINT) error");
+        return -1;
+    }    
+
+	// SIGUSR2에 대해서 usrsig를 등록한다. 
+    if (sigaction(SIGUSR2, &amp;usrsig, 0) == -1)
+    {
+        printf ("signal(SIGUSR2) error");
+        return -1;
+    }    
+
+    while(1)
+    {
+        printf("%d\n", i);
+        i++;
+        sleep(1);
+    }
+}
+
+void sig_int(int signo)
+{
+    sigset_t sigset, oldset;
+
+	// 핸들러가 수행되는 동안 수신되는 모든 시그널에 대해서
+	// 블럭한다.  
+    sigfillset(&amp;sigset);
+    if (sigprocmask(SIG_BLOCK, &amp;sigset, &amp;oldset) &lt; 0)
+    {
+        printf("sigprocmask %d error \n", signo);
+    }
+    fprintf(stderr, "SIGINT !!!!\n");
+    sleep(5);
+}
+
+void sig_usr(int signo)
+{
+    printf("sig_usr2\n");
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+    			sigsetops(3);
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_signal_다루기_2">시그널 다루기 2</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_signal_다루기_3">시그널 다루기 3</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_쓰레드와_시그널">쓰레드와 시그널</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

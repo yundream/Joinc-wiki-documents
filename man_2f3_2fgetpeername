@@ -1,0 +1,264 @@
+#title linux man page : getpeername 연결된 호스트의 정보를 알아온다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getpeername">getpeername</a>(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getpeername">getpeername</a>(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN12"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN15"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN35"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>소켓 지정번호 s 에 접속된 호스트정보를 알아오고 싶을때 사용한다.  </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/socket.h&#62;
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getpeername">getpeername</a>(int s, struct sockaddr *name, socklen_t *namelen);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		때때로 네트웍으로 접근한 소켓 지정번호 <B
+CLASS="EMPHASIS"
+>s</B
+> 를 이용하여 
+		접근한 호스트의 정보를 알아오고 싶을때가 있을것이다. 이럴경우 사용할수 있으며 
+		s 에는 소켓저정번호, *name 는 알아낸 호스트의 정보를 저장할 sockaddr 구조체, 
+		마지막 *namelen 은 name이 가리키고 있는 영역의 크기를 나타낸다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN12"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		다양한 원인에 의해서 에러가 발생할수 있으며 아래와 같은 에러 메시지들이 있다. 
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EBADF</DT
+><DD
+><P
+>	
+					s 가 유효한 기술자가 아니다. 
+				</P
+></DD
+><DT
+>ENOTSOCK</DT
+><DD
+><P
+>					s 가 소켓이 아닌 파일일경우
+				</P
+></DD
+><DT
+>ENOTCONN</DT
+><DD
+><P
+>					소켓이 연결되어 있지 않을경우
+				</P
+></DD
+><DT
+>ENOBUFS</DT
+><DD
+><P
+>					시스템에 연산을 위해서 이용할수 있는 자원이 부족할때
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN35"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;stdio.h&#62;
+
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=main">main</a>(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int state, client_len;
+
+    struct sockaddr_in clientaddr, serveraddr, myaddr;
+
+
+    // internet 기반의 스트림 소켓을 만들도록 한다. 
+    if ((server_sockfd = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=socket">socket</a>(AF_INET, SOCK_STREAM, 0)) &#60; 0)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("socket error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+    bzero(&#38;serveraddr, <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=htonl">htonl</a>(INADDR_ANY);
+    serveraddr.sin_port = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=htons">htons</a>(12345);
+
+    state = bind(server_sockfd , (struct sockaddr *)&#38;serveraddr, 
+            <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=sizeof">sizeof</a>(serveraddr));
+    if (state == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("bind error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+    state = <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=listen">listen</a>(server_sockfd, 5);
+    if (state == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("listen error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+
+    client_sockfd = accept(server_sockfd, (struct sockaddr *)&#38;clientaddr, 
+                           &#38;client_len);
+    if (client_sockfd == -1)
+    {
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=perror">perror</a>("Accept error : ");
+        <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=exit">exit</a>(0);
+    }
+
+    // 바로여기
+    getpeername(client_sockfd, (struct sockaddr *)&#38;myaddr, &#38;client_len);  
+
+    printf("client ip is %d&#92;n",myaddr.sin_port);
+    printf("client port is <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=%s&#92;n",inet_ntoa">%s&#92;n",inet_ntoa</a>(myaddr.sin_addr));
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(client_sockfd);
+    return 1;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+
+}}}

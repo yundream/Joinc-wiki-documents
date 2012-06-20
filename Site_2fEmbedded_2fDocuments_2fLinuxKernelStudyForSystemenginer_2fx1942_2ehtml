@@ -1,0 +1,739 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>커널 시작</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="PREVIOUS"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="NEXT"
+TITLE="lock_kernel()"
+HREF="start.kerenl.lockkernel.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="chap05.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>5장. 리눅스 커널 부팅</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="start.kerenl.lockkernel.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="AEN1942"
+>5.1. 커널 시작</A
+></H1
+><P
+>			<A
+HREF="arm.src.analysis.html#ARM.SRC.HEAD-ARMV.S"
+>4.4.2절</A
+>의 <A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.KERNEL-START"
+><A
+HREF="arm.src.analysis.html#HEAD-ARMV.S.KERNEL-START"
+><B
+>(5)</B
+></A
+></A
+>에서
+			start_kernel이 불리는데 여기 부터가 일반 적인 커널의 시작이라고 생각하면 된다.
+		</P
+><P
+>			start_kernel 전 까지는 리눅스 커널이 실행되기 위한 기본 적인 초기화 등을 해놓은 상태라고
+			생각하면 된다. 아래에 start_kernel()만을 발췌해 놨다. 또 커널 부팅 중 남은 기록은
+			<A
+HREF="kernel-dmesg.html"
+>5.8절</A
+>를 참조 바란다.
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ *	Activate the first processor.
+ */
+
+asmlinkage void __init start_kernel(void)
+{
+	char * command_line;
+	unsigned long mempages;
+	extern char saved_command_line[];
+/*
+ * Interrupts are still disabled. Do necessary setups, then
+ * enable them
+ */
+<A
+NAME="MAIN.C.LOCKKERNEL"
+><B
+>(1)</B
+></A
+>
+	lock_kernel();
+<A
+NAME="MAIN.C.BANNER"
+><B
+>(2)</B
+></A
+>
+	printk(linux_banner);
+<A
+NAME="MAIN.C.SETUP"
+><B
+>(3)</B
+></A
+>
+	setup_arch(&#38;command_line);
+<A
+NAME="MAIN.C.CMDLINE"
+><B
+>(4)</B
+></A
+>
+	printk("Kernel command line: %s\n", saved_command_line);
+<A
+NAME="MAIN.C.OPTION"
+><B
+>(5)</B
+></A
+>
+	parse_options(command_line);
+<A
+NAME="MAIN.C.TRAP"
+><B
+>(6)</B
+></A
+>
+	trap_init();
+<A
+NAME="MAIN.C.IRQ"
+><B
+>(7)</B
+></A
+>
+	init_IRQ();
+<A
+NAME="MAIN.C.SCHED"
+><B
+>(8)</B
+></A
+>
+	sched_init();
+<A
+NAME="MAIN.C.SOFTIRQ"
+><B
+>(9)</B
+></A
+>
+	softirq_init();
+<A
+NAME="MAIN.C.TIME"
+><B
+>(10)</B
+></A
+>
+	time_init();
+
+	/*
+	 * HACK ALERT! This is early. We're enabling the console before
+	 * we've done PCI setups etc, and console_init() must be aware of
+	 * this. But we do want output early, in case something goes wrong.
+	 */
+<A
+NAME="MAIN.C.CONSOLE"
+><B
+>(11)</B
+></A
+>
+	console_init();
+#ifdef CONFIG_MODULES
+<A
+NAME="MAIN.C.MODULES"
+><B
+>(12)</B
+></A
+>
+	init_modules();
+#endif
+	if (prof_shift) {
+		unsigned int size;
+		/* only text is profiled */
+		prof_len = (unsigned long) &#38;_etext - (unsigned long) &#38;_stext;
+		prof_len &#62;&#62;= prof_shift;
+		
+		size = prof_len * sizeof(unsigned int) + PAGE_SIZE-1;
+		prof_buffer = (unsigned int *) alloc_bootmem(size);
+	}
+
+<A
+NAME="MAIN.C.KMEM"
+><B
+>(13)</B
+></A
+>
+	kmem_cache_init();
+<A
+NAME="MAIN.C.STI"
+><B
+>(14)</B
+></A
+>
+	sti();
+<A
+NAME="MAIN.C.DELAY"
+><B
+>(15)</B
+></A
+>
+	calibrate_delay();
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (initrd_start &#38;&#38; !initrd_below_start_ok &#38;&#38; 
+			initrd_start &#60; min_low_pfn &#60;&#60; PAGE_SHIFT) {
+		printk(KERN_CRIT "initrd overwritten (0x%08lx &#60; 0x%08lx) - "
+		    "disabling it.\n",initrd_start,min_low_pfn &#60;&#60; PAGE_SHIFT);
+		initrd_start = 0;
+	}
+#endif
+<A
+NAME="MAIN.C.MEM"
+><B
+>(16)</B
+></A
+>
+	mem_init();
+<A
+NAME="MAIN.C.KMEMSIZEINIT"
+><B
+>(17)</B
+></A
+>
+	kmem_cache_sizes_init();
+	pgtable_cache_init();
+
+	mempages = num_physpages;
+
+<A
+NAME="MAIN.C.FORKINIT"
+><B
+>(18)</B
+></A
+>
+	fork_init(mempages);
+<A
+NAME="MAIN.C.PROC"
+><B
+>(19)</B
+></A
+>
+	proc_caches_init();
+<A
+NAME="MAIN.C.VFS"
+><B
+>(20)</B
+></A
+>
+	vfs_caches_init(mempages);
+	buffer_init(mempages);
+	page_cache_init(mempages);
+#if defined(CONFIG_ARCH_S390)
+	ccwcache_init();
+#endif
+	signals_init();
+#ifdef CONFIG_PROC_FS
+	proc_root_init();
+#endif
+#if defined(CONFIG_SYSVIPC)
+<A
+NAME="MAIN.C.IPC"
+><B
+>(21)</B
+></A
+>
+	ipc_init();
+#endif
+<A
+NAME="MAIN.C.CHECKBUGS"
+><B
+>(22)</B
+></A
+>
+	check_bugs();
+	printk("POSIX conformance testing by UNIFIX\n");
+
+	/* 
+	 *	We count on the initial thread going ok 
+	 *	Like idlers init is an unlocked kernel thread, which will
+	 *	make syscalls (and thus be locked).
+	 */
+<A
+NAME="MAIN.C.SMP"
+><B
+>(23)</B
+></A
+>
+	smp_init();
+<A
+NAME="MAIN.C.REST"
+><B
+>(24)</B
+></A
+>
+	rest_init();
+}</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="x1942.html#MAIN.C.LOCKKERNEL"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						<A
+HREF="start.kerenl.lockkernel.html"
+>5.2절</A
+> 참조
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.BANNER"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						linux_banner는 init/version.c에 다음과 같이 정의되어 있다.
+					</DD
+><DD
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>const char *linux_banner = 
+	"Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"
+	LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DD
+><DD
+><P
+>						이 내용은 부팅할 때 아래와 같이 출력되고 /var/log/dmesg의 첫 줄에 기록된다.	
+					</P
+></DD
+><DD
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>Linux version 2.4.16 (root@localhost) (gcc version 2.95.3 20010315 (release)) #22 2002. 02. 27. (수) 13:30:14 KST</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.SETUP"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						<A
+HREF="start.kernel.setuparch.html"
+>5.3절</A
+> 참조
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.CMDLINE"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						화면에 command line option을 출력한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.OPTION"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						command line option을 해석한다. 여기에서 해석되는 것은 모두 커널 내부적으로 사용되는 것이고
+						init로 보내지진 않는다.
+					</DD
+><DD
+><P
+>						해석된 옵션은 '='가 있으면 환경 변수로 취급되고 없으면 옵션을 처리되 환경 변수는 envp_init[]에
+						담기고 옵션은 argv_init[]에 담긴다.
+					</P
+></DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.TRAP"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						<A
+HREF="start.kernel.trapinit.html"
+>5.4절</A
+> 참조
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.IRQ"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>						<A
+HREF="start.kernel.irq.html"
+>5.5절</A
+> 참조
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.SCHED"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>						<A
+HREF="start.kernel.sched.html"
+>5.6절</A
+> 참조
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.SOFTIRQ"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>						소프트웨어 인터럽트를 기본 시스템을 초기화 한다. bh에 대한 초기화가 이뤄지기도 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.TIME"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>						CMOS에서 시간을 읽고 CPU의 속도를 얻어낸다. /var/log/dmesg에 
+						"Detected 1009.016 MHz processor."라고 출력되는 부분이기도 하다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.CONSOLE"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>						콘솔 디바이스를 초기화 한다. 모든 초기화를 수행하는 것은 아니고 초기에 필요한 정도만
+						하고 나머지는 나중에 한다.
+						dmesg에 'Console: colour VGA+ 132x43'를 출력한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.MODULES"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>						모듈의 초기화를 하지만 i386, ARM에선 아무 것도 하지 않는다. ia64만 뭔가를 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.KMEM"
+><B
+>(13)</B
+></A
+></DT
+><DD
+>						대부분의 슬랩 배정자(slab allocator)를 초기화 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.STI"
+><B
+>(14)</B
+></A
+></DT
+><DD
+>						인터럽트를 가능하게 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.DELAY"
+><B
+>(15)</B
+></A
+></DT
+><DD
+>						BogoMIPS를 계산한다. dmesg에 'Calibrating delay loop... 2011.95 BogoMIPS'라고 출력된다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.MEM"
+><B
+>(16)</B
+></A
+></DT
+><DD
+>						max_mapnr, totalram_pages, high_memory를 계산하고 dmesg에
+						'Memory: 512920k/524208k available (1213k kernel code, 10900k reserved, 482k data,
+						228k init, 0k highmem)'라고 출력한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.KMEMSIZEINIT"
+><B
+>(17)</B
+></A
+></DT
+><DD
+>						슬랩 초기화를 마친다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.FORKINIT"
+><B
+>(18)</B
+></A
+></DT
+><DD
+>						uid_cache를 만들고 사용 가능한 메모리의 양에 따라 max_threads를 초기화하고 RLIMIT_NPROC을
+						max_threads/2로 정한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.PROC"
+><B
+>(19)</B
+></A
+></DT
+><DD
+>						procfs가 사용하는 데이터 스트럭쳐를 초기화 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.VFS"
+><B
+>(20)</B
+></A
+></DT
+><DD
+>						VFS, VM, buffer cache 등에 대한 슬램 캐시를 만든다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.IPC"
+><B
+>(21)</B
+></A
+></DT
+><DD
+>						System V IPC가 지원되는 커널이라면 IPC 하부 시스템을 초기화 한다. 세마포어, 메시지큐,
+						공유메모리를 초기화 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.CHECKBUGS"
+><B
+>(22)</B
+></A
+></DT
+><DD
+>						아키텍쳐에 따른 버그를 검사한다. 예를 들어 ia32의 "f00f 버그"다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.SMP"
+><B
+>(23)</B
+></A
+></DT
+><DD
+>						멀티 프로세서 시스템이 가능한 아키텍쳐의 경우에만 해당하는 내용으로 SMP를 초기화 한다.
+					</DD
+><DT
+><A
+HREF="x1942.html#MAIN.C.REST"
+><B
+>(24)</B
+></A
+></DT
+><DD
+>						rest_init() 자체는 무척 간단하다. 우선 init 프로세스를 실행해 준다. 그리고 start_kernel()의
+						첫 부분에서 lock 했던 커널을 unlock 해주고 idle 상태로 들어간다. idle 상태로 들어가도 이미
+						init 프로세스가 생성된 후기 때문에 상관 없이 커널의 부팅은 진행된다. idle 프로세스는 0번의
+						프로세스 번호를 갖는다.
+					</DD
+><DD
+><P
+>						나머지에 대해선 <A
+HREF="start.kernel.initprocess.html"
+>5.7절</A
+> 참조
+					</P
+></DD
+></DL
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="start.kerenl.lockkernel.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>리눅스 커널 부팅</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>lock_kernel()</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,242 @@
+#title namespace 활용
+
+[[TableOfContents]]
+== namespace ==
+C++의 namespace는 Java의 Package와 비슷한 용도로 사용할 수 있습니다. 이름공간이라고 번역하기도 하는데, 여러 이름영역에서 클래스,함수,변수를 나누어서 사용할 수 있습니다.
+
+대규모 프로젝트를 진행하다보면 이름이 중복되는 위험을 만나게 되는데, namespace를 이용해서 이러한 위험들을 피하고 버전을 관리할 수 있습니다. 그리고 다른 여러가지 재미있는 응용이 가능합니다.
+
+=== 일반적인 활용 ===
+예컨데 아래와 같은 경우를 예상해 볼 수 있습니다.
+{{{#!plain
+void StrReplace()  // A팀에서 만든 문자치환 함수
+{
+	cout << "A : StrReplace" << endl;
+}
+
+void StrReplace() // B팀에서 만든 문자치환 함수
+{
+	cout << "B : StrReplace" << endl;
+}
+}}}
+이 함수를 호출할 경우, 어떤 함수를 호출해야 하는지 알 수가 없으므로 '''redefinition'''에러가 발생합니다. namespace를 이용하면 이 문제를 해결할 수 있습니다.
+
+{{{#!plain
+namespace A
+{
+	void StrReplace()  // A팀에서 만든 문자치환 함수
+	{
+		cout << "A : StrReplace" << endl;
+	}
+}
+
+namespace B 
+{
+	void StrReplace() // B팀에서 만든 문자치환 함수
+	{
+		cout << "B : StrReplace" << endl;
+	}
+}
+int main()
+{
+    A::StrReplace();
+    B::StrReplace();
+}
+}}}
+
+=== namespace 별칭 ===
+namespace가 짧으면 충동을 일으킬 수 있을 것이다. 하지만 너무 길면
+{{{#!plain
+namespace Joinc_Application_CommonFunc
+{
+	class RegEx();
+	class Time();
+}
+}}}
+
+사용하는데, 애로사항이 꽃핀다. namespace는 별칭을 허용한다.
+{{{#!plain
+int main()
+{
+	namespace JAC = Joinc_Application_CommonFunc;
+	JAC::RegEx();
+	JAC::Time();
+}
+}}}
+
+=== 중첩 namespace ===
+namespace는 중첩이 가능합니다. Counting Log를 만든다고 가정해 보겠습니다. Counting은 User, Service, transaction으로 이루어 집니다. 이 경우 다음과 같이 중첩해서 namespace를 구성할 수 있을 겁니다. 
+{{{#!plain
+namespace mycounting
+{
+	namespace user
+	{
+		void Counting();
+	}
+	namespace service
+	{
+		void Counting();
+	}
+	namespace transaction
+	{
+		void Counting();
+	}
+}
+}}}
+
+중첩 namespace는 긴 이름의 namespace를 대신할 수도 있습니다. '''namespace Joinc_Application_CommonFunc''' 대신 다음과 같이 사용할 수 있을 겁니다.
+{{{#!plain
+namespace Joinc
+{
+	namespace::Application
+	{
+		namespace::CommonFunc
+		{
+		}
+	}
+}
+}}}
+
+=== using namespace ===
+중첩 namsespace를 예로 들어보겠습니다. 이경우 다음과 같이 사용해야 할 겁니다.
+{{{#!plain
+mycounting::user::Counting();
+mycounting::transaction::Counting();
+mycounting::service::Counting();
+}}}
+
+이름 공간이 모두 명시되니 명확해서 좋긴 하지만 사용하기가 여간 불편할 수 있을 것 같습니다. using을 이용해서 사용할 이름공간을 미리 명시하면, 컴파일러가 알아서 이름공간을 찾아갈 수 있도록 만들 수 있습니다.
+{{{#!plain
+// mycounting 이름공간을 사용할 것을 명시합니다.
+using namespace mycounting; 
+
+user::Counting();
+transaction::Counting();
+service::Counting();
+}}}
+사용하기 편해졌군요.
+
+=== 익명 namespace ===
+
+=== namespace 응용 ===
+이 프로그램은 몇개의 모듈로 구성된 멀티 스레드 기반 웹 서버로 유저/서비스/트랜잭션 별로 count 로깅을 해야 합니다. 여러 모듈에서 count를 해야 하기 때문에 프로그램 전역에서 카운트 정보가 유지되어야 합니다. 그래서 namespace로 관리하기로 했습니다. 
+
+my.h
+{{{#!plain
+#ifndef _MY_H
+#define _MY_H
+#include <string>
+#include <iostream>
+
+using namespace std;
+class Count
+{
+private:
+	string name;
+	int count;
+public:
+	Count(string aname)
+	{
+		name = aname;
+		count = 0;
+		cout << "Create " << name << endl;
+	}
+	void Counting(int a)
+	{
+		count += a; 
+	}
+	void Print()
+	{
+		cout << name << " : " << count << endl;
+	}
+};
+
+namespace count
+{
+	namespace user
+	{
+		void Init(string);
+		Count *GetInstance();
+	}
+	namespace service 
+	{
+		void Init(string);
+		Count *GetInstance();
+	}
+	namespace transaction 
+	{
+		void Init(string);
+		Count *GetInstance();
+	}
+}
+#endif
+}}}
+
+my.cc
+{{{#!plain
+#include "my.h"
+
+namespace count
+{
+	namespace user
+	{
+		class Count *myCount;
+		void Init(string name)
+		{
+			myCount = new Count(name);
+		}
+		Count *GetInstance()
+		{
+			return myCount; 
+		}
+	}
+	namespace service 
+	{
+		class Count *myCount;
+		void Init(string name)
+		{
+			myCount = new Count(name);
+		}
+		Count *GetInstance()
+		{
+			return myCount;
+		}
+	}
+	namespace transaction 
+	{
+		class Count *myCount;
+		void Init(string name)
+		{
+			myCount = new Count(name);
+		}
+		Count *GetInstance()
+		{
+			return myCount;
+		}
+	}
+}
+}}}
+
+사용
+{{{#!plain
+#include "my.h"
+#include <iostream>
+
+using namespace std;
+using namespace count;
+
+int main()
+{
+	service::Init("service");
+	transaction::Init("transaction");
+	user::Init("user");
+
+	service::GetInstance()->Counting(4);
+	service::GetInstance()->Print();
+	service::GetInstance()->Counting(4);
+	service::GetInstance()->Print();
+
+	transaction::GetInstance()->Counting(100);
+	transaction::GetInstance()->Print();
+}
+}}}

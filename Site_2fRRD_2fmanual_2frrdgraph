@@ -1,0 +1,92 @@
+#title rrd manual page : rrdgraph
+
+이 문서는 rrdtool의 모든 내용을 설명하지 않는다. 자주 사용될만하다고 생각되는 것들만을 설명하고 있다.
+=== 사용법 ===
+{{{#!plain
+rrdtool graph filename [option ...] [data definition ...] [data calculation ...] \
+[variable definition ...] [graph element ...] [print element ...]
+}}}
+
+=== 설명 ===
+RRDtool의 '''graph'''를 사용하면, 저장되어 있는 rrd data 를 인간이 쉽게 알아볼 수 있는 그래프 이미지로 출력할 수 있다. graph의 원래 목표는 보기 좋은 그래프를 만들어내는 것이지만 수치연산을 통한 통계 레포트 작성도 가능하다. 예를 들자면, slide windows 수치연산을 이용해서 [wiki:Site/RRD/Web_Trend Trend] 레포트를 만드는 등의 일이 가능하다.
+
+=== 자세히 보기 ===
+'''rrdtool graph'''를 이용하기 위해서는 수집된 RRD 데이터베이스로 부터, 하나 이상의 정의된 데이터 (data definition)를 사용해야만 한다. RDBMS로 치자면 데이터 필드가 필요하다는 얘기가 된다. 데이터베이스는 몇개가 되도 상관없다. 각각의 데이터베이스에서 가져올 데이터 필드의 이름만 알고 있으면 된다. 역시 RDBMS(:12)의 '''join'''과 비슷한 개념이라고 볼 수 있겠다. [[badsense]]
+
+또한 데이터베이스로 부터 Average, maxima, percentiles, etcetera 등의 값을 얻어올 수 있다. 물론 이러한 값을 사용하기 위해서는 RRD 데이터베이스를 만들때, 이들 값들에 대한 정의가 되어 있어야 할 것이다.
+
+graph 명령을 수행하면 해당 시간범위에 해당하는 RRA의 데이터를 가져와서 - fetch - 2차원 평면 그래프에 그리게 된다. 때때로 가져온 데이터의 단위를 변경시켜줘야 하는 경우가 발생할 수 있다. byte per second 로 저장이 되어 있는데, bits per seconds로 변경해서 그래프로 나타내어야 하는 경우가 될 것이다. '''graph'''는 단위 변경에 사용할수 있는 간단한 수치연산 옵션을 제공한다.
+
+=== 옵션 ===
+  '''filename'''
+    만들어낼 그래프 파일의 이름이다. 보통 확장자를 .png 로 한다. 파일이름을 '-'로 하면, 이미지를 표준출력(:12) 시킨다. 이경우 파일이 생성되지 않게 된다.
+
+  '''Time range'''
+    {{{#!plain
+[-s|--start time] [-e|--end time] [-S|--step seconds]
+}}}
+    RRA로부터 데이터를 읽어들일 시간범위를 지정한다. 지정하지 않을 경우 '''하루전 부터 지금까지'''의 데이터를 읽어온다. Start 와 end 는 여러가지 형식으로 지정할 수 있다. 32bit Unix:::Time:::stamp(:12), yyyy/MM/DD 등으로 지정이 가능하다. '''step'''를 이용하면, 데ㅤㅇㅣㅌ터를 얻어내기 위한 간격을 조정할 수 있다. 만약 step를 한시간인 3,600 으로 한다면, 스탭보다 작은 데이터 값들은 모두 무시가 된다. 
+
+  '''Labels'''
+    {{{#!plain
+[-t|--title string] [-v|--vertical-label string]
+}}}
+    그래프의 수평 혹은 수직방향으로 문자열을 출력할 수 있다. '''-t'''를 이용하면 그래프의 상단 중앙에 문자열을 출력한다. '''-v'''를 이용하면 그래프의 왼쪽에 세로방향으로 문자열이 출력된다. -t 는 그래프의 제목을 위해서 -v 는 그래프의 단위를 표시하기 위해서 주로 사용한다.
+
+  '''Size'''
+    {{{#!plain
+[-w|--width pixels] [-h|--height pixels] [-j|--only-graph]
+}}}
+    그래프가 그려질 '''canvas'''의 크기를 pixel 단위로 지정한다. 기본값은 400 x 100 pixel 이다.
+    '''--only-graph'''를 이용하고 height를 32 보다 작게하면 thumnail과 같은 이미지를 얻어낼 수 있다. 이 옵션은 라벨등을 제외한 수치 그래프만을 이미지로 만든다.
+
+  '''Limits'''
+    {{{#!plain
+[-u|--upper-limit value] [-l|--lower-limit value] [-r|--rigid]
+}}}
+    이 옵션을 사용하지 않을경우, 그래프는 데이터의 크기에 따라서 자동적으로 y축 눈금의 범위가 결정된다. 이 옵션을 사용하면 y축 눈금의 범위를 조정할 수 있다. 그래프의 데이터는 --upper-limit 와 --lower-limit 사이에 위치하게 되며, 이 사이에서 자동으로 scaling 된다.
+
+  '''기타'''
+    {{{#!plain
+[-c|--color COLORTAG#rrggbb[aa]]
+}}}
+    그래프의 각 부위별로 색을 지정할 수 있다. 색을 지정할 부위는 '''COLORTAG'''로 결정된다. COLORTAG 에는 '''BACK''', '''CANVAS''', '''SHADE''', '''GRID''', '''FONT'''등이 있다. 부위 별로 옵션을 이용하면, 다수의 부위에 대해서 색을 지정할 수 있다.
+    {{{#!plain
+--color BACK#00FF00 --color CANVAS#E0E0E0
+}}}
+
+    {{{#!plain
+[--zoom factor]
+}}}
+    그래프를 확대/축소시키기 위해서 사용한다. 0에서 1사이라면 축소, 1보다 크면 확대된다. thumbnail을 만들기 위한 목적으로 사용할 수도 있을 것이다.
+
+    {{{#!plain
+[-c|--color COLORTAG#rrggbb[aa]]
+}}}
+    그래프에 문자가 표시되는 부위별로 폰트의 크기와 종류를 지정할 수 있다. 부위는 COLORTAG로 지정할 수 있으며, DEFAULT, TITLE, AXIS, UNIT, LEGEND 등이 있다. 다음은 사용 예이다. --color 과 마찬가지로 다수의 옵션을 사용할수 있다.
+    {{{#!plain
+--font TITLE:13:/usr/lib/fonts/times.ttf --AXIS:12:/usr/lib/fonts/times.ttf
+}}}
+    폰트이름에 '''.'''을 사용하면 기본폰트가 사용된다. 기본폰트는 환경변수(:12) RRD_DEFAULT_FONT 를 변경하면 된다. 만약 UTF8 을 지원하고 baekmuk 과 같은 폰트가 있다면 한글을 출력할 수도 있다. 출력품질이 좋지 않다는게 문제다. 다음은 백묵폰트를 사용해서 한글출력을 한 예이다.
+    {{{#!plain
+--font TITLE:13:/usr/share/fonts/truetype/baekmuk/dotum.ttf --font AXIS:6:/usr/share/fonts/truetype/baekmuk/dotum.ttf
+}}}
+    attachment:hangul.png
+
+=== Graph ===
+그래프에 표현되는 글포맷, 라인등을 조정할 수 있다.
+  '''GPRINT:vname:format'''
+    그래프안에 문자열을 출력한다.
+
+  '''VRULE:time#color[:legend]'''
+     그래프의 해당 시간(time)에 수직의 라인을 그린다. 해당영역을 주목해야할 필요가 있을 때 사용한다. 색은 #color로 조절할 수 있다. #00FF00, #FF00FF 와 같은 형식으로 지정할 수 있다. 시간은 unix time(:12)을 사용한다.
+
+  '''HRULE:value#color[:legend]'''
+     그래프상의 값에 '''value'''에 해당하는 수평선을 그린다. 임계치 값을 표현하기 위한 용도로 사용한다. 
+     http://www.joinc.co.kr/modules/rrd/images/ppsweek.png
+
+  '''LINE[width]:value[#color][:[legend][:STACK]'''
+     그래프상에 value에 해당되는 실제 값을 찍기 위해서 사용한다. width는 선의 굵기를 나타낸다. 0에서 부터 8까지 지정이 가능하다. '''STACK'''을 명시하면, 기존에 그려진 value에 더해서 그래프가 그려지게 된다. cpu(:12) 사용율은 wait, used, system 의 더한 값이다. 이 경우에는 STACK를 명시해야 명확한 그래프가 만들어질 것이다.
+
+  '''AREA:value[#color][:[legend][:STACK]'''
+     LINE과 마찬가지로 value에 해당되는 값을 그래프상에 찍기 위해서 사용된다. 선만을 그리는 LINE과는 달리, 영역을 주어진 '''color'''로 채운다는 점이 다르다. 

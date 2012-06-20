@@ -1,0 +1,108 @@
+#title C# 공부페이지
+
+== 소개 ==
+C# 공부를 위한 페이지 입니다. 문법 같은 것은 건너 뛸거구요. 스레드, 파일, 네트워크, IPC, 클래스 지원 특성과 같은 것들을 위주로 공부할 생각입니다.
+
+== 스레드 ==
+
+== 파일 ==
+가장 기본적이면서 가장 중요한 파일다루기입니다. 
+
+파일관련 .NET 인터페이스는 System.IO.File 에 있습니다. 리눅스(:12) C(:12)는 저수준의 함수만 지원하는데 반해 .NET은 아주 다양한 인터페이스를 지원하네요.
+
+=== 파일 열기 ===
+가장 저수준의 메서드라고 할만한 것의 이름은 역시나 Open이군요.
+{{{#!plain
+public static FileStream Open(
+	string path,
+	FileMode mode
+)
+
+public static FileStream Open(
+	string path,
+	FileMode mode,
+    FileAccess
+)
+
+public static FileStream Open(
+	string path,
+	FileMode mode,
+    FileAccess,
+    FileShare
+)
+}}}
+3가지 구현이 있군요. '''path'''는 파일 이름일 거구. mode는 파일 오픈 방식을 정의 하기 위해서 사용을 합니다.
+  * CreateNew : 새로 파일을 생성하기 위해서 사용. 이미 파일이 존재한다면 IOException을 던진다.
+  * Create : 새로 파일을 생성하기 위해서 사용. 같은 이름의 파일이 존재한다면 덮어쓴다.
+  * Open : 존재하는 파일을 열때 사용한다. 존재하지 않으면 System.IO.FileNotFoundException을 던진다.
+  * OpenOrCreate : 파일을 연다. 존재하지 않으면 파일을 만든다. 
+  * Truncate : 존재하는 파일을 연다. 이때 파일을 0 byte 크기로 자른다. 
+  * Append : 존재하는 파일을 열고 파일의 끝으로 위치한다. 파일이 존재하지 않는다면 새로운 파일을 만든다. 
+
+FileAccess는 접근방식인데요. 리눅스와 마찬가지로 읽기 전용, 쓰기 전용, 읽기/쓰기 방식이 있군요.
+  * Read : 읽기 전용 
+  * Writre : 쓰기 전용
+  * ReadWrite : 읽기/쓰기 모두
+
+FileShare는 좀 생소하네요. 리눅스에서는 이런 일을 하는 옵션이 없거든요. 멀티 스레드(:12) 프로그램에서 다른 스레드의 접근권한을 만들기 위한 옵션이라고 합니다.
+  * None : 파일을 닫기 전까지, 다른 스레드는 파일을 열 수 없습니다. 
+  * Read : 읽기 허락.
+  * Write : 쓰기 허락
+  * ReadWrite : 읽기/쓰기 모두 허락
+  * Delete : 파일 삭제 허락
+어떤 경우에 필요한지는 잘 모르겠습니다. 리눅스에서는 이 옵션없이도 스레드간 파일 사용하는데 문제가 없었기 때문에.
+
+이들은 '''FileStream''' 객체를 반환하는데요. 이 객체에서 지원하는 메서드를 이용해서 파일 작업을 할 수 있습니다.
+
+이 밖에 OpenRead, OpenText, OpenWrite와 같은 응용 메서드가 몇개 존재하네요. mode와 access의 조합을 달리한 wrapper 메서드겠죠.
+
+=== 파일 작업 ===
+FileStream 객체에서 지원하는 메서드를 이용해서 파일 입출력 작업을 할 수 있습니다. 일반적인 Read, Write 함수 외에, Seek, Lock 메서드들도 제공하네요. 객체지향(:12)의 힘이겠죠. 굳이 설명할 필요는 없겠습니다. 필요할 때는 [http://msdn.microsoft.com/en-us/library/system.io.filestream.aspx MSDN]문서를 참고하면 될 듯.
+
+=== 예제 === 
+'''파일 내용을 읽어서 출력'''
+{{{#!plain
+using System;
+using System.IO;
+
+class TestFileIO
+{
+	public static void Main(string[] args)
+	{
+		
+		string fileName = args[0];
+        // 파일이 존재하는지 확인
+		if (!System.IO.File.Exists(fileName))
+		{
+			Console.Write("File Not Found : ", fileName);
+			return;
+		}
+		byte[] buffer;
+		buffer = new byte[1024];
+        
+        // 파일을 여시고
+		System.IO.FileStream fs = System.IO.File.Open(fileName,
+		                                              System.IO.FileMode.Open);
+		
+		int numBytesToRead = (int)fs.Length;
+		int count=0;
+
+        // 읽어서 표준출력 합니다.
+        // byte[]를 string으로 변환하려니 좀 까다롭군요. 뭔가 편한 방법이 있겠죠.
+		while((count = fs.Read(buffer,0, numBytesToRead)) > 0)
+		{
+			Console.WriteLine(count);
+			Console.Write(System.Text.ASCIIEncoding.ASCII.GetString(buffer));
+		}
+		fs.Close();
+	}
+}
+}}}
+
+'''파일을 다른 파일로 복사'''
+
+== 스레드 ==
+운영체제를 막론하고 가장 문제가 되는 기술이 멀티 스레드 운용기술입니다. 개발자가 크게 신경써야할 부분은 스레드 생성, 소멸, 동기화, 자원 접근 관리입니다. 신경써야할 부분이 몇개 안되긴 하지만 예상외로 고민해야할 부분이 많습니다. 특히 동기화와 자원 접근 관리 부분인데요. 스레드라는 동시 처리 방식이 사람에게 익숙치 않아서, 이 과정을 머리로 그리는데 어려움이 많아서 그런 것 같습니다.  
+
+스레드에 대한 일반적인 내용은 [wiki:Site/Thread Thread]를 참고하시기 바랍니다.
+

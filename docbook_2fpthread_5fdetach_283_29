@@ -1,0 +1,156 @@
+#title pthread_detach(3)
+[wiki:function_pthread_detach(3) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/01/03           -->
+<!-- 연락처 : dreamyun@yahoo.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>pthread_detach(3)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	실행중인 쓰레드를 detached(분리)상태로 만든다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;pthread.h&gt;
+
+int pthread_detach(pthread_t th);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		pthread_detach()는 쓰레드 식별자<emphasis>th</emphasis>를 가지는 쓰레드를 메인쓰레드에서 
+		분리 시킨다. 이것은 <emphasis>th</emphasis>를 가지는 쓰레드가 종료되는 즉시 쓰레드의 모든 
+		자원을 되돌려(free)줄 것을 보증한다. detach상태가 아닐경우 쓰레드가 종료한다고 하더라도 
+		pthread_join(3)을 호출하지 않는 한 자원을 되돌려주지 않는다. 
+	</para>
+	<para>
+		pthread_detach()함수를 호출하는 외에도 pthread_create()시 pthread_attr_t에 detachstate를 
+		지정해 줌으로써 detach상태로 생성할 수 도 있다. pthread_attr_t는 pthread_attr_init(3)함수를 
+		이용해서 변경할 수 있다.  
+	</para>
+	<para>
+		쓰레드가 detach상태로 되었다면 해당 쓰레드에 대한 pthread_join()호출은 실패한다.  
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공하면 0을, 실패하면 0이 아닌 값을 리턴한다.   
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>ESRCH</term>	
+			<listitem>
+				<para>	
+					<emphasis>th</emphasis>식별자를 가진 쓰레드가 존재하지 않는다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					<emphasis>th</emphasis>식별자를 가진 쓰레드가 이미 detach상태에 있다. 
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;pthread.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+
+// 쓰레드 함수
+// 1초를 기다린후 아규먼트^2 을 리턴한다.
+void *t_function(void *data)
+{
+    char a[100000];
+    int num = *((int *)data);
+	printf("Thread Start\n");
+    sleep(5);
+	printf("Thread end\n");
+}
+
+int main()
+{
+    pthread_t p_thread;
+    int thr_id;
+    int status;
+    int a = 100;
+
+    printf("Before Thread\n"); 
+    thr_id = pthread_create(&amp;p_thread, NULL, t_function, (void *)&amp;a);
+    if (thr_id &lt; 0)
+    {
+        perror("thread create error : ");
+        exit(0);
+    }
+    // 식별번호 p_thread 를 가지는 쓰레드를 detach 
+    // 시켜준다. 
+    pthread_detach(p_thread);
+    pause();
+    return 0;
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=118http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=118">Pthread API Reference</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_pthread_create(3)">pthread_create(3)</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_attr_init(3)">pthread_attr_init(3)</ulink>
+				</para>
+			</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+
+}}}

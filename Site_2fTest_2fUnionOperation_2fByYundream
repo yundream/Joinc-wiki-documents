@@ -1,0 +1,166 @@
+#title yundream의 구현
+
+MakeTermScore의 인자값을 변화시키는 것으로 배열의 크기를 변화시킬 수 있다.
+ 1. 첫번째 인자 : 배열의 크기
+ 2. 두번째 인자 : 최대 범위 
+MakeTermScorer(100, 2000) 이라면 0-2000에서 랜덤하게 100개의 숫자를 꺼내온다. 결과는 정렬되어서 리턴된다.  
+
+이 함수는 lucene(:12) pharse 쿼리의 scorering에 사용된다. 
+{{{#!plain
+#include <stdio.h>
+#include <vector>
+#include <iostream>
+#include <set>
+#include <time.h>
+#include <map>
+#include <unistd.h>
+#include <sys/time.h>
+
+using namespace std;
+
+// <did, score> 구조체
+struct KeyValue
+{
+	int did;
+	int score;
+};
+
+struct ltstr
+{
+	bool operator() (const KeyValue s1, const KeyValue s2) const
+	{
+		return s1.score > s2.score; 
+	}
+};
+
+vector<KeyValue> MakeTermScore(int, int);
+
+int main(int argc, char **argv)
+{
+	vector<KeyValue> Term1;
+	vector<KeyValue> Term2;
+	srandom(time((time_t *)NULL));
+	vector<KeyValue> tempTerm;
+	vector<KeyValue> tempTerm2; 
+	multiset<KeyValue, ltstr> InvertDoc;
+	KeyValue *tempTerm3;
+
+	struct timeval mytime1, mytime2;
+
+	// 테스트를 위한 2개의 배열 set 생성    ------------------------
+	vector< vector<KeyValue>::iterator > ScoreQueue;
+	vector< vector<KeyValue>::iterator > ScoreEnd;
+
+	Term1 = MakeTermScore(100, 200);
+	Term2 = MakeTermScore(100, 400);
+	// 테스트를 위한 2개의 배열 set 생성 end ------------------------ 
+
+	// 2개의 배열 set에 대한 iterator 저장
+	ScoreQueue.push_back(Term1.begin());
+	ScoreQueue.push_back(Term2.begin());
+	ScoreEnd.push_back(Term1.end());
+	ScoreEnd.push_back(Term2.end());
+
+	gettimeofday(&mytime1, NULL);
+	tempTerm3 = (KeyValue *)malloc(sizeof(KeyValue)*1200); 
+
+	unsigned int i=0;
+	unsigned int inputidx = 0;
+
+	int sum = 0;
+
+	/* Vector And */
+	unsigned int size2 = Term2.size();
+	unsigned int size1 = Term1.size();
+	unsigned int index = 0;
+	int turn = 0;
+	int topdoc = -1;
+
+	// 교집한 연산 -----------------------------------------------
+	for ( i = 0; i < size2; i++)
+	{
+		if (Term2[i].did > topdoc)	
+		{
+			topdoc = Term2[i].did;
+			turn++;
+			for (index; index < size1; index++)
+			{
+				if (Term1[index].did > topdoc)
+				{
+					topdoc = Term1[index].did;
+					break;
+				}
+				if (Term1[index].did == topdoc)
+				{
+					index++;
+					tempTerm3[inputidx] = Term2[i];
+					inputidx++;
+					topdoc = Term1[index].did;
+					break;
+				}
+			}
+		}
+		if (Term2[i].did == topdoc)
+		{
+			index++;
+			turn++;
+			topdoc = Term1[index].did;
+			tempTerm3[inputidx] = Term2[i];
+			inputidx++;
+		}
+	}
+	// 교집한 연산 end -------------------------------------------
+	gettimeofday(&mytime2, NULL);
+
+	// 연산 테스트 -----------------------------------------------
+	for (i =0; i < Term1.size(); i++)
+	{
+		printf("%d ", Term1[i].did);
+	}
+	printf("\n\n");
+	for (i =0; i < Term2.size(); i++)
+	{
+		printf("%d ", Term2[i].did);
+	}
+	printf("\n\n");
+	for (i = 0; i < inputidx; i++)
+	{
+		printf("%d ", tempTerm3[i].did);
+	}
+	printf("\n\n");
+
+	// 연산시간 측정
+	printf("TIME SEC  :  %lu\n", mytime2.tv_sec  - mytime1.tv_sec);
+	printf("TIME USEC :  %lu\n", mytime2.tv_usec - mytime1.tv_usec);
+	printf("Term1 : %d\n", Term1.size());
+	printf("Term2 : %d\n", Term2.size());
+	printf("SUM   : %d\n", inputidx); 
+	printf("SUM   : %d\n", sum); 
+	printf("TURN  : %d\n", turn); 
+
+	return 0;
+}
+
+vector<KeyValue> MakeTermScore(int num, int maxdoc)
+{
+	KeyValue lvalue;
+	vector<KeyValue> term;
+	set<int> did;
+	set<int>::iterator si;
+
+
+	for (int i = 0; i < num; i++)
+	{
+		did.insert(random()%maxdoc);
+	}
+	si = did.begin();
+	while(si != did.end())
+	{
+		lvalue.did   = *si;
+		lvalue.score = random()%100;	
+		term.push_back(lvalue);
+		*si++;
+	}
+	return term;
+}
+}}}

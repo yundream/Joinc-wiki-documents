@@ -1,0 +1,59 @@
+#title winsock : listen - 연결 대기열을 생성한다.
+
+== listen ==
+listen 함수는 연결요청 소켓이 대기하는 '''연결 대기열'''을 생성한다.
+
+== 사용 법 ==
+{{{#!plain
+int listen(
+  __in  SOCKET s,
+  __in  int backlog
+);
+}}}
+  * __s__ : socket() 함수로 생성된 SOCKET 객체 
+  * __backlog__ : 연결 대기열의 크기. 어느 정도의 크기가 효율적인지는 정해진바가 없다. 네트워크 상태와 서비스 종류에 따라서 달라진다. 보통 5 정도를 사용한다. 윈속 2 부터는 '''SOMAXCONN'''라는 상수 값을 사용한다. SOMAXCONN을 지정하면 소켓 서비스 제공자가 알아서 backlog 값을 설정한다. 
+
+== 반환 값 ==
+실패하면 0을 반환 한다. 표와 같은 에러코드를 만든다.
+|| WSANOTINITIALISED   || WSAStartup 이 호출되지 않았다.         || 
+|| WSAENETDOWN         || 네트워크 서브 시스템이 다운 되었다.    ||
+|| WSAEMFILE           || 더 이상의 소켓을 생성할 수 없다.       ||
+|| WSAEISCONN          || 소켓이 이미 연결되어이다.              ||
+|| WSAENOTSOCK         || 지정자가 소켓이 아니다.                ||
+|| WSAEINVAL           || bind(:12)함수로 묶이지 않은 소켓이다.  ||
+
+== 설명 ==
+클라이언트가 connect()를 호출해서 연결요청을 하면, 서버는 socket()로 생성한 '''듣기 소켓'''으로 연결요청을 생성한다. 생성된 연결 요청은 '''listen 대기열'''에 들어간다. listen 대기열의 연결요청을 꺼내는 함수는 accept()이다. accept 함수는 listen 대기열에서 가장 오래된 요청을 꺼내와서 '''연결 소켓'''을 생성한다. 클라이언트와 서버는 '''연결 소켓'''을 이용해서 통신 한다. 
+
+listen 함수는 하나 이상의 연결을 처리해야 하는 서버에서 사용한다. 만약 '''연결 대기열'''이 모두 차버린 상태에서 클라이언트가 연결하려하면, 클라이언트는 '''WSAECONNREFUSED''' 에러를 받고 연결에 실패한다. 
+
+== 예제 ==
+{{{#!plain
+struct sockaddr_in serverAddr;
+SOCKET ListenSocket;
+
+WSADATA wsaData;
+if(WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)
+{
+    printf("WSAStartup Error\n");
+    return 1;
+}
+
+ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+// ...
+// ...
+serverAddr.sin_family = AF_INET;
+serverAddr.sin_addr.s_addr = inet_addr(INADDR_ANY);
+serverAddr.sin_port = htons(1234);
+
+if(bind(ListenSocket, (SOCKADDR *)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+{
+    printf("Error binding on socket.\n");
+    closesocket(ListenSocket); 
+}
+
+if (listen( ListenSocket, SOMAXCONN ) == SOCKET_ERROR)
+{
+    printf("Error listening on socket.\n");
+}
+}}}

@@ -1,0 +1,262 @@
+#title 파일지정자를 복사한다. 
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>dup(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. dup(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN17"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN20"
+>에러</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN32"
+>예제</A
+></DT
+><DT
+>1.6&#51208;. <A
+HREF="#AEN36"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	파일 지정자를 복사한다. </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int dup(int oldfd);
+int dup2(int oldfd, int newfd);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		dup()와 dup2()는 파일 지정자 <B
+CLASS="EMPHASIS"
+>oldfd</B
+>에 대한 복사본을 
+		생성한다. 성공적으로 수행될경우 oldfd 지정자에 대한 복사본은 
+		서로 공유되어서 사용된다. 즉 lock, 파일위치 포인터, 플래그등을 
+		공유한다. 만약 원본 파일지정자 에서 위치변경이 일어 났다면, 
+		다른 복사된 파일지정자에도 영향을 미친다.  
+	</P
+><P
+>		그러나 이 두개의 파일지정자간 close-on-exe 플래그는 공유되지 
+		않는다. 
+	</P
+><P
+>		dup()를 이용해서 복사되어지는 새로운 파일 지정자는 사용되지 않는 
+		가장 작은 파일 지정자를 이용한다. dup2()는 디스크립터는 파일 지정자를 
+		지정할 수 있는데, 이전에 열린 <B
+CLASS="EMPHASIS"
+>newfd</B
+>가 있다면 
+		닫고 나서, <B
+CLASS="EMPHASIS"
+>oldfd</B
+>를 
+		<B
+CLASS="EMPHASIS"
+>newfd</B
+>에 복사하면 된다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		복사된 새로운 파일지정자를 리턴한다. 에러가 발생하면 -1 을 리턴한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>1.4&#51208;. 에러</A
+></H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EBADF</DT
+><DD
+><P
+>	
+					oldfd 가 열린 파일 지정자가 아닐경우 
+				</P
+></DD
+><DT
+>EMFILE</DT
+><DD
+><P
+>					프로세스가 최대로 열수 있는 파일 지정자 
+					갯수를 가진 상태에서 새로운 파일지정자를 얻고자 
+					시도하는 경우 
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN32"
+>1.5&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+
+int main()
+{
+    int fd, fd2;
+    char buf[80];
+
+    fd = open("dup.c", O_RDONLY);
+    fd2 = dup(fd);
+    printf("%d = %d\n", fd, fd2);
+
+    memset(buf, 0x00, 80);
+    read(fd, buf, 20);
+    printf("fd : %d\n%s\n", fd, buf);
+
+    memset(buf, 0x00, 80);
+    read(fd2, buf, 20);
+    printf("fd : %d\n%s\n", fd2, buf);
+
+    close(fd);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>1.6&#51208;. 참고문헌</A
+></H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=85"
+TARGET="_top"
+>dup 활용</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+
+}}}

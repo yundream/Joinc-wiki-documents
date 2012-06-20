@@ -1,0 +1,80 @@
+#title kill - 프로세스에 시그널을 보낸다.
+
+[[tag(signal,kill,시스템프로그래밍,C)]]
+=== 사용법 ===
+{{{#!plain
+kill [ -signal | -s signal ] pid ...
+kill [ -L | -V, --version ]
+kill -l  [ signal ]
+}}}
+
+=== 설명 === 
+프로세스에 signal(:12)을 보내기 위해서 사용한다. 시그널을 받은 프로세스는 시그널핸들러를 실행시키거나 시그널 핸들러가 없을 경우 시그널에 대한 기본 행동을 한다. 일반적으로 '''HUP''', '''INT''', '''KILL''', '''STOP''', '''CONT'''를 자주 사용한다. 시그널은 이름을 사용할 수도 있고, 번호를 사용할 수도 있다. 즉 -9 와 -SIGKILL 은 동일하다.
+
+'''pid'' 앞에 마이너스 표시가 붙을경우 모든 프로세스 그룹에게 시그널을 보낸다. pid를 -1로 할경우 자신과 init프로세스를 제외한 모든 프로세스에게 시그널을 보낸다. 
+
+=== 시그널들 ===
+ || 이름		|| 번호				|| 행동				|| 설명					||
+ || 0				|| 0					|| n/a				|| 시그널을 받는지 확인하기 위해서 사용 ||
+ || ALARM		|| 14					|| 종료				||	||
+ || HUP			|| 1					|| 종료				||	||
+ || INT			|| 2					|| 종료				||	||
+ || KILL		|| 9					|| 종료				|| 이 시그널은 절대 무시할 수 없다.	||
+ || PIPE		|| 13					|| 종료				||	||
+ || PROF		||						|| 종료				||	||
+ || TERM		|| 15					|| 종료				||	||
+ || USR1		||						|| 종료				||	||
+ || USR2		||						|| 종료				||	||
+ || VTALRM	||						|| 종료				||	||
+ || PWR			||						|| 무시				|| 시스템에 따라 종료하는 경우도 있음	||
+ || WINCH		||						|| 무시				||	||
+ || CHLD		||						|| 무시				||	||
+ || URG			||						|| 무시				||	||
+ || TSTP		||						|| 멈춤				|| 쉘과 상호작용하기 위함		||
+ || TTIN		||						|| 멈춤				|| 쉘과 상호작용하기 위함		||
+ || TTOU		||						|| 멈춤				|| 쉘과 상호작용하기 위함		||
+ || STOP		||						|| 멈춤				|| 쉘과 상호작용하기 위함		||
+ || CONT		||						|| 재시작			|| 만약 멈춤상태였다면, 계속진행한다. 그렇지 않다면 무시 ||
+ || ABRT		|| 6					|| core				||	||
+ || FPE			|| 8					|| core				||	||
+ || ILL			|| 4					|| core				||	|| 
+ || QUIT		|| 3					|| core				||	||
+ || SEGV		|| 11					|| core				||	||
+ || TRAP		|| 5					|| core				||	||
+ || SYS			|| 						|| core				|| 대부분 미구현 ||
+ || EMT			||						|| core				|| 대부분 미구현 ||
+ || BUS			|| 						|| core				||	||
+ || XCPU		||						|| core				||	||
+ || XFSZ		||						|| core				||	||
+
+=== 예제 ===
+권한을 가지고 있는 모든 프로세스를 종료한다.
+{{{#!plain
+# kill -9 -1
+# kill -KILL -1
+}}}
+
+시그널의 목록을 보여준다.
+{{{#!plain
+# kill -l
+ 1) SIGHUP       2) SIGINT       3) SIGQUIT      4) SIGILL
+ 5) SIGTRAP      6) SIGABRT      7) SIGBUS       8) SIGFPE
+ 9) SIGKILL     10) SIGUSR1     11) SIGSEGV     12) SIGUSR2
+13) SIGPIPE     14) SIGALRM     15) SIGTERM     16) SIGSTKFLT
+17) SIGCHLD     18) SIGCONT     19) SIGSTOP     20) SIGTSTP
+21) SIGTTIN     22) SIGTTOU     23) SIGURG      24) SIGXCPU
+25) SIGXFSZ     26) SIGVTALRM   27) SIGPROF     28) SIGWINCH
+29) SIGIO       30) SIGPWR      31) SIGSYS      34) SIGRTMIN
+35) SIGRTMIN+1  36) SIGRTMIN+2  37) SIGRTMIN+3  38) SIGRTMIN+4
+39) SIGRTMIN+5  40) SIGRTMIN+6  41) SIGRTMIN+7  42) SIGRTMIN+8
+43) SIGRTMIN+9  44) SIGRTMIN+10 45) SIGRTMIN+11 46) SIGRTMIN+12
+47) SIGRTMIN+13 48) SIGRTMIN+14 49) SIGRTMIN+15 50) SIGRTMAX-14
+51) SIGRTMAX-13 52) SIGRTMAX-12 53) SIGRTMAX-11 54) SIGRTMAX-10
+55) SIGRTMAX-9  56) SIGRTMAX-8  57) SIGRTMAX-7  58) SIGRTMAX-6
+59) SIGRTMAX-5  60) SIGRTMAX-4  61) SIGRTMAX-3  62) SIGRTMAX-2
+}}}
+
+여러개의 프로세스의 PID에 기본 시그널(SIGTERM)을 보낸다.
+{{{#!plain
+# kill 123 543 2341 5421
+}}}

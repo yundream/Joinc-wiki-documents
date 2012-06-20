@@ -1,0 +1,49 @@
+#title chef에 대하여
+
+== chef ==
+chef는 infrastructure를 자동화 하기 위한 프레임워크다. 전체 시스템 형상을 코드화 하고, 코드를 자동으로 수행함으로써 손쉽게 시스템을 운영, 유지, 확장, 복제할 수 있도록 도와준다. 
+
+=== chef 구조 ===
+chef는 '''server & client'''모델을 따르는 프레임워크로 '''chef server''', '''workstations''', '''node''' 로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1_fvo_dFcqZIJntmAD5NH-QPMYnl84nUTKYKdIHO5CdM&amp;w=751&amp;h=393">
+}}}
+  1. Chef Server 
+    Chef Server는 인프라 (설정)정보 코드를 저장하기 위한 '''Chef 코드 저장소'''를 가지고 있다. 모든 chef 코드는 chef server에 집중해서 관리한다. chef server는 REST API를 이용해서 접근할 수 있다. 추가적으로 WebUI를 이용해서 인프라스트럭쳐를 관리할 수도 있다.  
+  1. Node
+    인프라를 구성하는 단위 시스템으로 chef client가 설치된다. bear metal 혹은 VM 환경일 수 있다. 노드는 chef-client 프로그램을 실행해서 chef server로 부터 '''run list'''를 가져와서 설정을 변경하고 패키지를 설치하고 애플리케이션을 실행한다. 노드는 클라이언트라고 부르기도 한다.
+  1. Workstation  
+    chef 코드를 개발하는 컴퓨터 노드다. '''Knife'''를 이용해서 chef server에 작업 결과를 upload 한다. 
+인프라스트럭쳐의 설정 데이터는 cookbooks, data bags, role 등에 저장이 된다. 이들 데이터는 svn이나 git와 같은 형상관리 시스템을 이용해서 관리한다. - 형상관리 시스템을 가지지 않을 수도 있지만, 반드시 가질 것을 권장한다. -  
+
+== 인프라스트럭쳐 모델링 ==
+=== Nodes, Run List ===
+노드는 chef client가 설치되는 호스트 컴퓨터다. 노드의 특성은 attributes와 run list에 의해서 결정이 된다. attributes는 노드의 특성 값들이 저장된다. run list는 attributes와 코드들을 이용해서 설정을 적용한다. 예컨데 run list는 프로그램 코드, attributes는 코드에 사용되는 변수라고 할 수 있다.
+
+'''roles'''는 비슷한 특성을 가지는 node를 그룹으로 관리하기 위해서 사용한다. roles는 하나 이상의 run list를 가지고 있으며, role을 적용한 node들은 모두 같은 설정을 가지게 된다. 웹서버 그룹, 데이터 베이스 서버그룹, 분산 저장 시스템 그룹 등을 일괄 관리할 때 유용하게 사용할 수 있다. 
+
+=== Cookbooks === 
+Cookbooks는 recpie, resource definition, attribute, library, cookbook file 그리고 template 파일, 기타 메타데이터의 모음이다. 일반적으로 Cookbook는 단일 애플리케이션 단위로 개발한다. 즉 mysql cookbook, apache cookbook, dhcp cookbook 형식으로 개발한다. 
+
+=== Recipes ===
+recipe는 설정을 적용하기 위한 기본 코드 단위다. recipe는 ruby 코드로 만들어져 있으며, resources 명령들을 이용해서 코드를 만든다.   
+
+=== resources ===
+리소스는 호스트의 설정을 제어하기 위해서 사용하는 명령모음으로 플랫폼에 상관없이 사용할 수 이싸다. 예를 들어 '''package'''리소스를 이용하면 패키지를 설치할 수 있는데, apt, yum, BSD ports등의 플렛폼에 맞는 패키징 시스템을 사용한다. 
+
+=== data bags ===
+data bags는 chef server에 저장되는 key - value 형식의 데이터다. data bags의 데이터는 모든 cookbook에서 전역변수처럼 사용할 수 있다. 인프라스트럭쳐 전체에서 사용되는 데이터를 저장하기 위해서 사용한다. 
+
+== Chef 관리 ==
+=== Knife ===
+knife는 Chef server에 명령을 내리기 위한 커맨드 라인 인터페이스다. WebUI가 있기는 하지만 대부분의 chef 작업은 knife를 통해서 이루어진다.
+
+=== Management Console ===
+web UI 형식으로 chef server에 명령을 내릴 수 있다. user, nodes, role, cookbook, data bags 등을 직관적으로 관리할 수 있다.
+
+== 인증 ==
+chef-cliet와 knife는 '''REST API'''를 이용해서 chef server와 통신한다. chef-clients는 API를 호출해서 run list를 가져오고 cookbook을 다운로드 한 다음 이들을 실행한다. 이 과정을 진행하려면 먼저 chef server로 부터 인증과정을 거쳐야 한다.  
+
+인증과정은 '''Authentication'''과 '''Authorization'''의 두부분으로 나뉜다.
+

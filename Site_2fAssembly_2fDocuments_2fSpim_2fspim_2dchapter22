@@ -1,0 +1,390 @@
+#title SPIM Exception Handler
+
+[[TableOfContents]]
+
+번역:강웅빈
+번역감수:프겔ㅤㅎㅛㅇ들
+
+
+=== SPIM Exception Handler ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_1.html
+
+여태까지 여러분이 스핌에서 실행하는 프로그램은 순기계(bare machine) 옵션을 사용하여 실행하였다. 순기계(bare machine) 에서는 컴퓨터 자체의 기계코드없이 본인이 작성한 코드로만 실행을 한다. 대부분의 컴퓨터는 운영체제의 제어 하에 운영된다. 응용프로그램은 입출력이나 다른 시스템 작업을 하기위해서 운영체제가 제공하는 서비스를 사용한다.  
+
+SPIM은 운영체제를 가지고 있지 않지만 어셈블리 프로그램을 작성하도록 보조해주는 서비스를 제공하는 예외 처리자(exception handler)를 가지고 있다.
+
+
+장의 주제:
+
+    * syscall 명령 
+    * SPIM exception handler.
+    * 예외 처리자 서비스(Exception handler services):
+          o halt program
+          o print string
+          o read string
+          o print integer
+          o read integer
+    * Hello World 예제.
+    * Library Fine 예제.
+
+질문: 실제 기계적으로 구현된 순머신(bare machine)에서 문자를 터미널에 쓰는 작업이 쉽겠습니까?
+
+=== syscall ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_2.html
+
+답: 쉽지 않다.
+
+가장 단순한 컴퓨터일지라도 문자를 스크린에 출력하기 위해서는 많은 명령들과 비디오 카드에 대한 세부지식이 필요하다. 이와같은 주제는 지금은 다루지 않는다. SPIM은 키보드의 입려과 모니터에 출력할 수 있도록 운영체제를 모방한 예외처리자(exception handler)를 가지고 있다.
+
+어셈블리어는 syscall 명령을 사용하여 운영체제가 제공하는 서비스를 요청한다. syscall 명령은 요청된 서비스를 수행할 수 잇도록 제어를 운영체제로 넘긴다. 일반적으로 운영체제는 요청된 서비스를 수행한 후 제어를 프로그램으로 넘긴다.(많은 세부과정을 생략하고 설명하였다).
+
+{{{#!plain
+syscall          # 운영체제에 서비스를 요청한다. 
+
+다른 운영체제에서는 다른방식으로 이러한 명령을 사용한다. 다음은 스핌 예외처리자가 사용하는 방식이다:
+
+li  $v0,code      # Load $v0를 운영체제 서비스코드 숫자를 올린다.
+
+.......           # 서비스를 위한 parameters 집어넣는다. 
+.......           # registers $a0, $a1 or $f12 (see below).
+
+syscall           #운영체제에 요청한다.
+
+                  # 만약 결과값이 있다면  $v0 or $f0 
+                  # 
+}}}
+
+syscall 명령은 예외(exception)를 발생시킨다. 예외처리자로 제어를 넘긴다. 예외처리자는 운영체제의 일부분으로서 운영체제 서비스를 요청받는다. 다른 종류의 서비스는 다른 종류의 레지스터에 데이터 값을 원할 수 있다. 모든 서비스가 요청자에게 값을 돌려주는 것은 아니다.
+ 
+질문: syscall 은 기본 명령입니까 의사 명령입니까?
+
+=== 예외처리자 서비스(Exception Handler Services) ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_3.html
+
+답: 32 비트 기계명령과 상응하는 기본 어셈블리 명령이다.
+
+다음은 스핌 예외 처리를 하는 서비스이다. 다음 페이지에서는 이 서비스들을 사용하는 방법을 설명한다. print 서비스는 스핌 가상 모니터에 문자를 출력한다. read 서비시는 키보드로부터 문자를 읽고 (숫자 읽기 서비스의 경우) 문자열을 적절한 형태로 변환한다.
+
+
+attachment:exceptionservice.JPG
+
+다음은 서비스를 사용하는 예이다. 레지스터 $v0에 exit를 위한 코드를 올린다. 그런 후에 syscall 명령을 사용한다. exit 서비스는 프로그램을 중단한다. (이제까지는 단일 스텝 프로그램을 사용하거나 프로그램 끝에 도달하여 프로그램을 종료했다)
+
+{{{#!plain
+li      $v0,10      # code 10 == exit
+syscall             # 제어를 운영체제로 넘긴다.
+               
+}}}
+
+질문: 실제 운영체제에서 컴퓨터에 실행되는 프로그램의 경우 exit 서비스를 호출할 경우 무슨일이 일어날까요?
+
+=== Print String ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_4.html
+
+답: 실제 프로그램에서 이 서비스는 운영체제로 제어를 넘긴다 넘겨진 제어는 다시 되돌려받지 않는다. 
+
+exit 서비스는 프로그램을 종료할때 보통 사용한다. 실제컴퓨터는 항상 실행하는 상태이고 제어권을 누군가가 가지고 있어야 한다. Exit  서비스로 제어를 운영체제로 돌려 보내준다. 운영체제는 제어를 넘겨받은후 자기가 맡은 작업을 수행한다. 또다른 사용자 프로그램을 시작할 수 도 있다. (스핌에서 exit 서비스는 모든 실행을 중단 시킨다)
+
+print string 스핌 예외 처리자 서비스는 null로 종료되는 문자를 가상 모니터에 출력한다. 문자의 주소는 레지스터 $a0로 올려진다. 일반적으로 문자는 메모리의 데이터 영역에 위치해 있다.
+
+
+{{{#!plain
+li      $v0,4       # code 4 == print string
+la      $a0,string  # $a0 == address of the string
+syscall             # 운영체제에 서비스를 요청한다.
+    . . . .
+
+        .data
+string: .asciiz      "Hello SPIM!\n"
+}}}
+print string 서비스는 $a0에 의해 지정된 바이트부터 시작하여 하나 하나의 바이트를 가상 모니터로 보낸다. null 바이트를 만날때 까지 계속하여 이 작업을 한다. 서비스는 바이트가 ascii 형식인지 아닌지 검사 하지 않는다. 만약 $a0 잘못된 주소가 담겨져 있다면 의미없는 문자가 출력될 것이다.
+
+줄을 바꾸고자 한다면 새줄표시 문자 '\n'를 문자열의 끝이나 중간에 사용한다.
+
+주의할 버그: la 명령으로 무자를 출력하기 위해 문자의 첫번째 바이트 주소를 어떻게 올리는가 주의해서 보자. 
+
+질문: print string 를 사용하여 레지스터에 담긴 32비트 크기의 정수를 출력할 수 있습니까?
+
+=== 전형적인 예  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_5.html
+
+답: 출력할 수 없다. 다른 서비스를 사용하여야 한다.
+
+자 이제 책 1장에서나 볼만한 프로그램을 살펴볼 준비가 되었다. 다음 프로그램은 문자를 출력하고 exit 서비스를 호출한다.
+
+{{{#!plain
+# hello.asm
+#
+        .text
+        .globl  main
+main:
+        li      $v0,4       # code 4 == print string
+        la      $a0,string  # $a0 == address of the string
+        syscall             # 예외 처리자를 호출한다.
+
+        li      $v0,10      # code 10 == exit
+        syscall             # 프로그램을 종료한다.
+
+        .data
+string: .asciiz      "Hello SPIM!\n"
+# end of file
+}}}
+
+시뮬레이터 모니터 창에 문자가 출력되나. 이 프로그램은 완전한 프로그램이다 소스파일을 복사하여 그대로 실행할 수 있다. 하지만 다음 페이지를 먼저 보도록 하자.
+
+질문: 실제 컴퓨터(하드웨어)에서는 예외처리자는 무엇입니까?
+
+=== 스핌 시작하기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_6.html
+
+답: 메모리나 ROM에 상주하는 기계어 프로그램이다.
+
+attachment:exceptionOptions.gif
+
+SPIM에서는 시뮬레이터가 예외처리자 역활을 한다. 실제 기계에서 예외처리자 프로그램은 ROM에 상주할 수도 있고 하드 디스크의 부트영역(boot sector)로부터 읽혀질 수도 있을 수 있다. 아주 옛날에는 메모리에 직접 수작업으로 입력하기도 하였다.
+
+스핌에서 예외처리자를 사용하기 위해서는 그림과 같이 설정을 하여준다. 옵션에서 "Allow pseudoinstructions"과  "Load trap file"을 설정한다. 그리고 Mapped I/O를 설정하지 않는다.
+
+이제 파일 열기메뉴로 소스파일을 선택하여 프로그램을 어셈블하고 올려보자(전해 하였던것과 동일한 방법이다). 프로그램은 초기화 코드와함께 스핌 시뮬레이터에 올려진다. 초기화 코드는 주소  0x00400000에서 시작한다.  0x00400000 주소는 이전까지는 프로그램이 시작되는 주소였다.
+
+프로그램을 실행하기 위해 Go 버튼을 누르고 팍업창에 OK를 선택한다. 
+
+질문: 전과같이 0x00400000주소에서 한스텝가기를 시작할 수 있습니까?
+
+== 예제 출력 ==
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_7.html
+
+답: 예. 그러나 대부분의 코드가 당신의 프로그램에서 나온게 아니기 때문에 전처럼 흥미롭진 않습니다.
+
+hello.asm 예제 프로그램을 실행하고 있는 스핌이다. 시뮬레이트된 콘솔이 뒤에 있다. 앞윈도우에서는 트랩 처리기를 위한 초기화 코드를 볼 수 있다. 트랩을 발생시키는 프로그램을 실행시킬때 트랩 처리기가 작동한다. 일반적으로 트랩핸들러는 0으로 나누거나 워드 정렬되지 않은 주소에서 워드를 불러들이는 일 등을 할 경우 작동한다. (스핌 창에서) 앞의 창을 아래로 스크롤 하면 hello.asm파일의 소스에 해당하는 코드를 볼 수 있다. 데이터 섹션을 보면 문자열을 위한 ascii코드를 볼 수 있다.
+
+attachment:helloOut.gif
+
+질문: 프로그램이 다음과 같이 변경 되었을경우 무슨 일이 일어날까요?
+{{{#!plain
+main:
+        li      $v0,4       # code 4 == print string
+        la      $a0,string  # $a0 == address of the string
+        addiu   $a0,1       # add one to the address
+        syscall             # Invoke the operating system.
+        . . .
+        .data
+string: .asciiz      "Hello SPIM!\n"
+}}}
+
+== 정수 입력 출력 서비스 ==
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_8.html
+
+답: 프로그램은 "ello SPIM!"을 출력합니다.
+
+정수 입력 서비스는 개행문자가 입력되기 전 까지의 한줄을 읽는다. 이 문자열은 부호('+', '-')로 시작할 수 있고, ASCII문자 '0', '1',...,'9' 로 이루어 져야 한다. 이 문자열은 32비트 2의 보수 식으로 표현된 정수로 변환되어 $v0에 저장된다.
+
+{{{#!plain
+li      $v0,5     # 코드 5 == 정수 입력 서비스
+syscall           # 운영체제 호출.
+                  # ascii문자열 한줄을 읽는다.
+                  # 32비트 정수로 변환.
+                  # $v0 <-- 2의 보수식의 정수
+}}}
+
+정수 출력 서비스는 $a0에 있는 32비트의 정수를 SPIM터미널로 출력 한다. 물론 lw를 쓰지 않고서도 정수를 $a0에 넣는 방법은 많다.
+
+{{{#!plain
+li      $v0,1     # 코드 1 == 정수 출력
+lw      $a0,int   # $a0 == 정수
+syscall           # 운영체제 호출.
+                  # 32비트 정수를 문자열로 변환.
+                  # 문자들을 모니터에 출력.
+}}}
+
+질문:
+정수 출력 서비스는 정수를 시뮬레이트 된 모니터에 출력합니다. 그런데.. 출력전에 무슨일을 해야할까요?
+
+=== 예제 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_9.html
+
+답: 예외 처리 서비스는 먼저 레지스터 $a0에 있는 2의 보수로 표현된 정수를 ascii 문자로 전환한다. 
+
+다음 예제 프로그램은 온스(ounce)로 표현된 정수를 읽어서 파운드(pound)와 온스(ounce)에 해당하는 숫자를 출력한다.
+
+
+{{{#!plain
+# ounces.asm
+#
+# 온스(ounce)를 파운드(pound)와 온스(ounce)로 전환한다.
+
+        .text
+        .globl  main
+
+main:   li      $v0,4       # 프롬프트를 출력한다.
+        la      $a0,prompt  #
+        syscall
+        li      $v0,5       # 온스를 읽는다.
+        syscall
+
+        li      $t1,16      # 1 pound는 16 oz.이다.
+        divu    $v0,$t1     # lo = pound; hi = oz.
+
+        mflo    $a0
+        li      $v0,1       # print
+        syscall             # pounds
+        li      $v0,4       # print "pounds"
+        la      $a0,pout
+        syscall
+
+        mfhi    $a0         # print
+        li      $v0,1       # ounces
+        syscall             # 
+        li      $v0,4       # print
+        la      $a0,ozout   # "ounces"
+        syscall
+
+        li      $v0,10      # exit
+        syscall
+
+        .data
+prompt: .asciiz "Enter ounces: "
+pout:   .asciiz " Pounds\n"
+ozout:  .asciiz " Ounces\n"
+# end of file
+}}}
+
+대개의 경우에서 프로그램은 입력과 출력이 주이다. 실제계산은 극히 일부이다.
+
+질문:
+프로그램은 Pounds와 Ounces를 각라인에 출력한다. 프로그램을 바꿔서 한줄에 Pounds와 Ounces가 출력되도록 해보자.
+
+=== Read String ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_10.html
+
+답:" Ounces\n"에서 "\n"을 제거하자. 
+
+예외 처리자는 키보드로부터 입력되는 string을 읽어올 수 있습니다.
+
+{{{#!plain
+li      $v0,8       # code 8 == read string
+la      $a0,buffer  # $a0 == buffer 주소
+li      $a1,16      # $a1 == buffer 길이
+syscall             # 운영체제를 호출한다. 
+
+ . . . .
+
+        .data
+buffer: .space 16   # 16 bytes를 예약해 논다.
+}}}
+
+세부사항: 레지스터 $a1은 입력버퍼(input buffer)의 길이(바이트 크기로)를 담고 있다. 키보드로부터 읽혀진 ($a1)-1까지의 문자가 버퍼에 null로 종료되는 문자열(string)으로 넣어진다. 버퍼의 마지막 바이트는 null로 채워진다.
+
+사용자는 enter 키로 문자열의 끝을 표시한다. "enter" 문자는 버퍼에 줄바꾸기 문자(newline) "\n" 즉0x0a로 표시된다. 이 문자를 뒤따라 null 바이트 0x00가 온다. 만약 사용자가 정확히 ($a1)-1 크기의 문자를 문자열(string)로 입력한다면 버퍼에서 줄바꾸기 문자는 생략된다. 어떤 경우라도 버퍼에는 데이터의 끝에 nulll이 존재한다.
+
+질문:즉시 읽어들인 문자를 print string 서비스를 사용해서 출력할 수 있습니까?
+
+=== 예제 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_11.html
+
+답: 예
+
+때로는 문자열이 더큰 문자열의 부분일경우도 있다.이러한 경우에 입력된 문자열의 끝에 null을 제거해야만 한다. 어떤 경우에는 다음의 예에서처럼 두개의  print string 작동을 사용할 수 도 있다.
+
+예제프로그램에서 사용자는 이름과 ","와 ENTER를 입력한다. 프로그램은 이름을 사용하여 사용자에 맞게 편지를 출력한다. 편지의 몸체가되는 본문은 한번의 syscall을 사용하여 출력된다. 프로그램에서 null로 종료되는 문자로 이루어진 사용자에 맞게 꾸며진 인사말이 따로  syscall을 사용하여 먼저 출력된다.
+
+{{{#!plain
+# overdue.asm
+
+        .text
+        .globl  main
+
+main:   
+        # 이름 구하기
+        li      $v0,4           # 프롬프트 출력
+        la      $a0,prompt      #
+        syscall
+        li      $v0,8           # code 8 == 문자열 읽기 서비스
+        la      $a0,name        # $a0 == 버퍼주소
+        li      $a1,24          # $a1 == 버퍼길이
+        syscall                 # 운영체제 호출
+
+        # print the letter
+        li      $v0,4           # 환영 메세지 표시
+        la      $a0,letter      #
+        syscall
+        li      $v0,4           # 몸체 표시
+        la      $a0,body        #
+        syscall
+
+        li      $v0,10      # 나간다
+        syscall
+
+        .data
+prompt: .asciiz "enter name, followed by comma-enter: "
+letter: .ascii  "\n\nDear "
+name:   .space  24
+
+body:   .ascii  "\nYour library books are way\n"
+        .ascii  "overdue.  Please return them\n"
+        .ascii  "before we give your name\n"
+        .asciiz "to the enforcement squad.\n\n"
+
+# end of file
+}}}
+
+이름끝에 사용자가 ","를 입력하도록 하는게 조잡해 보일 수 도 있다. 프로그램이 이름의 끝을 찾아내 자동적으로 ","를 삽입하는 것이 더좋을 것이다. 하지만 프로그램은 더길어지게 될것이다.
+
+질문: 빈칸도 사용자가 입력한 이름의 한부분이 될 수 있습니까?
+
+
+=== 프로그램의 작동 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_12.html
+
+답: 네. 빈칸은 ascii코드 0x20이며 다른 문자들처럼 취급 됩니다.
+
+아래의 그림의 프로그램의 정상적인 작동을 보여준다. 이름과 쉼표가 사용자에 의해 입력 되었다.
+
+attachment:fineLetterB.gif  
+
+질문: "백스페이스"가 문자입니까?
+ 
+=== 라인 버퍼 편집 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_13.html
+
+답: 네. ascii코드 0x08입니다.
+
+사용자가 실수로 이름을 잘못 입력 했을때, 사용자는 백스페이스를 눌러 글자를 지우려 한다. 그러나 백스페이스는 원하는데로 작동하지 않을 것이다. 백스페이스 문자(0x08)은 다른 글자들과 함께 문자열에 포함된다. SPIM에서 문자가 아닌 바이트들은 작은 검은색 사각형으로 나타난다.
+
+attachment:fineLetter.gif
+
+대부분의 운영체제는 프로그램으로 문자열이 보내지기전에 유저가 백스페이스, del, 화살표등을 이용해 문자열을 편집할 수 있도록 한다. 응용프로그램이 사용자 입력을 요청하면 운영체제가 문자열 편집기능을 포함한 실제 입력 기능을 제공한다.(이것은 "cooked" 입력 모드라고도 한다)
+
+SPIM 예외 처리 서비스는 그런 서비스를 제공하지 않는다. 문자들은 문자가 쳐지는대로 바로 프로그램으로 보내진다. 만약 유저가 백스페이스 키를 누르면 백스페이스 키가 입력 스트링에 포함된다.(이것은 "raw"입력 모드라고도 불린다)
+
+원한다면 raw문자들을 버퍼에서 받아 입력 문자열을 편집하는 프로그램을 만들수있다. 이것은 하기가 귀찮은 일이고, 보통 빼버리는 경우가 많지만 빼는것은 좋지 않다.
+
+질문:
+운영체제가 왜 raw모드를 제공합니까? 왜 항상 cooked모드로 문자를 받아들이지 않습니까?
+
+=== 22장 끝 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22_14.html
+답:
+게임이나 워드프로세서같은 많은 프로그램들에서 BS,DEL와 화살표 같은 키들은 각프로그램의 요구상황에 따라 해석된다. 그러한 키들은 cooked 모드로 입력되었다면 올바르게 작동하지 않을 것이다.
+
+논의된 주제
+
+    * syscall 명령 
+    * 예외 처리자 서비스 Exception handler services
+    * print string
+    * 스핌에서 예외 처리자 사용하기 
+    * read integer
+    * read string
+
+장끝의 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22quiz.html 퀴즈]와 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-22/ass22programs.html 연습문제]를 풀어봅시다.
+
+
+
+{{{#comment 
+강웅빈 apr 4
+다시 돌아옵니다...붙었네요..:)}}}
+
+
+
+
+

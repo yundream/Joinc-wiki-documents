@@ -1,0 +1,59 @@
+#title kvm위에서 xenserver 올리기 
+
+== kvm위에 xenserver 올리기 ==
+굳이 kvm위에 xenserver를 올리는 이유는 개인 노트북에 완전한 cloudstack 환경을 만들기 위함이다.   
+
+xenserver위에 xenserver를 올리는 방법이 있겠는데, 그렇게 되면 내 노트북에 올리는 것은 물건너가기 때문에 kvm을 사용하기로 했다. kvm은 이미 리눅스에 정식으로 포함되있을 뿐만 아니라, 데스크탑을 그대로 가상화 환경으로 꾸밀 수 있다. 내 노트북을 가상화 환경으로 꾸밀 수 있다는 얘기. 물론 그러기 위해서는 노트북 환경이 꽤 좋아야 할테지만.
+
+=== 가상 인터페이스 만들기 ===
+xenserver5.6 SP2 iso를 다운로드 했다. 2012년 2월 6일 현재 xenserver 6.0까지 나왔지만, cloudstack 2.2.13이 xenserver6을 지원하지 않는 관계로 5.6 버전을 사용하기로 했다.
+
+xenserver의 인터페이스와 통신할 가상 인터페이스를 만들어야 하는데, tap 디바이스를 사용하기로 했다. 
+{{{#!plain
+# openvpn --mktun --dev tap0
+# openvpn --mktun --dev tap1
+# ifconfig tap0 172.12.23.254 netmask 255.255.255.0 up
+# ifconfig tap1 172.12.24.254 netmask 255.255.255.0 up
+}}}
+
+=== xenserver 설치하기 ===
+xenserver를 설치할 가상 디스크를 만든다.  
+{{{#!plain
+# qemu-img create -f raw test_xenserver.raw 20G
+}}}
+
+이제 설치한다.
+{{{#!plain
+# qemu-system-x86_64 -smp 2 -m 1024 -k en-us -hda test_xenserver.raw -cdrom ../XenServer-5.6.100-SP2-install-cd.iso -net nic -net tap,ifname=tap0,script=no -net socket,listen=localhost:1200 -net nic -net tap,ifname=tap1,script=no -net socket,listen=localhost:1201
+}}}
+
+설치는 간단하다. 입력이라고는 패스워드와 네트워크 설정 밖에 없다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/1_w7S0PmomW9B_uURotQrtMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-hGDp69ELfvs/TzPFAUlB5GI/AAAAAAAAB_E/zrOjIua1QHs/s400/xenserver01.png" height="300" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+네트워크 설정만 잘하면 된다. 메니지먼트 서버에 연결을 위한 인터페이스를 선택하고 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/IN-_WVLy00YiiGx0rDnuwtMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-4fGpCMJzFNM/TzPFXPEXnNI/AAAAAAAACAQ/r0aGxHPzc2k/s640/xenserver09.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+아이피만 잡아주고, 설치 종료를 기다리면 된다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/jMmL3ucaZrzXnvQTY3b2ztMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-OAQVKBYfDT8/TzPFZR5dGUI/AAAAAAAACAc/rFQw4OIqurQ/s640/xenserver10.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+리부팅하면 xenserver 관리 콘솔이 기다린다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/4qmz1otxfFbvxiyKVbd5KtMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-sIBvdYvRFbs/TzPTq_H9HeI/AAAAAAAACAo/O78Yvk-gZQE/s640/xenserver11.png" height="389" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+Customize System이 '''Bochs'''인 것을 주목하자.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/4qmz1otxfFbvxiyKVbd5KtMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-sIBvdYvRFbs/TzPTq_H9HeI/AAAAAAAACAo/O78Yvk-gZQE/s640/xenserver11.png" height="389" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== VM 만들기 ===
+이제 VM을 만들어보자. VM을 만들 환경은 다음과 같다.
+  * XenCenter 
+    XenCenter를 이용해서 설치하기로 했다. 리눅스용 XenCenter가 없는 관계로 window vm을 실행했다.    
+  * NFS ISO : NFS로 마운트를 해서 VM을 설치한다. Host Linux에 NFS 서버를 설치했다.  

@@ -1,0 +1,40 @@
+#title Hira Method (소스코드 해석 방법론)
+원문 : http://kldp.org/node/71854
+
+[[TableOfContents]]
+=== 소개 ===
+부실한 문서화는 일부 회사를 제외하고 전세계가 다르지 않은듯 하다.  프로그래머는 원래 문서화 작업을 싫어한다. 그댓가로 우리가 늘 작업해야 하는 또는 참고해야 하는 프로젝트에 관한 자료를, 소스 코드 이외에는 구할 수 없기가 쉽다.  그래서 프로젝트는 대개 소스 코드 해석으로 시작하게 된다. 
+
+컨설팅 회사에 다니던 히라 소스케라는 한 일본 사람이 회사를 그만두고 오까야마의 고향집에 칩거, 초인적인 인내로 Linux Kernel Source Code를 함수 하나 하나, 스트럭쳐 하나 하나 해석하고 있다.
+
+그가 커널 소스 해석하고 문서화 하는 방법론을 통칭하여 히라 메소드라 부른다.
+
+필자가 히라 메소드를 접한 계기는 작년(2005) 가을로 거슬러 올라간다. 소니의 열렬한 툴 신봉자 가따야마 야스시씨, 그는 히라씨의 친구이다. 가따야마씨와 함께 일하게 되면서 필자는 상당한 양의 기존 코드를 히라 메소드로 문서화했다. (구체적인 얘기는 컨피던셜이므로 양해를 구합니다) 
+
+히라 메소드를 개략적으로 설명하고자 한다.
+=== 해석 시스템 구축 ===
+lxr, global, doxygen등의 툴로 Source Code를 HTML화 한다. 해석 기록 도구로서 wiki를 사용한다. 최종 산출물은 wiki page와 Source Code HTML page가 된다. 웹서버를 사용하지만 개인적인 용도라면 moinmoin의 desktop version(standalone)과 doxygen 조합이 편리하다. (lxr는 MySQL이 필요하다.) 다이어그램을 그리기 위해서 graphviz, DIA, powerpoint나 기타 CASE tool(bouml이 심플해서 필자 취향이다)을 사용하는 것이 좋다.
+
+=== 해석 ===
+Source Code에서 역으로 Use Case를 만드는 작업이다. Module I/F의 Entry Point가 될 만한 함수를 찾는다. 보통 init_XXX, create_XXX, open_XXX, C++이라면 MODULE name으로 된 class의 static member function인 경우도 있다. Flow를 살펴보면 성공 처리(Use Case 용어로는 Success Story). 와 실패 처리로 나뉜다. 해석을 단순화 하기 위해 우선은 성공 처리만을 쫓는다.
+ 1. 대상 함수의 소스 코드를 wiki page TextArea에 복사한다.
+ 1. 한 의미를 갖는 소스 블럭을 단위로 무슨 일을 하는 지 자연어로 묘사한다.
+ 1. 사소한 코드, Debugging 코드는 ...로 치환한다.
+ 1. 필요에 따라서 다른 페이지로의 링크를 단다.
+
+=== 평가 및 정리 ===
+프로그램은 데이터와 그 데이터에 대한 알고리즘이다 (Code Reading). 즉, (C Code라고 해도) OOD적인 그림이 그려지는데, 함수 해석에서 새롭게 알게된 스트럭쳐(Object)간의 관계(class diagram)를 문서로 정리한다. 특정 스트럭쳐에 대한 일련의 함수를 관찰함으로써 그 스트럭쳐의 역할(Role)을 파악할 수 있다.
+전체를 파악할 때까지 2. 3.을 반복한다.
+
+아마 독자는 얘기를 다 듣고 난 지금 에이 그게 뭐냐라는 느낌이 들 수 있다. 필자도 그랬고, 그 작업의 지루함이란... 그런데 원래 문서 작업이 그런 게 아닌가. 백문이 불여일견 여기에서 히라씨의 리눅스 커널 해석 페이지를 보자.
+http://hira.main.jp/wiki/pukiwiki.php
+
+페이지의 왼편에 그가 최근에 해석한 함수 리스트가 보일 것이다
+
+히라 메소드를 사용하다 보면
+
+문서 작업 특유의 지루함이 리스크로 작용할 수 있다. (마늘만 먹구 어떻게 100일을 버티우?) 이는 Automation으로 어느 정도 보완 가능하다.
+
+Server Side에서 Client Side에서 각각 자동화할 수 있다. Server Side에서는 Wiki에 가능한한 입력을 최소화할 수 있도록 필요에 따른 Plug-in (Tag)를 만든다. 예를 들면 Wiki Page Template (새로 페이지 열 때 Source Code를 자동으로 Copy 한다든가 하는), 짧은 링크 태그등. Client Side에서도 가능하지만 Browser별로 만들어야 하기 때문에 Server Side에서 구현하는 게 낫다.
+
+Browser의 Text Area상에서 편집하는 것은 위험(입력한 데이터를 날린다든지)하기도 하고 High Light가 지원되지 않고 Vim이나 Emacs의 화려한 기능을 사용할 수 없다. IE에는 http://global.iburiworks.com/products/areaeditor/download.html FireFox에는 http://mozex.mozdev.org 를 이용하여 외부 에디터로 Text Area를 편집할 수 있다. Syntax HighLight는 Wiki마다 다르고 Editor마다 다르므로 찾아보시라. - 개인적으로 w3m(:12)를 추천한다 -

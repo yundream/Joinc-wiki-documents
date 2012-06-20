@@ -1,0 +1,1089 @@
+#title 6장. 레코드 읽기/쓰기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>레코드 단위의 읽기와 쓰기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="Programming from the Ground Up"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="파일 다루기"
+HREF="usedfile.html"><LINK
+REL="NEXT"
+TITLE="견고한 프로그램 작성하기"
+HREF="robustprogmake.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>Programming from the Ground Up</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="usedfile.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="robustprogmake.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="RECORDREADANDREAD"
+></A
+>6. 레코드 단위의 읽기와 쓰기</H1
+><P
+>		<A
+HREF="usedfile.html"
+>5&#51208;</A
+>장의 파일다루기는 파일을 다루는 기본적인 규칙을 
+		알려주었다는 점에서는 쓸만한 내용이긴 하지만, 실제 애플리케이션에 
+		적용시키기에는 부족한 점이 있다. 5장의 예는 그냥 문자열을 단순하게 읽어들이는 
+		정도였지만, 대부분의 응용 애플리케이션은 파일에 구조화된 데이터를 사용하게 
+		된다. 보통 C언어에서 데이터를 다루기 위해서 흔히 볼 수 있는 구조체 데이터를 
+		연상하면 될것이다.   
+	</P
+><P
+>		이러한 구조화된 데이터는 컴퓨터상에서 효율적으로 다룰 수 있다. 
+		이들 구조화된 데이터는 데이터를 레코드 단위로 저장하게 되는데 각각의 
+		레코드는 여러개의 필드로 구성이된다. 프로그래머는 각 레코드의 크기를 쉽게 얻어
+		올 수 있으므로, 원하는 데이터에 빠르게 접근할 수 있게 된다.
+	</P
+><P
+>		이러한 레코드는 두가지 정도를 생각할 수 있을 것 같다. 하나는 레코드의 
+		각필드의 크기가 고정되어 있는 고정길이를 가진 레코드이고, 또하나는 필드의 
+		크기가 변동되는 변동레코드이다. 고정 레코드를 다루는 프로그램은 대체적으로 
+		가볍고 빠르게 작동할 수 있을 뿐아니라 코딩하기도 쉽다라는 점 때문에 
+		아주 복잡하지 않은 애플리케이션을 작성하기 위한 방법으로 널리 사용되고 있다. 
+	</P
+><P
+>		반면 변동길이 레코드의 경우에는 다양한 데이터를 다루어야 하는 DB 프로그램과 
+		같은 좀더 강략한 애플리케이션을 만들기 위해서 사용할 수 있다. 물론 그만큼 
+		프로그램 작성시 생각할 요소가 많아 질 것이다. 
+	</P
+><P
+>		이번 장에서는 고정길이를 가진 레코드를 다루는 프로그램을 작성할 것이다. 
+		우리가 다루는 레코드는 개인정보를 가지게 될 것이며, 이를 위해서 
+		다음과 같은 필드들을 사용할 것이다. 		  
+		<P
+></P
+><UL
+><LI
+><P
+>					성 - 8byte
+				</P
+></LI
+><LI
+><P
+>					이름 - 16byte 
+				</P
+></LI
+><LI
+><P
+>					주소 - 240byte
+				</P
+></LI
+><LI
+><P
+>					나이 - 4byte
+				</P
+></LI
+></UL
+>
+		위의 필드중 나이를 제외한 모든 필드는 문자열 데이터가 된다. 나이는 숫자 
+		이므로 4byte정도를 할당하는 것으로 충분 할 것이다. (물론 인간의 최대 수명이
+		120세 정도라고 볼 수 있으므로 1byte만 할당하는 정도로도 충분할 것이다. 
+		그러나 우선은 간단하게 4byte로 하겠다.)  
+	</P
+><P
+>		지금까지 우리가 작성한 어셈블리 예재들은 단지 하나의 프로그램 파일로 이루어져
+		있었으나 여기에서는 여러개의 파일로 분리해서 작성하도록 할것이다. C에서 흔히 말하는
+		모듈별 분할 컴파일을 위함인데, 이렇게 하면 기능별로 소스코드 파일을 유지할 수 
+		있으므로 프로그램의 유지/보수가 수월해 지는 장점을 가진다. 이렇게 모듈별로 프로그램을
+		나누어서 유지할경우 프로그램 전역에 걸쳐서 사용되는 공통된 값들을 유지할 필요가 
+		있다. C에서는 include파일을 통해서 이러한 문제를 해결하는데, 어셈블리역시 비슷한 
+		방법을 이용해서 선언과 정의를 분리해낼 수 있다. 	
+	</P
+><P
+>		다음은 프로그램에서 사용할 유저정보 구조체를 위한 선언파일로 record-def.s로 
+		저장하도록 하겠다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.equ RECORD_FIRSTNAME,      0
+.equ RECORD_LASTNAME,      	8 
+.equ RECORD_ADDRESS,       	24 
+.equ RECORD_AGE,           264	 
+.equ RECORD_SIZE,          268
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		이와 함께 프로그램 전역적으로 사용될 각종 상수를 정의했다. 이들 상수는 
+		시스템 콜 번호와 표준입출력과 같은 값들을 명시하도록 할것이며, linux.s에 
+		저장하도록 하겠다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#System Call Numbers
+.equ SYS_EXIT, 1
+.equ SYS_READ, 3
+.equ SYS_WRITE, 4
+.equ SYS_OPEN, 5
+.equ SYS_CLOSE, 6
+.equ SYS_BRK, 45
+
+#System Call Interrupt Number
+.equ LINUX_SYSCALL, 0x80 #Standard File Descriptors
+.equ STDIN, 0 
+.equ STDOUT, 1
+.equ STDERR, 2
+
+#Common Status Codes
+.equ END_OF_FILE, 0
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		이제 우리는 정의된 구조체를 이용해서 3개의 프로그램을 만들도록 하겠다. 첫번째 
+		프로그램은 구조체를 레코드로해서 파일로 저장하는 프로그램이다. 두번째 프로그램은 
+		파일의 레코드 내용을 출력하는 프로그램이며, 세번째 프로그램은 모든 레코드의 
+		나이를 더해서 출력하는 프로그램이다.
+	</P
+><P
+>		이들 프로그램은 구조체와 더불어 프로그램을 가로질러서 사용되는 상수를 정의하고 
+		있는 linux.s를 포함하게 될 것이다.  
+	</P
+><P
+>		이러한 일을 하는 프로그램을 만들기 위해서 우리는 함수를 작성할 것이다. 함수를 
+		작성하기 위해서 함수가 어떠한 인자를 필요로 할지를 생각해 보도록 하자. 
+		<P
+></P
+><UL
+><LI
+><P
+>					레코드의 읽은 데이터를 저장하기 위한 버퍼의 위치
+				</P
+></LI
+><LI
+><P
+>					읽거나 쓰기 위한 파일 지정자
+				</P
+></LI
+></UL
+>
+	</P
+><P
+>		다음은 파일 지정자로 부터 읽기 위한 함수다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># 하는일 : 이 함수는 파일 지정자로 부터 레코드를 읽어 들인다. 
+# 입  력 : 파일 지정자와 버퍼 
+# 출  력 : 함수는 버퍼에 레코드의 내용을 쓰고 상태값을 리턴한다.
+
+# 상수를 정의한 파일들을 포함 시킨다.
+.include "record-def.s"
+.include "linux.s"
+
+# 스택 지역 변수
+.equ ST_READ_BUFFER,    8
+.equ ST_FILEDES,        12
+.section .text
+.globl read_record
+.type read_record, @function
+read_record:
+pushl %ebp
+movl  %esp, %ebp
+
+push %ebx
+movl ST_FILEDES(%ebp), %ebx
+movl ST_READ_BUFFER(%ebp), %ecx
+movl $RECORD_SIZE, %edx
+movl $SYS_READ, %eax
+int  $LINUX_SYSCALL
+
+# %eax는 리턴 값으로, 함수의 실행 결과를 호출한 프로그램에게 
+# 되돌려주기 위해서 사용한다.
+popl %ebx
+
+movl %ebp, %esp
+popl %ebp
+ret
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		이 함수는 매우 간단하다. 인자로 주어진 파일 지정자로 부터 레코드 크기(RECORD_SIZE)
+		만큼의 데이터를 읽어 들이고, 버퍼에 저장하는 일을 한다.  
+	</P
+><P
+>		버퍼의 내용을 레코드에 쓰는 함수 역시 간단하게 작성할 수 있다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># 하는일 : 파일 지정자에 레코드를 쓴다. 
+# 입  력 : 파일지정자와 버퍼
+# 출  력 : 함수의 실행 결과 
+.include "linux.s"
+.include "record-def.s"
+
+# 스택 로컬 변수
+.equ ST_WRITE_BUFFER, 8
+.equ ST_FILEDES, 12
+.section .text
+.globl write_record
+.type write_record, @fundtion
+
+write_record:
+pushl %ebp
+movl %esp, %ebp
+
+
+pushl %ebx
+movl $SYS_WRITE, %eax
+movl ST_FILEDES(%ebp), %ebx
+movl ST_WRITE_BUFFER(%ebp), %eax
+movl $RECORD_SIZE, %edx
+int  $LINUX_SYSCALL
+
+# %eax는 리턴 값으로 호출한 프로그램에게 실행 결과값을 
+# 넘겨준다.
+popl %ebx
+
+movl %ebp, %esp
+popl %ebp
+ret
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		이걸로 기본적인 함수를 만들었으므로 이제 본격적으로 프로그램을 작성할 시간이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="RECORDWRITE"
+></A
+>6.1. 레코드 쓰기</H2
+><P
+>			이 프로그램은 레코드를 파일에 쓰는 프로그램인데, 간단하게 작성하기 위해서 
+			레코드의 필드 값은 하드코딩 하도록 하겠다. 
+		</P
+><P
+>			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+.include "linux.s"
+.include "record-def.s"
+
+.section .data
+
+record1:
+.ascii "yun\0"
+.rept  4    #padding 
+.byte  0
+.endr
+
+.ascii "dream\0"
+.rept  10 
+.byte  0
+.endr
+
+.ascii "Seoul city Chun-dam dong\0" 
+.rept   215
+.byte   0
+.endr
+
+.long 25
+
+record2:
+.ascii "yun\0" 
+.rept  4
+.byte  0
+.endr
+
+.ascii "mung\0"
+.rept  11
+.byte  0 
+.endr
+.ascii "Seoul city joinc dong\0"
+.rept  218
+.byte  0
+.endr
+
+.long 27
+
+file_name:
+.ascii "test.dat\0"
+.equ ST_FILE_DESCRIPTOR, -4
+.globl _start
+
+
+_start:
+movl %esp, %ebp
+subl $4, %esp
+
+movl $SYS_OPEN, %eax
+movl $file_name, %ebx
+movl $0101, %ecx
+movl $0666, %edx
+int   $LINUX_SYSCALL
+
+movl %eax, ST_FILE_DESCRIPTOR(%ebp)
+
+pushl ST_FILE_DESCRIPTOR(%ebp)
+pushl $record1
+call  write_record
+addl  $8, %esp
+
+pushl ST_FILE_DESCRIPTOR(%ebp)
+pushl $record2
+call  write_record
+addl  $8, %esp
+
+movl $SYS_CLOSE, %eax
+movl ST_FILE_DESCRIPTOR(%ebp), %ebx
+int  $LINUX_SYSCALL
+
+movl $SYS_EXIT, %eax
+movl $0, %ebx 
+int  $LINUX_SYSCALL
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이 프로그램은 매우 간단하다. 단지 몇개의 상수들이 사용되었으며, .data 섹션에 
+			저장해야될 레코드가 있는 것외의 다른 것들(읽기/쓰기)는 이미 다룬 적이 있는 
+			내용들이다. 
+		</P
+><P
+>			프로그램의 가장 처음에는 상수가 선언된 파일을 포함(include)시키는 
+			코드가 들어갔다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.include "linux.s"
+.include "record-def.s"
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			C언어를 해봤다면 굳이 설명할 필요 없는 코드로, 프로그램 전역적으로 사용되어야 할 
+			상수나 함수들을 별도의 파일에 선언해 놓고 이를 사용하기 위한 목적으로 사용한다.
+		</P
+><P
+>			다음 레코드의 값을 정의 하는 부분이 나오는데 여기에서 .rept라는 
+			새로운 지시어를 만나게 된다. 이 지시어는 .endr 지시어와 함께 사용되는데, 
+			.rept에서 지정된 숫자 만큼 중간에 오는 값으로 채우는 일을 한다. 위 코드에서는 
+			문자열 필드의 나머지 부분을 '\0'으로 채우기 위한 목적으로 사용하고 있다. 
+			C에서 메모리 영역을 특정 값으로 채우기 위해서 사용하는 memset(2)과 비슷한 용도로 
+			사용할 수 있을 것이다.    
+		</P
+><P
+>			이제 컴파일과 링크 과정을 거쳐서 실행 파일을 만들어 보도록 하자.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as write-records.s -o write-records.o
+# as write.s -o write.o
+# ld write-records.o write.o -o write-records
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			우리가 만든 프로그램은 2개의 파일로 나뉘어져 있다. 그러므로 이들을 하나로 
+			묶어주는(link)과정이 필요하게 된다. 링크는 ld linker를 이용하면 된다. 만들어진 
+			실행파일은 다음과 같이 실행 시킬 수 있다.	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./write-records
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			실행되고 나면 test.dat라는 파일이 만들어 진다. 이 파일을 vi에디터로 확이해 보면 
+			일반 텍스트 파일과는 좀 다르게 출력될 것이다. 이유는 NULL과 같은 출력될 수 없는 
+			문자들이 포함되어 있기 때문이다. 어쨋든 레코드를 성공적으로 썼으니, 이제 
+			레코드로 부터 읽어들이는 프로그램을 만들어 보도록 하자.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="RECORDREAD"
+></A
+>6.2. 레코드 읽기</H2
+><P
+>			여기에서는 저장된 레코드로 부터 이름, 주소, 나이를 읽어와서 출력하는 프로그램을
+			만들어 보도록 하겠다. 	
+		</P
+><P
+>			우리가 출력하고자 하는 레코드의 필드중 이름과 주소는 고정된 길이를 가지고 있지 
+			않다. 그러므로 몇개의 문자를 써야하는지를 계수할 수 있어야 한다. 다행히도 우리는 
+			레코드를 적을 때, 필드의 끝을 '\0'로 포맷했음으로, '\0'을 만날때까지 읽어들인 
+			문자만 계수하면 된다. 가정 먼저 문자의 갯수를 계수하는 프로그램을 만들어 
+			보도록 하겠다. 이 프로그램의 이름은 count-chars.s로 하겠다. 	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># 목    적 : null byte를 만날 때까지 문자의 갯수를 검사한다.
+# 입    력 : 문자열의 주소  
+# 출    력 : 문자열의 갯수를 %eax로 
+# 프로세스 :
+#   %ecx  -  문자 카운트
+#   %al   -  현재 문자
+#   %edx  -  현재 문자 주소 
+
+.include "linux.s"
+.include "record-def.s"
+
+.type count_chars, @function
+.globl count_chars
+
+# 첫번째 인자가 들어 있는 스택 
+.equ ST_STRING_START_ADDRESS, 8
+
+count_chars:
+pushl %ebp
+movl  %esp, %ebp
+
+# 0부터 카운트를 시작한다.
+movl $0, %ecx
+movl ST_STRING_START_ADDRESS(%ebp), %edx
+
+count_loop_begin:
+# 최근 문자를 가져온다.
+movb (%edx), %al 
+
+# null인지 검사한다.
+cmpb $0, %al
+# 만약 null이라면 루프를 끝낸다.
+je count_loop_end
+
+# 널이 아니라면 포인터와 카운트를 1씩 증가 시킨다. 
+incl %ecx
+incl %edx
+
+# 루프의 처음으로 되돌아 간다.
+jmp  count_loop_begin
+
+count_loop_end:
+# 카운트 결과를 %eax로 복사한다.  
+movl %ecx, %eax
+
+popl %ebp
+ret
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이해하기에 별 어려운 점이 없는 간단한 코드다. 이 코드는 데이타 주소로 부터 
+			1바이트씩 읽어 나가면서 +1을 한다. 만약 읽은 바이트가 '\0'이라면 지금까지 계수한
+			수를 리턴한다.
+		</P
+><P
+>			이제 실제 파일로 부터 레코드를 읽어들이는 코드를 만들어 보도록 하자. 
+			이 프로그램은 다음과 같은 흐름을 가질 것이다.  
+			<P
+></P
+><UL
+><LI
+><P
+>						파일을 연다
+					</P
+></LI
+><LI
+><P
+>						레코드를 읽는다.
+					</P
+></LI
+><LI
+><P
+>						이름 문자열의 크기를 계수한다. 
+					</P
+></LI
+><LI
+><P
+>						이름을 표준 출력한다.
+					</P
+></LI
+><LI
+><P
+>						개행문자를 출력한다.	
+					</P
+></LI
+><LI
+><P
+>						다른 레코드를 읽는다.	
+					</P
+></LI
+></UL
+>
+		</P
+><P
+>			이제 우리는 개행문자를 출력하는 간단한 프로그램을 만들 것이다. 이것은 
+			각 필드의 값을 출력한 후 필드를 구분해서 보기 좋게 만들기 위한 목적으로 사용한다. 
+			프로그램의 이름은 read-records.s로 하겠다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.include "linux.s"
+.globl write_newline
+.type write_newline, @function
+.section .data
+
+newline:
+.ascii "\n"
+.section .text
+.equ ST_FILEDES, 8
+
+write_newline:
+pushl %ebp
+movl  %esp, %ebp
+
+movl $SYS_WRITE, %eax
+movl ST_FILEDES(%ebp), %ebx
+movl $newline, %ecx
+movl $1, %edx
+int  $LINUX_SYSCALL
+movl %ebp, %esp 
+popl %ebp
+ret
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이제 실제 레코드로 부터 데이터를 읽어오는 메인프로그램을 작성한다. 프로그램의 
+			이름은 read-records.s로 하겠다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.include "linux.s"
+.include "record-def.s"
+
+.section .data
+
+file_name:
+.ascii "test.dat\0"
+
+.section .bss
+.lcomm record_buffer, RECORD_SIZE
+
+.section .text
+
+# Main 프로그램 
+.globl _start
+
+_start:
+# 입력과 출력을 위한 파일지정자의 스택위치를 
+# 계산
+.equ ST_INPUT_DESCRIPTOR, -4
+.equ ST_OUTPUT_DESCRIPTOR, -8
+
+# 스택 포인터를 %ebp로 복사한다.
+movl %esp, %ebp
+# 파일지정자를 위한 공간을 할당한다.
+subl $8, %esp
+
+# 파일을 연다.
+movl $SYS_OPEN, %eax
+movl $file_name, %ebx
+movl $0, %ecx        # 읽기 전용으로 연다.
+movl $0666, %edx
+int  $LINUX_SYSCALL
+
+# 입력을 위한 파일 지정자를 저장한다.
+movl %eax, ST_INPUT_DESCRIPTOR(%ebp)
+
+# 표준 출력(1)을 위한 파일지정자를 저장한다. 
+movl $STDOUT, ST_OUTPUT_DESCRIPTOR(%ebp)
+
+record_read_loop:  
+pushl ST_INPUT_DESCRIPTOR(%ebp)
+pushl $record_buffer
+call  read_record 
+addl  $8, %esp
+
+# 읽어들인 데이터의 길이가  
+# 레코드 크기와 같은지 확인한다. 
+# 레코드 크기와 다르다면 루프를 벗어난다. 
+cmpl  $RECORD_SIZE, %eax
+jne   finished_reading
+
+# 그렇지 않다면 레코드의 이름을 출력한다. 
+# 이름을 출력하기 위해서는 문자열의 크기를 
+# 읽어와야 한다.
+pushl $RECORD_FIRSTNAME + record_buffer
+call  count_chars
+addl  $4, %esp
+
+movl  %eax, %edx
+movl  ST_OUTPUT_DESCRIPTOR(%ebp), %ebx
+movl  $SYS_WRITE, %eax
+movl  $3, %ecx
+int   $LINUX_SYSCALL
+ret
+
+pushl ST_OUTPUT_DESCRIPTOR(%ebp)
+call  write_newline
+addl  $4, %esp
+
+jmp   record_read_loop
+
+finished_reading:
+movl $SYS_EXIT, %eax
+movl $0, %ebx
+int  $LINUX_SYSCALL
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이제 지금까지의 프로그램을 컴파일하고 링크해서 실행가능한 파일로 만들어 보자.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as count-chars.s -o count-chars.o
+# as write-newline.s -o write-newline.o 
+# as read-records.s -o read-records.o
+# as read.s -o read.o
+# ld read.o read-records.o write-newline.o count-chars.o -o read-records
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			프로그램은 ./read-records 로 실행시킬 수 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="RECORDEDIT"
+></A
+>6.3. 레코드 수정</H2
+><P
+>			이 프로그램은 다음과 같은 코드영역을 가진다.
+			<P
+></P
+><UL
+><LI
+><P
+>						입력파일과 출력파일을 연다.
+					</P
+></LI
+><LI
+><P
+>						입력파일로 부터 레코드를 읽는다.
+					</P
+></LI
+><LI
+><P
+>						나이를 증가 시킨다.
+					</P
+></LI
+><LI
+><P
+>						출력파일에 쓴다.
+					</P
+></LI
+></UL
+>
+		</P
+><P
+>			다음은 레코드의 값을 수정해서 다른 파일로 저장하는 프로그램이다. 프로그램의 
+			이름은 add-year.s로 하겠다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.include "linux.s"
+.include "record-def.s"
+
+.section .data
+input_file_name:
+.ascii "test.dat\0"
+
+output_file_name:
+.ascii "testout.dat\0"
+
+.section .bss
+.lcomm record_buffer, RECORD_SIZE
+
+.equ ST_INPUT_DESCRIPTOR, -4
+.equ ST_OUTPUT_DESCRIPTOR, -8
+
+
+.section .text
+.globl _start
+
+
+_start:
+movl %esp, %ebp
+subl $8, %esp 
+
+movl $SYS_OPEN, %eax
+movl $input_file_name, %ebx
+movl $0, %ecx
+movl $0666, %edx
+int  $LINUX_SYSCALL
+
+movl %eax, ST_INPUT_DESCRIPTOR(%ebp)
+
+# 쓰기 위해서 파일 열기
+movl  $SYS_OPEN, %eax
+movl  $output_file_name, %ebx
+movl  $0101, %ecx
+movl  $0666, %edx
+int   $LINUX_SYSCALL
+
+movl  %eax, ST_OUTPUT_DESCRIPTOR(%ebp)
+
+
+loop_begin:
+pushl ST_INPUT_DESCRIPTOR(%ebp) 
+pushl $record_buffer
+call  read_record 
+addl  $8, %esp
+
+# read로 부터의 리턴값과 레코드크기를 비교한다.
+# 만약 레코드 크기와 같지 않다면 루프를 종료한다. 
+cmpl  $RECORD_SIZE, %eax
+jne   loop_end
+
+# 나이를 증가시킨다.
+incl  record_buffer + RECORD_AGE
+
+pushl ST_OUTPUT_DESCRIPTOR(%ebp)
+push  $record_buffer
+call  write_record
+addl  $8, %esp
+
+jmp   loop_begin
+
+loop_end:
+movl  $SYS_EXIT, %eax
+movl  $0, %ebx
+int   $LINUX_SYSCALL
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			코딩을 마쳤다면 다음과 같은 방법으로 실행파일을 생성하도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as add-year.s -o add-year.o
+# ld add-year.o read.o write.o -o add-year
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램을 ./add-year로 실행시킬 수 있다. 실행시키고 나면 testout.dat라는 
+			파일이 생성된걸 확인할 수 있을 것이다. 
+		</P
+><P
+>			지금까지의 내용을 통해서 우리는 고정된 길이의 레코드를 제어하는 프로그램은 
+			간단하게 작성할 수 있다는 것을 배웠다. 단지 지정된 크기만큼 데이터를 읽어서 
+			버퍼에 쌓고, 이런 저런 작업을 해서 출력하기만 하면 된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="ENDINGCHAPTER"
+></A
+>6.4. 마치며</H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN721"
+></A
+>6.4.1. 복습</H3
+><P
+>				<P
+></P
+><UL
+><LI
+><P
+>							레코드란 무엇인가 ?
+						</P
+></LI
+><LI
+><P
+>							고정된 길이를 가진 레코드가 그렇지 않은 레코드에 대해서 
+							얻을 수 있는 장점은 무엇인가.
+						</P
+></LI
+><LI
+><P
+>							여러개의 파일로 분리된 어셈블리 소스에서 상수를 포함시키는 
+							방법에 대해서 설명하시오.
+						</P
+></LI
+><LI
+><P
+>							왜 여러개의 프로그램 파일로 나누어서 프로그램을 작성하는가.
+						</P
+></LI
+><LI
+><P
+>							record_buffer + RECORD_AGE 가 의미하는 바를 설명하시오. 
+							왜 어드래스 모드를 사용하고 있는가 ?
+						</P
+></LI
+></UL
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN735"
+></A
+>6.4.2. 연습문제</H3
+><P
+>				<P
+></P
+><UL
+><LI
+><P
+>						프로그램의 실행인자로 파일이름을 받도록 예제 
+						프로그램들을 수정해 보자.	
+						</P
+></LI
+><LI
+><P
+>							lseek(2) 시스템 호출에 대해서 연구해 보도록하자. lseek를 
+							이용해서 읽은 파일의 나이를 수정한 후 다시 저장하도록 
+							add-year 프로그램을 수정해보자.
+						</P
+></LI
+><LI
+><P
+>							키보드로부터 레코드 값을 입력받아서 파일로 쓰는 프로그램을 
+							만들어 보도록 한다. 
+						</P
+></LI
+></UL
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="usedfile.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="robustprogmake.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>파일 다루기</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>견고한 프로그램 작성하기</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

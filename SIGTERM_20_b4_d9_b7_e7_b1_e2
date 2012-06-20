@@ -1,0 +1,103 @@
+#title SIGTERM 다루기
+
+=== 목 적 ===
+ * C++ 로 만들어진 데몬프로그램의 종료시 각 클래스 객체의 소멸자를 어떻게 호출되게 할 것인가에 대한 고찰
+ * 시그널 관련 글은 여기를 참고 http://www.joinc.co.kr/modules.php?name=News&file=article&sid=142
+
+=== Code ===
+{{{#!vim cpp
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+                                                                                                                             
+class tClass1 {
+                                                                                                                             
+   private :
+      char* buf;
+                                                                                                                             
+   public :
+      void method(void) {
+         buf = new char[100];
+         while (1) {
+            printf("This is thread 1\n");
+            sleep(1);
+         }
+      }
+      ~tClass1(void) {
+         delete[] buf;
+         printf("Thread 1 exit\n");
+      }
+                                                                                                                             
+};
+                                                                                                                             
+class tClass2 {
+                                                                                                                             
+   private :
+      char* buf;
+                                                                                                                             
+   public :
+         void method(void) {
+            buf = new char[100];
+            while (1) {
+               printf("This is thread 2\n");
+               sleep(1);
+            }
+         }
+         ~tClass2(void) {
+            delete[] buf;
+            printf("Thread 2 exit\n");
+         }
+                                                                                                                             
+};
+                                                                                                                             
+tClass1* pClass1;
+tClass2* pClass2;
+pthread_t pt1, pt2;
+                                                                                                                             
+void* tFunc1(void* arg) {
+   pClass1->method();
+}
+                                                                                                                             
+void* tFunc2(void* arg) {
+   pClass2->method();
+}
+                                                                                                                             
+void hanSigInt(int sig) {
+   printf("Got signal %d\n", sig);
+   sleep(3);
+   printf("Leave handle of signal\n");
+}
+                                                                                                                             
+void hanSigTerm(int sig) {
+   printf("Got signal %d\n", sig);
+   pthread_cancel(pt1);
+   pthread_cancel(pt2);
+   delete pClass1;
+   delete pClass2;
+   sleep(3);
+   pthread_join(pt1, NULL);
+   pthread_join(pt2, NULL);
+   printf("Leave this program\n");
+   exit(EXIT_SUCCESS);
+}
+                                                                                                                             
+int main(void) {
+   daemon(1, 1);
+   pClass1 = new tClass1;
+   pClass2 = new tClass2;
+   signal(SIGINT, hanSigInt);
+   signal(SIGTERM, hanSigTerm);
+   pthread_create(&pt1, NULL, tFunc1, NULL);
+   pthread_create(&pt2, NULL, tFunc2, NULL);
+   while (1) {
+      printf("This is main\n");
+      sleep(1);
+   }
+   exit(EXIT_SUCCESS);
+}
+}}}
+
+ * 위와같이 SIGTERM 발생 시 쓰레드를 의도적으로 멈추고, 의도적으로 클래스 객체를 해제시켜 - 그러기 위해서 클래스 인스턴스가 아니라  클래스 포인터를 사용하였다 - 소멸자를 실행시키고 나서 프로그램을 종료하는게 깔끔할 수 도 있겠다.
+ * 허나 좀 간단하게 한다면 클래스 포인터대신 그냥 클래스 인스턴스를 생성하고,  SIGTERM 발생시 핸들러에서 exit 만 해줘도 프로그램은 알아서 쓰레드를 종료시키고 인스턴스를 해제하면서 자동으로 소멸자를 호출하게 된다. 허나 명백한 순서는 소멸자가 먼저 호출되고 그 작업이 끝난 후 다음으로 쓰레드 종료된다. 짧은순간이지만 유효하지 않는 메모리, 혹은 기술자에 엑세스하는 쓰레드의 작업이 있을수도 있는데 이러한 상황에서 심각한 문제가 생길 가능성이 있는지, 없는지는 확신하지 못하겠다. (거의 없다고 생각된다)

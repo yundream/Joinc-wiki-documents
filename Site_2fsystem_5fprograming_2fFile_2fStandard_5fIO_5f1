@@ -1,0 +1,985 @@
+#title 리눅스 시스템 프로그래밍 : 표준 입출력 다루기 1
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>stdio.h 사용하기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>stdio.h 사용하기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN18"
+>표준 입출력</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>표준입력, 표준출력, 표준에러</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN31"
+>Streams 열기</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN40"
+>Streams 열기 모드</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN96"
+>stream 닫기</A
+></DT
+><DT
+>2.5&#51208;. <A
+HREF="#AEN100"
+>stream 위치변경</A
+></DT
+><DT
+>2.6&#51208;. <A
+HREF="#AEN115"
+>stream 의 버퍼 모드및 크기 조정</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN128"
+>임시파일 생성</A
+></DT
+><DT
+>4&#51208;. <A
+HREF="#AEN135"
+>파일 지우기 및 이름변경</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		프로그래밍상에서 가장 주로 다루는 문제는 문자열과 입출력에 
+		관한 내용이다. 이건 모든 프로그래밍 작업시에 가장 기본이 되는 
+		작업이므로 표준라이브러리 형태로 제공하며, Unix 계열에서는 
+		stdio.h 에서 표준입출력 과 관련된 함수들을 제공한다. 여기에는 
+		scanf 와 printf 와 같은 형식화된 입출력과 관계된일을 하는 함수와 fopen 
+		과 같은 스트림기반의 표준 입출력 관련함수들을 제공한다. 이번장에서는 
+		stdio.h 에서 제공하는 여러가지 표준 I/O 관련 함수중 파일 OPEN과 관련된 
+		함수들에 대해서 주로 알아볼것이다. 그리고 임시파일 생성 과 파일 이름변경 
+		및 삭제에 관한 간단한 설명을 할것이다. 
+	</P
+><P
+>		사실 scanf, printf 와 같은 함수는 read, write 를 통해서 충분히 
+		구현할수 있다. 그럼에도 이러한 함수들을 사용하는 이유는 이러한 
+		함수를 사용하면 "인생이 편해지기" 때문이다. read 나 write 를 이용해서 
+		형식화된 입출력을 다룬다고 생각해보라, 생각만 해도 머리가 지끈 거릴
+		것이다. 어쨋든 stdio.h 에서 다루는 고수준의 함수들을 사용하면, 여러가지 
+		복잡한 작업을 좀더 수월하게 해결할수 있다.     
+	</P
+><P
+>		가장 간단한 예를 들어서 어떤 문자가 영문인지 확인하는 코드를 작성한다고 
+		생각하자. 이코드는 아마 아래와 비슷할것이다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>(c =&#62;'a' || c &#60;= 'z' &#38;&#38; c=&#62;'A' || c &#60;='Z')
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		그러나 C에서 제공하는 표준함수를 사용하면 아래와 같이 간단히 
+		처리할수 있다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>isalpha(c);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		얼마나 인생이 편해지는가.. 우리는 stdio.h 에서 제공하는 표준입출력과 
+		관련된 함수들을 이용함으로써, 코드의 양을 줄일수 있으며, 문제의 발생확
+		률역시 줄일수 있고, 유지/보수도 훨씬 수월하게 만들수 있다. 
+	</P
+><P
+>		stdio.h 에서 제공하는 함수들은 unistd.h 에서 제공하는 함수들과 
+		언뜻 중복되는듯이 보인다. fopen/open, fgets/read, fputs/write 등 
+		인데, 이들의 차이점은 stdio.h 에서는 입출력을 관리하기 위한 구조체를 
+		이용함으로써 객체화된 입출력 관리를 하는반면, unistd.h 에서 제공하는 
+		함수들은 단일 문자(byte)단위로 입출력을 관리한다는 차이점을 가진다. 
+ 		여기에 대한 좀더 자세한 내용은 
+		<A
+HREF="/modules.php?name=News&file=article&sid=27"
+TARGET="_top"
+>FILE 객체와 파일지시자 와의 차이점..</A
+>을 참조하기 바라며, 이문서를 좀더 수월하게 이해하기 위해서는 
+		꼭 참고하기 바란다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2&#51208;. 표준 입출력</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. 표준입력, 표준출력, 표준에러</A
+></H2
+><P
+>		우리가 어떤 프로그램을 만들어서 이것을 실행시키면, 이 프로그램은 
+		자동적으로 3개의 기본 스트림을 만든다(open). 이것들은 
+		표준입력(stdin), 표준출력(stdout), 표준에러(stderr)이며, 표준입력은 
+		키보의 입력을 받아들이거나, 다른 프로그램으로 부터의 표준출력을 
+		받아들이기 위해서 열리며, 표준출력은 모니터와 같은 
+		장치에 출력시키기 위해서 사용된다. 물론 표준출력은 모니터 뿐만 아니라 
+		디스크(파일), 프린터 등 모든 장치로 출력시킬수 있다. 표준에러는 
+		프로그램에서 발생시키는 여러 에러들을 출력시키기 위해서 사용한다.   
+		</P
+><P
+>		이러한 스트림 기반의 표준입/출력 함수들은 내부적으로 버퍼
+		이(버퍼는 스크림관련 구조체멤버로 정의되어 있다)를 관리한다. 
+		그런 이유로 만약 fclose(), ffluse() 와 같은 함수를 사용하지 않을경우 
+		버퍼의 내용을 읽어버릴수도 있음을 주의해야 한다.  
+		</P
+><P
+>		다음 예제는 파일을 어떻게 열고 읽혀지는지, 그리고 
+		각각의 표준입력, 출력, 에러가 어떻게 처리되는지 알아보기 위한 간단한 
+	 	셈플 코드이다. 모든 입/출력은 fputs 와 fgets 만을 이용해서 처리했다. 	
+		</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제: std_test.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main(int argc, char** argv)
+{
+    char buf[255];
+    FILE* fp;
+    if (argc == 2)
+    {
+        fp = fopen(argv[1], "r");
+        if (fp == NULL)
+        {
+            fputs("file open error", stderr);    
+            exit(0);
+        }
+    }
+    else
+    {
+        fp = stdin;
+    }
+
+    while(fgets(buf, 255, fp) != NULL)
+    {
+        fputs(buf, stdout);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		간단하지만 표준 입/출력, 표준 에러에 대한 기본적인 모든 정보를 담고 있다.  
+		위의 예제는 인자가 있을경우 인자의 이름을 가지는 파일을 읽어들여서 
+		장치로 표준출력 시켜주며, 그렇지 않을경우 장치로 부터 표준입력을 기다린다. 
+		이 장치는 표준입력의 경우 파일이나 키보드가 될수 있고 표준출력의 경우 
+		모니터나 파일 혹은 프린터가 될수 있다. 
+		</P
+><P
+>		이 프로그램은 다음과 같은 다양한 방법으로 테스트 될수 있다. 프로그램의 이름은 
+		./std_test 라고 정했다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>0: [root@localhost test]# ls
+    helloworld.c
+1: [root@localhost test]# ./std_test helloworld.c  
+2: [root@localhost test]# ./std_test &#60; helloworld.c
+3: [root@localhost test]# ./std_test
+   1234
+   1234
+   hello
+   hello
+   ^D
+4: [root@localhost test]# ./std_test helloworld.c &#62; dump
+5: [root@localhost test]# ./std_test hellowworld.c 2&#62; error.dump 
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		1,2,3,4 번은 특별히 설명할필요가 없는 간단한 테스트이다. 
+		다만 5번은 좀 눈여겨 볼필요가 있는데, 4번의 테스트에서 std_test 는 실제로 존재
+		하지 않는 파일을 참조하고 있다. 그러므로 이 프로그램은 "file open error&#92;n" 
+		메시지를 표준에러로 출력할것이다.       
+		</P
+><P
+>		대부분의 쉘은 redirect(재지향) 기능을 제공하는데, "&#62;" 를 사용해서 재지향을 
+		시킨다. 보통은 표준출력을 재지향 시키지만 "2&#62;" 같은 방법을 이용해서 
+		표준에러를 재지향 시킬수도 있다. 
+		그러므로 프로그램은 표준 에러 메시지를 error.dump 
+		파일로 보낸다. "2&#62;"를 사용하지 않고 "&#62;" 를 사용할경우 표준입력만 전달되므로 
+		error.dump 에는 아무내용도 보내지지 않게 된다. 재지향에 대한 자세한 내용은 
+		쉘 문서를 참고하기 바란다.	 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>2.2&#51208;. Streams 열기</A
+></H2
+><P
+>			우리는 스트림을 사용하기 전에 이 스트림을 특정 디바이스 혹은 파일에 연결
+			시켜줘야만 한다. 이러한 스트림을 열때는 "읽기", "쓰기", "읽기/쓰기" 모드로 
+			열수 있으며, 열기에 실패하면 NULL 을 되돌려준다. 
+			만약에 파일을 성공적으로 열었다면, 
+			파일의 객체를 가르키는 FILE 타입의 포인터를 되돌려주고, 우리는 이 
+			파일 객체 포인터를 이용해서 입출력 조작을 하게 된다. 
+			Stream 을 열기 위한 함수는 다음과 같은것들이 있다.      
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>FILE* fopen(char *path, char *mode);
+FILE* fdopen(int fildes, char *mode);
+FILE* freopen(char *path, char *mode, FILE *stream);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			fopen 은 파일 스트림을 열기 위해서 사용된다. path 열고자 하는 파일의 
+			디렉토리이며, mode 는 파일을 여는방식 (읽기전용, 쓰기전용, 읽기/쓰기전용)을 
+			지정하기 위해서 사용한다.  
+		</P
+><P
+>			fdopen 은 open(2)함수 등으로 생성한 int  guddml 열린 파일 기술자(file descriptor)를 
+			스트림객체로 
+			연결시키기 위해서 사용한다. fildes 가 연결시키고자 하는 파일 기술자이며, 
+			mode 는 파일 여는 방식을 지정한다.    
+		</P
+><P
+>			freopen 은 f+re+open 의 합성어이다. 즉 다시연다는 뜻으로, path 에 지정된 파일로 
+			stream 을 연결시키기 위해서 사용하며, 기존의 stream 은 닫히게 된다. 
+			이것은 주로 표준 스트림객체(stdin, stdout, stderr)을 파일로 연결하기 위해서 사용
+			된다. 
+		</P
+><P
+>			위의 함수들은 성공적으로 수행될경우 FILE 객체를 가르키는 포인터를 넘겨준다. 
+			FILE 는 struct _IO_FILE 가 typedef 된 이름이다. _IO_FILE 구조체는 
+			/usr/include/libio.h 에 선언되어 있는데 대략 다음과 같은 정보들을 
+			가지고 있다. 좀 양이 많으니 모두다 적지는 않겠다. 직접 확인해보기 바란다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct _IO_FILE {
+    int _flags;       /* High-order word is _IO_MAGIC; rest is flags. */
+#define _IO_file_flags _flags
+
+    /* The following pointers correspond to the C++ streambuf protocol. */
+    /* Note:  Tk uses the _IO_read_ptr and _IO_read_end fields directly. */
+    char* _IO_read_ptr;   /* Current read pointer */
+    char* _IO_read_end;   /* End of get area. */
+    char* _IO_read_base;  /* Start of putback+get area. */
+    ...	
+    int _fileno;
+    ...
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+			위의 구조체를 보면 파일내용을 버퍼링하기 위한 다양한 멤버변수와 
+			파일지시자 등을 묶어서 한꺼번에(이를테면 객체화)관리 한다는걸 알수 있을
+			것이다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.3&#51208;. Streams 열기 모드</A
+></H2
+><P
+>			우리는 위의 함수들을 사용하여서 Stream 을 열때 모드를 지정해줄수 있는데, 
+			다음과 같은 모드가 존재한다.  
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN43"
+></A
+><P
+><B
+>&#54364; 1. 모드 종류</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>mode</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>read</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>write</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>truncate file</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>create file</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 시작위치</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"r"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 처음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"r+"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 처음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"w"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 처음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"w+"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 처음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"a"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 마지막</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>"a"</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>n</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>y</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일 마지막</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>			
+			예를들어 fopen("filename", "r") 을 이용해서 filename 을 열려고 했다면, 
+			단지 읽을수만 있으며, 시작위치는 파일의 처음이 될것이다. 이경우 파일을 
+			생성할수 없으며, 파일을 자를수도 없다(당연하다 쓰기가 안되니까).  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN96"
+>2.4&#51208;. stream 닫기</A
+></H2
+><P
+>		fopen 등을 이용해서 스트림을 열었다면, 프로그램을 종료하기 전에 반드시 
+		stream 을 닫아주어야 한다. 
+		open 등을 이용해서 열었을경우 이는 선택사항인데 반해 
+		fopen 의 경우에는 스트림의 흐름을 버퍼에 담아놓고 관리하기 때문에, 
+		stream 을 닫기 전에 반드시 버퍼가 비어있는지 반드시 확인해 주어야 하기 때문이다. 
+		그리고 하나의 프로세스가 한번에 열수 있는 streasm 의 갯수제한이 있으며 open 으로 
+		파일을 열었을때보다 상당히 많은 시스템자원을 소비한다. 그러므로 더이상 쓰지 
+		않는 stream은 그때그때 닫아주는게 좋다. stream 을 닫기 위해서는 아래와 같은 
+		함수를 사용한다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int fclose(FILE *stream)
+		</PRE
+></TD
+></TR
+></TABLE
+>	
+		FILE *stream 은 fopen 을 통해서 열어 놓은 stream 이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN100"
+>2.5&#51208;. stream 위치변경</A
+></H2
+><P
+>			우리가 어떤 스트림을 열었다면 스트림을 열었던 mode 에 따라서 위치가 
+			처음 혹은 마지막으로 기본 위치가 지정된다. 그리고 읽기나 쓰기를 함에 따라서 
+			그 위치가 증가하면서 순차적으로 변하게 된다. 그런데 만약 Database 와 같은 
+			응용 프로그램에서 스트림을 열었다면, 스트림의 위치를 임의대로 이동할수 
+			있어야 할것이다.   
+		</P
+><P
+>			이러한 스트림의 위치이동은 터미널(표준입력, 표준출력) 에서는 필요 없는 
+			기능이지만(이러한 것들은 순차적인 흐름이므로) 
+			블럭디바이스(하드디스크 같은) 임의 접근이 가능한 장치에 대해서는 
+			스트림의 위치를 임의 이동 가능해야한다.   
+		</P
+><P
+>			이러한 스트림에서의 위치 변경을 위해서 다음과 같은 함수를 제공한다. 
+			(간단히 생각에서 파일에서 원하는 위치로 이동하기 위해서)  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int  fseek(FILE* stream, long offset, int whence);
+long ftell(FILE* stream);
+void rewind(FILE* stream);
+int  fgetpos(FILE* stream, fpos_t* pos);
+int  fsetpos(FILE* stream, fpos_t* pos);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			fseek 는 파일의 위치를 이동하기 위해서 사용된다. whence 에서 offset 
+			만큼 떨어진 곳으로 이동을 한다. whence 가 SEEK_SET 로 지정되면 스트림의 처음, 
+			SEEK_CUR 은 현재 위치,  SEEK_END 라면 스트림의 마지막이 된다. 
+		</P
+><P
+>			ftell은 헌재 스트림의 위치를 돌려준다. 
+		</P
+><P
+>			rewind 를 사용하면 스트림의 처음위치로 이동시켜준다. 
+			fseek(stream, 0, SEEK_SET) 와 동일하다. 
+		</P
+><P
+>	
+			fgetpos 와 fsetpos 는 ftell 과 fseek 과 동일한 작업을 할수 있다. 이러한 작업은
+			fpos_t* pos 를 이용하게 되는데, 사용방법이 꽤 복잡한 이유로 그리 자주 사용하지는 않는다. 
+			대부분의 경우 fseek 와 ftell 로 끝낼수 있기 때문이다. 아래는 간단한 예이다.  
+		</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제: fseek.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main()
+{
+    FILE* fp;    
+    char buf[256];
+
+    // 파일을 "a+" 모드로 열었음으로 스트림의 위치는
+    // 파일의 맨 마지막으로 위치한다. 
+    fp = fopen("test.txt", "a+");
+    if (fp == NULL)
+    {
+        perror("fopen error : ");
+        exit(0);
+    }
+
+    // 현재 스트림의 위치를 출력한다.
+    printf("%d&#92;n&#92;n", ftell(fp));
+
+    // 파일의 처음에서 3번째 위치로 이동한다. 
+    fseek(fp, 3, SEEK_SET);   
+    fgets(buf, 256, fp);
+    printf("%s", buf);
+
+    // 파일을 처음에서 0번째 측 처음으로 되돌린다. 
+    // 이것은 rewind() 를 사용한것과 같다. 
+    fseek(fp, 0, SEEK_SET);   
+    fgets(buf, 256, fp);
+    printf("%s", buf);
+
+    fclose(fp);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				물론 테스트 하기전에 "test.txt" 파일을 만들어야 한다.. 다음과 같은 내용을 
+				가진 test.txt 파일을 만들자. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>12345678901234567890
+				</PRE
+></TD
+></TR
+></TABLE
+>	
+				이제 위의 프로그램을 컴파일 하고 실행하면 다음과 같은 결과를 보여줄것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./fseek
+21
+
+45678901234567890
+12345678901234567890
+[root@localhost test]#
+				</PRE
+></TD
+></TR
+></TABLE
+>	
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN115"
+>2.6&#51208;. stream 의 버퍼 모드및 크기 조정</A
+></H2
+><P
+>			보통 스트림은 곧바로 장치로(모니터 혹은 파일) 보내지지 않고 내부 버퍼에 
+			일시 저장되었다가 특정 조건을 만족하면 장치로 보내진다.  
+			이러한 버퍼링에는 3가지 종류가 있는데 비 버퍼링(버퍼하지 않음), 블럭 버퍼링, 
+			라인 버퍼링이 있다. 예를들어 비 버퍼링 모드일때는 쓰자마자 곧바로 장치에 
+			전달된다(모니터 혹은 파일). 블럭 버퍼링일 경우에는 바로 장치로 가지 않고 
+			설정된 block 의 크기가 가득 찼을경우 전달되게 된다. 라인 버퍼링 모드 일경우 
+			에는 개행문자(&#92;n)을 만났을때 장치로 전달된다. 라인 버퍼링 모드는 
+			일반적인 표준 입/출력(터미널에서 쓰거나 읽을때) 모드이다.  
+		</P
+><P
+>			stream 의 버퍼를 관리 하기 위해서 유닉스는 다음과 같은 함수들을 제공한다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>void setbuf(FILE *stream, char *buf);
+void setbuffer(FILE *stream, char *buf, size_t size);
+void setlinebuf(FILE *stream);
+int setvbuf(FILE *stream, char *buf, int mode, size_t size);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			setvbuf 는 mode 를이용해서 버퍼링모드를 지정할수 있으며 size 로 버퍼의 
+			크기를  지정할수 있다. 
+			모드는 다음의 3갸지가 있다. 
+			<P
+></P
+><UL
+><LI
+><P
+>_IONBF 비 버퍼링 모드</P
+></LI
+><LI
+><P
+>_IOLBF 라인 버퍼링 모드</P
+></LI
+><LI
+><P
+>_IOFBF 블럭 버퍼링 모드</P
+></LI
+></UL
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN128"
+>3&#51208;. 임시파일 생성</A
+></H1
+><P
+>	
+		보통 임시파일은 /tmp 디렉토리아래에 만들어 지는데, /tmp 의 권한은 아래와 같다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost root]# ls -al /
+drwxrwxrwt    9 root     root         4096  4월 25 21:20 tmp
+...
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		보통 /tmp 는 모든 응용 프로그램들이 임시파일을 만들기 위해서 사용해야 하므로 
+		권한은 777이 되어야 할것이다. 그러나 이렇게 될경우 문제가 있다. 만약 root 가 만들어 
+		놓은 임시파일을 다른 유저가 접근하게 되는 경우가 생길수 있기 때문이다. 그래서 
+		유닉스는 디렉토리에 권한을 주는 또다른 방법을 생각했는데, 바로 stikey bit 라는 것이다. 
+		이것이 설정된 디렉토리는 누구나 자신의 파일을 만들수 있지만, 자신의 권한이 아닌 파일에는 
+		접근을 못하게 된다. 
+	</P
+><P
+>	
+		이렇게 해서 /tmp 에 접근을 할수 있게 되는데, 여러개의 응용프로그램이 파일을 만들게 되므로 
+		파일이름이 겹칠수 있을것이다. 그래서 유닉스에서는 다음과 같이 랜덤하게 임시파일 이름을 
+		만드는 함수를 제공한다. 	
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char *tmpnam(char *s);		
+FILE *tmpfile(void);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		tmpnam 을 사용하면 절대경로를 가지는 랜덤한 이름을 가지는 파일이름을 아규먼트로 되돌려준다.  
+		"/tmp/filen8pwCL" 와 같은 이름의 파일을 되돌려준다. 
+		tmpfile 을 사용하면  임사파일을 read/write 모드로 생성하고, 여기에 대한 파일스트림 포인터를 
+		되돌려준다. 이파일은 프로그램이 종료될때 자동적으로 삭제된다. 만약 유일한 파일이름이 만들
+		어지지 않는다면 NULL 을 되돌려준다. 
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+int main()
+{
+    char name[255];
+    int i;
+    mkstemp(name);
+    printf("%s&#92;n",name);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN135"
+>4&#51208;. 파일 지우기 및 이름변경</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int remove(char *path);
+int rename(char *oldpath, const char *newpath); 
+		</PRE
+></TD
+></TR
+></TABLE
+>	
+		remove 는 파일을 삭제하기 위해서 rename 는 파일이름을 변경하기 위해서 사용되며 
+		쉘에서 rm, mv 를 옵션을 주지 않고 실행시킨것과 똑같은 일을한다. 이것은 
+		내부적으로 unlink(2)와 rmdir(2) 를 호출한다. 그러므로 파일과 디렉토리에 
+		관계없이 삭제, 이동(이름변경) 이 가능하다.  
+		</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+[[Category(4)]]

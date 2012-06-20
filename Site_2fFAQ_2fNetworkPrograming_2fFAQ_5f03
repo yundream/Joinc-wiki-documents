@@ -1,0 +1,37 @@
+#title 네트워크 프로그래밍 FAQ 3 - 클라이언트 프로그램의 제작 (TCP)
+[[tableofcontents]]
+=== 어떻게 문자열을 인터넷 주소로 변경할 수 있습니까 ===
+당신이 만든 프로그램이 명령행 인자로 '''호스트의 주소'''를 입력받는다고 가정해보자. 입력되는 호스트 주소는 분명히 '''aaa.bbb.ccc'''의 형태를 가지고 있을 것이다. 혹은 '''host.domain.com''' 형식의 도메인 이림일 것이다. 이들 인터넷 주소형식은 인간은 쉽게 이해할 수 있지만, 컴퓨터는 32bit의 주소만을 알고 있으므로, 변환함수를 써서 변환시켜줘야 한다. 
+{{{#!plain
+/* 
+   문자열 형식으로 주어진 주소를 32bit 인터넷 주소로 변경한다.
+*/
+struct in_addr *atoaddr(char *address) {
+    struct hostent *host;
+    static struct in_addr saddr;
+
+    /* First try it as aaa.bbb.ccc.ddd. */
+    saddr.s_addr = inet_addr(address);
+    if (saddr.s_addr != -1) {
+           return &saddr;
+    }
+    host = gethostbyname(address);
+    if (host != NULL) 
+   {
+        return (struct in_addr *) *host->h_addr_list;
+    }
+    return NULL;
+}
+}}}
+
+이들 함수에 대한 자세한 내용은 [wiki:Site/Network_Programing/Documents/DomainAddress 인터넷주소 변환] 문서를 참고하기 바란다.
+
+=== 서버에서 accept() 함수가 아직 호출되지 않았는데, 어떻게 클라이언트의 connect() 함수가 성공할 수 있습니까. ===
+이것을 이해할려면 listen() 함수가 하는 정확히 이해하고 있어야 한다. listen() 함수는 연결을 위한 대기열을 유지하는 일을 한다. 즉 클라이언트로 부터 연결요청이 들어오면 3 way handshake 를 거쳐서 완전한 연결을 만들어서, 대기열에 저장을 한다. 그러므로 accept()를 호출하기 전이라 하더라도 클라이언트의 연결을 받아들일 수 있게 된다. accept()는 listen()으로 만들어진 대기열에서 가장 먼저 이루어진 연결을 얻어오는 일을 한다.
+
+listen() 함수를 보면, 두번째 인자로 '''backlog'''라는게 있다. 이것은 queue(대기열)의 크기로, 얼마나 많은 클라이언트의 연결을 유지할 것인가를 결정하기 위해서 사용한다. accept()과정이 느려서 클라이언트의 연결이 대기열의 크기를 초과하게 될경우, 이후에 연결을 시도하는 클라이언트는 연결거부 메시지를 받게 된다.
+
+=== connect 를 시도할때 timeout을 체크하는 방법 ===
+서버가 떠있는데, 여러가지 이유로 연결에 너무 많은 시간이 소비되거나 영원히 block 될 수 있다. 이 경우에는 connect() 함수에 대해서 timeout 체크를 해야 한다. alarm()을 이용한 방법과 non-block 소켓을 이용하는 방법이 있다. 자세한 내용은 [wiki:Site/Network_Programing/Documents/Sockettimeout 소켓 타임아웃]문서를 참고하기 바란다.
+
+

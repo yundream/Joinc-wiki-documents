@@ -1,0 +1,246 @@
+#title 네트워크 프로그래밍 : connection Time 얻어오기
+
+이 문서는 여러분이 TCP(:12)와 IP(:12), pcap(:12)에 대한 기본적인 이해를 하고 있다고 가정하에 작성되었다. 다음의 문서들을 먼저 읽어보기 바란다. 
+
+  * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/IP_%C0%DA%BC%BC%C8%F7_%BA%B8%B1%E2 IP자세히 보기] 
+  * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/article/TCP_%C0%DA%BC%BC%C8%F7_%BA%B8%B1%E2 TCP자세히 보기]
+  * [http://joinc.co.kr/modules/moniwiki/wiki.php/article/libpcap%C0%BB_%C0%CC%BF%EB%C7%D1_%C7%C1%B7%CE%B1%D7%B7%A1%B9%D6 libpcap 프로그래밍]
+
+=== 간단한 방법으로 Connection 시간 얻기 ===
+최근 QOS(:12)에 관심을 가지면서, 서비스 연결시간과 transaction 시간을 얻어오는 방법에 대해서 고민하기 시작했다. 간단하게는 직접 서비스에 연결하는 프로그램을 만들어서 데이터를 가져오는데 걸리는 시간을 측정하는 프로그램을 만들 수도 있을 것이다. 필자의 경우 웹서버의 응답시간을 테스트 하기 위해서 wget(:12)과 같은 프로그램을 사용하기도 했다.  
+
+그러나 이러한 임시의 방법은 다음과 같은 문제점을 가진다. 
+  1. connection time 은 구할 수 없다.
+  1. 다양한 클라이언트에서의 데이터 응답시간을 얻어낼 수 없다. 
+
+QOS 관점에서 보자면, 이러한 문제점은 치명적이다. QOS를 위한다면, 다양한 지역과 도메인에서의 정확한 connection time과 데이터 응답시간을 통계내고, 이를 이용해서 서비스를 최적화 시킬 수 있어야 하기 때문이다.
+
+=== 패킷 수준에서의 Connection 시간 얻기 ===
+그래서 패킷을 직접 분석해서 connection 시간을 얻어오는 프로그램을 만들어 보기로 했다. 이 프로그램이 제대로 작동된다면, 좀더 확장해서 특정 도메인 영역의 모든 패킷에 적용할 수 있을 것이다. 
+
+패킷을 얻어오기 위해서 libpcap(:12)을 사용하기로 했다. libpcap(:12)은 공개된 패킷덤프 프로그램으로 snort(:12)와 같은 IDS(침입탐지 시스템)등의 패킷분석 엔진에도 사용되고 있다.
+
+패킷을 얻어오는건 크게 문제가 되지 않을 것이다. 문제는 TCP/IP(:12)에서의 connection 과정을 패킷차원에서 이해하는게 될 것이다. 그럼 connection 과정을 패킷 수준에서 알아보도록 하자.     
+
+=== 패킷수준에서 알아보는 Connection 과정 ===
+TCP/IP 에서 Connection에 관여하는 프로토콜은 TCP(:12)이다. 아래와 같이 3번의 패킷 교환을 통해서 연결이 이루어지게 되므로 흔히 3번악수기법(three-way handshake)라고 한다. 
+
+attachment:three.png
+
+간단히 예를들어서 알아보도록 하자. 80번 웹서비스에 대한 connection이 일어난다고 가정해보자. 클라이언트는 5555 포트를 이용해서 접근을 한다고 할때, 다음과 같이 나타낼 수 있을 것이다.
+  1. SRC PORT : 5555 --> DST PORT : 80
+     SYN = 1
+     SEQ = 350245447
+     ACK_SEQ = 0;
+  1. SRC PORT : 80 --> DST PORT : 5555
+     SYN = 1
+     SEQ = 196123544 
+     ACK_SEQ = 350245448
+  1. SRC PORT : 80 --> DST PORT : 5555 
+     SYN = 0
+     SEQ = 350245448
+     ACK_SEQ = 196123545
+
+=== 프로시져 ===
+이제 간단하게 connection time을 체크하는 프로그램의 계획을 세울 수 있을 것이다. 패킷이 TCP이고, SYN이 1이고, ACK_SEQ가 0이라면, 클라이언트로 부터의 연결이라고 볼 수 있음으로 이때부터, 해당 클라이언트의 IP/PORT로부터 SEQ+1 패킷이 오는 것을 기다려서, 그 간격을 측정하는 것이다. 
+
+다음은 프로시져 코드다.
+{{{#!plain
+if (tcp 패킷이라면)
+{
+	if (tcp.syn == 1)	
+	{
+		connection 구조체에, time, port, ip, seq를 설정한다.
+	}
+	else
+	{
+		port와 ip가 동일하고 seq == seq+1 이라면
+		연결이 완성된 것이다.
+		connection 시간 = current time = time;
+	}
+}
+}}}
+
+=== 구현 ===
+이제 서비스의 connection time 을 체크하는 프로그램을 만들어 보도록 하겠다. 단 이 프로그램은 다음과 같은 제약을 가진다.
+  * SRC PORT만 일치 
+     패킷을 명확히 동기화 시키기 위해서는 '''SRC IP, SRC PORT, SEQ'''3개를 일치시켜야 한다. 그러나 여기에서는 간단히 하기 위해서 SRC PORT만 일치시키도록 하겠다. 클라이언트의 포트는 대략 1025-65536까지 이므로, 바쁜 서버가 아닌한은 겹칠확률이 그리 크지 않을 것이다. 
+
+     SEQ도 일치시키지 않아도, 대부분의 경우에는 문제가 되지 않을 것이다. 그러나 half connection 공격을 하게 될경우, 동일한 클라이언트 PORT로 계속해서 half 연결을 시도할 수 있다. SEQ를 일치시키지 않는다면, 이러한 half connection 공격을 검사해내기 힘들어 진다. 
+{{{#!plain
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+// Unix Standard Library
+#include <time.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <iostream>
+
+#include <pcap.h>
+
+#include <net/bpf.h>
+#include <netinet/in.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
+
+#include <net/if.h>
+#include <net/ethernet.h>
+#include <arpa/inet.h>
+
+#include <sys/socket.h>
+
+
+#define TCPHEADERSIZE 6*4
+
+using namespace std;
+
+enum MODE{NONPROMISCUOUS, PROMISCOUS};
+
+struct _connect_Info
+{
+  struct timeval start_Time;
+  int flag;
+};
+int main(int argc, char *argv[])
+{
+  char errbuf[256];
+  int ret;
+  struct _connect_Info  *connect_Info;
+
+  bpf_u_int32 netp;
+  bpf_u_int32 maskp;
+
+  char *dev;
+
+  struct pcap_pkthdr hdr;
+  struct ether_header *ep;
+  struct tcphdr    *tcph;
+  struct ip *iph;
+
+  struct timeval current_time;
+
+  struct sockaddr_in *sin;
+
+  const u_char *packet;
+
+  unsigned short ether_type;
+  pcap_t *pcd;
+
+  // 65536개 만큼의 Src Port를 저장할 수 있는 자료공간을 만든다.
+  connect_Info = (struct _connect_Info *)malloc(sizeof(struct _connect_Info) * 65536);
+
+  dev = pcap_lookupdev(errbuf);
+  if (dev == NULL)
+  {
+    printf("%s\n", errbuf);
+    return 1;
+  }
+
+  // Non Promiscous 모드로 이더넷 장치를 연다.
+  pcd = pcap_open_live(dev, BUFSIZ, NONPROMISCUOUS, -1, errbuf);
+  if (pcd == NULL)
+  {
+    printf("%s\n", errbuf);
+    return 1;
+  }
+
+  // 패킷을 읽어들인다.
+  for (;packet=(const unsigned char *)pcap_next(pcd, &hdr);)
+  {
+    ep = (struct ether_header *)packet;
+    packet += sizeof(struct ether_header);
+    ether_type = ntohs(ep->ether_type);
+    // TCP/IP 패킷인 경우에만 분석한다.
+    if (ether_type == ETHERTYPE_IP)
+    {
+      iph = (struct ip *)packet;
+      if(iph->ip_p == IPPROTO_TCP)
+      {
+        tcph = (struct tcphdr *)(packet + iph->ip_hl *4);
+        // syn 이 1일경우
+        if (tcph->syn == 1)
+        {
+          gettimeofday(&current_time, NULL);
+          // ACK_SEQ가 0이면 connection 시도다.
+          if (tcph->ack_seq == 0)
+          {
+            memcpy((void *)&connect_Info[ntohs(tcph->source)].start_Time,
+              (void *)&current_time, sizeof(struct timeval)) ;
+            connect_Info[ntohs(tcph->source)].flag = 1;
+          }
+          // 그렇지 않을 경우 Server에서 Client로의 ACK다.
+          else
+          {
+            if (connect_Info[ntohs(tcph->dest)].flag == 1)
+            {
+              connect_Info[ntohs(tcph->dest)].flag = 2;
+            }
+          }
+        }
+        // 연결이 맺어졌다.
+        if (connect_Info[ntohs(tcph->source)].flag == 2)
+        {
+          printf("%d -> %d\n", ntohs(tcph->source), ntohs(tcph->dest));
+          printf("Connection Time %.4f msec\n",
+              (current_time.tv_sec - connect_Info[ntohs(tcph->source)].start_Time.tv_sec)*1000 +
+              (float)(current_time.tv_usec - connect_Info[ntohs(tcph->source)].start_Time.tv_usec)/1000.0);
+              memset((void *)&connect_Info[ntohs(tcph->source)], 0x00, sizeof(struct _connect_Info));
+          printf("=========\n");
+        }
+      }
+    }
+  }
+  return EXIT_SUCCESS;
+
+}
+}}}
+
+다음은 테스트 결과다. connection time을 얻어오는 것을 확인할 수 있다. joinc 서버에서 테스트한 결과다.
+{{{#!plain
+# ./con_time
+35512 -> 80
+Connection Time 0.0180 msec
+=========
+49187 -> 80
+Connection Time 0.0260 msec
+=========
+2564 -> 80
+Connection Time 0.0200 msec
+=========
+2565 -> 80
+Connection Time 0.0040 msec
+=========
+2567 -> 80
+Connection Time 0.0040 msec
+=========
+51374 -> 80
+Connection Time 0.0240 msec
+=========
+2568 -> 80
+Connection Time 0.0050 msec
+=========
+62272 -> 80
+Connection Time 0.0260 msec
+=========
+65186 -> 80
+Connection Time 0.0240 msec
+=========
+52408 -> 80
+Connection Time 0.0210 msec
+=========
+}}}
+=== 앞으로 할일 ===
+  * transaction time 을 얻어온다.
+  * RRD(:12)를 이용해서, 통계 정보를 출력한다.
+
+

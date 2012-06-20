@@ -1,0 +1,176 @@
+#title 조각 코드 : HTML 엔티티 변환함수
+
+=== 설명 ===
+php의 htmlspecialschars 참조
+
+어떤 문자들은 HTML에서 특별한 정의를 가지기에, 그 의미를 보존하려면, HTML 엔터티로 표현해야 합니다. 이 함수는 이러한 변환을 수행한 문자열을 반환합니다; 이 번역은 모든 웹 프로그래밍에서 매우 유용합니다. 모든 HTML 문자 엔터티를 번역해야 한다면, 이 함수 대신 htmlentities()를 사용하십시오. 
+
+이 함수로 게시판이나 방명록 등의 프로그램에서, HTML을 포함하는 사용자 입력 텍스트를 막을 수 있습니다. 선택적인 두번째 인자 quote_style은 작은 따옴표와 큰 따옴표를 어떻게 처리할지 결정합니다. 기본 모드는 하위 호환 모드 ENT_COMPAT로, 큰 따옴표만 변환합니다. ENT_QUOTES를 지정하면 작은 따옴표와 큰 따옴표 둘 다 변환하고, ENT_NOQUOTES를 지정하면 작은 따옴표와 큰 따옴표 둘 다 변환하지 않습니다. 
+
+다음 문자들을 변역합니다: 
+
+&'(앰퍼샌드)는 '&amp;amp;'가 됩니다. 
+
+'"'(큰 따옴표)는 ENT_NOQUOTES를 지정하지 않았을 때 '&amp;quot;'가 됩니다. 
+
+'''(작은 따옴표)는 ENT_QUOTES를 지정했을 때만 '&amp;#039;'가 됩니다. 
+
+'<'(보다 작음)는 '&amp;lt;'가 됩니다. 
+
+'>'(보다 큼)는 '&amp;gt;'가 됩니다.
+=== 사용방법 ===
+아래참조
+=== 코드 ===
+
+{{{#!plain
+#include <stdio.h>
+#include <malloc.h>
+
+#define ENT_HTML_QUOTE_NONE        0
+#define ENT_HTML_QUOTE_SINGLE    1
+#define ENT_HTML_QUOTE_DOUBLE    2
+
+#define ENT_COMPAT        ENT_HTML_QUOTE_DOUBLE
+#define ENT_QUOTES        (ENT_HTML_QUOTE_DOUBLE | ENT_HTML_QUOTE_SINGLE)
+#define ENT_NOQUOTES    ENT_HTML_QUOTE_NONE
+
+static const struct {
+    unsigned short charcode;
+    char *entity;
+    int entitylen;
+    int flags;
+}basic_entities[]={
+    {'&', "&amp;amp;", 5,0},
+    {'"', "&amp;quot;",6,ENT_HTML_QUOTE_DOUBLE},
+    {'\'',"&amp;#039;",6,ENT_HTML_QUOTE_SINGLE},
+    {'<', "&amp;lt;",    4,0},
+    {'>', "&amp;gt;",    4,0},
+    {0,NULL,0,0}
+};
+
+int htmlspecialchars(char *,char **,int);
+
+int main(int argc,char **argv){
+
+    char *src="<br>' \" & &This is test\n^^;\n\n";
+    char *ret;
+
+    htmlspecialchars(src,&ret,ENT_COMPAT);
+    printf("%s\n",ret);
+    free(ret);
+
+    return 0;
+
+}
+
+int htmlspecialchars(char *src,char **ret,int type){
+
+    int len=0;
+    int entity_len=0;
+    int size=0;
+    char *tmp;
+
+    len=strlen(src);
+    tmp=src;
+
+    while(*src!='\0'){
+
+        switch(*src){
+
+            case '&'://    &
+
+                entity_len+=basic_entities[0].entitylen;
+                break;
+
+            case '"'://    "
+
+                if((type==ENT_COMPAT)||(type=ENT_QUOTES)) entity_len+=basic_entities[1].entitylen;
+                break;
+
+            case '\''://    '
+
+                if((type!=ENT_COMPAT)||(type==ENT_QUOTES)) entity_len+=basic_entities[2].entitylen;
+                break;
+
+            case '<'://    <
+
+                entity_len+=basic_entities[3].entitylen;
+                break;
+
+            case '>'://    >
+
+                entity_len+=basic_entities[4].entitylen;
+                break;
+
+        }
+
+        ++src;
+
+    }
+
+    src=tmp;
+    size=len+entity_len;
+
+    if(((*ret)=(char *)malloc(sizeof(char)*size+1))==NULL) return 1;
+    memset((*ret),0x0,sizeof(char)*size+1);
+
+    tmp=(*ret);
+
+    while(*src!='\0'){
+
+        switch(*src){
+
+            case '&'://    &
+
+                memcpy((*ret),basic_entities[0].entity,basic_entities[0].entitylen);
+                (*ret)+=basic_entities[0].entitylen;
+                break;
+
+            case '"'://    "
+
+                if((type==ENT_COMPAT)||(type=ENT_QUOTES)){
+                    memcpy((*ret),basic_entities[1].entity,basic_entities[1].entitylen);
+                    (*ret)+=basic_entities[1].entitylen;
+                }
+                break;
+
+            case '\''://    '
+
+                if((type!=ENT_COMPAT)||(type==ENT_QUOTES)){
+                    memcpy((*ret),basic_entities[2].entity,basic_entities[2].entitylen);
+                    (*ret)+=basic_entities[2].entitylen;
+                }
+                break;
+
+            case '<'://    <
+
+                memcpy((*ret),basic_entities[3].entity,basic_entities[3].entitylen);
+                (*ret)+=basic_entities[3].entitylen;
+                break;
+
+            case '>'://    >
+
+                memcpy((*ret),basic_entities[4].entity,basic_entities[4].entitylen);
+                (*ret)+=basic_entities[4].entitylen;
+                break;
+
+            default:
+
+                *(*ret)=*src;
+                ++(*ret);
+
+        }
+
+        ++src;
+
+    }
+
+    (*ret)=tmp;
+    return 0;
+
+}
+}}}
+
+=== 변경사항 ===
+
+==== 2004/01/08 ====

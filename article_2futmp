@@ -1,0 +1,231 @@
+#title utmp를 이용한 사용자 정보 얻기
+
+== utmp 를 이용한 유저 로그인 정보 얻기 ==
+utmp에 대한 내용은 각 Unix 마다 다를수 있는데, 이 기사는 Linux(:12) readhat 7.x 을 기준으로 작성하도록 하겠다.
+
+여러분이 시스템 관리자라면, 현재 시스템에 누가 작업을 하고 있는지, 어떤 작업을하는지 등에 대한 정보를 알아야될 때가 있을것이다. 이럴경우 시스템 관리자는 "w" 를 사용해서 현재 접근한 사용자의 정보를 알아보려고 시도할 것이다.
+
+{{{#!plain
+[root@localhost test]$ w
+ 11:43am  up 270 days,  9:25,  3 users,  load average: 3.12, 3.22, 3.24
+USER     TTY      FROM              LOGIN@   IDLE   JCPU   PCPU  WHAT
+mercy4u  pts/1    s210-205-210-195 11:25am 41.00s  0.09s  0.06s  -bash 
+root     pts/2    s210-205-210-195 11:43am 18.00s  0.05s  0.05s  -bash 
+mercy4u  pts/4    s210-205-210-195 11:43am  0.00s  0.06s  0.02s  w 
+}}}
+
+위의 결과에서 보듯이 "w" 명령을 이용해서 우리는 시스템에 접근한 사용자에 대한 다양한 정보를 얻을수 있. 이러한 정보는 '''utmp'''라고 하는 유저로그인 로그 시스템을 이용해서 얻어올 수 있다.
+
+예제 : myutmp.c
+{{{#!plain
+#include <unistd.h>
+#include <utmp.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+
+
+int get_current_pid(int login_pid);
+char *get_current_procname(int proc_num);
+
+
+int main(int argc, char **argv)
+{
+    struct utmp *utmpfp;
+    struct utmp *myutmp;
+
+    char *tty_name = NULL;
+    char *host_ip;
+
+    char now_local_time[50];
+
+    time_t the_time;
+    struct tm *tm_ptr;
+
+    myutmp = malloc(sizeof(struct utmp));
+    //utmpfp = malloc(sizeof(struct utmp));
+    setutent();
+
+    while ((utmpfp = getutent()) != NULL)
+    {
+        the_time = utmpfp->ut_time;
+        tm_ptr = localtime(&the_time);
+        sprintf(now_local_time, "%d/%02d/%02d %02d:%02d",
+                                tm_ptr->tm_year+1900, tm_ptr->tm_mon+1,
+                                tm_ptr->tm_mday, tm_ptr->tm_hour,
+                                tm_ptr->tm_min);
+
+        host_ip = utmpfp->ut_host;
+        if (strlen(host_ip) < 1)
+            host_ip = "-";
+        if (utmpfp->ut_type == USER_PROCESS)
+        {
+            printf("%-12s %-8s %-12s %s   %s\n",
+                        utmpfp->ut_user,
+                        utmpfp->ut_line,
+                        host_ip,
+                        now_local_time,
+                        get_current_procname(get_current_pid(utmpfp->ut_pid)));
+        }
+    }
+
+    setutent();
+    printf("\nmy utmp info is ---\n");
+    tty_name = ttyname(0);
+
+    printf("%s\n",tty_name+5);
+    strcpy(myutmp->ut_line, tty_name+5);
+    utmpfp = getutline(myutmp);
+    if(utmpfp == NULL)
+    {
+        printf("Not Fild utmp\n");
+        exit(0);
+    }
+
+    printf("%d\n", utmpfp->ut_time);
+    the_time = utmpfp->ut_time;
+    tm_ptr = localtime(&the_time);
+    sprintf(now_local_time, "%d/%02d/%02d %02d:%02d",
+                            tm_ptr->tm_year+1900, tm_ptr->tm_mon+1,
+                            tm_ptr->tm_mday, tm_ptr->tm_hour,
+                            tm_ptr->tm_min);
+    printf("%-12s %-8s %-12s %s   %s\n",
+                utmpfp->ut_user,
+                utmpfp->ut_line,
+                host_ip,
+                now_local_time,
+                get_current_procname(get_current_pid(utmpfp->ut_pid)));
+
+    return 1;
+}
+
+int get_current_pid(int login_pid)
+{
+    int  fd;
+    char buf[255];
+    char stat_file[25];
+    int  field_num = 7;
+    int  i, j;
+    int  buf_index;
+    char current_pid[11];
+
+    memset(buf, '\0', 255);
+    sprintf(stat_file, "/proc/%d/stat", login_pid);
+
+    if ((fd = open(stat_file, O_RDONLY)) == -1)
+    {
+        printf("error\n");
+        return -1;
+    }
+
+    read(fd, buf, 255);
+    j = 0;
+    for (i = 0, buf_index=0; i < 255; i++)
+    {
+        if (buf[i] == ' ')
+        {
+            j++;
+        }
+        else
+        {
+            if (j == field_num)
+            {
+                current_pid[buf_index] = buf[i];
+                buf_index++;
+            }
+            if (j > field_num)
+                break;
+        }
+    }
+    close(fd);
+    return atoi(current_pid);
+}
+
+char *get_current_procname(int proc_num)
+{
+    char *buf;
+    char proc_file[256];
+
+    buf = (char *)malloc(256);
+    memset(buf, '\0', 256);
+
+    memset(proc_file, '\0', 256);
+    sprintf(proc_file, "/proc/%d/exe", proc_num);
+
+    readlink(proc_file, buf, 256);
+    return buf;
+}
+}}}
+위 프로그램을 설명하기 전에 utmp(5) 구조체에 대해서 알아보도록 하자. utmp 구조체는 아래와 같은 내용을 가진다.
+{{{#!plain
+struct utmp
+{
+    short ut_type;              /* type of login */
+    pid_t ut_pid;               /* pid of login process */
+    char ut_line[UT_LINESIZE];  /* device name of tty - "/dev/" */
+    char ut_id[4];              /* init id or abbrev. ttyname */
+    char ut_user[UT_NAMESIZE];  /* user name */
+    char ut_host[UT_HOSTSIZE];  /* hostname for remote login */
+    struct exit_status ut_exit; /* The exit status of a
+                                   process marked as DEAD_PROCESS. */
+    long ut_session;            /* session ID, used for
+
+    struct timeval ut_tv;       /* time entry was made.  */
+    int32_t ut_addr_v6[4];      /* IP address of remote host.  */
+    char pad[20];               /* Reserved for future use.  */
+};
+}}}
+ut_type 은 로그인 타입으로 미리 디파인된 값들을 가지고 있다. 이에 대한 내용은 utmp 의 맨 페이지를 참고하기 바란다.
+우리가 보고자 하는 로그인 타입의 유저는, 일반 유저 레벨에서 접근한 경우에 한하므로 ut_type 이 "USER_PROCESS"인 utmp 정보만 가져오도록 하겠다.
+shell 명령어로 사용하는 "w" 역시 ut_type 이 "USER_PROCESS" 인경우만 가져오는데, 이러한 ut_type 의 값은 USER_PROCESS 로 7로 디파인되어 있으며,
+
+이 쏘쓰의 첫부분에서는 getutent(3) 함수를 이용하여 utmp파일의 가장최근의 파일 위치에서 부터 utmp 정보를 읽어들이게 는데, setutent(3)을 통하여 utmp파일 의 위치를 가장처음으로 돌렸음으로, utmp의 처음정보부터 읽어오게 될것이다. (굳이 stutent 를 사용할필요는 없지만 안전한 프로그래밍 습관을 위해서..) 이정보는 utmpfp 구조체에 저장이되고, 더이상 utmp 정보가 나오지 않을때까지 - NULL 을 만나기 전까지 - 반복실행되게 된다.
+
+while 루프문 안에서는 getutent 를 통해서 가져온 정보를 이용해서 사용자가 보기편한 형태로 돌려주게 된다.
+이 프로그램에서 사용자에게 돌려주는 정보는, 로그인시간, 사용터미널이름, 호스트 아이피, 그리고 현재 진행중인 process 의 이름을 돌려주게 된다.
+
+대부분의 정보들은 단순히 utmp 구조체의 멤버들을 출력시킨것인데, 다만 현재 진행중인 process 가 무엇인지를 확인하기 위하여서, 별도의 함수를 작성하였다.
+
+get_current_pid 는 현재 사용자가 실행중인 프로그램(프로세스)의 pid 를 가져오고, get_current_procname 는 get_current_pid 를 통해서 현재 실행중인 프로세스의 pid 를 넘겨받아서, pid 에 맞는 명령어의 이름을 돌려준다.
+이에 대한 자세한 내용을 알고 싶다면 proc 파일시스템에 대한 이해가 필요한데, 상당히 방대한 내용이므로, 여기에서는 개념만 설명하고 넘어가도록 하겠다.
+
+리눅스는 모든 프로세스의 정보를 /proc 밑에 자신의 pid 이름의 디렉토리에 저장을하게 된다. 즉 내가 현재 vi 를 실행시켰는데, 이 vi 에 대한 자세한 프로세스 정보를 알기를 원한다면 ps 등을 이용해서 vi 의 pid 를 알아내고, /proc/pid 으로 이동하면 프로세스의 상세한 정보를 기록한 파일들을 열람함으로써 프로세스의 정보를 알아낼수 있다.
+/proc/pid 로 이동하면 이중 stat 라는 파일이 보일것이다. stat에는 프로세스의 pid, 명령어, ppid(부모프로세스의 pid) 등 프로세스의 전반적인 정보를 알아낼수 있는데, 8번째 필드값을 이용해서 가장최근에 실행된 프로세스의 pid 값을 알아낼수 있다.(정확하게는 gid 이지만 우리가 알아내고자 하는 pid 와 동일한 값을 보여주므로 넘어가도록 하겠다. 여기에 대한내용은 유닉스 프로세스에 대한 메뉴얼을 참조하기 바란다.)
+
+그리고 /proc/pid 를 살표보면 exe 라는 심볼링 링크된 파일을 볼수 있을것인데, 이것은 현재 프로세스를 실행시킨 명령어에 대한 심볼릭링크이다.
+
+결론적으로 우리는 /proc/pid/stat 를 이용해서 현재 실행중인 프로세스의 pid를 알수 있음으로 해당 프로세스 pid 의 proc 디렉토리로 이동해서 exe파일이 어떤 명령어에 심볼릭링크 되어있는지를 확인해서, 사용자가 지금 실행중인 프로그램이 어떤것인지를 알수 있게 된다. 심볼릭링크의 원본파일이름은 readlink(2) 를 이용해서 가져올수 있다.
+
+다시한번 정리해 보자면 get_current_pid 를 이용 /proc/pid/stat 파일을 분석해서 현재 실행중인 프로세스의 pid(current_pid) 를 가져오고, get_current_procname 을 이용해서 /proc/current_pid/exe 의 심볼링크된 원본의 파일이름을 읽어 옴으로써 사용자의 현재진행중인 프로그램명을 얻어오게 되는것이다.
+
+프로그램의 마지막에서는 getutline(3)함수를 이용해서 자기자신의 utmp 정보를 출력하도록 만들었다. getutline 는 tty 번호를 이용해서 utmp 정보를 가져온다. tty의 이름은 ttyname(3) 을 이용해서 얻어올수 있다.
+
+아래는 프로그램을 실행시킨 결과이다
+{{{#!plain
+[root@localhost test]# ./myutmp 
+root         tty1     -            2002/09/16 22:12   
+root         pts/0    -            2002/09/17 01:34   
+root         pts/1    -            2002/09/16 22:13   
+root         pts/2    -            2002/09/16 22:13   
+root         pts/3    -            2002/09/20 11:53   
+root         pts/4    -            2002/09/21 01:51   
+root         pts/5    -            2002/09/21 02:03   
+root         pts/6    -            2002/09/21 02:28   
+root         pts/7    -            2002/09/21 03:07   
+root         pts/8    -            2002/09/17 00:43   
+root         pts/9    -            2002/09/18 00:13   
+root         pts/10   -            2002/09/21 03:08   
+root         pts/11   -            2002/09/21 03:11   
+root         pts/12   -            2002/09/18 00:52   
+root         pts/13   -            2002/09/22 11:14   
+root         pts/14   -            2002/09/22 11:15   
+root         pts/15   -            2002/09/22 11:16   
+root         pts/16   -            2002/09/19 23:37   
+root         pts/17   -            2002/09/22 11:32   
+my utmp info is ---
+root         pts/14   -            2002/09/22 11:15   
+}}}

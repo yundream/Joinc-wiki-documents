@@ -1,0 +1,1392 @@
+#title 동적 메모리할당
+[wiki:docbook/동적_메모리할당 Docbook 원문]
+ 1. 문서가 오래되어서 좀 수정해야 하는데 음..
+ 1. 솔라리스에서의 malloc()관련문제 추가 - 정리해서 원문에 넣을 수 있음 [yundream]  
+ [[TableofContents]]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>동적 메모리할당</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>동적 메모리할당</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN15"
+>메모리 할당</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN18"
+>정적 메모리 할당에 대해서</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>동적 메모리 할당에 대해서</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN30"
+>malloc, realloc, sizeof, memset, free</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1.1&#51208;. <A
+HREF="#AEN32"
+>malloc</A
+></DT
+><DT
+>2.2.1.2&#51208;. <A
+HREF="#AEN55"
+>realloc</A
+></DT
+><DT
+>2.2.1.3&#51208;. <A
+HREF="#AEN63"
+>sizeof</A
+></DT
+><DT
+>2.2.1.4&#51208;. <A
+HREF="#AEN69"
+>free</A
+></DT
+></DL
+></DD
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN82"
+>동적 메모리 할당의 응용</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN85"
+>링크드 리스트 에 대해서</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN90"
+>동적 메모리 할당을 통한 링크드 리스트의 구현</A
+></DT
+><DT
+>3.3&#51208;. <A
+HREF="#AEN106"
+>예제</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		어떤 언어를 이용해서 프로그래밍을 하든지 프로그램이 하는 주요한  
+		임무는 결국 데이타를 주고/받고 이를 가공하는 작업이다.  
+		이는 사람이 사회에서 살아가기 위한 가장 주요한 일이 서로간의 
+		대화인것과 마찬가지이다. 
+	</P
+><P
+>		사람은 서로 대화를 하기 위해서 대화할 내용을 미리 어딘가에 저장하고 
+		있어야 한다. 사교를 위한 대화를 위해서라면 머리에 저장되어 있는
+		(저장이라고 말하니 좀 이상하긴하다 --;) 데이타(경험)를 활용해서 
+		대화를 하면 될것이고, 업무상 중요한 대화라면, 미리 노트를 하든지 
+		해서 실제 대화때 중요한 내용을 빠트리지 않도록 준비를 해야 할것이다.    
+	</P
+><P
+>		프로그램도 마찬가지로 어떤 수행을 위해서는 데이타를 어딘가에 저장해 
+		두고 있어야 할것이다. 이러한 데이타 의 저장은 메모리공간 
+		혹은 디스크 공간을 이용한다. 
+	</P
+><P
+>		이문서는 데이타저장을 위해서 어떻게 메모리 공간을 
+		이용해야 하는지에 대한 내용을 다루고 있다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2&#51208;. 메모리 할당</A
+></H1
+><P
+>		메모리 할당을 위한 방법은 크게 2가지가 있다. 정적메모리 할당과 
+		동적 메모리 할당이 그것인데, 동적 메모리 할당을 설명하기 전에 
+		정적 메모리 할당에 대해 간단히 알아보도록 하겠다.
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2.1&#51208;. 정적 메모리 할당에 대해서</A
+></H2
+><P
+>			Static Memory Allocation 이라고 불리우며, 
+			메모리의 크기가 미리 고정시켜서 할당하는 것을 말한다. 
+			일반적으로 메모리크기를 할당하는 쉬운 방법으로, 할당시켜줘야할 
+			메모리의 한계 크기를 명확히 알고 있을경우 사용한다.  
+		</P
+><P
+>			예를 들어 주소를 저장하기 위한 메모리 공간이 필요하다고 할때, 
+			우리는 주소를 저장하기 위해서 어느정도의 메모리 공간이 필요한지를 
+			대충 계산할수 있다. 주소길이가 아무리 길어봐야 256 자를 넘지 
+			않을것이기 때문이다.  
+		</P
+><P
+>			이러한 정적 메모리 할당은 프로그램 시작시에 미리 고정시켜서 
+			할당시켜 버린다.(그런 이유로 Static 이란 단어가 붙는다.)  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>...
+int main()
+{
+    char address[256];
+    char zipcode[10];
+
+    ... 
+    ...
+}				
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			정적으로 메모리를 할당할경우 약간의 메모리 낭비가 있을수 있다. 
+			보통 할당할 메모리를 결정할때, 최대 사용가능하다고 생각되는 
+			메모리량보다 약간더 크게 잡는게 보통이기 때문이다. 
+		</P
+><P
+>			그러나 크기의 한계를 명확히 알수 있을경우, 동적 메모리 할당보다 
+			사용하기 쉽고, 버그가 발생할 확률도 적다는 장점을 가지고 있다. 
+			보통 프로젝트를 진행하게 될경우 약간의 메모리 낭비보다는 
+			버그의 발생을 더큰 프로그램 위험요소로 생각하기 때문에, 
+			가능한한 정적 메모리 할당을 사용한다. 
+			동적 메모리 할당을 사용할경우 메모리 누수, 혼동되는 포인터의 
+			사용에 의한 잘못된 메모리 참조등 여러가지 
+			문제를 발생시킬수 있기 때문이다. 포인터 잘못사용해서 발생하는 
+			문제가 얼마나 프로그래머를 괴롭히는지는 말하지 않아도 
+			잘 알고 있으리라 생각된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 동적 메모리 할당에 대해서</A
+></H2
+><P
+>			Dynamic Memory Allocation 이라고 불리우며, 
+			말그대로 프로그램 실행중에 동적으로 메모리의 크기를 할당시켜줘야 
+			할 필요가 있을경우 사용한다. 
+		</P
+><P
+>			예를 들어서 간단한 에디터 프로그램을 만든다고 했을때, 
+			보통 파일의 내용을 메모리 상에 읽어 들이게 될것이다. 
+			그런데 파일의 크기가 얼마가 될지는 아무도 알수 없다. 
+			파일이 작을경우 그 크기가 0이 될수도 있겠지만 파일이 클경우 
+			수십 메가 바이트 혹은 그 이상이 될수도 있을것이기 때문이다. 
+			이경우에는 정적 메모리 할당을 사용할수 없으며, 
+			어쩔수 없이 동적 메모리 할당을 사용해야 할것이다.   
+		</P
+><P
+>			"어쩔수 없이" 란 말을 붙인 이유는 되도록이면 동적 메모리 할당을 
+			사용하는것 보다는 정적메모리 할당을 사용하는게 여러모로 이익이 
+			많기 때문이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN30"
+>2.2.1&#51208;. malloc, realloc, sizeof, memset, free</A
+></H3
+><DIV
+CLASS="SECTION"
+><H4
+CLASS="SECTION"
+><A
+NAME="AEN32"
+>2.2.1.1&#51208;. malloc</A
+></H4
+><P
+>					동적 메모리 할당을 위해서 C 는 주요한 몇가지 시스템 함수와 
+					키워드를 제공한다. 이중 malloc 는 메모리 상에서 연속된 
+					일정 크기의 공간을 할당받기 위해서 사용하는 가장 
+					일반적인 함수이다.     
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>void *malloc(size_t number_of bytes);
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					malloc() 함수는 인자로 할당받고자 하는 메모리의 크기를 
+					byte 단위로 명시한다. 만약 메모리 할당이 성공했다면 malloc 
+					함수는 할당된 메모리의 시작 위치를 가리키는 포인터를 
+					반환한다. (포인터에 대한 내용은 <A
+HREF="modules.php?name=News&file=article&sid=87&mode=nested"
+TARGET="_top"
+>데이타와 포인터</A
+>) 
+					void * 를 받는 이유는 void * 를 이용할경우 
+					어떤 타입으로라도 
+					형변환이 가능하기 때문이다. 
+				</P
+><P
+>					만약 100 byte 의 문자를 저장하기 위한 공간을 
+					할당받기 원한다면 
+					다음과 같이 malloc() 함수를 호출하면 될것이다.     
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char *cp;
+
+cp = (char *)malloc(100);
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					위의 방법을 통해서 메모리 할당을 하게 된다면, 
+					메모리는 다음과 같이 구성되게 될것이다. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  0 1 2 3          0  ....        100
+ +-+-+-+-+        +-+-+-+-+-+-+-+-+-+
+ | cp    |        |                 |
+ +-+-+-+-+        +-+-+-+-+-+-+-+-+-+
+  |                |
+  +----------------+ 
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					malloc() 을 통해서 메모리 할당요청을 받은 운영체제(커널)은 
+					100 byte 크기만큼의 연속된 메모리를 할당하고, 
+					할당된 메모리의 
+					첫번째를 가리키는 주소값을 넘겨준다. 
+					우리가 실제 *cp 를가지고 
+					하는 여러가지 데이타 관련된 조작은 할당된 메모리의 주소값을 
+					이용해서 이루어지게 된다. 
+				</P
+><P
+>					아래의 예제를 실행시켜보면 좀더 쉽게 이해가 가능할것이다.  
+				</P
+><P
+>					<B
+CLASS="EMPHASIS"
+>예제 : malloc_1.c</B
+>
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int main()
+{
+    char buf[128] = "12345";
+    char buf2[128] = "12345";
+    char *ch;
+
+    char *cp;
+    char *ct;
+
+    ch = buf;
+    printf("address ch           : %x&#92;n", &#38;ch);
+    printf("address ch -&#62; buf    : %x&#92;n", ch);
+    printf("address buf          : %x&#92;n", buf);
+    printf("address buf -&#62; first : %x&#92;n", &#38;(*buf));
+    printf("&#92;n");
+
+    printf("address cp not      : %x&#92;n", &#38;cp);
+    printf("address cp -&#62;       : %x&#92;n", cp);
+    cp = (char *)malloc(100);
+    cp = buf;
+    printf("address cp -&#62; buf   : %x&#92;n", cp);
+    cp = buf2;
+    printf("address cp -&#62; buf2  : %x&#92;n", cp);
+}
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					다음은 위의 프로그램을 실행시킨 결과이다. 
+					결과 값은 때와 장소와 시스템에 따라 달라질수 있다. 
+					(1, 2, 3, 4, ... 는 필자가 설명을 위해 붙인 숫자이다)
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>   
+[root@localhost test]# ./malloc2
+address ch           : bffff76c --- 1
+address ch -&#62; buf    : bffff7f0 --- 2
+address buf          : bffff7f0 --- 3
+address buf -&#62; first : bffff7f0 --- 4
+
+address cp not      : bffff768 --- 5
+address cp -&#62;       : 0        --- 6
+address cp -&#62;       : 8049860  --- 7
+address cp -&#62; buf   : bffff7f0 --- 8
+address cp -&#62; buf2  : bffff770 --- 9
+					</PRE
+></TD
+></TR
+></TABLE
+> 
+					1 번 결과는 포인터 *ch 가 할당된 곳의 주소값이다. 
+					2 번 결과는 *ch 가 포인터(가리키는)하는 곳의 첫번째 메모리
+					의 주소값이다. *ch 가 가리키는 곳은 buf 가 저장된 메모리의 
+					첫번째 주소 값이므로 bffff7f0 이 세팅되었다. 3번, 4번 결과
+					는 *ch 가 실제 buf의 주소를 가리키고 있음을 확인하기 
+					위해 출력한 값이다. 이들 결과를 보면 실제로 포인터가 
+					어떻게 값을 가리키고 있는지 확인할수 있을것이다.   
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  0 1 2 3       0 ....        100
+ +-+-+-+-+     +-+-+-+-+-+-+-+-+-+
+ | ch    |     | buf             |
+ +-+-+-+-+     +-+-+-+-+-+-+-+-+-+
+ bffff76c      bffff7f0
+  |             |
+  +-------------+
+					</PRE
+></TD
+></TR
+></TABLE
+>
+				</P
+><P
+>					5 번부터 8 번까지는 malloc()을 호출함으로써 메모리 
+					구성이 실제로 어떻게 되는지를 보여준다. 
+					5 번은 cp 가 위치한 곳의 주소이니까 별로 신경쓸필요는 없다. 
+					6 번은 malloc() 하기전에 *cp 가 가리키고 있는 곳의 
+					주소 값을 보여주는데 메모리 할당되어 있지않은경우이다. 
+					위의 경우 NULL 을 가리키고 있는데, 
+					이것은 상황에 따라 변한다. 
+					다시 말해서 메모리 할당하지 않았을경우 
+					임의의 영역을 가리킨다고 
+					보면 무난하다.  
+					7 번이 malloc()을 이용해서 메모리 
+					할당한후 가리키는 곳의 주소인데, malloc() 하기전과 비교해 
+					보면 가리키고 있는 곳의 주소가 
+					명확하게 정해져 있음을 확인할수 있다.   
+					8,9 번은 각각 buf 와 buf2 를 대입했다.  
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> malloc 하기전
+  0 1 2 3 
+ +-+-+-+-+
+ | cp    |
+ +-+-+-+-+     ?
+  |            |
+  +------------+
+ 
+ malloc 한후
+  0 1 2 3           0 ...       100       0 ....        100
+ +-+-+-+-+         +-+-+-+-+-+-+-+-+     +-+-+-+-+-+-+-+-+-+
+ | cp    |         |               |     | buf             |
+ +-+-+-+-+         +-+-+-+-+-+-+-+-+     +-+-+-+-+-+-+-+-+-+
+                    8049860              bffff7f0
+  |                 |
+  +-----------------+
+
+ buf를 대입한후 
+
+  0 1 2 3           0 ...       100       0 ....        100         
+ +-+-+-+-+         +-+-+-+-+-+-+-+-+     +-+-+-+-+-+-+-+-+-+        
+ | ch    |         |               |     | buf             |        
+ +-+-+-+-+         +-+-+-+-+-+-+-+-+     +-+-+-+-+-+-+-+-+-+        
+ bffff7ec           8049860              bffff7f0                   
+  |                                       |
+  +---------------------------------------+
+					</PRE
+></TD
+></TR
+></TABLE
+>
+				</P
+><DIV
+CLASS="SECTION"
+><HR><H5
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.2.1.1.1&#51208;. 메모리를 사용하기 위해서는 반드시 할당해야 한다.</A
+></H5
+><P
+>						당연한 얘기이지만 메모리를 사용하기 위해서는 적당한 공간을 
+						할당해주어야 한다. 바로 위의 그림에서 malloc 하기전에 
+						*cp 가 가리키는 주소를 보면 상황에 따라 달라진다고 했다.  
+						그럼으로 할당되지 않은 포인터에 데이타를 입력하면 
+						임의의 주소에 어떤 값을 입력하는 꼴이 된다. 
+						운이 좋으면 임의의 주소 영역에 데이타를 충분히 저장할 공간이 
+						확보되어 있어서 에러없이 프로그램이 실행될수도 있지만, 
+						다른 프로세스가 차지하고 있는 메모리 영역을 침범할수도 있다. 
+						이럴경우 메모리 영역에 대한 
+						우선권은 먼저 획득한 프로세스에게 있음으로, 커널은  
+						이 메모리영역에 데이타를 쓰려고 하는 프로세스를 
+						강제 종료시킬것이다(세그먼트 폴트 에러) 
+					</P
+><P
+>						위에서 메모리 할당을 하지 않았음에도 불구하고 
+						프로그램이 제대로 실행되면 운이 좋은경우라고 했는데, 
+						사실 이경우는 운이 좋은경우가 아니고 
+						운이 나쁜경우가 된다. 언뜻 보기에 정상적으로 
+						실행되는것 처럼 보일수 있기 때문에 디버깅 작업을 
+						어렵게 만들수 있기 때문이다(다른 프로세스의 메모리 영역을 
+						침범할 가능성을 가지고 있는 불완전한 코드이다). 
+						잘 돌다가 어느날 아침에 확인해보니까 프로그램이 
+						죽게 될 확률이 높다. 사용하는 메모리의 
+						공간이 작을수록(크면은 다른 영역을 침범할 가능성이 
+						크다) 운 좋게(나쁘게) 제대로 작동될 확률이 크다.    
+					</P
+><P
+>						그러므로 아래와 같은 코드는 심각하게 잘못된 
+						코드이다.(아마 어떤경우에는 제대로 실행되고, 
+						어떤 경우에는 세그먼트 폴트가 떨어질것이다) 
+						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char *cp;
+
+memcpy(cp, "1234", 100);
+						</PRE
+></TD
+></TR
+></TABLE
+>
+						위의 코드는 아래와 같이 미리 공간을 할당한후 
+						사용하도록 제작성 해야 한다. 		
+						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char *cp;
+
+cp = (char *)malloc(100);
+memcpy(cp, "1234", 100);
+						</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN55"
+>2.2.1.2&#51208;. realloc</A
+></H4
+><P
+>					메모리의 크기를 조정하고자 할때 사용한다. 
+					에디터 프로그램을 예로 들어보자면, 2가지 메모리 할당을 
+					할수 있을건데, 파일의 크기를 읽은다음 파일의 크기만큼 
+					한번에 메모리 할당을 해버리는 방법과 1024 바이트 정도로 
+					할당하고, 파일을 읽어들이다가 1024 를 초과하게 되면, 
+					realloc 를 이용해서 1024를 더 할당해주는 방법이 있다.   
+				</P
+><P
+>					어느걸 사용하든지 관계는 없지만, realloc 은 기본행동이 
+					만약 연속된 메모리 공간이 충분하지 않을경우 
+					연속된 메모리 공간을 할당할수 있도록 새로 공간을 잡게 
+					되며, 이와중에 기존의 데이타가 복사되므로 상당히 
+					많은 비용이 소모될수 있다.(실제 테스트 해보면 알겠지만 
+					malloc 에 비해서 눈에 띄게 많은 시간이 소모된다) 
+				</P
+><P
+>					<B
+CLASS="EMPHASIS"
+>예제 : realloc.c</B
+>
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int main()
+{
+    char *cp;
+    int i;
+
+    cp = (char *)malloc(100);
+    memcpy(cp, "111", 100);
+    printf("100     : %x&#92;n", cp);
+    cp = (char *)realloc(cp, 10000);
+    printf("10000   : %x&#92;n", cp);
+    cp = (char *)realloc(cp, 1000000);
+    printf("1000000 : %x&#92;n", cp);
+    printf("Value is (%s)&#92;n", cp);
+}
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					다음은 위의 예제를 실행시킨 결과이다. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost doc]# ./realloc
+100     : 8049770
+10000   : 8049770
+1000000 : 4015e008
+Value is (111)
+					</PRE
+></TD
+></TR
+></TABLE
+>
+				 	위의 값은 상황에 따라 변할수 있다. 100, 10000 은 
+					같은 메모리 주소를 사용하고 있지만, 1000000 이 되면서 
+					메모리의 위치가 변경되었음을 알수 있다. 아무래도 100 과 
+					10000 의 경우 그리 큰차이가 나지 않기 때문에 현재 
+					위치에서 연속된 메모리 공간을 확보하기가 수월하지만 
+					값이 커질수록 연속된 메모리 공간을 확보가 어려워지기 
+					때문에, 어쩔수 없이 메모리 이동이 일어나게 된다. 
+					메모리 위치 이동이 일어난다 하더라도 값은 그대로 복사되고 
+					있음을 알수 있다.    
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>2.2.1.3&#51208;. sizeof</A
+></H4
+><P
+>					sizeof 는 C 에서 제공하는 키워드로 해당 자료형의 크기를 
+					돌려준다. sizeof 는 메모리 할당에 있어서 꽤 중요한 역할을 
+					가진다. 이유는 각 자료형마다 차지하는 byte 크기가 틀리고, 
+					같은 자료형이라 할지라도 운영체제에 따라 그 크기가 
+					달라질수 있기 때문이다. 예를들어 int 형 자료 4개를 
+					저장하기 위해서 다음과 같이 
+					메모리 크기를 할당했다고 하자.    
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int *ip;
+
+ip = (int *)malloc(16);
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					int 형은 보통의 경우 4byte 이니까 
+					4개의 자료를 저장하기 위해서
+					는 16 만큼의 크기가 필요한건 확실하다. 
+					그러나 int 형의 크기가 
+					4byte 인것은 보통의 경우이고 2byte 혹은 8byte 인 경우가 	
+					있을수도 있다. 그럴경우 위의 프로그램은 현재 운영체제에서는
+ 					문제 없겠지만, 다른 운영체제로 포팅하고자 
+					할때 문제가 될수도 있다.  
+				</P
+><P
+>					이런 문제를 없애기 위해서 sizeof 키워드를 제공받아서 
+					사용한다. 이 키워드를 사용하면 운영체제에서 
+					사용하는 자료형의 크기를 돌려주게 
+					됨으로 위에서와 같은 문제점이 
+					발생하지 않는다.  
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int *ip;
+
+ip = (int *)malloc(sizeof(int)*4);
+
+printf("int size is %d&#92;n", sizeof(int));
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					int 자료형을 위해서 4byte 공간을 필요로 하는 운영체제라면 
+					16, 8byte 만큼을 필요로 하는 운영체제라면 32byte 만큼을 
+					할당받을수 있게 될것이다.  
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN69"
+>2.2.1.4&#51208;. free</A
+></H4
+><P
+>					malloc() 은 메모리 할당을 커널에 요청하는 시스템 함수이다. 
+					그러므로 일단 malloc()에 의해서 할당받은 메모리는 
+					프로세스가 종료될때까지 커널에 의해서 보호받게 된다. 
+				</P
+><P
+>					이말은 malloc() 를 잘못 사용할경우 쓸데없는 
+					메모리 공간의 낭비
+					를 가져 올수 있으며, 심각할경우 메모리 누수를 가져올수 
+					있다는 뜻이된다. 다음의 예를 보자
+				</P
+><P
+>					<B
+CLASS="EMPHASIS"
+>warn_mem.c</B
+>
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int main()
+{
+
+    char *cp;
+
+    while(1)
+    {
+        cp = (char *)malloc(10000);
+        printf("%x&#92;n", cp);
+        sleep(1);
+    }
+}
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					위의 프로그램을 실행시켜보면, 운영체제에서 계속적으로 
+					10000byte 크기의 새로운 메모리 공간을 프로세스에게 할당해 
+					주는것을 볼수 있다.  
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost doc]# ./warn_mem
+8049690
+8061d38
+807a3e0
+8092a88
+80ab130
+80c37d8
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					실제 warn_mem 의 실행결과 메모리 누수가 생기는지 
+					확인을 위해서 간단한 스크립트를 만들어서 테스트를 해보도록 
+					하자. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco /root]# while [ 1 ]
+&#62; do 
+&#62; ps -aux | grep warn_mem | grep -v vi | grep -v grep
+&#62; sleep 1
+&#62; done
+USER       PID %CPU %MEM   VSZ  RSS TTY      STAT START   TIME COMMAND
+root     11719  0.0  0.3  1436  400 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  1636  408 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  1736  412 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  1836  416 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  1936  420 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  2036  424 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  2236  432 ttypc    S    11:24   0:00 ./warn_mem
+root     11719  0.0  0.3  2336  436 ttypc    S    11:24   0:00 ./warn_mem
+					</PRE
+></TD
+></TR
+></TABLE
+>
+				 	ps 의 헤더 부분은 원래 스크립트의 실행결과에는 표시되지 
+					않지만 ps 결과의 필드 구분을 쉽게 하기 위해서 추가 시켰다. 
+					위의 결과를 보면 warn_mem 프로세스에서 점유하는 메모리의 
+					크기가 지속적으로 증가되고 있음을 볼수 있다. 이러한 메모리 
+					누수는 프로그램과 시스템에 매우 치명적일수 있다. 
+					특히 이러한 종류의 
+					문제는 컴파일러에서 처리를 해주지 않기 때문에 나중에 
+					문제점을 찾기가 매우 곤란해진다. 흔히 말하는 몇일 잘돌다가 
+					죽는 프로그램이 될 가능성이 크다.
+				</P
+><P
+>					그러므로 사용하지 않는 메모리공간은 반드시 운영체제에게 
+					되돌려 주어야 한다. C 는 동적으로 할당된 메모리의 해제를 
+					위해서 free() 를 제공한다.  
+					다음은 warn_mem.c 의 메모리 누수 문제를 free() 를 통해서 
+					해결한 코드이다.  
+				</P
+><P
+>					<B
+CLASS="EMPHASIS"
+>free_mem.c</B
+>
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int main()
+{
+
+    char *cp;
+
+    while(1)
+    {
+        cp = (char *)malloc(100000);
+        printf("%x&#92;n", cp);
+        sleep(1);
+        free(cp);
+    }
+}
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					위의 프로그램을 실행시키고, 테스트를 해보면 기존에 
+					있던 메모리 누수 현상이 사라졌음을 확인할수 있을것이다. 
+				</P
+></DIV
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN82"
+>3&#51208;. 동적 메모리 할당의 응용</A
+></H1
+><P
+>		이번장에서는 동적메모리 할당의 응용 예제를 만들어 볼것이다. 
+		만들 응용 예제는 linked list 이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN85"
+>3.1&#51208;. 링크드 리스트 에 대해서</A
+></H2
+><P
+>			링크드 리스트는 그리 간단히 다룰수 있는 주제가 아니다. 
+			링크드 리스트에 대한 자세한 설명은 자료구조를 다룰 기회가 있으면 
+			그때 하기로 하고, 여기에서는 개념정도만 설명하도록 하겠다. 
+		</P
+><P
+>			링크드 리스트는 말그대로 리스트를 만들기 위해서 사용되는 
+			자료구조이다. 리스트를 만들기 위해서는 자료의 연속된 순서를 
+			만들어 줘야 한다. 그럴려면 다음자료의 정보가 무엇인지를 
+			알아야 하는데, 링크드 리스트란 다음자료의 정보가 무엇인지를 
+			알고 있는 구조를 말한다. 여기서 다음자료의 정보란 다음 자료가 
+			위치하고 있는 주소의 값이 될것이다.     
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> P: Pointer
+ +--------++-+   +--------++-+   +--------++-+
+ | Data 1 ||P|   | Data 2 ||P|   | Data 3 ||P|
+ +--------++-+   +--------++-+   +--------++-+
+            |     |         |     |         |
+            +-----+         +-----+         +--- NULL 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			대충 위와 같은 방식으로 연결된다. 리스트를 이루고 있는 
+			리스트 멤버들은 실제 Data 와 더불어 다음 데이타의 주소정보를 
+			가지고 있는 Pointer 을 가지고 있으며, 프로그래머는 이 
+			Pointer 정보를 이용해서, 데이타에 접근할수 있게 된다. 
+			위의 그림을 보면 알겠지만 Data 3 에 접근하기 위해서는 
+			Data 1 번부터 순차적으로 접근해야 한다는 것을 알수 있다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN90"
+>3.2&#51208;. 동적 메모리 할당을 통한 링크드 리스트의 구현</A
+></H2
+><P
+>			위에서 말했지만 자료구조 자체의 설명을 목적이 아닌 관계로 
+			가장 단순한 형태의 링크드 리스트를 구현하도록 하겠다. 
+			이 링크드 리스트는 다음과 같은 기능을 가진다. 
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>데이타 삽입</DT
+><DD
+><P
+>						멤버 데이타를 삽입한다. 최초 데이타가 삽입될때는 
+						다음 데이타가 없음으로 다음데이타를 가리키는 
+						Pointer 은 NULL 이 될것이다. 만약 두번째 데이타가 
+						들어온다면 첫번째 데이타의 Pointer 은 두번째 
+						데이타의 위치를 가리키게 될것이다. 두번째 데이타는 다시 
+						NULL 을 가리키게 될것이다.   
+					</P
+></DD
+><DT
+>데이타 삭제</DT
+><DD
+><P
+>						데이타 삭제를 제대로 구현하고자 한다면, 찾기후 
+						삭제를 구현해야 하겠으나 여기에서는 POP 스타일의 
+						삭제를 구현하도록 한다.(가장 먼저 들어온 데이타가 
+						가장 먼저 삭제되는 방식) 
+					</P
+></DD
+><DT
+>데이타 출력</DT
+><DD
+><P
+>						역시 간단하게 처음의 리스트 멤버부터 순차적으로 
+						검색해가면서 데이타를 출력하는 방식으로 구현할 
+						것이다. 
+					</P
+></DD
+></DL
+></DIV
+>	
+			위의 3가지 구현은 링크드 리스트 뿐만 아니라 다른 자료구조에서도 
+			가장 기본이 되는것들이며 위의 구현방식의 약간 다른 응용으로 
+			만들어진다. 좀더 난이도 있는 구현은 각자 공부삼아서 해보기 
+			바란다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN106"
+>3.3&#51208;. 예제</A
+></H2
+><P
+>			<B
+CLASS="EMPHASIS"
+>linked_list.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;string.h&#62;
+
+typedef struct
+{
+    char name[12];
+    struct list_item *next_link;
+} list_item;
+
+list_item * add_item(list_item *, char *);
+list_item * remobe_item(list_item *);
+void print_list(list_item *item);
+
+int main()
+{
+    list_item *list;
+
+    list = NULL;
+
+    list = add_item(list, "yundream");
+    list = add_item(list, "kknd2");
+    list = add_item(list, "hohoho");
+    list = add_item(list, "loveisall");
+    print_list(list);
+
+    printf("&#92;n");
+    list = remove_item(list);
+    print_list(list);
+}
+
+list_item * add_item(list_item *item, char *name)
+{
+    list_item *lp = item;
+
+    // 기존에 Item 이 있을경우 
+    // 가장 최근의 Item의 next_link 가 추가 되는 Item 의 
+    // 주소를 가리키도록 포인터를 조정한다.  
+    if (item != NULL)
+    {
+        while(item-&#62;next_link != NULL)
+            item = item-&#62;next_link;
+
+        item-&#62;next_link = (struct list_item *)malloc(sizeof(list_item));
+        item = item-&#62;next_link;
+        strcpy(item-&#62;name, name);
+        return lp;
+    }
+    // 처음 Item 추가시에는 가리킬 데이타가 없음으로 
+    // next_link 는 NULL 이 된다.  
+    else
+    {
+        item = (struct list_item *)malloc(sizeof(list_item));
+        item-&#62;next_link = NULL;
+        strcpy(item-&#62;name, name);
+        return item;
+    }
+}
+
+list_item * remove_item(list_item *item)
+{
+    list_item *tmp;
+    printf("Element remove is %s&#92;n", item-&#62;name);
+    // 첫번째 링크가 가리키는 다음 데이타  
+    // 즉 두번째 데이타의 정보를 tmp 에 대입하고 
+    // 첫번째 데이타를 free 시켜줌으로 
+    // 링크드 리스트에서 제거시킨다. 
+    tmp = item-&#62;next_link;
+    free(item);
+    return tmp;
+}
+
+void print_list(list_item *item)
+{
+    if (item == NULL)
+        printf("NONE LIST&#92;n");
+
+    // Item 의 처음부터 끝까지 순차적으로 
+    // 검색하면서 데이타를 출력시킨다. 
+    else
+        while(item != NULL)
+        {
+            printf("%10s : %x %x&#92;n",
+                            item-&#62;name,
+                            item,
+                            item-&#62;next_link);
+            item = item-&#62;next_link;
+        }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			다음은 필자의 컴퓨터에서 실행시킨 결과다. 번호는 설명을 위해서 
+			붙인것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./linked_list 
+  yundream : 80498a0 80498b8 --- 1
+     kknd2 : 80498b8 80498d0 --- 2
+    hohoho : 80498d0 80498e8 --- 3
+ loveisall : 80498e8 0       --- 4
+
+Element remove is yundream
+     kknd2 : 80498b8 80498d0
+    hohoho : 80498d0 80498e8
+ loveisall : 80498e8 0
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			2개의 주소값이 출력되는데, 첫번째 주소값은 자신의 주소값이고 
+			2번째 주소값은 다음 가리키는 데이타의 주소값이다. 보면 
+			1 -&#62; 2 -&#62; 3 -&#62; 4 의 식으로 데이타를 가리키고 있음을 알수 있다.   
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+=== 솔라리스에서의 메모리 할당 ===
+ * indra(1ndr4@hanmail.net)
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX     (1024*1024)*1024
+#define ALERT(funct, funct2, line) { \
+        printf("Executed %s function. (in %s function. %d line)\n", \
+        funct, funct2, line); \
+}
+
+int main()
+{
+        char *buf;
+
+        sleep(5);
+        ALERT("malloc", __FUNCTION__, __LINE__);
+        buf = (char*)malloc(MAX);
+        sleep(5);
+        ALERT("free", __FUNCTION__, __LINE__);
+        free(buf);
+        sleep(5);
+        ALERT("exit", __FUNCTION__, __LINE__);
+        exit(0);
+}
+}}}
+
+OS 환경은 SunOS 5.8 i86 이며, 사양은 320 RAM, intel Pentium 3 800, LG IBM 노트북, 컴파일러는 GNU gcc 버전 2.95(20010315 release) 버전이다.
+
+{{{#!plain
+bash-2.03# uname -a; gcc -v
+SunOS indra 5.8 Generic_108529-16 i86pc i386 i86pc
+Reading specs from /usr/local/lib/gcc-lib/i386-pc-solaris2.8/2.95.3/specs
+gcc version 2.95.3 20010315 (release)
+bash-2.03#
+}}}
+
+위의 코드를 컴파일 하여 백그라운드로 실행하면서 vmstat 명령을 이용, 
+메모리 할당 부분에 대해서 알아보았다.
+
+{{{#!plain
+bash-2.03# cc -o free free.c
+bash-2.03# ./free &
+[1] 18777
+bash-2.03# vmstat 1
+ procs     memory            page            disk          faults      cpu
+ r b w   swap  free  re  mf pi po fr de sr cd -- -- --   in   sy   cs us sy id
+ 0 0 0 1270732 247888 29 247 4  0  0  0  0  1  0  0  0  131 1368  306  5  3 92
+ 0 0 0 1269968 239636 59 515 0  0  0  0  0  0  0  0  0  121 2540  553  8  7 85
+ 0 0 0 1269968 239616 59 509 0  0  0  0  0  0  0  0  0  124 2485  543  8  6 86
+Executed malloc function. (in main function. 15 line)
+ 0 0 0 1269968 239600 59 516 0  0  0  0  0  0  0  0  0  119 2487  539  9  5 86
+ 0 0 0 221380 239580 59 508  0  0  0  0  0  0  0  0  0  123 2480  543  8  6 86
+ 0 0 0 221380 239564 59 508  0  0  0  0  0  0  0  0  0  122 2476  540 10  4 86
+ 0 0 0 221380 239552 59 508  0  0  0  0  0  0  0  0  0  120 2488  546  9  5 86
+ 0 0 0 221380 239540 59 508  0  0  0  0  0  0  0  0  0  118 2472  534 10  4 86
+Executed free function. (in main function. 18 line)
+ 0 0 0 221380 239528 59 508  0  0  0  0  0  0  0  0  0  123 2487  542  9  6 85
+ 0 0 0 221380 239608 59 508  0  0  0  0  0  0  0  0  0  120 2484  540  8  6 86
+ 0 0 0 221380 239596 59 508  0  0  0  0  0  0  0  0  0  118 2474  538  9  5 86
+ 0 0 0 221380 239584 59 508  0  0  0  0  0  0  0  0  0  124 2495  548  8  6 86
+ 0 0 0 221380 239568 59 508  0  0  0  0  0  0  0  0  0  121 2483  543  9  5 86
+Executed exit function. (in main function. 21 line)
+ 0 0 0 221380 239556 59 508  0  0  0  0  0  0  0  0  0  122 2474  534  8  6 86
+ 0 0 0 1270024 239624 59 508 0  0  0  0  0  0  0  0  0  122 2479  542 11  3 86
+ 0 0 0 1270024 239612 59 508 0  0  0  0  0  0  0  0  0  118 2469  534  6  8 86
+ 0 0 0 1270024 239600 59 508 0  0  0  0  0  0  0  0  0  118 2513  543  7  7 86
+^C
+[1]+  Done                    ./free
+bash-2.03#
+}}}
+
+실제적으로 free() 함수로 동적메모리 할당을 해제했다고 하더라도 어플리케이션 단위에서는 해당 메모리를 그대로 가지고 있는것으로 나타났다.
+
+같은 코드를 가지고 RedHat linux 배포판에서 test 를 해보았다. OS 환경은 RH 8.0, gcc 버전은 3.2(20020903 release) 버전이다.
+
+{{{#!plain
+indra@ ~test> ./free &
+[1] 25255
+indra@ ~test> while :; do ps -aux | grep "./free"; sleep 1 ; done
+indra    25255  0.0  0.0  1308  216 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.0  1308  216 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.0  1308  216 pts/5    S    13:07   0:00 ./free
+Executed malloc function. (in main function. 15 line)
+indra    25255  0.0  0.1 1049892 312 pts/5   S    13:07   0:00 ./free
+indra    25255  0.0  0.1 1049892 312 pts/5   S    13:07   0:00 ./free
+indra    25255  0.0  0.1 1049892 312 pts/5   S    13:07   0:00 ./free
+indra    25255  0.0  0.1 1049892 312 pts/5   S    13:07   0:00 ./free
+Executed free function. (in main function. 18 line)
+indra    25255  0.0  0.1  1312  308 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.1  1312  308 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.1  1312  308 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.1  1312  308 pts/5    S    13:07   0:00 ./free
+indra    25255  0.0  0.1  1312  308 pts/5    S    13:07   0:00 ./free
+Executed exit function. (in main function. 21 line)
+[1]+  Done                    ./free
+^C
+
+indra@ ~test>
+}}}
+
+SunOS 에서의 메모리 관리가 user 의 눈으로 보이는것만 다른것인지 아니면 실제 free() 후 메모리 관리가 효율성을 위한 측면으로 다른 OS 와 관리체계가 다른지는 아직까지 불 분명 하다.
+
+이에 대한 yundream 님의 답변:
+
+----
+http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=28365&forum=1&2
+
+솔라리스 운영체제에서 테스트 한거 아닙니까 ? 
+리눅스상에서는 free 했을경우 제대로 해제가 되는데, 
+솔라리스에서는 해제가 안되더군요. 
+정확히 말하면 안되는것처럼 보인다고 해야 정확한 표현일듯 싶은데, 
+
+저도 예전에 솔라에서 작업하다가, 
+malloc 후 free 가 안되는 문제로 꽤 고민을 한적이 있었습니다. 
+몇몇 문서를 찾아봤더니, 메모리관련작업 안정성을 확보하기 위해서라고 되어 있는것 같기는 하던데 
+확실히는 잘 모르겠습니다. 
+
+어쨋든 저것때문에 메모리 누수와 같은 문제가 
+발생하지 않습니다. 
+솔라에서 메모리관리를 어떻게 하는지좀 알아봐야 겠네요. 
+
+저문제로 가끔 짜증날때가 있는데, 
+어떤 이유로 일시적으로 한 100메가 이상 메모리를 잡아서 쓰게되었다면 free를 해도 ps 상에서는 
+100메가를 그대로 잡고 있는걸로 보이기 때문에, 
+프로그래머 입장에서는 문제가 되지 않겠지만, 
+가끔 고객에게 프로그램을 제공할때 문제가 될수도 있죠. 
+"왜 이렇게 메모리를 많이 잡아먹어요? 문제 있는거 아닌가요?" 
+이런 문제가 발생할수 있습니다. 
+설명을 해도 쉽게 납득을 하지 못하죠.
+----
+
+마지막으로 realloc() 을 통한 메모리 재 할당을 test 하여 보았다.
+linux 에서는 realloc() 을 사용시, 메모리 사이즈가 재 설정되는 양상을
+보였지만 SunOS 에서는 역시 처음 malloc() 으로 할당된 메모리 사이즈를
+유지하고 있었다.
+
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX     (1024*1024)*1024
+#define ALERT(funct, funct2, line) { \
+        printf("Executed %s function. (in %s function. %d line)\n", \
+        funct, funct2, line); \
+}
+
+int main()
+{
+        char *buf;
+
+        sleep(5);
+        ALERT("malloc", __FUNCTION__, __LINE__);
+        buf = (char*)malloc(MAX);
+        sleep(5);
+        ALERT("realloc", __FUNCTION__, __LINE__);
+        buf = (char*)realloc(buf, 1024*1024);
+        sleep(5);
+        ALERT("free", __FUNCTION__, __LINE__);
+        free(buf);
+        sleep(5);
+        ALERT("exit", __FUNCTION__, __LINE__);
+        exit(0);
+}
+}}}
+
+{{{#!plain
+indra@ ~test> ./free &
+[1] 25389
+indra@ ~test> while :; do ps -aux | grep "./free"; sleep 1 ; done
+indra    25389  0.0  0.0  1308  216 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.0  1308  216 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.0  1308  216 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.0  1308  216 pts/5    S    13:29   0:00 ./free
+Executed malloc function. (in main function. 15 line)
+indra    25389  0.0  0.1 1049892 312 pts/5   S    13:29   0:00 ./free
+indra    25389  0.0  0.1 1049892 312 pts/5   S    13:29   0:00 ./free
+indra    25389  0.0  0.1 1049892 312 pts/5   S    13:29   0:00 ./free
+indra    25389  0.0  0.1 1049892 312 pts/5   S    13:29   0:00 ./free
+Executed realloc function. (in main function. 18 line)
+indra    25389  0.0  0.1  2340  316 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  2340  316 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  2340  316 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  2340  316 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  2340  316 pts/5    S    13:29   0:00 ./free
+Executed free function. (in main function. 21 line)
+indra    25389  0.0  0.1  1312  312 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  1312  312 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  1312  312 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  1312  312 pts/5    S    13:29   0:00 ./free
+indra    25389  0.0  0.1  1312  312 pts/5    S    13:29   0:00 ./free
+Executed exit function. (in main function. 24 line)
+[1]+  Done                    ./free
+^C
+indra@ ~test>
+}}}

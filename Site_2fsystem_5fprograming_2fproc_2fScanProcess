@@ -1,0 +1,646 @@
+#title 프로세스 검사하기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>프로세스 검사하기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>프로세스 검사하기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN13"
+>프로세스 관리기</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN15"
+>프로세스 관리기 란?</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN19"
+>프로세스 관리의 방법</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN24"
+>만들고자 하는 프로그램에 대해서</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN29"
+>프로세스</A
+></DT
+><DT
+>2.3.2&#51208;. <A
+HREF="#AEN33"
+>코딩</A
+></DT
+><DT
+>2.3.3&#51208;. <A
+HREF="#AEN43"
+>테스트</A
+></DT
+><DT
+>2.3.4&#51208;. <A
+HREF="#AEN48"
+>결과에 대한 분석</A
+></DT
+></DL
+></DD
+><DT
+>2.4&#51208;. <A
+HREF="#AEN53"
+>솔라리스에서의 응용</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN63"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번에는 프로세스가 정상적으로 작동하고 있는지 그렇지 않은지를 
+		검사하는 프로세스 관리기를 작성해보도록 할것이다. 이 관리 
+		프로그램은 솔라리스와 리눅스에서 코딩되고 테스트 될것이다. 
+		솔리리스와 Linux 를 선택한 이유는 필자가 쉽게 접근할수 있는 OS 이기 
+		때문이다. 
+	</P
+><P
+>		혹시라도 다른 Unix OS 에 접근할수 있는 기회가 생긴다면, 다른 기타 
+		Unix 에서의 프로세스 관리 방법에 대해서 강좌를 만들어 보도록 
+		하겠다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>2&#51208;. 프로세스 관리기</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2.1&#51208;. 프로세스 관리기 란?</A
+></H2
+><P
+>			우리가 관리하는 시스템에는 수많은 프로세스가 작동하고 있을것이다. 
+			이중 어떤 프로세스는 매우 중요해서 죽으면 안되는 그런 프로세스가 
+			있을 것이며, 만약 이런 중요 프로세스가 작동을 중지 했다면 
+			작동이 중지되었음을 관리자가 인지할수 있도록 신호를 보내주는 
+			또다른 프로그램이 필요할 것이다.	
+		</P
+><P
+>			이 프로그램은 관리해야되는 중요 프로세스를 지속적으로 
+			모니터링 하고 있다가 문제가 생길경우 여러가지 방법으로 
+			관리자에게 통보해야 할것이다. 통보 방법으로는 가장 널리 쓰일만한 
+			것은 TCP/IP 소켓 통신을 이용한 관리자 프로그램으로의 alert 전송이 
+			아마 가장 유용할것이다. 이는 대부분의 경우 관리자와 관리해야될 
+			프로세스를 가동중인 시스템이 원격으로 떨어져 있기 때문일 것이다. 	
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN19"
+>2.2&#51208;. 프로세스 관리의 방법</A
+></H2
+><P
+>			기본적으로 /proc 파일시스템의 정보를 이용한다. /proc 은 
+			프로세스의 정보를 가지고 있는 임시 파일 시스템(process information 
+			pseudo-filesystem) 으로써 모든 실행중인 프로세스의 자세한 
+			정보를 가진다. 
+		</P
+><P
+>			대부분의 Unix 시스템들이 /proc 파일시스템을 채택하고 있는데, 
+			/proc 파일시스템을 분석함으로써, 어떤 프로세스가 어떤상태로 
+			실행되고 있으며, 어떤 프로그램을 실행했는지, 어떤 파일을 
+			open 하고 있는지, 메모리 사용은 어떠한지.. 등등 프로세스의 
+			모든 정보를 알아낼수 있다. 
+		</P
+><P
+>			프로세스 관리의 방법은 간단하다. /proc 파일시스템을 조사해서 
+			관심있어 하는 프로세스가 제대로 작동하고 있는지 확인하면 
+			되는 것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>2.3&#51208;. 만들고자 하는 프로그램에 대해서</A
+></H2
+><P
+>			프로세스관리라는 주제 자체가 너무 광범위 하므로, 
+			범위를 좀 줄이도록 하겠다. 임의의 프로세스를 관리하는 방식이 
+			아닌 특정한 프로세스를 관리하는 방식을 채택하도록 할것이다. 
+		</P
+><P
+>			우리는 이전에 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=74&mode=&order=0&thold=0"
+TARGET="_top"
+>PIPE 응용</A
+> 에서 fork&#38;exec
+			기법으로 sub 프로그램을 자동으로 실행시키는 프로그램을 작성했었다. 
+			우리는 기존의 프로그램을 약간 수정해서 생성된 sub 프로그램의 
+			관리까지 가능하도록 할것이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN29"
+>2.3.1&#51208;. 프로세스</A
+></H3
+><P
+>	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int main()
+{
+    설정파일을 읽어들인다.
+    {
+        실행해야될 sub 프로그램의 실행명을 읽어들인다. 
+    }
+
+    while(sub 프로그램 리스트의 크기만큼)
+    {
+        fork&#38;exec 로 sub 프로그램을 실행시킨다. 
+        pipe 를 통하여 읽어들인 sub 프로그램의 pid 를 가져온다. 
+    }
+    while(sub 프로그램의 pid 크기만큼)
+    {
+        /proc/pid/exe 를 조사한다. 
+        만약 /proc/pid 가 없거나.. 있더라도 exe 이름이 다르면 
+        프로세스에 이상이 생긴것으로 판단한다.  
+    }
+} 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				프로세스는 매우 명확하다. 특별한 기술이 필요한것도 아니며 
+				단지 /proc 파일 시스템에 대한 기본적인 이해와, 
+				파일관련 몇가지 함수정도만 알고 있으면 된다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.3.2&#51208;. 코딩</A
+></H3
+><P
+>				아래의 프로그램의 이름은 proc_m.cc 로 하도록 하자. 
+				코드는 수행가능한 상태로 만드는데에 중점을 두었으며, 
+				아름다운 코드를 만들기 위한 부가적인 작업에는 신경을 쓰지 
+				않았다. 아래의 프로그램을 보기전에 반드시 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=74&mode=&order=0&thold=0"
+TARGET="_top"
+>PIPE 응용</A
+> 을 먼저 읽어보기 바란다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : proc_m.cc</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;map&#62;
+#include &#60;stdio.h&#62;
+#include &#60;string&#62;
+#include &#60;unistd.h&#62;
+#include &#60;vector&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *fp;    
+    char buf[80];
+    char info[20];
+    int sub_pid;
+    int my_pid;
+    int pid;
+    int mypipe[2];
+    map&#60;int, string&#62; mpid; 
+
+    // 실행시킬 프로그램의 리스트가 있는 설정파일을 읽어들인다. 
+    fp = fopen("config.cfg", "r");
+
+    while(fgets(buf, 80, fp) != NULL)
+    {
+        buf[strlen(buf) - 1] =0x00; 
+        proc_info.push_back(buf);
+    }
+    fclose(fp);
+
+    my_pid = getpid();
+    pipe(mypipe);
+    for (int i = 0; i &#60; proc_info.size(); i++)
+    {
+        if (getpid() != my_pid)
+            exit(0);
+
+
+        pid = fork();
+        if (pid == 0)
+        {
+            dup2(mypipe[1], 1);
+            close(mypipe[0]);
+            close(mypipe[1]);
+            execl(proc_info[i].c_str(), proc_info[i].c_str(), NULL);
+        }
+
+        // 파이프를 통해서 sub 프로그램의 PID 를 읽어들이고, 
+        // 이 정보를 이용해서 검사해야될 프로그램의 리스트를 map 형식으로 
+        // 작성한다.  
+        read(mypipe[0], (void *)&#38;sub_pid, sizeof(int));    
+        mpid[sub_pid]=proc_info[i];
+    }
+
+    char proc_path[20];
+    char exec_path[80];
+    while(1)
+    {
+        memset(proc_path, 0x00, 20);
+        memset(exec_path, 0x00, 80);
+        map&#60;int, string&#62;::iterator mi=mpid.begin();
+        while(mi != mpid.end())
+        {
+            sprintf(proc_path, "/proc/%d/exe", mi-&#62;first);
+            if (readlink(proc_path, exec_path, 80) &#62; 0) 
+            {
+                if (mi-&#62;second == exec_path)
+                {
+                    cout &#60;&#60; "ok Process " &#60;&#60; " : " &#60;&#60; mi-&#62;first &#60;&#60; endl;
+                }
+                else
+                {
+                    // 이상이 생긴 프로세스는 map 에서 제거시킨다.
+                    cout &#60;&#60; mi-&#62;second &#60;&#60;" Process error" &#60;&#60; endl;
+                    mpid.erase(mi);    
+                }
+            }
+            else
+            {
+                // 이상이 생긴 프로세스는 map 에서 제거시킨다.
+                cout &#60;&#60; mi-&#62;second &#60;&#60;" Process error" &#60;&#60; endl;
+                mpid.erase(mi);    
+            }
+            *mi++;
+        }
+        cout &#60;&#60; "==================" &#60;&#60; endl;
+        // 1초단위로 검사한다. 
+        sleep(1);
+    }
+    pause();
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				우선 검사해야될 프로세스의 정보 저장을 위해서 
+				map 을 사용했다. 
+				key 는 PID 가 되며, value 는 PID 에 대한 
+				실행명령 이름이다. 이 프로그램은 1초단위로 
+				map 자료구조에 저장되어 있는 프로세스를 검사한다.  
+			</P
+><P
+>				각 실행프로그램의 프로세스 정보는 /proc 의 자신의 
+				PID 를 이름으로 하는 디렉토리 밑에 저장된다. 
+				예를들어 PID 이름이 1660 이였다면 PID 1660 에 대한 
+				프로세스 정보는 /proc/1660 아래에 저장되게 된다.   	
+			</P
+><P
+>				/proc/pid 디렉토리 밑에 보면 exe 라는 심볼릭 링크된 
+				파일이 하나 존재하는데 이것이 바로 해당 PID 에 대한 
+				실행명령 이름이된다. 
+			</P
+><P
+>				그러므로 우리는 최초에 프로그램을 실행시킬때 프로그램의 
+				PID 번호와 실행프로그램의 이름을 안다면, /proc/pid/exe 
+				파일을 조사함으로써, 프로세스가 제대로 실행되고 있는지를 
+				감시할수 있게 된다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>2.3.3&#51208;. 테스트</A
+></H3
+><P
+>				이 프로그램을 실행시키면 아래와 같은 결과를 보여줄것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./proc_m
+ok Process  : 3217
+ok Process  : 3218
+ok Process  : 3219
+==================
+ok Process  : 3217
+ok Process  : 3218
+ok Process  : 3219
+==================
+ok Process  : 3217
+ok Process  : 3218
+ok Process  : 3219
+==================
+....
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이제 PID 3217 을 kill 명령을 이용해서 중지 시키고 그결과를 
+				알아보자. 그러면 proc_m 은 다음과 같은 메시지를 화면에 
+				출력할것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>/usr/yundream/bin/proc1 Process error
+ok Process  : 3218
+ok Process  : 3219
+==================
+ok Process  : 3218
+ok Process  : 3219
+==================
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				process 에 문제가 생겼다는것을 탐지해 내고, 에러 메시지를 
+				출력시키고, 문제가 생긴 process 는 map 자료구조에서 제거한후 
+				다음번부터 검사할때는 문제의 process 를 검사에서 제외 시켰음을 
+				알수 있다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.3.4&#51208;. 결과에 대한 분석</A
+></H3
+><P
+>				위의 프로그램은 특정상황에서 /proc 파일시스템을 이용해서 
+				어떻게 프로세스의 관리가 가능한지에 대한 모습을 보여주고 
+				있다. 비록 특정상황이긴 하지만, 기본적인 방법만 안다면 
+				약간의 응용을 통하여 폭넓은 사용이 가능할것이다.   
+			</P
+><P
+>				위의 프로그램을 서버/클라이언트 모델로 만들어서 문제 상황을 
+				서버로 전송할수 있게 만들면 이 자체가 조그마한 
+				SMS(시스템 관리하는 소프트웨어)
+				있다. 또한 마음만 먹는다면 ps 와 같은 전체 프로세스를 관리할수 
+				있는 프로그램의 제작도 가능하다. 이렇게된다면 많은 기능을 
+				포함하고 있는 SMS 프로그램의 작성도 가능할것이다.   	 
+			</P
+><P
+>				여기에서는 설명하지 않고 있지만 /proc/pid 밑의 파일을 분석하면 
+				해당 프로세스의 환경변수, 메모리 사용량, cpu 사용율, process 
+				상태(좀비, sleep, run), 부모 PID 등의 아주 상세한 프로세스 
+				정보를 가져올수 있기 때문이다. 이러한 상세한 정보는 
+				man proc 를 참고하기 바란다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>2.4&#51208;. 솔라리스에서의 응용</A
+></H2
+><P
+>			리눅스의 /proc 시스템을 보면 모든 정보가 text 형태로 저장되어 
+			있음을 알수 있을것이다. 그러므로 리눅스에서 필요한 프로세스 
+			정보를 알아내고 싶다면, 정보를 가지고 있는 파일을 open 한다음에 
+			이를 파싱하기만 하면 된다. 
+		</P
+><P
+>			그러나 솔라리스의 경우에는 프로세스 정보가 text 가 아닌 구조체 
+			형식으로 저장된다. 그러므로 해당 정보를 읽어들이기 위해서는 
+			해당 프로세스 정보를 저장하고 있는 파일의 구조체 정보를 알고 
+			있어야만 한다. 
+		</P
+><P
+>			또한 파일의 이름이나 형식도 약간씩 차이가 있다. 
+			예를 들어 리눅스에서는 해당 PID의 실행파일 이름을 가져오기 위해서 
+			/proc/pid/exe 심볼릭 링크파일의 원본파일을 검사하면 되었지만 
+			솔라리스는 /proc/pid/psinfo 의 파일을 읽어서 적당한 멤버변수로 
+			구성되는 구조체에 저장한다음 이것을 읽어들여야 한다.   
+		</P
+><P
+>			위의 리눅스 버젼을 솔라리스에서 사용가능한 버젼으로 바꾸기 위해서는 
+			/proc/pid/psinfo 파일을 읽어들여서 psinfo 구조체에 담아오고 
+			프로세스의 이름을 저장하고 있는 멤버변수를 읽어오는 방식을 
+			사용해야 한다. 이 구조체는 다음과 같이 정의되어 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct psinfo {
+    int     pr_flag;        /* process flags */
+    int     pr_nlwp;        /* number of lwps in process */
+    pid_t   pr_pid;         /* unique process id */
+    pid_t   pr_ppid;        /* process id of parent */
+    pid_t   pr_pgid;        /* pid of process group leader */
+    pid_t   pr_sid;         /* session id */
+    uid_t   pr_uid;         /* real user id */
+    uid_t   pr_euid;        /* effective user id */
+    gid_t   pr_gid;         /* real group id */
+    gid_t   pr_egid;        /* effective group id */
+    uintptr_t pr_addr;      /* address of process */
+    size_t  pr_size;        /* size of process image in Kbytes */
+    size_t  pr_rssize;      /* resident set size in Kbytes */
+    size_t  pr_pad1;
+    dev_t   pr_ttydev;      /* controlling tty device (or PRNODEV) */
+        /* The following percent numbers are 16-bit binary */
+        /* fractions [0 .. 1] with the binary point to the */
+        /* right of the high-order bit (1.0 == 0x8000) */
+    ushort_t pr_pctcpu;     /* % of recent cpu time used by all lwps */
+    ushort_t pr_pctmem;     /* % of system memory used by process */
+    timestruc_t pr_start;   /* process start time, from the epoch */
+    timestruc_t pr_time;    /* usr+sys cpu time for this process */
+    timestruc_t pr_ctime;   /* usr+sys cpu time for reaped children */
+    char    pr_fname[PRFNSZ];       /* name of execed file */
+    char    pr_psargs[PRARGSZ];     /* initial characters of arg list */
+    int     pr_wstat;       /* if zombie, the wait() status */
+    int     pr_argc;        /* initial argument count */
+    uintptr_t pr_argv;      /* address of initial argument vector */
+    uintptr_t pr_envp;      /* address of initial environment vector */
+    char    pr_dmodel;      /* data model of the process */
+    char    pr_pad2[3];
+    int     pr_filler[7];   /* reserved for future use */
+} psinfo_t;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			여기에 보면 pr_fname 이란 멤버변수가 보일건데, 이것이 
+			해당 PID 에 대한 실행파일 명을 담고 있다. 그러므로 PID 의 
+			실행파일명을 읽어들이기 위해서는  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct psinfo pinfo;
+fd = open("/proc/pid/psinfo", O_RDONLY);
+read(fd, (void *)&#38;pinfo, sizeof(pinfo));
+cout &#60;&#60; "exec is " &#60;&#60; pinfo.pr_fname &#60;&#60; endl;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			과 같이 프로그램을 약간 수정해야 할것이다.   
+		</P
+><P
+>			어쨋든 정보를 가져오는 방식에는 약간 차이가 있긴하지만, 프로세스 
+			정보를 가져오는 기본법칙은 리눅스나 솔라리스나 별차이가 없음을 
+			알수 있다. 
+		</P
+><P
+>			솔라리스에서 man proc 를 하면 이러한 정의된 구조체와 이에 대한 
+			자세한 설명을 가져올수 있다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 간단한 프로세스 관리방법에 대해서 알아보았다. 
+		느꼈겠지만 아마도 조금만더 신경을 쓰면, 꽤 많은 시스템 정보를 
+		알려주는 SMS 프로그램의 제작이 가능할것이란 생각이 들것이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

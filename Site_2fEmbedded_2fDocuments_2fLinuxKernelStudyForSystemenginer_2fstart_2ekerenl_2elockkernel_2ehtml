@@ -1,0 +1,491 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>lock_kernel()</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 부팅"
+HREF="chap05.html"><LINK
+REL="PREVIOUS"
+TITLE="커널 시작"
+HREF="x1942.html"><LINK
+REL="NEXT"
+TITLE="setup_arch()"
+HREF="start.kernel.setuparch.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="x1942.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>5장. 리눅스 커널 부팅</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="start.kernel.setuparch.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="START.KERENL.LOCKKERNEL"
+>5.2. lock_kernel()</A
+></H1
+><P
+>			lock_kernel()은 각 아키텍쳐 마다 하나씩 따로 정의되어 있다. 보통 $(TOPDIR)/include/asm-*/smplock.h
+			에 함수로 정의되어 있고 spark64, sh, cris 아키텍쳐는 매크로로 정의되어 있다.
+		</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="LOCK-NEEDED"
+>5.2.1. Lock이 왜 필요하지?</A
+></H2
+><P
+>				리눅스는 CPU를 여러 개 가진 시스템에서도 실행되고 이를 지원하고 있다. 만약 여러 개의 CPU가 동시에
+				같은 변수의 값을 조정하고 읽는 경우가 생긴다면 어떻게 되겠는가? 아래의 간단한 예를 보면서 얘기해
+				보자.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>very_important_count++;</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				두개의 CPU가 동시에 같은 코드를 실행했다면 아래와 같은 표 처럼 실행되야 맞다고 가정해보자.
+				<DIV
+CLASS="TABLE"
+><A
+NAME="RACE-EXPECTED-RESULT"
+></A
+><P
+><B
+>표 5-1. 예상 결과</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><THEAD
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>Instance1</TH
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>Instance2</TH
+></TR
+></THEAD
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>read very_important_count (5)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>add 1 (6)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>write very_important_count (6)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>read very_important_count (6)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>add 1 (7)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>write very_important_count (7)</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+> 
+				그러나 이건 아마도 이런 식으로 실행될 수도 있다.    
+				<DIV
+CLASS="TABLE"
+><A
+NAME="RACE-POSSIBLE-RESULT"
+></A
+><P
+><B
+>표 5-2. 가능한 결과</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><THEAD
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>Instance1</TH
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+>Instance2</TH
+></TR
+></THEAD
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>read very_important_count (5)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>read very_important_count (5)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>add 1 (6)</TD
+><TD
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>add 1 (6)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>write very_important_count (6)</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>write very_important_count (6)</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+> 
+				결과 적으로 예상은 Instance1이 실행됐을 때 값이 6이되고 Instance2가 실행됐을 때 7이 되길 바란
+				것이지만 <A
+HREF="start.kerenl.lockkernel.html#RACE-POSSIBLE-RESULT"
+>표 5-2</A
+> 처럼 서로 실행이 중첩되버리면 결과 값이 6으로
+				엉망이 될 수도 있다.
+			</P
+><P
+>				이런 일을 막기 위해 보통 락(lock)이란 것을 쓰는데 쉽게 말해 서로 중첩되서 실행되지 않도록 보장
+				하는 것이라고 이해하면 된다.
+			</P
+><P
+>				시스템을 초기화 하는 동안에 이런 일이 발생하면 시스템 초기화는 엉망이 되고 커널은 제대로 부팅할
+				수 없게 된다. 그래서 초기화 동안 락을 걸고 나중에 초기화가 다 끝나면 락을 풀어주게 된다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="LOCK-GENERAL"
+>5.2.2. Lock - 기초적 설명</A
+></H2
+><P
+>				멀티태스킹 OS에서 한 변수를 여러 개의 프로세스가 공유하고 이를 동시에 사용한다면 여러 프로세스
+				간의 연계된 시간에 따라 이 변수를 사용하는 것이 중첩되는데 이를 보통 레이스 컨디션(race condition)
+				이라고 부른다. 그리고 동시 발생 문제를 다루는 코드를 크리티컬 리전(critical region)이라 부른다.
+				리눅스는 SMP 상에서 동작하므로 이런 문제가 커널 디자인에 있어서 중요한 문제중 하나다.
+			</P
+><P
+>				위에서 말한 동시 접근과 같은 문제의 해결은 락(lock)을 이용하는 것이고 락은 한번에 하나의 접근만이
+				크리티컬 리전에 들어가도록 해서 해결한다.
+			</P
+><P
+>				락엔 두가지 타입이 있다. 하나는 스핀락(spinlock)으로 include/asm/spinlock.h에 정의되어 있다.
+				이 타입은 싱글홀더락(single-holder lock)이고 매우 작고 빠르고 아무데서나 사용할 수 있다.
+			</P
+><P
+>				두번째 타입은 세마포어로 include/asm/semaphore.h에 정의되어 있다. 세마포어는 보통 싱글홀더락
+				(mutex)으로 사용되지만 한번에 여러 홀더를 가질 수 있다. 사용자가 세마포어를 얻지 못하면 사용자의
+				프로세스는 큐에 넣어지고 세마포어가 사용 가능해질 때 깨어나게된다. 이 말은 프로세스가 기다리는
+				동안 CPU가 다른 뭔가를 한다는 것이다. 그러나 많은 경우에 그냥 기다릴 수 없을 때가 있다. 이 경우엔
+				스핀락을 대신 사용해야한다.
+			</P
+><P
+>				커널을 설정할 때 SMP 지원을 체크하지 않았다면 스핀락은 존재하지 않게 된다. 이런 결정은 아무도 
+				동시에 실행하지 않고 락을 걸 이유가 없는 경우 아주 좋은 커널 디자인이라 말할 수 있다. 세마포어는
+				언제나 존재하는데 이는 사용자 프로세스간에 동기를 맞추기위해 필요하기 때문이다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="I386-ARM-SPINLOCK"
+>5.2.3. i386, ARM의 스핀락</A
+></H2
+><P
+>				i386 계열은 SMP 시스템이 존재 하기 때문에 스핀락이 정의되어 있고 사용되지만 ARM의 경우 SMP
+				시스템이 없기 때문에 스핀락이 정의되어 있지 않다. 그래서 ARM의 asm/smplock.h는 기본으로 정의된
+				것이 사용된다.
+			</P
+><P
+>				기본 정의된 스핀락은 include/linux/spinlock.h에 다음과 같이 정의되어 있다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#define spin_lock(lock)	(void)(lock) /* Not "unused variable". */</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				이에 반해 i386은 include/asm-i386/spinlock.h에 다음과 같이 정의되어 있다.
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>static inline void spin_lock(spinlock_t *lock)
+{
+#if SPINLOCK_DEBUG
+	__label__ here;
+here:
+	if (lock-&#62;magic != SPINLOCK_MAGIC) {
+		printk("eip: %p\n", &#38;&#38;here);
+		BUG();
+	}
+#endif
+<A
+NAME="SEE-ASM-APPENDIX"
+><B
+>(1)</B
+></A
+>
+	__asm__ __volatile__(
+		spin_lock_string
+		:"=m" (lock-&#62;lock) : : "memory");
+}</PRE
+></TD
+></TR
+></TABLE
+>
+				<DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="start.kerenl.lockkernel.html#SEE-ASM-APPENDIX"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>							인라인 어셈블리에 대해선 <A
+HREF="app3.html"
+>부록 C</A
+>를 참조해 무슨 내용인지 확인 하기 바란다.
+						</DD
+></DL
+></DIV
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="x1942.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="start.kernel.setuparch.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>커널 시작</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap05.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>setup_arch()</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

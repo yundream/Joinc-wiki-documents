@@ -1,0 +1,518 @@
+#title x86 보호모드
+== x86 보호모드 ==
+ * 작성자
+  조재혁 ([mailto:minzkn@minzkn.com])
+ 
+ * 고친과정
+  2001년 어느날 : 처음씀
+
+=== 읽어보기 전에 ===
+ 이 문서에서 사용된 표기는 실제 이름과 다를수 있습니다. 단지 설명의 용이성을 위해서 임의로 붙인 표기입니다.
+ 이 문서에 기술된 표에서 특별한 설명이 없으면 0으로 간주하시면 됩니다. 이는 예약영역의 의미가 짙어서 0입니다.
+ 방준영님의 깊은 조언과 정경주님의 오타지적 감사드립니다.
+
+=== Segment register ===
+ * Logical 주소의 2가지 부분
+ * 하나의 Segment는 Segment의 범위에 있는 Offset을 가집니다.
+ * Segment는 16bit의 Selecter로 정의되는 동안 32bit Offset를 유지합니다.
+ * Segment register는 6개로 분류되며 CS, SS, DS, ES, FS, GS가 있습니다. 이 6개의 Register를 사용하여 서로 다른 목적을 가진 메모리를 사용합니다. 각 Segment별 목적(100% 반드시 지킬 필요는 없습니다.)
+ * CS(!CodeSegment): 프로그램의 Instruction 하위 2개의 bit는 현재 프로그램의 접근권한을 정의하며 0부터 3까지 4단계를 가집니다. 0이 제일 많은 접근권한을 가지며 3이 가장 제한된 접근권한을 가집니다. Linux는 0과 3만을 Kernel mode/User mode로 각각 사용합니다.
+ * SS(!StackSegment): 현재 프로그램의 스택
+ * DS(!DataSegment): Data
+ * ES(!ExtraSegment): 목적지 또는 DS의 보조
+ * FS, GS: 특정한 이름도 없고 목적도 없는 자유로운 Segment (참고: Intel에서는 이를 정하지 않았지만 차후에 정해질수도 있으므로 프로그래머들에게 사용에 있어서 이점을 참고하라고 했습니다.)
+
+=== Segment descriptor ===
+ 각각의 Segment는 8byte의 Segment descriptor라는 것에 의해 기술되는데 기술되는 종류로는 GDT(Global Descriptor Table) 또는 LDT(Local Descriptor Table)가 있습니다. 
+ GDT는 1개만을 사용하지만 LDT는 각 Process마다 따로 소유할수 있습니다.
+ Memory상의 GDT와 LDT의 Descriptor의 주소와 한계는 gdtr과 ldtr이라는 Register에 읽혀집니다.
+ LDT는 GDT로부터 선택이되며 GDT중 한 개는 LDT를 주소지정하도록 되어 있습니다.
+
+====   Descriptor의 구조  ====
+ || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||| Base (32 ~ 24bit) || G || B(D) || O || AVL |||||||| Limit (19 ~ 16bit) ||
+ || P |||| DPL || S || E || ED/C || R/W || A |||||||||||||||| Base (23 ~ 16bit) ||
+ |||||||||||||||||||||||||||||||| Base (15 ~ 0bit) ||
+ |||||||||||||||||||||||||||||||| Limit (15 ~ 0bit) ||
+
+ * Limit : Descriptor가 서술되는 영역의 한계에서 1을 뺀 값 (즉, 0은 한계값이 1이 됩니다)
+ * P : Descriptor의 정의 유무 (1)
+ * DPL: Descriptor 특권레벨 (0 ~ 3)
+ * S : System descriptor(1) 또는 Code/Data descriptor(0)
+ * E : Code(1) / Data(0)
+ * ED : Data(0) / Stack(1) - E가 0인 경우
+ * C : 특권레벨 준수(1) / 무시(0) - E가 1인 경우
+ * R : Code가 읽혀질수 있다(1) / 없다(0) - E가 1인 경우
+ * W : Data가 기록될수 있다(1) / 없다(0) - E가 0인 경우
+ * A : Descriptor의 Access유무 - Micro processor가 관리함
+ * G : Limit값이 1 ~ 1MByte 사이를 가질 것인가(0) 아니면 4K~4GByte 사이를 가질것인가(1)를 결정
+ * B(D) : 16bit 해석(0) 또는 32bit 해석(1)
+ * O : 현재 0으로 예약됨
+ * AVL : Segment가 유용한지의 여부 - 운영체제가 관리(이는 가상메모리의 여부로 종종 사용)
+
+ * 참고 : 위의 구조는 80x386기반의 Descriptor이고 80x286에서는 Base(32~24)와 G/B/O/AVL/Limit(19~16)항목은 0으로 예약되어 있습니다.
+ * 참고 : 첫 번째 GDT는 항상 0으로 예약되어 있으며 0이 아닌 값을 가지고 있더라도 사용할수 없습니다. 이는 NULL포인터에 의한 오류를 막기 위한 것이고 때문에 사용될수 없습니다. 응용하자면 0번 GDT는 사용할수 없으므로 GDT를 gdtr에 올리기 위해서 이 영역에 GDT정보 6바이트를 싣는 프로그램이 종종 있으며 이는 8바이트를 아낄수 있는 하나의 최적화 방안이 됩니다. (관리도 쉬워짐)
+ * 참고 : Descriptor에 정의된 각 항목별 이름은 실제로 정의된 단어들이 아닙니다. Intel에서는 뚜렷하게 이를 밝힌적                      이 없습니다.
+ * 참고 : P, DPL, S, E, ED/C, R/W, A bit를 필자는 Access right bit라고 칭하고 중요한 부분으로 가정하고 보세요.
+
+====   Selector의 구조  ====
+ || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||||||||||||| Selector || TI |||| RPL ||
+
+ * RPL : 요청할 특권레벨 (0 ~ 3)
+ * TI : GDT(0) / LDT(1) 선택
+ * Selector : GDT 또는 LDT(TI에 의해서 선택된)의 8192(2의 13승)개중 1개를 선택
+
+ * 참고 : GDT/LDT 각각 8192개씩 16,384개의 Descriptor가 언제든지 이용가능한 값이 되므로 최대 그 만큼의 Segment가 각 응용에 사용될수 있습니다.
+ * 예 : 만약 2번째 Descriptor를 선택한다고 가정하면 (2 
+
+====   Segment 장치  ====
+ TI에 의해서 선택된 gdtr 또는 ldtr을 읽어 GDT 또는 LDT에서 Descriptor를 선택하고 선택된 Descriptor에서 Base + Offset register를 주소지정하게 되며 Limit*(G bit MUL)를 벋어난 Offset을 가질 경우 예외처리(흔히 말하는 Segment fault)가 수행 됩니다.
+
+====   System descriptor의 종류  ====
+ 위에서 Access right bit라고 칭한 부분중에서 E, ED/C, R/W, A를 S bit에 의해서 아래의 표를 참고로 하여 System descriptor로 성격이 바뀌게 됩니다.
+
+ || '''Type''' || '''목적''' ||
+ || 0000b || 무효 ||
+ || 0001b || 이용 가능한 80x286 TSS ||
+ || 0010b || LDT ||
+ || 0011b || 바쁜 80x286 TSS ||
+ || 0100b || 80x286 call gate ||
+ || 0101b || Task gate ||
+ || 0110b || 80x286 Interrupt gate ||
+ || 0111b || 80x286 Trap gate ||
+ || 1000b || 무효 ||
+ || 1001b || 이용 가능한 80x386 TSS ||
+ || 1010b || 미래의 Intel 제품을 위한 reserved ||
+ || 1011b || 바쁜 80x386 TSS ||
+ || 1100b || 80x386 call gate ||
+ || 1101b || 미래의 Intel 제품을 위한 reserved ||
+ || 1110b || 80x386 Interrupt gate ||
+ || 1111b || 80x386 Trap gate ||
+
+====   Gate descriptor  ====
+ || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||| Base (31 ~ 24bit) || G || B(D) || O || AVL |||||||| Limit (19 ~ 16bit) ||
+ || P |||| DPL || 0 |||||||| Type || 0 || 0 || 0 |||||||||| Work count (4 ~ 0 bit) ||
+ |||||||||||||||||||||||||||||||| Selector ||
+ |||||||||||||||||||||||||||||||| Offset (15 ~ 0 bit) ||
+
+ Word counter는 호출자의 Stack 으로부터 호출된 Gate에 의해 접근된 Procedure의 Stack으로 몇개의 Word가 전송될 것인지를 나타냅니다.
+
+ 간단히 설명하자면 인자의 개수를 몇개로 받을지를 예기하는 겁니다. 물론 다른 목적도 있지만 교과서적인 내용으로 봤을때는 ...
+ Word 개수 항목은 Interrupt gate와 함께 사용되지 않는다는데 유의할 필요가 있겠습니다. (즉, 이 경우 Word count=0)
+ Gate가 접근될때 Selector의 내용이 TR(Task register)에 탑재된다는 것도 인지하고 있어야 합니다.
+
+====   General protection위반의 종류  ====
+
+ 이것은 Interrupt 0x0d와 밀접한 관련이 있습니다.
+
+ * Descriptor table의 범위 초과
+ * 특권규칙 위반
+ * 잘못된 Descriptor segment type의 탑재
+ * 보호된 Code segment에 Write시도
+ * 읽기전용 Code segment의 읽기 (이것은 그럴수도 아닐수도 있다는 점을 인지하고 있어야 합니다.)
+ * 읽기전용 Data segment에 Write시도
+ * Segment의 범위 초과
+ * CTS, HLT, LGDT, LIDT, LLDT, LMSW, LTR을 실행시에 조건 (CPL == IOPL)을 검사하여 위반될 경우
+ * CLI, IN, INS, LOCK, OUT, OUTS, STI를 실행시에 조건 (CPL > IOPL)을 검사하여 위반될 경우
+
+===   Paging  ===
+ * 정의 : Paging은 임의의 선형(논리)주소가 임의의 물리적 메모리 Page에 놓일수 있게 해주는 방법
+ * Linear memory page는 리얼모드 및 보호모드에서 사용할수 있습니다. 즉, 보호모드 전용이 아닙니다.
+ * x86의 Memory page 하나는 길이가 4K바이트 선상단위로 이를 구현하는데는 3가지 요소가 사용됩니다.
+
+ || '''31''' || '''30''' || '''29''' || '''28''' || '''27''' || '''26''' || '''25''' || '''24''' || '''23''' || '''22''' || '''21''' || '''20''' || '''19''' || '''18''' || '''17''' || '''16''' || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||||||| Directory (10 bit) |||||||||||||||||||| Table (10 bit) |||||||||||||||||||||||| Offset (12 bit) ||
+
+ * Page mode로 들어가기 위해서는 CR0 Register에 있는 PG bit를 1로 합니다. 그 전에 directory/table은 준비 되어 있어야 합니다. 
+ * !CR3 Register  
+
+ || '''31''' || '''30''' || '''29''' || '''28''' || '''27''' || '''26''' || '''25''' || '''24''' || '''23''' || '''22''' || '''21''' || '''20''' || '''19''' || '''18''' || '''17''' || '''16''' || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||||||||||||||||||||||||||| Page directory base |||||| OS bit || 0 || 0 || D || A || PCD || PWT || U/S || W || P ||
+
+ * P : 논리 1이면 주소변환에서 사용 가능하고 0이면 변환에 사용될수 없습니다. 즉, 0이면 Disk paging이 구현가능합니다. 따라서 각 !PageTable에 Mapping되는 주소의 크기는 4 !MByte가 됩니다.(총 Mapping 가능한 주소공간은 4G, 확장된 Paging을 사용할 경우 4M단위의 Page크기로 총 Mapping 가능한 주소공간은 64G)
+ * R/W, U/S : 각각의 bit조합에 따라 가장 낮은 유저 3을 위한 우선순위 레벨 보호를 제공합니다.
+
+ || 0 || 0 || 없음 ||
+ || 1 || 0 || 없음 ||
+ || 0 || 1 || 읽기 전용 ||
+ || 1 || 1 || 읽기 / 쓰기 ||
+
+ * PWT : Write-through Cache
+ * PCD : Cache disable
+ * A(Accessed) : Microprocessor가 디렉토리 항목을 접근할때마다 1로 세트됩니다.
+ * D    : Dirty로 운영체제를 위해 사용됩니다.
+
+ * 예제 Source
+  {{{
+      PageDirectory DD 4                ; 페이지 디렉토리
+      PageTable0    DD 1024 DUP (?)     ; 페이지 테이블 0번
+
+      XOR EAX, EAX
+      MOV AX, CS
+      SHL EAX, 4
+      ADD EAX, OFFSET PageTable0        ; 여기까지 논리적 메모리 주소를 선형 메모리 주소로 변환한 것
+      AND EAX, 0fffff000h
+      OR AL, 7
+      MOV PageDirectory, EAX            ; PageDirectory는 PageTable0 ...
+      MOV CX, 256                       ; 4K * 256만큼을 재 맵핑 하기 위한 Count
+      MOV DI, OFFSET PageTable0
+      MOV AX, DS
+      MOV ES, AX
+      MOV EAX, 7                        ; U/S, R/W, P를 Set
+L_0:
+      STOSD
+      ADD EAX, 4096                     ; Re map 00000h ~ 09ffffh to 00000h ~ 09ffffh
+      LOOP L_0                          ; 4K단위로 Mapping
+      MOV EAx, 0102007h
+      MOV CX, 16
+L_1:
+      STOSD                             ; Re map 0a000h ~ 0affffh to 102000h ~ 11ffffh
+      ADD EAX, 4096
+      LOOP L_1                          ;  열심히 옮기지만 재맵핑 시키면서
+      XOR EAX, EAX
+      MOV AX, DS
+      SHL EAX, 4
+      ADD EAX, OFFSET PageDirectory
+      MOV CR3, EAX                      ; In paging... 페이징 준비 끝
+}}}
+
+===   확장된 Paging  ===
+ Pentium에서는 보다 확장된 Paging이 제공되며 Page frame의 크기가 4K에서 4M로 확장가능하므로 보다 큰 메모리블럭을 적은수의 페이지 디렉토리로 관리할수 있게 됩니다. 단, 이것이 항상 장점으로 남을수는 없습니다. 조그마한 메모리만을 Paging하기 원한다면 이것은 메모리 효율을 떨어뜨리는 결과를 초래할수 있겠습니다. 보통 32bit 머신에서는 4M의 필요성이 큰 효율을 가져다 주지는 못할것입니다. (필자는 개인적으로 소프트웨어가 2G이상의 메모리를 요구하는 경우 4M page를 종종 사용하는데 page의 관리차원의 Mapping 절차에 대한 단순함으로 큰 메모리 블럭을 자주 사용하는 task의 경우는 이를 종종 사용하였습니다. 어찌되었건 이것은 제 코드상에서는 성능 향상을 보인것으로 보아서 거대한 메모리 Management 특성을 가진 소프트웨어에서는 간혹 써볼만 한것 같습니다.)
+
+ '''!CR4''' register의 bit4번(Page size enable)을 Set하면 4M Page모드로 확장됩니다. 4M mode로 들어가면 다음과 같이 선형주소가 바뀝니다. (Page table이 없다는 점에 주의)
+
+ || '''31''' || '''30''' || '''29''' || '''28''' || '''27''' || '''26''' || '''25''' || '''24''' || '''23''' || '''22''' || '''21''' || '''20''' || '''19''' || '''18''' || '''17''' || '''16''' || '''15''' || '''14''' || '''13''' || '''12''' || '''11''' || '''10''' || '''9''' || '''8''' || '''7''' || '''6''' || '''5''' || '''4''' || '''3''' || '''2''' || '''1''' || '''0''' ||
+ |||||||||||||||||||| Directory (10 bit) |||||||||||||||||||||||||||||||||||||||||||| Offset (22 bit) ||
+
+===   Three-level paging  ===
+ RAM이 싸게 공급되어 용량이 커지더라도 Page table을 Memory공간에 낭비를 하는 것은 바람직하지 않으므로 64bit에서는 Three-level pasing을 사용해야 할것입니다. !Alpha와 UltraSPARC은 64bit계열이며 이는 Three-level paging을 여기에 적용할 수 있습니다. Page크기가 무조건 크게 한다고 좋은게 아니므로 16K Page가 적당합니다. 16K는 14bit로 주소지정이 가능하므로 offset 항목은 14bit로 하고 나머지 50bit중 25bit씩 각각 Directory와 Table로 사용한다면 3200만개의 Page가 가능합니다.
+
+ Alpha microprocessor에서는 다음과 같습니다. Page는 8K로 하여 13bit이고 PageTable은 10비트씩 3개로 쪼개어 Two-level에서는 10bit=1024만큼의 PageTable을 가질수 있게 합니다. 나머지 21bit는 항상 0입니다. 
+ || Global directory(10bit) || Middle directory(10bit) || Table(10bit) || Offset(13bit) ||
+ |||| 25bit || 25bit || 14bit ||
+
+===   Hardware cache  ===
+ PCD : Microprocessor의 PCD핀의 기능을 제어하며 이 것이 set되면 Page가 아닌 Bus사이클동안 논리 1이 됩니다. 이것은 외부 하드웨어가 Level-II cache memory를 제어할수 있게 합니다. (간단히 말해서 Cache할건지 안할건지)
+ PWT : Microprocessor의 PWT핀의 기능을 제어하며 Write-through cache를 제어하기 위해서Page가 아닌 Bus사이클동안 PWT핀에 나타납니다.
+
+ ''' 이 비트는 신중히 결정해야 한다고 필자는 강력히 주장합니다. 잘 선택하면 성능을 극대화 합니다. '''
+
+====   Translation Lookaside Buffers (TLB)  ====
+ x86계열의 CPU에서는 Paging을 위해서 매번 Page directory를 읽는것은 줄이고자 TLB라는 일종의 Directory cache buffer를 사용합니다. Pentium부터 4 !MByte paging을 지원하도록 되었으며 이것이 4K page와 차이점은 4M page는 Page table이 존재하지 않는것이 특징이며 Page directory 크기를 줄일수 있고 큰 블럭을 다루므로 속도적인 면에서 약간의 우위를 갖습니다. 다만, 메모리 효율적인 측면은 잘못하면 최악의 메모리 사용율이 발생할수 있으므로 이점은 반드시 고려되어야 합니다.
+
+ 특권레벨이 높은 운영체제(레벨 0)등에서 이 Page directory를 효율적으로 관리하기 위해 자주 바꾸게 되는데 문제는 특권레벨이 낮은 응용프로그램에서는 이를 바뀌었는지 알 필요도 없고 TLB에 대한 제어도 할수 없으므로 매번 운영체제가 그것을 비워주거나 바뀐부분만을 TLB로부터 갱신해주어야 하는 문제가 있습니다. 다행이도 이것이 우연인지 아닌지 별로 그렇게 큰 신경을 쓸 필요가 없다는데 다행일뿐이지만 어쨌건 왜 다행인지는 알아야 겠죠?
+
+ {{{
+PUSHF     ; 여기서는 PUSHF, CLI, POPF는 개념적인 이해를 위해 쓴겁니다.
+CLI
+MOV EAX, CR3
+MOV CR3, EAX
+POPF
+}}}
+
+ 즉, 그냥 !CR3 register를 읽고 다시 써주면 TLB가 자연스럽게 정리작업이 됩니다. 이것이 왜 자연스럽게 되는가? 그것은 Task를 전환할때 이미 이것이 작용하기 때문입니다. 그 다음은 Scheduler를 이해하면 되는데 이 문서는 범위를 여기까지만 소개하도록 하겠습니다.
+ 
+ 참고로 임의의 TLB 특정 부분을 갱신할수 있는 명령이 있는데 잊어먹었습니다. 나중에 생각나면 쓰도록 하겠습니다.
+
+===   GDT/IDT Setup -> 보호모드 진입 및 리얼모드 돌아오기 예제  ===
+ {{{
+; Copyright (c) MINZ
+; Code by JaeHyuk Cho - <mailto:minzkn@infoeq.com>
+DEF_ASM_GO32       EQU "GO32.ASM"
+
+DEF_MAX_DefaultGDT = 2000h                                 ; 8192d
+DEF_MAX_DefaultIDT = 0100h                                 ;  256d
+
+PUBLIC             RegisterIDT, RegisterGDT
+PUBLIC             SetupIDT, SetupGDT
+PUBLIC             Go32
+PUBLIC             L_Exit32
+;
+PUBLIC             D_StackFrame
+PUBLIC             D_IDTR, D_GDTR
+PUBLIC             D_IDT_Item, D_GDT_Item
+PUBLIC             D_IDT, D_GDT
+
+                   ASSUME CS:CODE_GO32, DS:DATA_GO32, ES:NOTHING, SS:STACK_DEFAULT
+CODE_GO32          SEGMENT
+}}}
+ 여기까지는 그냥 일반적인 어셈블리의 앞 머리입니다.
+
+ {{{
+RegisterIDT        PROC FAR ; void far pascal RegisterIDT(unsigned int s_intnum) ; IDT 추가 생성
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH EAX
+                   PUSH EDX
+                   XOR EAX, EAX
+                   MOV AX, WORD PTR [BP + 06h]             ; s_intnum
+                   MOV DX, DEF_SIZE_Descriptor
+                   MUL DX
+                   ADD EAX, OFFSET DESC_GO32_IDT:D_IDT
+                   PUSH DESC_GO32_IDT
+                   PUSH AX
+                   PUSH DATA_GO32
+                   PUSH OFFSET DATA_GO32:D_IDT_Item
+                   PUSH DEF_SIZE_Descriptor
+                   CALL FAR PTR CODE_MEMORY:MemCpy
+                   POP EDX
+                   POP EAX
+                   POP BP
+                   RETF 2
+RegisterIDT        ENDP
+}}}
+ IDT를 구조에 맞게 인자로 받아서 만들어 줍니다.
+
+ {{{
+RegisterGDT        PROC FAR ; void far pascal RegisterGDT(unsigned int s_descnum)
+                   PUSH BP
+                   MOV BP, SP
+                   PUSH EAX
+                   PUSH EDX
+                   XOR EAX, EAX
+                   MOV AX, WORD PTR [BP + 06h]             ; s_descnum
+                   MOV DX, DEF_SIZE_Descriptor
+                   MUL DX
+                   ADD EAX, OFFSET DESC_GO32_GDT:D_GDT
+                   PUSH DESC_GO32_GDT
+                   PUSH AX
+                   PUSH DATA_GO32
+                   PUSH OFFSET DATA_GO32:D_GDT_Item
+                   PUSH DEF_SIZE_Descriptor
+                   CALL FAR PTR CODE_MEMORY:MemCpy
+                   POP EDX
+                   POP EAX
+                   POP BP
+                   RETF 2
+RegisterGDT        ENDP
+}}}
+ GDT를 구조에 맞게 인자로 받아서 만들어 줍니다.
+
+ {{{
+SetupIDT           PROC FAR ; void far pascal SetupIDT(void)
+                   PUSH DS
+                   PUSH AX
+                   MOV AX, DATA_GO32
+                   MOV DS, AX
+
+                   POP AX
+                   POP DS
+                   RETF
+SetupIDT           ENDP
+}}}
+ IDT를 만드는 부분이지만 그냥 비어 있습니다. !SetupGDT함수처럼 !RegisterIDT를 사용하여 안에 채워넣으면 됩니다.
+
+ {{{
+SetupGDT           PROC FAR ; void far pascal SetupGDT(void)                                     
+                   PUSH DS
+                   PUSH AX
+                   PUSH BX
+                   MOV AX, DATA_GO32
+                   MOV DS, AX
+                   ; 0000h - Null descriptor
+                   XOR AX, AX
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_LimitLow, AX
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_BaseLow, AX
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseMid, AL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access00, AL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access01, AL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseHigh, AL
+                   PUSH AX
+                   CALL FAR PTR CODE_GO32:RegisterGDT
+                   ; 0001h - IDT descriptor
+                   ; 0002h - GDT descriptor
+                   ; 0003h - Real code descriptor
+                   PUSH CODE_GO32
+                   PUSH DEF_Null
+                   CALL FAR PTR CODE_CALC:ToPhysical
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_LimitLow, 0FFFFh
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_BaseLow, AX
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseMid, DL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access00, 10011010b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access01, 00000000b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseHigh, DH
+                   PUSH 0003h
+                   CALL FAR PTR CODE_GO32:RegisterGDT
+                   ; 0004h - Real data descriptor                   
+                   PUSH DATA_GO32
+                   PUSH DEF_Null
+                   CALL FAR PTR CODE_CALC:ToPhysical
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_LimitLow, 0FFFFh
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_BaseLow, AX
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseMid, DL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access00, 10010010b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access01, 00000000b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseHigh, DH
+                   PUSH 0004h
+                   CALL FAR PTR CODE_GO32:RegisterGDT
+                   ; 0005h - Full data descriptor
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_LimitLow, 0FFFFh
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_BaseLow, 00000h
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseMid, 000h
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access00, 10010010b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access01, 11001111b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseHigh, 000h
+                   PUSH 0005h
+                   CALL FAR PTR CODE_GO32:RegisterGDT
+                   ; 0006h - Video data(TEXT) descriptor
+                   ; 0007h - Video data(GRAPHICS) descriptor
+                   ; 0008h - Code descriptor
+                   PUSH CODE_KN32
+                   PUSH OFFSET CODE_KN32:KernelMain32
+                   CALL FAR PTR CODE_CALC:ToPhysical
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_LimitLow, 0FFFFh
+                   MOV WORD PTR DATA_GO32:D_GDT_Item.STRUC_BaseLow, AX
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseMid, DL
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access00, 10011110b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_Access01, 11000000b
+                   MOV BYTE PTR DATA_GO32:D_GDT_Item.STRUC_BaseHigh, DH
+                   PUSH 0008h
+                   CALL FAR PTR CODE_GO32:RegisterGDT
+                   ; 0009h - Data descriptor
+                   ; 000Ah - Bss descriptor
+                   ; 000Bh - Stack descriptor
+                   ; 000Ch - Heap descriptor
+
+                   ; Load GDT
+                   MOV EAX, OFFSET DESC_GO32_GDT:D_GDT
+                   PUSH DESC_GO32_GDT
+                   PUSH AX
+                   CALL FAR PTR CODE_CALC:ToPhysical
+                   MOV WORD PTR DATA_GO32:D_GDTR.STRUC_LimitLow, (DEF_MAX_DefaultGDT * DEF_SIZE_Descriptor) - 1
+                   MOV WORD PTR DATA_GO32:D_GDTR.STRUC_BaseLow, AX
+                   MOV BYTE PTR DATA_GO32:D_GDTR.STRUC_BaseMid, DL
+                   MOV BYTE PTR DATA_GO32:D_GDTR.STRUC_Access00, DH
+                   LGDT QWORD PTR DATA_GO32:D_GDTR
+                   POP BX
+                   POP AX
+                   POP DS
+                   RETF
+SetupGDT           ENDP
+}}}
+ 사용할 Descriptor를 성격에 맞게 등록합니다.
+
+ {{{
+Go32               PROC FAR ; void far pascal Go32(void)
+                   PUSH DS
+                   PUSH ES
+                   PUSH FS
+                   PUSH GS
+                   PUSHAD
+                   ; Print
+                   PUSH DATA_GO32
+                   PUSH OFFSET DATA_GO32:S_MSG_Go32_Enter
+                   CALL FAR PTR CODE_TEXT:Puts
+                   ; Clear descriptor
+                   PUSH DESC_GO32_IDT
+                   MOV EAX, OFFSET DESC_GO32_IDT:D_IDT ; 32bit offset
+                   PUSH AX
+                   PUSH DEF_Null
+                   PUSH (DEF_MAX_DefaultIDT * DEF_SIZE_Descriptor) SHR 01h
+                   CALL FAR PTR CODE_MEMORY:MemSetW
+                   PUSH DESC_GO32_GDT
+                   MOV EAX, OFFSET DESC_GO32_GDT:D_GDT ; 32bit offset
+                   PUSH AX
+                   PUSH DEF_Null
+                   PUSH (DEF_MAX_DefaultGDT * DEF_SIZE_Descriptor) SHR 01h
+                   CALL FAR PTR CODE_MEMORY:MemSetW
+                   ; Setup descriptor & environ
+                   CALL FAR PTR CODE_GO32:SetupIDT
+                   CALL FAR PTR CODE_GO32:SetupGDT
+                   ; Set PE
+                   MOV AX, DATA_GO32
+                   MOV DS, AX
+                   MOV AX, SS
+                   MOV WORD PTR DATA_GO32:D_StackFrame[DEF_Far_Segment], AX
+                   MOV WORD PTR DATA_GO32:D_StackFrame[DEF_Far_Offset], SP
+                   MOV EAX, CR0
+                   OR AL, 01h
+                   MOV CR0, EAX ; 보호모드 진입점
+                   MAC_ClearCache ; Code cache를 지우기 위해 그냥 바로 앞에 점프 "jmp $+2"
+                   MAC_JumpFar <0003h * DEF_SIZE_Descriptor>, <OFFSET CODE_GO32:L_GO32_Enter> ; DWORD jump 입니다.
+L_GO32_Enter       LABEL FAR
+                   MOV AX, 0004h * DEF_SIZE_Descriptor
+                   MOV DS, AX
+                   MOV ES, AX
+                   MOV FS, AX
+                   MOV GS, AX
+                   ; MOV AX, 000Bh * DEF_SIZE_Descriptor
+                   ; MOV SS, AX
+                   ; XOR ESP, ESP
+                   XOR EAX, EAX
+                   XOR EBX, EBX
+                   XOR ECX, ECX
+                   XOR EDX, EDX
+                   XOR ESI, ESI
+                   XOR EDI, EDI
+                   XOR EBP, EBP
+
+                   MAC_JumpFar <0008h * DEF_SIZE_Descriptor>, <OFFSET CODE_KN32:KernelMain32> ; 실제 32비트 동작을 할 32비트 코드가 있는 곳
+
+                   ; Clear PE
+L_Exit32           LABEL FAR
+                   MOV EAX, CR0
+                   AND AL, 0FEh
+                   MOV CR0, EAX
+                   MAC_ClearCache
+                   MAC_JumpFar <CODE_GO32>, <OFFSET CODE_GO32:L_GO32_Return> ; Real mode로 돌아옵니다. 하지만 아직은 Real mode의 완전한 반환은 아닙니다.
+L_GO32_Return      LABEL FAR
+                   ; Restore environ
+                   MOV AX, DATA_GO32 ; 여기서 실제로 Real mode를 위한 Segment를 배치하여 줍니다.
+                   MOV DS, AX
+                   XOR AX, AX
+                   MOV ES, AX
+                   MOV FS, AX
+                   MOV GS, AX
+                   LSS SP, DWORD PTR DATA_GO32:D_StackFrame
+                   ; Print
+                   PUSH DATA_GO32
+                   PUSH OFFSET DATA_GO32:S_MSG_Go32_Return
+                   CALL FAR PTR CODE_TEXT:Puts
+                   POPAD
+                   POP GS
+                   POP FS
+                   POP ES
+                   POP DS
+                   RETF
+Go32               ENDP
+}}}
+ 보호모드로 진입했다가 그냥 나옵니다.
+
+ {{{
+CODE_GO32          ENDS
+
+                   ASSUME CS:CODE_GO32, DS:DATA_GO32, ES:NOTHING, SS:STACK_DEFAULT
+DATA_GO32          SEGMENT
+S_MSG_Go32_Enter   DB 0FEh, " Enter to 32bit processing."
+                   DB DEF_ASCII_CarrigeReturn, DEF_ASCII_LineFeed
+                   DB DEF_ASCII_EndOfString
+S_MSG_Go32_Return  DB 0FEh, " Return to 16bit processing."
+                   DB DEF_ASCII_CarrigeReturn, DEF_ASCII_LineFeed
+                   DB DEF_ASCII_EndOfString
+D_StackFrame       DW DEF_Null, STACK_DEFAULT
+D_IDTR             STRUC_Descriptor <0000h, 0000h, 00h, 00h, 00h, 00h>
+D_GDTR             STRUC_Descriptor <0000h, 0000h, 00h, 00h, 00h, 00h>
+D_IDT_Item         STRUC_Descriptor <0000h, 0000h, 00h, 00h, 00h, 00h>
+D_GDT_Item         STRUC_Descriptor <0000h, 0000h, 00h, 00h, 00h, 00h>
+DATA_GO32          ENDS
+
+                   ASSUME CS:CODE_GO32, DS:BSS_GO32, ES:NOTHING, SS:STACK_DEFAULT
+BSS_GO32           SEGMENT
+BSS_GO32           ENDS
+
+                   ASSUME CS:CODE_GO32, DS:DESC_GO32_IDT, ES:NOTHING, SS:STACK_DEFAULT
+DESC_GO32_IDT      SEGMENT
+D_IDT              STRUC_Descriptor DEF_MAX_DefaultIDT DUP (<>)
+DESC_GO32_IDT      ENDS
+
+                   ASSUME CS:CODE_GO32, DS:DESC_GO32_GDT, ES:NOTHING, SS:STACK_DEFAULT
+DESC_GO32_GDT      SEGMENT
+D_GDT              STRUC_Descriptor DEF_MAX_DefaultGDT DUP (<>)
+DESC_GO32_GDT      ENDS
+                   END
+
+; End of source
+}}}
+ 보시는 바와 같이 필요한 Data segment를 기술하였습니다.

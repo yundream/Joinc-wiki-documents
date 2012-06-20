@@ -1,0 +1,504 @@
+#title 함수사전을 위키페이지로
+[wiki:article_함수사전을 위키페이지로 HTML 변환문서]
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>함수사전을 위키 페이지로</title>
+
+	<author>
+		<surname>윤 상배</surname>
+
+		<affiliation>
+			<address>
+				<email>yundream@www.joinc.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>0.9</revnumber>
+			<date>2004년 1월 08일 21시</date>
+			<revremark>docbook 문서로 변환</revremark>
+		</revision>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2004년 1월 03일 09시</date>
+			<revremark>wiki문서 최종완료</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title>소개</title>
+	<para>
+		joinc에서는 <ulink url="http://www.joinc.co.kr/modules.php?name=Encyclopedia&amp;op=list_content&amp;eid=2">함수사전</ulink>을 제공하는데, 사전의 
+		내용을 모두 위키로 옮기는 작업을 하기로 했다. 여기에서는 옮기는 
+		과정에 대해서 기술한다.   
+	</para>
+</section>
+<section>
+	<title>왜 위키페이지로 옮기는 작업을 하는가</title>
+	<section>
+		<title>google에서의 검색용이를 위해서</title>
+		<para>
+			어떤 이유에서인지 모르겠지만 <ulink url="http://www.google.co.kr">
+			google</ulink>에서 함수사전에 있는 함수들의 내용이 검색되지 
+			않는다는 것을 확인했다. 비록 내부적으로 Joinc 통합검색엔진 
+			프로젝트를 진행하고 있긴 하지만 google등의 검색엔진에서도 쉽게 
+			검색될 수 있다면 좋을 것이다. 지금 운영중인 위키에 있는 페이지들은 
+			google을 통한 검색이 잘 이루어 지고 있음을 확인했고, 그런이유로 위키 
+			페이지로 옮기기로 결정했다. 
+		</para>
+	</section>
+	<section>
+		<title>위키 페이지에서 직접적인 함수참조 가능하도록</title>
+		<para>
+			사이트의 특성상 위키 페이지에 함수들이 자주 등장하게 되는데, 함수의 내용이 
+			궁금할경우 joinc의 함수찾기 기능을 이용해서 함수를 참조해야만 한다. 
+			4-5번 정도의 마우스 클릭작업이 들어갸야 하는데, 시간도 많이 걸리고 
+			매우 불편하다.  
+		</para>
+		<para>
+			이들 함수사전의 내용을 위키로 만들면 위키의 PHP코드를 약간 수정하는 정도로
+			자동으로 링크가 걸리도록 할 수 있다. fgets(3), gets(3), fopen(3) 모든 함수가 
+			자동으로 링크가 걸리는 걸 확인 할 수 있을것이다. 실제 문서 작성 때도 
+			문서작성자는 함수를 링크시키기 위해서 부가적인 작업을 하지 않아도 된다.       
+			이 기능은 php의 정규치환을 이용해서 구현했다. 다음은 정규표현식이다. 
+			<screen>
+$text = ereg_replace("([a-z0-9\_]+)(\([a-zA-Z0-9:\_\.\"\,\&amp;\* ]*\))",
+        "&lt;a href=http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_\\1\\2&gt;\\1&lt;/a&gt;\\2", $text);
+			</screen>
+			정규표현식을 보면 알겠지만 모든 함수사전을 위한 모든 위키페이지 명은 
+			<emphasis>function_</emphasis>를 접두사로 가져야 한다. 
+		</para>
+	</section>
+	<section>
+		<title>사용자 피드백의 용이성</title>
+		<para>
+			위키의 특성으로 용이한 사용자 피드백이 가능할 것이다. 
+			필요하다면 wiki전용의 댓글 시스템을 만들 수도 있다.  
+		</para>
+	</section>
+</section>
+<section>
+	<title>함수사전을 위키 페이지로</title>
+	<section>
+		<title>기본 아이디어</title>
+		<para>
+			물론 노가다 수작업으로 일일이 위키 페이지를 만들 수 있겠으나 프로그램을 
+			만들어서 일괄적업 하기로 했다.	
+			현재 함수사전의 모든 내용은 DB를 통해서 관리된다. 간단한 DB프로그램을 만들어서 
+			각각의 함수이름과 함수이름에 대한 설명이 들어 있는 필드의 정보를 가져올 수 있다.
+			그러면 이들 내용을 토대로 wiki페이지를 만든다. 
+		</para>
+	</section>
+	<section>
+		<title>DB에서 함수사전 테이블 내용 가져오기</title>
+		<para>
+			DB에서 내용을 가져오기 위해서 함수사전에 사용되는 테이블의 구조를 분석할 
+			필요가 있다. 함수사전에는 <emphasis>joinc_encyclopedia</emphasis>와 
+			<emphasis>joinc_encyclopedia_text</emphasis> 두개의 테이블이 사용된다.  
+		</para>
+		<section>
+			<title>함수 사전 관련 테이블 구조</title>
+			<para>
+ 				joinc_encyclopedia에는 사전의 타입과 설명등이 입력된다. joinc의 사전은 
+				여러 종류의 사전이 동시에 운용될 수 있으므로 사전의 프로토타입의 정의를 
+				위한 테이블이 별도로 필요하다.     
+				<table>
+					<title>joinc_encyclopedia</title>
+					<tgroup cols=2>
+					<tbody>
+						<row>
+							<entry></entry>
+							<entry>Field</entry>
+							<entry>Type</entry>
+							<entry>Null</entry>
+							<entry>Key</entry>
+							<entry>Default</entry>
+							<entry>Extra</entry>
+						</row>
+						<row>
+							<entry>1</entry>
+							<entry>eid</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry>PRI</entry>
+							<entry>NULL</entry>
+							<entry>auto_inc</entry>
+						</row>
+						<row>
+							<entry>2</entry>
+							<entry>title</entry>
+							<entry>varchar</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+						<row>
+							<entry>3</entry>
+							<entry>description</entry>
+							<entry>text</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+						<row>
+							<entry>4</entry>
+							<entry>counter</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+					</tbody>
+					</tgroup>
+				</table>
+				<variablelist>
+					<varlistentry>
+						<term>eid</term>
+						<listitem>
+							<para>
+  							새로운 사전이 추가될때 마다 1씩 증가하며 함수내용에 대한 
+							인덱스 값이 된다.    
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>title</term>
+						<listitem>
+							<para>
+								eid 번호를 가지는 사전에 대한 제목
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>description</term>
+						<listitem>
+							<para>
+  								사전에 대한 상세 설명 
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>counter</term>
+						<listitem>
+							<para>
+								방문 카운트
+							</para>
+						</listitem>
+					</varlistentry>
+				</variablelist>
+			</para>
+			<para>
+				<table>
+					<title>joinc_encyclopedia_text</title>
+					<tgroup cols=2>
+					<tbody>
+						<row>
+							<entry></entry>
+							<entry>Field</entry>
+							<entry>Type</entry>
+							<entry>Null</entry>
+							<entry>Key</entry>
+							<entry>Default</entry>
+							<entry>Extra</entry>
+						</row>
+						<row>
+							<entry>1</entry>
+							<entry>tid</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry>PRI</entry>
+							<entry>NULL</entry>
+							<entry>auto_inc</entry>
+						</row>
+						<row>
+							<entry>2</entry>
+							<entry>eid</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+						<row>
+							<entry>3</entry>
+							<entry>title</entry>
+							<entry>varchar</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+						<row>
+							<entry>4</entry>
+							<entry>text</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+						<row>
+							<entry>5</entry>
+							<entry>count</entry>
+							<entry>int</entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+							<entry></entry>
+						</row>
+					</tbody>
+					</tgroup>
+				</table>
+				<variablelist>
+					<varlistentry>
+						<term>tid</term>
+						<listitem>
+							<para>
+								사전내용에 대한 일련번호
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>eid</term>
+						<listitem>
+							<para>
+								사전내용이 어느 사전에 포함된것인지에 대한 정보로 
+								joinc_encyclopedia.eid를 인덱스한다.
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>title</term>
+						<listitem>
+							<para>
+								사전내용에 대한 제목
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>text</term>
+						<listitem>
+							<para>
+								실질적인 사전 내용
+							</para>
+						</listitem>
+					</varlistentry>
+					<varlistentry>
+						<term>counter</term>
+						<listitem>
+							<para>
+								방문 카운트
+							</para>
+						</listitem>
+					</varlistentry>
+				</variablelist>
+			</para>
+		</section>
+		<section>
+			<title>위키페이지로 저장하기</title>
+			<para>
+				DB를 뒤져서 함수사전 내용을 얻어왔다면, 얻어온 내용을 토대로 위키페이지를 
+				만들어야 한다. 위키페이지는 파일기반으로 
+				<ulink url="http://doc.kldp.org/KoreanDoc/html/RCS/RCS.html">RCS</ulink>를 
+				통해서 관리된다. 
+			</para>
+			<para>
+				파일로 저장되므로 파일이름을 정해야 하는데 중복을 피하기 위해서 
+				함수명앞에 '''function_'''을 붙이도록 한다. 
+				실제 저장되는 위키페이지는 <emphasis>_</emphasis>를 
+				<emphasis>_5f</emphasis>로 치환된다. 
+				또한 <emphasis>(</emphasis>, <emphasis>)</emphasis>는 각각 
+				<emphasis>_28</emphasis>, <emphasis>_29</emphasis>로 치환된다. 
+				만약 <emphasis>fgets(3)</emphasis>을 등록시키길 원한다면 
+				<emphasis>function_5ffgets_283_29</emphasis>라는 이름의 파일로 등록된다. 
+			</para>
+			<para>
+				등록된 후에는 이걸 RCS로 보내야 한다. 이를 위해서 <emphasis>ci</emphasis>
+				명령을 사용한다. 
+				<screen>
+# ci -tfunction_5ffgets_283_29 function_5ffgets_283_29 
+				</screen>
+				그러면 RCS파일이 생성된다. 이후 <emphasis>co</emphasis>명령을 이용해서 
+				RCS파일을 다시 받아와서 원본파일을 유지하면 된다. 
+				<screen>
+# co function_5ffgets_283_29
+				</screen>
+				위의 내용이 잘 이해되지 않는다면 RCS레퍼런스 문서를 읽어 보기 바란다. 
+			</para>
+		</section>
+	</section>
+</section>
+<section>
+	<title>프로그램의 작성</title>
+	<para>
+		프로그램은 C를 이용해서 작성되었다.
+	</para>
+	<section>	
+		<title>전체 프로세스</title>	
+		<para>
+			프로세스는 간단하다.
+			<screen>
+int main()
+{
+  nobody 권한으로 변경한다.
+  mysqldb에 접근
+  함수사전을 얻기 위한 쿼리 수행
+  while(더이상 사전내용이 없을 때 까지) 
+  {
+    list(title, text)를 얻어온다. 
+    function_5ftitle 이름으로 파일을 만든다.  
+    파일에 text를 적는다.
+    {
+      write wiki메크로 
+    }
+    co명령을 이용해서 RCS에 등록한다. 
+    ci명령을 이용해서 RCS의 내용을 가져온다.   
+  }
+}
+			</screen>
+		</para>
+	</section>
+	<section>
+		<title>코드</title>
+		<para>	
+			코드 역시 매우 단순하다. 이 코드는 그럭저럭 돌아가지만 수정해야될 
+			부분과 추가해야될 몇 가지 기능들이 있다. 간단한 주석으로 설명을 대신한다. 
+			<screen>
+#include &lt;mysql.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdio.h&gt;
+#include "jdb.h"
+#include &lt;stdlib.h&gt;
+
+static char page_name[80];
+
+// ( ==&gt; _28 
+// ) ==&gt; _29
+char * replace_tag(char *str)
+{
+    char null[12];
+    char fu[80];
+    char num[12];
+    sscanf(str,"%[^(]%[(]%[^)]", fu, null, num);
+    sprintf(page_name, "%s%s%s%s", fu, "_28", num, "_29");
+    return &amp;page_name[0];
+}
+
+int main(int argc, char **argv)
+{
+    MYSQL   *connection = NULL, conn;
+    MYSQL_RES *sql_result;
+    MYSQL_ROW sql_row;
+    int query_stat;
+    char wiki_macro[80];
+    char wiki_page[80];
+    char *perfect_page;
+    char man_section[16];
+    FILE *fp;
+
+    // MysqlDB에 연결  
+    mysql_init(&amp;conn);
+    connection = mysql_real_connect(&amp;conn, DB_HOST,
+                                DB_USER, DB_PASS,
+                                DB_NAME, 3306, (char *)NULL, 0);
+
+    if (connection == NULL)
+    {
+        fprintf(stderr, "Mysql connection error : %s", mysql_error(&amp;conn));
+        return 1;
+    }
+    query_stat = mysql_query(connection,
+            "select title, eid, tid from nuke_encyclopedia_text where eid=2");
+    if(query_stat != 0)
+    {
+        fprintf(stderr, "Mysql query error : %s\n", mysql_error(&amp;conn));
+        return 1;
+    }
+
+    sql_result = mysql_store_result(connection);
+    while((sql_row = mysql_fetch_row(sql_result)) != NULL)
+    {
+        char ci_command[120];
+        char co_command[120];
+        char title[80];
+        if(strlen(sql_row[0]) &gt; 3)
+        {
+            // wikipage에 들어갈 메크로문자열과 
+            sprintf(wiki_macro, "[[printency(%s,%s)]]\n", sql_row[1], sql_row[2]);
+            // wikipage 이름
+            sprintf(wiki_page, "function_5f%s", sql_row[0]);
+            // wikipage 타이틀
+            sprintf(title, "#title %s\n", sql_row[0]);
+            // wikipage이름을 wiki스타일에 맞도록 변경한다. 
+            perfect_page = replace_tag(wiki_page);
+
+            // RCS등록을 위한 명령
+            sprintf(ci_command, "/usr/bin/ci -t%s %s", perfect_page, perfect_page);
+            sprintf(co_command, "/usr/bin/co %s", perfect_page);
+            if((fp = fopen(perfect_page, "w")) != NULL)
+            {
+                fputs(title,fp);
+                fputs(wiki_macro, fp);
+                fclose(fp);
+                // RCS등록을 한다. 
+                system(ci_command);
+                system(co_command);
+            }
+        }
+    }
+    mysql_free_result(sql_result);
+    mysql_close(connection);
+    return 0;
+}
+			</screen>
+다음과 같이 컴파일 했다. 
+			<screen>
+# gcc -o wikifunc  main.c -I/usr/include/mysql -L/usr/lib/mysql -lmysqlclient -Wall
+			</screen>
+		</para>	
+	</section>
+	<section>
+		<title>테스트</title>
+		<para>
+			이 문서 자체가 테스트다. 아래의 함수가 링크가 잘 된다면 성공한 것이다.
+			<screen>
+파일을 열때는 open(2), 혹은 feopen(3)를 사용한다. 
+write()함수는 write(fd, char *buff, size)와 같은 방식으로 사용한다.
+			</screen>
+		</para>
+	</section>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+			<listitem>
+				<para>
+ 					<ulink url="http://doc.kldp.org/KoreanDoc/html/RCS/RCS.html">RCS 레퍼런스</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+ 					<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=10">Mysql 프로그래밍</ulink>
+				</para>
+			</listitem>
+		</orderedlist>
+	</para>
+</section>
+</article>
+}}}

@@ -1,0 +1,315 @@
+#title linux man page : fclose 열린 파일 stream을 닫는다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>fclose(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. fclose(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN15"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN19"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN28"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN34"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	열린 파일 스트림(stream)을 닫는다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int fclose(FILE *stream);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		fclose()함수는 <B
+CLASS="EMPHASIS"
+>stream</B
+>으로 연결되어 있는 파일의 스트림
+		연결을 끊는다. 만약 닫고자 하는 스트림이 출력을 위해 열려져있던 스트림이라면 
+		fflush(3)를 이용해서 버퍼에 있는 데이터를 모두 써야 한다.   
+		<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>			만약 닫혀진 <B
+CLASS="EMPHASIS"
+>stream</B
+>에 대해서 fclose()가 다시 한번 실행된다면 
+			어떤일이 일어날지 알 수 없다. 세그멘테이션 오류로 종료할 수도 있고, 그렇지 않고 
+			계속 작동할 수도 있다. 프로그래밍을 할 때는 이점에 주의해야 한다. 
+			</P
+></BLOCKQUOTE
+></DIV
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+></A
+>1.3. 반환값</H1
+><P
+>		성공하면 0을 리턴한다. 실패했을 경우는 <B
+CLASS="EMPHASIS"
+>EOF</B
+>를 리턴하고 errno를 
+		설정한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN19"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EBADF</DT
+><DD
+><P
+>	
+					잘못 연결된 <B
+CLASS="EMPHASIS"
+>stream</B
+>이다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN28"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *fp = NULL;
+    char buff[256];
+
+    if ((fp = fopen("flock.c", "r")) == NULL)
+    {
+        perror("open error");
+        exit(1);
+    }
+
+    while(fgets(buff, 255, fp))
+    {
+        printf("%s", buff);
+    }
+
+    if (fclose(fp) != 0)
+    {
+        perror("close error 1");
+        exit(0);
+    }
+    if (fclose(fp) != 0)
+    {
+        perror("close error 2");
+        exit(0);
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위 코드는 fclose()를 두번 호출하고 있다. 아마도 두번째 호출에서 문제가 
+		발생할 것이다. 필자의 리눅스 박스에서는 세그멘테이션 오류가 발생하면서 
+		프로그램이 종료되었다. 
+	</P
+><P
+>		위의 문제를 해결하기 위해서 다음과 같은 매크로 함수를 만들었다.   
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#define Fclose(a) if (a != NULL) \
+{\
+    fclose(a); \
+    a = NULL; \
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위의 함수는 fclose()를 호출하기 전에 우선 스트림이 NULL인지를 확인하고 NULL이라면 
+		이미 닫혀진 스트림으로 가정하고 그냥 넘어간다. 만약 NULL이 아니라면 열려있는 
+		스트림이라고 판단하고 fclose()를 호출한다. fclose()를 호출한 후에 닫혀진 스트림이라는
+		걸 확인시키기 위해서 스트림이 NULL을 가르키도록 한다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN34"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fopen%283%29"
+TARGET="_top"
+>fopen(3)</A
+>
+				</P
+></LI
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fflush%283%29"
+TARGET="_top"
+>fflush(3)</A
+>
+				</P
+></LI
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fdopen%283%29"
+TARGET="_top"
+>fdopen(3)</A
+>
+				</P
+></LI
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=43"
+TARGET="_top"
+>stdio.h 사용하기</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

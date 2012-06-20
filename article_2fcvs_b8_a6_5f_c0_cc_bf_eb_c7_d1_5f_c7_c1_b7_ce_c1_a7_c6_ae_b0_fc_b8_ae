@@ -1,0 +1,1823 @@
+#title cvs를 이용한 프로젝트 관리
+[wiki:docbook_cvs를_이용한_프로젝트_관리 Docbook 원문]
+
+[[TableofContents]]
+== FAQ ==
+cvs 사용중 궁금한 내용을 올려주세요. 어느정도 정리가 되면 본문에 정식 포함시킬 생각입니다. 
+==== snapshot ====
+어느 한 시점에서 프로젝트 파일들에 동일한 꼬리표(TAG)를 붙여서, 프로젝트가 계속 진행되더라도 필요할 때 snapshot 시점의 프로젝트를 가져올 수 있다. 
+
+테스트 최종 완료시점, 1차 성능 완료 시점등의 프로젝트를 따로 유지해서 나중에 다시 가져오고 싶을 경우, CVS를 이용하지 않는다면 tar등으로 프로젝트 전체를 압축해서 보관해야 할 것이다. cvs는 명령어 한줄로 간단하게 이러한 문제를 해결할 수 있다. 
+{{{#!plain
+# cvs tag TEST_REL_1
+}}}
+이제 이 프로젝트는 TEST_REL_1 이라는 꼬리표(tag)가 붙게 된다. 프로젝트 진행중 TEST_REL_1 꼬리표가 붙은 프로젝트를 가져오길 원한다면 아래와 같이 하면 된다.
+{{{#!plain
+# cvs co -rTEST_REL_1 myprogdir
+}}}
+이제 myprogdir에 TEST_REL_1의 snapshot 프로젝트가 생성이 되었다.
+
+
+== 본문 ==
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>cvs 를 이용한 프로젝트 관리</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+></A
+>cvs 를 이용한 프로젝트 관리</H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44256;&#52828; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 1.0</TD
+><TD
+ALIGN="LEFT"
+>2005년 6월 9일 13시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>바이너리 파일 추가 방법,
+				디렉토리 upload 방법,
+				오타 수정</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.9</TD
+><TD
+ALIGN="LEFT"
+>2003년 10월 20일 21시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>익명 CVS 설정 추가, 
+				diff관련 옵션 설명 추가</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 8월 11일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서 작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1. <A
+HREF="#AEN22"
+>CVS에 대한 소개</A
+></DT
+><DT
+>2. <A
+HREF="#AEN30"
+>CVS에 대한 기본지식</A
+></DT
+><DD
+><DL
+><DT
+>2.1. <A
+HREF="#AEN32"
+>CVS 란?</A
+></DT
+><DT
+>2.2. <A
+HREF="#AEN35"
+>어떨때 CVS가 필요하죠?</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1. <A
+HREF="#AEN38"
+>공동 프로젝트 관리</A
+></DT
+><DT
+>2.2.2. <A
+HREF="#AEN46"
+>프로젝트 백업</A
+></DT
+><DT
+>2.2.3. <A
+HREF="#AEN51"
+>데이터 동기화</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3. <A
+HREF="#AEN57"
+>CVS 사용하기</A
+></DT
+><DD
+><DL
+><DT
+>3.1. <A
+HREF="#AEN59"
+>CVS 서버 설치하기</A
+></DT
+><DD
+><DL
+><DT
+>3.1.1. <A
+HREF="#AEN71"
+>CVS저장소 만들기</A
+></DT
+><DT
+>3.1.2. <A
+HREF="#AEN76"
+>CVS 유저 환경 설정</A
+></DT
+><DT
+>3.1.3. <A
+HREF="#AEN82"
+>CVS 사용하기</A
+></DT
+><DD
+><DL
+><DT
+>3.1.3.1. <A
+HREF="#AEN87"
+>익명 CVS설정하기</A
+></DT
+></DL
+></DD
+><DT
+>3.1.4. <A
+HREF="#AEN97"
+>CVS 사용자 환경설정</A
+></DT
+></DL
+></DD
+><DT
+>3.2. <A
+HREF="#AEN104"
+>cvs 클라이언트 사용하기</A
+></DT
+><DD
+><DL
+><DT
+>3.2.1. <A
+HREF="#AEN106"
+>로그인 하기 : login</A
+></DT
+><DT
+>3.2.2. <A
+HREF="#AEN112"
+>프로젝트 만들고 등록하기 : import</A
+></DT
+><DT
+>3.2.3. <A
+HREF="#AEN121"
+>프로젝트 가져오기 : checkout</A
+></DT
+><DT
+>3.2.4. <A
+HREF="#AEN125"
+>프로젝트 수정후 적용(업데이트) : commit</A
+></DT
+><DT
+>3.2.5. <A
+HREF="#AEN130"
+>파일 받아오기/로그 보기 : update, log</A
+></DT
+><DT
+>3.2.6. <A
+HREF="#AEN135"
+>버젼별 차이 확인 : diff</A
+></DT
+><DT
+>3.2.7. <A
+HREF="#AEN145"
+>파일 추가하기 : add</A
+></DT
+><DT
+>3.2.8. <A
+HREF="#AEN151"
+>충돌의 해결</A
+></DT
+><DT
+>3.2.9. <A
+HREF="#AEN162"
+>필요없는 파일지우기 : delete</A
+></DT
+><DT
+>3.2.10. <A
+HREF="#AEN167"
+>프로젝트를 완료했을때 : release</A
+></DT
+></DL
+></DD
+><DT
+>3.3. <A
+HREF="#AEN170"
+>효율적인 프로젝트 관리를 위한 CVS 사용법</A
+></DT
+><DT
+>3.4. <A
+HREF="#AEN177"
+>기타 옵션</A
+></DT
+><DD
+><DL
+><DT
+>3.4.1. <A
+HREF="#AEN179"
+>디렉토리 upload하기</A
+></DT
+><DT
+>3.4.2. <A
+HREF="#AEN183"
+>바이너리 파일 추가하기</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>4. <A
+HREF="#AEN187"
+>CVS 의 다른 활용들</A
+></DT
+><DT
+>5. <A
+HREF="#AEN192"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="AEN22"
+></A
+>1. CVS에 대한 소개</H1
+><P
+>		과거는 컴퓨터 시스템의 능력이 매우 제한적이였고 사용하는 유저 
+		역시 제한적이거나 지극히 개인적인 용도로 사용하는 경우가 대부분 
+		이였다. 때문에 소프트웨어역시 비교적 단순했으며 단지 한두명의 
+		개발자 투입만으로도 꽤나 쓸만한 애플리케이션이 만들어지기도 했다. 
+	</P
+><P
+>		도스 시절부터 컴퓨터를 다루어왔던 유저라면 "누구누구의 어떤 프로그램"
+		이라는 얘기를 많이 들어 보았을 것이다. 지금은 사정이 달라져서 
+		아주 간단한 프로그램이 아니고서는 혼자 개발해서 그럭저럭 인지도 
+		있는 프로그램을 만든다는것 자체가 매우 힘들어졌다. 
+	</P
+><P
+>		요즘은 UI만 제작하는 것도 하나의 작업으로 분류된다. 인터넷이 일반적으로 
+		보급되면서 대부분의 애플리케이션은 C/S환경하에서 작동하게 된다. 
+		개발자는 데이터전송과 처리에 대한 부분까지 신경써야 하며 많은 경우 
+		서버와 클라이언트가 서로 다른 운영체제하에 놓이며, 특히 서버 프로그램의 
+		경우 여러가지의 전혀 달라보이는 운영체제를 지원해야하는 경우도 있다.  
+	</P
+><P
+>		이런 이유로
+		왠만한 규모의 프로젝트라 할지라도 혼자서 개발을 진행한다는건 
+		매우 힘들며, 대부분 팀단위로 프로젝트를 진행을 하게 된다. 
+		이 팀이란건 또 어떤가 같은 사무실에서 같은 시간에 존재하면서 
+		서로 의견교환을 통해서 프로젝트를 진행 시킬 수도 있지만 인터넷이라는 
+		매체를 통해서 전혀 다른 공간에서 전혀 다른 시간대에 프로젝트를 
+		진행 시켜야 하는 경우도 생긴다. 전 세계인이 참여하는 많은 
+		오픈 프로젝트가 그러하다.  
+	</P
+><P
+>		이런 경우 하나의 소스코드를 한명 이상이 접근해서 수정할 수 있는데, 
+		프로젝트를 진행하다 보면 소스코드가 엉뚱하게 꼬일 수 있을 것이다. 
+		같은 사무실에서 단지 몇명의 프로그래머가 작업을 한다면, 
+		서로 의견조율을 하거나 처음부터 각각의 모듈만 담당하게 만들어서 
+		어느정도 문제를 해결할 수 있을 거라고 생각할 수도 있을 것이다. 
+		그러나 막상 프로젝트를 진행해보면 이게 결코 말처럼 쉬운일이 
+		아니란걸 알게 될것이다. 프로젝트를 진행하다 보면 이쪽 시스템에서 
+		테스트하고, 저쪽 시스템에서 테스트하고 문제가 생기면 즉각 
+		수정을 하게 되는데, 이러다보면 소스코드가 여기저기 위치하게 
+		되고 결국 어느 소스가 최근 소스코드인지 헷갈리는 사태가 
+		발생하게 된다. 하물며 오픈소스와 같이 수많은 프로그래머가 느슨하게 
+		묶여있는 경우는 더 말할 필요도 없다. 적당한 버젼관리 도구의 
+		사용없이는 프로젝트의 진행자체가 불가능해질 것이다.  
+	</P
+><P
+>		이러한 문제의 해결을 위해서 여러도구가 개발되었는데, 그중 하나가 CVS로 
+		현재 가장 널리 사용되고 있는 버젼관리 도구이다.  
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN30"
+></A
+>2. CVS에 대한 기본지식</H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN32"
+></A
+>2.1. CVS 란?</H2
+><P
+>	
+			CVS는 Concurrent Version System 의 줄임말로써 직역 하자면 
+			공동 버젼 시스템, 의역하자면 "공동으로 진행하는 프로젝트의 
+			버젼 관리 시스템" 정도가 될것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN35"
+></A
+>2.2. 어떨때 CVS가 필요하죠?</H2
+><P
+>			CVS는 사용하기에 따라서 여러가지 용도로 사용할수 있다. 
+			이번장에서는 CVS를 이용할수 있는 다양한 상황들에 대해서 
+			알아보도록 하겠다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN38"
+></A
+>2.2.1. 공동 프로젝트 관리</H3
+><P
+>				회사혹은 학교에서 프로젝트를 진행하다보면, 여러명이서 
+				하나의 프로젝트를 진행하는 경우가 발생할것이다. 
+			</P
+><P
+>				이럴경우 보통 모듈별로 개발을 하게 되겠지만, 또한 모듈은 
+				전체 프로젝트에 영향을 미치게 되므로, 자신의 모듈버젼과 
+				전체 프로젝트의 버젼을 컨트롤할수 있어야 한다. 그리고 
+				코드가 충동하게 될경우(서로 같은 부분을 수정함으로써)의 
+				문제를 해결할수 있어야 한다. 
+			</P
+><P
+>				이러한 작업은 프로젝트 규모가 작고 개발 참여자 수가 적고, 
+				개발 참여자가 가까운 지역(사무실 같은)에 모두 모여있다면, 
+				한명의 버젼관리자(보통은 팀장)를 두고 그럭저럭 관리가 
+				가능할것이다.  
+			</P
+><P
+>				그러나 조금만 프로젝트가 커지고, 개발참여자 수가 많아지고
+				개발자가 지역적으로 떨어져 있는 상황에서는 거의 불가능 하다는 
+				걸 알수 있게 될것이다. 특히 인터넷을 통해서 느슨하게 연결된 
+				오픈 프로젝트의 경우 도구를 사용하지 않는 다면 거의 관리가 
+				불가능 할 것이다.
+			</P
+><P
+>				CVS 를 사용하면
+				이러한 대규모의 프로젝트에서 각 모듈 개발자가 자신의 
+				버젼을 유지하면서 전체 프로젝트에 참여할수 있도록 할수 있다. 
+			</P
+><P
+>				실제로 KDE, GNOME, APACHE 서버 등 다양한 프로젝트가 CVS 를 
+				이용해서 프로젝트를 관리하고 있다. 이러한 프로젝트는 
+				규모가 작아도 수십명, 혹은 수백명이 프로젝트를 진행하게 
+				되는데(게다가 지역적으로 멀리 떨어져 있다), CVS가 중간에서 
+				프로젝트가 산으로 가지 않도록 중계해준다. 오픈 프로젝트를 
+				하는데 있어서 CVS는 거의 표준적으로 사용되는 버젼관리 
+				도구이다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN46"
+></A
+>2.2.2. 프로젝트 백업</H3
+><P
+>				CVS 를 사용할경우 자동적으로 프로젝트 백업의 문제까지 
+				해결이 가능하다. CVS 는 중간에 CVS 서버가 있어서, 
+				프로젝트 데이터의 저장소 역할을하며  모든 개발자는 CVS 서버에서 
+				최신의 프로젝트를 다운로드 받아서, 자신의 컴퓨터에서 
+				테스트하고 코딩해서, 이걸 다시 CVS 서버에 업데이트 시키는 
+				방식을 사용하게 된다. 
+			</P
+><P
+>				그러므로 실수로 자신의 프로젝트 데이터가 날아간다고 해도
+				전혀 염려할 필요가 없다. 그냥 서버에서 다시 다운 받기만 
+				하면 된다. 
+				최악의 경우 CVS 서버가 날라갔다고 하더라도 가장 최근의 
+				쏘쓰를 가진 개발자가 있을 것이므로 쉽게 복구 가능하다.
+			</P
+><P
+>				또한 CVS는 최신 버젼의 소스코드 뿐만 아니라 과거 버젼의 
+				소스코드에 대한 정보를 가지고 있어서 최근의 몇개 버젼에 
+				문제가 생겼다고 하더라도 쉽게 그이전의 소스코드를 얻어올 
+				수 있다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN51"
+></A
+>2.2.3. 데이터 동기화</H3
+><P
+>				요즘은 회사와 집과의 경계가 많이 허물어 졌다. 
+				(좋은 현상인지 나쁜 현상인지는 좀 생각해 봐야겠지만) 
+				그러다 보니 회사에서 하는일을 가정에서 하기도 하고, 가정에서 
+				했던 일을 회사로 가져가기도 한다. 그럴경우 회사의 컴터와 
+				가정의 컴터에 있는 데이타의 동기화가 필수적이다. 이런 데이타 
+				동기화를 위해서 "노트북", "PDA" 같은걸 사용할수 있겠지만, 이건 
+				너무 비싸다. ftp 도 사용할수 있겠지만, 이거 잘못 사용하면 
+				데이터가 꼬일수 있다. 또한 상당히 불편하다.  
+			</P
+><P
+>				이럴때 CVS 를 사용하면 대단히 편하게 작업이 가능하다. 
+				회사에서 작업을 마치고 CVS 서버에 등록하고, 가정으로 돌아가서 
+				CVS 서버에 등록된 최신의 작업을 받아와서 작업을 하고 
+				다시 CVS 서버에 등록만 하면 되기 때문이다. 
+				(물론 이왕이면 가정에까지 회사일을 가지고 가지 않으면 
+				좋겠지만..) 
+			</P
+><P
+>				또한 덤으로 자신의 중요한 자료까지 자동으로 백업된다. 
+			</P
+><P
+>				필자 역시 이러한 방법으로 작업을 한다. 작업거리가 좀 남았는데, 
+				회사에서는 일이 잘안되고(실은 일하기 싫어서겠지만 --;), 
+				그냥 집에가서 느긋하게 TV도 보고, 웃통 벗어던지고 일하고 
+				싶을때 매우 편하게 CVS를 이용할수 있다. 
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN57"
+></A
+>3. CVS 사용하기</H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN59"
+></A
+>3.1. CVS 서버 설치하기</H2
+><P
+>			지금 까지 CVS에 대한 개론적인 설명을 알아 보았다. 이제 본격적으로 
+			CVS를 설치하고 운용하고 사용하는 방법을 알아보도록 하겠다.  
+			CVS 서버 설치는 redhat 8.x 리눅스를 기준으로 하겠다. 
+			대부분의 redhat 리눅스 배포판은 cvs 를 기본적으로 포함하고 있다. 
+			rpm 패키지 관리자를 통해서 설치하자.  
+		</P
+><P
+>			이제 Internet services daemon 에 cvs 서버를 등록 시켜주기만 하면 
+			된다. 레드헷 7.x 버젼부터는 inetd 대신에 xinetd 가 Internet services 
+			daemon 으로 사용되어 지고 있다. /etc/xinetd.d 디렉토리 밑에 
+			cvspserver 이란 이름으로 서비스 설정파일을 만들도록 하자. 
+			내용은 다음과 같다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>service cvspserver
+{
+    disable         = no
+    flags           = REUSE
+    socket_type     = stream
+    wait            = no
+    user            = root
+    server          = /usr/bin/cvs
+    server_args     = --allow-root=/home/cvs pserver
+    log_on_failure  += USERID
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			만약 inetd를 사용하는 예전 버젼의 리눅스라면 아래와같이 
+			설정하도록 한다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># echo "2401 stream tcp nowait root /usr/bin/cvs cvs -f \
+  --allow-root=/cvsroot pserver" &#62;&#62; /etc/inetd.conf
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			위의 설정값들중 --allow-root를 주목하기 바란다. 프로젝트가 
+			서버에 저장된다면 당연히 이들 프로젝트가 서버의 어디 디렉토리로 
+			저장되어야 하는지 지정할 수 있어야 할것이다. cvs에서는 
+			이를 repository(이하 저장소)라고 한다. --allow-root는 
+			cvs 저장소가 /home/cvs임을 명시해 주기 위해서 사용된다. 
+			만약 새로운 프로젝트인 hello_world를 만들었다면 
+			이 프로젝트는 /home/cvs/hello_world 디렉토리에 저장이 된다.    
+		</P
+><P
+>			이제 xinetd 데몬(혹은 inetd데몬)을 다시 실행(/etc/rc.d/init.d/xinetd restart) 시키면 
+			cvs 서버가 작동하게 될것이다. 
+			cvs 서비스는 2401 포트를 이용해서 서비스 된다(/etc/services 참조). 
+			제대로 cvs 서비스가 되고 있는지 알아보기 위해서 포트 스캐닝 도구인 
+			nmap 을 사용해서 확인해 보도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@cvs xinetd.d]# nmap 192.168.0.4
+
+Starting nmap V. 2.54BETA7 ( www.insecure.org/nmap/ )
+Interesting ports on localhost.localdomain (127.0.0.1):
+(The 1527 ports scanned but not shown below are in state: closed)
+Port       State       Service
+22/tcp     open        ssh                     
+25/tcp     open        smtp                    
+80/tcp     open        http                    
+111/tcp    open        sunrpc                  
+2401/tcp   open        cvspserver              
+3306/tcp   open        mysql                   
+		</PRE
+></TD
+></TR
+></TABLE
+>
+			2401 번 포트로 cvspserver 가 서비스 되고 있음을 알수 있다. 
+			이로써 cvs 서버의 설치및 가동을 마쳤다.  
+		</P
+><P
+>			다른 배포판을 사용하더라도 설치상에 있어서 문제점은 없을것이다. 
+			데비안 이라면 전용 패키지관리자를 이용해서 설치하면 된다. 
+			패키지 설치가 여의치 않다면 쏘쓰를 직접 컴파일 해서 설치
+			하면 된다.
+		</P
+><P
+>			cvs 는 cvspserver 를 이용한 서비스 외에도 rsh, ssh 를 이용한 
+			서비스도 가능하다. 이에 대한 내용은 <A
+HREF="http://kldp.org/KoreanDoc/html/CVS_Tutorial-KLDP"
+TARGET="_top"
+>CVS 사용</A
+> 문서를 참고 하기 바란다. 
+			이문서에서는 가장 널리 사용되는 cvspserver 방식에 대해서만 설명하고 있다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN71"
+></A
+>3.1.1. CVS저장소 만들기</H3
+><P
+>			위의 설정에서 우리는 /home/cvs를 프로젝트들을 위한 저장소로 
+			사용한다고 했는데, 저장소로 사용하기 전에 저장소 터를 다지기 
+			위한 사전작업이 필요하다. 
+		</P
+><P
+>			이러한 작업은 cvs에서 제공하는 init옵션을 통해서 가능하다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs -d /home/cvs init
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			-d를 이용해서 저장소로 사용될 디렉토리를 지정하고 
+			init를 명시하는 정도로 어렵잖게 저장소를 생성할 수 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN76"
+></A
+>3.1.2. CVS 유저 환경 설정</H3
+><P
+>	
+			CVS 에 서버를 만들어 놓았으면 이제 CVS 자원을 사용하도록 
+			환경설정을 해주어야 한다. 가장 중요한 건 공동으로 작업할 
+			프로젝트 파일들이 저장될 CVS 저장 디렉토리(저장소)를 설정하는 일이다.   
+		</P
+><P
+>	
+			일단 우리는 위의 /etc/xinetd.d/cvspserver 를 설정하면서 
+			cvs 데몬이 뜨게될경우 --allow-root 옵션을 이용해서 /home/cvs 
+			를 홈디렉토리(프로젝트가 저장될 디렉토리)를 지정했다. 이제 
+			/home/cvs 를 실제 프로젝트 사용자들이 사용할수 있도록 권한 설정을 
+			해주어야 한다.  
+		</P
+><P
+>	
+			cvs 의 권한 설정을 위해서 cvs 란 그룹을 만들도록 하고 /home/cvs 
+			디렉토리에 cvs 그룹에 대해서 읽기/쓰기/실행 권한을 부여하도록 
+			하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># groupadd cvs
+# mkdir cvs
+# chmod 770 cvs 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이제 cvs 그룹에 포함된 모든 사용자는 CVS 자원을 이용할수 있는 
+			권한을 가지게 되며, 이후로는 프로젝트를 등록시켜서 공동작업에 
+			CVS 를 이용하기만 하면 된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN82"
+></A
+>3.1.3. CVS 사용하기</H3
+><P
+>			이제 CVS 서버의 설정이 끝났음으로, 클라이언트의 입장에서 
+			어떻게 프로젝트를 등록하고 공동으로 작업을 진행시킬수 있는지에 
+			대해서 알아보도록 하겠다. 이러한 작업들은 클라이언트에게 제공되는 
+			"cvs" 라는 프로그램을 통해서 이루어진다.   
+		</P
+><P
+>			CVS 의 사용방법은 다음과 같은 환경하에서 테스트되었다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>              +------------+
+              | @cvs       | project : hello_world
+              | CVS SERVER |
+              +------------+
+                     |
+                     |
+        +------------+------------+ 
+        |                         | 
+   +---------+               +---------+
+   | @myhome |               | @one    |
+   +---------+               +---------+</PRE
+></TD
+></TR
+></TABLE
+>
+			@cvs 는 CVS 저장소를 가지고 있는 서버이며, 
+			@myhome 은 "팀원" @one 는 "팀장" 의 개발호스트(컴퓨터) 이다. 
+			공동으로 진행될 프로젝트는 hello_world 이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN87"
+></A
+>3.1.3.1. 익명 CVS설정하기</H4
+><P
+>				익명 CVS란 말그대로 일반 사용자에게 CVS를 읽고/쓸수 있는 
+				권한을 부여하는 것이며, 많은 오픈 프로젝트들이 익명 CVS를 
+				허용해서 가능한한 많은 개발자가 참여할 수 있도록 길을 열어 
+				놓고 있다.  
+			</P
+><P
+>				이러한 익명 CVS사용자는 보통 프로젝트에 대한 읽기권한만을 
+				부여한다.  익명 사용자에게 쓰기권한을 주면 프로젝트의 진행이 
+				너무 산만해 질 수 있기 때문이다. 익명 사용자(혹은 개발자)는 
+				프로젝트에 반영해야 될 내용이 있을 때 메일등을 통해서 
+				프로젝트 메인 개발자에게 통보하는게 보통이다. 
+			</P
+><P
+>				익명 CVS를 허용하기 위해서는 우선 시스템에 anonymous계정이 
+				만들어져 있어야 한다. 쉘을 가지지 못하도록 설정한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># useradd anonymous -s /bin/false 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그리고 /cvsroot/CVSROOT/passwd 파일에 위의 
+				계정을 등록하면 된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># echo anonymous: &#62; /cvsroot/CVSROOT/passwd
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				정확하게는 <B
+CLASS="EMPHASIS"
+>[유저아이디]:[패스워드]</B
+>의 
+				형태가 되어야겠지만 익명 CVS의 경우 패스워드를 설정하지 
+				않는게 일반적이므로 패스워드는 생략하도록 한다. 
+				패스워드를 부여하고 싶다면 crypt된 문자열값을 사용하도록 
+				한다. 
+			</P
+><P
+>				익명 CVS사용자의 경우 아래와 같이 설정해서 읽기만 가능하도록 
+				권한을 제한시킨다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># echo anonymous &#62; /cvsroot/CVSROOT/readers
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN97"
+></A
+>3.1.4. CVS 사용자 환경설정</H3
+><P
+>				cvs 서버에 프로젝트를 등록시키고, 프로젝트를 업데이트하고, 
+				받아오기 위해서 우리는 "cvs" 라는 전용 클라이언트를 사용하게 
+				된다. "cvs" 다음에 여러가지 명령행 옵션을 이용함으로써, 
+				원하는 작업을 하게 된다.  
+			</P
+><P
+>				"cvs" 프로그램을 사용하기 위해서 우리는 CVS 서버에 접근해서 
+				지정된 디렉토리(프로젝트가 저장되는 디렉토리 다른말로 "저장소") 
+				가 어디인지 cvs 프로그램에 알려주어야만 한다.  	
+				보통 환경변수인 CVSROOT 를 통해서 "cvs" 에게 CVS 서버의 
+				정보를 알려준다. 
+				그러므로 자신의 홈디렉토리의 
+				.bash_profile 파일에 다음과 같은 내용을 
+				추가시켜주어야 한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>CVSROOT=:pserver:yundream@192.168.0.5:/home/cvs
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 CVSROOT 에는
+				"pserver" 은 우리가 CVS 서버에 접근하기 위해서 pserver 방식을 
+				사용할것이며, 서버의 IP는 192.168.0.5 접근 아이디는 yundream 
+				그리고 프로젝트가 저장되어 있는 
+				저장소 디렉토리는 /home/cvs 라는 정보를
+				가지고 있다. 
+			</P
+><P
+>				환경변수 CVSROOT 를 사용하지 않고 -d 를 이용하는 방법도 있다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>cvs -d :pserver:yundream@192.168.0.5:/home/cvs [옵션]
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그러나 이방법은 불편하므로 환경변수를 사용하도록 하자. 	
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN104"
+></A
+>3.2. cvs 클라이언트 사용하기</H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN106"
+></A
+>3.2.1. 로그인 하기 : login</H3
+><P
+>				프로젝트를 아무나 접근해서 사용하게 해서는 당연히 안될 
+				것이다. 그러므로 최초에 아이디와 패스워드를 이용한 
+				인증절차를 거치게 된다. 		
+			</P
+><P
+>				CVS 서버에 로그인 하기 위해서는 "cvs" 다음에 옵션으로 login 					을 주고 실행시키면 된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs login
+CVS password: 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그러면 패스워드를 묻는 프롬프트가 떨어질것이다. 자신의 
+				패스워드를 입력하면 인증이 성공된다. 
+				한번 인증이 성공되면 인증에 사용한 여러가지 정보가 
+				.cvspass 에 저장되고 다음부터는 .cvspass 를 사용해서 
+				자동적으로 인증을 하기 때문에 최초에 한번만 login 을 
+				성공하면 된다.    
+			</P
+><P
+>				물론 당연히 CVS 서버인 192.168.0.5 에는 yundream 이란 사용자가 
+				등록되어 있어야 하며 이 사용자는 cvs 그룹에 포함되어 
+				있어야 한다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN112"
+></A
+>3.2.2. 프로젝트 만들고 등록하기 : import</H3
+><P
+>				가장 먼저 해야할일은 진행될 프로젝트를 만들고 
+				등록하는 일이다. 우리가 진행하고자 하는 프로젝트는 
+				hello_world 프로젝트이며, 여기에는 hello.c라는 
+				하나의 파일이 포함되어 있다. 다음은 hello.c의 코드이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int main()
+{
+    printf("Hello World\n");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				우리는 단지 hello.c코드가 
+				있는 디렉토리로 이동해서 다음과 같이 import 시켜주면 
+				된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cd hello_world
+# cvs -d:pserver:yundream@192.168.0.5:/home/cvs import hello_world project start
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 디렉토리는 프로젝트 임포트를 위해서 새로 준비된 
+				디렉토리여야 한다. 그렇지 않고 잡다한 파일들이 있을경우 
+				이들 파일들까지 몽땅 프로젝트에 등록되어 버린다. 
+				만약 환경변수 CVSROOT가 설정되어 있다면 아래와 같이 
+				간단하게 import를 실행할 수 있을 것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs import hello_world project start
+N hello_world/hello.c
+
+No conflicts created by this import
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				2번째 인자인 hello_world는 import할 프로젝트의 이름이며 
+				project, start는 프로젝트의 부가 정보들이다
+				(별로 신경쓸 필요 없다).
+			</P
+><P
+>				이렇게 하면 cvs서버의 저장소에 hello_world란 디렉토리가 
+				생기고 여기에 hello.c가 올라가게된다. 
+				<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>						cvs 저장소에 올라가는 파일 원래 파일이름뒤에 ',v'이 
+						붙어서 저장된다. hello.c라면 hello.c,v라는 이름으로 
+						저장되며 여기에는 hello.c의 원래 내용외에 
+						버젼 관리를 위한 각종 정보가 들어가게 된다.  
+					</P
+></BLOCKQUOTE
+></DIV
+>   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN121"
+></A
+>3.2.3. 프로젝트 가져오기 : checkout</H3
+><P
+>				프로젝트 관리자가 프로젝트를 만들었다면 이제 
+				프로젝트 개발자들이 프로젝트를 받아와서 필요한 작업을 
+				해야할 것이다. 
+				프로젝트에 가져오는 방법은 간단하다. "cvs" 다음에 
+				checkout(혹은 co) 옵션을 사용하면 된다. co 옵션 뒤에는 
+				등록할 프로젝트 이름(hello_world)를 명시해 주면 된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+# cvs co hello_world 
+cvs server: 
+Updating hello_world
+U hello_world/hello.c
+				</PRE
+></TD
+></TR
+></TABLE
+> 
+				성공적으로 프로젝트가 등록되었다. 이제 ls 해보면 
+				현재 디렉토리에 hello_world 라는 프로젝트이름을 가지는 
+				디렉토리가 생겼음을 알 수 있다. 이와 더불어 
+				hello.c역시 확인 가능할 것이다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN125"
+></A
+>3.2.4. 프로젝트 수정후 적용(업데이트) : commit</H3
+><P
+>				그런데 원래의 hello.c를 보면 printf()함수가 선언되어 있는 
+				stdio.h가 빠져있다. 대부분의 경우 문제가 없지만 
+				컴파일러에 따라서 경고메시지를 보내거나 심한경우 
+				컴파일 실패하는 경우도 있다. 그래서 헤더파일을 추가하기로 
+				했다.    
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    printf("Hello world");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>	 
+				헤더파일을 추가 시켰다. 
+				이제 프로젝트 내용을 내가 수정한 내용으로 cvs를 업데이트 
+				시켜야 할것이다. 이럴때는 "commit" 옵션을 이용하면 된다. 
+				-m 옵션을 이용하여 변경된 내용에 대한 간단한 로그도 남겨줄수 
+				있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs commit -m "stdio.h 헤더파일 인클루드" hello.c 
+Checking in hello.c;
+/home/cvs/hello_world/hello.c,v  &#60;--  hello.c
+new revision: 1.2; previous revision: 1.1
+done
+#
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				물론 cvs 업데이트를 시킬때는 반드시 컴파일이 되는지 정도는 
+				확인하고 올려야 될것이다. 컴파일도 안되는 코드를 올렸다가는 
+				팀원들에게 원망의 소리를 듣게 될것이다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN130"
+></A
+>3.2.5. 파일 받아오기/로그 보기 : update, log</H3
+><P
+>	
+				이제 여러분은 hello_world 프로젝트의 진행 일원이 
+				되었다. 프로젝트 참여 개발자로서 여러분이 
+				컴퓨터 앞에 앉았다면 가장 먼저 해야할일은 간밤에 누군가 
+				프로젝트를 수정하지 않았는지 확인하고 테스트하는 
+				일부터 해야 한다. 최근 프로젝트에 대한 변경사항은 
+				"up"을 이용해서 확인할 수 있다.     
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[yundream@myhome hello_world]$ cvs up
+cvs server: Updating .
+P hello.c
+[yundream@myhome hello_world]$ 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				hello.c 라는 파일이 수정 돼었음을 알수 있다. 
+				hello.c 는 새로이 수정 되었음으로 누가 어떤 이유로 
+				코드를 수정했는지 확인해볼 필요가 있을 것이다. 
+				이럴때는 "log" 명령을 사용한다. "log"명령을 사용하면 
+				해당 파일에 대한 간략한 로그정보를 얻어 올수 있다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[yundream@myhome hello_world]$ cvs log hello.c
+cvs server: Logging .
+
+RCS file: /home/cvs/hello_world/hello.c,v
+Working file: hello.c
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;     selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2002/06/07 01:36:27;  author: yundream;  state: Exp;
+stdio.h 헤더파일 인클루드
+=============================================================================
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그러면 버젼정보에서 부터, 
+				누가 수정을 했는지, 언제 수정을 했는지와 commit하면서 
+				남긴 로그메시지 등이 표시 
+				됨으로 hello.c 가 어떤식으로 변경되었는지 대략의 
+				정보를 얻어올 수 있다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN135"
+></A
+>3.2.6. 버젼별 차이 확인 : diff</H3
+><P
+>				이렇게 해서 새로운 소스 파일을 가져왔는데, 
+				어느 코드의 어떤 라인이 수정되었는지 
+				확인하고 싶을 때가 생길 것이다. 이러한 버젼별 코드 변경사항의 
+				히스토리가 남게 된다면 나중에 문제가 생겼을 때 이전버젼의 
+				코드를 쉽게 얻어낼수도 있을 것이다. 
+			</P
+><P
+>				cvs는 버젼별 코드변경사항을 모두 저장하며 개발자는 이 내용을 
+				이용해서 코드변경사항을 확인할 수 있을 뿐 아니라 문제가 
+				생겼을시 이전 버젼의 코드를 얻어올 수도 있다.
+				<DIV
+CLASS="NOTE"
+><BLOCKQUOTE
+CLASS="NOTE"
+><P
+><B
+>&#52280;&#44256;: </B
+>						물론 이러한 작업을 위해서는 약간의 수작업이 필요한데, 
+						공개된 CVS프론트엔드들은 자동으로 이러한 
+						귀찮은 일을 대신 해준다. 아마도 웹기반의 CVS프론트엔드가
+						가장 좋은 선택이 될 것이다. 
+					</P
+></BLOCKQUOTE
+></DIV
+>
+			</P
+><P
+>				버젼별 변경내용은 diff를 통해서 확인할 수 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>//hello.cc에 대해서 1.1버젼과 1.2버젼과의 변경내용을 출력하시오.
+# cvs diff -r 1.2 -r 1.1 hello.cc
+bash-2.04# cvs diff -r 1.2 -r 1.1 hello.c 
+Index: hello.c
+===================================================================
+RCS file: /home/cvs/hello_world/hello.c,v
+retrieving revision 1.2
+retrieving revision 1.1
+diff -r1.2 -r1.1
+1,2d0
+&#60; #include &#60;stdio.h&#62;
+&#60; 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				단지 diff만 사용하면 가장최근의 변경사항을 출력한다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#cvs diff test.cc
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN145"
+></A
+>3.2.7. 파일 추가하기 : add</H3
+><P
+>				이렇게 해서 프로젝트를 진행하다 보니 README파일을 추가시켜야 
+				할 필요성을 느끼게 되었다. 이처럼 프로젝트를 진행하다 보면 
+				중간중간 여러개의 파일을 추가해야 될건데 이럴경우 add를 
+				이용해서 파일을 추가하면 된다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs add README
+cvs server: scheduling file `README' for addition
+cvs server: use 'cvs commit' to add this file permanently
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이렇게 해서 파일을 추가하긴 했는데 이렇게 했다고해서 
+				바로 파일이 cvs에 등록되지는 않는다. 반드시 commit 를 해서 
+				파일이 프로젝트에 사용될것이라는것을 승인 시켜줘야 한다. 
+			</P
+><P
+>				이제 다른 개발자가 cvs up을 하면 README파일이 추가된것을 
+				확인할 수 있게 된다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs up
+cvs server: Updating .
+U README
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN151"
+></A
+>3.2.8. 충돌의 해결</H3
+><P
+>	
+				위의 경우는 "팀장"이 파일을 올리고, "팀원"이 파일을 받아서 
+				수정하고 다시 파일을 올리는 과정을 밟고 있다. 
+				그러나 하나의 프로젝트파일에 대해서 2명이 동시에 작업을 
+				하다보면 충돌되는 경우가 생길수 있을것이다. 
+			</P
+><P
+>	
+				예를 들어서 "팀장"과 "팀원"이 동시에 같은 라인을 수정하고 
+				있는데, 팀장이 먼저 commit 를 했다고 하자. 잠시 후에 
+				팀원이 commit 하면, 같은 코드라인에 대해서 충돌이 
+				일어나게 될것이다.  
+			</P
+><P
+>	
+				그렇지만 걱정할것 없다. cvs 가 알아서 자동적으로 관리해주기 
+				때문이다. 팀원이 자신의 쏘쓰를 commit 하려고 하면 cvs 는 
+				자동적으로 "코드라인에 충돌이 일어났음으로 먼저 update 를 
+				하시오" 라는 메시지를 출력한다. 그래서 update 를 시키면 
+				어느 부분이 충돌을 일으키는지 표시해준다.      
+			</P
+><P
+>	
+				다시 프로젝트 쏘쓰인 hello.c 로 돌아가서, 팀장이
+				다음과 같이 코드를 약간 수정했다고 가정하자.	 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    printf("Hello World!!!!!\n");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그런데 그때 "팀원" 도 동일한 코드를 수정했다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    printf("Hello World??\n");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이상태에서 팀장이 commit 시키고, 잠시후에 팀원이 commit 
+				시키려고 하면 다음과 같은 에러가 발생한다. 
+				(팀장은 아무 이상없이 commit 시킬수 있다)  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>&#13;[yundream@myhome hello_world]$ cvs commit -m hello.c
+cvs commit: Examining .
+cvs server: Up-to-date check failed for `hello.c'
+cvs [server aborted]: correct above errors first!
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이문제를 해결하기 위해서 먼저 update 명령을 이용해서 
+				현재 CVS서버에 저장된 프로젝트 내용을 가져오도록 한다. 
+				그러면 다음과 같은 메시지를 받아볼수 있을것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs up
+cvs server: Updating .
+RCS file: /home/cvs/hello_world/hello.c,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into hello.c
+rcsmerge: warning: conflicts during merge
+cvs server: conflicts found in hello.c
+C hello.c
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				기존의 1.3 버젼과 지금 버젼의 프로젝트와 충돌이 생겼음을 알수 
+				있다. 'C' 는 충돌(confilict)이 있음을 나타내는 단어이다. 
+				이제 hello.c 쏘쓰를 보면 다음과 같이 충돌되는 부분을 
+				표시해줄것이다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main(int main, char **argv)
+{
+&#60;&#60;&#60;&#60;&#60;&#60;&#60; hello.c
+    printf("Hello World!!!!!\n");
+=======
+    printf("Hello World??\n");
+&#62;&#62;&#62;&#62;&#62;&#62;&#62; 1.3
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이럴경우는 팀장과 연락을 취해서(메일, 메신저, 전화로) 
+				충돌되는 코드에 대해서 서로 조율해야 할것이다. 굳이 조율까지 
+				할 필요 없이 그냥 팀장의 코드를 사용하기로 했다면 충돌된 부분을 
+				팀장의 코드로 조정한다음에 commit시키면 된다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN162"
+></A
+>3.2.9. 필요없는 파일지우기 : delete</H3
+><P
+>				쏘쓰파일중에 더이상 필요가 없어진 파일에 대해서는 delete 명령을 
+				이용할수 있다. README 파일이 더이상 필요 없다면 우선 README
+				파일을 rm을 이용해서 지워주고.. delete한 후 commit시키면
+				된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># rm README
+# cvs delete README
+cvs server: scheduling `README' for removal
+cvs server: use 'cvs commit' to remove this file permanently
+
+# cvs commit -m "리드미 더이상 필요 없어서 삭제했음" README
+Removing README;
+/home/cvs/hello_world/README,v  &#60;--  README
+new revision: delete; previous revision: 1.1
+done
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이제 다른 프로젝트 개발자가 cvs up을 하면 다음과 같이 
+				README가 삭제되었음을 확인할 수 있게 된다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs up
+cvs server: Updating .
+cvs server: README is no longer in the repository
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이후 ls를 하면 실제 README파일이 지워져있음을 확인 할 수 
+				있을 것이다. 그렇다면 어떤 악의적인 개발자가 
+				중요한 파일을 지워버리면 잘못해서 해당 파일을 영원히 잃어 
+				버리게 되는 사태가 발생하지 않을지 걱정이 될 수도 있을 것이다.  
+				그러나 이 문제는 그리 크게 걱정할 필요가 없다. 해당 파일은 
+				이미 다른 여러 개발자들이 가지고 있을 것이며, 설혹 그렇지 
+				않다 하더라도 cvs 서버에는 파일이 보존이 되어 있기 때문에 
+				언제든지 복구 가능하기 때문이다. 또한 누가 파일을 삭제 했는지 
+				log를 통해서 쉽게 알아 낼 수 도있다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN167"
+></A
+>3.2.10. 프로젝트를 완료했을때 : release</H3
+><P
+>				프로젝트를 완료했다면, release 옵션을 사용해서 
+				프로젝트를 닫을수 있다. 프로젝트를 닫는다고 해서 
+				저장소의 파일을 완전히 지우는 것은 아니다. 단지 
+				저장소의 프로젝트에 어떠한 수정도 할수없는 상태다.
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN170"
+></A
+>3.3. 효율적인 프로젝트 관리를 위한 CVS 사용법</H2
+><P
+>			CVS는 여러명의 개발자가 참여한다는 가정하게 사용되어 지므로 
+			이를 효율적으로 프로젝트가 진행되도록 하기 위한 몇가지 
+			지켜야할 사항이 있는데 이들에 대해서 알아보도록 하겠다.  
+		</P
+><P
+>			아침에 와서 컴퓨터 앞에 앉았다면, 가장먼저 cvs up 을 이용해서 
+			밤사이에 업데이트 된 내용이 있는지 확인을 한다. 
+			그다음 작업에 들어간다. 공동작업을 할때 가장 중요한것은 
+			상대편 작업자가 무슨일을 하고 있는지에 대해 알아야 하는 
+			것이다. 습관적으로 cvs up을 해줘야 한다. 
+		</P
+><P
+>			그리고 꽤 중요한 수정이 있었다고 하면 중간중간에 commit하도록 
+			한다. commit할때도 우선 cvs up을 이용해서 수정사항이 있었는지 
+			확인하도록 하고 당연하지만 반드시 컴파일이 되는지 확인한 후   
+			commit 시켜야 한다. 	
+		</P
+><P
+>			CVS 를 제대로 사용하기 위해서는 CVS 저장소의 구성을 잘해놓아야 
+			한다. 예를 들어 Project_A 란 프로젝트를 시작한다면 
+			Project_A 란 디렉토리를 
+			만들고 그 아래에 프로젝트에 필요한 각종 디렉토리, 즉 작업문서의 
+			저장을 위한 doc 디렉토리, 실제 쏘쓰가 포함될 src 디렉토리, 
+			인크루드 파일이 존재하게 될 src/include 디렉토리 등, 체계적으로 
+			프로젝트를 관리할수 있도록 미리 저장소를 세팅해 놓아야한다. 
+			물론 나중에라도 디렉토리를 추가할수도 있지만, 이왕이면 미리 
+			프로젝트에 대한 계획을 잘 세워두는게 좋을것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>Project_A --+-- doc -+-- readme.txt
+            |        | 
+            |        +-- todo_list.txt
+            |        |
+            |        +-- schedule.xls 
+            |
+            +-- src --+-- Makefile
+                      |  
+                      +-- main.cc  
+                      |  
+                      +-- io.cc  
+                      |  
+                      +-- include --+-- io.h 
+                      |             | 
+                      |             +-- common.h 
+                      +-- lib     --+-- crypt.a 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그리고 가능하면 모듈별로 쏘쓰코드를 나누고, 각 모듈별로 분담해서 
+			개발을 하도록 하는게 프로젝트를 쉽게 관리 하는 방법이다. 
+			그러면 개발자는 자신의 모듈만 신경쓰면서도, 전체의 프로젝트의 흐름에 
+			유연하게 대처할수 있게 된다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN177"
+></A
+>3.4. 기타 옵션</H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN179"
+></A
+>3.4.1. 디렉토리 upload하기</H3
+><P
+>	
+				작업을 하다보면 디렉토리를 만들어서 cvs서버에 등록시켜야 하는
+				경우가 있다. 등록은 add와 commit를 이용해서 가능한데, 
+				이를 upload하기 위해서는 -d 옵션을 이용해야 한다. -d 옵션을 
+				사용하지 않을경우 일반 파일들만 upload하고 디렉토리는 upload
+				하지 않게 된다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs up -d
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN183"
+></A
+>3.4.2. 바이너리 파일 추가하기</H3
+><P
+>				cvs는 일반텍스트로 이루어진 파일을 잘 관리하게끔 최적화 되어있다.
+				그러다 보니 바이너리 파일을 추가할경우 이를 텍스트로 인식해서 
+				힘들게 추가했더니 파일이 깨지는 경우가 발생한다. 
+				바이너리 파일은 다음과 같은 방법으로 추가하도록 하자.	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># cvs add -kb filename.bin 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN187"
+></A
+>4. CVS 의 다른 활용들</H1
+><P
+>		필자는 개인 정보의 관리를 위해서 CVS 를 사용한다. 
+		회사에서 일하다가 좋은 사이트를 찾았다거나, 
+		중요한 메모 상황이 발생했다거나, 좋은 자료를 찾았을경우, 일정관리 
+		까지 모두 CVS 로 저장해두고 집에 있건 회사에 있건 개인 자료를 
+		공유할수 있도록 만들어 놓았다. 
+	</P
+><P
+>		모질라의 북마킹 데이타를 CVS 로 연결시켜 놓았기 때문에, 
+		집에 있건 회사에 있건 동일한 북마킹 데이타를 유지할수 있으며, 
+		일정관리(Koraganizer 을 이용한다), 메모데이타(knotes) 역시 공유 
+		가능하도록 해두어서 편하게 사용하고 있다. 
+	</P
+><P
+>		이렇게 CVS를 사용함으로써 PDA, email, 노트북(돈이 좀 있어야 한다) 
+		매체를 이용하지 않고도, 간단하게 데이타 동기화를 이루어 낼수 있다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN192"
+></A
+>5. 결론</H1
+><P
+>		이상 CVS의 설치와 간단한 사용방법과 활용방법에 대해서 얘기 해보았다. 
+		여기에 있는 내용은 CVS 의 많은 기능중 꼭 필요한 10% 정도의 내용만을 
+		다루고 있다. CVS 사용에 대한 깊은 내용을 알기 원한다면 cvs 와 함께 
+		배포되는 man 페이지를 활용하거나 <A
+HREF="http://kldp.org/KoreanDoc/html/CVS-KLDP/index.html"
+TARGET="_top"
+>CVS 이야기</A
+>, <A
+HREF="http://kldp.org/KoreanDoc/html/CVS_Tutorial-KLDP"
+TARGET="_top"
+>CVS 사용</A
+> 등의 문서를 참고하기 바란다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+== 관련 게시물 ==
+[[getphpbb(http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=29357&forum=1)]]

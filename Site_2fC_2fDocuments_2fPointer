@@ -1,0 +1,944 @@
+#title 데이터와 포인터에 대한 이해
+
+[[tag(pointer)]]
+포인터에 대한 메모리차원에서의 이해를 원한다면, [wiki:Site/Java/Documents/ComputerScienceUsingJava/Chapter03 자바를 이용한 컴퓨터 과학 3장 메모리]문서를 읽어 보기 바란다.
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>데이타 와 포인터</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>데이타 와 포인터</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN16"
+>데이타와 형(Type)</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>데이타는 bit 의 연속된 나열이다.</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1&#51208;. <A
+HREF="#AEN31"
+>구조체는 어떻게 저장되는가 ?</A
+></DT
+><DT
+>2.1.2&#51208;. <A
+HREF="#AEN36"
+>void 형에 대해서</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN54"
+>포인터 (Pointer)</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN59"
+>포인터는 주소를 가르킨다</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN79"
+>배열과 포인터는 동일하다</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		C 언어를 가장 처음 접하면서 겪는 어려움은 
+		엄격하게 구분되어 있는 자료형과 이들 자료들을 다루기 위해서 
+		사용하는 포인터라는 개념 그리고 이와 더불어서 사용되는 
+		형변환 이다. 
+	</P
+><P
+>		이는 최근의 여러가지 고수준 언어들이 포인터의 사용을 지양하고, 
+		자료형에 그리 엄격하지 않는것과 구분된다. 이들을 유저(프로그래머)가 
+		직접 다루게 되면 아무래도 프로그램 오류를 유발시킬 가능성이 
+		많아 짐으로 컴파일러에서 이러한 것들을 처리하도록 하고 있다.   
+	</P
+><P
+>		C 언어에서 이러한 것들의 처리는 프로그래머의 몫이다. 
+		그런 이유로 C 언어를 중급언어라고 한다. 프로그래머에게 위의 
+		문제들의 해결을 맡김으로써 분명 프로그래머에게 많은 부담이 주어지는 
+		건 사실이다. 그러나 또한 이것들을 제대로만 사용할줄 알게 된다면, 
+		다른 언어에서는 곤란한 저수준에서의 프로그래밍이 가능하게 된다. 
+		이런 이유로 C 언어가 시스템/네트웍 프로그래밍에서 다른 언어들 보다 
+		우위에 있게 되는 것이다.    
+	</P
+><P
+>		이 문서에서는 이러한 자료들이 어떻게 저장되는지, 형변환이 
+		어떻게 일어나는지 또한 자료에 접근하기 위해서 사용되는 
+		포인터란 어떤것인지에 대해서 알아보도록 할것이다. 
+	</P
+><P
+>		이 문서는 C 입문자 에게 포인터 개념을 가르키기 위한 목적으로 작성된 문서는 아니다. 
+		어느정도 C를 아는 사용자에 한해서 여전히 포인터에 대해서 헷갈리는 C 언어 초/중급 
+		사용자를 위한 내용을 담고 있다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>2&#51208;. 데이타와 형(Type)</A
+></H1
+><P
+>		결국 프로그램이 하는 일은 데이타를 저장하고, 읽어들이고 
+		일어들인 데이타를 처리해서 고객이 원하는 정보로 변환해서 
+		보여주는 것이다. 혹은 시스템 프로그램이라면 데이타를 
+		이용해서 시스템을 제어하는 일을 할것이다.    
+	</P
+><P
+>		그러므로 데이타가 어떤 방식으로 저장되고 읽어들일수 있는지 
+		이해하는 것은 대단히 중요한 일이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. 데이타는 bit 의 연속된 나열이다.</A
+></H2
+><P
+>			컴퓨터 입장에서는 프로그래머가 흔히 데이타의 형 구분을 위해서 
+			사용하는 int, char, long int 이런것에 대해서 전혀 상관하지 
+			않는다. 컴퓨터 입장에서는 데이타는 단지 bit 의 나열일 뿐이다. 
+			컴퓨터는 이 bit 를 8bit(1byte) 단위로 저장을 하게 된다.  
+		</P
+><P
+>			프로그래머가 흔히 사용하는 데이타 형이라는 것은 
+			프로그래머가 데이타의 조작을 편리하게끔 만들어 놓은 것에 
+			불과 하다. 즉 int 형이라면 연속된 4 byte(32bit) 정보를 
+			memory 혹은 디스크에 저장하고, char 형이라면 1 byte(8bit) 단위로 정보를 
+			저장하고/읽어들일것을 약속한 것일 뿐이다. 그러나 컴퓨터입장에서는 
+			그냥 byte 의 연속된 정보일 뿐이다.  
+		</P
+><P
+>			다음의 예제를 실행시켜 보자
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : mem.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    int  a[4];
+    char c[6] = "6789";
+    short int d[2];
+
+    a[0] = 324;
+    a[1] = 2000;
+    a[2] = 3;
+    a[3] = 4;
+
+    printf("a : int, c : char, d : short int&#92;n");
+
+    printf("size int   %d&#92;n", sizeof(int));
+    printf("size char  %d&#92;n", sizeof(char));
+    printf("size short %d&#92;n", sizeof(short));
+
+    printf("a[0] : %x&#92;n", &#38;a[0]);
+    printf("a[1] : %x&#92;n", &#38;a[1]);
+    printf("a[2] : %x&#92;n", &#38;a[2]);
+    printf("a[3] : %x&#92;n", &#38;a[3]);
+
+    printf("c[0] : %x&#92;n", &#38;c[0]);
+    printf("c[1] : %x&#92;n", &#38;c[1]);
+
+    printf("d[0] : %x&#92;n", &#38;d[0]);
+    printf("d[1] : %x&#92;n", &#38;d[1]);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 필자의 Linux 박스(kernel 2.4.x) 에서의 실행결과 
+			이다. 실행 값은 다를수 있다. (아시겠지만 '&#38;' 는 주소 연산자이다. 주소값을 
+			되돌려준다) 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>a : int, c : char, d : short int
+
+size int   4
+size char  1
+size short 2
+
+a[0] : bffff7b0
+a[1] : bffff7b4
+a[2] : bffff7b8
+a[3] : bffff7bc
+
+c[0] : bffff7a0
+c[1] : bffff7a1
+
+d[0] : bffff79c
+d[1] : bffff79e
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			sizeof() 함수는 자료형의 크기를 알아내기 위해서 사용하는 함수이다. 
+			sizeof 를 사용할경우 해당 자료형의 크기를 byte 단위로 되돌려준다.  
+		</P
+><P
+>			printf 에서 형식화된 입출력을 위해 사용된 %x 는 16 진수 형태로 보여주기 
+			위한 인자이다. 변수 a 는 int 형이며, int 형은 아시다시피 32bit 크기를 가진다. 
+			이것을 sizeof 해보면 4(32/8) 를 되돌려줄것이다. 
+			주소 값의 크기를 보라 a[0] 에서 부터 a[3] 까지 주소값이 4 만큼 증가하고 있음을 알수 
+			있다. 이 주소값은 byte 단위로 증가를 함으로 a[0] 에서 부터 a[3] 까지 메모리 상에 
+			연속되게 위치하고 있음을 알수 있을것이다.    	   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 단위 : byte 
+
+      0 1 2 3 
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     | a[0]  | a[1]  | a[2]  | a[3]  |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+bffff7b0     7b4     7b8     7bc
+       a[0] = 324 
+       a[1] = 2000
+       a[2] = 3
+       a[3] = 4
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		 	변수 c 의 경우에는 char 형인데, char 형은 1byte 크기를 가진다. 실제 주소의 증가분을 
+			봐도 1byte 크기 단위로 증가하고 있음을 알수 있다. 2 바이트 크기를 가지는 short int 
+			도 마찬가지로 2byte 크기 단위로 주소 값이 증가하고 있음을 알수 있다.     	
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>2.1.1&#51208;. 구조체는 어떻게 저장되는가 ?</A
+></H3
+><P
+>				위의 char, int, short 와 같은 자료형외에 struct 와 같은 프로그래머가 정의해서 
+				사용하는 자료형도 있다. 구조체는 여러개의 자료형을 묶어 놓은 형식을 취하고 있는데, 
+				struct 자료형 역시 컴퓨터의 입장에서 단순히 연속된 byte 의 모음이다. 
+				다음 프로그램을 컴파일후 실행시켜 보자.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+struct mydata
+{
+    int age;
+    int weight;
+
+    char name[16];
+    char juso[80];
+};
+
+int main()
+{
+    struct mydata data;
+
+    printf("%d&#92;n", sizeof(data));
+
+    printf("mydata.age    : %x&#92;n", &#38;data.age);
+    printf("mydata.weight : %x&#92;n", &#38;data.weight);
+    printf("mydata.name   : %x&#92;n", &#38;data.name);
+    printf("mydata.juso   : %x&#92;n", &#38;data.juso);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				실행하면 다음과 같은 결과를 보여줄 것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>104
+mydata.age    : bffff740
+mydata.weight : bffff744
+mydata.name   : bffff748
+mydata.juso   : bffff758
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				mydata 구조체의 sizof 값은 104 가 나왔다. 계산을 해보면 4+4+16+80 = 104 
+				로 정확하게 크기가 계산되었음을 알수 있다. 
+				그리고 printf 의 주소값을 보면 각각의 자료형에 알맞도록 메모리 크기가 할당되어 
+				있으며, 메모리 상에서 연속되게 할당되어 있음을 알수 있을 것이다. 
+				age, weight 는 4byte 씩, name 16 byte, juso 는 80byte 가 할당되어 있음을 
+				알수 있을 것이다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN36"
+>2.1.2&#51208;. void 형에 대해서</A
+></H3
+><P
+>				여러분은 void 타입에 대해서 들어본적이 있을것이다. 
+				이거 상당히 혼동될수 있는데, void 타입이란 이를테면 데이타형 을 컴퓨터 입장에서 
+				해석하는 것이다. 프로그래머의 경우 
+				프로그래밍 작업을 수월하게 하기 위해서 다양한 데이타 타입을 이용하지만 
+				말했듯이 컴퓨터에게 있어서 데이타 타입은 사실 필요가 없다. 컴퓨터 입장에서는 
+				단지 연속된 8bit(byte) 데이타의 나열일 뿐이다. 
+				달리 말하자면 컴퓨터 입장에서는 모든 데이타는 void 형이다.
+				그러므로 void 타입의 경우 모든 데이타형을 저장할수 있게 된다.    
+			</P
+><P
+>				보통의 경우 int, char 혹은 struct 와 같은 데이타 타입을 이용해서 작업하는 
+				것은 매우 편리하긴 하지만, 때때로 데이타 타입을 분리해서 작업하면 
+				오히려 불편한 경우가 생길수가 있다. 대표적인 예로 memcpy 를 예로 들어보자. 
+				memcpy 는 다음과 같이 선언되어 있는데, 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>void *memcpy(void *dest, const void *src, size_t n);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				만약 주어지는 인자가 void 형이 아니라고 가정해 보자. 그렇다면 
+				int 형 복사, char 형복사, struct 형 복사를 하기 위한 별도의 memcpy 함수를 
+				만들어야만 할것이다.(이를테면 imemcpy, cmemcpy 등) 
+				이거 대단히 귀찮은 작업이다. 그나마 우리가 크기를 알고 있는 int, char 같은 경우라면 
+				괜찮겠지만, 사용자 정의형 데이타타입을 위한 memcpy 함수를 만드는건 상당히 
+				까다로운 작업이 될것이다.  
+			</P
+><P
+>				그렇다면 가장 간단한 방법은 데이타 타입에 상관하지 않고 컴퓨터 입장에서 
+				데이타를 바라 보는 것이다. 바로 컴퓨터 입장에서의 데이타 타입이 void 형이다.  
+				컴퓨터입장에서는 데이타 타입은 void 형 오직 하나이므로, 프로그래머가 정의한  
+				데이타 타입을 공통 데이타 타입인 void 형으로 형변환(cast) 시켜준다면, 
+				타입에 관계없이 작업할수 있게 될것이다.   
+			</P
+><P
+>				다음은 void 형의 이해를 돕기 위한 간단한 예제이다.
+			</P
+><P
+>		
+				<B
+CLASS="EMPHASIS"
+>예제 memcpy2.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+struct mydata
+{
+    int age;
+    int weight;
+
+    char name[16];
+    char juso[80];
+};
+
+int main()
+{
+    struct mydata data;
+    char f_data[120];
+    int my_weight;
+
+    data.age    = 29;
+    data.weight = 64;
+
+    strcpy(data.name, "yundream");
+    strcpy(data.juso, "seoul korea");
+
+    memset(f_data, 0x00, 120);
+    memcpy(f_data, (void *)&#38;data, sizeof(struct mydata));
+    memcpy((void *)&#38;my_weight, f_data+4, sizeof(int));
+
+    printf("%d&#92;n", my_weight);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				memcpy 한후 f_data 의 메모리 구성을 보면 아래와 같을 것이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+ we = weight
+ 단위 : byte
+
+  4    4    16            80                     16        
+ +----+----+-------------+----------------------+-----------+
+ |age |we  |name         | juso                 | NULL      |
+ +----+----+-------------+----------------------+-----------+
+
+ |                                                          | 
+ +--------                 120 byte                  -------+
+				</PRE
+></TD
+></TR
+></TABLE
+> 
+				참고로 char 형일 경우 void 형으로 형변환(cast) 할 필요가 없다. 
+				왜냐하면 char 는 1byte 단위로 컴퓨터의 데이타 저장단위 1byte 와 동일하기 
+				때문이다.  
+			</P
+><P
+>				어쨋든 void 타입을 이용해서 전혀 다른 데이타 형으로 데이타 복사를 하긴 했는데, 
+				그렇다면 f_data 에서 데이타를 가져오는건 어떻게 해야 할까. 
+				가장 간단한 방법은 mydata 형의 변수를 하나더 만든다음에 여기에 memcpy 
+				시키는 방법이 있을수 있을것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>mydata data2;
+...
+
+memcpy((void *)&#38;data2, f_data, sizeof(mydata));
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이렇게 하면 f_data 에서 sizeof(mydata) 크기인 104 만큼이 data2 로 복사될 
+				것이다. 
+			</P
+><P
+>				만약 weight 의 정보만을 가져오고 싶다면, 굳이 struct 전체를 복사할 필요 없이 
+				다음과 같은 방법으로 weight 정보를 가져올수 있을것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int my_weight;
+...
+
+memcpy((void *)&#38;my_weight, f_data+4, sizeof(int));
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				우리가 가져오고자 하는 값은 f_data 에서 4 바이트만큼 뒤로 이동한 데이타 이다. 
+				(age 가 int 형으로 4byte 의 크기를 가짐으로) 그럼으로 f_data 에 +4 만큼 해주면 
+				weight 가 저장된 곳의 주소를 가르키게 될것이다. 우리가 가져오고 싶어하는 weight 
+				데이타는 4 바이트 크기의 int 형 데이타 임으로 sizeof(int) 의 크기만큼을 
+				my_weight 가 가르키는 주소로 복사하면 될것이다. 
+			</P
+><P
+>				name, juso 값 역시 위와 같은 방법으로 가져올수 있다. 
+			</P
+><P
+>				그리고 메모리는 연속되게 할당된다는 점에 착안한다면 다음과 같은 
+				코딩도 가능할것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+struct mydata
+{
+    int a;
+    int b;
+};
+int main()
+{
+    int c[2];
+
+    struct mydata data;
+
+    data.a = 1;
+    data.b = 2;
+
+    memcpy((void *)&#38;c, (void *)&#38;data, sizeof(struct mydata));
+
+    printf("%d&#92;n", c[0]);
+    printf("%d&#92;n", c[1]);
+
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				출력을 해보면 알겠지만 구조체가 그대로 c[2] 배열 변수에 복사되었음을 
+				알수 있다. 어차피 c[2] 도 8byte 의 크기를 가지고, mydata 도 8byte 를 
+				가지고 있음으로 void 형으로 형변환시켜주고 복사한다면, 
+				동일한 메모리블럭 구조를 가질수 있기 때문이다.  
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+>
+<H1
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>3&#51208;. 포인터 (Pointer)</A
+></H1
+><P
+>		"포인터란 데이타가 저장된 주소를 가르킨다." 대부분의 C 언어 입문서에 보면 
+		보통 이렇게 포인터에 대한 설명을 시작한다. 분명 틀린말은 아니며, 위의 명제대로 
+		포인터의 개념은 매우 간단하다고 할수 있다. 
+		그렇지만 C 언어 초보자이건 중급사용자이건 간에 포인터라는 것이 개념만큼 만만치  
+		않다라는데 공감할것이다.  
+	</P
+><P
+>		심지어 C 언어의 활용을 가로막는 가장 큰 적 하면 일순위로 꼽는게 "포인터" 일 정도이다. 
+	</P
+><P
+>		이번장에 대해서는 Pointer 에 대한 기본적인 개념에 대해서 알아보도록 하겠다. 	
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN59"
+>3.1&#51208;. 포인터는 주소를 가르킨다</A
+></H2
+><P
+>			포인터는 그 데이타가 저장된 주소를 가르킨다. 다시 mem.c 의 결과를 보도록 하자.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 단위 : byte 
+
+      0 1 2 3 
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     | a[0]  | a[1]  | a[2]  | a[3]  |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+bffff7b0     7b4     7b8     7bc
+
+       a[0] = 324
+       a[1] = 2000
+       a[2] = 3
+       a[3] = 4
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			C 에서는 포인터 연산을 위한 연산자를 별도로 제공하는데 '*' 이다. 이것을 통해서 
+			데이타를 포인터를 사용해서 접근할수 있다. 
+			예를 들어 *a 를 사용한다면 이것의 뜻은 "변수 a 를 위해 할당된 메모리의 주소를 
+			가르키는" 의 뜻이 된다. 
+			mem.c 에 다음의 코드를 추가 시켜 보자   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>printf("%d
+", *a);			
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			a 가 저장된 주소의 값은 bffff7b0 이다(*a 가 가르키는 주소의 값). 
+			%d 를 사용하여서 출력을 하라고 했음으로 
+			bffff7b0 에서 부터 bffff7b3 까지의 값을 int 형으로 변환하여 출력을 하게 될것이다. 
+			그러므로 위의 코드는 "324" 을 출력 시킨다. 
+		</P
+><P
+>			그렇다면 한가지 궁금한게 있다. 
+			만약 printf("%c
+", *a) 로 출력하라고 하면 어떻게 될까? 에러가 발생하게 될까 ? 
+			눈치 챘겠지만 컴파일에러도 발생하지 않고, 워닝도 발생하지 않을 뿐더러, 실행시 
+			에도 에러가 발생하지 않는다. 위의 경우를 해석해 보자면, a 가 저장된 주소로 부터 
+			1byte 만큼 (%c 는 1byte 캐릭터를 출력하기 위해서 사용함으로) 데이타를 읽어들여서 
+			화면에 출력하게 된다. *a 가 저장된 메모리의 주소에 저장된 데이타를 자세히 살펴보면 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>bffff7b0          b1         b2         b3
+       01000100   00000001   00000000   00000000
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 될것이다. (계산기로 계산해 보면 324 는 101000100 이다. 그런데, Linux 는 리틀엔디안 저장방식 
+			을 따름으로 낮은주소의 데이타가 가장 먼저 저장므로 위와 같은 방식으로 
+			메모리에 저장된다. 엔디안에 대한 내용은 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=79&mode=nested&order=0&thold=0"
+TARGET="_top"
+>Endian에 대해서</A
+>를 참조하기 바란다)   
+			그러므로 printf("%c
+", *a) 가 출력하게 되는 값은 bffff7b0 에서 부터 
+			1byte 만큼 저장되어 있는 값인 01000100 이다. 이것을 10 진수로 변환 시켜보면 68 이고 
+			68 은 ASCII 코드표에서 D 를 가르키므로 결국 'D' 를 출력하게 된다.  
+		</P
+><P
+>			아마 포인터에 대한 대략적인 이해를 했을것이다. 그렇다면 a[0] 을 가져 오는건 
+			알겠는데 a[1] 의 값은 어떻게 하면 가져올수 있을지 알아보자. 
+			간단히 생각해서 최초 *a 에서 4 만큼 포인터의 위치를 이동시키면 될것이다. 실제로 
+			이러한 방식으로 포인터 연산을 하게 된다.  
+		</P
+><P
+>			그냥 *(a+1) 해주면 된다. +1 이면 혹시 1byte 만큼만 증가하지 않을지.. 걱정이 될수도 
+			있겠지만 이럴경우 컴파일러가 변수 'a' 의 sizeof 를 계산해서 알아서 증가 시켜준다. 
+			즉 sizeof(a) 는 4 임으로 *(a+1) 은 bffff7b0 + 4 의 주소를 가르키게 된다. 
+			a[1] 의 값을 가져오길 원한다면 아래와 같이 코딩하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>printf("%d
+", *(a+1));
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그러면 bffff7b4 에서 bffff7b7 까지의 값을 읽어들여서 int 형으로 변환시켜서 
+			출력 시켜주게 된다.  
+			마찬가지로 *c+1 을 하게 되면 1byte 만큼 증가 시켜서 해당 주소가 가르키는 값을 
+			화면에 출력 시켜줄것이다.  
+		</P
+><P
+>			그리고 혼동할수 있는데, *a+1 과 *(a+1)은 그 결과 값이 엄연히 다르다. 
+			*a+1 은 *a 의 값에 +1 을 해주는 것이고 (즉 325), *(a+1), a의 주소에 sizeof(a)*1 만큼 
+			이동한 주소값을 가르키는 것이다. 전자는 그냥 덧셈 연산이고, 후자가 포인터 연산이다. 
+			가끔 혼동될수 있으니 주의해야 한다.      
+		</P
+><P
+>			자 그러면 예제 memcpy2.c 를 pointer 버젼으로 바꾸어 보자. 
+			memcpy2.c 는 void 형을 설명하기 위한 예제로는 쓸만하지만 데이타의 이용을 
+			위해서 비용이 큰 메모리 복사를 사용한다라는 단점을 가지고 있다. 
+			이것을 아래와 같이 포인터 버젼으로 바꾸면 거의 비용이 들지 않는 효율적인 
+			코드를 만들수 있다.     
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : memcpy3.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+struct mydata
+{
+    int age;
+    int weight;
+
+    char name[16];
+    char juso[80];
+};
+
+int main()
+{
+    struct mydata data, *data2;
+    char *f_data;
+    int my_weight;
+	int *test;
+
+    data.age    = 29;
+    data.weight = 64;
+
+    strcpy(data.name, "yundream");
+    strcpy(data.juso, "seoul korea");
+
+    printf("point size %d&#92;n", sizeof(f_data));
+    printf("point size %d&#92;n", sizeof(test));
+
+    // 참조 1
+    printf("data    : %x&#92;n", &#38;data);
+    printf("f_data  : %x&#92;n", &#38;f_data);
+    printf("data2   : %x&#92;n", &#38;data2);
+
+
+    // 참조 2 
+    f_data = (void *)&#38;data;
+
+	// 참조 3 
+    data2 = (void *)f_data;
+
+    printf("data2 %d&#92;n", data2-&#62;age);
+    printf("data2 %d&#92;n", data2-&#62;weight);
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 코드는 데이타의 복사가 일어나지 않는다. 	
+			참조 2을 보면 f_data 가 data 의 주소위치를 가르키는(포인터) 하도록 했다. 
+			그리고 참조 3에서는 data2 가 다시 f_data 의 주소 위치를 가르키도록 했다. 
+			참조 2에서 주소 연산자 '&#38;' 가 사용된 이유는 data 는 포인터가 아님으로 
+			포인터인 f_data 에 대입시킬수가 없기 때문이다. 대입연산자는 같은 타입일 경우에만 
+			가능하다. 그러므로 주소연산자 '&#38;' 를 이용해서 data 의 주소를 f_data 에 대입 
+			가능하도록 만든것이다. 참조 3 에서 f_data 는 그 자체가 포인터 임으로 포인터인 
+			data2 에 대입해도 전혀 문제가 없다.   
+		</P
+><P
+>			위의 결과를 출력해 보면 아래와 비슷하게 나올것이다. 실행시 메모리 상태등에 
+			따라서 값이 다르게 나올수 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>point size 4
+point size 4
+data    : bffff700
+f_data  : bffff6f8
+data2   : bffff6fc
+
+data2.age    29
+data2.weight 64
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그런데 좀 이상한게 있다 char *, int * 의 크기가 모두 4 로 나와 있다. 
+			그 이유는 포인터 자체가 하나의 자료형으로 취급되기 때문이다. 
+			포인터를 위한 크기는 운영체제에 따라 다르지만 보통 4바이트인 경우가 많다. 
+			이경우 가르킬수 있는 메모리의 최대 크기는 2^32 이 될것이다.  
+			리눅스는 4byte 의 크기를 가짐으로 대략적으로 리눅스 운영체제가 관리할수 있는 
+			메모리의 최대크기는 4G 바이트 쯤이 될것이며, 실제로 커널에 특별한 패치를 가하지 않는한 
+			이정도의 한계를 가진다. 
+		</P
+><P
+>			각 포인터는 자신이 가리켜야할 데이타가 있는 주소의 위치 정보를 가지고 있다. 
+			위의 각 포인터가 가르키는 정보를 그림으로 나타낸다면 
+			아래와 같을 것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 단위 : byte
+                0 1 2 3       0 1 2 3 4 ......           103
+ +-+-+-+-+     +-+-+-+-+     +-+-+-+-+-+----------------+-+
+ |f_data |     | data2 |     | data                       |
+ +-+-+-+-+     +-+-+-+-+     +-+-+-+-+-+----------------+-+
+  bffff6f8      bffff6fc      bffff700
+ ||             |             |
+ |+-----&#60;-------+             |
+ +-------------&#62;--------------+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			data2 에서 age 값을 가져오기 위해서 주소 연산자 "-&#62;"를 사용하고 있는데, 
+			위의 그림을 보면 이해가 가능할것이다. age 라는 멤버변수의 값은 data2 의 멤버 변수가 
+			아닌 data2 가 가르키고(포인터 하고) 있는 data의 멤버변수이다. 그러므로 
+			반드시 포인터 연산자를 써서, 참조할 데이타가 있는 주소값을 연산해 주어야 한다.  
+			만약 data2.age 로 값을 가져오려고 한다면, 컴파일러는 에러를 리턴하며 컴파일 실패 할것이다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN79"
+>3.2&#51208;. 배열과 포인터는 동일하다</A
+></H2
+><P
+>			예제 mem.c 에서 변수 a 는 4의 크기를 가지는 배열로 선언되있다. 
+			배열은 포인터과 동일하게 사용가능하다. 즉 a[0] 은 *a 와 같으며, 
+			a[1] 은 *(a+1) 과 동일하다. 
+		</P
+><P
+>			앞장에서 포인터 연산을 할때 *a+1 은 포인터 연산이 아니라고 했는데, 그 이유는 
+			*a+1 은 a[1] 이 아니고 a[0] + 1 이 되기 때문이다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+=== 관련글 ===
+  1. [wiki:Site/C/Documents/CprogramingForLinuxEnv/Ch10_Pointer 리눅스 환경에서의 C 프로그래밍 - Pointer]
+  1. [wiki:Site/C/Documents/PointerGuide Pointer 가이드]
+=== 이 문서가 도움이 되었나요 ? ===
+[[Vote(아주 많이 16, 많이 3, 그럭저럭 3, 별로 0, 전혀 1)]]
+[[comment]]

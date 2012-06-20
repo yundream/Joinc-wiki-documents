@@ -1,0 +1,139 @@
+#title 23장 윈도우용 멀티캐스트 프로그램 예제 오류 
+
+
+관련 질문 : [http://ask.joinc.co.kr/index.php?qa=58&qa_1=p573-window-multicating-example-%EC%A7%88%EB%AC%B8%EC%9E%85%EB%8B%88%EB%8B%A4 P573. window Multicating example 질문입니다.]
+
+23장. 윈도우용 멀티캐스트 프로그램 예제를 다음과 같이 수정합니다. 제가 문서를 만든 환경은 Visual C++ 2008에서 확장자를 .c 로 컴파일 했습니다. c++을 고려하지 않았기 때문에, c++로 컴파일 할경우 void * 형변환등에서 문제가 발생합니다. c++은 c보다 형변환 규칙이 엄격하기 때문입니다. 예컨데 다음과 같은 경우인데요. c컴파일러로는 컴파일 되지만 c++로는 컴파일 되지 않습니다.
+{{{#!plain
+#include <stdio.h>
+
+void hello(const char *a)
+{
+  printf("%s\n", a);
+}
+int main()
+{
+  char *s="hello world";
+  void *d;
+  d = (void *)s;
+
+  hello(d);
+}
+}}}
+
+23장의 예제를 컴파일 할경우 setsockopt에서 형변환 옵션이 발생하는데, 이를 const char*로 C++에서도 컴파일 가능하도록 수정했습니다.
+
+그리고 read를 fgets(:3)함수로 수정했습니다. 왜 read가 들어갔는지.. 모르겠습니다.-.-;
+
+'''수정한 코드.'''
+{{{#!plain
+#include <winsock2.h>
+#include <stdio.h>
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+
+#define MAXLINE 1024
+
+char *msg_exit ="exit\n";
+
+DWORD WINAPI ThreadFunction(LPVOID lpParm);
+
+int main(int argc, char **argv)
+{
+	WSADATA wsaData;
+	SOCKET read_fd;
+	SOCKET send_fd;
+	int flag;
+
+	struct sockaddr_in mcast_group;
+	struct ip_mreq mreq;
+
+	char name[16];
+	char message[MAXLINE];
+
+	if(argc != 4)
+	{
+		printf("Usage : %s \n", argv[0]);
+		return 1;
+	}
+
+	if(WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+	{
+		printf("WSAStartup error\n");
+		return 1;
+	}
+	sprintf(name, "%s", argv[3]);
+	memset(&mcast_group, 0x00, sizeof(mcast_group));
+
+	mcast_group.sin_family = AF_INET;
+	mcast_group.sin_port = htons(atoi(argv[2]));
+	inet_pton(AF_INET, argv[1], &mcast_group.sin_addr);
+
+	if( read_fd = socket(AF_INET, SOCK_DGRAM, 0) < 0 )
+	{
+		return 1;
+	}
+
+	mreq.imr_multiaddr = mcast_group.sin_addr;
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+	if(setsockopt(read_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&mreq, sizeof(mreq))<0)
+	{
+		printf("error : add group\n");
+		return 1;
+	}
+	flag = 1;
+	if(setsockopt(read_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag)) < 0)
+	{
+		printf("Socket Reuseaddr Error\n");
+		return 1;
+	}
+
+	if(bind(read_fd, (struct sockaddr *)&mcast_group, sizeof(mcast_group)) < 0)
+	{
+		return 1;
+	}
+
+	if( (send_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 )
+	{
+		return 1;
+	}
+  CreateThread(
+		NULL,
+		0,
+		ThreadFunction,
+		&read_fd,
+		0,
+		NULL);
+	while(1)
+	{
+		memset(message, 0x00, MAXLINE);
+		fgets(message, MAXLINE, stdin);
+		sprintf(message, "%s : %s", name, message);
+		if(sendto(send_fd, message, strlen(message), 0, (struct sockaddr *)&mcast_group, sizeof(mcast_group)) < strlen(message))
+		{
+			return 1;
+		}
+	}
+	WSACleanup();
+	return 0;
+
+}
+
+DWORD WINAPI ThreadFunction(LPVOID lpParm)
+{
+	int addrlen;
+	char message[MAXLINE];
+	struct sockaddr_in from;
+	SOCKET read_fd;
+	read_fd = *(int *)lpParm;
+	addrlen = sizeof(from);
+	memset(message, 0x00, MAXLINE);
+	if(recvfrom(read_fd, message, MAXLINE, 0, (struct sockaddr *)&from, &addrlen))
+	{
+		printf("error : recvfrom\n");
+			return 1;
+	}
+	printf("%s", message);
+}
+}}}

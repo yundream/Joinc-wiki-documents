@@ -1,0 +1,125 @@
+#title CentOS kickstart
+
+== 소개 ==
+리눅스 운영체제의 자동 설치
+  * PXE-boot를 이용한 Network 설치 
+  * kickstart로 설치 자동화
+
+== 환경 ==
+ * PXE & TFTP 서버
+   * ubuntu 11.10  
+ * boot 운영체제
+   * centos
+
+== PXE boot ==
+'''P'''reboot E'''x'''ecution '''E'''nvironment의 줄임말로 네트워크 인터페이스를 이용해서 운영체제를 설치하기 위해서 사용한다.
+
+PXE를 사용하기 위해서는 DHCP와 TFTP가 필요하다. DHCP는 부팅 서버에 네트워크 정보를 자동으로 설정하기 위해서 사용하는 프로토콜이다. TFTP는 bootstrap 프로그램과 몇가지 부가 파일을 다운로드하기 위해서 사용한다.  
+
+=== DHCP 서버 설치 ===
+dhcp server를 이용해서 네트워크 환경을 자동으로 설정하기로 했습니다.  isc dhcp server를 설치했습니다. 
+{{{#!plain
+# sudo apt-get install isc-dhcp-server
+}}}
+
+vi /etc/dhcp/dhcpd.conf
+{{{#!plain
+ddns-update-style none;
+
+# option definitions common to all supported networks...
+option domain-name "example.org";
+option domain-name-servers 8.8.8.8, 8.8.4.4;
+option routers 172.30.1.254;
+option subnet-mask 255.255.255.0;
+
+default-lease-time 60;
+max-lease-time 72;
+
+log-facility local7;
+subnet 172.30.1.0 netmask 255.255.255.0 {
+        range 172.30.1.100 172.30.1.200;
+}
+}}}
+
+{[{#!plain
+# sudo /etc/init.d/isc-dhcp-server restart
+ * Stopping ISC DHCP server dhcpd                              [fail] 
+ * Starting ISC DHCP server dhcpd                              [ OK ] 
+}}}
+
+=== TFTP 서버 설치 ===
+서버 패키지 설치
+{{{#!plain
+# apt-get install tftp tftpd
+}}}
+tftp 설정 파일. xinetd 기반
+{{{#!plain
+service tftp
+{
+        disable = no
+        socket_type             = dgram
+        protocol                = udp
+        wait                    = yes
+        user                    = root
+        server                  = /usr/sbin/in.tftpd
+        server_args             = -s /tftpboot
+        per_source              = 11
+        cps                     = 100 2
+        flags                   = IPv4
+}
+}}}
+tftp 작업디렉토리 생성
+{{{#!plain
+mkdir /tftpboot
+}}}
+
+syslinux 설치
+  * syslinux는 IBM PC를 부팅하기 위한 bootloaders를 포함하는 리눅스 커널을 제공한다.
+{{{#!plain
+# apt-get install syslinux syslinux-common
+}}}
+
+환경 설정 및 부팅 이미지 복사
+{{{#!plain
+# cp /usr/lib/syslinux/pxelinux.0 /tftpboot/
+# cp /usr/lib/syslinux/menu.c32 /tftpboot/
+}}}
+부팅 이미지는 Centos 5.7의 것을 업어왔다. 부팅 이미지는 /boot 디렉토리 밑에 있다. vmlinux 과 initrd.img를 업어온 tftp 작업 디렉토리에 복사한다.
+{{{#!plain
+# cp vmlinuz /tftpboot/cento/x86/
+# cp initrd.img /tftpboot/cento/x86/
+}}}
+
+pxelinux 설정 파일
+{{{#!plain
+# cat /tftpboot/pxelinux.cfg/default
+default menu.c32
+timeout 100
+menu background splash.jpg
+menu color border 0 #ffffffff #00000000
+menu color sel 7 #ffffffff #ff000000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 7 #ffffffff #ff000000
+menu color timeout_msg 0 #ffffffff #00000000
+menu color timeout 0 #ffffffff #00000000
+menu color cmdline 0 #ffffffff #00000000
+menu tabmsg Press ENTER to Install or TAB to edit a menu entry
+ 
+  
+menu title ####  OS Installer Boot Menu  ####
+label 1 
+  menu label CentOS5.7(32bit) on R210
+  kernel centos/x86/vmlinuz
+  append ksdevice=eth0 initrd=centos/x86/initrd.img network ks=nfs:192.168.0.10:/tftpboot/ks/ks32.cfg text
+}}}
+
+
+=== 참고 ===
+ * http://jonnychoe.egloos.com/5459100
+ * http://en.wikipedia.org/wiki/Preboot_Execution_Environment
+ * http://www.bgevolution.com/blog/pxe-network-boot-virtualbox/
+ * http://forum.falinux.com/zbxe/?document_srl=518293
+ * http://en.wikipedia.org/wiki/SYSLINUX

@@ -1,0 +1,688 @@
+#title Port Scannig 검사툴
+[wiki:docbook_Port_Scannig_검사툴 Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Port Scannig 검사툴</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Port Scannig 검사툴</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 8월 28일 9시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN17"
+>JPSD 제작</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>프로그램에 대한 개략적인 기능명세</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1&#51208;. <A
+HREF="#AEN22"
+>Port Scanning 탐지및 PORT 통계</A
+></DT
+><DT
+>2.1.2&#51208;. <A
+HREF="#AEN26"
+>DOS공격 탐지</A
+></DT
+></DL
+></DD
+><DT
+>2.2&#51208;. <A
+HREF="#AEN33"
+>구현 프로세스</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN41"
+>예제</A
+></DT
+><DT
+>4&#51208;. <A
+HREF="#AEN56"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이번에는 두번에 걸쳐 다루었던 libpcap기술을 응용해서 
+		각 서비스 포트에 대한 네트워크 통계및 포트스캐닝을 검사하는 
+		프로그램을 만들어 보도록 하겠다.   
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2&#51208;. JPSD 제작</A
+></H1
+><P
+>		이번에 작성하고자 하는 프로그램은 JPSD라는 다소 촌스러운 이름을 가진 
+		프로그램이다. 눈치 챘겠지만 Joinc Port Scanning Decter의 첫 글자를 따서 
+		이름을 지었다. 다소 거부감이 느껴지더라도 그러려니 하고 
+		넘어가주기 바란다.   
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. 프로그램에 대한 개략적인 기능명세</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1.1&#51208;. Port Scanning 탐지및 PORT 통계</A
+></H3
+><P
+>				크래킹을 하기 위해서 가장 먼저 하는 일은 목적으로 하는 서버에 대한 
+				정보를 취득하는 작업이며, 이를 위한 가장 손쉽고 효과적인 방법은 
+				열려있는 포트에 대한 정보를 얻는 작업이다. 이러한 포트검색을 위한 
+				대표적인 프로그램은 namp이며 서버에 Port Scanning이 이루어졌다면 
+				주의깊게 서버를 감시해야될 필요가 있다.  
+			</P
+><P
+>				JPSD의 주요 기능은 PORT통계를 내고 이를 기초로 
+				Port Scanning이 있었는지를 확인한다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN26"
+>2.1.2&#51208;. DOS공격 탐지</A
+></H3
+><P
+>				DOS(DDOS)공격은 공격기법중에서도 매우 고전적이고 어찌보면 고리타분한 
+				공격일 수도 있겠지만 구현이 매우 쉬운데다가 마땅히 차단할 방법이 없기 때문에 
+				간혹 네트워크(혹은 단일 호스트)에 매우 치명적인 영향을 주기도 한다. 
+			</P
+><P
+>				2003년 1월 25일 발생한 인터넷 대란이 이러한 경우다. 원인은 SQL_Hell이라는 
+				웜바이러스 때문인데 이 바이러스는 MSSQL의 resoultion버그를 이용해서 특정포트로 
+				무한정 패킷을 보낸다. 또한 주위의 또다른 MSSQL서버에 침투에서 이와 동일한 일을 하게 
+				되고 결국 전체 네트워크 시스템이 맛이가게 되었다. 전체 네트워크 시스템으로 확대되기는 
+				했지만 결국 특정 서비스에 대해서 다량의 패킷을 보내에서 호스트를 마비시키고 
+				덤으로 네트워크 트래픽을 증가시켜서 네트워크에 문제가 발생하는 공격이란 점에서 
+				이번 인터넷 대란은 (좀더 지능적인)DOS 공격에 의해서 일어난 것으로 분석할 수 있다. 
+			</P
+><P
+>				만약 이때 라우터나 특정 호스트에 이러한 DOS공격을 탐지할 수 있는 장치가 마련되어 
+				있었다면 국가 전체의 네트워크 시스템이 맛가는 일은 막을 수 있었을 것이다. 
+				기본적으로 DOS공격을 완벽하게 막는건 거의 불가능하다고 할 수 있지만 탐지는 
+				그리 어렵지 않게 가능하다.  
+			</P
+><P
+>				라우터나 혹은 패킷을 검사할 수 있는 호스트에서 패킷을 검사하고 패킷에 대한 
+				목적지 포트번호를 가져오고 이에 대해서 일정시간 간격으로 카운팅 하기만 하면 된다. 
+				이들 카운팅 테이터는 일정한 시간단위로 저장되어서 평균값을 유지하고 최근의 
+				카운팅 데이터와 비교하면 특정 포트로의 변화를 감지 할 수 있게 된다. 	
+				만약 특정 포트에 대해서 평균치에 비해 갑자기 많은 카운팅이 발생한다면 
+				이를 위험신호로 판단하여 조취를 취할 수 있을 것이다.  
+			</P
+><P
+>				우리가 작성할 JPSD는 비록 포트에 대한 대략적인 통계와 이들 통계에 대한 
+				자료를 이용하여 PORT Scanning이 이루어지고 있는지 확인하는 정도이지만, 
+				단지 포트에 대한 통계만을 가지고서도 대략적인 DOS공격에 대한 탐지도 
+				가능할 것이다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.2&#51208;. 구현 프로세스</A
+></H2
+><P
+>			아이디어를 (제대로)구현하기 위한 프로세스는 그리 간단하지가 않다.
+		</P
+><P
+>			일단 호스트에 설치된 JPSD는 자신의 IP를 목적으로 하고 있는 모든 패킷에 대해서 
+			검사를 해야만 한다. 이는 RAW소켓을 이용해서 검사하면 된다. 
+		</P
+><P
+>			패킷을 얻었다면 IP헤더를 검사해서 목적지와 포트를 검사한다음 
+			포트에 대한 카운팅을 실시한다. 카운팅이 되었다면 카운팅 된 숫자가 
+			일정갯수를 초과하는지 검사해야 한다. 이때 초과여부는 두가지 방법에 
+			의해서 검사된다. 첫번째는 절대값에 의한 검사이며, 두번째는 예전에 조사되었던 
+			카운팅의 평균값을 구하고 그 평균값과 현재의 값을 비교하는 방법으로 두가지 
+			방법 모두 병행해서 사용한다. 이 평균값을 구하는 것 역시 그리 간단하지가 않다. 
+			단지 평균값보다 얼마를 초과 했느냐를 구하는게 아닌 증가율을 구해야 하기 때문이다.
+			또한 동일한 증가율이라고 하더라도 카운팅갯수에 따라 달라져야 한다. 
+			예를 들어 평균 카운팅 갯수가 100000개인데 가장 최근 카운팅 갯수가 200000이라면 
+			DOS류의 공격으로 의심할 수 있을 것이다. 그러나 10개에서 20개로 늘어났을 경우 
+			단지 2배의 증가율을 보였다고 해서 DOS류의 공격으로 의심할 수는 없을 것이다.  
+		</P
+><P
+>			게다가 이러한 정보들을 파일로 저장하고 있어야 한다. 파일로 저장된 정보라면 
+			그래프로 이들 정보를 보여줄 수도 있을 것이다.   
+			제대로 만들려면 이래 저래 해결해야 될 문제들이 꽤 많다.  
+		</P
+><P
+>			여기에서는 이런 복잡한 것들에 대해서 신경쓰지 않을 것이다. 
+			단지 포트에 대한 카운트를 검사하고 일정시간 후에 이를 출력해서 
+			DOS공격인지에 대한 판단은 유저에게 맡기도록 할 것이다.  
+			사용고 5분단위로 카운팅된 정보를 클라이언트로 전달하는 정도의 기능만 
+			포함 시키도록 하겠다. 
+		</P
+><P
+>			제대로 작동하는 DOS공격 탐지 프로그램은 개인적으로 별도의 프로젝트로 
+			진행할 생각으로 때가 되면 공개하도록 하겠다. 
+			(그 때가 언제가 될런지는 아무도 모른다 -.-);  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>3&#51208;. 예제</A
+></H1
+><P
+>		다음은 예제 프로그램이다. 언제나 처럼 코드는 
+		깔끔, 효율, 효과적..과는 거리가 먼 그냥 돌아가는 한마디로 말해서 
+		최소한의 기능구현에만 신경을 쓰면서 작성되었다.
+		(한마디로 귀찮아서 대충대충 작성한 -.-);  
+	</P
+><P
+>		좀더 그럴듯하게 만드는건 각자의 몫으로 남겨두도록 하겠다.  
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : jpsd.cc</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pcap.h&#62;
+#include &#60;net/bpf.h&#62;
+#include &#60;time.h&#62;
+#include &#60;sys/time.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;signal.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+#include &#60;errno.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;pthread.h&#62;
+
+#include &#60;netinet/ip.h&#62;
+#include &#60;netinet/tcp.h&#62;
+#include &#60;netinet/udp.h&#62;
+#include &#60;netinet/if_ether.h&#62;
+#include &#60;netinet/in.h&#62;
+
+#include &#60;net/if.h&#62;
+#include &#60;net/ethernet.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+#include &#60;sys/ioctl.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;sys/types.h&#62;
+
+
+#include &#60;string&#62;
+#include &#60;set&#62;
+#include &#60;ncurses.h&#62;
+
+using namespace std;
+
+
+#define PROMISCOUS        1
+#define NONPROMISCUOUS    0
+
+#define PORT_NUM        65536
+
+// 뮤텍스 잠금용 뮤텍스 잠금 변수
+pthread_mutex_t  m_lock = PTHREAD_MUTEX_INITIALIZER; 
+
+// 포트별 카운트와 사이즈를 저장하기 위한 구조체
+typedef struct _port_count
+{
+    int count;
+    int size;
+} port_count;
+
+// 0-64435 범위의 모든 IP 패킷에 대한 카운팅 
+// 정보를 저장한다. 
+static port_count gport_count[PORT_NUM];
+
+// IP및 TCP헤더 구조체
+struct ip        *iph;
+struct tcphdr    *tcph;
+
+static WINDOW *infoview;
+
+// 통계검사를 할때 PORT_NUM만큼 루프를 도는건 
+// 자원낭비다. 대부분의 PORT의 경우 
+// 카운팅이 0일 것이기 때문이다. 
+// 그래서 카운팅된 PORT만 별도로 저장하는 자료구조를 
+// 준비해서 
+// 통계시 이 자료구조에 등록된 포트에 대해서만 
+// 통계를 내도록 한다. 
+set&#60;int&#62; port_set; 
+
+// 현재 IP를 얻어온다.
+ulong GetIP(char *);
+
+// 사용자가 Ctrl+C를 눌렀을 때 
+// 실행되는 시그널 핸들러로 프로그램을 종료한다.
+void sigint(int signo)
+{
+    endwin();    
+    printf("Exit&#92;n");
+    exit(0);
+}
+
+// 포트 카운트 통계정보를 얻어와서 화면에 
+// 출력한다.
+void *staticsview(void *data)
+{
+    int prev_count = 0;
+    int prev_size  = 0;
+    int count = 0;
+    int size  = 0;
+    int loop_num = 1;
+    time_t current_time = time((time_t *)NULL);
+    set&#60;int&#62;::iterator si;
+    while(1)
+    {
+        // 10초 단위로 통계를 낸다.
+        sleep(10);
+        
+        pthread_mutex_lock(&#38;m_lock);
+        si = port_set.begin();
+        count = 0;
+        size  = 0;
+        // 만약 등록된 포트가 200이상이라면 
+        // 포트 스캐닝 공격이 있었다고 간주하고 
+        // WARN을 발생한다. 
+        if (port_set.size() &#62; 200)
+        {
+            mvprintw(19, 1,"WARN  : PORT SCANNING %s %d", 
+                ctime(&#38;current_time), port_set.size());
+        }
+
+        // 포트 통계를 낸다.
+        // 포트 카운트가 5이하인 포트의 정보는 삭제한다. 
+        while(si != port_set.end())
+        {
+            count += gport_count[*si].count;
+            size  += gport_count[*si].size; 
+            if (gport_count[*si].count &#60; 5) 
+            {
+                port_set.erase(si);
+            }
+            *si++;
+        }
+        pthread_mutex_unlock(&#38;m_lock);
+        // 포트 통계 정보를 화면에 출력한다. 
+        mvprintw(20, 1,"TOTAL : %11d  %d", count, size);
+        mvprintw(21, 1,"AVG   : %11d  %d", count/loop_num, size/loop_num);
+        mvprintw(22, 1,"DIFF  : %11d  %d", abs(count - prev_count), 
+                                        abs(size - prev_size));
+        prev_count = count;
+        prev_size  = size;
+
+        loop_num++;
+    }
+}
+
+// 화면 초기화를 한다. 
+// 뒷배경은 파란색, 글자의 색은 하얀색으로 한다.
+void init_scr()
+{
+    initscr();
+    start_color();
+    init_pair(1, COLOR_WHITE, COLOR_BLUE);
+    curs_set(2);
+    noecho();
+    keypad(stdscr, TRUE);
+}
+
+int main(int argc, char **argv)
+{
+    char *dev;
+    int  n;
+
+    bpf_u_int32  netp;
+    bpf_u_int32  maskp;    
+
+    char errbuf[PCAP_ERRBUF_SIZE];
+    int ret;
+    struct pcap_pkthdr hdr;
+    const u_char *packet;
+    struct ether_header *ep;    
+    struct ip *iph;
+    struct sockaddr_in *sin;
+
+    ulong myip; 
+    unsigned short ether_type;
+    pthread_t thread_i;
+
+    // SIGINT에 대한 시그널 핸들러를 등록한다.    
+    // 사용자가 Ctrl+C를 이용해서 SIGINT를 발생시키면 
+    // endwin()을 호출하고 프로그램을 종료한다.  
+    if(signal(SIGINT, sigint) == SIG_ERR)
+    {
+        perror("signal setting error : ");
+        exit(0);
+    } 
+
+    // 화면을 초기화 시킨다.
+    init_scr();
+    bkgd(COLOR_PAIR(1));
+    infoview = subwin(stdscr, 1, 80, 0, 0);
+
+    // 통계 쓰레드 생성
+    if ((n = pthread_create(&#38;thread_i, NULL, staticsview, NULL)) != 0)
+    {
+        perror("thread create error ");
+        exit(0);    
+    }
+
+    pcap_t *pcd;
+    dev = pcap_lookupdev(errbuf);
+    if (dev == NULL)
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }
+    myip = GetIP(dev);
+    sin-&#62;sin_addr.s_addr =  myip;
+
+    move(1,1);
+    printw("DEV IS %s : %s", dev, inet_ntoa(sin-&#62;sin_addr));
+    ret = pcap_lookupnet(dev, &#38;netp, &#38;maskp, errbuf);
+    if (ret == -1) 
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }
+    refresh();
+
+    pcd = pcap_open_live(dev, BUFSIZ, NONPROMISCUOUS, -1, errbuf);
+    if (pcd == NULL)
+    {
+        printf("%s&#92;n", errbuf);
+        exit(1);
+    }
+
+    memset(gport_count, 0x00, PORT_NUM*sizeof(port_count));
+    int i = 0;
+    int k;
+    set&#60;int&#62;::iterator si;
+
+    for (;packet=(const unsigned char *)pcap_next(pcd, &#38;hdr);)
+    {
+        ep = (struct ether_header *)packet;
+        packet += sizeof(struct ether_header);    
+        ether_type = ntohs(ep-&#62;ether_type); 
+        // 패킷이 IP기반일 경우 카운팅을 실시한다.
+        if(ether_type == ETHERTYPE_IP)
+        {
+            iph = (struct ip *)packet;
+            if (myip == iph-&#62;ip_dst.s_addr)    
+            {
+                tcph = (struct tcphdr *)(packet + iph-&#62;ip_hl * 4);
+                gport_count[ntohs(tcph-&#62;dest)].count++;
+                gport_count[ntohs(tcph-&#62;dest)].size += ntohs(iph-&#62;ip_len);
+                port_set.insert(ntohs(tcph-&#62;dest));
+
+                pthread_mutex_lock(&#38;m_lock);
+                si = port_set.begin();
+                k = 0;
+                // 카운팅된 정보는 실시간으로 화면에 출력한다.
+                while (si != port_set.end())        
+                {
+                    if (gport_count[*si].count &#62; 5)
+                    {
+                        mvprintw(k+2, 1,"%6d : %11d %11d", *si, 
+                            gport_count[*si].count,
+                            gport_count[*si].size); 
+                        k++;
+                    }
+                    *si++;
+                }
+                pthread_mutex_unlock(&#38;m_lock);
+                refresh();
+            }
+            i++;
+        }
+    }
+    endwin();
+}
+
+
+ulong GetIP(char *device)
+{
+    struct ifreq ifr;
+    struct sockaddr_in *sin;
+    int fd ;
+
+    memset((void *)&#38;ifr, 0x00, sizeof(ifr));
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd &#60; 0)
+    {
+        perror("socket ");
+        exit(0);
+    }
+    strncpy(ifr.ifr_name, device, 12);
+
+    ioctl(fd, SIOCGIFADDR, (char *)&#38;ifr);
+    sin = (struct sockaddr_in *)&#38;ifr.ifr_addr;
+
+    close(fd);
+    return (ulong)sin-&#62;sin_addr.s_addr;
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		화면 출력을 위해서 ncurses라이브러리를 사용했다 ncurses에 대한 정보는 
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=47"
+TARGET="_top"
+>		ncurses 프로그래밍</A
+>을 참고하기 바란다. 포트 통계를 위해서 사용한 
+		pcap라이브러리에 대한 설명은  
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=112"
+TARGET="_top"
+>		libpcap를 이용한 프로그래밍</A
+>을 참고하면 된다.
+	</P
+><P
+>		ncurses와 libpcap에 대한 이해만 가지고 있다면 주석만으로도 충분히 이해가능한 
+		코드이다. 컴파일 방법은 다음과 같다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># g++ -o jpsd jpsd.cc -lpthread -lpcap -lpthread
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		다음의 필자의 사이트에서 실제로 jpsd를 실행시킨 결과의 화면이다. 
+		<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN52"
+></A
+><P
+><B
+>&#44536;&#47548; 1. jpsd의 실행화면</B
+></P
+><P
+><IMG
+SRC="http://www.joinc.co.kr/albums/album01/aem.gif"></P
+></DIV
+>
+	</P
+><P
+>		정말로 port scan을 검사해 낼 수 있는지의 확인을 원한다면 nmap등을 통해서 
+		테스트 해보기 바란다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN56"
+>4&#51208;. 결론</A
+></H1
+><P
+>		이상 libpcap을 이용해서 포트통계와 포트 스캐닝을 검사해내는 프로그램을 
+		만들어 보았다. 위의 프로그램은 매우 아이디얼한 프로그램으로 
+		실제 그럴듯하게 작동하기 위해서는 많은 기능들이 추가되어야만 할것이다.     
+	</P
+><P
+>		우선은 결과값을 네트워크를 통해서 원격지에 전송할 수 있도록 서버/클라이언트 
+		모델로 확장시켜야 하며, 정확한 통계를 위해서 통계결과값을 파일이나 DB로 남기는 
+		기능을 추가시켜야 한다. 또한 문제가 발생했을 경우 문제될만한 IP에 대한 목록을 
+		출력하는 기능도 포함되어야 한다. 
+	</P
+><P
+>		보여주는 것 역시 투박한 터미널 화면 보다는 GUI화면을 통해서 쉽게 결과를 확인가능 
+		하도록 만들어 주어야 할것이다. 
+	</P
+><P
+>		위에서 언급했듯이 필자는 좀더 그럴듯하게 작동하는 프로그램을 만드는 프로젝트를 
+		진행할 계획이며, 어느정도 완성되었을 경우 공개할 예정이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+
+[[category(5)]]

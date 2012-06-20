@@ -1,0 +1,453 @@
+== 개 요 ==
+
+나는 OOP를 좋아한다. 각 기능들을 객체화해서 속성과 행위로 표현하여 객체간의 관계로서 프로그램을 완성시켜 나간다는 그 개념이 좋다.
+그런 이유에서 나는 깔끔하게 설계가 잘 된 자바를 참 좋아한다. 물론 C/C++ 를 비롯해서 Python, Perl, PHP, JavaScript, ... 들도 다 좋아하긴 하다. 둘만 꼽아라면 당연히 C++ (POSIX) 과 Java가 되겠다.
+C++로 OOP를 하다보면 멀티쓰레드 프로그램에서 우리는 쓰레드 클래스의 필요성을 종종 느낀다.
+아주 예전에 쓰레드객체라고 기초적인 클래스를 만들어 여기에 올린적이 있다. 
+이제 다시 자바의 그것과 같은 기능을 하는 (아주 약간의 차이는 있지만), 그리고 주로 사용되는 메소드만 넣은 쓰레드 클래스를 다시 만들어 올린다.
+이것은 나의 상용 프로젝트에서도 사용되는 수준의 것이며 여러분들도 자유롭게 사용 및 발전시킬 수 있겠다..
+
+특별히 자바에서 isInterrupted() 란 메소드는 쓰레드에서 InterruptedException 이 발생하고 이를 catch하지 않고 그냥 종료되었을때 true를 리턴하고 catch하였을때는 false를 리턴함을 주목하자. 그리고 이 클래스에서도 동일하게 동작한다. 또한, 한번 종료된 쓰레드는 다시 start시킬 수 없으며 이 또한 동일하게 구현되었다.
+
+== Code ==
+
+ * Thread.h
+{{{#!plain
+#ifndef THREAD_H_
+#define THREAD_H_
+
+#include <pthread.h>
+#include <string>
+#include <stdexcept>
+
+using namespace std;
+
+	
+class Thread
+{
+public:
+	Thread();
+	Thread(const string& name);
+	virtual ~Thread();
+	void start();
+	void join();
+	void join(unsigned long time);
+	void interrupt();
+	bool isInterrupted();
+	bool isAlive();
+	const string& getName();
+	void setName(const string& name);
+	
+private:
+	int _state;
+	bool _joinning;
+	bool _isInterrupted;
+	pthread_mutex_t _mutex;
+	pthread_cond_t _cond;
+	static pthread_attr_t _attr;
+	pthread_t _thread;
+	static long _id;
+	string _name;
+	static void* threadHandler(void* arg);
+	static void interruptHandler(int sigInt);
+	void init(const string& name);
+	virtual void run() = 0;
+	
+};
+
+class InterruptedException : public exception 
+{
+public:
+	explicit InterruptedException(const string&  message)
+	: _message(message)
+	{}
+
+	virtual ~InterruptedException() throw()
+	{}
+
+	virtual const char* what() const throw()
+	{
+		return _message.c_str();
+	}
+
+private:
+	string _message;
+	
+};
+
+
+class IllegalThreadStateException : public exception 
+{
+public:
+	explicit IllegalThreadStateException(const string&  message)
+	: _message(message)
+	{}
+
+	virtual ~IllegalThreadStateException() throw()
+	{}
+
+	virtual const char* what() const throw()
+	{
+		return _message.c_str();
+	}
+
+private:
+	string _message;
+	
+};
+
+#endif /*THREAD_H_*/
+}}}
+
+ * Thread.cpp
+{{{#!plain
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <signal.h>
+#include "Thread.h"
+
+using namespace std;
+
+
+long Thread::_id = 0;
+
+pthread_attr_t Thread::_attr;
+
+void* Thread::threadHandler(void* arg)
+{
+	signal(SIGUSR1, interruptHandler);
+	Thread* thread = (Thread*) arg;
+	try
+	{
+		thread->run();
+	}
+	catch (InterruptedException& e)
+	{
+		thread->_isInterrupted = true;
+	}
+	catch (...)
+	{
+	}
+	thread->_state = -1;
+	if (thread->_joinning)
+	{
+		pthread_mutex_lock(&thread->_mutex);
+		pthread_cond_broadcast(&thread->_cond);
+		pthread_mutex_unlock(&thread->_mutex);
+	}
+	return NULL;
+}
+
+void Thread::interruptHandler(int sigInt)
+{
+	throw InterruptedException("Thread interrupted");	
+}
+
+Thread::Thread()
+{
+	char name[32];
+	sprintf(name, "Thread-%ld", _id);
+	init(name);
+}
+
+Thread::Thread(const string& name)
+{
+	init(name);
+}
+
+Thread::~Thread()
+{
+	pthread_attr_destroy(&_attr);
+	pthread_mutex_destroy(&_mutex);
+	pthread_cond_destroy(&_cond);
+}
+
+void Thread::init(const string& name)
+{
+	_name = name;
+	_joinning = false;
+	_isInterrupted = false;
+	pthread_mutex_init(&_mutex, NULL);
+	pthread_cond_init(&_cond, NULL);
+	_state = 0;
+	pthread_mutex_lock(&_mutex);
+	if (_id == 0)
+	{
+		pthread_attr_init(&_attr);
+		pthread_attr_setdetachstate(&_attr, PTHREAD_CREATE_DETACHED);
+	}
+	_id++;	
+	pthread_mutex_unlock(&_mutex);
+}
+
+void Thread::start()
+{
+	if (_state == 1)
+	{
+		throw IllegalThreadStateException("Thread already started");
+	}
+	else if (_state == 0)
+	{
+		_state = 1;
+		pthread_create(&_thread, &_attr, threadHandler, this);
+	}
+	else if (_state == -1)
+	{
+		throw IllegalThreadStateException("Thread had been started");
+	}
+}
+
+void Thread::join()
+{
+	if (_state == 1)
+	{
+		pthread_mutex_lock(&_mutex);
+		_joinning = true;
+		pthread_cond_wait(&_cond, &_mutex);
+		_joinning = false;
+		pthread_mutex_unlock(&_mutex);
+	}
+}
+
+void Thread::join(unsigned long time)
+{
+	if (_state == 1)
+	{
+		struct timeval now;
+		struct timespec timeout;
+		gettimeofday(&now, NULL);
+		ldiv_t t = ldiv(time * 1000000, 1000000000);
+		timeout.tv_sec = now.tv_sec + t.quot;
+		timeout.tv_nsec = now.tv_usec * 1000 + t.rem;
+		pthread_mutex_lock(&_mutex);
+		_joinning = true;
+		pthread_cond_timedwait(&_cond, &_mutex, &timeout);
+		_joinning = false;
+		pthread_mutex_unlock(&_mutex);
+	}
+}
+
+void Thread::interrupt()
+{
+	pthread_kill(_thread, SIGUSR1);
+}
+
+bool Thread::isInterrupted()
+{
+	return _isInterrupted;
+}
+
+bool Thread::isAlive()
+{
+	return _state == 1;
+}
+
+const string& Thread::getName()
+{
+	return _name;
+}
+
+void Thread::setName(const string& name)
+{
+	_name = name;
+}
+}}}
+
+* Test
+{{{#!plain
+#include <iostream>
+#include "Thread.h"
+
+using namespace std;
+
+
+class Test1 : public Thread
+{
+private:
+	void run()
+	{
+		string name = getName();
+		for (int i = 0; i < 10; i++)
+		{
+			try
+			{
+				cout << name << endl;
+				sleep(1);
+			}
+			catch (InterruptedException& e)
+			{
+				cout << name << ": " << e.what();
+				cout << " but continue" << endl;
+			}
+		}
+		cout << name << " ending" << endl;
+	}
+};
+
+
+class Test2 : public Thread
+{
+private:
+	void run()
+	{
+		string name = getName();
+		for (int i = 0; i < 10; i++)
+		{
+			cout << name << endl;
+			sleep(1);
+		}
+		cout << name << " ending" << endl;
+	}
+};
+
+class Test3 : public Thread
+{
+private:
+	Thread& _t;
+	
+	void run()
+	{
+		cout << getName() << " is joinning " << _t.getName() << endl;
+		_t.join();
+		cout << getName() << " is ending" << endl;
+	}
+	
+public:
+	Test3(Thread& t)
+	: _t(t) {}
+};
+
+void checkAlive(Thread& thread)
+{
+	string name = thread.getName();
+	if (thread.isAlive())
+	{
+		cout << name << " is alive" << endl;
+	}
+	else
+	{
+		cout << name << " is died" << endl;
+	}
+}
+
+
+void checkInterrupt(Thread& thread)
+{
+	string name = thread.getName();
+	if (thread.isInterrupted())
+	{
+		cout << name << " is interrupted" << endl;
+	}
+	else
+	{
+		cout << name << " is not interrupted" << endl;
+	}
+}
+
+int main()
+{
+	try
+	{
+		Test1 t1;
+		Test2 t2;
+		t2.setName("Second Thread");
+		string t1Name = t1.getName();
+		string t2Name = t2.getName();
+		t1.start();
+		t2.start();
+		sleep(2);
+		cout << "Now joinning " << t1Name << " until 2 sec" << endl;
+		t1.join(2000);
+		checkAlive(t1);
+		checkAlive(t2);
+		try
+		{
+			cout << "Now tring restart " << t1Name << endl;
+			t1.start();
+		}
+		catch (exception& e)
+		{
+			cerr << typeid(e).name() << ": " << e.what() << endl;
+		}
+		sleep(2);
+		cout << "Now interrupt " << t1Name << endl;
+		cout << "Now interrupt " << t2Name << endl;
+		t1.interrupt();
+		t2.interrupt();
+		sleep(2);
+		checkAlive(t1);
+		checkAlive(t2);
+		cout << "Now joinning " << t2Name << endl;
+		t2.join();
+		Test3 t3(t1);
+		t3.setName("Third Thread");
+		t3.start();
+		sleep(1);
+		cout << "Now joinning " << t1Name << endl;
+		t1.join();
+		checkAlive(t1);
+		checkAlive(t2);
+		checkAlive(t3);
+		checkInterrupt(t1);
+		checkInterrupt(t2);
+		checkInterrupt(t3);
+		sleep(1);
+		cout << "Now restart " << t2Name << endl;
+		t2.start();
+	}
+	catch (IllegalThreadStateException& e)
+	{
+		cerr << typeid(e).name() << ": " << e.what() << endl;
+	}
+	sleep(1);
+	cout << "Main thread ending" << endl;
+	return 0;
+}
+
+
+}}}
+
+ * 실행결과
+{{{#!plain
+Thread-0
+Second Thread
+Thread-0
+Second Thread
+Thread-0
+Now joinning Thread-0 until 2 sec
+Second Thread
+Thread-0
+Second Thread
+Thread-0
+Thread-0 is alive
+Second Thread is alive
+Now tring restart Thread-0
+27IllegalThreadStateException: Thread already started
+Second Thread
+Thread-0
+Second Thread
+Thread-0
+Now interrupt Thread-0
+Now interrupt Second Thread
+Thread-0: Thread interrupted but continue
+Thread-0
+Thread-0
+Thread-0 is alive
+Second Thread is died
+Now joinning Second Thread
+Third Thread is joinning Thread-0
+Thread-0
+Now joinning Thread-0
+Thread-0 ending
+Third Thread is ending
+Thread-0 is died
+Second Thread is died
+Third Thread is died
+Thread-0 is not interrupted
+Second Thread is interrupted
+Third Thread is not interrupted
+Now restart Second Thread
+27IllegalThreadStateException: Thread had been started
+Main thread ending
+}}}

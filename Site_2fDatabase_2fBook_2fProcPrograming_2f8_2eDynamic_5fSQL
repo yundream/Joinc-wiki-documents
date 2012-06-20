@@ -1,0 +1,983 @@
+#title Dynamic SQL
+[[TableOfContents]]
+=== Dynamic SQL ===
+이번에 할 것은 동적 SQL문장을 처리할 수 있는 Dynamic SQL이다. 크게 구분하자면 Oracle Dynamic SQL과 ANSI Dynamic SQL로 구분된다. 이번 과정에서 다룰 것은 이 둘중에서 ANSI Dynamic SQL이 되겠다. 비록 넘어갈 것이지만 Oracle Dynamic SQL에 대해서도 간단하게 한번 알아볼 것이다.
+
+==== Dynamic SQL이란 무엇인가? ====
+프로그램을 개발할 때 대부분의 경우 SQL문장을 사용하는 목적과 대상을 알고 있다. 이럴경우 문장의 형태(select, DML, DDL등)라던가 Select일 경우 Select List의 개수, Select List의 데이터 타입, 데이터의 길이를 정확히 하고 Where구문에 들어가는 조건이나 Insert의 Values구문에 들어가는 값들을 정확히 알고 있는것이다. 당연히 이런 프로그램은 아주 간단하고 프로그램의 작성과 실행에 있어서 매우 간결하다. 매우 간단한 반면 실제 현업에서 쓰이는 대부분의 프로그램들도 이정도의 수준이서 머물고 있는 것도 사실이다. 하지만 일을 하다보면 프로그램을 작성할 당시 즉 프로그램을 컴파일하는 때에 정확한 SQL문장이 정해지지 않고 프로그램이 실행이 되어서야 SQL문장을 정확히 파악 할 수 있는 상황에 놓이는 경우가 있다. 이러한 SQL을 Dynamic SQL이라 한다. 이미 눈치빠른 독자들 몇몇은 이름만을 보고도 알 수 있을 것이다. 대체로 Dynamic라는 단어는 런타임이 동작하는 것들 앞에 많이 붙는 수식어 이기 때문이다.
+
+==== Dynamic SQL의 장점과 단점은 무엇인가? ====
+Dynamic SQL의 경우 실행시 SQL문장에 대한 정확한 정보가 없더라도 프로그램의 수행에 있어서 아무 문제가 없다. 그리고 프로그램을 실행하면서 SQL문장을 동적으로 받아들일 수 있기 때문에 대화형의 프로그램이 작성가능하다. 당연히 이러한 이점이 있다면 프로그램을 코딩하기가 쉽지가 않다는 것이 문제다. 하지만 몇번 해본다면 익숙해 질 것이고 개념을 이해해두면 그리 어렵지는 않을 것이다. 앞의 간단한 프로그램들에 비하면 어렵다는 의미로 받아들이면 되겠다. 
+
+==== Dynamic SQL은 언제 쓰일 수 있는가? ====
+대부분의 프로그램들은 Statis SQL이다. 이러한 것들은 한가지 정해진 목적을 가진 것들이고 그 이외에는 쓰일 수가 없는 것이다. 만약 Dynamic SQL을 사용한다면 Static SQL보다 좀더 유연한 프로그램을 작성할 수 있을 것이다. 예를 들자면 SQL*Plus같은 프로그램을 작성 할수도 있을것이고 DB Administrator Tool도 만들수가 있는 것이다. 아무래도 Dynamic SQL의 특성상 좀더 범용적인 곳에 쓰일 수가 있다.
+
+이제는 오라클 Dynamic SQL에 대해서 알아보자. 이것은 이번 과정에서 쓰이지는 않는다. 그냥 그런게 있다 정도로 지나가면 되겠다.
+
+Oracle Dynamic SQL
+  * Method 1
+     Host 변수 없이 사용되는 DML문장을 실행하는 방법이다.
+  * Method 2
+     Host 변수가 사용되고 사용되는 Host 변수의 개수는 모르는 상태에서 DML문장을 실행하는 방법이다.
+  * Method 3
+     Input Host 변수의 개수와 Select List의 칼럼 개수를 알고 있는 상태에서 Select 문장을 실행하는 방법이다.
+  * Method 4
+    Input Host 변수의 개수와 Select List의 칼럼 개수를 모르는 상태에서 Select 문장을 실행하는 방법이다.
+
+이렇게 4가지 방법이 있으며 설명에서 보면 알겠지만 Method 1이 가장 쉬우며 Method가 가장 어렵다. Method 4의 경우 일반적인 SQL문장은 가능하겠지만 Object Type, Cursor, DML returning 구문, LOB 등 몇가지 지원하지 않는게 있으며 이런 경우 ANSI Dynamic SQL을 사용하라고 나와있다. 즉 이것은 옛날에 만들어진 프로그램을 계속적으로 지원하기 위해서 존재하는 것이므로 이제부터 배울 독자들에게는 ANSI Dynamic SQL을 권하는 것이 옳다 하겠다.
+
+자 이제부터 ANSI Dynamic SQL에 대해서 공부해 보겠다. ANSI Dynamic SQL의 코딩 순서와 각 순서에 있어서 사용하는 ANSI SQL 구문을 살펴보도록 하자.
+
+먼저 사용할 SQL문장을 아래와 같다고 가정하자.
+{{{#!plain
+select * from emp where empno = :p_empno;
+}}}
+
+몇가지 알수 없는 부분이 보인다. 어떻게 해야 할까 막막하기만 하다. 하나씩 살펴보자.
+
+ 1. 먼저 입출력에 사용할 변수를 결정해 주어야 한다. 단순히 exec sql declare begin section, exec sql declare end secion 구분 사이에 변수를 선언하면 된다.
+    {{{#!plain
+exec sql
+declare begin section;
+	int empno;
+	char ename [20];
+	int deptno;
+exec sql
+declare end section;
+}}}
+
+ 1. 입출력에 사용할 변수를 사용하기 위해서 descriptor (굳이 한글로 번역하자면 기술자정도 되겠다. 입출력 변수의 정보를 오라클에게 설명해주기 위해서 반드시 필요하다.)를 선언한다.
+    {{{#!plain
+exec sql
+allocate descriptor [global | local] {:descriptor_name | string_literal}
+[with max {:occurrences | number_literal};
+}}}
+    먼저 GLOBAL은 프로그램 전체 모듈에서 사용할 수 있고 LOCAL은 해당 모듈에서만 사용할 수 있다. Descriptor의 이름은 반드시 호스트 변수를 사용해야 하는 것은 아니다. 필요하다면 사용해도 되지만 단순히 ‘in’, ‘out’정도의 프로그램 내에서 유일한 문자열이면 사용가능하다. Occurrences는 입출력 Bind 변수의 최대치이다. 특별히 지정해 주지 않는다면 기본값으로 100이다.
+
+ 1. SQL문장을 Prepare 한다. 이 과정은 문장을 실행하기 위해서 SQL을 파싱하는 과정으로 생각하면 되겠다.
+    {{{#!plain
+exec sql
+	prepare stmt_id from :stmt;
+}}}
+    stmt_id는 입출력에서 변수로 선언되지 않은 것으로 넣어준다. stmt는 입출력 변수에 선언한 변수로 SQL문장을 저장하고 있는 것이다. SQL문장을 반드시 변수에 넣어주는 것은 아니고 필요하다면 인용부호로 둘러싸인 SQL문장을 그대로 넣어주어도 된다.
+
+ 1. 앞에서 선언한 Input descriptor를 사용하여 Input Bind변수들을 설명해 주어야 한다.
+    {{{#!plain
+exec sql
+describe input stmt_id using [sql] descriptor [global | local]
+{:desc_nam | string_literal} ;
+}}}
+    이 문장은 Input Bind 변수들을 설명하기 위해서 이전에 생성한 Input descriptor를 사용하겠다고 선언하는 것이다. stmt_id는 SQL문장을 prepare하면서 얻어온 ID를 사용하면 된다.
+    {{#!plain
+exec sql
+	[for [:]array_size] get descriptor [global | lcoal]
+{:descriptor_name | string_literal}
+{:hv0 = count | value item_number :hv1 = item_name1 [{, :hvn = item_namen}]};
+}}}
+이 문장은 descriptor로부터 바인드 변수의 정보를 얻어오는 것이다. 앞에서 배운 array processing일 경우에는 array size를 지정해 주어야 한다. descriptor 이름을 가진 호스트 변수 또는 문자열을 지정해 주고 value 뒤에 지정해 주고싶은 Bind 변수의 위치를 지정해 주면 된다. hv0에 들어가는 count는 Bind 변수의 전체 개수이며 hv1부터는 오라클로 Bind 변수의 정보를 전달한 호스트 변수들의 리스트이다. 그럼 item_namen으로부터 얻을 수 있는 것들은 무엇이 있는지 알아보자.
+
+ * 표7 Get Descriptor Item
+|| Item	이름	|| 설명			||
+|| Type		|| 변수의 데이터 타입	||
+|| Length	|| 변수의 길이		||
+|| Precision	|| 숫자의 자리수	||
+|| Scale	|| 소수 아래쪽의 자리수	||
+|| Nullable	|| NULL 값의 허용	||
+|| Indicator	|| 연결된 Indicator 변수||
+|| Data		|| 실제 값		||
+|| Name		|| 칼럼의 이름		||
+|| Character_set_name	|| 칼럼의 문자셋	||
+
+{{{#!plain
+exec sql
+   [for array_size] set descriptor [global | local]
+   {:descriptor_name | string_literal}
+   {count = :hv0 | value item_number [ref] item_name1 = :hv1
+   [{, [ref] item_namen = :hvn}]};
+}}}
+이 문장은 descriptor를 이용하여 Bind 변수의 정보를 설정하는 것이다. 위와 별로 다른 것들은 없다. Item_number는 Bind 변수의 위치라고 말했다. 그럼 item_namen에 들어가는 것들은 무엇이 있는지 알아보자.
+
+ * 표8 Set Descriptor Item
+|| Item 이름	|| 설명				||
+|| Type		|| 변수의 데이터 타입		||
+|| Length	|| 변수의 길이			||
+|| Indicator	|| 연결된 Indicator 변수	||
+|| Data		|| 실제 값			||
+|| Character_set_name	|| 칼럼의 문자셋	||
+
+ 1. Input Bind 변수들을 descriptor를 이용하여 설명해 주었다면 실제 값을 너어주어야 한다.
+이것은 위에서 배운 구문을 사용하여 데이터를 넣어주면 된다.
+    {{{#!plain
+exec sql
+set descriptor local 'in'
+value :value type = :type, length = :length, data = :data;
+}}}
+    이정도로 하면 되겠다. value뒤에 :value에 Bind 변수의 위치가 들어가고 해당 변수의 데이터와 데이터 타입, 길이를 지정해 주는 문장의 예이다.
+ 1. Input Bind 변수의 값을 다 넣어 주었으므로 오라클로부터 실제 데이터를 패치해 오기 위해서 Select 일 경우에는 커서를 선언하고 열어서 SQL문장을 실행하고 DML이나 DDL등의 경우에는 커서는 쓰지 않고 바로 실행한다.
+    {{{#!plain
+exec sql
+        declare cursor_name cursor for stmt_id;
+exec sql [FOR :array_size] open cursor_name
+[[using [sql] descriptor [global | local] {:desc_name1 | string_literal}]
+[into [sql] descriptor [global | local] {:desc_name2 | string_literal}]];
+}}}
+    위 문장은 위에서 prepare한 SQL문장을 가지고 커서를 선언하고 역시 위에서 선언한 Input descriptor를 이용하여 커서를 여는 문장이다. 앞에서 대부분의 용어에 대한 설명이 있었으니 특별히 어려운 것이 없으리라 생각한다.
+ 1. Output descriptor를 사용하여 패치해올 Select List 즉 칼럼의 개수와 데이터 타입 데이터의 길이등을 알아내야 한다.  이것 역시 4번 과정과 똑 같다. 단지 Output descriptor를 이용하여 Output Bind 변수에 필요한 정보를 가져기위해서 Output 변수들을 위한 descriptor를 지정해주어야 한다.
+   {{{#!plain
+exec sql
+describe output stmt_id using [sql] descriptor [global | local]
+{:desc_nam | string_literal} ;
+}}}
+   이 문장은 Output Bind 변수들이 필요한 정보를 얻기 위해서 이전에 생성한 Output descriptor를 사용하겠다고 선언하는 것이다. stmt_id는 SQL문장을 prepare하면서 얻어온 ID를 사용하면 된다. 그 외의 과정은 과정 (4)과 동일하다.
+ 
+ 1. 커서로부터 한 행씩 패치하면서 각각의 칼럼 값을 얻어온다.
+    {{{#!plain
+exec sql
+[for :array_size] fetch cursor_name
+into [sql] descriptor [global | local] {:descriptor_name | string_literal};
+    exec sql
+	get descriptor local 'out' value :value :data = data, :indi = indicator;
+}}}
+위의 문장들은 커서에서 하나의 행을 패치하고 패치한 행에서 각각의 칼럼의 값을 얻어오는 것이다. value뒤에 있는 :value는 칼럼의 위치이고 :data에 칼럼의 값이 들어가고 :indi에는 칼럼의 indicator 값이 들어간다. 칼럼의 값을 얻어오는 것은 과정(4)에서 나온 exec sql get descriptor … 문장을 사용한다.
+
+ 1. 모든 작업이 끝나면 커서를 닫고 할당한 drscriptor를 없앤다.
+    {{{#!plain
+exec sql
+	close cursor_name;
+exec sql
+	deallocate descriptor [global | local] {:descriptor_name | string_literal};
+}}}
+이 문장들은 모든 과정이 끝나고 커서를 닫고 생성한 descriptor들을 없애는 것이다.
+
+이제 Dynamic SQL의 모든 과정을 보았다. 사실 이렇게 살펴본다고 해서 감이 잘 오지는 않을 것이다. 누가 뭐래도 프로그래머는 실제로 프로그램을 짜면서 감각을 익히는 것이다. 아래의 예제를 잘 살펴보면 이해하는데 별 어려움이 없으리라 생각한다.
+
+다음 프로그램을 컴파일 하기 위해서는 Pro*C/C++를 수행할 때 옵션을 주어야 한다. 
+
+{{{#!plain
+$ proc mode=ansi parse=none dblib.pc 
+}}}
+
+주의할 것은 mode = ansi 또는 dynamic = ansi 를 반드시 지정해 주어야 한다. 
+
+{{{#!plain down:dblib.h
+/* --------------------------------------------------------------------------------
+파일 이름 : dblib.h
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+/*
+ * dblib.h
+ * dblib.pc에서 사용하는 매크로 등을 넣어둔 파일
+ */
+
+#define FALSE           0
+#define TRUE            !FALSE
+
+#define FAILURE         EXIT_FAILURE
+#define SUCCESS         EXIT_SUCCESS
+
+#define COMMIT          0
+#define ROLLBACK        1
+
+#define MAX_SQL_LEN     2048
+
+#define MAX_NAME_LEN    32
+#define MAX_DATA_LEN    4096
+
+#define MAX_ROWS        65536
+
+/*
+ * ANSI SQL Datatypes
+ */
+#define	CHAR			1
+#define VARCHAR2		12
+#define DATE			9
+#define DECIMAL			3
+#define DOUBLE			8
+#define FLOAT			6
+#define INTEGER			4
+#define NUMBER			2
+#define REAL			7
+#define SHORT			5
+#define SMALLINT		5
+}}}
+
+{{{#!plain down:dblib.pc
+/* --------------------------------------------------------------------------------
+파일 이름 : dblib.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+/*
+ * dblib.pc
+ * Dynamic SQL을 수행할 수 있도록 만들어진 일종의 라리브러리 파일
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "dblib.h"
+
+exec sql include sqlca;
+
+
+/* --------------------------------------------------------------------------
+                         변   수       선   언   부
+-------------------------------------------------------------------------- */
+
+exec sql begin declare section;
+	/*
+	 * DB에 접속하기 위한 변수들
+	 */
+	char	username [32];
+	char	password [32];
+	char	database [32];
+
+	/*
+	 * SQL 문장을 저장하기 위한 변수
+	 */
+	char	stmt [1024];
+
+	/*
+	 * Select 문장을 실행할때 쓰이는 변수들
+	 */
+	int		input_cnt;
+	int		output_cnt;
+	char	name [32];
+	int		value;
+	int		type;
+	int		length;
+	char	data [4096];
+	short	indi;
+
+exec sql end   declare section;
+
+
+/* --------------------------------------------------------------------------
+                        함   수       구   현   부
+-------------------------------------------------------------------------- */
+
+/*
+ * 오라클 작업도중 에러발생시 에러메시지를 리턴한다.
+ */
+char *ora_sqlerrm (void)
+{
+	return (sqlca.sqlerrm.sqlerrmc);
+}
+
+
+/*
+ * 오라클 작업도중 에러발생시 에러코드를 리턴한다.
+ */
+int ora_sqlcode (void)
+{
+	return (sqlca.sqlcode);
+}
+
+
+/*
+ * 데이타베이스와 접속하는 함수.
+ * user에 접속할 사용자 이름이, pass에 해당 사용자의 암호가 들어가고
+ * db에는 접속할 데이타베이스의 Connect String이 들어간다.
+ * Local DB인 경우 Connect String는 필요없다.
+ * 만약 db의 값이 NULL이라면 로컬 데이타베이스에 접속한다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_connect (const char *user, const char *pass, const char *db)
+{
+	/*
+	 * 사용자이름과 패스워드가 들어어오지 않았다면 에러로 처리한다.
+	 */
+	if (user == NULL || pass == NULL) return (FAILURE);
+
+	/*
+	 * 사용자이름과 패스워드를 복사하고
+	 * 원격지 DB인 경우 커넥트스트링도 복사한다.
+	 */
+	strcpy (username, user);
+	strcpy (password, pass);
+	if (db != NULL)
+	{
+		strcpy (database, db);
+	}
+
+	/*
+	 * 원격지 DB인지 로컬 DB인지 구분하여 접속한다.
+	 */
+	if (db != NULL)
+	{
+		exec sql
+			connect :username identified by :password using :database;
+	}
+	else
+	{
+		exec sql
+			connect :username identified by :password;
+	}
+
+	/*
+	 * sqlcode를 검사하여 성공여부를 리턴한다.
+	 */
+	return ((sqlca.sqlcode == 0) ? SUCCESS : FAILURE);
+}
+
+
+/*
+ * 데이타베이스와 접속을 종료하는 함수.
+ * mode가 COMMIT이라면 현재까지 데이타베이스의 변경사항을 커밋하고
+ * mode가 ROLLBACK이라면 현재까지 데이타베이스의 변경사항을 롤백한다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_disconnect (int mode)
+{
+	/*
+	 * 모드를 검사하여 현재 트랜젝션을 커밋 또는 롤백하여 접속을 종료한다.
+	 */
+	if (mode == COMMIT)
+	{
+		exec sql
+			commit work release;
+	}
+	else
+	{
+		exec sql
+			rollback work release;
+	}
+
+	/*
+	 * sqlcode를 검사하여 성공여부를 접속한다.
+	 */
+	return ((sqlca.sqlcode == 0) ? SUCCESS : FAILURE);
+}
+
+
+/*
+ * DB의 변경사항을 COMMIT 하는 함수
+ */
+int ora_commit (void)
+{
+	/*
+	 * 트랜젝션을 커밋힌다.
+	 */
+	exec sql
+		commit work;
+
+	/*
+	 * sqlcode를 검사하여 성공여부를 접속한다.
+	 */
+	return ((sqlca.sqlcode == 0) ? SUCCESS : FAILURE);
+}
+
+
+/*
+ * DB의 변경사항을 ROLLBACK 하는 함수
+ */
+int ora_rollback (void)
+{
+	/*
+	 * 트랜젝션을 롤백한다.
+	 */
+	exec sql
+		rollback work;
+
+	/*
+	 * sqlcode를 검사하여 성공여부를 접속한다.
+	 */
+	return ((sqlca.sqlcode == 0) ? SUCCESS : FAILURE);
+}
+
+
+/*
+ * SQL문장을 설정하는 함수
+ * 파라메타로 실행할 SQL문장을 받는다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_setstmt (char *str)
+{
+int	i = 0;
+
+	/*
+	 * 빈 문장이 들어올 경우 실패로 처리한다.
+	 */
+	if (strlen (str) == 0)
+	{
+		return (FAILURE);
+	}
+
+	/*
+	 * 문장의 앞부분에 공백문자나 탭문자가 들어온 경우 이부분을 스킵하도록 한다.
+	 */
+	for (i = 0; i < strlen (str); i ++)
+	{
+		if (!isspace (str [i]))
+		{
+			break;
+		}
+	}
+
+	/*
+	 * 공백문자나 탭문자를 제외한 뒷부분을 복사한다.
+	 */
+	strcpy (stmt, str + i);
+
+	/*
+	 * 문장의 뒷부분에 개행문자, 공백, 콜론등의 문자들이 있으면 제거한다.
+	 */
+	for (i = strlen (str) - 1; i >= 0; i --)
+	{
+		if (stmt [i] == '\n') stmt [i] = '\0';
+		else if (stmt [i] == '\r') stmt [i] = '\0';
+		else if (stmt [i] == '\t') stmt [i] = '\0';
+		else if (stmt [i] == ' ' ) stmt [i] = '\0';
+		else if (stmt [i] == ';' ) stmt [i] = '\0';
+		else break;
+	}
+
+	return (SUCCESS);
+}
+
+
+/*
+ * 현재 설정된 SQL문장을 얻어오는 함수
+ */
+char *ora_getstmt (char *buf)
+{
+	strcpy (buf, stmt);
+}
+
+
+/*
+ * Select문장이 아닌 모든 문장을 (DML, DDL, DCL) 실행하는 함수
+ * DML  (INSERT, UPDATE, DELETE) 문장을 실행하는 함수
+ * DDL  (CREATE, ALTER, DROP, RENAME, TRUNCATE) 문장을 실행하는 함수
+ * DCL  (GRANT, REVOKE) 문장을 실행하는 함수
+ * 성공하면 SUCCESS를, 실패하면 FAILURE를 반환한다.
+ */
+
+int ora_execute (void)
+{
+	/*
+	 * 문장의 첫 구분을 검사하여 DML, DDL, DCL인가 검사한다.
+	 */
+	if (!strncmp (stmt, "INSERT",   6) ||
+		!strncmp (stmt, "Insert",   6) ||
+		!strncmp (stmt, "insert",   6) ||
+		!strncmp (stmt, "UPDATE",   6) ||
+		!strncmp (stmt, "Update",   6) ||
+		!strncmp (stmt, "update",   6) ||
+		!strncmp (stmt, "DELETE",   6) ||
+		!strncmp (stmt, "Delete",   6) ||
+		!strncmp (stmt, "delete",   6) ||
+		!strncmp (stmt, "CREATE",   6) ||
+		!strncmp (stmt, "Create",   6) ||
+		!strncmp (stmt, "create",   6) ||
+		!strncmp (stmt, "ALTER",    5) ||
+		!strncmp (stmt, "Alter",    5) ||
+		!strncmp (stmt, "alter",    5) ||
+		!strncmp (stmt, "DROP",     4) ||
+		!strncmp (stmt, "Drop",     4) ||
+		!strncmp (stmt, "drop",     4) ||
+		!strncmp (stmt, "RENAME",   6) ||
+		!strncmp (stmt, "Rename",   6) ||
+		!strncmp (stmt, "rename",   6) ||
+		!strncmp (stmt, "TRUNCATE", 8) ||
+		!strncmp (stmt, "Truncate", 8) ||
+		!strncmp (stmt, "truncate", 8) ||
+		!strncmp (stmt, "REVOKE",   6) ||
+		!strncmp (stmt, "Revoke",   6) ||
+		!strncmp (stmt, "revoke",   6) ||
+		!strncmp (stmt, "GRANT",    5) ||
+		!strncmp (stmt, "Grant",    5) ||
+		!strncmp (stmt, "grant",    5))
+	{
+		/*
+		 * 문장을 실행한다.
+		 */
+		exec sql
+			execute immediate :stmt;
+
+		/*
+		 * sqlcode를 검사하여 결과를 리턴한다.
+		 */
+		return ((sqlca.sqlcode == 0) ? SUCCESS : FAILURE);
+	}
+}
+
+
+/*
+ * Bind 변수를 정의하고 커서를 선언하고 열어 칼럼의 개수를 전달한다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_select_open (int *ncols)
+{
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분 하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+
+	/*
+	 * input, output을 위한 descriptor를 생성한다.
+	 */
+	exec sql
+		allocate descriptor local 'in' ;
+	exec sql
+		allocate descriptor local 'out';
+
+	/*
+	 * SQL 문장을 파싱하기 위한 ID를 얻어온다.
+	 */
+	exec sql
+		prepare sql from :stmt;
+
+	/*
+	 * Input Bind 변수들을 위한 descriptor를 지정한다.
+	 */
+	exec sql
+		describe input sql using descriptor local 'in';
+
+	/*
+	 * Input Bind 변수의 개수를 descriptor에서 얻어온다
+	 */
+	exec sql
+		get descriptor local 'in' :input_cnt = count;
+
+	/*
+	 * ANSI SQL Datatypes
+	 *
+	 * Character         : 1
+	 * Character Varying : 12
+	 * Date              : 9
+	 * Decimal           : 3
+	 * Double Precision  : 8
+	 * Float             : 6
+	 * Integer           : 4
+	 * Numeric           : 2
+	 * Real              : 7
+	 * SmallInt          : 5
+	 */
+
+	/*
+	 * SQL문장의 Input Bind 변수의 개수만큼 Type, Length, 실제 Data를 지정한다.
+	 * value는 bind 변수의 위치순서, Type은 데이타 타입, Length는 변수의 길이다.
+	 */
+	for (value = 1; value <= input_cnt; value ++)
+	{
+		/*
+		 * Input Bind 변수의 이름과 타입, 길이를 얻어온다.
+		 */
+		exec sql
+			get descriptor local 'in' value :value
+			:name = name, :type = type, :length = length;
+		
+		/*
+		 * Input Bind 변수의 값을 받아들인다.
+		 * 대부분의 Dynamic SQL에서는 Input Bind 변수를
+		 * 거의 쓰지 않으므로 실제로는 잘 안쓰인다.
+		 */
+		printf ("Enter Value for Input Variable %s : ", name);
+		fgets (data, sizeof (data), stdin);
+		/*
+		 * CR, LF 코드를 제거한다.
+		 */
+		data [ strlen (data) -1 ] = '\0';
+
+		/*
+		 * 모든 bind 변수의 값은 문자열로 받아들이므로 type을 12로 한다.
+		 * 실제 Input Bind 변수의 길이, 타입, 값을 지정해 준다.
+		 */
+		type = 12;
+		length = strlen (data) + 1;
+		exec sql
+			set descriptor local 'in' value :value
+			type = :type, length = :length, data = :data;
+	}
+
+	/*
+	 * 커서를 선언하고 연다
+	 */
+	exec sql
+		declare curs cursor for sql;
+	exec sql
+		open curs using descriptor local 'in';
+
+	/*
+	 * Output Bind 변수들을 describe하기 위한 descriptor를 지정한다.
+	 */
+	exec sql
+		describe output sql using descriptor local 'out';
+
+	/*
+	 * Dynamic SQL이므로 Select List의 칼럼 개수를 알지 못한다. 
+	 * 그러므로 'out' descriptor를 이용하여 Select List의 칼럼의
+	 * 개수를 얻어와서 함수인자 ncols에 전달한다.
+	 */
+	exec sql
+		get descriptor local 'out' :output_cnt = count;
+
+	*ncols = output_cnt;
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+
+
+/*
+ * 커서에서 지정한 칼럼의 이름을 얻어온다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_select_fetch_name (char *pdata, int pos)
+{
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분 하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+	
+	/*
+	 * descriptor에서 칼럼의 이름을 얻어온다.
+	 * value는 칼럼의 위치이다.
+	 */
+
+	/*
+	 * descriptor로부터 지정 위치의 칼럼 이름을 얻어온다.
+	 */
+	value = pos;
+	exec sql
+		get descriptor local 'out' value :value :name = name;
+
+	/*
+	 * 칼럼 이름을 함수 인자 pdata에 넣어준다.
+	 */
+	strcpy (pdata, name);
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+
+
+/*
+ * 커서에서 하나의 row를 패치하기 전에 먼저 각 칼럼의
+ * 데이타 타입을 정의 해주어야만 한다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_select_set_column (int pos, int type, int length)
+{
+int value;
+
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분 하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+	
+	/*
+	 * 지정 위치의 칼럼 데이타를 얻어오기 위해서 descriptor에
+	 * Output Bind 변수의 datatype, length를 설정한다.
+	 */
+	value = pos;
+	exec sql
+		set descriptor local 'out' value :value
+		type = :type, length = :length;
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+
+
+/*
+ * 커서에서 하나의 row를 descriptor에 패치해 넣는다.
+ * 나중에 descriptor에서 한 칼럼씩 데이타를 얻어온다.
+ * 성공하면 SUCCESS를 실패하면 FAILURE를 반환한다.
+ */
+int ora_select_fetch_row (void)
+{
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분 하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+	
+	/*
+	 * 커서에서 하나의 row를 패치하여 descriptor로 넣는다.
+	 */
+	exec sql
+		fetch curs into descriptor local 'out';
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+
+
+/*
+ * 하나의 row를 가지고 있는 descriptor에서 하나의 칼럼 데이타를 패치한다.
+ */
+int ora_select_fetch_data (char *pdata, int pos)
+{
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분 하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+	
+
+	/*
+	 * descriptor에서 지정된 위치의 칼럼 데이타를 얻어온다.
+	 */
+	value = pos;
+	exec sql
+		get descriptor local 'out' value :value
+		:data = data, :indi = indicator;
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	/*
+	 * indicator 변수의 값을 조사하여 칼럼 데이타가 NULL이 아니라면
+	 * 데이타를 복사하고 NULL이 맞다면 "[NULL]" 문자열을 값으로 복사한다.
+	 */
+	strcpy (pdata,  (indi != -1) ? data : "[NULL]");
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+
+
+/*
+ * 커서로부터 모든 내용을 패치하고 커서와 descriptor를 닫는다.
+ */
+int ora_select_close (void)
+{
+	/*
+	 * sqlca.sqlcode 를 검사해도 좋으나 exec sql문장이 너무 많은 경우
+	 * 일일이 sqlcode를 검사하는 것은 코드를 읽기가 지저분하므로
+	 * whenever구문을 사용해서 SQL 에러가 발생하면 ERROR로 가도록 한다.
+	 */
+	exec sql
+		whenever sqlerror goto ERROR;
+
+	/*
+	 * 사용한 커서를 닫는다.
+	 */
+	exec sql
+		close curs;
+
+	/*
+	 * 사용한 input, output descriptor를 제거한다.
+	 */
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	/*
+	 * SQL 에러가 발생하였을 경우 계속 진행하도록 한다.
+	 */
+	exec sql
+		whenever sqlerror continue;
+
+	return (SUCCESS);
+
+/*
+ * 에러가 발생하였을 경우 커서와 데스크립트를 닫는다.
+ */
+ERROR:
+	printf ("Error : %d - %s\n", ora_sqlcode (), ora_sqlerrm ());
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close curs;
+	exec sql
+		deallocate descriptor local 'in';
+	exec sql
+		deallocate descriptor local 'out';
+
+	return (FAILURE);
+}
+}}}
+
+{{{#!plain down:test.c
+/* --------------------------------------------------------------------------------
+파일 이름 : test.c
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+/*
+ * test.c
+ * dblib.c 를 사용하여 SQL 문장을 동적으로 할당한 예제
+ * 모든 함수 수행에 ret 변수에 결과를 받는다.
+ * ret 변수를 검사하여 함수의 실행 결과를 알 수 있다. 
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "dblib.h"
+
+int main (void)
+{
+int i;
+int ret;
+int ncols;
+char stmt [MAX_SQL_LEN];
+char data [MAX_DATA_LEN];
+
+	strcpy (stmt,
+		"select d.dname, e.ename, to_char (e.hiredate, 'yyyy-mm-dd') hiredate, e.sal, e.comm from dept d, emp e where d.deptno = e.deptno ");
+
+	ret = ora_connect ("scott", "tiger", NULL);
+
+	ret = ora_setstmt (stmt);
+
+	ret = ora_select_open (&ncols);
+
+	for (i = 1; i <= ncols; i ++)
+	{
+		ret = ora_select_fetch_name (data, i);
+		printf ("%-10s ", data);
+	}
+	printf ("\n-------------------------------------------------------\n");
+
+	for (i = 1; i <= ncols; i ++)
+	{
+		ret = ora_select_set_column (i, VARCHAR2, MAX_DATA_LEN);
+	}
+
+	while (ora_select_fetch_row () == SUCCESS)
+	{
+		for (i = 1; i <= ncols; i ++)
+		{
+			ret = ora_select_fetch_data (data, i);
+			printf ("%-10s ", data);
+		}
+		printf ("\n");
+	}
+
+	ret = ora_disconnect (ROLLBACK);
+
+	exit (EXIT_SUCCESS);
+}
+}}}

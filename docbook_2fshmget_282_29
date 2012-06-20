@@ -1,0 +1,269 @@
+#title shmget(2)
+[wiki:function_shmget(2) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/06/04           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>shmget(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	공유메모리 영역을 할당한다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/ipc.h&gt;
+#include &lt;sys/shm.h&gt;
+
+int shmget(key_t key, size_t size, int shmflg);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		shmget()은 주어진 인자 <emphasis>key</emphasis>를 접근번호로 하는 
+		공유메모리 공간할당을 커널에 요청한다. 커널에서 성공적으로 공유메모리 
+		공간을 할당하게 되면 공유메모리를 가르키는 식별자를 리턴하게 된다.
+		생성될 공유메모리 공간의 크기는 <emphasis>size</emphasis>를 통해서 
+		byte 단위 크기로 지정할 수 있다. 공간의 할당은 
+		<emphasis>shmflg</emphasis>가 IPC_PRIVATE이거나 <emphasis>key</emphasis>
+		를 가지는 공유메모리영역이 존재하지 않거나, IPC_CREAT가 지정되었을 경우
+		(shmflg&amp;IPC_CREAT가 0이 아닌)에 이루어진다.
+	</para>
+	<para>
+		다음은 사용가능한 <emphasis>shmflg</emphasis>값들이다.	
+		<variablelist>	
+			<varlistentry>
+			<term>IPC_CREAT</term>	
+			<listitem>
+				<para>
+				새로운 영역을 할당한다. 만약 이 값이 사용되지 않았다면, 
+				shmget()은 <emphasis>key</emphasis>로 이미 생성된 접근 가능한 
+				공유메모리 영역이 있는지 확인하고 이에 대한 식별자를 
+				되돌려줄 것이다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>IPC_EXCL</term>	
+			<listitem>
+				<para>
+				IPC_CREAT와 함께 사용하며 공유메모리 영역이 이미 존재하면 에러를
+				리턴한다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>mode_flags(하위 9bit)</term>	
+			<listitem>
+				<para>
+				접근 권한의 지정을 위해서 사용한다. 실행권한은 사용하지 않는다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+	<para>
+		만약 새로운 영역이 생성되었다면 shmflg의 권한정보는 영역에 대한 정보가
+		정의되어 있는 shmid_ds 구조체의 멤버인 shm_perm으로 복사된다. shmid_ds
+		구조체는 아래와 같이 정의되어 있다.	
+		<screen>
+struct shmid_ds {
+    struct ipc_perm shm_perm;    /* operation perms */
+    int             shm_segsz;   /* size of segment (bytes) */
+    time_t          shm_atime;   /* last attach time */
+    time_t          shm_dtime;   /* last detach time */
+    time_t          shm_ctime;   /* last change time */
+    unsigned short  shm_cpid;    /* pid of creator */
+    unsigned short  shm_lpid;    /* pid of last operator */
+    short           shm_nattch;  /* no. of current attaches */
+};
+
+struct ipc_perm {
+    key_t  key;
+    ushort uid;   /* owner euid and egid */
+    ushort gid;
+    ushort cuid;  /* creator euid and egid */
+    ushort cgid;
+    ushort mode;  /* lower 9 bits of shmflg */
+    ushort seq;   /* sequence number */
+};
+		</screen>
+		만약 공유 메모리 영역이 이미 존재한다면 접근권한은 수정된다. 
+	</para>
+</section>
+<section>
+	<title>시스템 호출에 대한 반응</title>
+	<para>
+		<variablelist>
+			<varlistentry>
+			<term>fork()</term>
+			<listitem>
+				<para>
+					attache된 공유 메모리 공간은 자식 프로세스에게 상속된다. 
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>exec()</term>
+			<listitem>
+				<para>
+					exec()가 호출된 후에는 모든 공유 메모리 공간은 detache된다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>exit()</term>
+			<listitem>
+				<para>
+					exit()후 모든 공유 메모리 공간은 detache된다
+					(없어 지지는 않는다). 
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공하면 <emphasis>shmid</emphasis>를 반환, 실패하면 -1을 반환한다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+				공유 영역생성시 너무 작은 공간을 할당 하거나(<emphasis>size < SHMMIN</emphasis>)
+				너무 큰 공간(<emphasis>size > SHMMAX</emphasis>)을 할당했을 
+				경우
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EEXIST</term>	
+			<listitem>
+				<para>	
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EACCESS</term>	
+			<listitem>
+				<para>	
+				IPC_CREAT | IPC_EXCL 로 생성을 요청했는데, 이미 공유 메모리 
+				영역이 존재하고 있을 경우,
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOSPC</term>	
+			<listitem>
+				<para>	
+				<emphasis>size</emphasis>만큼의 공간을 할당할 수 없을 경우. 
+				사용가능한 공간은 SHMALL값으로 커널전역적으로 정의되어 있다.
+				(/usr/include/linux/shm.h 참고)	
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOENT</term>	
+			<listitem>
+				<para>	
+				IPC_CREAT를 사용하지 않았는데, 해당 <emphasis>key</emphasis>를
+				가지는 공유 메모리 영역이 존재 하지 않는 경우 
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EACCESS</term>	
+			<listitem>
+				<para>	
+				공유 메모리 영역에 대한 접근권한이 주어져 있지 않다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>ENOMEM</term>	
+			<listitem>
+				<para>	
+				이용할 수 있는 커널 메모리가 충분하지 않다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+	<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리의_사용">공유 메모리</ulink>참고
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리와_세마포어를_이용한_프로세스간_데이터처리">공유 메모리를 이용한 프로세스간 데이터 교환</ulink>
+			</para>
+		
+		</listitem>
+		<listitem>
+			<para>
+			ftok(3)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			ipc(5)			
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmctl(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmat(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			shmdt(2)
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

@@ -1,0 +1,262 @@
+이 소스의 중요한 부분 : multicast의 구현방법
+
+NOTE: Bitrate를 어떻게 지킬것인가에 대한 고찰이 필요합니다. 
+
+----
+{{{#!plain
+/*
+ Copyright (c) Information Equipment co.,LTD.
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+
+ - Simple is best !
+*/
+
+#if !defined(DEF_SOURCE_multicast_c)
+#define DEF_SOURCE_multicast_c "multicast.c"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <netdb.h>
+#include <net/if.h>
+#include <netinet/if_ether.h>
+
+#define __K__(x) (x * 1000)
+#define __M__(x) (x * 1000000)
+
+#define DEF_MULTICAST_PACKETSIZE (32 << 10)
+#define DEF_MULTICAST_INDEXMASK  (0xffff)
+#define DEF_MULTICAST_TTL        (2)
+#define DEF_MULTICAST_BITRATE    (__M__(0) + __K__(512) + 0)
+
+int main(int s_Argc, char *s_Argv[]);
+static int MULTICAST_TEST(int s_Argc, char *s_Argv[]);
+static void MZ_Delay(int s_msDelay);
+static int MULTICAST_TEST_SERVER(const char *s_MulticastZoneIP, int s_MulticastZonePort, int s_Bitrate);
+static int MULTICAST_TEST_CLIENT(const char *s_MulticastZoneIP, int s_MulticastZonePort);
+static int MULTICAST_DIFF_TIME(const struct timeval *s_Old, const struct timeval *s_New);
+
+int main(int s_Argc, char *s_Argv[])
+{
+ int s_Return;	
+ fprintf(stdout, "multicast v1.0.0 - Copyright (c) Information Equipment co.,LTD. - %s %s\n"
+		 "Code by JaeHyuk Cho , Application name : multicast test , Made in KOREA.\n\n", 
+	 __DATE__, __TIME__);
+ s_Return = MULTICAST_TEST(s_Argc, s_Argv);
+ fprintf(stdout, "\nEnd of multicast test (Return code = %d).\n", s_Return); 
+ return(s_Return);
+}
+
+static int MULTICAST_TEST(int s_Argc, char *s_Argv[])
+{
+ int s_Return = 0, s_ArgCount;
+ int s_Mode = (-1);
+
+ char *s_MulticastZoneIP = "224.1.1.1";
+ int s_MulticastZonePort = 5555;
+ int s_Bitrate = DEF_MULTICAST_BITRATE;
+
+ if(s_Argc > 1)
+ {
+  for(s_ArgCount = 1;s_ArgCount < s_Argc;s_ArgCount++)
+  {
+   if(strcmp(s_Argv[s_ArgCount], "server") == 0)s_Mode = 0;
+   else if(strcmp(s_Argv[s_ArgCount], "client") == 0)s_Mode = 1;
+   else if(strstr(s_Argv[s_ArgCount], "."))s_MulticastZoneIP = s_Argv[s_ArgCount];
+   else sscanf(s_Argv[s_ArgCount], "%i", &s_MulticastZonePort);
+  }
+ } 
+
+ if(s_Mode != (-1))
+ {
+  fprintf(stdout, "Mode     : %s\n"
+		  "ZoneIP   : %s\n"
+		  "ZonePort : %d\n"
+		  "Bitrate  : %dKbps\n",
+		  s_Mode == 0 ? "SERVER" : "CLIENT",
+		  s_MulticastZoneIP, 
+		  s_MulticastZonePort,
+		  s_Bitrate / 1000);
+ }
+
+ if(s_Mode == 0)s_Return = MULTICAST_TEST_SERVER(s_MulticastZoneIP, s_MulticastZonePort, s_Bitrate);
+ else if(s_Mode == 1)s_Return = MULTICAST_TEST_CLIENT(s_MulticastZoneIP, s_MulticastZonePort);
+ else fprintf(stdout, "Usage: %s <Mode=server|client> <MulticastZoneIP> <MulticastZonePort>\n", s_Argv[0]);
+ 
+ return(s_Return);
+}
+
+static void MZ_Delay(int s_msDelay)
+{ /* usleep(s_MicroDelay) */
+ struct timeval s_TimeVal;
+ s_TimeVal.tv_sec = s_msDelay / 1000;
+ s_TimeVal.tv_usec = (s_msDelay % 1000) * 1000;
+ select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &s_TimeVal);
+}
+
+static int MULTICAST_DIFF_TIME(const struct timeval *s_Old, const struct timeval *s_New)
+{
+ int s_Return;
+ unsigned long long s_OldTime, s_NewTime;
+ s_OldTime = (s_Old->tv_sec * 1000000) + s_Old->tv_usec;
+ s_NewTime = (s_New->tv_sec * 1000000) + s_New->tv_usec;
+ s_Return = (int)((unsigned long long)(s_NewTime - s_OldTime) / 1000llu);
+ return(s_Return); /* ms */
+}
+
+static int MULTICAST_TEST_SERVER(const char *s_MulticastZoneIP, int s_MulticastZonePort, int s_Bitrate)
+{
+ int s_Return = 0, s_Socket, s_TTL = DEF_MULTICAST_TTL, s_SendBytes, s_Index, s_msDelay;
+ unsigned char s_SendBuffer[ DEF_MULTICAST_PACKETSIZE ];
+ struct sockaddr_in s_BindAddress, s_SendAddress;
+ socklen_t s_BindAddressLength, s_SendAddressLength;
+ 
+ s_Socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+ if(s_Socket >= 0)
+ {
+  s_BindAddress.sin_family = AF_INET;
+  s_BindAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+  s_BindAddress.sin_port = htons(0);
+  s_BindAddressLength = (socklen_t)sizeof(s_BindAddress);
+  if(bind(s_Socket, (struct sockaddr *)(&s_BindAddress), s_BindAddressLength) == 0)
+  {
+   if(setsockopt(s_Socket, IPPROTO_IP, IP_MULTICAST_TTL, (char *)(&s_TTL), sizeof(s_TTL)) == 0)
+   {
+    s_Index = 0;	  
+    s_msDelay = sizeof(s_SendBuffer) * 8000 / s_Bitrate; 
+    
+    s_SendAddress.sin_family = AF_INET;
+    s_SendAddress.sin_addr.s_addr = s_MulticastZoneIP ? inet_addr(s_MulticastZoneIP) : htonl(INADDR_ANY);
+    s_SendAddress.sin_port = htons(s_MulticastZonePort);	  
+    s_SendAddressLength = (socklen_t)sizeof(s_SendAddress);
+    do
+    {
+     memcpy((void *)(&s_SendBuffer[sizeof(s_SendBuffer) - sizeof(s_Index)]), &s_Index, sizeof(s_Index));
+     s_SendBytes = sendto(s_Socket, 
+		          (void *)(&s_SendBuffer[0]), 
+		          (size_t)sizeof(s_SendBuffer),
+		          MSG_NOSIGNAL, 
+			  (struct sockaddr *)(&s_SendAddress),
+			  s_SendAddressLength 
+		         );
+     if(s_SendBytes > 0)
+     {
+      fprintf(stdout, "[%5d] Sent %d/%d bytes, Delay=%dms.\n", 
+		       s_Index,
+		       s_SendBytes, 
+		       sizeof(s_SendBuffer), 
+		       s_msDelay);
+#if DEF_MULTICAST_INDEXMASK != (0)
+      s_Index = (s_Index + 1) & DEF_MULTICAST_INDEXMASK;
+#else
+      s_Index++;
+#endif
+     }
+     else fprintf(stderr, "%s: %s - [ERROR] Can not send index=%d, sent=%d/%d !!!\n", __FILE__, __FUNCTION__, s_Index, s_SendBytes, sizeof(s_SendBuffer));
+     MZ_Delay(s_msDelay);
+    }while(1); 
+   }
+   else fprintf(stderr, "%s: %s - [ERROR] Can not TTL setup !!!\n", __FILE__, __FUNCTION__);	  
+  }
+  else fprintf(stderr, "%s: %s - [ERROR] Can not bind UDP socket !!!\n", __FILE__, __FUNCTION__);
+  close(s_Socket);
+ }
+ else fprintf(stderr, "%s: %s - [ERROR] Can not open UDP socket !!!\n", __FILE__, __FUNCTION__);
+ return(s_Return);
+}
+
+static int MULTICAST_TEST_CLIENT(const char *s_MulticastZoneIP, int s_MulticastZonePort)
+{
+ int s_Return = 0, s_Socket, s_RecvBytes, s_Index, s_CalcIndex, s_IsSelect, s_DiffTime;
+ unsigned char s_RecvBuffer[ DEF_MULTICAST_PACKETSIZE ];
+ struct sockaddr_in s_BindAddress, s_RecvAddress;
+ socklen_t s_BindAddressLength, s_RecvAddressLength;
+ struct ip_mreq s_RequestIP;
+ char *s_StatusString;
+ fd_set s_FD;
+ struct timeval s_TimeVal, s_TimeVal_Old, s_TimeVal_New;
+ 
+ s_Socket = socket(PF_INET, SOCK_DGRAM, 0);
+ if(s_Socket >= 0)
+ {
+  s_BindAddress.sin_family = AF_INET;
+  s_BindAddress.sin_addr.s_addr = htonl(INADDR_ANY); /* My speacial interface */
+  s_BindAddress.sin_port = htons(s_MulticastZonePort);
+  s_BindAddressLength = sizeof(s_BindAddress);
+  if(bind(s_Socket, (struct sockaddr *)(&s_BindAddress), s_BindAddressLength) == 0)
+  {
+   s_RequestIP.imr_multiaddr.s_addr = s_MulticastZoneIP ? inet_addr(s_MulticastZoneIP) : htonl(INADDR_ANY);
+   s_RequestIP.imr_interface.s_addr = s_BindAddress.sin_addr.s_addr;
+   if(setsockopt(s_Socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &s_RequestIP, sizeof(s_RequestIP)) == 0)
+   {
+    s_Index = 0;	 
+    gettimeofday(&s_TimeVal_Old, (struct timezone *)0);	    
+    do
+    {
+     FD_ZERO(&s_FD);
+     FD_SET(s_Socket, &s_FD);
+     s_TimeVal.tv_sec = 1, s_TimeVal.tv_usec = 0;
+     s_IsSelect = select(s_Socket + 1, (fd_set *)(&s_FD), (fd_set *)0, (fd_set *)0, &s_TimeVal);
+     if(s_IsSelect > 0)
+     {
+      if(FD_ISSET(s_Socket, &s_FD))s_IsSelect = 1;
+      else s_IsSelect = 0;
+     } 
+     if(s_IsSelect <= 0)
+     {
+      fprintf(stdout, "Wait packet . . .\n");	     
+      continue;
+     }
+     s_RecvBytes = recvfrom(s_Socket, 
+		            (void *)(&s_RecvBuffer[0]), 
+			    (size_t)sizeof(s_RecvBuffer),
+			    MSG_NOSIGNAL,
+			    (struct sockaddr *)(&s_RecvAddress),
+			    (socklen_t *)(&s_RecvAddressLength)
+			   );
+     if(s_RecvBytes > 0)
+     {
+      memcpy((void *)(&s_CalcIndex), (void *)(&s_RecvBuffer[sizeof(s_RecvBuffer) - sizeof(s_CalcIndex)]), sizeof(s_CalcIndex));
+      if(s_CalcIndex == s_Index)s_StatusString = "PASS";
+      else s_StatusString = "MISSMATCH";
+      gettimeofday(&s_TimeVal_New, (struct timezone *)0);	   
+      s_DiffTime = MULTICAST_DIFF_TIME(&s_TimeVal_Old, &s_TimeVal_New); 
+      memcpy((void *)(&s_TimeVal_Old), (void *)(&s_TimeVal_New), sizeof(struct timeval)); 
+      fprintf(stdout, "[%5d] Recv %d/%d, DiffTime=%dms - %dKbps <%s>\n", 
+                      s_CalcIndex,
+		      s_RecvBytes,
+		      sizeof(s_RecvBuffer),
+		      s_DiffTime,
+		      ((s_RecvBytes << 3) * 1000) / s_DiffTime / 1000,
+		      s_StatusString); 
+#if DEF_MULTICAST_INDEXMASK != (0)
+      s_Index = (s_CalcIndex + 1) & DEF_MULTICAST_INDEXMASK;
+#else
+      s_Index = s_CalcIndex + 1;
+#endif
+     }
+     else fprintf(stderr, "%s: %s - [ERROR] Can not recv index=%d, recv=%d/%d !!!\n", __FILE__, __FUNCTION__, s_Index, s_RecvBytes, sizeof(s_RecvBuffer));
+    }while(1);
+   }
+   else fprintf(stderr, "%s: %s - [ERROR] Can not join interface !!!\n", __FILE__, __FUNCTION__);
+  }
+  else fprintf(stderr, "%s: %s - [ERROR] Can not bind MULTICAST socket !!!\n", __FILE__, __FUNCTION__);
+  close(s_Socket);
+ }
+ else fprintf(stderr, "%s: %s - [ERROR] Can not open DGRAM socket !!!\n", __FILE__, __FUNCTION__);
+ return(s_Return);
+}
+
+#endif
+
+/* End of source */
+}}}
+----

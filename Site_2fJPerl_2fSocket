@@ -1,0 +1,81 @@
+#title Perl 소켓 프로그래밍
+
+참고 : http://www.devshed.com/c/a/Perl/Socket-Programming-in-PERL/
+=== Perl 소켓 프로그래밍 ===
+네트워크 프로그램은 주로 C(:12)를 이용해서 작성을 해왔다. 워낙에 익숙해져 있기도 하지만 Perl을 이용한 멀티쓰레드, 멀티프로세싱 프로그래밍 경험이 없었기 때문이기도 하다. - 왠만 하면 C를 이용했기 때문에 경험이 없었을 수도 있지만.. -
+
+이번에는 Perl을 이용해서 소켓 프로그래밍을 하기로 했다. Master <-> Slave 방식의 분산 시스템을 만들고, 이때 Slave 에서 실행될 Job Function은 Master에 의해서 배포되도록 설계를 했는데 아무래도 컴파일된 프로그램을 배포하는건 효율적이지 못하기 때문이다. 다양한 환경의 시스템이라면, 컴파일된 프로그램을 배포하는건 개발/관리차원에서 문제가 될 수 있다. 
+
+그래서 perl을 이용해서 job function을 개발하기로 했다. 
+=== Server 프로그래밍 ===
+{{{#!plain linenum
+#! /usr/bin/perl -w
+# server0.pl
+#--------------------
+
+use strict;
+use Socket;
+
+# use port 7890 as default
+my $port = shift || 7890;
+my $proto = getprotobyname('tcp');
+
+# reusable socket(:12)을 생성한다.
+socket(SERVER, PF_INET, SOCK_STREAM, $proto) or die "socket: $!";
+setsockopt(SERVER, SOL_SOCKET, SO_REUSEADDR, 1) or die "setsock: $!";
+
+# grab a port on this machine
+my $paddr = sockaddr_in($port, INADDR_ANY);
+
+# port(:12)를 bind() 한다. 
+bind(SERVER, $paddr) or die "bind: $!";
+listen(SERVER, SOMAXCONN) or die "listen: $!";
+print "SERVER started on port $port ";
+
+# 연결을 받아들인다. 
+my $client_addr;
+while ($client_addr = accept(CLIENT, SERVER))
+{
+	# 연결된 호스트의 정보를 얻어낸다. 
+	my ($client_port, $client_ip) = sockaddr_in($client_addr);
+	my $client_ipnum = inet_ntoa($client_ip);
+	my $client_host = gethostbyaddr($client_ip, AF_INET);
+
+	# 연결된 호스트의 정보를 출력한다. 
+	print "got a connection from: $client_host","[$client_ipnum] ";
+
+	# 연결된 호스트에 메시지를 전송한다. 
+	print CLIENT "Smile from the server";
+	close CLIENT;
+} 
+}}}
+
+=== Client 프로그래밍 ===
+{{{#!plain linenum
+#! /usr/bin/perl -w
+# client1.pl - a simple client
+#----------------
+
+use strict;
+use Socket;
+
+# 연결할 호스트 정보를 설정한다. 
+my $host = shift || 'localhost';
+my $port = shift || 7890;
+my $proto = getprotobyname('tcp');
+
+my $iaddr = inet_aton($host);
+my $paddr = sockaddr_in($port, $iaddr);
+
+# 소켓을 생성하고 연결한다.
+socket(SOCKET, PF_INET, SOCK_STREAM, $proto)
+	or die "socket: $!";
+connect(SOCKET, $paddr) or die "connect: $!";
+
+my $line;
+while ($line = <SOCKET>)
+{
+	print $line;
+}
+close SOCKET or die "close: $!"; 
+}}}

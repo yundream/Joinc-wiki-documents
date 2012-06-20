@@ -1,0 +1,434 @@
+#title linux man page : shmget -  공유메모리 공간을 할당한다.
+[wiki:docbook/shmget(2) Docbook 원문]
+
+{{{#!html
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML
+><HEAD
+><TITLE
+>shmget(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.7"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. shmget(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN33"
+>시스템 호출에 대한 반응</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN49"
+>반환값</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN53"
+>에러</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN89"
+>예제</A
+></DT
+><DT
+>1.7. <A
+HREF="#AEN93"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	공유메모리(:12) 영역을 할당한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1. 사용법</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/ipc.h&#62;
+#include &#60;sys/shm.h&#62;
+
+int shmget(key_t key, size_t size, int shmflg);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2. 설명</A
+></H2
+><P
+>		shmget()은 주어진 인자 <B
+CLASS="EMPHASIS"
+>key</B
+>를 접근번호로 하는 
+		공유메모리 공간할당을 커널(:12)에 요청한다. 커널에서 성공적으로 공유메모리 
+		공간을 할당하게 되면 공유메모리를 가르키는 식별자를 리턴하게 된다.
+		생성될 공유메모리 공간의 크기는 <B
+CLASS="EMPHASIS"
+>size</B
+>를 통해서 
+		byte 단위 크기로 지정할 수 있다. 공간의 할당은 
+		<B
+CLASS="EMPHASIS"
+>shmflg</B
+>가 IPC_PRIVATE이거나 <B
+CLASS="EMPHASIS"
+>key</B
+>
+		를 가지는 공유메모리영역이 존재하지 않거나, IPC_CREAT가 지정되었을 경우
+		(shmflg&#38;IPC_CREAT가 0이 아닌)에 이루어진다.
+	</P
+><P
+>		다음은 사용가능한 <B
+CLASS="EMPHASIS"
+>shmflg</B
+>값들이다.	
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>IPC_CREAT</DT
+><DD
+><P
+>				새로운 영역을 할당한다. 만약 이 값이 사용되지 않았다면, 
+				shmget()은 <B
+CLASS="EMPHASIS"
+>key</B
+>로 이미 생성된 접근 가능한 
+				공유메모리 영역이 있는지 확인하고 이에 대한 식별자를 
+				되돌려줄 것이다.
+				</P
+></DD
+><DT
+>IPC_EXCL</DT
+><DD
+><P
+>				IPC_CREAT와 함께 사용하며 공유메모리 영역이 이미 존재하면 에러를
+				리턴한다.
+				</P
+></DD
+><DT
+>mode_flags(하위 9bit)</DT
+><DD
+><P
+>				접근 권한의 지정을 위해서 사용한다. 실행권한은 사용하지 않는다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+><P
+>		만약 새로운 영역이 생성되었다면 shmflg의 권한정보는 영역에 대한 정보가
+		정의되어 있는 shmid_ds 구조체의 멤버인 shm_perm으로 복사된다. shmid_ds
+		구조체는 아래와 같이 정의되어 있다.	
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct shmid_ds {
+    struct ipc_perm shm_perm;    /* operation perms */
+    int             shm_segsz;   /* size of segment (bytes) */
+    time_t          shm_atime;   /* last attach time */
+    time_t          shm_dtime;   /* last detach time */
+    time_t          shm_ctime;   /* last change time */
+    unsigned short  shm_cpid;    /* pid of creator */
+    unsigned short  shm_lpid;    /* pid of last operator */
+    short           shm_nattch;  /* no. of current attaches */
+};
+
+struct ipc_perm {
+    key_t  key;
+    ushort uid;   /* owner euid and egid */
+    ushort gid;
+    ushort cuid;  /* creator euid and egid */
+    ushort cgid;
+    ushort mode;  /* lower 9 bits of shmflg */
+    ushort seq;   /* sequence number */
+};
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		만약 공유 메모리 영역이 이미 존재한다면 접근권한은 수정된다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>1.3. 시스템 호출에 대한 반응</A
+></H2
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>fork()</DT
+><DD
+><P
+>					attache된 공유 메모리 공간은 자식 프로세스에게 상속된다. 
+				</P
+></DD
+><DT
+>exec()</DT
+><DD
+><P
+>					exec()가 호출된 후에는 모든 공유 메모리 공간은 detache된다.
+				</P
+></DD
+><DT
+>exit()</DT
+><DD
+><P
+>					exit()후 모든 공유 메모리 공간은 detache된다
+					(없어 지지는 않는다). 
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN49"
+>1.4. 반환값</A
+></H2
+><P
+>		성공하면 <B
+CLASS="EMPHASIS"
+>shmid</B
+>를 반환, 실패하면 -1을 반환한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN53"
+>1.5. 에러</A
+></H2
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+				공유 영역생성시 너무 작은 공간을 할당 하거나(<B
+CLASS="EMPHASIS"
+>size &#60; SHMMIN</B
+>)
+				너무 큰 공간(<B
+CLASS="EMPHASIS"
+>size &#62; SHMMAX</B
+>)을 할당했을 
+				경우
+				</P
+></DD
+><DT
+>EEXIST</DT
+><DD
+><P
+>	
+				</P
+></DD
+><DT
+>EACCESS</DT
+><DD
+><P
+>	
+				IPC_CREAT | IPC_EXCL 로 생성을 요청했는데, 이미 공유 메모리 
+				영역이 존재하고 있을 경우,
+				</P
+></DD
+><DT
+>ENOSPC</DT
+><DD
+><P
+>	
+				<B
+CLASS="EMPHASIS"
+>size</B
+>만큼의 공간을 할당할 수 없을 경우. 
+				사용가능한 공간은 SHMALL값으로 커널전역적으로 정의되어 있다.
+				(/usr/include/linux/shm.h 참고)	
+				</P
+></DD
+><DT
+>ENOENT</DT
+><DD
+><P
+>	
+				IPC_CREAT를 사용하지 않았는데, 해당 <B
+CLASS="EMPHASIS"
+>key</B
+>를
+				가지는 공유 메모리 영역이 존재 하지 않는 경우 
+				</P
+></DD
+><DT
+>EACCESS</DT
+><DD
+><P
+>	
+				공유 메모리 영역에 대한 접근권한이 주어져 있지 않다.
+				</P
+></DD
+><DT
+>ENOMEM</DT
+><DD
+><P
+>	
+				이용할 수 있는 커널 메모리가 충분하지 않다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN89"
+>1.6. 예제</A
+></H2
+><P
+>	<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리의_사용"
+TARGET="_top"
+>공유 메모리</A
+>참고
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN93"
+>1.7. 참고문헌</A
+></H2
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리와_세마포어를_이용한_프로세스간_데이터처리"
+TARGET="_top"
+>공유 메모리를 이용한 프로세스간 데이터 교환</A
+>
+			</P
+></LI
+><LI
+><P
+>			ftok(3)
+			</P
+></LI
+><LI
+><P
+>			ipc(5)			
+			</P
+></LI
+><LI
+><P
+>			shmctl(2)
+			</P
+></LI
+><LI
+><P
+>			shmat(2)
+			</P
+></LI
+><LI
+><P
+>			shmdt(2)
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

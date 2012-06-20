@@ -1,0 +1,139 @@
+#title linux man page : getaddrinfo - 네트워크 주소 정보를 가져온다. 
+
+== getaddrinfo ==
+네트워크 주소 정보를 가져온다.
+
+=== 사용 법 ===
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+int getaddrinfo(const char *node, const char *service,
+                const struct addrinfo *hints,
+                struct addrinfo **res);
+
+void freeaddrinfo(struct addrinfo *res);
+}}}
+
+=== 매개 변수 ===
+ * node : 호스트 이름 
+ * service : 서비스 이름
+ * hints : addrinfo 구조체를 채워서 넘기면, 이 함수는 addrinfo 구조체의 멤버 변수 값을 읽어서, 이에 대한 주소 정보를 넘긴다.  
+ * res : 힌트 값을 참고해서 가져온 네트워크 주소 정보는 res를 통해서 가져올 수 있다.  
+
+=== 설명 ===
+이 함수는 __node__와 __service__정보를 이용해서 인터넷 호스트와 서비스에 대해서 사용할 수 있는 주소 정보를 담고 있는, addrinfo 구조체의 목록을 반환한다. addrinfo 구조체는 해당 호스트와 서비스에 대응되는 주소 정보를 포함한다. 이들 주소 정보는 bind(2)와 connect(2)등의 함수에서 사용할 수 있다.  
+
+addrinfo 구조체
+{{{#!plain
+struct addrinfo {
+    int              ai_flags;
+    int              ai_family;
+    int              ai_socktype;
+    int              ai_protocol;
+    size_t           ai_addrlen;
+    struct sockaddr *ai_addr;
+    char            *ai_canonname;
+    struct addrinfo *ai_next;
+};
+}}}
+  * ai_family : 주소 영역 값을 가진다. '''AF_INET'''와 '''AF_INET6''' 가 사용된다. node와 service가 IPv4 주소영역이라면 AF_INET, IPv6 주소영역이라면 AF_INET6을 설정한다. 만약 AF_UNSPEC가 설정되면 모든 주소 영역의 정보를 반환한다. 
+  * ai_socktype : 소켓 형식값을 가진다. SOCK_STREAM 혹은 SOCK_DGRAM이 지정된다. 만약 0을 지정하면 모든 종류의 소켓 형식에 대한 정보를 반환한다.
+  * ai_protocol : 소켓 주소가 사용하는 프로토콜 
+  * ai_flags : 추가 옵션
+=== 반환 값 ===
+이 함수는 성공하면 0, 실패하면 0이 아닌 값을 반환한다.
+
+=== 예제 ===
+{{{#!plain
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+
+
+int main(int argc, char **argv)
+{
+        struct addrinfo hints;
+        struct addrinfo *result, *rp;
+        struct sockaddr_in *sin;
+        struct sockaddr_in6 *sin6;
+        int *listen_fd;
+        int listen_fd_num=0;
+
+        char buf[80] = {0x00,};
+        int i = 0;
+        if(argc != 2)
+        {
+                printf("Usage : %s [port]\n", argv[0]);
+                return 1;
+        }
+
+        memset(&hints, 0x00, sizeof(struct addrinfo));
+
+        hints.ai_flags = AI_PASSIVE;
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        if(getaddrinfo(NULL, argv[1], &hints, &result) != 0 )
+        {
+                perror("getaddrinfo");
+                return 1;
+        }
+
+        for(rp = result ; rp != NULL; rp = rp->ai_next)
+        {
+                listen_fd_num++;
+        }
+        listen_fd = malloc(sizeof(int)*listen_fd_num);
+
+        printf("Num %d\n", listen_fd_num);
+        for(rp = result, i=0 ; rp != NULL; rp = rp->ai_next, i++)
+        {
+                if(rp->ai_family == AF_INET)
+                {
+                        sin = (void *)rp->ai_addr;
+                        inet_ntop(rp->ai_family, &sin->sin_addr, buf, sizeof(buf));
+                        printf("<bind 정보 %d %d %s>\n", rp->ai_protocol, rp->ai_socktype, buf);
+                }
+                else if(rp->ai_family == AF_INET6)
+                {
+                        sin6 = (void *)rp->ai_addr;
+                        inet_ntop(rp->ai_family, &sin6->sin6_addr, buf, sizeof(buf));
+                        printf("<bind 정보 %d %d %s>\n", rp->ai_protocol, rp->ai_socktype, buf);
+                }
+                if((listen_fd[i] = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) < 0)
+                {
+                        printf("Socket Create Error\n");
+                }
+                if(rp->ai_family == AF_INET6)
+                {
+                        int opt = 1;
+                        setsockopt(listen_fd[i], IPPROTO_IPV6, IPV6_V6ONLY, (char *)&opt, sizeof(opt));
+                }
+
+                if(bind(listen_fd[i], rp->ai_addr, rp->ai_addrlen) != 0)
+                {
+                        if(errno != EADDRINUSE);
+                        {
+                                perror("bind error\n");
+                                return 1;
+                        }
+                }
+                if(listen(listen_fd[i], 5) != 0)
+                {
+                        perror("listen error\n");
+                        return 1;
+                }
+        }
+        freeaddrinfo(result);
+        pause();
+        return 1;
+}
+}}}

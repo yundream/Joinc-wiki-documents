@@ -1,0 +1,313 @@
+#title putpwent(3)
+[wiki:docbook_putpwent(3) docbook 원본]
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>putpwent</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. putpwent</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN15"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN18"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN26"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN31"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	유저 패스워드 정보를 파일에 쓴다.  </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pwd.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+
+int putpwent(const struct passwd *p, FILE *stream);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		putpwent()함수는 <B
+CLASS="EMPHASIS"
+>stream</B
+>에 연결된 파일에
+		패스워드 구조체 정보<B
+CLASS="EMPHASIS"
+>p</B
+>를 이용해서 패스워드내용을 
+		추가한다. 
+	</P
+><P
+>		passwd구조체는 &#60;pwd.h&#62;에 다음과 같이 정의되어 있다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct passwd {
+        char    *pw_name;       /* user name */
+        char    *pw_passwd;     /* user password */
+        uid_t   pw_uid;         /* user id */
+        gid_t   pw_gid;         /* group id */
+        char    *pw_gecos;      /* real name */
+        char    *pw_dir;        /* home directory */
+        char    *pw_shell;      /* shell program */
+};
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+></A
+>1.3. 반환값</H1
+><P
+>		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+></A
+>1.4. 에러</H1
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					잘못된 값이 인자로 사용되었다.	
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN26"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;pwd.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdio.h&#62;
+
+#define USER_DEFAULT_DIR "/home/%s"
+#define USER_DEFAULT_SHELL "/bin/sh"
+void help()
+{
+    fprintf(stderr, "Usage: useradd2 [username] -d usr_dir -s usr_shell\n");
+}
+
+int main(int argc, char **argv)
+{
+    int opt;
+    struct passwd lpass; 
+    char user_dir[80];
+    char user_name[32];
+    FILE *pwfp;
+
+    memset((void *)&#38;lpass, 0x00, sizeof(lpass));
+    while((opt = getopt(argc, argv, "s:d:h")) != -1)
+    {
+        switch(opt)
+        {
+            case 's':
+                lpass.pw_shell = optarg; 
+                break;
+            case 'd':    
+                lpass.pw_dir = optarg; 
+                break;
+            case 'h':
+                help();
+                exit(0);
+                break;
+            case '?': 
+                help();
+                break;
+        }
+    }
+
+    if (optind &#62; argc)    
+    {
+        snprintf(user_name, 32, "%s", argv[optind]);
+        lpass.pw_name = user_name;
+    }
+    else
+    {
+        help();
+        exit(1);
+    }
+
+    if(!lpass.pw_dir)
+    {
+        sprintf(user_dir, USER_DEFAULT_DIR, user_name);
+        lpass.pw_dir = user_dir;
+    }
+    if(!lpass.pw_shell)
+    {
+        lpass.pw_shell = USER_DEFAULT_SHELL;
+    }     
+    printf("User id    : %s\n", lpass.pw_name);
+    printf("User shell : %s\n", lpass.pw_shell);
+    printf("User dir   : %s\n", lpass.pw_dir);
+
+    pwfp = fopen("/etc/passwd", "a");
+    putpwent(&#38;lpass, pwfp);
+    fclose(pwfp);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		fopen()을 통하여 파일을 열때 "w"로 열지 않도록 주의해야 한다. 그럴 경우 기존 파일의 
+		내용을 모두 잃어버리게 된다.  
+	</P
+><P
+>		그리고 위의 프로그램은 작동방식만을 설명하는 수준의 프로그램이다. 제대로 작동하도록 
+		만들려면 getpwent(3)등의 함수를 이용해서 패스워드 목록을 가져오고 중복된 이름이 있는지 
+		확인하고, uid와 gid를 결정하는 등의 루틴이 포함되어야 한다. putpwent()함수는 uid와 gid를 
+		결정해 주지 않기 때문이다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN31"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=9"
+TARGET="_top"
+>getopt를 이용한 프로그램 인자처리</A
+>
+				</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

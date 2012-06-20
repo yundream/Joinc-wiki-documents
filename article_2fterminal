@@ -1,0 +1,2110 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>터미널 제어</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>터미널 제어</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>터미널</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN11"
+>터미널이란 무엇인가 ?</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN18"
+>터미널의 종류</A
+></DT
+><DD
+><DL
+><DT
+>1.2.1&#51208;. <A
+HREF="#AEN20"
+>Text Terminal</A
+></DT
+><DT
+>1.2.2&#51208;. <A
+HREF="#AEN24"
+>Window (Terminal ?)&#38; Thin Clients</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>2&#51208;. <A
+HREF="#AEN31"
+>터미널 제어</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN34"
+>터미널 제어가 왜 필요한가 ?</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN41"
+>터미널 장치 파일(tty)</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN48"
+>termios 함수를 통한 터미널제어</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1&#51208;. <A
+HREF="#AEN52"
+>터미널 기본모드</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1.1&#51208;. <A
+HREF="#AEN55"
+>Canonical Mode Input Processing</A
+></DT
+><DT
+>2.3.1.2&#51208;. <A
+HREF="#AEN60"
+>NonCanonical Mode Input Processing</A
+></DT
+></DL
+></DD
+><DT
+>2.3.2&#51208;. <A
+HREF="#AEN64"
+>termios 구조체 - 터미널 속성구조체</A
+></DT
+><DT
+>2.3.3&#51208;. <A
+HREF="#AEN252"
+>터미널 속성 얻어오기</A
+></DT
+><DT
+>2.3.4&#51208;. <A
+HREF="#AEN256"
+>터미널 속성 설정</A
+></DT
+><DT
+>2.3.5&#51208;. <A
+HREF="#AEN273"
+>몇가지 예제들</A
+></DT
+><DT
+>2.3.6&#51208;. <A
+HREF="#AEN297"
+>터미널 검사하기</A
+></DT
+><DT
+>2.3.7&#51208;. <A
+HREF="#AEN307"
+>터미널 윈도우 사이즈</A
+></DT
+><DT
+>2.3.8&#51208;. <A
+HREF="#AEN315"
+>stty 명령어</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN319"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 터미널</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN11"
+>1.1&#51208;. 터미널이란 무엇인가 ?</A
+></H2
+><P
+>			터미널(terminal) 은 모니터(moniter)와 키보드(keyboard)의 
+			조합으로 지역적으로 붙어있거나 혹은 원격으로 연결된 
+			컴퓨터와 대화하기 위해서 사용되며, 장치의 개념으로 이해할수 
+			있다. 프로그래머는 프로그램을 실행시키기 위해서 
+			키보드를 이용해서 명령을 실행시키며, 그 결과는 모니터를 
+			통해서 출력된다. 우리는 터미널이 없이는 컴퓨터를 효과적으로 
+			다룰수 없을것이다. - 모니터+키보드 대신에 천공테이프를 통해서 
+			명령을 실행시키고, 그 결과를 라인프린터를 통해서 출력받는 
+			다고 가정해보라 - 
+		</P
+><P
+>			유닉스 시스템은 기본적으로 text 터미널을 사용하고 있다. 
+			이 텍스트 터미널은 1970 년대 메인프레임(mainframe) 컴퓨터와 
+			통신하기 위해서 사용했었는데, 프로그래머는 전용 장치 
+			(모니터와 키보드가 연결된)를 케이블로 메인프레임과 연결시킨후 
+			프로그래밍작업을 하거나, 문서를 만들고, 시스템을 관리하는 
+			일을 했다.   
+		</P
+><P
+>			지금은 터미널장치와 소프트웨어에 많은 발전이 
+			이루어져서, 그당시와는 비교할수 없는 편리한 환경에서 작업을 
+			할수 있다. 만약 여러분이 리눅스를 사용하고 있다면 
+			(X Windows가 아닌) 아마도 여러가지 작업을 위해서 
+			키보드와 모니터 - 터미널 - 를 이용하고 있을것이다.  
+			또한 CTRL+ALT+F1 ... F6 키를 이용하면 여러개의 가상 터미널을 
+			만들어서 가상 터미널 상을 오가면서 동시에 몇개의 다른 작업을 
+			수행할수도 있을것이다. 	 
+		</P
+><P
+>			추가적으로 여러분이 X 윈도우를 사용한다면 
+			터미널을 흉내내는 (emulate) 
+			어플리케이션들을 사용해서, 수십개 이상의 터미널을 띄워서 
+			자유자재로 터미널상을 오가면서 작업을 할수도 있다. 
+			이러한 터미널 emulate 프로그램으로는 
+			xterm, rxvt, zterm 등이 있으며, 
+			한글 입/출력을 지원 기능을 추가한 hanterm 등이 
+			있다.  
+			만약 외형적으로 아주 멋진 터미널 emulate 를 구한다면 Eterm 과 
+			같은 어플리케이션을 사용할수도 있을것이다. 
+			윈도우즈에서는 crt, putty 등의 터미널 emulate 어플리케이션이 
+			존재한다.   
+		</P
+><P
+>			현재 우리가 사용하는 개인 PC 는 터미널장치로 키보드와 
+			모니터를 이용하는데, 이들 장치는 각각 그래픽 카드와 PS/2 포트에 
+			연결되어서 사용되어진다. 그러나 위에서 예를든 메인프레임, 
+			라우터 그리고 OS가 내장된 몇가지 소형장비들은 
+			오랜역사를 지니고 있는 
+			serial port(직렬포트) 에 직접 케이블을 연결해서 사용하기도 
+			한다. 라우터에 문제가 생겨서 A/S 직원이 A/S 하는걸 보았다면 
+			아마도 전용 터미널을 serial port (com port) 와 연결해서 
+			작업하는걸 보았을것이다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>1.2&#51208;. 터미널의 종류</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>1.2.1&#51208;. Text Terminal</A
+></H3
+><P
+>				텍스트 터미널은 호스트 컴퓨터와 통신하기 위해서 
+				ASCII 코드를 이용한다. 이러한 ASCII 코드는 
+				보통은 키보드를 통해서 바로 입력이 가능한 문자들이며 
+				모니터를 통해서 바로 출력될수 있다. 
+				그리고 이러한 문자들외에도 몇가지 제어를 위한 
+				문자(Special control byte)들이 존재한다. 
+				이들 제어문자는 커서이동, 삭제 와 같은 입력을 
+				제어하기 위해서 사용된다. 
+				이러한 제어문자는 수백가지 
+				종류가 존재하고 있다.
+				또한 강조글자(bold) 밑줄문자(underline) 와 색상변경과  
+				같은 출력 모양의 조정을 할수도 있다. 이러한 출력모양 
+				조정을 위해서 ANSI 를 사용한다.   
+			</P
+><P
+>				이들 텍스트 터미널은 기본적으로 ASCII 코드만을 통해서 통신을 
+				하기 때문에, 매우저렴하게 전용장치를 개발할수 있으며, 
+				어플리케이션 역시 쉽게 개발가능하다. 
+				- 정확히 말하자면 ASCII 256 중에 상위 128 개만을 
+				사용한다 -	 
+				386, 286 급 컴퓨터 정도면 충분히 터미널 장치로 사용할수 
+				있을것이며, 만약 휴대성이 중요하다면 액정디스플레이가 
+				달린 매우 조그마한 싸이즈로 만들수도 있을것이며, 
+				실제 라우터 세팅을 위한 전용 장치들이 액정디스플레이와 
+				키보드만을 갖춘 형태로 사용되어지고 있다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>1.2.2&#51208;. Window (Terminal ?)&#38; Thin Clients</A
+></H3
+><P
+>				text 터미널이 아닌것은 Thin Clients(혹은 윈도우 터미널) 
+				라고 말할수 있다. 
+				통신수단으로 그래픽 정보를 사용한다. 이들 Thin Clients 의 
+				경우 전송받은 GUI 화면을 빠른시간에 모니터에 뿌려줄수 
+				있어야 함으로 텍스트 터미널을 구현하기 위한 장치보다 더 
+				비용이 많이든다. 
+			</P
+><P
+>				또한 그래픽정보를 전송해야 함으로 텍스트 터미널보다 
+				네트웍 자원을 많이 소모한다. 
+			</P
+><P
+>				Thin 클라이언트를 이용 할경우 많은 저장공간과 빠른 연산능력을 
+				가진 중앙컴퓨터를 하나두고, 다른 사용자는 적은 저장공간과 
+				상대적으로 느린 연산능력을 가진 (Thin) 컴퓨터를 두어서 
+				실제 어플리케이션을 사용하거나, 데이타를 이용할때 
+				중앙 컴퓨터에 연결해서 필요한 작업을 하는 컴퓨팅 환경을 
+				만들수 있을것이다.  
+			</P
+><P
+>				이럴경우 여러가지 중요 정보가 중앙컴퓨터에 집중되고, 
+				다수의 연결 사용자 컴퓨터에 투자하는 비용을 줄일수 있음으로  
+				정보관리와 비용측면에서 이익을 볼수 있을거라고 생각된다. 
+				그러나 실제로 이러한 컴퓨팅 환경을 만들어서 쓰는 경우는 
+				그리 흔하지 않다. 지역네트웍에 과도한 부하를 유발할수 있고, 
+				중앙 컴퓨터에 문제가 생겼을 경우 모든 작업이 중단될수 
+				있기 때문이다. 거기에 자신의 정보가 자신이 하드에 있지 않고 
+				중앙의 다른 하드에 있다는 것 자체를 많은 직원들이 싫어하는 
+				(믿어워 하지 못하는) 경향이 있기 때문이다.  
+			</P
+><P
+>				그래서 주로 원격지의 MS 윈도우즈 계열의 서버를 관리하기 
+				위한 목적으로 많이 쓰인다. 
+				VNC 라든지 Windows Terminal Server 가 이러한 어플리케이션이다.  
+				리눅스의 X 윈도우의 경우 C/S 환경으로 만들어져 
+				있기 때문에 기본적으로 Window 터미널로써의 역활을 수행할수 
+				있다. 
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN31"
+>2&#51208;. 터미널 제어</A
+></H1
+><P
+>		여기에서는 기본적으로 text terminal 을 기준으로 설명하게 될것이며, 
+		테스트를 하기 위한 운영체제는 Linux (Kernel 2.4.x) 가 될것이다. 
+		또한 시리얼통신을 위한 terminal 환경과 같은 것들은 다루지 않을것이다. 
+		이문서에서는 PC에서 가장 일반적으로 사용되는 키보드+모니터 (/dev/tty) 
+		에 대해서만 다룰것이다. 시리얼통신과 같은 특수? 한것들은 
+		역시(-.-;) 기회가 된다면(언젠가) 다루도록 하겠다. 	   
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN34"
+>2.1&#51208;. 터미널 제어가 왜 필요한가 ?</A
+></H2
+><P
+>			기본적으로 사용자는 컴퓨터혹은 여러가지 
+			주변장치와 대화할때 터미널을 이용해서 대화하게 
+			된다. 
+			보통 우리가 컴퓨터 모니터 앞에 앉아서 작업을 할때는 표준 
+			터미널장치인 /dev/tty 를 통해서 컴퓨터와 대화를 하겠지만 
+			때때로 직렬(serial)포트를 통해서 컴퓨터와 대화를 해야하는 경우도 
+			생길것이다. 이들 직렬포트와 통신하기 위해서는 /dev/ttyS0 과 같은 장치파일 
+			들을 이용해서 통신을 하게 되는데, 이경우 회선속도를 서로 맞추어줘야 하며, 
+			여러가지 이스케이프문자(Ctrl+C 와 같은)에 대한 처리등을 해주어야 함으로 
+			터미널특성 변경등의 작업을 해주어야 한다. - 이 문서에서는 시리얼 통신과 
+			관련된 주제는 다루지 않을것이다. - 
+		</P
+><P
+>			그리고 /dev/tty 를 통해서 작업을 하고자 할때도 키보드 입력을 
+			반향(echo) 시켜야 할것인지, 특수문자입력에 대한 정책수정, 캐리지리턴을 
+			받아들여야 할것인지, Ctrl+d, Ctrl+c 와 같은 제어문자를 
+			받아들일것인지 무시할것인지 등 필요에 따라서 터미널의 특성을 변경시켜줘야 
+			하는 경우가 있다. 
+			가장 간단한 예로 아이디와 패스워드를 입력받는 터미널기반의 프로그램을 
+			만들어야 한다고 했을때, 패스워드 입력시에는 키보드로 입력되는 문자가 
+			모니터에 바로 출력되게 하면 안될것이다. 이럴경우는 터미널의 특성을 변경시켜서 
+			키보드입력이 화면에 반향(echo)되지 않도록 해주어야 한다. 
+			다음의 예제 프로그램을 실행시켜 보자. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : echo_off.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+
+#include &#60;termios.h&#62;
+#include &#60;string.h&#62;
+
+static struct termios stored_settings;
+void echo_off(void)
+{
+    struct termios new_settings;
+    tcgetattr(0, &#38;stored_settings);
+    new_settings = stored_settings;
+    new_settings.c_lflag &#38;= (~ECHO);
+    new_settings.c_lflag &#38;= (~ICANON);
+    tcsetattr(0,TCSANOW, &#38;new_settings);
+
+    return ;
+}
+
+void echo_on(void)
+{
+    tcsetattr(0, TCSANOW, &#38;stored_settings);
+    return ;
+}
+
+void get_pass(char *pass)
+{
+    char buf;
+    int i=0;
+
+    printf("Passwd : ");
+    echo_off();
+    while ((buf=getc(stdin)) != '&#92;n')
+    {
+        pass[i] = buf;
+        printf("%s", "*");
+        i ++;
+    }
+    echo_on();
+}
+
+int main()
+{
+    char pass[16];
+    memset(pass, 0x00, 16);
+    get_pass(pass);
+    printf("&#92;nYour input : %s&#92;n", pass);
+    return 1;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 프로그램은 사용자 패스워드를 입력받는 일을한다. 
+			패스워드의 경우 화면에 바로 출력되면 안됨으로, 
+			터미널의 라인 출력 특성을 "반향 끔" 으로 설정하고 키입력을 
+			받아들이도록 했다. 그리고 사용자 키입력을 "*" 로 대체 
+			시켜서 화면에 출력하도록 해서 사용자 패스워드를 입력
+			받도록 만들었다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>2.2&#51208;. 터미널 장치 파일(tty)</A
+></H2
+><P
+>			각각의 터미널은 자신이 사용하는 장치파일에 연결해서 
+			통신을 하게 된다. 예를들어 com1 포트와 시리얼 통신을 해야 한다면 
+			/dev/ttyS0 과 연결을 해야 한다. 그렇지 않고 
+			일반적인 개인 PC 의 표준터미널인 키보드&#38;모니터 와 통신하기를 원한다면 
+			/dev/tty0 과같은 장치파일과 연결해야 할것이다. 
+			이러한 장치파일은 ASCII 코드중 화면에 표시되는 문자(chricter)를 
+			이용해서 통신을 하게 됨으로 캐릭터 디바이스 파일(문자 장치파일) 이라고 
+			부른다. 
+			ls -al 로 위의 파일의 정보를 알아보면 아래와 같을것이다.         
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /dev]# ls -al /dev/tty*	
+crw-rw-rw-    1 root     root       5,   0 10월 12  2001 /dev/tty
+crw--w----    1 root     root       4,   0 12월  1 12:21 /dev/tty0
+crw--w----    1 root     tty        4,   1 12월  1 12:21 /dev/tty1
+crw--w----    1 root     root       4,  10 10월 12  2001 /dev/tty10
+crw--w----    1 root     root       4,  11 10월 12  2001 /dev/tty11
+crw--w----    1 root     root       4,  12 10월 12  2001 /dev/tty12
+crw--w----    1 root     root       4,  13 10월 12  2001 /dev/tty13
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			파일 리스트의 가장앞에 있는 'c' 가 캐릭터 디바이스 파일임을 나타내주는 
+			표시이다. 
+		</P
+><P
+>			이러한 장치파일에에 접근해서 원하는 장치와 통신하는 방법은 
+			의외로 간단하다. 
+			일반파일과 마찬가지로 open 한다음에 read, write 함수를 사용해서 
+			정보를 읽고 쓰면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    | &#60;-- APP 개발자영역 --&#62; | &#60;-- 디바이스 드라이버 개발자영역 --&#62; |
+  +-----+     +-----------+     +------------+    +---------------+    +------+ 
+  | APP | --- | open(2)   | --- | /dev/ttyS0 | -- | device driver | -- | 장치 |   
+  +-----+     | read(2)   |     +------------+    +---------------+    +------+
+              | write(2)  |    
+              +-----------+    
+			</PRE
+></TD
+></TR
+></TABLE
+> 
+			위의 그림은 일반 어플리케이션에서 어떻게 장치와 통신할수 있는지에 대한 
+			계략적인 모양을 나타낸 그림이다. 
+			장치는 키보드가 될수도 있을것이며, 
+			때에 따라서는 COM,USB 포트가 될수도 있을것이다. 많이 알려져 있는 대부분의 장치 
+			디바이스 드라이버는 이미 제작되어 있음으로 일반 어플리케이션 프로그래머라면 
+			open, read, write 를 이용해서 장치와 통신하는 부분까지만 신경쓰면 된다. 그러나 
+			알려져 있지 않은 장치를 컴퓨터에 연결해서 사용해야 할경우에는 
+			직접 디바이스 드라이버를 제작해야 할것이다. 
+		</P
+><P
+>			Barcode 리더기로 부터 읽어들인 데이타를 처리하는 어플리케이션을 만들고자 한다면, 
+			(com1 포트를 사용한다고 가정하자), 어플리케이션 제작자는 
+			단지 /dev/ttyS0 을 open 한다음에 read 함수를 이용해서 읽을 데이타가 있는지 
+			검사하고, 데이타가 들어오면 이것을 적당하게 처리하도록 해주면 된다. 
+			물론 내부적으론 몇가지 다른 일들을 해줘야 겠지만, 개념적으로 보자면 매우 간단하게 
+			구현가능함을 알수 있다.      
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.3&#51208;. termios 함수를 통한 터미널제어</A
+></H2
+><P
+>			유닉스에서는 이러한 터미널제어를 위해서 termios 라는 함수모음을 제공한다. 
+			우리는 이 함수들을 통해서 터미널을 원하는 방향으로 제어할수 있게 된다.  
+			이번장에서는 termios 함수들에 대한 설명과 이를 이용한 터미널제어의 방법에 
+			대해서 알아보도록 하겠다.  
+		</P
+><P
+>			기본적으로 termios 는 디바이스(장치)와의 asynchronous(비동기) 통신을 위한 
+			프로그래밍 인터페이스를 제공한다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN52"
+>2.3.1&#51208;. 터미널 기본모드</A
+></H3
+><P
+>				터미널은 크게 2가지 모드인 "정규모드"와 "비정규모드" 로 
+				나뉜다. 이것들은 터미널을 제어하는데 매우 중요한 요소임으로 
+				별도의 장을 만들어서 설명을 했다.   
+			</P
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN55"
+>2.3.1.1&#51208;. Canonical Mode Input Processing</A
+></H4
+><P
+>					흔히 정규모드라고 하며   
+					기본적으로 라인단위로 입출력을 처리하게 된다. 
+					여기에서 말하는 라인의 개념은 우리들이 에디터에서 작업할때의 
+					라인과 같은 개념으로 '&#92;n' 혹은 EOF(End-Of-File) 를 
+					만날때까지의 문자열을 말한다. 
+					보통 사용자와 컴퓨터와 대화하기 위한 
+					입출력은 정규모드 상태에서 행해진다. 
+					이상태에서는 문자열 입력후 Enter 키를 눌러야 리턴이 될것이다.  
+					(혹은 Ctrl+d 를 눌러서 EOF 를 발생시킬경우)
+				</P
+><P
+>				 	또한 정규 방식에서는 ERASE와 KILL 문자등이 허용된다. 
+					정규방식 자체가 라인단위 입출력작동임으로 당연히 Erase, kill 문자를
+					사용할수 있을것이다. 	
+				</P
+><P
+>					기본적으로 터미널은 정규모드로 시작한다. 
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN60"
+>2.3.1.2&#51208;. NonCanonical Mode Input Processing</A
+></H4
+><P
+>					비정규모드라고 한다. 정규모드가 라인단위로 입출력을 처리하는
+					것과 달리 비정규모드는 한바이트씩 처리하게 된다. 
+					한바이트씩 처리하게 됨으로 정규모드에서 가능했던 여러가지 
+					특수문자들(ERASE, KILL, EOF, NL, CR)을 사용할수 없게 된다. 
+					- 당연하다 이미 돌려진 문자에 대해서 ERASE 등을 할수 있을 턱이 없다 - 
+				</P
+><P
+>					예제 echo_off.c 가 비정규모드로 작동하는 프로그램인데, delete 키등이 
+					먹지 않음을 알수 있다. 위에서 말했듯이 비정규모드에서는 ERASE 문자가 
+					사용되지 않기 때문이다. echo_off.c 를 비정규 모드로 작성한 이유는 
+					정규모드로 할경우 개행문자 '&#92;n' 이 입력되기 전까지는 리턴되지 않음으로 
+					바이트단위로 리턴하도록 하기 위해서이다.  
+        			위 예제코드에서 new_settings.c_lflag &#38;= (~ICANON); 을 주석처리 한다음에 
+					실행시키면 엔터키를 입력하기 전까지는 화면에 "*" 이 출력되지 않음을 
+					알수 있을것이다. 
+					대신 Delete 와 같은 몇몇 특수문자의 전달이 가능함을 알수 있다.  
+				</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN64"
+>2.3.2&#51208;. termios 구조체 - 터미널 속성구조체</A
+></H3
+><P
+>				모든 터미널 데이타는 다음의 termios 구조체의 각 플레그의 
+				비트값을 읽어오거나 비트값을 세팅해줌으로써 검사와 설정을 
+				할수 있다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct 
+{
+    tcflag_t c_iflag;  /* input modes */
+    tcflag_t c_oflag;  /* coutput modes */
+    tcflag_t c_cflag;  /* contrl modes */
+    tcflag_t c_lflag;  /* local flag */ 
+    cc_t     c_cc[NCCS];
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				c_inflag 는 말그대로 입력과 관련되어서 터미널 속성을 변경하기 위해서 
+				사용된다. c_oflag 는 출력과 관련된 속성변경을 처리히가 위해서, 
+				c_cflag 는 직렬(시리얼)통신과 관련된 터미널 속성변경을 위해서 사용된다. 
+				마지막 c_lflag 는 실제 사용자에게 보여지는 터미널의 속성 즉 
+				출력의 반향(ECHO)를 on/off, 특수입력문자들(Ctrl+C 와 같은)의 속성 
+				제어를 제어하기 위해서 사용한다.   
+			</P
+><P
+>				다음은 각각의 플래그를 통해서 설정할수 있는 터미널의 속성들이다. 
+				아마 별로 사용하지 않는 몇가지 정도는 빠졌을수도 있음으로 
+				자세한 모든 터미널 속성정보를 알고 싶다면 termios 의 man 페이지를 
+				참고하기 바란다. 
+				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN69"
+></A
+><P
+><B
+>&#54364; 1. 터미널 속성값 - c_iflag</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>설명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>터미널 입력과 관련된 제어를 한다. 입력제어 값들은 
+								   모드 on 되어있는 상태이다.  	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IGNBRK</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>break 컨디션을 무시한다. 
+								   break 컨디션은 연속된 0의 값을 가지는 비트로 정의된다. 
+								   만약 IGNBRK 가 on 되어 있고 입력데이타에 break 컨디션이 
+								   전달된다면 무시하게 된다.  
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>BRKINT</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이것은 break 컨디션 상에서 SIGINT 를 가로채기 위해서 
+								   사용된다. 만약 IGNBRK 가 off 되어있고, BRKINT가 
+								   세팅되어 있는 상태에서 break 컨디션이 입력된다면 
+								   이것은 출력쿠에 쌓이게 된다. 만약 터미널이 
+								   foreground process 상태로 돌고 있는 도중이라면, 
+								   SIGINT 신호를 발생시키게 된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IGNPAR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>parity 에러무시한다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>INPCK</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>parity 체크를 실시한다. </TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ISTRIP</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>만약 이 플레그를 on 시키면, 유효한 입력 문자를 
+								   처음 7bit 로 세팅하게 된다. 그렇지 않을경우 8bit 
+								   입력으로 처리한다. 		
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>INLCR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>NL 문자(new-line)를 CR(carriage return) 문자로 
+								   대체시킨다. 만약 이 플레그가 on 된다면, NL 문자는 CR 
+								   문자로 변경된다.     
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IGNCR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CR 문자를 무시한다. on 될경우 입력되는 CR 문자를 무시한다.
+								   (읽지 않는다)
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ICRNL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CR 문자를 NL 문자로 대체시킨다. IGNCR 이 on 되어 있지 않은 
+								   상태에서 ICRNL이 on 되어 있을경우 받은 CR 을 NL 로 변경한다.  
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IXON</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>start 와 stop 출력제어를 활성화 한다. 만약 플레그가 on 인 
+								   상태에서 STOP 캐릭터를 받았다면 출력을 멈추게 된다. 
+								   그러다가 START 캐릭터를 받게 되면 다시 출력을 시작하게 된다. 
+								   이것은 flow-control(흐름제어)를 위한 용도로 사용되며, 
+								   실제 STOP, START 캐릭터를 읽어들이지는 않는다. 
+								   만약 플레그가 off 상태라면 STOP, START 캐릭터를 읽어들인다.
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IXOFF</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>입력제어를 위해서 start 와 stop 를 활성화 한다. 
+								   만약에 플레그가 on 으로 되어있다면 시스템은 입력큐가 
+								   가득 찼을때 STOP 캐릭터를 전송한다. 그리고나서 입력큐에 
+								   있는 데이타를 모두 읽었다면 START 캐릭터를 전송한다. 
+								   IXON과 함께 흐름제어를 위해서 사용된다. 	 	  
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IXANY</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>어떤 문자에 대해서라도 출력을 한다. 
+								   이 플레그가 on 이라면 입력된 어떤 문자라도 출력을 시작 
+								   하게 된다. 		
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IMAXBEL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>만약 입력스트림이 overflows 될경우 ASCII BEL 을 반향한다.
+							</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN113"
+></A
+><P
+><B
+>&#54364; 2. 터미널 속성값 - c_iflag</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>설명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>출력을 어떻게 다룰지에 관한 설정을한다. 기본설정은 
+								   모든 비트에 대해서 on(1) 의 상태이다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>&nbsp;</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OPOST</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Post-process output 모드. 만약 이 플레그가 off 상태라면 
+								   문자는 변화없이 전달된다. 그렇지 않고 on 이라면, 
+								   뒤에 오는 flag 에 의해서 변경될수 있다.   
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OLCUC</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on 되어 있을경우 영문소문자 는 영문대문자로 
+								   치환되어서 전달된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ONLCR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on 되어 있을경우 NL 문자는 CR-NL 문자로 
+								   치환되어서 전달된다. 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OCRNL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on 되어 있다면 CR 문자는 NL 문자로 치환된다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ONOCR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on 되어 있다면 CR이 아닌 첫번째 문자부터 
+								   전달되게 된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OFILL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>시간지연을 위해서 fill 문자를 이용한다. 이 플레그가 on 되어 
+								   있다면, 문자 전달시간지연을 위해서 time 지연을 사용하지 않고 
+								   fill 문자를 전달하는 것으로 대신한다.  	 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OFDEL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on 되어 있다면 fill 문자로 DEL이 전달된다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>NLDLY</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>new-line 문자지연이다. NL0 과 NL1 두개의 값이 준비되어 있다. 
+								   NL0 은 지연없음이며, NL1 의 경우 약 0.1 초 정도의 
+								   지연시간이 생긴다. 만약 OFILL 플레그가 on 되어 있다면, 
+								   지연을 만들기 위해서 두개의 fill 문자를 전달한다.  	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CRDLY</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CR 문자지연이다. 여기에는 CR0, CR1, CR2, CR3 의 값이 준비되어 
+								   있다. CR0 은 지연없음, CR1 은 컬럼위치에 따라 지연시간 결정, 
+								   CR2 는 약 0.10 초, CR3 는 약 0.15초의 지연이 생긴다. 	 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>TABDLY</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>수평탭 시간지연이다. TAB0, TAB1, TAB2, TAB3 의 값이 
+								   준비되어 있다. TAB0은 지연없음, TAB1 은 컬럼위치에 따라 
+								   지연시간 결정, TAB2 는 0.1초가량의 지연된다. 
+								   TAB3 로했을경우 탭은 스페이스로 확장된다.  	 	 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>BSDLY</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>백스페이스키 시간지연이다. BS0과 BS1 이 준비되어 있으며, 
+								   BS0은 지연없음, BS1 은 약 0.05 의 시간지연을 나타낸다. 
+								   OFILL 플레그가 세팅되어 있으며 BS1 이라면 한개의 fill 
+								   문자를 보낸다. 	
+							</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN157"
+></A
+><P
+><B
+>&#54364; 3. 터미널 속성값 - c_cflag</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>설명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>하드웨어의 터미널제어에 관련된 속성들이다. 모뎀과 같은 
+								   하드웨어 제어에 많이 쓰인다. 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CBAUD</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>baud rate 에 대한 설정이다. 하드웨어에 따라서 속도의 
+								   변화가 불가능한경우도 있다. 모뎀을 사용해본적이 있다면 
+								   baud rate 에 대해서 자주 들어보았을것이다. 
+								   자주 사용되는 baud rate 는 B4800, B9600, B19200, B38400 으로 
+								   각숫자가 baud 속도를 나타낸다. 참고로 baud 는 하드웨어의 데이타 
+								   처리 속도를 나타낸다. 이외에 B50, B75, B110, B134, B150, 
+								   B200, B300, B600, B1200, B1800, B2400 이 있다. 마찬가지로 
+								   B 다음의 숫자가 baud 속도이다.   
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CSIZE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>문자의 크기를 지정하기 위해서 사용한다. CS5, CS6, CS7, CS8
+								   이 준비되어 있으며, 각각 5, 6, 7, 8bit 를 나타낸다. 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CSTOPB</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>stop 비트의 수를 정한다. 이 플레그가 on 되어있다면 2개의
+								   stop 비트를 그렇지 않다면 1개의 stop 비트를 보낸다.  	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>CREAD</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>receiver 을 활성화한다. 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>HUPCL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 세팅되어 있다면, 마지막 프로세스가 종료되거나, 
+								   마지막 프로세스의 line(회선)이 닫힐경우 disconnect 가 
+								   발생한다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>PARENB</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>parity 를 추가한다. 이 플레그가 on 되어 있으면, 
+								parity 를 생성하고 검색하게 된다. 각문자에 parity bit 가 
+								추가된다.  
+							</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN183"
+></A
+><P
+><B
+>&#54364; 4. 터미널 속성값 - c_lflag</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>설명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>로컬(사용자) 터미널에 관한 속성과 관련되어 있다. 초기값은 
+								   모두 on 상태이다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ISIG</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>signal 을 받아들인다. 이 플레그가 on 되어 있다면, 
+								   INTR, QUIT, SUSP, DSUSP 과 같은 특수 문자를 받아들인다.  
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ICANON</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 플레그가 on되면 정규모드로 입력이 이루어진다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>NOFLSH</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>queue flush 를 비활성화 시킨다. </TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHO</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>반향을 설정한다. 만약 이 플레그가 off 되어있다면 입력은 반향되지 않는다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHOE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>erase 문자를 반향한다. 만약 이 플레그와 함께 ECHO 플레그가 on 되어있다면 ERASE 
+								   가 발생할경우 스크린에서 마지막 문자를 지우게 된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHOE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>erase 문자를 반향한다. 만약 이 플레그와 함께 ECHO 플레그가 on 되어있다면 ERASE 
+								   가 발생할경우 스크린에서 마지막 문자를 지우게 된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHOPRT</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>만약 ECHO 플래그가 on 되어있고 ECHOPRT가 on 되었을경우 ERASE 가 발생한다면 
+								   (back 스페이스키를 입력한다면) 삭제되는 문자가 '&#92;' 뒤에 표시되게 된다. 
+								   만약 모든 문자를 삭제했다면 '/' 가 출력되게 된다.     
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHOKE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Backspace-Space-Backspace entire line on line kill</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHONL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>NL문자가 반향된다. ECHONL 플레그가 on 되어있다면,  
+								   ECHO 플래그가 on 되어있지 않더라도 NL 문자가 반향된다.
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ECHOCTL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제어문자가 반향되도록 한다. 제어문자는 0에서 37 까지의 ASCII 코드이다. 
+								   이 플레그를 on 시킨상태에서 CTRL+X 같은 제어문자를 입력할경우 ^X 로 
+								   화면에 표시될것이다. 	 
+							</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+><P
+>				<DIV
+CLASS="TABLE"
+><A
+NAME="AEN221"
+></A
+><P
+><B
+>&#54364; 5. 제어문자 속성값 - c_cc</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>설명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>c_cc 배열은 제어문자를 제어하기 위해서 사용한다. 즉 CTRL+X, CTRL+X, CTRL+C 
+								   등의 문자와 관련된 제어를 할수 있다.  
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VINTR</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>일시중지(Ctrl+C)와 관련된 제어이다. 만약 ISIG 플레그가 on 되어 있다면 
+								   일시중지 문자를 입력시키면 포그라운드 프로세스에 SIGINT 시그널이 발생된다.   
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VQUIT</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Quit 제어문자 Ctrl+&#92; 와 관련된다. ISIG 플래그가 on 되어 있고 Quit 제어문자가 
+								   입력되면 SIGQUIT 시그널이 발생한다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VERASE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ERASE 제어문자(백스페이스) 와 관련된다. 정규모드(ICANON) 플래그 가 on 되어 
+								   있고, ERASE 제어문자가 발생하면 가장 마지막 문자가 지워진다.	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VKILL</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>KILL 제어문자 (Ctrl+u)와 관련된다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VEOF</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Ctrl-d 제어문자와 관련된다. ICANON 플래그가 on 되어 있고, EOF가 발생하면 
+								   읽기 대기중인 모든문자들은 개행문자를 만나지 않더라도 
+								   바로 프로세스에게 전달된다. 
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VSTOP</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>STOP 제어문자(Ctrl+s)와 관련된다. </TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VSUSP</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>SUSP 제어문자 (Ctrl+z)와 관련된다. ISIG 플래그가 on 되어있는 상태에서
+								   Ctrl+z 가 입력되면 모든 포그라운드 프로세스에 SIGSTOP 신호가 전달된다. 	
+							</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>VWERSE</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>WERASE 제어문자 (Ctrl+w) 와 관련된다.</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN252"
+>2.3.3&#51208;. 터미널 속성 얻어오기</A
+></H3
+><P
+>				터미널의 속성을 변경하기 위해서는 일단 현재 터미널이 
+				속성을 얻어와야 한다. 그리고 나서 변경하고픈 터미널의 속성값을 
+				비트연산을 이용해서 on/off시켜주면 된다. 
+				현재 터미널의 속성을 얻어오기 위해서 tcgetattr 함수를 사용한다. 
+				이함수를 사용하면 터미널의 속성값을 얻어와서 struct termios 구조체를 
+				채운후 되돌려준다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int tcgetattr(int fd, struct termios *termios_p);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				fd 는 속성을 알기를 원하는 open 된 파일(일반파일 혹은 문자디바이스 파일) 이다. 
+				알아낸 속성은 termios_p 에 채워지게 된다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN256"
+>2.3.4&#51208;. 터미널 속성 설정</A
+></H3
+><P
+>				tcgetattr 을 이용해서 터미널 속성을 가져왔다면, bit 연산을 통해서 
+				터미널 속성값을 변경해줄수 있다. 
+				이러한 연산은 tcsetattr 함수를 이용한다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;termios.h&#62;
+#include &#60;unistd.h&#62;
+
+int tcsetattr(int fd, int optional_actions, 
+              struct termios *termios_p);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				fd 는 속성을 변경시키기 원하는 open된 파일(터미널)을 가리키는 
+				파일 지정자이다. tcgetattr 로 가져온 속성을 비트연산을 통하여 
+				적당히 변경시킨후(termios 구조체의 멤버변수를 이용) 위의 
+				함수를 이용해서 변경할수 있다. 
+				optioal_actions 는 변경된 터미널 설정이 언제시점에서 
+				적용될것인지를 결정하기 위해서 사용한다. 다음의 
+				3가지 값중에 하나를 선택해서 지정할수 있다.  
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>TCSANOW</DT
+><DD
+><P
+>	
+						tcsetattr 을 호출한즉시 터미널 속성변경사항이 적용된다. 
+					</P
+></DD
+><DT
+>TCSADRAIN</DT
+><DD
+><P
+>	
+						해당 파일 지정자에 대한 모든 출력이 종료된다음에 속성변경사항이 
+						적용된다.  
+					</P
+></DD
+><DT
+>TCSAFLUSH</DT
+><DD
+><P
+>	
+						해당 파일 지정자에 대한 모든 출력이 종료된다음 속성변경사항이 
+						적용된다. 변화가 발생할때 읽혀지지 않은 데이타는 버려진다. 
+					</P
+></DD
+></DL
+></DIV
+>	
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN273"
+>2.3.5&#51208;. 몇가지 예제들</A
+></H3
+><P
+>				이상 터미널 설정에 관한 다양한 내용들에 대해서 알아봤는데, 
+				몇가지 예제를 통해서 확실히 이해를 해보도록 하자. 
+			</P
+><P
+>				우리는 위에서 termios 구조체의 c_lflag 를 이용하면 사용자 터미널의 
+				속성을 변경시킬수 있다는 것을 배웠다. 보통의 터미널 프로그램을 사용하면서 
+				입력을 하는 도중에 CTRL+C 등을 입력하면 SIGINT 신호가 발생해서 프로그램이 
+				죽는다는 것을 알고 있다(시그널 핸들럴르 설치하지 않았을경우). 
+				그러나 때때로 입력도중에 CTRL+C, CTRL+Z 등의 키입력을 무시하고 싶을때가 
+				있을것이다. 이럴경우 temios 구조체와 tcgetattr, tcsetattr 을 이용함으로써 
+				간단하게 위의 특수문자들을 무시할수 있다. 다음은 간단한 예제이다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>sig_ign.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;termios.h&#62;
+
+struct termios old_settings;
+int main()
+{
+    struct termios new_settings;
+    char buf[80];
+    tcgetattr(0, &#38;old_settings);
+    new_settings = old_settings;
+    new_settings.c_lflag &#38;= (~ISIG); // 특수문자 무시
+    tcsetattr(0, TCSANOW, &#38;new_settings);
+
+    fgets(buf, 80, stdin);
+    fputs(buf, stdout);
+    tcsetattr(0, TCSANOW, &#38;old_settings);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 실행시켜서 입력도중에 CTRL+C, CTRL+Z 등의 키를 눌러서 
+				어떻게 터미널이 반응하는지 확인해 보면 특수문자들이 무시되고 있다는걸 
+				알수 있을것이다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c_source]# ./sig_ign
+^X^C^Z
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 경우는 CTRL+X, CTRL+C, CTRL+Z 를 입력한 경우인데, 모든 특수문자입력을 
+				무시하고 있음을 알수 있다. 
+			</P
+><P
+>				또다른 예제를 만들어보자. 우리는 가끔 사용자의 의향을 묻는 
+				루틴을 만들어야할 필요가 있다 보통은 (Y/N) 등의 문자를 통해서 
+				의향을 묻게 되는데, 사용자가 대소문자를 불문하고 입력할수 
+				있기 때문에, 입력검사할때 대소문자를 따로검사해야 한다. 
+				이럴때 다음과 같은 방법으로 터미널의 속성을 변경함으로써, 
+				좀더 깔끔하게 마무리할수 있다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>input.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;termios.h&#62;
+
+struct termios old_settings;
+int main()
+{
+    struct termios new_settings;
+    char buf;
+
+    tcgetattr(0, &#38;old_settings);
+    new_settings = old_settings;
+    new_settings.c_oflag |= OLCUC;
+
+    tcsetattr(0, TCSANOW, &#38;new_settings);
+
+    printf("youre OK (Y/N)? ");
+    buf=getc(stdin);
+	printf("your input is %c&#92;n", buf);
+    tcsetattr(0, TCSANOW, &#38;old_settings);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 예제 실행하면 사용자가 대문자를 입력하건 소문자를 입력하든지 간에 
+				무조건 대문자로 치환된다는걸 알수 있을것이다. 
+				그런데 사용자가 'Y' 를 입력한다음에 Enter 키를 눌러야지만 내용이 전달 
+				된다. 그냥 'Y' 만 누르면 바로 전달되게 할수 없을까? 
+				그럴때는 터미널 속성을 "비정규모드"로 변경시켜 주면 된다. 
+				위 코드에 new_settings.c_lflag &#38;= (~ICANON); 한줄만 추가시켜주면 된다.     
+			</P
+><P
+>				현재 터미널이 몇 bit를 처리하는지 알아오는 예제를 
+				만들어보도록 하자. 역시 매우 간단하다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제: csize.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;termios.h&#62;
+
+struct termios old_settings;
+int main()
+{
+    struct termios new_settings;
+    int size;
+    char buf;
+
+    tcgetattr(0, &#38;new_settings);
+    size = new_settings.c_cflag&#38;CSIZE ;
+
+    if (size == CS7) printf("7bits/byte&#92;n");
+    else if (size == CS8) printf("8bits/byte&#92;n");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				다음은 터미널의 속도를 가져오는 간단한 예제코드이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : baud.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;termios.h&#62;
+#include &#60;stdio.h&#62;
+
+int main()
+{
+    struct termios new_settings;
+    int baud;
+
+    tcgetattr(0, &#38;new_settings);
+
+    baud = new_settings.c_cflag&#38;CBAUD;
+
+    if (baud == B9600) printf("speed 9600 baud&#92;n");
+    else if (baud == B19200) printf("speed 19200 baud&#92;n");
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				아마도 B9600 으로 값이 나올것이다.  
+			</P
+><P
+>				마지막으로 termios 구조체의 c_cc 값을 이용해서 터미널 속성을 변경
+				하는 예제이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>c_cc.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;termios.h&#62;
+#include &#60;unistd.h&#62;
+
+struct termios old_settings;
+int main()
+{
+    struct termios new_settings;
+    int vdisable;
+    char buf[255];
+
+    if (vdisable = fpathconf(0, _PC_VDISABLE) &#60; 0)
+    {
+        perror("error ");
+        exit(0);
+    }
+
+    tcgetattr(0, &#38;new_settings);
+
+    old_settings = new_settings;
+    new_settings.c_lflag |= ICANON;
+    new_settings.c_cc[VSUSP] = vdisable;
+
+    tcsetattr(0, TCSAFLUSH, &#38;new_settings);
+    memset(buf, 0x00, 255);
+    read(0, buf, 255);
+    printf("%s&#92;n", buf);
+
+    tcsetattr(0, TCSAFLUSH, &#38;old_settings);
+    exit(0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 예제는 c_cc 배열을 이용해서 터미널의 특성을 변경한 것으로, 
+				Ctrl+z 키를 눌러도 SIGSTOP 신호가 발생하지 않도록 했다. fpathconf 함수에 
+				대한 내용은 man 페이지를 참고하기 바란다. 
+				만약 문자입력도중에 Ctrl+D 를 눌러도 입력이 종료되지 않도록 하려면 
+				VSUSP 대신에 VEOF 를 넣어주면 된다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN297"
+>2.3.6&#51208;. 터미널 검사하기</A
+></H3
+><P
+>				우선 open 등을 통해서 열린 파일지정자 fd 가 장치에 연결된것인지 
+				아니면 일반파일에 연결된것인지 알아내야 할것이다. 
+				isatty(3) 을 이용하면 된다.        
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int isatty ( int fd );
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				isatty 는 인자로 주어지는 fd 를 검사해서 만약 터미널이라면 1
+				그렇지 않다면 0을 되돌려준다.   
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : isatty.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;sys/types.h&#62;
+
+int main()
+{
+    int fd;
+    printf("%d&#92;n", isatty(0));
+
+    fd = open("test100.txt", O_RDWR);
+    printf("%d&#92;n", isatty(fd));
+    close(fd);
+
+    fd = open("/dev/ttyS0", O_RDONLY);
+    if (fd &#60; -1)
+    {
+        printf("open error&#92;n");
+        exit(0);
+    }
+    printf("%d&#92;n", isatty(fd));
+    close(fd);
+    exit(0);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				열린 파일지정자 fd 에 대한 터미널이름을 반환받고 싶다면 
+				ttyname(3) 함수를 사용한다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+char *ttyname ( int fd );
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				만약 fd가 터미널에 연결되어 있지 않다면 NULL을 반환한다. 
+				그렇지 않다면 장치파일 이름을 리턴할것이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+int main()
+{
+    char *tty;
+
+    if (isatty(0))
+    {
+        tty = ttyname(0);
+        printf("%s&#92;n", tty);
+    }
+    else
+    {
+        printf("not tty&#92;n");
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN307"
+>2.3.7&#51208;. 터미널 윈도우 사이즈</A
+></H3
+><P
+>				요즘에 와서 대부분의 터미널은 터미널 에뮬레이터 어플리케이션을 통해서 
+				X 윈도상에서 작업을 하게 된다. 이경우 터미널 윈도우 
+				사이즈가 중요해진다. 
+				윈도우의 크기변화에 따라서 화면모양을 다시 그려줘야할 필요가 
+				있기 때문이다.  
+			</P
+><P
+>				우리가 X 윈도우상에서 터미널 에뮬레이터의 크기를 변화시키면, 
+				SIGWINCH 시그널이 발생한다. 그럼으로 윈도우 크기의 변화를 
+				알아내기 위해서는 SIGWINCH 시그널에 대한 시그널 핸들러를 
+				설치하고, 시그널 핸들이 호출되었을때, 현재 터미널의 사이즈를 
+				계산하면 될것이다. 터미널의 사이즈 계산은 ioctl(2) 함수를 
+				사용하면 된다.  
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제 : change_winsize.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;signal.h&#62;
+#include &#60;sys/ioctl.h&#62;
+#include &#60;stdio.h&#62;
+
+// 윈도우 사이즈를 얻어온다. 
+struct winsize get_winsize(int fd)
+{
+    int i;
+    struct winsize size;
+    if (ioctl(fd, TIOCGWINSZ, (char *)&#38;size) &#60; 0)
+    {
+        perror("size get error&#92;n");
+    }
+    return size;
+}
+void sig_handler(int);
+
+struct winsize c_winsize;
+int main()
+{
+
+    // 표준입력이 장치에 연결되어 있는지 확인한다.  
+    if (!isatty(0))
+        exit(0);
+
+    // 시그널 핸들러를 등록한다.  
+    if(signal(SIGWINCH, sig_handler) == SIG_ERR)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    c_winsize = get_winsize(0);
+    printf("%d %d %d %d&#92;n", c_winsize.ws_row, c_winsize.ws_col,
+                            c_winsize.ws_xpixel, c_winsize.ws_ypixel);
+
+    // 창이 일정 사이즈이상이 되지 않을경우 종료시킨다. 
+    if (c_winsize.ws_col &#60; 80 || c_winsize.ws_row &#60; 20)
+    {
+        printf("윈도우 사이즈는 80, 20이상이 되어야 합니다&#92;n");
+        exit(0);
+    }
+    while(1)
+    {
+        sleep(10);
+    }
+}
+
+void sig_handler(int signo)
+{
+    printf("WINSIZE CHANGE&#92;n");
+    c_winsize = get_winsize(0);
+    printf("%d %d %d %d&#92;n", c_winsize.ws_row, c_winsize.ws_col,
+                            c_winsize.ws_xpixel, c_winsize.ws_ypixel);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				winsize 구조체는 다음과 같이 선언되어 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct winsize
+{
+    unsigned short int ws_row;
+    unsigned short int ws_col;
+    unsigned short int ws_xpixel;
+    unsigned short int ws_ypixel;
+};
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				ws_row, ws_col 은 문자단위의 크기이며, ws_xpixel, ws_ypixel 은 
+				픽셀단위 크기이다. hanterm 과 같은 터미널 에뮬레이트 프로그램을 
+				띄운다음 위 프로그램을 실행시키고 창의 크기를 변경시키면서 
+				테스트해보도록 하자.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN315"
+>2.3.8&#51208;. stty 명령어</A
+></H3
+><P
+>				참고로 쉘상에서 stty 명령을 이용하면, 현재 터미널의 상세 속성값들을 
+				얻어올수 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c_source]# stty -a
+speed 9600 baud; rows 30; columns 80; line = 0;
+intr = ^C; quit = ^&#92;; erase = &#60;undef&#62;; kill = ^U; eof = ^D; eol = &#60;undef&#62;
+eol2 = &#60;undef&#62;; start = ^Q; stop = ^S; susp = &#60;undef&#62; rprnt = ^R; werase = ^W;
+lnext = ^V; flush = ^O; min = 1; time = 0;
+-parenb -parodd cs8 -hupcl -cstopb cread -clocal -crtscts
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr icrnl ixon -ixoff
+-iuclc -ixany -imaxbel
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+isig icanon iexten echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+echoctl echoke
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				앞에 '-' 가 붙은것은 비활성화 되었다는 뜻이다. 
+				이러한 터미널 속성값은 자식프로세스에게 상속이 된다. 
+				위의 프로그램들을 속성변경후 fork&#38;exec 기법으로 
+				쉘을 실행시키도록 해서 프로그램을 실행시키기전의 stty 출력값과 
+				프로그램실행해서 속성변경후 fork&#38;exec 된 쉘에서 stty 의 출력값과 
+				한번 비교해 보기 바란다.  
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN319"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 termios 구조체와 이것을 이용한 터미널 속성변경에 대해서 
+		간단히 알아보았다. 여기에서는 일반적인 터미널인 키보드+모니터를 
+		기준으로 설명하고 있는데, 시리얼통신을 위한 터미널 
+		속성에 대한 내용은 빠져있다. 이 내용들은 시리얼프로그래밍관련 
+		강좌에서 다루도록 하겠다. 어쨋든 시리얼프로그래밍 역시 기본적으로 
+		이문서에서 다룬 내용에 몇가지더 추가되는 것임으로, 이문서를 읽은후에 
+		시리얼프로그래밍 관련 문서를 보면 쉽게 이해가 될것이다.   
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+
+}}}

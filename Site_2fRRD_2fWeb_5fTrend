@@ -1,0 +1,216 @@
+#title RRD와 웹로그를 이용한 Trend 분석
+
+=== 소개 ===
+개인적으로 웹로그의 분석을 위해서 webalizer(:12)를 사용하고 있다. 그럭저럭 괜찮은거 같지만 Trend를 보여주기에는 부족함이 상당히 많은 툴이다. 변화량은 보여줄 수 있지만 그래프자체가 고정되어 있기 때문에, 이번주와 지난주의 비교와 같은 변화추이 Trend를 보여주는 기능이 빠져있기 때문이다. 
+
+최근에 QOS(:12) 관련된 업무를 시작하면서, 웹서비스의 Trend를 분석할 수 있는 툴의 필요성을 느끼게 되었다. 최초에는 Webalizer과 같은 프로그램을 사용해볼까 하고 생각했지만, 위의 문제로 충분하지 않다고 판단되어서 선택에서 제외하게 되었다. 또다른 방법으로 google:::analytics(:12)와 같이 분석하고자 하는 모든 페이지에 자바 스크립트를 심어서 데이터를 수집하고 분석하는 방식을 생각해보았다. 이 방법은 확실히 좋은 결과를 보여주기는 하지만 문제는 개발해야 될것과 고려해야 될사항이 너무 많다는점. 
+
+  1. 데이터 마이닝 수준에서 자료를 분석하는 툴을 만들어야 한다.
+  1. 자바 스크립트등을 이용해서 클라이언트 정보를 보내는데, 이들 정보를 받는 서버 프로그램에 문제가 생길 수 있다. 관리 포인트가 하나 늘어난다는 얘기인데, 이는 꽤 심각한 이슈가 될 수 있다. 구글 같은 경우만 봐도 analytics 문제 때문에, 서비스 자체가 느리게 뜨는 경우를 심심찮게 볼 수 있다. 비동기적으로 데이터를 받아서 백그라운드에서 처리하는 등의 방식을 생각해내면 되겠지만, 골치아픈 문제가 되리란건 예상할 수 있다.
+
+그래서 간단히 이용할 수 있는 다른 방법을 찾게 되었고, 평소 사용하던 RRD로 부터 해결책을 얻게 되었다. RRD를 이용하면, 저장된 데이터로 부터 손쉽게 Trend정보를 얻어낼 수 있다. 해서 겸사겸사 웹로그를 읽어서 1분단위로 counting한 정보를 RRD(:12)에 넣어서 웹서비스의 시간대/요일별 트랜드를 분석하기 위한 툴을 만들어보았다.
+
+=== RRD 생성 ===
+다음과 같은 DS/RRA룰을 만들었다. 트랜드 분석의 경우 각 월의 주간단위 비교등이 가능해야 하기 때문에, 가능한 오랜시간동안 RAW 데이터를 쌓아둘 필요가 있다. 1분, 5분, 30분, 2시간, 2일의 데이터를 1년간 유지할 수 있도록 했다. 데이터의 양이 좀 커지긴 하겠지만, 그래봤자 80M 미만으로 1년에 이정도면, 그리 부담가지 않는 크기인듯 싶다.
+
+다음은 정의된 DS, RRA룰이다. 저장 간격은 60초로 결정했다. 현재 저장된 웹로그를 보니, 가장 오래된게 2007/07/31 이였다. 현재 시간이 2007/9/6일이니, start 시간을 대략 오늘-40 으로 잡았다.
+{{{#!plain
+# rrdtool create webhits.rrd --start 1185608570 -s 60 \
+DS:hits:GAUGE:120:U:U \
+RRA:AVERAGE:0.5:1:525600 \
+RRA:AVERAGE:0.5:5:105120 \
+RRA:AVERAGE:0.5:30:17520 \
+RRA:AVERAGE:0.5:120:1440 \
+RRA:AVERAGE:0.5:1440:730 \
+RRA:MAX:0.5:30:17520 \
+RRA:MAX:0.5:1440:730
+}}}
+
+=== 웹로그 Counting 프로그램 작성 ===
+apache 로그를 읽어들인 다음 분단위로 counting 하는 프로그램을 작성해야 한다.  apache(:12)로그의 형식은 다음과 같다.
+{{{#!plain
+38.99.13.124 - - [31/Jul/2007:18:05:43 +0900] \
+"GET /modules/moniwiki/wiki.php/data_structure_stack?action=edit HTTP/1.0" 200 10181
+}}}
+이 로그를 분석해서 로그 생성시간을 알아내고, 60초 시간단위로 카운팅하는 프로그램을 작성한다.
+{{{#!plain adsense
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <time.h>
+
+#include <stdio.h>
+#include <string.h>
+
+const char date[13][4] = {"Jan", "Feb", "Mar", "Apr", "May",
+"Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", ""};
+
+int getTimeStemp(char *strdate)
+{
+    struct tm tm_ptr;
+    char seps[] = "/: ";
+    char *tr;
+    int idx = 0;
+
+    tr = strtok(strdate, seps);
+
+    while(tr != NULL)
+    {
+        switch(idx)
+        {
+            case 0:
+                tm_ptr.tm_mday = atoi(tr);
+                break;
+            case 1:
+                tm_ptr.tm_mon =dayIdx(tr);
+                break;
+            case 2:
+                tm_ptr.tm_year = atoi(tr) - 1900;
+                break;
+            case 3:
+                tm_ptr.tm_hour = atoi(tr);
+                break;
+            case 4:
+                tm_ptr.tm_min = atoi(tr);
+                break;
+            case 5:
+                tm_ptr.tm_sec = atoi(tr);
+                break;
+        }
+        idx++;
+
+        tr = strtok(NULL, seps);
+    }
+    return mktime(&tm_ptr);
+}
+
+int main(int argc, char **argv)
+{
+    char *fname = argv[1];
+    FILE *fp = NULL;
+    char buf[1024];
+    char *sp;
+    char *ep;
+    char date[80];
+    int curtime = 0;
+    int prevtime = 0;
+    int logcount = 0;
+
+    fp = fopen(fname, "r");
+    if (fp == NULL)
+    {
+        perror("Error :");
+        return 1;
+    }
+
+    while(fgets(buf, 1024, fp))
+    {
+        sp = strstr(buf,"[");
+        if (sp == NULL) continue;
+        ep = strstr(buf, "]");
+        if (ep == NULL) continue;
+        snprintf(date, ep - sp, "%s", sp+1);
+        curtime = getTimeStemp(date);
+        if (!prevtime) prevtime = curtime;
+
+        if ((curtime - prevtime) > 60)
+        {
+            printf("%d %d\n", curtime, logcount);
+            logcount = 0;
+            prevtime = curtime;
+        }
+        else
+        {
+            logcount++;
+        }
+    }
+}
+
+int dayIdx(char *str)
+{
+    int i;
+    for (i = 0; i < 13; i++)
+    {
+        if(strcmp(str, date[i]) == 0)
+            return i;
+    }
+    return -1;
+}
+}}}
+결과는 표준출력(:12)된다. 이것을 파일로 재지향(:12)하고, 재지향된 파일을 아래의 perl(:12) 스크립트로 읽어들여서 rrd update 시키면, web trend 분석을 위한 데이터셋이 완성된다.
+{{{#!plain
+#!/usr/bin/perl
+
+print  $ARGV[0];
+
+open(FD, $ARGV[0]) || die ("Cannot open File $ARGV[0]");
+
+$count = 0;
+while($line = <FD>)
+{
+    $line =~ s/ /:/;
+    $line =~ s/\n//;
+    system("/usr/local/bin/rrdtool update /usr/local/mutihost/joinc/modules/rrd/webhits.rrd $line");
+    print $count++,"\n";
+}
+}}}
+
+이제 '''rrdtool graph'''를 이용해서, 이번주와 지난주의 trend를 비교하기 위한 그래프를 만들었다.
+{{{#!plain
+rrdtool graph webhits.png -s "-1 week" \
+DEF:hits=webhits.rrd:hits:AVERAGE \
+DEF:lastweek=webhits.rrd:hits:AVERAGE:start="-2 weeks":end="start + 1week" \
+SHIFT:lastweek:604800 \
+LINE1=lastweek#00FF00:"last week" LINE1:hits#FF0000:"this week"
+}}}
+http://www.joinc.co.kr/modules/rrd/webhits.png
+
+이렇게 해서 만들어진 그래프는 분석된 데이터를 정확하게 보여주기는 하지만, Trend를 보여주기에는 너무 들쭉날쭉 함을 알 수 있다. Trend를 좀 더 명확하게 보여주기 위해서는 Log 그래프화 시킬 필요가 있을 것이다. 그래서 다음과 같이 graph를 생성했다.
+{{{#!plain
+# rrdtool graph webhits2.png -s "-1 week" -t "Web Server Hits - This week vs Last week" -v "hitss/minute" \
+DEF:hits=webhits.rrd:hits:AVERAGE:start="-8 days":end="start + 8days" \
+DEF:lastweek=webhits.rrd:hits:AVERAGE:start="-15 days":end="start + 8 days" \
+SHIFT:lastweek:604800 \
+CDEF:t_hits=hits,86400,TREND \
+CDEF:t_lastweek=lastweek,86400,TREND \
+LINE1:lastweek#CCFFCC:"last week" LINE1:hits#FFCCCC:"this week" \
+LINE1:t_lastweek#00FF00:"last week" LINE1:t_hits#FF0000:"this week"
+}}}
+여기에는 2개의 CDEF 가 추가되어 있다. 이것은 86400초(하루)단위로 트랜드를 보여주기 위한 용도로 사용된다. 이렇게 CDEF의 TREND로 다시 계산함으로써, 아래와 같이 일주일간의 트랜드를 보여주는 그래프를 완성했다.
+http://www.joinc.co.kr/modules/rrd/webhits2.png
+
+위의 그래프는 처음 그래프와 함께 보여줌으로써 스케일을 맞추기 위해서, 최근 Trend 데이터가 명확히 표시되지 않는다. 해서 최초 그래프를 제회하고, 최근 그래프만 뽑아서 보기로 했다.
+{{{#!plain
+# rrdtool graph webhits2.png -s "-1 week" -t "Web Server Hits - This week vs Last week" -v "hitss/minute" \
+DEF:hits=webhits.rrd:hits:AVERAGE:start="-8 days":end="start + 8days" \
+DEF:lastweek=webhits.rrd:hits:AVERAGE:start="-15 days":end="start + 8 days" \
+SHIFT:lastweek:604800 \
+CDEF:t_hits=hits,86400,TREND \
+CDEF:t_lastweek=lastweek,86400,TREND \
+LINE1:t_lastweek#00FF00:"last week" LINE1:t_hits#FF0000:"this week"
+}}}
+http://www.joinc.co.kr/modules/rrd/webhits3.png
+
+지난주와 이번주의 Trend 변화를 좀더 직관적으로 바라볼 수 있는 그래프가 만들어졌음을 알 수 있다.
+
+하는 김에 월별 트랜드도 만들어 보았다.
+{{{#!plain
+# rrdtool graph webhitsmon.png -s "-1 month" -t "Web Server Hits - Trend" -v "hits/minute" \
+DEF:hits=webhits.rrd:hits:AVERAGE CDEF:t_hits=hits,86400,TREND \
+CDEF:tt_hits=hits,604800,TREND \
+LINE1:t_hits#00FF00:"Trend/Day" LINE1:tt_hits#FF0000:"Trend/week"
+}}}
+TREND를 위한 2개의 CDEF를 만들었다. 하나는 sliding windows의 크기를 하루, 다른 하나는 sliding windows의 크기를 일주일로 했다.
+
+http://www.joinc.co.kr/modules/rrd/webhitsmon.png
+
+아래는 일주일단위로 TREND만을 나타낸 그래프이다.
+
+http://www.joinc.co.kr/modules/rrd/webhitsmon2.png
+
+월간 트랜드의 변화를 확실히 알 수 있다. 33주째에 log hits가 줄어든건, 연휴 (광복절)이 끼어있었기 때문이다.
+
+[[tag(RRD,MRTG,QOS)]]

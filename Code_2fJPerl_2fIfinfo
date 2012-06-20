@@ -1,0 +1,47 @@
+#title 인터페이스의 트래픽 정보를 얻어온다.
+
+=== 소개 ===
+지정된 인터페이스의 In/Out bps,pps 정보를 얻어낸다. proc(:12) 파일시스템을 이용하며, SNMP(:12)와 동일한 결과를 출력한다. RRD(:12)등의 툴을 이용하면 모니터링(:12) 정보로 활용할 수 있을 것이다.
+
+=== 코드 ===
+{{{#!plain
+#!/usr/bin/perl
+
+$iname = $ARGV[0];
+if ($#ARGV != 0)
+{
+  printf("Usage : ./interface.pl [ifname]\n");
+  exit(1);
+}
+
+open(FD, "/proc/net/dev") || die "Error";
+$isok = 0;
+$data;
+
+while($line = <FD>)
+{
+  if ( $line =~ m/$iname/)
+  {
+    @_ = split /:| +/,$line;
+    $data= "inbps=$_[2] inpps=$_[3] inerrs=$_[4] outbps=$_[10] outpps=$_[11] outerrss=$_[12]";
+    $isok = 1;
+    break;
+  }
+}
+
+if ($isok == 1)
+{
+  print "InterFace Status OK | $data";
+}
+else
+{
+  print "InterFace Status FAILURE |";
+}
+}}}
+
+=== 사용법 ===
+{{{#!plain
+# ifinfo eth0
+}}}
+
+[[tag(proc,perl,rrd,zenoss,snmp,모니터링)]]

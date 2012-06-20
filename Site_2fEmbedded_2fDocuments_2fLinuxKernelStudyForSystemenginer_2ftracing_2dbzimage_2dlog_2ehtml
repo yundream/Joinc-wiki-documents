@@ -1,0 +1,807 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>bzImage가 만들어지는 과정 추적-Log 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Makefile 분석"
+HREF="chap02.html"><LINK
+REL="PREVIOUS"
+TITLE="bzimage가 만들어지는 과정 추적-Makefile 분석"
+HREF="tracing-bzimage-makeing.html"><LINK
+REL="NEXT"
+TITLE="단계별 자세한 분석"
+HREF="detail-analysis-of-each-stage.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="tracing-bzimage-makeing.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>2장. Makefile 분석</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="detail-analysis-of-each-stage.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="TRACING-BZIMAGE-LOG"
+>2.4. bzImage가 만들어지는 과정 추적-Log 분석</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="MAKE-BZIMAGE-ORDER"
+>2.4.1. make bzImage 순서 정리</A
+></H2
+><P
+>				make bzimage를 실행 했을 때 실행되는 순서를 Makefile을 기준으로 나열해 봤다.
+				<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>$(TOPDIR)/Makefile에 포함된 $(TOPDIR)/arch/i386/Makefile에 있는
+						'bzimage:'로부터 시작 </P
+></LI
+><LI
+><P
+>의존 관계에 의해 vmlinux가 먼저 만들어짐</P
+><P
+>이때 vmlinux가 만들어지면 $(TOPDIR)/arch/i386/boot로 이동해 계속 진행</P
+></LI
+><LI
+><P
+>vmlinux의 진행</P
+><P
+>의존 관계에 의해 version.h $(CONFIGURATION) init/main.o init/version.o
+						linuxsubdirs가 먼저 만들어짐</P
+></LI
+><LI
+><P
+>의존 관계에 의한 만들기가 끝나면 $(TOPDIR)/vmlinux가 만들어짐</P
+></LI
+><LI
+><P
+>의존 관계에 의해 $(CONFIGURE) bbootsect bsetup compressed/bvmlinux tools/build가
+						만들어진다</P
+></LI
+><LI
+><P
+>compressed/bvmlinux의 진행</P
+><P
+>의존 관계에 의해 piggy.o $(OBJECTS)가
+						먼저 만들어짐</P
+></LI
+><LI
+><P
+>piggy.o는 $(TOPDIR)/vmlinux를 압축해 만든다.</P
+></LI
+></OL
+>
+			</P
+><P
+>				순서대로 나열했지만 Makefile의 특성상 하나를 만들기 전에 이미 다른 것이 먼저 만들어져야하는 등의
+				의존 관계가 있기 때문에 순서가 뒤집힌 것처럼 보일 것이다. 이를 바로 잡아 먼저 만들어지는 순으로
+				나열해보면 아래와 같다.
+				<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>							vmlinux
+						</P
+><P
+>							<P
+></P
+><OL
+TYPE="a"
+><LI
+><P
+>include/linux/version.h</P
+></LI
+><LI
+><P
+>init/main.o</P
+></LI
+><LI
+><P
+>init/version.o</P
+></LI
+><LI
+><P
+>linuxsubidrs(fs lib mm ipc kernel drivers net)</P
+></LI
+></OL
+>
+						</P
+></LI
+><LI
+><P
+>							bzimage
+						</P
+><P
+>							<P
+></P
+><OL
+TYPE="a"
+><LI
+><P
+>bbootsect</P
+></LI
+><LI
+><P
+>bsetup</P
+></LI
+><LI
+><P
+>										compressed/bvmlinux
+									</P
+><P
+>											<P
+></P
+><OL
+TYPE="i"
+><LI
+><P
+>piggy.o</P
+></LI
+><LI
+><P
+>head.o</P
+></LI
+><LI
+><P
+>misc.o</P
+></LI
+></OL
+>
+										</P
+></LI
+><LI
+><P
+>tools/build</P
+></LI
+></OL
+>
+						</P
+></LI
+></OL
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="MAKE-BZIMAGE-LOG"
+>2.4.2. Log</A
+></H2
+><P
+>				Makefile을 통해 분석된 것을 이제는 실예를 사용해 분석해보자. 아래 Log는
+				'make bzImage 2&#62;&#38;1 | tee log-bzImage.txt'를 사용해 얻은 것이다. 전체는 필요 없는 부분이 너무
+				많기 때문에 필요 없는 부분은 삭제하거나 축약하고 실었다.
+			</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+><A
+NAME="LOG.MAIN.O"
+><B
+>(1)</B
+></A
+>
+gcc -D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4    -c -o init/main.o init/main.c
+. scripts/mkversion &#62; .tmpversion
+
+<A
+NAME="LOG.VERSION.O"
+><B
+>(2)</B
+></A
+>
+gcc -D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4   -DUTS-MACHINE='"i386"' -c -o init/version.o init/version.c
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  kernel
+
+<A
+NAME="LOG.KERNEL"
+><B
+>(3)</B
+></A
+>
+gcc -D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4   -DUTS-MACHINE='"i386"' -c -o init/version.o init/version.c
+make[1]: 들어감 `/usr/src/linux-2.4.16/kernel' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/kernel' 디렉토리
+rm -f kernel.o
+ld -m elf-i386  -r -o kernel.o sched.o dma.o fork.o exec-domain.o panic.o printk.o module.o exit.o itimer.o info.o time.o softirq.o resource.o sysctl.o acct.o capability.o ptrace.o timer.o user.o signal.o sys.o kmod.o context.o uid16.o ksyms.o pm.o
+make[2]: 나감 `/usr/src/linux-2.4.16/kernel' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/kernel' 디렉토리
+
+<A
+NAME="LOG.DRIVERS"
+><B
+>(4)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  drivers
+make[1]: 들어감 `/usr/src/linux-2.4.16/drivers' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/drivers' 디렉토리
+
+<A
+NAME="LOG.MM"
+><B
+>(5)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  mm
+make[1]: 들어감 `/usr/src/linux-2.4.16/mm' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/mm' 디렉토리
+rm -f mm.o
+ld -m elf-i386  -r -o mm.o memory.o mmap.o filemap.o mprotect.o mlock.o mremap.o vmalloc.o slab.o bootmem.o swap.o vmscan.o page-io.o page-alloc.o swap-state.o swapfile.o numa.o oom-kill.o shmem.o
+make[2]: 나감 `/usr/src/linux-2.4.16/mm' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/mm' 디렉토리
+
+<A
+NAME="LOG.FS"
+><B
+>(6)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  fs
+make[1]: 들어감 `/usr/src/linux-2.4.16/fs' 디렉토리
+rm -f fs.o
+ld -m elf-i386  -r -o fs.o open.o read-write.o devices.o file-table.o buffer.o super.o block-dev.o char-dev.o stat.o exec.o pipe.o namei.o fcntl.o ioctl.o readdir.o select.o fifo.o locks.o dcache.o inode.o attr.o bad-inode.o file.o iobuf.o dnotify.o filesystems.o namespace.o seq-file.o noquot.o binfmt-script.o binfmt-elf.o proc/proc.o partitions/partitions.o ext2/ext2.o isofs/isofs.o nls/nls.o autofs4/autofs4.o devpts/devpts.o jfs/jfs.o
+make[1]: 나감 `/usr/src/linux-2.4.16/fs' 디렉토리
+
+<A
+NAME="LOG.NET"
+><B
+>(7)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  net
+make[1]: 들어감 `/usr/src/linux-2.4.16/net' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/net' 디렉토리
+
+<A
+NAME="LOG.IPC"
+><B
+>(8)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  ipc
+make[1]: 들어감 `/usr/src/linux-2.4.16/ipc' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/ipc' 디렉토리
+rm -f ipc.o
+ld -m elf-i386  -r -o ipc.o util.o msg.o sem.o shm.o
+make[2]: 나감 `/usr/src/linux-2.4.16/ipc' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/ipc' 디렉토리
+
+<A
+NAME="LOG.LIB"
+><B
+>(9)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  lib
+make[1]: 들어감 `/usr/src/linux-2.4.16/lib' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/lib' 디렉토리
+rm -f lib.a
+ar  rcs lib.a errno.o ctype.o string.o vsprintf.o brlock.o cmdline.o bust-spinlocks.o rbtree.o rwsem.o dec-and-lock.o
+make[2]: 나감 `/usr/src/linux-2.4.16/lib' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/lib' 디렉토리
+
+<A
+NAME="LOG.ARCH.I386.KERNEL"
+><B
+>(10)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  arch/i386/kernel
+make[1]: 들어감 `/usr/src/linux-2.4.16/arch/i386/kernel' 디렉토리
+rm -f kernel.o
+ld -m elf-i386  -r -o kernel.o process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys-i386.o pci-dma.o i386-ksyms.o i387.o bluesmoke.o dmi-scan.o pci-i386.o pci-pc.o pci-irq.o mtrr.o apm.o mpparse.o apic.o nmi.o io-apic.o acpitable.o
+gcc -D--ASSEMBLY-- -D--KERNEL-- -I/usr/src/linux-2.4.16/include -traditional -c head.S -o head.o
+gcc -D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4     -c -o init-task.o init-task.c
+make[1]: 나감 `/usr/src/linux-2.4.16/arch/i386/kernel' 디렉토리
+
+<A
+NAME="LOG.ARCH.I386.MM"
+><B
+>(11)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  arch/i386/mm
+make[1]: 들어감 `/usr/src/linux-2.4.16/arch/i386/mm' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/arch/i386/mm' 디렉토리
+rm -f mm.o
+ld -m elf-i386  -r -o mm.o init.o fault.o ioremap.o extable.o
+make[2]: 나감 `/usr/src/linux-2.4.16/arch/i386/mm' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/arch/i386/mm' 디렉토리
+
+<A
+NAME="LOG.ARCH.I386.LIB"
+><B
+>(12)</B
+></A
+>
+make CFLAGS="-D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  " -C  arch/i386/lib
+make[1]: 들어감 `/usr/src/linux-2.4.16/arch/i386/lib' 디렉토리
+make all-targets
+make[2]: 들어감 `/usr/src/linux-2.4.16/arch/i386/lib' 디렉토리
+rm -f lib.a
+ar  rcs lib.a checksum.o old-checksum.o delay.o usercopy.o getuser.o memcpy.o strstr.o mmx.o
+make[2]: 나감 `/usr/src/linux-2.4.16/arch/i386/lib' 디렉토리
+make[1]: 나감 `/usr/src/linux-2.4.16/arch/i386/lib' 디렉토리
+
+<A
+NAME="LOG.VMLINUX"
+><B
+>(13)</B
+></A
+>
+ld -m elf-i386 -T /usr/src/linux-2.4.16/arch/i386/vmlinux.lds -e stext arch/i386/kernel/head.o arch/i386/kernel/init-task.o init/main.o init/version.o \
+	--start-group \
+	arch/i386/kernel/kernel.o arch/i386/mm/mm.o kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o \
+	 drivers/acpi/acpi.o drivers/char/char.o drivers/block/block.o drivers/misc/misc.o drivers/net/net.o drivers/media/media.o drivers/char/agp/agp.o drivers/char/drm/drm.o drivers/ide/idedriver.o drivers/cdrom/driver.o drivers/sound/sounddrivers.o drivers/pci/driver.o drivers/pcmcia/pcmcia.o drivers/net/pcmcia/pcmcia-net.o drivers/pnp/pnp.o drivers/video/video.o drivers/md/mddev.o \
+	net/network.o \
+	/usr/src/linux-2.4.16/arch/i386/lib/lib.a /usr/src/linux-2.4.16/lib/lib.a /usr/src/linux-2.4.16/arch/i386/lib/lib.a \
+	--end-group \
+	-o vmlinux
+nm vmlinux | grep -v '\(compiled\)\|\(\.o$\)\|\( [aUw] \)\|\(\.\.ng$\)\|\(LASH[RL]DI\)' | sort &#62; System.map
+
+<A
+NAME="LOG.BBOOTSECT"
+><B
+>(14)</B
+></A
+>
+make[1]: 들어감 `/usr/src/linux-2.4.16/arch/i386/boot' 디렉토리
+gcc -E -D--KERNEL-- -I/usr/src/linux-2.4.16/include -D--BIG-KERNEL-- -traditional -DSVGA-MODE=NORMAL-VGA  bootsect.S -o bbootsect.s
+as -o bbootsect.o bbootsect.s
+bbootsect.s: Assembler messages:
+bbootsect.s:257: Warning: indirect lcall without `*'
+ld -m elf-i386 -Ttext 0x0 -s --oformat binary bbootsect.o -o bbootsect
+
+<A
+NAME="LOG.BSETUP"
+><B
+>(15)</B
+></A
+>
+gcc -E -D--KERNEL-- -I/usr/src/linux-2.4.16/include -D--BIG-KERNEL-- -D--ASSEMBLY-- -traditional -DSVGA-MODE=NORMAL-VGA  setup.S -o bsetup.s
+as -o bsetup.o bsetup.s
+bsetup.s: Assembler messages:
+bsetup.s:1716: Warning: indirect lcall without `*'
+ld -m elf-i386 -Ttext 0x0 -s --oformat binary -e begtext -o bsetup bsetup.o
+
+<A
+NAME="LOG.PIGGY.O"
+><B
+>(16)</B
+></A
+>
+make[2]: 들어감 `/usr/src/linux-2.4.16/arch/i386/boot/compressed' 디렉토리
+tmppiggy=-tmp-$$piggy; \
+rm -f $tmppiggy $tmppiggy.gz $tmppiggy.lnk; \
+objcopy -O binary -R .note -R .comment -S /usr/src/linux-2.4.16/vmlinux $tmppiggy; \
+gzip -f -9 &#60; $tmppiggy &#62; $tmppiggy.gz; \
+echo "SECTIONS { .data : { input-len = .; LONG(input-data-end - input-data) input-data = .; *(.data) input-data-end = .; }}" &#62; $tmppiggy.lnk; \
+ld -m elf-i386 -r -o piggy.o -b binary $tmppiggy.gz -b elf32-i386 -T $tmppiggy.lnk; \
+rm -f $tmppiggy $tmppiggy.gz $tmppiggy.lnk
+
+<A
+NAME="LOG.HEAD.O"
+><B
+>(17)</B
+></A
+>
+gcc -D--ASSEMBLY-- -D--KERNEL-- -I/usr/src/linux-2.4.16/include -traditional -c head.S
+
+<A
+NAME="LOG.MISC.O"
+><B
+>(18)</B
+></A
+>
+gcc -D--KERNEL-- -I/usr/src/linux-2.4.16/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-common -pipe -mpreferred-stack-boundary=2 -march=i686 -malign-functions=4  -c misc.c
+
+<A
+NAME="LOG.BVMLINUX"
+><B
+>(19)</B
+></A
+>
+ld -m elf-i386 -Ttext 0x100000 -e startup-32 -o bvmlinux head.o misc.o piggy.o
+make[2]: 나감 `/usr/src/linux-2.4.16/arch/i386/boot/compressed' 디렉토리
+
+<A
+NAME="LOG.BUILD"
+><B
+>(20)</B
+></A
+>
+gcc -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -o tools/build tools/build.c -I/usr/src/linux-2.4.16/include
+
+<A
+NAME="LOG.BVMLINUX.OUT"
+><B
+>(21)</B
+></A
+>
+objcopy -O binary -R .note -R .comment -S compressed/bvmlinux compressed/bvmlinux.out
+
+<A
+NAME="LOG.BZIMAGE"
+><B
+>(22)</B
+></A
+>
+tools/build -b bbootsect bsetup compressed/bvmlinux.out CURRENT &#62; bzImage
+Root device is (3, 1)
+Boot sector 512 bytes.
+Setup is 4768 bytes.
+System is 899 kB
+make[1]: 나감 `/usr/src/linux-2.4.16/arch/i386/boot' 디렉토리
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.MAIN.O"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						main.o
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.VERSION.O"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						version.o
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.KERNEL"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						kernel
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.DRIVERS"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						drivers
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.MM"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						mm	
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.FS"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						fs
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.NET"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>						net
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.IPC"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>						ipc
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.LIB"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>						lib
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.ARCH.I386.KERNEL"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>						arch/i386/kernel
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.ARCH.I386.MM"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>						arch/i386/mm
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.ARCH.I386.LIB"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>						arch/i386/lib
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.VMLINUX"
+><B
+>(13)</B
+></A
+></DT
+><DD
+>						vmlinux
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BBOOTSECT"
+><B
+>(14)</B
+></A
+></DT
+><DD
+>						bbootsect
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BSETUP"
+><B
+>(15)</B
+></A
+></DT
+><DD
+>						bsetup
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.PIGGY.O"
+><B
+>(16)</B
+></A
+></DT
+><DD
+>						arch/i386/boot/compressed/piggy.o	
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.HEAD.O"
+><B
+>(17)</B
+></A
+></DT
+><DD
+>						arch/i386/boot/compressed/head.o	
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.MISC.O"
+><B
+>(18)</B
+></A
+></DT
+><DD
+>						arch/i386/boot/compressed/misc.o	
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BVMLINUX"
+><B
+>(19)</B
+></A
+></DT
+><DD
+>						arch/i386/boot/compressed/bvmlinux
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BUILD"
+><B
+>(20)</B
+></A
+></DT
+><DD
+>						build
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BVMLINUX.OUT"
+><B
+>(21)</B
+></A
+></DT
+><DD
+>						bvmlinux.out
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-log.html#LOG.BZIMAGE"
+><B
+>(22)</B
+></A
+></DT
+><DD
+>						bzImage
+					</DD
+></DL
+></DIV
+><P
+>				위에 열거한 것과 같이 실제 컴파일에서의 순서가 명확하게 나왔다. drivers와 같은 단계에선
+				하위 디렉토리가 무척 많아 여러 디렉토리를 컴파일하는데 그런 것들은 모두 생략했다.
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="tracing-bzimage-makeing.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="detail-analysis-of-each-stage.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>bzimage가 만들어지는 과정 추적-Makefile 분석</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>단계별 자세한 분석</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

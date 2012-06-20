@@ -1,0 +1,133 @@
+#title xinetd 프로그래밍
+
+2002년에 만들어진 문서입니다. 당시에는 inetd를 사용했는데, 꽤나 오래전에 xinetd방식이 사용되고 있습니다. 지금에 맞게 문서를 업데이트 합니다. -- 2011/06/23
+
+== xinetd 기반 네트워크 프로그래밍 == 
+=== xinetd 와 stand alone 방식 ===
+일반적으로 네트워크 프로그램을 만든다고 하면, 독립된 소켓 서버 프로그램을 생각할 겁니다. socket(:12) -> bind(:12) ->listen(:12) 으로 연결 소켓 대기열을 만들고 accept(:12)함수로 연결 소켓을 가져온다음 멀티:::스레드(:12) 혹은 멀티:::프로세스(:12)방식으로 클라이언트를 처리합니다.
+
+스스로 모든 것을 처리하는 이런류의 소켓 프로그램을 '''stand alone'''방식 프로그램이라고 하는데요. 이 방식의 프로그램만 있는 것은 아닙니다. xinetd를 이용한 프로그래밍 방식도 있습니다. 
+
+소켓 프로그램은 크게 두 개 부분으로 나뉜다는 것을 알고 있을 겁니다. 
+  1. soket->bind->listen->accept 로 이어지는 부분으로 클라이언트 연결을 확인합니다.
+  1. read <-> write 로 이어지는 부분으로 클라이언트와 통신 하는 부분 
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Bu-wkW8NFsJU6kTFvEQw7TyE9des9mXeJ9B4aWwLUdI&amp;w=668&amp;h=245">
+}}}
+
+멀티 스레드 혹은 멀티 프로세스 방식의 프로그램이 accept함수 호출 후에 분기를 하죠.
+
+그렇다면 이런 생각을 해 볼 수도 있을 겁니다. 클라이언트 연결만을 처리하는 프로세스를 따로 두는 거죠. 이 프로그램은 오로지 클라이언트 연결만을 처리합니다. accept 함수로 클라이언트 연결을 가져오면, 데이터를 처리할 프로그램을 실행 하는 겁니다. 
+
+클라이언트와 통신할 프로그램은 fork 후 exec 함수로 프로그램을 실행할 건데요. fork 하면서 연결 소켓을 넘겨주면 되죠. dup2(:12) 함수로 명시적으로 소켓을 복사하면 되겠죠. 표준입력(:12)으로 복사하는게 무난하겠죠. 이에 대한 구현은 [wiki:Site/Network_Programing/Documents/Inet_daemon inet 데몬 방식의 프로그램 개발]에 나와 있으니 참고 바랍니다.
+
+=== xinetd ===
+리눅스는 이런 툴을 제공합니다. 몇 개 포트에 대기하고 있다고, 연결이 들어오면 해당 포트의 데이터를 처리할 외부 프로그램을 호출하는 방식입니다. 이 데몬 프로그램을 xinetd 라고 합니다.    
+
+xinetd가 작동하려면 두 가지 설정 요소를 가져야 됨을 알 수 있습니다. 기다릴 포트 번호와 각 포트 번호에 연결된 클라이언트 요청을 처리할 프로그램의 위치죠.
+
+xinetd의 설정파일은 '''/etc/xinetd.d'''디렉토리 밑에 두면 된다. 파일의 내용은 대략 다음과 같다. 서비스의 이름이 myecho 라면 
+{{{#!plain
+# cat /etc/xinetd.d/myecho
+service myecho
+{
+    type = UNLISTED
+    disable         = no
+    socket_type     = stream
+    protocol        = tcp
+    user            = root
+    wait            = no
+    server = /usr/local/bin/echo
+    port = 12345
+}                                                                               
+}}}
+  * type : 서비스의 타입으로 아래의 타입 중 하나를 선택하면 된다.
+     * RPC : RPC(:12) 서비스일 경우
+     * INTERNAL : xinetd의 서비스를 받을 경우. INTERNAL로 지정되어 있을 경우 서비스 이름이 /etc/servies에 등록돼 있어야 한다. myecho는 등록된 서비스가 아니기 때문에 UNLISTED를 사용했다. /etc/services의 포트를 사용하므로 '''port'''를 설정할 필요가 없다. 
+     * UNLISTED : 표준 서비스가 아닐 경우에, 즉 /etc/rpc 혹은 /etc/services에 등록돼지 않은 서비스의 경우에 사용한다. 표준 서비스가 아니므로 '''port'''를 설정해야 한다.
+  * disable : 서비스를 할 건지 
+  * socket_type : stream 이면 stream 기반, dgram이면 데이터 그램 기반  
+  * protocol : 사용할 프로토콜로 /etc/protocols에 있는 것들을 지원한다. 일번적인 소켓 네트워크 프로그램이라면 tcp와 udp가 될 것이다.
+  * user : 프로그램의 실행 사용자 권한 
+  * server : 클라이언트를 처리할 프로그램의 경로 
+  * wait : no면 여러 클라이언트를 처리할 수 있다. 
+
+=== xined 기반 프로그램 개발 ===
+이제 프로그램을 개발해야 겠죠. 프로그램의 이름은 myecho가 되겠네요. 
+{{{#!plain
+#include <fcntl.h>
+#include <string.h>
+
+int main(int argc, char **argv)
+{
+  char buf[1024];
+  memset(buf, 0x00, 1024);
+  read(0, buf, 1024);
+  write(0, buf, strlen(buf));
+}
+}}}
+너무 간단합니다. 소켓을 만들고 기다리는 과정이 생략됐기 때문이죠. 그냥 데이터만 처리하면 됩니다.
+
+쉘 스크립트로 한번 만들어 볼까요 ?
+{{{#!plain
+# cat myecho
+#!/bin/sh
+read input
+echo $input
+}}}
+3줄로 끝입니다.!!! 
+
+=== xined 기반 프로그램 테스트 ===
+echo 서비스를 위한 코드를 만들었는데요. 네트워크 프로그램이라고 생각하기엔 코드가 너무 간단해서 정말 실행될지 믿음이 가지 않는군요. 테스트를 해봐야 겠습니다.
+
+위에서 만든 myecho 설정파일을 /etc/xinetd.d/ 에 복사를 하고. xinetd 데몬을 재 시작합니다. 
+{{{#!plain
+# /etc/init.d/xinetd restart
+ * Stopping internet superserver xinetd                                       [ OK ] 
+}}}
+
+네.. 이제 netstat로 서비스 포트가 떠 있는지 확인해 보죠.
+{{{#!plain
+# netstat -nap | grep xine
+tcp     0      0 0.0.0.0:8888     0.0.0.0:*       LISTEN      16947/xinetd    
+}}}
+8888번 포트로 떠있는게 보이면 성공한겁니다. 이제 myecho 서비스를 이용해 보겠습니다. 클라이언트 프로그램 개발은 귀찮으니 그냥 telnet으로 테스트 하기로 했습니다.
+{{{#!plain
+# telnet 127.0.0.1 8888
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is '^]'.
+hello world
+hello world
+Connection closed by foreign host.
+# 
+}}}
+아 잘되는 군요.
+
+----
+
+
+2.1.2절. 테스트 하기
+
+
+이제 클라이언트를 이용해서 테스트 하기만 하면 된다. 클라이언트는 셈플로 알아보는 소켓프로그래밍에 있는 zipcode_cli.c 를 그대로 사용하면 된다.
+
+2.2절. inetd 방식과 stand alone 방식중 어느걸 선택해야 하나
+
+결론 부터 말하자면 서비스할 서버의 환경에 따라서 적당한 방식을 채택하면 된다.(너무 뻔한 답변인것 같지만 --;)
+
+2.2.1절. inetd
+
+각각 적당한 용도가 있다. 일단 inetd 방식의 경우 위에서 보았겠지만 코딩량이 많이 줄어든다. 또한 에러발생확률도 줄어든다. inetd 데몬 자체가 검증된 프로그램이기 때문이다. 또한 다중의 클라이언트를 받아들이기 위해서 사용하는 fork, select, poll 등에 대해서 신경쓸필요가 없다. 보통 이들 fork, select, poll 은 꽤 까다로운 프로그래밍 작업을 요구하며, 이는 많은 오류를 발생시키기도 한다.
+
+inetd 방식은 telnet, ftp, pop 서비스와 같은 빈번한 요구가 발생하지 않거나, 일단 요청을 받아들이면 꽤 오랜시간 작업을 수행하는 서비스에 적당하다. 반면 http 서비스와 같이 초기 반응속도가 중요시하거나 매우 빈번한 요청이 일어나는 서비스에는 적당한 방법이 아니다.
+
+그리고 에러를 표준출력시킬수 없으므로 약간 디버깅이 까다로와 질수 있다는 단점을 가지고 있다. 디버깅을 원한다면 에러로그를 파일로 저장하는 방법을 사용해야 할것이다.
+
+2.2.2절. inetd
+
+stand alone 방식은 http와 같은 반응속도가 중요하거나, 매우 빈번한 요청이 일어나는 서비스에 적당하다.
+
+예를들어 서버가 oracle 에 연결해서 데이타를 가져오는 일을한다고 했을때 inetd 방식을 사용하면 클라이언트의 연결이 들어올때 마다 oracle DB로의 연결을 수행해야 할것이다. 이는 엄청난 자원의 비효율성을 증가 시킬수 있다. 그러나 stand alone 방식으로 했을때는 최초에 한번만 oracle DB로 연결하고, 새로운 클라이언트가 연결되더라도 이미 연결된 oracle DB로 작업을 할수 있을것이다.
+
+그러나 코드량이 많아지고, 신경써야할 부분들이 매우 많아진다는 단점을 가지고 있다.

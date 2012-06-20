@@ -1,0 +1,66 @@
+#title 뇌를 자극 하는 TCP/IP 장별 노트 4장 
+
+== echo_server_win.c ==
+4장 echo_server_win.c의 소스코드가 터무니 없이 꼬여있습니다. 사소한 오타도 아니고 왜 이런 일이 생겼는지 모르겠습니다. 변수명 같은게 제가 사용하는 방식이 아니고, 전혀 엉뚱한 이름의 변수들이 사용되고 있는게, 코드를 copy & paste 하면서 어디선가 꼬여버린 것 같습니다. T.T
+
+컴파일 가능한 코드로 다시 올립니다.
+{{{#!plain
+#include <winsock2.h>
+#include <stdio.h>
+
+#define MAX_PACKETLEN 1024
+#define PORT 3500
+
+int main()
+{
+  WSADATA wsaData;
+  SOCKET listen_s, client_s;
+  struct sockaddr_in server_addr, client_addr;
+  char szReceiveBuffer[MAX_PACKETLEN];
+  int readn, writen;
+  int len;
+
+  if(WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+  {
+    return 1;
+  }
+  listen_s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if(listen_s == INVALID_SOCKET)
+  {
+    return 1;
+  }
+ 
+  ZeroMemory(&server_addr, sizeof(struct sockaddr_in));
+
+  server_addr.sin_family = PF_INET;
+  server_addr.sin_port = htons(PORT);
+  server_addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+  if(bind(listen_s, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
+  {
+    return 0;
+  }
+  if(SOCKET_ERROR == listen(listen_s, 5) == SOCKET_ERROR)
+  {
+    return 0;
+  }
+
+
+  while(1)
+  {
+	ZeroMemory(&client_addr, sizeof(struct sockaddr_in));
+	len = sizeof(struct sockaddr_in);
+    client_s = accept(listen_s, (struct sockaddr *)&client_addr, &len);
+    readn = recv(client_s, szReceiveBuffer, MAX_PACKETLEN, 0);
+    if(readn > 0)
+    {
+      writen = send(client_s, szReceiveBuffer, readn, 0); 
+    }
+    closesocket(client_s);
+  }
+  closesocket(listen_s);
+  WSACleanup();
+  return 0;
+}
+
+}}}

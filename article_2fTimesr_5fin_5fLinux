@@ -1,0 +1,326 @@
+#title Timesr in Linux
+ * 원문 : http://www.linuxgazette.com/node/view/8993 
+ * 번역 : yundream
+----
+=== 소개 ===
+이 문서는 Linux OS에서 제공되는 타이머(Timers)와 관련된 내용을 다룬다. 타이머는 디바이스 드라이버와 같은 낮은 수준의 시스템 프로그램뿐만 아니라 응용수준의 프로그램에서도 매우중요하게 사용되는 자원이다. 리눅스 OS는 다양한 방법의 타이머를 제공한다. 여기에서는 이들중 몇 가지에 대해서 다루어보도록 하겠다. 이 문서는 리눅스 커널 2.4.20을 기준으로 작성되며, 리눅스에서 개발도중 시간을 이용한 분석작업등에 도움이 될 것이다.    
+
+=== RTC ===
+==== RTC와 System Clock ====
+많은 사람들이 종종 RTC(Real Time Clock)와 System Clock을 혼동하는걸 본다. RTC는 시스템이 다운되었을 때 마더보드의 조그마한 배터리를 통해서 유지되는 time 추적 시스템 이다(데스크탑 시스템에서는 CMOS의 베터리를 이용한다). 컴퓨터가 부팅되면 RTC는 커널에 의해서 읽혀져서 xtime변수에 초기화 된다(xtime은 리눅스 커널의 /include/linux/sched.h 에 정의되어 있다). 커너은 이 xtime을 이용해서 시간값(time_of_the_day)를 초기화 한다. 이렇게 해서 일반 유저 레벨의 애플리케이션은 xtime변수로 부터 생성된 time of day를 얻어와서 시간으로 이용하게 된다. 일반적으로 커널은 부팅시 한번 RTC를 읽어온다. 이런이유로 RTC는 유저 스페이스에서 time_of_the_day를 호출하는 것으로 변경할 수 없다.       
+
+==== Timer Interrupt ====
+커널은 시스템의 하드웨어에서 미리정의된 간격으로 발생시캐는 timer 인터럽트를 이용해서 시간의 간격을 이용해서 시간을 계산한다. 하드웨어에서 사용하는 timer간격은 '''HZ'''를 기본단위로 한다. 이것은 얼마나 자주 clock 인터럽트를 발생시킬 것인지를 나타내며 보통 100HZ(10 millisecond)간격으로 인터럽트를 발생시킨다. 이 크기는 커널컴파일시 값을 변경함으로써 조정가능하다. 
+
+==== jiffies ====
+'''jiffies'''는  시스템이 부팅된 때부터의 clock ticks의 갯수를 기록하는 내부 시스템 변수로 커널에 의해서 관리된다. 이것은 <linux/schedule.h>에 정의되어 있다. 이값은 휘발성이며 long의 크기를 가진 관계로, 약 1.5년정도 연속해서 clock ticks를 계산할 경우 overflow가 발생한다.  
+
+==== Architecture Specific Methods ====
+모든 플랫폼은 개발자들이 가능한 짧은 타이머 간격을 얻을 수 있도록 나름대로의 매커니즘을 제공하고 있다. 여기에는 timer counter register과 같은 옵션을 두어서 모든 클럭 사이클에 대해서 그 값을 증가시키는 방법이 있다. 이것은 플렛폼이 32bit인지 64bit인지에 의존적이다. 이러한 counter register을 TSC (Timestamp counter)라고 하며 대부분의 플랫폼에서 제공하고 있으며, 유저 스페이스와 커널 스페이스 모두에서 읽을 수 있도록 되어 있다. TSC에 대한 사용은 레지스터를 읽는 매크로를 이용하게 된다. 이 매크로는 #include <asm/msr.h>에 정의되어 있다. 
+{{{#!plain
+// Catches the 64 bit value into two 32 bit
+#define rdtsc(low,high) \
+     __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high)) 
+
+//Catches the lower 32 bit value
+#define rdtscl(low) \
+     __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
+}}}
+
+==== 현재 시간 ====
+'''jiffies'''는 보통 모듈을 통해서 많이 이용되는 값으로 현재 시간의 정확한 값을 얻어온다. '''jiffies'''는 상대적으로 긴 시간간격하에서 시간을 측정하기 위해서 사용하기에 매우 좋은 방법이다. 그러나 jiffies만을 이용해서 시간을 구해내는건 꽤나 번거로운 작업이 될 수 있으므로 보통 현재시간을 간단하게 얻어 올 수 있는 몇가지 함수들을 제공하게 된다.  
+
+gettimeofday(2)는 현재 시간을 얻기 위해서 주로 사용된다. 이것은 현재 시간을 초와 마이크로 초 단위로 '''timeval'''구조체에 넣어서 되돌려준다. 다른 비슷한 함수로는 do_gettimeofday()함수가 있다.    
+
+이 함수들은 마이크로 초 수준의 정밀도를 보여준다. 또다른 방법으로는 커널함수인 get_fast_time()을 이용하는 것이 있는데, 이것은 현재시간을 매우 빠르고 능률적으로 얻어온다.
+{{{#!plain
+void get_fast_time (struct timeval *tv);
+}}}
+
+현재 시간을 얻는 가장 좋은 방법은 '''xtime'''값을 이용하는 것으로 매우 세밀하게 현재 값을 얻어올 수 있다. 
+
+=== 기타 참고 문헌 ===
+{{{#!plain
+           ================================
+            Real Time Clock Driver for Linux
+           ================================
+   
+   All PCs (even Alpha machines) have a Real Time Clock built into them.
+   Usually they are built into the chipset of the computer, but some may
+   actually have a Motorola MC146818 (or clone) on the board. This is the
+   clock that keeps the date and time while your computer is turned off.
+   
+   However it can also be used to generate signals from a slow 2Hz to a
+   relatively fast 8192Hz, in increments of powers of two. These signals
+   are reported by interrupt number 8. (Oh! So *that* is what IRQ 8 is
+   for...) It can also function as a 24hr alarm, raising IRQ 8 when the
+   alarm goes off. The alarm can also be programmed to only check any
+   subset of the three programmable values, meaning that it could be set to
+   ring on the 30th second of the 30th minute of every hour, for example.
+   The clock can also be set to generate an interrupt upon every clock
+   update, thus generating a 1Hz signal.
+  
+   The interrupts are reported via /dev/rtc (major 10, minor 135, read only
+   character device) in the form of an unsigned long. The low byte contains
+   the type of interrupt (update-done, alarm-rang, or periodic) that was
+   raised, and the remaining bytes contain the number of interrupts since
+   the last read.  Status information is reported through the pseudo-file
+   /proc/driver/rtc if the /proc filesystem was enabled.  The driver has
+   built in locking so that only one process is allowed to have the /dev/rtc
+   interface open at a time.
+  
+   A user process can monitor these interrupts by doing a read(2) or a
+   select(2) on /dev/rtc -- either will block/stop the user process until
+   the next interrupt is received. This is useful for things like
+   reasonably high frequency data acquisition where one doesn't want to
+   burn up 100% CPU by polling gettimeofday etc. etc.
+  
+   At high frequencies, or under high loads, the user process should check
+   the number of interrupts received since the last read to determine if
+   there has been any interrupt "pileup" so to speak. Just for reference, a
+   typical 486-33 running a tight read loop on /dev/rtc will start to suffer
+   occasional interrupt pileup (i.e. > 1 IRQ event since last read) for
+   frequencies above 1024Hz. So you really should check the high bytes
+   of the value you read, especially at frequencies above that of the
+   normal timer interrupt, which is 100Hz.
+  
+   Programming and/or enabling interrupt frequencies greater than 64Hz is
+   only allowed by root. This is perhaps a bit conservative, but we don't want
+   an evil user generating lots of IRQs on a slow 386sx-16, where it might have
+   a negative impact on performance.  Note that the interrupt handler is only
+   a few lines of code to minimize any possibility of this effect.
+  
+   Also, if the kernel time is synchronized with an external source, the 
+   kernel will write the time back to the CMOS clock every 11 minutes. In 
+   the process of doing this, the kernel briefly turns off RTC periodic 
+   interrupts, so be aware of this if you are doing serious work. If you
+   don't synchronize the kernel time with an external source (via ntp or
+   whatever) then the kernel will keep its hands off the RTC, allowing you
+   exclusive access to the device for your applications.
+  
+   The alarm and/or interrupt frequency are programmed into the RTC via
+   various ioctl(2) calls as listed in ./include/linux/rtc.h
+   Rather than write 50 pages describing the ioctl() and so on, it is
+   perhaps more useful to include a small test program that demonstrates
+   how to use them, and demonstrates the features of the driver. This is
+   probably a lot more useful to people interested in writing applications
+   that will be using this driver.
+  
+                                                        Paul Gortmaker
+}}}
+----
+{{{#!vim c  
+  /*
+   *      Real Time Clock Driver Test/Example Program
+   *
+   *      Compile with:
+   *              gcc -s -Wall -Wstrict-prototypes rtctest.c -o rtctest
+   *
+   *      Copyright (C) 1996, Paul Gortmaker.
+   *
+   *      Released under the GNU General Public License, version 2,
+   *      included herein by reference.
+   *
+   */
+  
+  #include <stdio.h>
+  #include <linux/rtc.h>
+  #include <sys/ioctl.h>
+  #include <sys/time.h>
+  #include <sys/types.h>
+  #include <fcntl.h>
+  #include <unistd.h>
+  #include <errno.h>
+  
+  int main(void) {
+  
+  int i, fd, retval, irqcount = 0;
+  unsigned long tmp, data;
+  struct rtc_time rtc_tm;
+  
+  fd = open ("/dev/rtc", O_RDONLY);
+  
+  if (fd ==  -1) {
+         perror("/dev/rtc");
+         exit(errno);
+ }
+ 
+ fprintf(stderr, " RTC Driver Test Example. ");
+ 
+ /* Turn on update interrupts (one per second) */
+ retval = ioctl(fd, RTC_UIE_ON, 0);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ fprintf(stderr, "Counting 5 update (1/sec) interrupts from reading /dev/rtc:");
+ fflush(stderr);
+ for (i=1; i<6; i ) {
+         /* This read will block */
+         retval = read(fd, &data, sizeof(unsigned long));
+         if (retval == -1) {
+                 perror("read");
+                 exit(errno);
+         }
+         fprintf(stderr, " %d",i);
+         fflush(stderr);
+         irqcount ;
+ }
+ 
+ fprintf(stderr, " Again, from using select(2) on /dev/rtc:");
+ fflush(stderr);
+ for (i=1; i<6; i ) {
+         struct timeval tv = {5, 0};     /* 5 second timeout on select */
+         fd_set readfds;
+ 
+         FD_ZERO(&readfds);
+         FD_SET(fd, &readfds);
+         /* The select will wait until an RTC interrupt happens. */
+         retval = select(fd 1, &readfds, NULL, NULL, &tv);
+         if (retval == -1) {
+                 perror("select");
+                 exit(errno);
+         }
+         /* This read won't block unlike the select-less case above. */
+         retval = read(fd, &data, sizeof(unsigned long));
+         if (retval == -1) {
+                 perror("read");
+                 exit(errno);
+         }
+         fprintf(stderr, " %d",i);
+         fflush(stderr);
+         irqcount ;
+ }
+ 
+ /* Turn off update interrupts */
+ retval = ioctl(fd, RTC_UIE_OFF, 0);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ /* Read the RTC time/date */
+ retval = ioctl(fd, RTC_RD_TIME, &rtc_tm);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ fprintf(stderr, " Current RTC date/time is %d-%d-%d, d:d:d. ",
+         rtc_tm.tm_mday, rtc_tm.tm_mon 1, rtc_tm.tm_year 1900,
+         rtc_tm.tm_hour, rtc_tm.tm_min, rtc_tm.tm_sec);
+ 
+ /* Set the alarm to 5 sec in the future, and check for rollover */
+ rtc_tm.tm_sec = 5;
+ if (rtc_tm.tm_sec >= 60) {
+         rtc_tm.tm_sec %= 60;
+         rtc_tm.tm_min ;
+ }
+ if  (rtc_tm.tm_min == 60) {
+         rtc_tm.tm_min = 0;
+         rtc_tm.tm_hour ;
+ }
+ if  (rtc_tm.tm_hour == 24)
+         rtc_tm.tm_hour = 0;
+ 
+ retval = ioctl(fd, RTC_ALM_SET, &rtc_tm);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ /* Read the current alarm settings */
+ retval = ioctl(fd, RTC_ALM_READ, &rtc_tm);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ fprintf(stderr, "Alarm time now set to d:d:d. ",
+         rtc_tm.tm_hour, rtc_tm.tm_min, rtc_tm.tm_sec);
+ 
+ /* Enable alarm interrupts */
+ retval = ioctl(fd, RTC_AIE_ON, 0);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ fprintf(stderr, "Waiting 5 seconds for alarm...");
+ fflush(stderr);
+ /* This blocks until the alarm ring causes an interrupt */
+ retval = read(fd, &data, sizeof(unsigned long));
+ if (retval == -1) {
+         perror("read");
+         exit(errno);
+ }
+ irqcount ;
+ fprintf(stderr, " okay. Alarm rang. ");
+ 
+ /* Disable alarm interrupts */
+ retval = ioctl(fd, RTC_AIE_OFF, 0);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ 
+ /* Read periodic IRQ rate */
+ retval = ioctl(fd, RTC_IRQP_READ, &tmp);
+ if (retval == -1) {
+         perror("ioctl");
+         exit(errno);
+ }
+ fprintf(stderr, " Periodic IRQ rate was %ldHz. ", tmp);
+ 
+ fprintf(stderr, "Counting 20 interrupts at:");
+ fflush(stderr);
+ 
+ /* The frequencies 128Hz, 256Hz, ... 8192Hz are only allowed for root. */
+ for (tmp=2; tmp<=64; tmp*=2) {
+ 
+         retval = ioctl(fd, RTC_IRQP_SET, tmp);
+         if (retval == -1) {
+                 perror("ioctl");
+                 exit(errno);
+         }
+ 
+         fprintf(stderr, " %ldHz: ", tmp);
+         fflush(stderr);
+ 
+         /* Enable periodic interrupts */
+         retval = ioctl(fd, RTC_PIE_ON, 0);
+         if (retval == -1) {
+                 perror("ioctl");
+                 exit(errno);
+         }
+ 
+         for (i=1; i<21; i ) {
+                 /* This blocks */
+                 retval = read(fd, &data, sizeof(unsigned long));
+                 if (retval == -1) {
+                         perror("read");
+                         exit(errno);
+                 }
+                 fprintf(stderr, " %d",i);
+                 fflush(stderr);
+                 irqcount ;
+         }
+ 
+         /* Disable periodic interrupts */
+         retval = ioctl(fd, RTC_PIE_OFF, 0);
+         if (retval == -1) {
+                 perror("ioctl");
+                 exit(errno);
+         }
+ }
+ 
+ fprintf(stderr, " *** Test complete *** ");
+ fprintf(stderr, " Typing "cat /proc/interrupts" will show %d more events on IRQ 8. ",
+                                                                  irqcount);
+ 
+ close(fd);
+ return 0;
+ 
+ } /* end main */
+}}}

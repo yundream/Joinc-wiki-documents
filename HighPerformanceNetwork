@@ -1,0 +1,426 @@
+ * 이 문서를 보라 도움이 될것이다... 기왕이면 해석해서 위키를 편집해달라. 
+
+ http://www.psc.edu/networking/perf_tune.html#HighPerf
+----
+= 고성능 데이터 전송 =
+ * 고수들을 위하여 이 글을 바칩니다.
+ * 이 문서를 제공해주신 Jamshid Mahdavi 님께 감사드립니다.
+== 시작하기에 앞서 ==
+ * 네트웍 기기들이 하루가 바쁘게 빨라져서 정신없지요. 초당 기가비트를 처리하는 LAN이 있고요. 요즘에는 많은 곳에서 되게 높은 사양의 네트워크 품질을 보여준데요.
+== 요약 ==
+ * 전송률의 계산
+{{{#!plain
+   1,000,000,000 bits    1 byte   70 seconds
+   ------------------- * ------ * ---------- = 8,750,000 bytes = 8.75 MBytes
+   1 second              8 bits   1,000
+}}}
+ * RFC2018, RFC1323, 최대버퍼크기의 결정, 기본 버퍼의 평균량, ...
+ * 최적의 버퍼크기를 찾자. 그 값은 ? 
+ * /proc/sys/net/* 하위의 파일(또는 sysctl)을 통한 네트워크 설정 조절
+ * SYN, FIN, 등을 이해하여 TIME_WAIT 남기지 말자?
+ * MTU 고려하면 ...
+ * TCP stack을 염두한다면 버퍼크기는 어찌 잡아야 할까?
+ * 그 밖에 윈도우즈에 대한 예기들...
+{{{#!html
+
+<h1><b>고성능 네트웍 옵션</b></h1>
+<b>1. TCP 선별적인 ACK응답(SACK, RFC2018): </b> SACK은 수신자에게 비연속적 데이터에 대해<br>
+ACK를 할 수 있도록 해준다. 이것은 특히 Bandwidth-Delay-Product (BDP)가 큰 경로에서 유용하다. <br>
+SACK는 현재 대부분의 운영체제에 의해서 지원되고 있다. 하지만, 반드시 시스템 관리자에의해 옵션이 켜져야 한다.<br>
+<br>
+상업적이고, 더 경험적인 구현에 대한 추가적인 정보는 다음의 주소에서 찾아볼 수 있다.<br>
+<a href="http://www.psc.edu/networking/all_sack.html">http://www.psc.edu/networking/all_sack.html</a><br>
+<br>
+<br>
+<b>2. Large Windows (RFC1323):</b> 본 TCP 향상(RFC1323)의 지원없이 적용될 수 있는<br>
+버퍼 크기는 64K로 제한된다. 상단의 BDP 부분에서 보았듯이 이러한 제한은 오늘날의 고속 WAN<br>
+환경에는 적절하지 않다.<br>
+대부분의 시스템에서  RFC1323 옵션을 지원하고 있으나, 관리자가 옵션을 켜주어야 작동한다.<br>
+<br>
+<br>
+<b>3. 호스트 에서의 최대 버퍼 크기</b> : 일반적으로 운영체제는 애플리케이션이 네트웍<br>
+데이터를 버퍼링 하는데 사용되는 메모리의 양을 제한한다. 호스트 시스템은 네트웍에서<br>
+데이터를 읽고 보내기 위해서 충분한 소켓 버퍼를 할당하는 환경설정을 해야만 한다. <br>
+일반적인 UNIX 시스템은 기본적으로 128K에서 1MB정도의 최대값을 가지고 있다.<br>
+다수의 경로에서 이 값은 충분하지 않으며 늘려주어야 할때가 많다.<br>
+<br>
+위에서 말했던 "RFC1323 Large window옵션이 지원없이" 라는 말을 주목하기 바란다.<br>
+기본적으로 TCP/IP는 네트웍에서 64k 이상의 버퍼의 사용을 지원하지 않으며, 이것은<br>
+최대 버퍼 크기의 설정과는 관계가 없다.<br>
+<br>
+<br>
+<b>4. 기본 버퍼 크기</b> : 위에서 말했던 "최대 버퍼" 크기는 말 그대로 버퍼의 최대<br>
+한계치를 지정한다. 참고로, 대부분의 운영체제는 내부에 설정된 버퍼 크기를 가지고있으며,<br>
+애플리케이션이 따로 버퍼 크기를 지정하지 않는한 기본 크기의 버퍼를 사용한다.<br>
+대부분의 시스템 관리자들은 LAN에 적절한 값을 설정한다<br>
+하지만, 큰 BDP를 가지고 있는 WAN환경을 지원하는데에는 그다지 충분한 옵션은 아니다<br>
+<br>
+<br>
+<b> 5. 애플리케이션 버퍼</b> : 만약 기본 버퍼의 크기가 충분하지 않다면, 해당 애플리케이션은<br>
+반드시 받기와 보내기 소켓 버퍼의 크기를 최소 BDP값으로 양쪽 다 지정해 주어야 한다.<br>
+대부분은 그렇지 않지만 일부의 애플리케이션은 소켓 버퍼사이즈를 지정할 수 있도록 해 준다.<br>
+(예 : Cray UNICOS FTP) 큰 소켓 버퍼를 지원하는, 몇가지 소프트웨어의 개정판이 있다<br>
+<br>
+* NLANR/DAST FTP클라이언트는 자동으로 해당 경로의 BDP값을 측정하여 소켓 버퍼의<br>
+  크기를 설정한다. 본 클라이언트는 다음의 주소에서 찾을수 있다.<br>
+   <a href="http://dast.nlanr.net/Projects/Autobuf_v1.0/autotcp.html">
+   http://dast.nlanr.net/Projects/Autobuf_v1.0/autotcp.html 
+   <a><br>
+* 사용자가 튜닝가능한 WU-FTP and NSCAR의 NCFTP의 예제를 구해보라.<br>
+<br>
+* NLANR/NCNE 는 FTP와 rsh의 몇가지 버전을 위해 애플리케이션의 개선에<br>
+   대한 내용이 포함된 도구 창고(tool repository)를 유지한다.<br>
+<br>
+<br>
+다른 방법으로는, 시스템 전체의 소켓 버퍼 사이즈를 늘리는 방법이 있으나, 이 경우 모든<br>
+애플리케이션이 큰 소켓버퍼를 사용하게 된다. 많은 네트웍 애플리케이션들이 요구하지도<br>
+않은 시스템 메모리를 낭비하게 되므로 권장하지 않는다.<br>
+<br>
+New: 가장 좋은 해결책은 운영체제가 스스로 소켓버퍼를 적절한 크기로 튜닝 해주는 것이다.<br>
+이런점에서 리눅스 사용자들은 Web100에 대해 연구하고 싶어 할지도 모른다.<br>
+Web100은  향상된 TCP 진단을 가능하게 하는 자동 튜닝기능 과 TCP도구들을 가지고 있다.<br>
+이것은 Jeff Smeke가 초기에 PSC에서 NetBSD를 위한 경험적 자동 튜닝 도구를<br>
+개발 했던것으로 부터 시작되었다.<br>
+미래에 우리는 TCP구현의 모든 부분이 이렇게 자동튜닝이 되길 바란다. 이렇게만 된다면, 모든<br>
+웹사이트들은 구식이 되어버릴것이다<br>
+<br>
+소켓 응용프로그램에서, 프로그래머는 setsockopt() 시스템 콜을 사용하여 소켓버퍼의 크기를 <br>
+지정할수 있다. Detailed Users Guide 에는 NCSA, Von Welch의 소켓기반 애플리케이션 내부에서<br>
+소켓 버퍼의 크기를 어떻게 설정하고 있는지 설명한 부분이 있다.<br>
+<br>
+<b>6. Path MTU </b> : 호스트 시스템은 해당 경로를 위해, 반드시 가능한 최대의 MTU를 사용해야 한다.<br>
+이것은 Path MTU Discovery (RFC1191)를 가능하게 설정 해야 하며, RFC1191 이후로는 기능들이 기본<br>
+작동되도록 설정 되어있지 않다. 따라서, 시스템 관리자가 반드시 사용 가능 하도록 설정 해주어야 한다.<br> 
+pMTU blackholes를 보면, Path MTU Discovery가 불가능하거나 적절하지 않을때,<br>
+때때로 시스템이 큰 패킷을 사용가능하도록 하는 트릭을 사용하는데, 이경우 생각지 못한 부작용이 따를수 있다.<br>
+<br>
+Path MTU Discovery server (다음 섹션에서 약간더 자세히 설명한다)는 특정 경로들에<br>
+의해 제공된 가장  MTU를 체크하는데 있어 유용할 것이다.<br>
+<br>
+<a href="http://www.ncne.org/jumbogram/mtu_discovery.php">http://www.ncne.org/jumbogram/mtu_discovery.php</a><br>
+<br>
+<h1>웹 기반 네트웍 분석 서버</h1>
+Web100 기반으로 하고있는 분석서버는 네트웍 문제상황을 해결하는데 유용하다.<br>
+다음의 몇가지를 짚고넘어 가보도록 하자.<br>
+<br>
+<b>SYN 테스트 서버</b> : 때때로 사용자들은 위에서 논의했던 SACK등의 고성능 네트웍<br>
+옵션이 켜져있는지 간단하고 빠르게 확인하고 싶어한다. 이것은 Web 100에 기반한<br>
+서버로서, 인터넷 상의 어떤 클라이언트라도 허용하므로서, 빠르고 쉽게 확인할 수 있도록 해준다.<br>
+텍스트 콘솔 창으로 부터 웹브라우져까지 어떠한 것으로도 접근이 가능하며, 텍스트 모드에선<br>
+간단히 다음과 같이 쳐주면 된다.<br>
+         telnet syntest.psc.edu 7960<br>
+<br>
+다른 방법으로는, 웹브라우져에서 다음과 같이 쳐주면 된다.<br>
+URL: http://syntest.psc.edu:7961<br>
+<br>
+<b>ORNL TCP 대역폭 테스터</b> : 어떤 사용자들은 외부에서 접속이 잘되는지를<br>
+확인하기 위해 원격지의 머신에 대해 간단한 네트웍 테스트 하기를 원한다.<br>
+이것은 몇가지의 작은 네트웍 테스트와 호스트 서버간의 대역폭을 측정해주는<br>
+웹기반 자바서버이다. 시간다면 다음의 사이트를 방문해보자.<br>
+<a href = "http://www.epm.ornl.gov/~dunigan/java/misc/tcpbw.html">
+http://www.epm.ornl.gov/~dunigan/java/misc/tcpbw.html
+</a></br>
+<br>
+<b>ANL 네트웍 환경 테스터</b> : 이것은 웹기반의 자바서버로서, 몇가지의 작은<br>
+네트웍 테스트와 호스트에 대한 정보분석을 제공한다.<br>
+이 서버는 전이중 양방향 전송의  불일치 문제 해결에 대해 상당히 유용하다.<br>
+<a href = "URL: http://miranda.ctd.anl.gov:7123">http://miranda.ctd.anl.gov:7123</a><br>
+위 사이트에서 본 툴에 대한 자세한 설명을 찾을수 있다.<br>
+<br>
+<b>Path MTU Discovery 서버</b> : 이 웹기반의 서버는, 피츠버그 슈퍼컴퓨팅 센터와<br>
+당신이 관심있어하는 호스트간에 최대 MTU 를 결정하는데 사용할 수 있다.<br>
+<a href="http://www.ncne.org/jumbogram/mtu_discovery.php">
+http://www.ncne.org/jumbogram/mtu_discovery.php
+</a><br>
+<br>
+이 툴은 질문시에 입력한 호스트와 피츠버그 슈퍼컴퓨팅 센터간의 경로와<br>
+지원된 최대 MTU를 보여준다.<br>
+<br>
+<br>
+
+
+<table border>
+<caption><h1>이런 특징들이 적용되는 여러가지 운영체제</h1></caption>
+<th>운영체제(알파벳순) (추가정보 클릭)</th>
+    <th>RFC1191 Path MTU Discovery</th><th>RFC1323 지원</th>
+    <th>기본 최대 소켓 버퍼 크기</th>
+    <th>기본 TCP 소켓 버퍼 크기</th>
+    <th>기본 UDP 소켓 버퍼 크기</th>
+    <th>Applications (if any) which are <em>user</em> tunable</th>
+    <th>RFC2018 SACK 지원 <br>
+<a href="http://www.psc.edu/networking/all_sack.html">추가정보</a></th>
+
+<tr>
+    <td><a href="#BSDI">BSD/OS 2.0</a>
+    <td>No<td>Yes<td>256kB<td>8kB<td>9216 snd 41600 rcv<td>None<td>
+    <a href="ftp://daedalus.cs.berkeley.edu/pub/tcpsack/">
+    Hari Balakrishnan's BSD/OS 2.1 implementation</a>
+</tr>
+<tr>
+    <td><a href="#BSDI">BSD/OS 3.0</a>
+    <td>Yes<td>Yes<td>256kB<td>8kB<td>9216 보내기 41600 받기<td>None
+</tr>
+
+<tr>
+    <td><a href="#Cray">CRI Unicos 8.0</a>
+    <td>예<td>예<td><td><td><td>FTP
+</tr>
+
+<tr>
+    <td><a href="#Compaq">(컴팩) Digital Unix 3.2</a>
+    <td><td>Yes Winscale, No Timestamps<td>128kB<td>32kB<td><td>None
+</tr>
+<tr>
+    <td><a href="compaq/compaq_detail.html">(컴팩) Digital Unix 4.0</a>
+    <td>Yes<td>Yes Winscale, No Timestamps
+    <td>128kB<td>32kB<td>9216 snd 41600 rcv<td>None
+    <td><a href="http://www.psc.edu/networking/tcp.html">PSC
+    Research version</a>
+</tr>
+
+<tr>
+<td><a href="#FreeBSD">FreeBSD 2.1.5</a>
+    <td>예<td>예<td>256kB<td>16kB<td>40kB<td>None
+    <td><a href="http://www.iet.unipi.it/~luigi/research.html">
+    Luigi Rizzo's FreeBSD2.1R version</a><br>
+    Also Eliot Yan of UCLA has one
+</tr>
+
+<tr>
+<td><a href="#HP">HPUX 9.X</a>
+    <td>No<td>9.05 and 9.07 provide patches for RFC1323<td>1 MB (?)
+	<td>8kB<td>9216<td>FTP (with patches)<td><tr>
+<td><a href="#HP">HPUX 10.{00,01,10,20,30}</a>
+    <td>예<td>예<td>256kB<td>32kB<td>9216<td>FTP<td><tr>
+<td><a href="#HP">HPUX 11</a>
+    <td>Yes<td>Yes<td> >31MB? <td>32kB<td>65535<td>FTP<td>
+</tr>
+
+<tr>
+    <td><a href="#AIX">IBM AIX 3.2 & 4.1</a>
+    <td>No<td>Yes<td>64kB<td>16kB<td>41600 Bytes recieve/9216 Bytes send<td>None
+</tr>
+
+<tr>
+<td><a href="#MVS">IBM MVS TCP stack by Interlink, v2.0 이상</a>
+    <td>No<td>Yes<td>1MB<td><td><td>
+</tr>
+
+<tr><td><a href="#Linux">Linux 2.4.00</a> or later.
+    <td>Yes<td>Yes<td>64kB<td>32kB (see <a href="#Linux">notes</a><td>32kB(?)
+    <td>None
+    <td>Yes
+</tr>
+
+<tr><td><a href="#MacOS">MacOS (Open Transport)</a>
+    <td>Yes<td>Yes<td>limited only by available system RAM<td>32kB<td>64kB (send and receive)
+<td>Fetch (ftp client)<td>Not in versions up to Open Transport 2.7.x; will be in OT 3.0
+</tr>
+
+<tr>
+<td><a href="#NetBSD">NetBSD 1.1/1.2</a>
+    <td>No<td>Yes<td>256kB<td>16kB<td><td>None
+    <td><a href="http://www.psc.edu/networking/tcp.html">PSC
+    Research version</a>
+</tr>
+
+<tr>
+    <td><a href="#NetManage">FTP 소프트웨어 (NetManage) 
+     OnNet Kernel 4.0 for Win95/98</a>
+    <td>Yes<td>Yes<td>963.75 MB<td> 8K [146K for Satellite tuning]
+    <td>8K send 48K recv<td>FTP server<td>Yes
+</tr>
+
+<tr><td>Novell Netware5</a>
+    <td>Yes<td>No<td>64kB<td>31kB<td><td>None
+    <td>
+</tr>
+
+<tr><td><a href="SGI">SGI IRIX 6.5</a>
+    <td>Yes<td>Yes<td>Unlimitted<td>60kB<td>60kB<td>None<td>Yes, as of
+    6.5.7.  It is on by default.
+</tr>
+
+
+<tr><td><a href="solaris/solaris_detail.html">Sun Solaris 2.5</a>
+    <td>Yes<td>No.  However, can be purchased as a Sun
+	Consulting Special, and will be in Solaris 2.6<td>256kB<td>8kB<td>8kB<td>None
+</tr>
+<tr><td><a href="solaris/solaris_detail.html">Sun Solaris 2.6</a>
+    <td>Yes<td>Yes<td>1MB TCP, 256kB UDP<td>8kB<td>8kB<td>None<td>Yes, 
+    <a href="ftp://playground.sun.com/pub/sack/tcp.sack.tar.Z">experimental
+    patch from Sun</a>
+</tr>
+<tr><td><a href="solaris/solaris_detail.html">Sun Solaris 7</a>
+    <td>Yes<td>Yes<td>1MB TCP, 256kB
+    UDP<td>8kB<td>8kB<td>None<td>Yes; default is "passive".  
+    (See <a href="solaris/solaris_detail.html">below</a>)
+</tr>
+
+<tr><td><a href="#WinNT">Microsoft Windows NT 3.5/4.0</a>
+    <td>Yes<td>No<td>64kB<td>max(~8kB,
+				min(4*MSS, 64kB))<td><td><td>No
+</tr>
+
+<tr>
+<td>Microsoft Windows NT 5.0 Beta
+    <td><td>Yes<td><td><td><td><td>Yes
+</tr>
+
+<tr>
+<td><a href="#Win98">Microsoft Win98</a>
+    <td><td>Yes<td>1GB(?!)<td>8kB<td><td><td>Yes (on by default)
+</tr>
+
+<tr>
+<td><a href="#Win2k">Microsoft Winows 2000 and Windows XP</a>
+    <td><td>Yes<td>1GB(?!)<td>8kB<td><td><td>Yes (on by default)
+</tr>
+
+
+<tr>
+<th>Operating System (Alphabetical) (Click for additional info)
+    <th>Path MTU Discovery<th>RFC1323 Support
+    <th>Default maximum socket buffer size
+    <th>Default TCP socket buffer size
+    <th>Default UDP socket buffer size
+    <th>Applications (if any) which are <em>user</em> tunable
+    <th>SACK Support<tr>
+</table>
+
+<h1>다향한 운영체제 에서의 자세한 시스템 튜닝 절차</h1>
+<b><h3>BSD/OS 2.1 and 3.0 (BSDi) 에서의 네트웍 상한선을 올리는 절차</h3></b><br>
+MTU discovery 는 BSD/OS 3.0에서 지원되고 있다. RFC1323도 또한 지원되고 있다.<br>
+그리고, 세팅하는 방법은 FreeBSD에서 설명되어있듯이 sysctl 인터페이스를 사용하여<br>
+관련된 커널 변수를 설정해주면된다. sysctl(1) 과 sysctl(3)을 보면 더 자세한 정보를 얻을 수 있다<br>
+<br>
+<h3> Unicos 8.0 CRI system 에서의 네트웍 상한선을 올리는 절차</h3>
+시스템 환경 파라미터들은 /etc/netvar에 의해서 조절될수 있다. /etc/netvar를<br>
+옵션없이 실행하게 되면 다음과 같은 변수들을 모두 볼수 있다.<br>
+<pre>
+% /etc/netvar
+Network configuration variables
+        tcp send space is 32678
+        tcp recv space is 32678
+        tcp time to live is 60
+        tcp keepalive delay is 14400
+        udp send space is 65536
+        udp recv space is 68096
+        udp time to live is 60
+        ipforwarding is on
+        ipsendredirects is on
+        subnetsarelocal is on
+        dynamic MTU discovery is on
+        adminstrator mtu override is on
+        maximum number of allocated sockets is 3750
+        maximum socket buffer space is 409600
+        operator message delay interval is 5
+        per-session sockbuf space limit is 0
+</pre>
+<br>
+다음의 변수들을 세팅할수 있다:<br>
+<ul>
+<br>
+<li> <em>동적 MTU discovery</em>: 기본적으로 꺼져있으며, 켤수 있다.<br>
+<li> <em>최대 소켓버퍼 공간</em>: 이 값은 바이트 단위로 원하는 만큼 최대 소켓<br>
+버퍼의 크기를 지정할 수 있다. <br>
+<br>
+<li> <em>tcp send space, tcp recv space</em>:  이 기본값들이<br>
+애플리케이션에서 사용하는 것들이다. 이것을 변경하는것은 주의를 요한다<br>
+</ul>
+<br>
+/etc/netvar에 의해서 바뀌어진 값들은 이후 생성된 새로운 프로세스에<br>
+즉시 적용되며, 이미 작동된 프로세스의 소켓들에는 적용되지 않는다.<br>
+<br>
+<hr>
+<h3>Digital Unix 3.2c (컴팩) DEC Alpha 시스템 에서의 네트웍 상한선을 올리는 절차</h3>
+기본적으로, 이 운영체제는 128kb의 최대 소켓 버퍼크기가 가능하다.<br>
+<br>
+이것을 최대로 올리기 위해서, 커널 변수인 sb_max값을 증가시켜야 하며, 이렇게 하기 위해서는<br>
+다음과 같은 명령을 루트권한으로 실행해야 한다.<Br>
+<br>
+# dbx -k /vmunix<br>
+(dbx) assign sb_max = (u_long) 524288<br>
+(dbx) patch sb_max = (u_long) 524288<br>
+<br>
+이 예제에서 sb_max는 512kb로 상향조정되었다. 처음의 명령은 현재 작동하고 있는 시스템에<br>
+적용하기 위한 변수이며, 두번째 명령은, 리붓후에도 변경된 값으로 계속 지정되도록 한다.<br>
+그러나, 주의할점은 재인스톨(덮어쓰기) 을 하게되면, 변경사항은 원상복구된다.<br>
+<br>
+디지털 유닉스의 메뉴얼에는 mbclusters 값을 적어도 832이상으로 설정할것을 권장하고 있다.<br>
+
+표준 애플리케이션은 소켓버퍼 크기를 설정할수 있는 메커니즘을 기본적으로 가지고있지 않지만,<br>
+커널변수(tcp_sendspace, tcp_recvspace)의 수정을 통해서, 변경을 할 수 있다.<br>
+<br>
+<h3><b>Digital Unix 4.0 (컴팩) DEC Alpha system 에서의 시스템 상한선을 올리는 절차</b></h3><br>
+<br>
+Digital Unix 4.0 에서는 많은 변수들이 sysconfig 명령으로 변경될수 있습니다, 대부분(전부는아님)의<br>
+관련 변수는 하단 처럼 나온다.
+<pre>
+	    % /sbin/sysconfig -q inet
+	    inet:
+	    tcp_sendspace = 32768
+	    tcp_recvspace = 32768
+	    tcp_keepidle = 14400
+	    tcp_keepintvl = 150
+	    tcp_keepinit = 150
+	    tcp_keepcnt = 8
+	    tcp_ttl = 60
+	    tcp_mssdflt = 536
+	    tcp_rttdflt = 3
+	    tcp_dont_winscale = 0
+	    tcpnodelack = 0
+	    tcptwreorder = 1
+	    udp_sendspace = 9216
+	    udp_recvspace = 41600
+	    udpcksum = 1
+	    udp_ttl = 30
+	    pmtu_enabled = 1
+	    pmtu_rt_check_intvl = 20
+	    pmtu_decrease_intvl = 1200
+	    pmtu_increase_intvl = 240
+	    ...
+
+	    % /sbin/sysconfig -q socket
+	    socket:
+	    sominconn = 0
+	    somaxconn = 1024
+	    sb_max = 131072
+
+
+다음과 같이 바꿀수있다 (예제):
+
+            # /sbin/sysconfig -r inet tcp_sendspace 65536
+            # /sbin/sysconfig -r inet tcp_recvspace 65536
+</pre>
+
+(컴팩) Digital UNIX systems (V4.0 릴리즈와 V3.2x의 시리즈)를 튜닝하기 위한 특정<br>
+도움말은 http://www.unix.digital.com/internet/tuning.htm 에서 찾을수 있다.<br>
+이 문서는 중요한 파라미터들의 정보에 대해서 설명하고 있으며, 어떻게 수정하는 지에 대한<br>
+명령어를 제공해준다(소켓 아이피 TCP레이어와 직접적으로 관련되어 있지 않은것도 다룬다)<br>
+또한, 중요한 패치 정보와, 매달 의 갱신된 사항이 포함되어 있다.<br>
+<br>
+<h3><b>FreeBSD 2.1.5 에서의 네트웍 상한선을 올리는 절차 </b></h3><br>
+MTU discovery 는 FreeBSD 2.1-0-RELEASE때부터 기존적으로 제공되었다. 만약 MTU discovery를<br>
+작동하지 않게 하려면,해당 MTU 인터페이스를 어떻게 잠그는지 알아야만 했다.<br>
+FreeBSD 2.1.0-RELEASE에서는 최대 소켓 버퍼 크기를 조정하지 못했으나 2.2-CURRENT 에서는<br>
+하단의 명령으로 수정할 수 있다.<br>
+<br>
+sysctl -w kern.maxsockbuf=524288<br>
+<br>
+위의 예는 최대 소켓 버퍼의 크기를 512kb로 늘려준 예제이다.<br>
+또한,  TCP와 UDP기본 버퍼 사이즈를 수정하는 변수들은 다음과 같다.<br>
+<br>
+net.inet.tcp.sendspace<br>
+net.inet.tcp.recvspace<br>
+net.inet.udp.recvspace<br>
+<br>
+
+
+}}}
+
+ 
+ [[BR]] '''영어실력이 안돼서 그림보듯이 여기까지 적어봅니다. 그림감상 잘했습니다. (앗! 어디서 돌이 날라오네... )''' - [minzkn]
+ [[BR]] '''- 슬슬 재미있군요.. 틀린부분  수정부탁드려요 ^^~ ''' - [netserenity]
+ [[BR]] '''헉 저장이 안되었다 T.T''' - [yundream]
+

@@ -1,0 +1,1964 @@
+#title Proc filesystem를 이용한 시스템 정보 수집
+[wiki:docbook/Proc_filesystem_시스템정보수집 Docbook 원문]
+
+{{{#!comment
+yundream 2007/1/29
+/proc/stat : Kernel.2.6에서 다음과 같이 3개의 필드가 추가되었다.
+iowait - time waiting for I/O to complete (since 2.5.41);
+irq -  time  servicing  interrupts  (since  2.6.0-test4);
+softirq - time servicing softirqs (since 2.6.0-test4).
+
+$ cat /proc/stat
+cpu  3244756 242977 1005658 57043945 782766 2916 28664 0
+}}}
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Proc filesystem - 시스템 정보 수집</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Proc filesystem - 시스템 정보 수집</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN14"
+>시스템 정보수집</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN22"
+>프로세스 정보 디렉토리</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN95"
+>커널 정보들</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN214"
+>IDE 장치 정보 /proc/ide</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN275"
+>네트워킹 정보 /proc/net</A
+></DT
+><DT
+>2.5&#51208;. <A
+HREF="#AEN394"
+>SCSI 정보</A
+></DT
+><DT
+>2.6&#51208;. <A
+HREF="#AEN399"
+>TTY 정보 /proc/tty</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN418"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이미 몇번에 걸쳐서 간단하게 proc 파일시스템에 대해서 
+		알아보긴 했으나, 지금까지의 문서는 거의 입문수준의 이벤트성 
+		문서였었다. 	  
+	</P
+><P
+>		그래서 이번에는 좀더 자세히 다루고자 마음먹고 문서를 작성한다. 
+		이문서는 리눅스 커널 2.4.x 를 기준으로 작성될것이나, 대부분의 
+		경우 2.2.x 에도 동일하게 적용될 것이다. 가끔은 솔라리스와 
+		비교 설명을 하게 될것이다.  
+	</P
+><P
+>		proc 파일시스템에 관련된 문서는 크게 3장으로 다룰것이다. 
+		첫번째 문서는 시스템정보 수집에 대한 내용을 다루며, 
+		두번째 문서는 시스템정보 변경에 대한 내용을 다룰것이다. 
+		마지막 문서는 시스템정보 수집기능을 이용한 간단한 어플리케이션 
+		제작과 함께 자신만의 proc 시스템을 만드는 법에 대해서 알아볼 
+		것이다.  
+		이번 문서는 그중 첫번째 장으로 시스템정보 수집에 대한 내용을 
+		다루게 된다.    	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>2&#51208;. 시스템 정보수집</A
+></H1
+><P
+>		이번장에서는 pseudo 파일 시스템인 /proc 에 대한 개략적인 설명과 함께, 
+		LInux 시스템상의 어떠한 정보를 제공하고 있는지 알아볼것이다. 
+		이해를 돕기 위해서 실례를 들어가면서 설명을 하게 될것이다. 
+	</P
+><P
+>		기본적으로 proc 파일 시스템은 커널이 가지고 있는 여러가지 데이타 
+		구조체를 시스템 사용자(프로그래머 혹은 시스템 관리자)에게 쉽게 
+		전달하기 위해서 사용하는 목적으로 만들어져 있다. 이 /proc 파일시스템 
+		을 이용하게 됨으로써 좀더 쉽게 각종 시스템 정보를 얻어올수 있으며, 
+		여러가지 커널옵션을 특별한 프로그래밍 과정없이 단지 파일의 정보변경
+		만을 통해서 쉽게 변경할수 있도록 도와준다.  
+	</P
+><P
+>		실제 proc 파일시스템을 이용하지 않고 커널 데이타 구조체에서 직접 
+		원하는 시스템 정보를 가져올수 있기는 하지만, 별도의 프로그래밍 
+		과정을 거쳐야 할뿐더라 꽤 귀찮은 여러가지 요건을 만족시켜주어야 한다. 
+		특별히 성능을 중요시 여기지 않는 대부분의 경우 proc 파일시스템을 
+		이용해서 정보를 가져오는 것으로도 충분히 기본적인 목적을 
+		달성할수 있을것이다.   
+	</P
+><P
+>		수집된 정보는 특히 시스템관리를 위한 시스템 모니터링 시스템(SMS) 
+		과 시스템 최적화를 위한 시스템성능분석등에 유용하게 사용될수 있다. 
+	</P
+><P
+>		특히 리눅스의 경우 다른 운영체제 보다 더욱 많은 상세한 정보들을 
+		(사실상 거의 대부분의 중요 정보들을) proc 파일시스템을 통해서 
+		제공함으로, 여기에 대한 정보를 제대로 알게 될경우 시스템 프로그래밍을 
+		좀더 원할하게 할수 있다. 사실 리눅스 상에서 제대로된 
+		시스템 프로그래밍을 원한다면 proc 파일시스템을 활용할줄 알아야 
+		할것이다.  
+	</P
+><P
+>		아래의 내용들은 linux 를 사용하고 있다면 cat 혹은 vi 와 같은 
+		에디터를 통해서 바로 테스트 가능함으로, 가급적이면 
+		내용을 반드시 확인해 보도록 하자. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1&#51208;. 프로세스 정보 디렉토리</A
+></H2
+><P
+>			/proc 디렉토리에는 프로세스 정보를 가지는 디렉토리가 존재한다. 
+			이들 프로세스정보 디렉토리는 각 프로세스의 PID를 이름으로 가지며 
+			이 디렉토리 안에는 다음과 같은 다양한 정보들을 제공한다.  
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN25"
+></A
+><P
+><B
+>&#54364; 1. /proc/PID 에서 제공하는 프로세스 정보들</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cmdline</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>명령행 옵션</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cpu</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>SMP 시스템일경우 어떤 cpu 에서 실행되었는지</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cwd</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>작업디렉토리 링크</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>exe</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프로세스를 실행시킨 명령어의 링크</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>fd</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>디렉토리로 모든 파일지정자를 가진다.</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>maps</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>실행어와 라이브러리파일의 메모리 맵</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>mem</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 프로세스에 의해서 사용되는 메모리</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>root</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>이 프로세스의 루트 디렉토리</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>stat</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프로세스 상태</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>statm</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프로세스 메모리 상태</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>status</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프로세스 상태(인간이 알아보기 쉬운 포맷)</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+			예를 들어서 PID가 1264 인 프로세스의 정보를 알아보고 싶다면 
+			/proc/1264/status 정보를 확인하면 된다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 		 
+[root@localhost 1264]# cat /proc/1264/status 
+Name:   bx
+State:  S (sleeping)
+Tgid:   1264
+Pid:    1264
+PPid:   1225
+TracerPid:      0
+Uid:    500     500     500     500
+Gid:    500     500     500     500
+FDSize: 256
+Groups: 500 
+VmSize:     3620 kB
+VmLck:         0 kB
+VmRSS:      1900 kB
+VmData:      636 kB
+VmStk:       140 kB
+VmExe:       896 kB
+VmLib:      1756 kB
+SigPnd: 0000000000000000
+SigBlk: 0000000080000000
+SigIgn: 8000000000001004
+SigCgt: 0000000000036203
+CapInh: 0000000000000000
+CapPrm: 0000000000000000
+CapEff: 0000000000000000
+			</PRE
+></TD
+></TR
+></TABLE
+> 		 
+			내용을 보면 ps 명령어가 보여주는 대부분의 정보를 보여주고 있음을 
+			알수 있으며, 실질적으로도 ps 프로그램은 proc 파일시스템의 정보를 
+			이용해서 시스템 정보를 출력시켜준다. 
+			실제 프로세스 정보 분석프로그램을 
+			만들일이 있다면 status 보다는 stat 파일을 사용하는게 편할것이다. 
+			status 는 인간이 보기에는 편하지만 프로그래밍 작업을 통해서 
+			원하는 데이타를 가져오기에는 적당하지 않은 포맷으로 되어 있다. 
+		</P
+><P
+>			또한 ststm 파일을 확인하면 프로세스 메모리 사용에 대한 더욱 상세한 
+			내용을 확인해 볼수 있다. 
+			여기에는 다음과 같은 상세 메모리 정보가 포함되어 있다. 
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN67"
+></A
+><P
+><B
+>&#54364; 2. statm 파일이 가지는 정보들</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>필드</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>값</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>size</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프로그램의 총 크기</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>resident</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>할당된 메모리의 크기</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>shared</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>공유영역으로 할당된 페이지의 수</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>trs</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>code 를 위해 할당된 페이지의 수</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>drs</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>data및 stack 로 할당된 페이지의 수</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>lrs</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>라이브러리 로 할당된 페이지의 수</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>dt</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>dirty 페이지의 수</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN95"
+>2.2&#51208;. 커널 정보들</A
+></H2
+><P
+>			리눅스의 proc 파일시스템은 프로세스의 정보뿐만 아니라 
+			커널이 실행되면서 
+			작성된 각종 정보들을 역시 파일로 관리하고 있다. 
+			(솔라리스의 경우에는 
+			단지 프로세스 정보만을 제공한다.) 제공하는 정보는 다음의 테이블에서 
+			확인하기 바란다.     
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN98"
+></A
+><P
+><B
+>&#54364; 3. /proc 의 파일정보들</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>내용</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>apm</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Advanced power management 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>bus</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>bus 관련정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cmdline</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널 실행옵션</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cpuinfo</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용cpu 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>device</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용가능한 디바이스(블럭/문자 장치)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>dma</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용하고 있는 DMS 채널</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>filesystems</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>지원되는 파일시스템</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>driver/rtc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>드라이버 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>execdomains</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>execdomains, 보안과 관련</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>fb</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>프레임버퍼 디바이스</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ide</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IDE 장치에 대한 정보 디렉토리</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>interrupts</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>인터럽트 사용율</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>iomem</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>메모리지도</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ioports</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용중인 입출력포트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>isapnp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>pnp 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>kcore</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널 core 이미지</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>kmsg</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널메시지</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ksyms</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널 심볼 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>loadavg</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>최근 1,5,15 분의 평균 load</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>locks</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>kernel locks 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>meminfo</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>메모리 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>misc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>기타등등</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>modules</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>실행중인(load) 모듈 목록, lsmod로 나오는 정보다</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>mounts</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>마운트된 파일시스템 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>net</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>네트워킹 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>partitions</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파티션 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>pci</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>PCI 버스 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>scsi</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>SCSI 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>slabinfo</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Slab pool 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>swaps</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>swap 파일시스템 사용정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>sysvipc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>SysVIPC 자원정보(메시지큐, 세마포어, 공유메모리등)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tty</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tty 드라이버 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>uptime</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>시스템 가도시간</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>version</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널버젼</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			예를들어서 시스템 인터럽트를 확인해 보고 싶다면 interrupts 
+			화일을 확인하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /proc]# cat /proc/interrupts
+           CPU0       
+  0:   55607808          XT-PIC  timer
+  1:     479783          XT-PIC  keyboard
+  2:          0          XT-PIC  cascade
+  8:          1          XT-PIC  rtc
+  9:    2217067          XT-PIC  eth0
+ 10:      88957          XT-PIC  usb-uhci, usb-uhci, Crystal CS4281
+ 12:    2121308          XT-PIC  PS/2 Mouse
+ 14:     487260          XT-PIC  ide0
+ 15:      80045          XT-PIC  ide1
+NMI:          0 
+ERR:          0
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			CPU0 이란 헤더명에서 볼수 있듯이 복수의 CPU 인터럽트정보를 
+			표시해 줄수 있다. interrupts 는 각각의 장치가 어느정도의 
+			사용율을 보이고 있는지 확인하기 위해서 유용하게 사용할수 있다. 
+		 	이것은 일정한 시간간격을 가지고 위의 파일의 내용을 
+			검사하여서 현재의 값에서 이전의 값을 뺀 값으로 조사할수 
+			있다. 실제 지금 find ./ -name 과 같은 하드디스크 인터럽트를 
+			많이 사용하는 작업을 시킨후 ide0 의 변화율을 보기 바란다. 
+			아마도 평소에 비해서 변화율이 극적으로 증가하는걸 볼수 있을 
+			것이다. 다음은 필자가 테스트를 위해서 작성한 
+			간단한 스크립트이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost proc]# while [ 1 ] 
+&#62; do
+&#62; cat interrupts | grep "ide0"
+&#62; sleep 1
+&#62; done
+ 14:      48529          XT-PIC  ide0  
+ 14:      48529          XT-PIC  ide0
+ 14:      48529          XT-PIC  ide0  
+ 14:      48538          XT-PIC  ide0   -- find 를 실행시켰다. 
+ 14:      48624          XT-PIC  ide0   ---+
+ 14:      48723          XT-PIC  ide0      |
+ 14:      48836          XT-PIC  ide0      | 인터럽트가 증가함을 알수 있다. 
+ 14:      48930          XT-PIC  ide0      |
+ 14:      49031          XT-PIC  ide0   ---+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			커널 2.4 부터는 irq 라는 흥미로운 정보를 담고 있는 새로운 
+			시스템정보를 알려주기 위한 디렉토리가 만들어져 있다. 여기에 
+			있는 정보들을 변경하면 IRQ와 CPU의 관계를 조정할수 있다. 
+			이 이야기는 여러분이 단지 하나의 CPU 에서 IRQ 를 "hook" 할수 있도록
+			할수 있음을 의미한다. - 물론 테스트를 위해서는 2개 이상의 CPU 를 
+			사용하는 시스템이 필요로 하지만 - 
+			irq 디렉토리를 보면 각각의 IRQ 번호를 이름으로 갖는 서브 디렉토리를 
+			가지며 이 디렉토리에는 prof_cpu_mask 라는 파일을 가진다. 
+			(이 파일은 CPU 가 2개 이상일때만 존재한다) 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /proc]# ls irq/
+0  1  10  11  12  13  14  15  2  3  4  5  6  7  8  9  prof_cpu_mask
+[root@localhost /proc]# ls irq/0/
+smp_affinity
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			smp_affinity 를 보면 다음과 같은 값이 세팅되어 있을것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost /proc]# cat irq/0/smp_affinity 
+ffffffff
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 값은 bitmask 로써, 당신이 이 IRQ(0번)를 제어하기 위해서 어떤 
+			CPU를 할당할것인지를 지정할수 있다. 
+			예를들어서 단지 첫번째 CPU 만이 IRQ 를 제어하도록 하려면 아래와 
+			같이하면된다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  
+[root@localhost /proc]# echo 1 &#62; irq/0/smp_affinity 
+			</PRE
+></TD
+></TR
+></TABLE
+> 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN214"
+>2.3&#51208;. IDE 장치 정보 /proc/ide</A
+></H2
+><P
+>			/proc/ide 디렉토리는 커널에서 등록중인 모든 IDE 장치에 대한 
+			정보를 가지고 있다. 이 디렉토리에는 각각의 IDE 컨트롤러 정보를 
+			가지는 써브디렉토리를 가진다. 그리고 각각의 IDE 컨트롤러를 가리키는 
+			심볼릭 링크 파일과 각 장치 버젼을 담고 있는 drivers 파일을 
+			제공한다.  
+			다음은 IDE 장치의 버젼정보를 담고 있는 drivers 파일의 출력 내용
+			이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco ide]# cat drivers 
+ide-cdrom version 4.59
+ide-floppy version 0.97
+ide-disk version 1.10
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 drivers 에는 가장 일반적인 정보인 어떤 ide 장치인지(
+			하드디스크, cdrom, 플로프)와 그 버젼만을 가지고 있는데, 
+			좀더 자세한 내용을 알기를 원한다면 ide0, ide1 과 같은 
+			디렉토리의 내용을 확인해야 한다. 다음 테이블을 
+			참고하기 바란다.  
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN218"
+></A
+><P
+><B
+>&#54364; 4. IDE 컨트롤러 정보 /proc/ide/ide?</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>channel</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IDE 체널 (0 또는 1)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>config</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>PCI/IDE bridge 를 위한 설정</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>mate</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Mate name</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>model</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IDE 컨트롤러의 칩셋/타입</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			IDE 컨트롤러 정보 /proc/ide? 디렉토리 아래에는 IDE 장치 
+			정보를 가지는 파일들이 제공된다. 다음 테이블을 참고하라. 
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN238"
+></A
+><P
+><B
+>&#54364; 5. IDE 컨트롤러 정보 /proc/ide/ide?/</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cache</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cache 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>capacity</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>저장공간블럭(1블럭 == 512byte)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>driver</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>드라이버 버젼</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>geometry</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>물리적/논리적 geometry</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>identify</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>devide identify block</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>media</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>매체의 종류</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>settings</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>디바이스 셋업 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>smart_thresholds</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IDE disk management thresholds</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>smart_value</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IDE disk management values</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			필자의 PC 에는 하나의 HDD 와 하나의 CDROM (둘다 IDE) 가 
+			달려있자. CDROM 은 hdc 와 연결되어 있는데, /proc/ide/hdc/media
+			의 내용을 출력하자 cdrom 이라고 나왔다. 미더어 타입을 
+			쉽게 알수 있다. 또한 capacity 사이즈가 1108760 블럭 으로 
+			나왔는데, 1block 은 512byte 임으로 계산하면 567685120 으로 
+			cdrom 미디어의 용량을 계산할수 있다. HDD 역시 마찬가지의 
+			방법을 이용해서 미디어와 용량을 계산할수 있을것이다.  
+		</P
+><P
+>			그러나 가장 중요한 정보를 주는 것은 settings 파일일것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost hda]# cat settings 
+name                    value           min             max             mode
+----                    -----           ---             ---             ----
+bios_cyl                1861            0               65535           rw
+bios_head               255             0               255             rw
+bios_sect               63              0               63              rw
+breada_readahead        4               0               127             rw
+bswap                   0               0               1               r
+current_speed           66              0               69              rw
+file_readahead          0               0               2097151         rw
+ide_scsi                0               0               1               rw
+init_speed              12              0               69              rw
+io_32bit                1               0               3               rw
+keepsettings            0               0               1               rw
+lun                     0               0               7               rw
+max_kb_per_request      64              1               127             rw
+multcount               8               0               8               rw
+nice1                   1               0               1               rw
+nowerr                  0               0               1               rw
+number                  0               0               3               rw
+pio_mode                write-only      0               255             w
+slow                    0               0               1               rw
+unmaskirq               1               0               1               rw
+using_dma               1               0               1               rw
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			언뜻봐도 실린더, 헤더, 섹터 등에 대한 정보가 눈에 들어올 것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN275"
+>2.4&#51208;. 네트워킹 정보 /proc/net</A
+></H2
+><P
+>			/proc/net 디렉토리에는 네트웍과 관련된 다양한 정보를 가지고 
+			있는 파일들이 있다. 당신의 시스템이 ipv6 를 지금지원하고 
+			있다면 ipv6 와 정보와 관련된 다음의 추가 파일들이 가지고 있을 
+			것이다. 당신이 kernel 2.4.x 를 사용하고 ipv6 모듈을 가지고 
+			있다면 지금 modprobe 를 이용해서 ipv6 모듈을 적재하기 바란다. 
+			그럼 아래와 같은 IPv6 정보관련 파일들이 생성될 것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+[root@localhost /]# modprobe ipv6
+[root@localhost root]# lsmod
+ipv6                  140416  -1 
+sb                      7968   0  (autoclean)
+sb_lib                 34624   0  (autoclean) [sb]
+uart401                 6560   0  (autoclean) [sb_lib]
+sound                  59052   0  (autoclean) [sb_lib uart401]
+soundcore               4324   5  (autoclean) [sb_lib sound]
+mga                   100656  14 
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN279"
+></A
+><P
+><B
+>&#54364; 6. /proc/net 에서 제공하는 IPv6 정보</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>udp6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>열린 UDP 소켓리스트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tcp6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>열린 TCP 소켓리스트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>raw6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>RAW 디바이스 상태</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>igmp6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IP 멀티캐스트 주소</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>if_inet6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IPv6 인터페이스 주소목록</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ipv6_route</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IPv6 를 위한 커널 라우팅 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ipv6_stats</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Global IPv6 라우팅 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>sockstat6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IPv6 소켓 상태</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>snmp6</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IPv6 snmp 데이타</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			다음은 일반적인 데이타이다. IPv4 관련 네트웍 정보파일과 
+			다른 것들을 포함하고 있다. 
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN314"
+></A
+><P
+><B
+>&#54364; 7. /proc/net 에서 제공하는 네트웍 정보</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공 정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>arp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널 ARP 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>dev</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>네트웍 디바이스 상태</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ip_fwchains</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>방화벽 </TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ip_fwchains</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>방화벽 chain 룰</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ip_fwnames</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>방화벽 chain 이름</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>netstat</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>네트웍통계</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>raw</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>raw 디바이스 통계</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>route</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>커널 라우팅 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>rpc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>rpc 정보 디렉토리</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>rt_cache</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>라우팅 캐쉬</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>snmp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>SNMP 데이타</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>sockstat</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>소켓 통계</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tcp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tcp 소켓</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>tr_rif</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Token ring RIF 라우팅 테이블</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>udp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>UDP 소켓</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>unix</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Unix 도메인 소켓</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>wireless</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Wireless 인터페이스 데이타</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>igmp</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>IP 멀티캐스트 주소</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>psched</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Global packet scheduler parameters</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>netlink</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>PF_NETLINK 소켓 리스트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ip_mr_vifs</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>List of multicast virtual interface</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ip_mr_cache</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>List of multicast routing cache</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			예를 들어서 dev 파일을 일정 시간간격으로 분석하면, 
+			각각의 네트웍 장치에 어느정도의 트레픽이 있는지 알아낼수 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost net]# cat dev
+Inter-|   Receive                                                |  Transmit ...
+    lo:       0       0    0    0    0     0          0         0        0  ...
+  eth0: 3471409    8518    0    0    0     0          0         0   522127  ...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			또한 tcp 파일을 보면 현재 커널에서 관리중인 소켓의 정보를 
+			알수 있다. 현재 필자는 bx 를 이용해서 irc 채팅중인데, 
+			이 bx 가 사용하는 소켓 정보를 알아본 결과 다음과 같았다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>     
+[root@localhost /]# ps -aux | grep bx | grep -v grep
+yundream  9420  0.0  0.8  3600 2096 pts/2    S    Nov12   0:01 bx irc.nuri.net
+[root@localhost /]# cd /proc/9420/fd  
+[root@localhost fd]# ls -al
+합계 0
+dr-x------    2 yundream yundream        0 11월 13 00:14 .
+dr-xr-xr-x    3 yundream yundream        0 11월 13 00:14 ..
+lrwx------    1 yundream yundream       64 11월 13 00:14 0 -&#62; /dev/pts/2
+lrwx------    1 yundream yundream       64 11월 13 00:14 1 -&#62; /dev/pts/2
+lrwx------    1 yundream yundream       64 11월 13 00:14 2 -&#62; /dev/pts/2
+lrwx------    1 yundream yundream       64 11월 13 00:14 3 -&#62; socket:[10592]
+lrwx------    1 yundream yundream       64 11월 13 00:14 4 -&#62; socket:[10594]
+			</PRE
+></TD
+></TR
+></TABLE
+>     
+			그럼 tcp 파일을 열어서 실제 위의 소켓정보가 tcp 파일에 
+			유지 되고 있는지 확인 해보자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost net]# cat tcp
+  sl  local_address rem_address   st tx_queue rx_queue tr tm-&#62;when retrnsmt ... 
+   0: 00000000:1770 00000000:0000 0A 00000000:00000000 00:00000000 00000000 ...
+   1: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000 ...
+   2: C3D2CDD2:807B CC2F3ED3:0050 01 00000000:00000000 00:00000000 00000000 ...
+   3: C3D2CDD2:807D CC2F3ED3:0050 01 00000000:00000000 00:00000000 00000000 ...
+   4: C3D2CDD2:804D 5070FFCB:1A0B 01 00000000:00000000 02:0004982C 00000000   500        0 10594 2 c1ab9080 30 4 30 2 2                              
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			필요없는 부분은 생략했다. 10594 부분을 눈여겨 보기 바란다. 
+			이부분이 커널에서 소켓을 가리키기 위해서 사용하는 번호이다. 
+			/proc/pid/fd 의 소켓 번호와 일치되고 있음을 알수 있다. 
+			C3D2CDD2 는 지금 시스템의 IP 번호이다. 804D 는 사용하고 있는 
+			포트번호이며 5070FFCB:1A0B 는 연결된 irc 서버 의 주소:포트 
+			정보임을 알수 있다. 1A08 은 6667 로 표준 irc 서버 포트이다. 
+			이들 정보는 16진수 정보로 표현되지 진수변환이 가능한 계산기를 
+			써서 확인해 보길 바란다.  
+		</P
+><P
+>			arp 파일의 내용은 arp 테이블의 내용을 보여준다. <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=33"
+TARGET="_top"
+>TCP/IP 개요(2)</A
+>
+			를 눈여겨 보았다면 어디에 쓰는테이블인지 이해가 될것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN394"
+>2.5&#51208;. SCSI 정보</A
+></H2
+><P
+>			만약 현재 시스템이 SCSI 어뎁터를 가지고 있다면 /proc/scsi 에 
+			각 어뎁터 정보를 가지는 디렉토리가 생성될 것이다.  
+			/proc/scsi 디렉토리에는 scsi 란 파일이 있는데, 이 파일은 
+			모든 scsi 장비의 대략적인 정보를 보여준다. 	 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost scsi]# cat scsi
+Attached devices:
+Host: scsi0 Channel: 00 Id: 00 Lun: 00
+  Vendor: IBM      Model: DGHS09U          Rev: 03E0
+  Type:   Direct-Access                    ANSI SCSI revision: 03
+Host: scsi0 Channel: 00 Id: 06 Lun: 00
+  Vendor: PIONEER  Model: CD-ROM DR-U06S   Rev: 1.04
+  Type:   CD-ROM                           ANSI SCSI revision: 02
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그리고 각 scsi 어뎁터 이름으로 디렉토리가 생성되어 있음을 
+			볼수 있을것이다. 이 파일들은 어뎁터가 사용하는 
+			컨트롤러의 IRQ, IO 주소 범위 등의 정보를 포함하고 있다. 
+			예를 들어서 만약 Adaptec AHA-2940 SCSI 어뎁터를 사용한다고 하면 
+			아마도 aic7xxx 디렉토리가 생성되어 있을것이다. 그러면  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost scsi]# cat aic7xxx/0 
+  Adaptec AIC7xxx driver version: 5.1.19/3.2.4
+  Compile Options:
+    TCQ Enabled By Default : Disabled
+    AIC7XXX_PROC_STATS     : Disabled
+    AIC7XXX_RESET_DELAY    : 5
+  Adapter Configuration:
+             SCSI Adapter: Adaptec AHA-294X Ultra SCSI host adapter
+                             Ultra Wide Controller
+      PCI MMAPed I/O Base: 0xeb001000
+   Adapter SEEPROM Config: SEEPROM found and used.
+        Adaptec SCSI BIOS: Enabled
+                      IRQ: 10
+                     SCBs: Active 0, Max Active 2,
+                           Allocated 15, HW 16, Page 255
+               Interrupts: 160328
+....
+			</PRE
+></TD
+></TR
+></TABLE
+> 	 
+			과 같은 정보를 볼수 있을것이다. 정보의 양이 꽤 많음으로 
+			생략했다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN399"
+>2.6&#51208;. TTY 정보 /proc/tty</A
+></H2
+><P
+>			여기에는 활성화되어있거나 사용할수 있는 tty 의 정보들을 
+			가져올수 있다. 이 디렉토리는 몇개의 파일과 서브디렉토리를 
+			포함하고 있다. 다음은 이들 파일과 파일을 통해서 얻을수 
+			있는 정보를 정리한 테이블이다.  	
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN402"
+></A
+><P
+><B
+>&#54364; 8. /proc/PID 에서 제공하는 프로세스 정보들</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>파일명</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>제공정보</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>drivers</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>드라이버와 사용하고 있는 리스트</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>ldiscs</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>registered line disciplines</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>driver/serial</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>사용통계와 tty lines 의 정보</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>	
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN418"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 proc 파일시스템을 이용한 시스템 정보 가져오기에 대해서 
+		알아보았다. 
+	</P
+><P
+>		여기에 있는 내용들은 완전한 내용을 담고 있지 않다. 
+		필자가 모르는 몇몇 생소한 용어들이 꽤있었고, 몇몇은 하드웨어에 
+		관한 꽤 상세한 지식을 가지고 있어야 제대로 설명이 가능한것들이 였는데, 
+		그러한 것들에 대한 설명은 부족할 것이다. 그리고 위의 ipv6 관련 
+		정보에서 보다시피, 커널의 종류와 시스템의 종류 Load 되어 있는 
+		모듈에 따라서 proc 파일시스템에서 제공하는 파일 자체가 
+		달라질수 있다. 그럼으로 몇가지 정보가 빠졌을수도 있다. 
+		이러한 정보는 직접 알아봐야 할것이다.    
+	</P
+><P
+>		하지만 자주 사용되는 중요한 내용들에 대해서는 대부분 다룬것으로 
+		생각된다. 시스템을 분석하는데 많은 도움이 되었으면 한다.  
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

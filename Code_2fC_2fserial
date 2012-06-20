@@ -1,0 +1,155 @@
+----
+ 1. serial
+ 1. serial echo 예제
+ 1. [minzkn]
+ 1. Version 0.1
+ 1. 2005/08/23 
+----
+
+=== 설명 ===
+이것은 간단히 Serial 통신을 하는 예제입니다. 
+serial로부터 받은 데이터를 고스란히 다시 반향하여 보내는 것입니다.
+
+현재 코드는
+{{{#!plain
+port=COM1 ("/dev/ttyS0") 
+baud=9600 
+parity=true 
+stop=1 
+data=8bit 
+}}}
+로 만들어져 있습니다.
+=== 사용방법 ===
+
+=== 코드 ===
+{{{#!plain down:serial.c
+/* 
+  Copyright (C) Information Equipment co.,LTD 
+  All rights reserved. 
+  Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> 
+  CVSTAG="$Header: /usr/local/mutihost/joinc/modules/moniwiki/data/text/RCS/Code_2fC_2fserial,v 1.2 2010/02/06 08:41:38 root Exp root $" 
+*/ 
+
+#include <sys/types.h> 
+#include <sys/time.h> 
+#include <stdio.h> 
+#include <unistd.h> 
+#include <fcntl.h> 
+#include <malloc.h> 
+#include <string.h> 
+#include <memory.h> 
+#include <signal.h> 
+#include <errno.h> 
+#include <termios.h> 
+
+#define mz_dump(m_d,m_s) do{int s_o,s_w,s_i;unsigned char s_b[17];if(((void *)(m_d))!=NULL){s_b[16]='\0';s_o=(int)0;\ 
+while(s_o<(m_s)){s_w=((m_s)-s_o)<16?((m_s)-s_o):16;printf("%08X",s_o);for(s_i=0;s_i<s_w;s_i++){if(s_i==8)printf(" | ");else printf(" ");\ 
+s_b[s_i]=*(((unsigned char *)(m_d))+s_o+s_i);printf("%02X",s_b[s_i]);if((s_b[s_i]&0x80)||(s_b[s_i]<' '))s_b[s_i]='.';}\ 
+while(s_i<16){if(s_i==8)printf("     ");else printf("   ");s_b[s_i]=' ';s_i++;}\ 
+printf(" [%s]\n",(char *)s_b);s_o+=16;}}else printf("error: dump null\n");}while(0) 
+
+int g_mz_break = 0; 
+
+void mz_my_signal(int s_signal) 
+{ 
+ switch(s_signal) 
+ { 
+  case SIGINT: 
+       g_mz_break = 1; 
+       (void)signal(s_signal, mz_my_signal); 
+       break; 
+  default: 
+       (void)printf("unknown signal ! (%d)\n", s_signal); 
+       break; 
+ } 
+} 
+
+int main(void) 
+{ 
+ /* configuration */ 
+ char *s_device_name = "/dev/ttyS0"; 
+ speed_t s_baud = B9600; 
+ tcflag_t s_data_bits = CS8; 
+ int s_parity_bit = 1; 
+
+ int s_handle, s_index, s_check; 
+ struct termios s_prev_termios, s_new_termios; 
+ ssize_t s_read_bytes, s_write_bytes; 
+ struct timeval s_timeval; 
+ fd_set s_fd_in; 
+ unsigned char s_buffer[ 4 << 10 ]; 
+
+ (void)signal(SIGINT, mz_my_signal); 
+
+ s_handle = open(s_device_name, O_RDWR | O_NOCTTY); 
+ if(s_handle != (-1)) 
+ { 
+  if(tcgetattr(s_handle, (struct termios *)(&s_prev_termios)) == 0) 
+  { 
+   (void)memcpy((void *)(&s_new_termios), (void *)(&s_prev_termios), (size_t)sizeof(struct termios)); 
+
+   s_new_termios.c_iflag = IGNBRK | ((s_parity_bit == 0) ? ((tcflag_t)0) : IGNPAR); 
+   s_new_termios.c_oflag = (tcflag_t)0; 
+   s_new_termios.c_cflag = s_data_bits | CLOCAL | CREAD; 
+   s_new_termios.c_lflag = (tcflag_t)0; 
+   for(s_index = 0;s_index < NCCS;s_index++)s_new_termios.c_cc[s_index] = (cc_t)0; 
+   s_new_termios.c_cc[VMIN] = (cc_t)1; 
+   s_new_termios.c_cc[VTIME] = (cc_t)0; 
+
+   if(cfsetispeed((struct termios *)(&s_new_termios), s_baud) == 0 && 
+      cfsetospeed((struct termios *)(&s_new_termios), s_baud) == 0) 
+   { 
+    if(tcsetattr(s_handle, TCSANOW, (struct termios *)(&s_new_termios)) == 0) 
+    { 
+     if(tcflush(s_handle, TCIOFLUSH) == 0) 
+     { 
+      (void)printf("Ready serial\n"); 
+      do 
+      { 
+       FD_ZERO(&s_fd_in); 
+       FD_SET(s_handle, &s_fd_in); 
+       s_timeval.tv_sec = (long)1, s_timeval.tv_usec = (long)0; 
+       s_check = select(s_handle + 1, (fd_set *)(&s_fd_in), (fd_set *)0, (fd_set *)0, (struct timeval *)(&s_timeval)); 
+       if(s_check > 0) 
+       { 
+        s_read_bytes = read(s_handle, (void *)(&s_buffer[0]), (size_t)sizeof(s_buffer)); 
+        if(s_read_bytes > ((ssize_t)0)) 
+        { 
+         (void)printf("recv data %d byte(s) {\n", (int)s_read_bytes); 
+         mz_dump(&s_buffer[0], s_read_bytes); 
+         (void)printf("}\n"); 
+#if 1 /* echo part */ 
+         s_write_bytes = write(s_handle, (void *)(&s_buffer[0]), (size_t)s_read_bytes); 
+         (void)printf("echo %d/%d byte(s)\n", (int)s_write_bytes, (int)s_read_bytes); 
+#endif 
+        } 
+        else if(s_read_bytes == ((ssize_t)0))(void)printf("no data\n"); 
+        else (void)perror("read"); 
+       } 
+       else if(s_check == 0)(void)printf("wait\n"); 
+       else (void)perror("select"); 
+      }while(g_mz_break == 0); 
+      (void)printf("End of serial\n"); 
+     } 
+     else (void)perror("tcflush"); 
+    } 
+    else (void)perror("tcsetattr"); 
+   } 
+   else (void)perror("cfset{i/o}speed"); 
+   if(tcsetattr(s_handle, TCSANOW, (struct termios *)(&s_prev_termios)) != 0)(void)perror("tcsetattr(restore)"); 
+  } 
+  else (void)perror("tcgetattr"); 
+  (void)close(s_handle); 
+ } 
+ else (void)perror("open"); 
+ return(1); 
+} 
+
+/* vim: set expandtab: */ 
+/* End of source */
+}}}
+
+=== 변경사항 ===
+
+==== 2005/08/23 ====
+

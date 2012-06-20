@@ -1,0 +1,81 @@
+#title 웹 성능 측정
+
+== 웹 성능 측정 ==
+reserver proxyserver를 개발했는데, 이에 대한 성능 측정이 필요하게 됐다. 여기 저기 뒤져서 아래의 도구를 찾아냈다.
+  1. apache ab 
+    apache에서 제공하는 성능 측정 도구. 관련 문서도 많고, 이걸 사용해서 테스트 했다는 사람들도 많아서 '''ab'''를 사용해 볼까 했는데, ssl(:12) handshake가 안된다. 쩝. 문서를 찾아봤더니 버그랜다. 개발한 프로그램이 ssl 기반이라서 포기해가로 했다. 언젠가 버그 픽스될지도 모르겠다. -- 2011/4/16일 현재
+  1. httperf
+  1. wget : wget(:12)은 웹 문서를 가져오기 위한 도구로 linux(:12) 사용자들 사이에서 널리 사용하는 기본 웹 도구다. 
+=== wget ===
+wget은 성능 측정도구로 만든 것은 아니지만, 정밀하게 측정할게 아니라면 간단하게 스크립트를 만드는 정도로 성능측정 도구로 사용할 수 있다. wget을 실행하면 아래처럼 문서의 크기와 걸린 시간등의 측정 자료를 내놓는데, 이걸 취합해서 통계 자료로 만들면 된다. 그냥 shell script로 여러개 띄워도 되고, 좀더 정확한 테스트를 하기 원한다면 스레드(:12) 기반의 C(:12) 프로그램을 하나 만들어도 되겠다. 여러개의 스레드를 만들어서 주어진 횟수만큼 wget을 호출하고 그 결과를 모으면 된다.  
+{{{#!plain
+# wget http://ask.joinc.co.kr/index.php
+--2011-04-16 12:36:38--  http://ask.joinc.co.kr/index.php
+Resolving ask.joinc.co.kr... 1.226.82.91
+접속 ask.joinc.co.kr|1.226.82.91|:80... 접속됨.
+HTTP request sent, awaiting response... 200 OK
+Length: unspecified [text/html]
+Saving to: `index.php'
+
+    [ <=>                                                                    ] 71,128      --.-K/s   in 0.05s   
+
+2011-04-16 12:36:38 (1.43 MB/s) - `index.php' saved [71128]
+}}}
+
+약간 정확도가 떨어지긴 하겠지만, 대략 적인 테스트를 하는데 무리는 없다. 
+
+예전에 wget기반으로 성능 측정 시스템을 만든적이 있다. 성능 측정 시스템은 클라이언트 입장에서의 통계자료 뿐만 아니라. 서버 프로그램의 자원측정도 중요한다. 예컨데, 이 정도의 응답 데이터를 전송하기 위해서 서버가 어느 정도의 자원을 필요로 하는지, 혹 메모리 누수 현상은 없는 지 등등이다. 
+
+이 성능 측정 시스템은 웹 기반으로 만들었다. 물론 테스트 서버에는 자원을 정보를 측정하기 위한 시스템 정보 수집용 Agent 프로그램도 설치했다. 측정 시스템은 wget 측정 프로그램을 실행하고, 원격지의 Agent 프로그램을 주기적으로 호출해서 저장하고 RRD(:12)를 이용 그래프를 그리는 식으로 작동했다.
+
+wget이 편한 이유는 cookie 관리가 쉽다는 점. mozilla의 쿠키정보를 가져다 그대로 사용할 수 있다. 쿠키로 세션을 관리하는 페이지를 테스트 한다고 하면, mozilla로 세션을 만든다음에 wget으로 모질라 쿠키파일을 그대로 이용하면 된다. 음.. 쿠키를 sqlite(:12)로 관리하는 군. 
+{{{#!plain
+# wget https://myproxy.co.kr/index.php --load-cookies .mozilla/firefox/njtcsyvm.default/cookies.sqlite --no-check-certificate -O test.html 
+}}}
+테스트 서버는 SSL 기반인데, self-sign 인증서를 사용하고 있다. 이 경우 wget은 검증되지 않은 인증서라고 해서 문서를 읽지 않는데, '''--no-check-certificate''' 옵션으로 사설 인증서를 허용할 수 있다. 
+이 방법도 쓸만하긴 한데, 다시 구축하기 귀찮아서 패스했다. 웹 서비스 개발팀이나 지원팀이라면, 이런 시스템의 구축이 반드시 필요하지 싶다.
+
+예전 구축한 시스템을 대략 정리한 [wiki:Site/QOS/Monitering_Tool/History_Management 문서]를 참고하면 도움이 될지도 모르겠다.
+
+=== apache ab ===
+앞서 언급했듯이 ssl(:12)지원 문제로 선택에서 제외했다. 
+
+=== httperf ===
+httperf다. --num-conns 과 --rate 옵션으로 시간당 연결 갯수를 설정하는 방법을 사용하는데, '''동시에 몇개의 연결을 만들어서 몇 회 HTTP 요청을 하는'''식의 테스트에 익숙했던지라 옵션을 이해하기가 수월하지 않았다. rate는 1초에 몇 개의 접속을 만들것인지 이고, --num-conns는 총 몇개의 접속을 만들것인지이다. 아래는 1초에 100개의 접속을 만들고, 총 1000개의 접속 요청을 하겠다는 얘긴데.. 음.. 익숙하지가 않다.
+
+{{{#!plain
+# httperf --hog --num-conns 1000 --rate 100 --server=myproc.co.kr --uri=/index.php --port=8080 --ssl
+}}}
+
+문제는 세션 Cookie 정보. 분명히 쿠키 설정관련 옵션이 있는데, 도저히 사용할 수가 없다. 내가 머리가 나빠서 그런가. 그래서 그냥 특정 세션 명에 대해서 무조건 패스하도록 서버 프로그램을 수정해버렸다. wget 처럼 모질라 쿠키파일을 그대로 사용하게 했으면 참 좋았을 텐데..
+
+다음은 테스트 결과
+{{{#!plain
+# httperf --hog --num-conns 100 --rate 200 --server=test.co.kr --uri=/index.php 
+httperf --hog --client=0/1 --server=test.co.kr --port=80 --uri=/index.php --rate=200 --send-buffer=4096 --recv-buffer=16384 --num-conns=100 --num-calls=1
+Maximum connect burst length: 1
+
+Total: connections 100 requests 100 replies 100 test-duration 3.081 s
+
+Connection rate: 32.5 conn/s (30.8 ms/conn, <=90 concurrent connections)
+Connection time [ms]: min 268.9 avg 1501.3 max 2600.2 median 1492.5 stddev 691.3
+Connection time [ms]: connect 62.9
+Connection length [replies/conn]: 1.000
+
+Request rate: 32.5 req/s (30.8 ms/req)
+Request size [B]: 77.0
+
+Reply rate [replies/s]: min 0.0 avg 0.0 max 0.0 stddev 0.0 (0 samples)
+Reply time [ms]: response 1246.8 transfer 191.6
+Reply size [B]: header 410.0 content 71128.0 footer 2.0 (total 71540.0)
+Reply status: 1xx=0 2xx=100 3xx=0 4xx=0 5xx=0
+
+CPU time [s]: user 0.25 system 2.82 (user 8.2% system 91.7% total 99.8%)
+Net I/O: 2269.8 KB/s (18.6*10^6 bps)
+
+Errors: total 0 client-timo 0 socket-timo 0 connrefused 0 connreset 0
+Errors: fd-unavail 0 addrunavail 0 ftab-full 0 other 0
+}}}
+중요한 것은 초당 32.5의 요청과 2269.8 KB의 데이터를 처리했다는 것. 
+
+[[Category(15)]]

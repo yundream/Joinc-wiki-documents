@@ -1,0 +1,170 @@
+#title WSAOVERLAPPED 구조체
+
+== WSAOVERLAPPED 구조체 ==
+WSAOVERLAPPED 구조체는 overlapped(중첩) 입출력 연산의 초기화와 이후 작업 완료 루틴 사이에서의 통신수단을 제공한다. WSAOVERLAPPED 구조체는 OVERLAPPED 구조체와 호환된다. 
+
+{{{#!plain
+typedef struct _WSAOVERLAPPED {
+  ULONG_PTR Internal;
+  ULONG_PTR InternalHigh;
+  union {
+    struct {
+      DWORD Offset;
+      DWORD OffsetHigh;
+    } ;
+    PVOID  Pointer;
+  } ;
+  HANDLE    hEvent;
+} WSAOVERLAPPED, *LPWSAOVERLAPPED;
+}}}
+=== 멤버 변수 ===
+  * Internal
+     예비 필드로 중첩 입출력이 실행되는 곳에서 내부적으로 사용한다.
+  * InternalHigh
+     예비 필드로 중첩 입출력이 실행되는 곳에서 내부적으로 사용한다.
+  * Offset
+     서비스 프로바이더를 위해 예약되어 있다.
+  * OffsetHigh
+     서비스 프로바이더를 위해 예약되어 있다.
+  * Pointer
+     서비스 프로바이더를 위해 예약되어 있다.
+  * hEvent
+     중첩 입출력 연산이 완료 루틴이 없는 상태에서 발생했다면 (lpCompletionRoutine이 NULL일 경우), 이 필드는 WSAEVENT 객체나 혹은 NULL을 가져야 한다. 만약 lpCompletionRoutine이 NULL이 아니라면 이 필드는 자유로이 사용할 수 있다.
+
+=== 예제 ===
+{{{#!plain
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdio.h>
+#include <windows.h>
+#pragma comment(lib, "wininet.lib")
+
+int __cdecl main()
+{
+
+    //---------------------------------------------
+    // Declare and initialize variables
+    WSADATA wsaData;
+    WSABUF DataBuf;
+
+    WSAOVERLAPPED Overlapped = { 0 };
+    SOCKET SendToSocket = INVALID_SOCKET;
+
+    struct sockaddr_in RecvAddr;
+    struct sockaddr_in LocalAddr;
+    int RecvAddrSize = sizeof (RecvAddr);
+    int LocalAddrSize = sizeof (LocalAddr);
+
+    int Port = 27015;
+    struct hostent *localHost;
+    char *ip;
+
+    char SendBuf[1024] = "Data buffer to send";
+    int BufLen = 1024;
+    DWORD BytesSent = 0;
+    DWORD Flags = 0;
+
+    int rc, err;
+    int retval = 0;
+
+    //---------------------------------------------
+    // Initialize Winsock
+    // Load Winsock
+    rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (rc != 0) {
+        fprintf(stderr, "Unable to load Winsock: %d\n", rc);
+        return 1;
+    }
+    // Create an event handle and setup an overlapped structure.
+    Overlapped.hEvent = WSACreateEvent();
+    if (Overlapped.hEvent == NULL) {
+        fprintf(stderr, "WSACreateEvent failed: %d\n", WSAGetLastError());
+        WSACleanup();
+        return 1;
+    }
+    //---------------------------------------------
+    // Create a socket for sending data
+    SendToSocket =
+        WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0,
+                  WSA_FLAG_OVERLAPPED);
+    if (SendToSocket == INVALID_SOCKET) {
+        fprintf(stderr, "socket failed: %d\n", WSAGetLastError());
+        WSACloseEvent(Overlapped.hEvent);
+        WSACleanup();
+        return 1;
+    }
+    //---------------------------------------------
+    // Set up the RecvAddr structure with the IP address of
+    // the receiver (in this example case "123.123.123.1")
+    // and the specified port number.
+    RecvAddr.sin_family = AF_INET;
+    RecvAddr.sin_port = htons(Port);
+    RecvAddr.sin_addr.s_addr = inet_addr("123.123.123.1");
+
+    //---------------------------------------------
+    // Set up the LocalAddr structure with the local IP address
+    // and the specified port number.
+    localHost = gethostbyname("");
+    ip = inet_ntoa(*(struct in_addr *) *localHost->h_addr_list);
+
+    LocalAddr.sin_family = AF_INET;
+    LocalAddr.sin_addr.s_addr = inet_addr(ip);
+    LocalAddr.sin_port = htons(Port);
+
+    //---------------------------------------------
+    // Bind the sending socket to the LocalAddr structure
+    // that has the internet address family, local IP address
+    // and specified port number.  
+    rc = bind(SendToSocket, (struct sockaddr *) &LocalAddr, LocalAddrSize);
+    if (rc == SOCKET_ERROR) {
+        fprintf(stderr, "bind failed: %d\n", WSAGetLastError());
+        WSACloseEvent(Overlapped.hEvent);
+        closesocket(SendToSocket);
+        WSACleanup();
+        return 1;
+    }
+    //---------------------------------------------
+    // Send a datagram to the receiver
+    printf("Sending a datagram...\n");
+    DataBuf.len = BufLen;
+    DataBuf.buf = SendBuf;
+    rc = WSASendTo(SendToSocket, &DataBuf, 1,
+                   &BytesSent, Flags, (SOCKADDR *) & RecvAddr,
+                   RecvAddrSize, &Overlapped, NULL);
+
+    if ((rc == SOCKET_ERROR) && (WSA_IO_PENDING != (err = WSAGetLastError()))) {
+        fprintf(stderr, "WSASendTo failed: %d\n", err);
+        WSACloseEvent(Overlapped.hEvent);
+        closesocket(SendToSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    rc = WSAWaitForMultipleEvents(1, &Overlapped.hEvent, TRUE, INFINITE, TRUE);
+    if (rc == WSA_WAIT_FAILED) {
+        fprintf(stderr, "WSAWaitForMultipleEvents failed: %d\n",
+                WSAGetLastError());
+        retval = 1;
+    }
+
+    rc = WSAGetOverlappedResult(SendToSocket, &Overlapped, &BytesSent,
+                                FALSE, &Flags);
+    if (rc == FALSE) {
+        printf("WSASendTo operation failed: %d\n", WSAGetLastError());
+        retval = 1;
+    }
+
+    //---------------------------------------------
+    // When the application is finished sending, close the socket.
+    printf("Finished sending. Closing socket.\n");
+    WSACloseEvent(Overlapped.hEvent);
+    closesocket(SendToSocket);
+    printf("Exiting.\n");
+
+    //---------------------------------------------
+    // Clean up and quit.
+    WSACleanup();
+    return (retval);
+}
+
+}}}

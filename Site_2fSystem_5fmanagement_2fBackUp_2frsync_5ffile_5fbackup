@@ -1,0 +1,185 @@
+#title rsync를 이용한 파일백업
+
+== rsync를 이용한 백업 시스템 구축 ==
+=== rsync 소개 ===
+rsync는 두개의 서로 다른 호스트에 동일하게 존재하는 파일에 대한 비교를 이용해서, 파일을 동기화 시키는 프로그램이다. rsync는 특히 증분백업이나 mirror 시스템을 구축하는데 효율적이다.
+
+rsync는 '''server & client''' 모드로 작동하며, 필요할 경우 server 없이 client로만 사용할 수 도 있다. client만을 가지고 사용할 경우에는 ssh(:12)를 이용한다.
+
+=== 백업시스템 ===
+여기에선는 rsync(:12) client만을 가지고 구축할 것이다. 이 방법의 장점은 ssh(:12)를 이용하기 때문에 백업원본이 존재하는 각 서버에 rsync를 일일이 설치할 필요가 없다는 점이다.
+
+rsync server를 실행시킬 필요가 없는대신에, ssh 자동 로그인 문제가 있는데, 이 문제는 perl의 expect(:12)모듈을 이용해서 해결하기로 했다.
+
+이 백업프로그램은 daemon(:12)모드로 실행이 되며, 실행될때 백업정보를 가진 설정파일을 읽어들인다. 
+
+=== 설정파일 ===
+설정파일은 다음과 같은 정보를 가진다.
+  * source : 백업받을 원본 파일혹은 디렉토리
+  * host : 원본파일을 가지고 있는 호스트 
+  * dest : 백업위치  
+  * user : ssh 로그인 계정(:12)
+  * passwd : 로그인을 위한 패스워드
+  * time : 백업받을 시간
+설정파일 포맷은 다음과 같다.
+{{{#!plain
+[SectionName]
+source=/source/directory
+host=source.host.net
+dest=/dest/directory
+user=backupUser
+passwd=123456
+time=5
+}}}
+
+다음은 설정파일을 읽는 펄 서브루틴이다. [wiki:Site/JPerl/Data_Structures/Hash_of_Hash hash의 hash]로 구현 했다.
+{{{#!plain
+sub getCfg
+{
+  my ($cfgfile) = @_;
+  open(FD, "<$cfgfile");
+  $rSection = "";
+  $idx= 0;
+  %cfgmap=();
+  while($line = <FD>)
+  {
+    if($line =~ /\[[a-zA-Z0-9]+\]/)
+    {
+      $line =~ s/\n|\[|\]//g;
+      push(@cfgSection, $cfgValue);
+      $Section = $line;
+      $rSection = $Section;
+      next;
+    }
+    if($line =~ /[a-zA-Z0-9]+=/)
+    {
+      $line =~ s/\s//g;
+      ($key, $value) = split '=', $line;
+      $cfgmap{$Section}{$key} = $value;
+    }
+  }
+  close(FD);
+  return \%cfgmap;
+}
+}}}
+
+=== Expect를 이용한 자동로그인 ===
+ssh 를 이용하므로 설정파일의 아이디와 패스워드를 읽어들여서, 해당 호스트로 자동으로 로그인을 해야 한다. 이 기능은 perl expect(:12) 모듈을 이용해서 구현했다. 
+
+다음은 이렇게 해서 만들어진 프로그램이다. daemon 서브루틴과 시간을 검사하는 기능이 빠진 불완전한 프로그램이지만, 대략적인 얼개를 유지하고 있으니 필요에 따라 수정해서 사용하는데 문제 없을 거라고 생각된다.
+{{{#!plain
+#!/usr/bin/perl
+# rsync 기반 백업 솔류션
+use Getopt::Std;
+use Expect;
+
+$VERSION="1.0";
+
+$SUC_MESSAGE = "OK ";
+$ERR_MESSAGE = "FAILURE ";
+  
+sub getVersion
+{
+  print "1.0\n";
+}
+
+##############################
+# MAIN
+##############################
+%opts=();
+getopts("vhc:",\%opts);
+
+$cfgfile = "backup.cfg";
+  
+if (defined $opts{v})
+{
+  getVersion();
+  exit 0;
+}
+if (defined $opts{c})
+{ 
+  $cfgfile = $opts{c};
+}   
+  
+#
+# 설정 파일을 읽어들인다. 
+#
+my $cfgmap = getCfg($cfgfile);
+
+# rsync를 이용해서 백업을 수행한다.
+for my $section (keys %$cfgmap)
+{
+
+  rsync($cfgmap{$section}{"host"},
+      $cfgmap{$section}{"user"},
+      $cfgmap{$section}{"passwd"},
+      $cfgmap{$section}{"source"},
+      $cfgmap{$section}{"dest"});
+}
+
+#################
+###### subroutine
+#################
+sub rsync
+{
+  my($host,$user, $passwd, $source, $dest) = @_;
+  my $exp = Expect->spawn("rsync -avz -e ssh $user\@$host:$source $dest");
+  my $time = 10;
+
+  # $exp->log_stdout(0);
+  $exp->expect($timeout,
+      [qr 'password: $' => \&passwd, $passwd],
+      [timeout => \&timeouterr],);
+  if ($exp->exitstatus() == 0)
+  {
+    print "BackUp Success\n";
+  }
+  else
+  {
+    print "BackUp Failure\n";
+  }
+}
+
+sub passwd
+{
+  my $lexp = shift;
+  my ($password) = @_;
+  $lexp->send("$password\n");
+  exp_continue;
+}
+
+sub timeout
+{
+  print "Time Out\n";
+}
+
+sub getCfg
+{
+  my ($cfgfile) = @_;
+  open(FD, "<$cfgfile");
+  $rSection = "";
+  $idx= 0;
+  %cfgmap=();
+  while($line = <FD>)
+  {
+    if($line =~ /\[[a-zA-Z0-9]+\]/)
+    {
+      $line =~ s/\n|\[|\]//g;
+      push(@cfgSection, $cfgValue);
+      $Section = $line;
+      $rSection = $Section;
+      next;
+    }
+    if($line =~ /[a-zA-Z0-9]+=/)
+    {
+      $line =~ s/\s//g;
+      ($key, $value) = split '=', $line;
+      $cfgmap{$Section}{$key} = $value;
+    }
+  }
+  close(FD);
+  return \%cfgmap;
+}
+}}}
+
+[[tag(시스템관리,backup,expect,rsync)]]

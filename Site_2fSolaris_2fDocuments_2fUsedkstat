@@ -1,0 +1,551 @@
+#title kstat를 이용한 시스템 정보 획득 
+
+[[TableOfContents]]
+=== 참고 링크 ===
+ * http://developers.sun.com/solaris/articles/kstatc.html
+
+=== kstat library에 대한 소개 ===
+kstat library 는 '''Solaris'''운영체제에서 커널의 여러가지 통계정보에 접근하기 위한 함수를 제공한다. 이 함수를 이용하면 cpu, memory, 입출력장치(interface, fd, hdd, scsi, nfs와 같은 네트워크 파일시스템)에 대한 상세한 정보들을 얻을 수 있다. 
+
+Linux운영체제의 /proc파일시스템을 통해서 얻을 수 있는 시스템정보들을 kstat 라이브러리를 통해서 얻을 수 있다고 보면 된다.
+
+=== kstat를 통한 커널 정보 수집 ===
+==== kstat 명령을 통한 자원 확인 ====
+Solaris는 시스템정보를 모니터링하기 위한 시스템 관리자를 위한 kstat라는 시스템 명령을 제공한다.
+ * 예를 들어서 cpu 정보를 확인하길 원한다면
+{{{#!plain
+kstat -c misc -m cpu_info
+module: cpu_info                        instance: 0
+name:   cpu_info0                       class:    misc                 
+        chip_id                         0
+        clock_MHz                       900
+        cpu_type                        sparcv9
+        crtime                          52.0145272
+        device_ID                       14466993752290
+        fpu_type                        sparcv9
+        implementation                  UltraSPARC-III+
+        snaptime                        2655206.9366932
+        state                           on-line
+        state_begin                     1113294756
+}}}
+  * cpu 상태의 확인을 원한다면
+{{{#!plain
+bash-2.03# kstat -c misc -m cpu_stat
+module: cpu_stat                        instance: 0
+name:   cpu_stat0                       class:    misc                 
+        anonfree                        0
+        anonpgin                        2
+        anonpgout                       0
+        as_fault                        64729904
+        bawrite                         50410
+        bread                           4583
+        bwrite                          192990
+......
+}}}
+  * '''-c'''는 얻어오고자 하는 시스템 정보의 클래스(카테고리)이다.
+  * '''-m'''은 얻어오고자 하는 모듈이름이다.
+  * 이들 클래스와 모듈값은 실제 kstat관련 함수를 호출할때 동일한 이름으로 사용된다.
+    {{{#!plain
+// cpu_info 모듈에 있는 정보를 접근하기 위한 kstat 포인터를 생성한다.
+if((ksp = kstat_lookup(kc, "cpu_info", i, NULL)) ==NULL)
+     break;
+// cpu_info 모듈의 항목중에 cpu_type 정보를 얻어온다.
+knp = kstat_data_lookup(ksp, "cpu_type");
+}}}
+kstat의 실행결과 출력되는 module와 name와 세부항목들은 kstat lib를 통해서 원하는 값을 가져오기 위한 기준정보가 된다. kstat lib를 통해서 정보를 가져오고 싶을 때, kstat명령을 우선실행해서 필요한 module, name, 세부항목이름을 알고나면 좀더 쉽게 kstat lib를 사용할 수 있을 것이다.
+
+==== kstat 정보 구성 구조 ==== 
+위의 kstat 명령어의 실행결과를 보면 kstat가 어떠한 정보 구성을 가지고 있는지 대략 이해가 가능할 것이다. kstat는 다음과 같은 4단계 디렉토리 구조를 가진다.
+{{{#!plain
+            class      module         name      key  <------> value         
+===================================================================
+kernel  --+--net ----+-- eri ----+--- eri0 --+- bad_pkts     12987201
+kstat     |          |           |           +- brdcstrcv    872019
+구조체    |          |           |           +- brdcstxmt    920
+          |          |           |           +- .....
+          |          |           +--- eri1
+          |          |
+          |          +-- lo -----------------+- ipackets     1320160
+          |                                  +- opackets     1320160
+          |
+          +--disk ---+-- sd -----+--- sd6  --+- read
+                                             +- rtime
+          ......
+}}}
+class는 대항목, module는 소항목, name은 실제 접근하고자 하는 장치의 이름이고, key는 가져오고자 하는 값을 가리키는 성능의 이름이다. 예를들어서 인터페이스 eri0에 입력된 패킷의 byte 정보를 얻기를 원한다면 net > eri > eri0 > rbytes 순으로 접근을 하면 된다.
+
+이러한 접근은 solaris 운영체제에서 제공하는 kstat library(이하 kstatlib)를 이용하게 된다. 
+
+=== 예제 ===
+==== CPU 일반정보 수집 ====
+{{{#!plain
+#include <kstat.h>
+#include <stdio.h>
+#include <inttypes.h>
+#define SLEEPTIME 10
+
+int main(int argc, char **argv)
+{
+  kstat_ctl_t   *kc;
+  kstat_t       *ksp;
+  kstat_io_t     kio;
+  kstat_named_t *knp;
+  unsigned int i;
+
+  kc = kstat_open();
+
+  i = 0;
+  while(1)
+  {
+    if((ksp = kstat_lookup(kc, "cpu_info", i, NULL)) ==NULL)
+      break;
+    kstat_read(kc, ksp, NULL);
+
+    /* lookup the CPU speed data record */
+    knp = kstat_data_lookup(ksp, "clock_MHz");
+    printf("CPU speed of system is %d\n", knp->value.i32);
+
+    /* lookup cpu type */
+    knp = kstat_data_lookup(ksp, "cpu_type");
+    printf("CPU type is %s\n", knp->value.c);
+
+    i++;
+  }
+}
+}}}
+
+=== Kstat Lib 레퍼런스 === 
+==== 소개 ====
+Solaris kernel은 module-specific statistics(특정모듈의 통계정보)를 외부에 보낼 수 있도록 device driver와 다른 kernel 모듈들에 대한 함수와 자료구조(data structure)를 제공한다. kstat 이라 참조되는 이러한 구조는 Solaris software(12) 개발자들에게 다음과 같은 사항을 제공한다.
+ * device driver와 다른 kernel 모듈들을 위한 통계를 보여주는 C-언어 함수
+ * 직접 kernel memory를 읽을 필요없이 application이 Solaris로부터 통계 데이터를 얻어올 수 있는 C-언어 함수
+ * 대화식으로 혹은 쉘 스크립트에서  통계 데이터에 접근할 수 있는 Perl 기반 명령어 라인 프로그램인 /usr/bin/kstat를 제공. (Solaris 8부터 지원)
+ 
+Solaris의 libkstat 라이브러리는 application이 kstats에 접근할 수 있는 C-언어 함수를 가지고 있다. 이들 함수들은 프로그램이 root가 되도록 setuid를 설정해야할 필요를 방지하기위해 kernel 데이터에 대한 보안 인터페이스를 제공하기위해 가상디바이스(pseudo-device)인 /dev/kstat을 사용한다.
+ 
+많은 개발자들이 C 프로그램을 통해 kernel 통계자료에 접근하고 싶어하기 때문에, 이 기사는 libkstat를 사용하는 것에 초점을 둔다. 이 기사는 data structre와 function에 대해서 설명하고, 예제 library를 처음 사용하는 독자들을 위한 샘플 코드를 제공한다.
+
+==== Data Structure Overview ====
+Solaris kernel 통계들은 kstat chain이라는 linked list 자료구조로 구성되어있다. 각각의 kstat은 공통헤더영역(common header section)과 특정 타입별 데이터 영역(type-specific data section)을 가진다. 이 chain은 system boot 시에 초기화 된다. 그러나, Solaris는 동적운영체제(Dynamic OS)이며, 이 chain은 시간의 경과에 따라 계속 변경된다.
+
+kstat의 각 엔트리들은 kernel의 필요에 의해 시스템에 추가되거나 삭제된다. 예를 들면, 동적 재구성(Dynamic Reconfiguration)방식을 사용하여 운영하는 시스템에 I/O board와 board에 붙어있는 component들을 추가하는 경우 새로 장착된 hard ware와 상호작용하는 device driver와 다른 kernel 모듈들이 kstat chain에 kstat entry를 삽입할 것이다.
+ 
+구조체 멤버 ks_data는 kstat의 데이터 섹션을 가리키는 pointer이다. raw, named, timer, interrupt, I/O와 같은 다양한 데이터 타입들(Multiple data types)이 지원된다. 이들은 Data Types.에 설명되어 있다.
+ 
+Example 1 - kstat Header Structure from /usr/include/kstat.h
+{{{#!plain
+ typedef struct kstat {  
+        /*      
+         * Fields relevant to both kernel and user     
+         */    
+        hrtime_t       ks_crtime;               /* creation time */
+        struct kstat  *ks_next;                 /* kstat chain linkage */
+        kid_t          ks_kid;                  /* unique kstat ID */
+        char           ks_module[KSTAT_STRLEN]; /* module name */
+        uchar_t        ks_resv;                 /* reserved */
+        int            ks_instance;             /* module's instance */
+        char           ks_name[KSTAT_STRLEN];   /* kstat name */
+        uchar_t        ks_type;                 /* kstat data type */
+        char           ks_class[KSTAT_STRLEN];  /* kstat class */
+        uchar_t        ks_flags;                /* kstat flags */
+        void          *ks_data;                 /* kstat type-specific data */
+        uint_t         ks_ndata;                /* # of data records */
+        size_t         ks_data_size;            /* size of kstat data section */
+        hrtime_t       ks_snaptime;             /* time of last data snapshot */
+        /*     
+         * Fields relevant to kernel only  
+         */  
+        int (*ks_update)(struct kstat *, int);  
+        void           *ks_private;  
+        int (*ks_snapshot)(struct kstat *, void *, int);  
+        void           *ks_lock;  
+      } kstat_t;
+}}}
+ 
+==== 주요 멤버 ====
+ks_crtime : kstat이 처음 생성된 시간을 나타내고 다양한 kernel counter들이 kstat이 생성된 시간부터의 rate 를 계산하는 것을 허용한다. (“boot 이후” 라는 말은 보다 일반적인 개념에 의해 “kstat 생성 이후”라는 말로 대치된다.) 생성시간, 마지막 snapshot 시간, kstat_timer_t, kstat_io_t 타임스탬프와 같은 kstats와 관련된 시간은 64비트 나노세컨드 값을 갖는다.
+ 
+kstat 타임스탬프의 정확도는 머신(machine)마다 다르지만 정밀도(precision)은 모든 플랫폼에 대해 동일하다. high-resolution 타임스템프에 대한 일반적인 정보는 gethrtime(3C)에 대한 man page를 참조하라.
+
+ks_next : kstat는 NULL-terminated로서 링크드리스트 혹은 chain에 저장된다. ks_next는 chain 내의 다음 kstat을 가리킨다.  
+
+ks_kid : kstat을 식별하는 ID (identifier)이다.
+
+ks_module and ks_instance : kstat을 생성한 module의 이름과 instance 번호를 담고있다. 단 하나의 instance 만 존재하는 경우 ks_instance는 0이다. 더 많은 정보는 kstat Names를 참조하라.
+
+ks_names : kstat에 대하여 의미있는 이름을 부여한다. kstat의 namespace에 대한 추가적인 정보는 kstat Names를 찾아보라
+
+ks_types : kstat에 있는 data들의 type이다. data type들은 Data Types에서 다룬다.
+
+ks_class : 각각의 kstat은 bus, disk, net, vm, misc등과 같은 몇 개의 넓은 class로 구분된다. 이 field는 서로 관련된 kstat들을 꺼내기 위한 필터로써 사용할 수 있다. 다음의 값들이 현재 솔라리스에서 사용되는 것들이다.
+{{{#!plain
+bus
+controller
+device_error
+disk
+hat
+kmem_cache
+kstat
+misc
+net
+nfs
+pages
+partition
+rpc
+ufs
+vm
+vmem
+}}} 
+ks_data, ks_ndata, and ks_data_size : ks_data 는 kstat의 data section을 가리키는 pointer이다. data의 type은 ks_type에 따라 다르게 저장된다. ks_ndata는 data record의 개수를 뜻한다. 몇몇 kstat type들만 다양한(Multiple) data record를 지원한다. 아래의 kstat은 여러개의(multiple) data record를 지원한다.
+{{{#!plain
+KSTAT_TYPE_RAW
+KSTAT_TYPE_NAMED
+KSTAT_TYPE_TIMER
+}}}
+ 아래의 kstat은 하나의(one) data record만을 지원한다.
+{{{#!plain
+KSTAT_TYPE_INER
+KSTAT_TYPE_IO
+}}}
+ks_data_size 는 data section의 total size를 나타내며 byte 단위이다.
+ 
+ks_snaptime : last data snapshot에 대한 timestamp이다.  이것은 아래의 계산식에 기반하여 activity rate를 계산할 수 있다.
+{{{#!plain
+rate = (new_count - old_count) / (new_snaptime - old_snaptime)
+}}}
+
+==== kstat의 사용 ====
+kstat을 사용하기 위해서 program은 첫 번째로 kstat_open()을 호출해야만 한다. 리턴값은 kstat control 구조체의 pointer 이다.
+{{{#!plain
+kstat_open()
+kstat control structure를 가리키는 pointer를 리턴한다.
+}}}
+
+Example 2 - kstat Chain Control Structure
+{{{#!plain
+typedef struct kstat_ctl {    
+       kid_t     kc_chain_id;    /* current kstat chain ID */    
+       kstat_t   *kc_chain;      /* pointer to kstat chain */    
+       int       kc_kd;          /* /dev/kstat descriptor */   
+   } kstat_ctl_t;
+}}}
+kc_chain은 kstat chain의 복사본의 헤더를 가리킨다. 보통 특정 kstat을 찾아 처리하기위해 chain을 순회(walk)하거나 kstat_lookup()을 사용한다. kc_chain_id는 kstat chain의 복사본의 kstat chain을 구분하는 식별자(KCID 라고 하는)이다. 이들(KCID)의 사용법은 kstat Names에서 설명해 놓았다.
+ 
+kstat data에 접속시 불필요한 overhead를 피하기 위하여 program은 kstat chain에서 원하는 정보의 타입을 먼저 검색하고. 그 다음에 kstat_read()와 kstat_data_lookup() 함수를 사용하여 kernel로부터 통계(statistics)자료를 얻어온다.
+ 
+Example 3은 disk I/O에 대한 모든 정보를 담고 있는 kstat entry를 보여주는 code 이다.  이 예는 chain 전체를 검색하여 ks_type이 KSTAT_TYPE_IO인 kstat을 찾고, kstat_read()를 호출하여 data를 가져온 후에 my_io_display()함수를 호출하여 얻어온 data를 처리한다. 이 예제 함수의 구현은 Example 9에서 볼 수 있다.
+
+Example 3 - Print kstat Entries with Disk I/O Information 
+{{{#!plain
+kstat_ctl_t    *kc;  
+kstat_t       *ksp;  
+kstat_io_t     kio;  
+
+kc = kstat_open();  
+
+for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {  
+  if (ksp->ks_type == KSTAT_TYPE_IO) {  
+     kstat_read(kc, ksp, &kio);  
+     my_io_display(kio);  
+  }  
+}  
+}}}
+ 
+==== Data Types ====
+kstat의 data section은 ks_type field에서 식별되는 5가지 type중 하나의 타입을 갖는다. 다음 kstat type들은 여러 개의(multiple) data record를 가지며 record의 개수는 ks_ndata에 들어있다.
+{{{#!plain
+KSTAT_TYPE_RAW
+KSTAT_TYPE_NAMED
+KSTAT_TYPE_TIMER
+}}}
+data section의 전체 사이즈는 ks_data_size 필드에서 알 수 있으며 byte 단위이다.
+ 
+'''KSTAT_TYPE_RAW'''
+raw” kstat type은 byte의 배열(array)로 취급되고 일반적으로 vminfo(/usr/include/sys/sysinfo.h에 정의됨) 같은 well-known structure를 담기(export)위해 사용된다.
+
+Example 4 - Dumping Out a Raw kstat
+{{{#!plain 
+static void print_vminfo(kstat_t *kp)  
+{  
+      vminfo_t *vminfop;  
+      vminfop = (vminfo_t *)(kp->ks_data);  
+   
+      printf("Free memory: %dn", vminfop->freemem);  
+      printf("Swap reserved: %dn" , vminfop->swap_resv);  
+      printf("Swap allocated: %dn" , vminfop->swap_alloc);  
+      printf("Swap available: %dn", vminfop->swap_avail);  
+      printf("Swap free: %dn", vminfop->swap_free);  
+}
+}}}
+ 
+'''KSTAT_TYPE_NAMED'''
+이 kstat type은 임의의 name = value 통계(statistics) 리스트를 저장하고 있다. Example 5는 named kstat을 담기 위해 사용되는 구조체를 보여준다.
+ 
+Example 5 - Named kstat Definitions from /usr/include/kstat.h
+{{{#!plain
+typedef struct kstat_named {  
+     char name[KSTAT_STRLEN];         /* name of counter */  
+     uchar_t data_type;               /* data type */  
+     union {  
+         char c[16];             /* enough for 128-bit ints */  
+         int32_t i32;  
+         uint32_t ui32;  
+         int64_t i64;  
+         uint64_t ui64;  
+         /* These structure members are obsolete */  
+         int32_t l;  
+         uint32_t ul;  
+         int64_t ll;  
+         uint64_t ull;  
+     } value;                  /* value of counter */  
+ } kstat_named_t;  
+   #define KSTAT_DATA_CHAR       0  
+   #define KSTAT_DATA_INT32      1  
+   #define KSTAT_DATA_UINT32     2  
+   #define KSTAT_DATA_INT64      3  
+   #define KSTAT_DATA_UINT64     4  
+   /* These types are obsolete */  
+   #define KSTAT_DATA_LONG       1  
+   #define KSTAT_DATA_ULONG      2  
+   #define KSTAT_DATA_LONGLONG   3  
+   #define KSTAT_DATA_ULONGLONG  4  
+   #define KSTAT_DATA_FLOAT      5  
+   #define KSTAT_DATA_DOUBLE     6 
+}}}
+Example 9에서는 프로그램이 named kstat들을 출력하는 방법을 보여주기 위해 my_named_display()함수의 사용법을 보여준다.
+ 
+<!> 만일 type이 KSTAT_DATA_CHAR 이라 하더라도, 16바이트 value field(즉, char 배열이)이null-terminated된다고 보증할 수 없다. printf()와 같은 함수로 value를 출력할 때 상기해야 하므로 이 사실은 중요하다. 
+ 
+'''KSTAT_TYPE_TIMER'''
+이 type의 kstat은 event timer에 대한 통계를 갖는다. 이들은 어떠한 타입의 event에 대해서도 기본적인 counting과 timing에 대한 정보를 제공한다.
+{{{#!plain
+ Example 6 - Timer kstat Definitions from /usr/include/kstat.h
+ typedef struct kstat_timer {  
+     char name[KSTAT_STRLEN];         /* event name */  
+     uchar_t resv;                    /* reserved */  
+     u_longlong_t num_events;         /* number of events */      
+     hrtime_t elapsed_time;           /* cumulative elapsed time */  
+     hrtime_t min_time;               /* shortest event duration */  
+     hrtime_t max_time;               /* longest event duration */  
+     hrtime_t start_time;             /* previous event start time */  
+     hrtime_t stop_time;              /* previous event stop time */  
+ } kstat_timer_t;
+ }}}
+ 
+ '''KSTAT_TYPE_INTR'''
+이 type의 kstat은 interrupt 통계(statistics)정보이다. interrupts 는 아래와 같이 분류된다.
+|| Interrupt Type   || Definition     ||
+|| Hard                  || 하드웨어 장치에 의해 발생 ||
+|| Soft                   || 몇몇 시스템 인터럽트 source의한 시스템 자체가 발생하는 인터럽트 ||
+|| Watching           || 주기적인 timer call에 의해 발생하는 인터럽트    ||
+|| Spurious            || 인터럽트 엔트리 포인트에 들어가지만 service할 인터럽트는 없다 ||
+|| Multiple Service  || 다른 타입의 인터럽트처리를 마치기 전에 인터럽트가 먼저 감지되고 서비스됨 ||
+ 
+{{{#!plain
+Example 7 - Interrupt kstat Definitions from /usr/include/kstat.h
+#define KSTAT_INTR_HARD      0   
+#define KSTAT_INTR_SOFT      1   
+#define KSTAT_INTR_WATCHDOG  2   
+#define KSTAT_INTR_SPURIOUS  3   
+#define KSTAT_INTR_MULTSVC   4   
+#define KSTAT_NUM_INTRS      5   
+typedef struct kstat_intr {           
+    uint_t intrs[KSTAT_NUM_INTRS]; /* interrupt counters */   
+} kstat_intr_t;
+}}}
+ 
+'''KSTAT_TYPE_IO'''
+Example 8 - I/O kstat Definitions from /usr/include/kstat.h
+{{{#!plain
+typedef struct kstat_io {  
+/*  
+  * Basic counters.  
+  */  
+  u_longlong_t nread;    /* number of bytes read */  
+  u_longlong_t nwritten; /* number of bytes written */  
+  uint_t       reads;    /* number of read operations */  
+  uint_t       writes;   /* number of write operations */  
+  hrtime_t wtime;           /* cumulative wait (pre-service) time */  
+  hrtime_t wlentime;        /* cumulative wait length*time product*/  
+  hrtime_t wlastupdate;     /* last time wait queue changed */  
+  hrtime_t rtime;           /* cumulative run (service) time */  
+  hrtime_t rlentime;        /* cumulative run length*time product */  
+  hrtime_t rlastupdate;     /* last time run queue changed */  
+  uint_t wcnt;              /* count of elements in wait state */  
+  uint_t rcnt;              /* count of elements in run state */  
+} kstat_io_t;
+}}} 
+
+==== Accumulated Time and Queue Length Statistics ====
+Time 통계(statistics)는 “active”time의 실행시간을 전부 더하여 구한다. Queue length statistics는 큐의 길이와 그 길이가 유지된 시간을 곱한 값의 총합으로 얻는다. 다시말해, Queue length를 time에 대하여 적분한 Riemann sum인 것이다. 각각의 상태(queue 에 들어가거나 queue 밖으로 나가거나 하는)가 변할 때 마다 이전 상태의 변화로부터 경과된 시간이 active time에 더해진다.(만일 그 시간 동안 queue length가 0이 아니라면) 
+ 
+경과된 시간과 queue length의 곱은 시간과 곱해진 길이(length)의 합에 더해진다. 프롤그래밍 적으로 말한다면
+{{{#!plain
+Stated programmatically: 
+ 
+if (queue length != 0) {  
+    time += elapsed time since last state change;  
+    lentime +=  (elapsed time since last state change * queue length);  
+}
+}}}
+이 방법은 queue length 대신 어떤 정의된 시스템(any define system)에서 residecy를 측정하는 일반화된 방법이 될 수 있다. 큐 길이(Queue length)대신에 “outstanding RPC calls to server X”를 생각해보자. 다수의 I/O subsystem들이 그들이 관리하는 최소한 2개의 기본적인 transaction list를 가진다.
+ 1. 처리(processing)가 시작되진 않았지만 처리되기 위해 Accept된 트랜젝션 리스트.
+ 1. 처리(proccessing)가 완료되지 않은 현재 처리중인 트랜잭션 리스트
+이런한 이유로 두 개의 누적 time 통계가 정의 된다.
+ 1. Pre-service time
+ 1. Service (run) time 
+각각의 누적시간은 nanoseconds 로 연산된다.
+ 
+'''Kstat Names'''
+kstat namespace는 kstat 구조체에서 3개의 field로 정의된다.
+{{{#!plain
+ks_module
+ks_instance
+ks_name
+}}}
+이 세 field의 조합은 유일성을 보장받는다.
+ 
+예를 들어 4개의 FastEthernet 카드를 장착한 시스템을 생각해보라.  Sun의 FastEthernet 컨트롤러를 위한 device driver module은 “hme"라 불린다. 첫 번째 이더넷 인터페이스는 instance0, 두 번째는 instance1, ... 이다. "hme" driver는 각 인터페이스마다 2가지 타입의 kstat을 제공한다.
+   1. 첫 번째는 성능 통계(performancce statistics)를 포함하는 named kstat이고
+   1. 두 번째는 interrupt 통계(statistics)를 포함한다.
+ 
+첫 번째 interface의 network 통계에 대한 kstat data는 ks_module == "hme", ks_instance == 0, ks_name == "hme0"에서 찾을 수 있다. interrupt 통계는 ks_module == "hme", ks_instance == 0, ks_name == "hmec0" 에 의해 식별되는 kstat에서 찾을 수 있다.
+ 
+이 Example에서 ks_name 필드(“hme0" and "hmec0”)를 만들기 위한 module 이름과 instance 번호의 조합이 드라이버의 이름 생성법이다. 다른 device driver들도 여러개의 kstat data type들을 생성하기 위해 유사한 명명법을 사용하지만 반드시 요구되지는 않는다. 이 모듈은 그 조합이 유일해야한다.
+ 
+kernel이 어떤 kstat을 제공하는지 알 수 있는 방법은 무엇인가?
+ 
+가장 쉬운 방법은 ,Solaris 8의 경우에, /usr/bin/kstat을 인자 없이 실행하는 것이다. 이 방법은 현재의 거의 모든 kstat data를 출력할 것이다. Solaris의 kstat 명령은 거의 모든 알려진 KSTAT_TYPE_RAW 타입의 kstat를 출력할 것이다.
+ Functions
+ 
+다음의 함수들은 kstat data에 접근하기위해 C program에서 사용된다
+{{{#!plain
+kstat_ctl_t *kstat_open(void);
+    : 커널 통계 라이브러리 (kernel statistics library)에 대한 접근하는 kstat 제어 구조체를 초기화한다.
+ 
+리턴값 : libkstat 함수에 kc argument로 들어가는 kstat_ctl_t 구조체에 대한 pointer를 리턴 한다.
+   ex)
+        kstat_ctl_t kc;
+        kc = kstat_open();
+kstat_t *kstat_lookup(kstat_ctl_t *kc, char *ks_module, int ks_instance, char *ks_name)
+    : 인자로 들어가는 ks_module, ks_instance, ks_name을 알아내기 위해 kstat의 kstat chain을 검색 한다.
+}}}
+ 
+만일, ks_module가 NULL, ks_instance가 -1, ks_name 이 NULL 이면 이 field들은 캐무시한다. 예를 들어 kstat_lookup(kc, NULL, -1, "foo")는 단순히 “foo”라는 name을 갖는 kstat chain을 찾을 것이다. 
+ 
+void *kstat_data_lookup(kstat_t *ksp, char *name) : kstat data section에서 주어진 이름(name)을 가진 data record를 찾는다.
+이 operation은 named data record를 가진 kstat type들에 대해서만 효과적이다. 현재 KSTAT_TYPE_NAMED와 KSATA_TYPE_TIMER type의 kstat들 만이 named data record를 가지고 있다. 당신은 kernel로부터 data를 얻기 위해서는 kstat_read()를 가장 먼저 호출해야만 한다. 이러한 routine이후에 data section에서 특정 data record를 찾는다.
+  * kid_t kstat_read(kstat_ctl_t *kc, kstat_t *ksp, void *buf) : 특정 kstat의 data를 kernel로부터 얻는 함수.
+  * kid_t kstat_write(kstat_ctl_t *kc, kstat_t *ksp, void *buf) : kernel 내부의 특정 kstat에 data를 쓰는 함수. 단 superuser만이 이 함수를 사용할 수 있다.
+  * kid_t kstat_chain_update(kstat_ctl_t *kc) : kernel의 header와 동기화된 사용자의 kstat header chain을 가져온다
+  * int kstat_close(kstat_ctl_t *kc) : kstat control 구조체와 연관된 모든 자원을 해제한다.  이것은 exit(2)와 execve()하면 자동으로 수행된다. 보다 많은 자료는 exit(2)와 execve(), exec(2)의 man page를 참고하라.
+ 
+==== Dealing with Chain Update ====
+Data Structure Overview에서 언급했듯이, kstat chain은 시간의 경과에 따라 동적으로 변화한다. libkstat 라이브러리 함수 kstat_open()은 kernel의 kstat chain의 복사본을 리턴한다. kernel의 kstat chain()의 data는 바뀔 수 있으므로, 당신의 program은 당신의 kstat chain 복사본의 내용이 kernel의 kstat chain과 일치하는지 알아보기 위하여 적절한 때에 kstat_chain_update()를 호출 해야한다. 이 것이 kstat 제어 구조체에 있는 kn_chain_in에 저장된 KCID의 목적이다.
+ 
+kernel module이 system의 chain으로부터 kstat을 더하거나 삭제할 때마다 KCID는 증가된다. 당신의 program이 kstat_chain_update()를 호출하면 이 함수는 당신 program의 control structure에 있는 kc_chain_id가 kernel에 있는 것 과 match하는지 체크한다(즉, 사용자의 KCID와 커널의 KCID가 같은지 비교한다.) 만일 kc_chain_id(KCID)가 일치하지 않는다면 kc_chain_update()는 program의 local kstat을 커널과 일치하도록 rebuild 하고 아래의 값을 return 한다.
+{{{#!plain
+    - kc_chain_update()의 리턴 값
+          chain이 update 될 경우 새로운 KCID 생성
+          chain에 변화가 없다면 0
+          어떠한 error가 탐지된다면 -1
+}}}
+만일 당신의 program이 이전에 호출한 kstat library 함수의 어떤 값(local data)을 저장(cache)하고 있다면 새로운 KCID는 당신이 최신의(up-to-date) infomation을 가지고 있음을 가리키는 flag로서 역할을 할 것이다. 당신은 당신의 program에 필요한 data가 추가되거나 삭제되었는지 알아보기 위해다시 chain을 검사할 수 있다.
+ 
+실제적인 예로 iostat이라는 command가 있다.  이것은 시스템 내의 disk에 대한 내부적인 정보(internal data)를 저장하고 있다가 disk가 on-line 혹은 off-line 되었는지 인식해야할 필요가 있다. 만일 iostat가 interval argument와 함께 호출된다면 iostat은 주어진 매번 interval second 마다 I/O통계를 출력할 것이다. loop를 통한 각 time별로 어떤 변화가 있는지 알아보기 위하여 iostat은 kstat_chain_update()를 호출한다. 만일 변화가 있다면 device는 추가 혹은 삭제는지 파악한다.
+ 
+==== Putting It All Together ====
+당신의 C Program은 다음을 포함해야만 한다.
+{{{#!plain 
+ #include <kstat.h>
+}}}
+프로그램이 lingking될 때 컴파일러 명령라인은 "-lkstat" 인자를 포함해야만 한다.
+{{{#!plain 
+cc -o print_some_kstats -lkstat print_some_kstats.c
+}}}
+ 
+다음은 짧은 예제 Program이다. 첫째, 프로그램은 kstat_lookup() 와 kstat_read()을 사용하여 system의 CPU speed를 알아낸다. 그리고 무한 루프(infinite loop)를 돌며 KSTAT_TYPE_IO 타입의 모든 kstat에 대한 정보를 얼마간 출력한다. 루프의 머리에서 당신이 current data를 가지고 있는지 체크하기 위해 kstat_chain_update()를 호출한 것에 대해 인지하라. 만일 kstat chain이 변경되었다면 stderr을 통해 짧은 message를 줄 것이다. 
+{{{#!plain
+ Example 9 - Sample Program to Print kstats of Different Types 
+ /*  print_some_kstats.c:  
+ *  print out a couple of interesting things  
+ */  
+ #include <kstat.h>  
+ #include <stdio.h>
+ #include <inttypes.h>
+ #define SLEEPTIME 10  
+   
+ void my_named_display(char *, char *, kstat_named_t *);  
+ void my_io_display(char *, char *, kstat_io_t);  
+   
+ main(int argc, char **argv)  
+ {  
+      kstat_ctl_t   *kc;  
+      kstat_t       *ksp;  
+      kstat_io_t     kio;  
+      kstat_named_t *knp;  
+   
+      kc = kstat_open();  
+   
+      /*  
+       * Print out the CPU speed. We make two assumptions here:  
+       * 1) All CPUs are the same speed, so we'll just search for the  
+       *    first one;  
+       * 2) At least one CPU is online, so our search will always  
+       *    find something. :)  
+       */  
+      ksp = kstat_lookup(kc, "cpu_info", -1, NULL);  
+      kstat_read(kc, ksp, NULL);  
+      /* lookup the CPU speed data record */  
+      knp = kstat_data_lookup(ksp, "clock_MHz");   
+      printf("CPU speed of system is ");  
+      my_named_display(ksp->ks_name, ksp->ks_class, knp);  
+      printf("n");  
+   
+      /* dump some info about all I/O kstats every  
+         SLEEPTIME seconds  */  
+      while(1) {  
+         /* make sure we have current data */  
+          if(kstat_chain_update(kc))  
+              fprintf(stderr, "<<State Changed>>n");   
+          for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {  
+            if (ksp->ks_type == KSTAT_TYPE_IO) {  
+               kstat_read(kc, ksp, &kio);  
+               my_io_display(ksp->ks_name, ksp->ks_class, kio);  
+            }  
+          }  
+          sleep(SLEEPTIME);  
+      } /* while(1) */  
+   
+ }  
+   
+ void my_io_display(char *devname, char *class, kstat_io_t k)  
+ {  
+      printf("Name: %s Class:   
+      printf("tnumber of bytes read   
+      printf("tnumber of bytes written   
+      printf("tnumber of read operations   
+      printf("tnumber of write operations   
+ }  
+   
+ void   
+ my_named_display(char *devname, char *class, kstat_named_t *knp)  
+ {  
+      switch(knp->data_type) {  
+      case KSTAT_DATA_CHAR:  
+           printf("%.16s",knp->value.c);  
+           break;  
+      case KSTAT_DATA_INT32:  
+           printf("%" PRId32,knp->value.i32);  
+           break;  
+      case KSTAT_DATA_UINT32:  
+           printf("%" PRIu32,knp->value.ui32);  
+           break;  
+      case KSTAT_DATA_INT64:  
+           printf("%" PRId64,knp->value.i64);  
+           break;  
+      case KSTAT_DATA_UINT64:  
+           printf("%" PRIu64,knp->value.ui64);  
+     }  
+ }
+}}}

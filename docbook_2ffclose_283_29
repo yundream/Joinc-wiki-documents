@@ -1,0 +1,163 @@
+#title fclose(3) 
+[wiki:function_fclose(3) HTML 변환문서]
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/01/03           -->
+<!-- 연락처 : dreamyun@yahoo.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>fclose(3)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	열린 파일 스트림(stream)을 닫는다.
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+
+int fclose(FILE *stream);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		fclose()함수는 <emphasis>stream</emphasis>으로 연결되어 있는 파일의 스트림
+		연결을 끊는다. 만약 닫고자 하는 스트림이 출력을 위해 열려져있던 스트림이라면 
+		fflush(3)를 이용해서 버퍼에 있는 데이터를 모두 써야 한다.   
+		<note>
+			<para>
+			만약 닫혀진 <emphasis>stream</emphasis>에 대해서 fclose()가 다시 한번 실행된다면 
+			어떤일이 일어날지 알 수 없다. 세그멘테이션 오류로 종료할 수도 있고, 그렇지 않고 
+			계속 작동할 수도 있다. 프로그래밍을 할 때는 이점에 주의해야 한다. 
+			</para>
+		</note>
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공하면 0을 리턴한다. 실패했을 경우는 <emphasis>EOF</emphasis>를 리턴하고 errno를 
+		설정한다.
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EBADF</term>	
+			<listitem>
+				<para>	
+					잘못 연결된 <emphasis>stream</emphasis>이다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main(int argc, char **argv)
+{
+    FILE *fp = NULL;
+    char buff[256];
+
+    if ((fp = fopen("flock.c", "r")) == NULL)
+    {
+        perror("open error");
+        exit(1);
+    }
+
+    while(fgets(buff, 255, fp))
+    {
+        printf("%s", buff);
+    }
+
+    if (fclose(fp) != 0)
+    {
+        perror("close error 1");
+        exit(0);
+    }
+    if (fclose(fp) != 0)
+    {
+        perror("close error 2");
+        exit(0);
+    }
+}
+		</screen>
+		위 코드는 fclose()를 두번 호출하고 있다. 아마도 두번째 호출에서 문제가 
+		발생할 것이다. 필자의 리눅스 박스에서는 세그멘테이션 오류가 발생하면서 
+		프로그램이 종료되었다. 
+	</para>
+	<para>
+		위의 문제를 해결하기 위해서 다음과 같은 매크로 함수를 만들었다.   
+		<screen>
+#define Fclose(a) if (a != NULL) \
+{\
+    fclose(a); \
+    a = NULL; \
+}
+		</screen>
+		위의 함수는 fclose()를 호출하기 전에 우선 스트림이 NULL인지를 확인하고 NULL이라면 
+		이미 닫혀진 스트림으로 가정하고 그냥 넘어간다. 만약 NULL이 아니라면 열려있는 
+		스트림이라고 판단하고 fclose()를 호출한다. fclose()를 호출한 후에 닫혀진 스트림이라는
+		걸 확인시키기 위해서 스트림이 NULL을 가르키도록 한다.   
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fopen%283%29">fopen(3)</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fflush%283%29">fflush(3)</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_fdopen%283%29">fdopen(3)</ulink>
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=43">stdio.h 사용하기</ulink>
+				</para>
+			</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}
+
+== 변경사항 ==

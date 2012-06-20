@@ -1,0 +1,635 @@
+#title Getting Started With Erlang 2장 Sequential Programming
+
+[[TableOfContents]]
+== Sequential Programming ==
+이번장은 Erlang(:12)프로그래밍언어의 대략적인 모습을 보여줄 목적으로 만들어졌다.
+
+몇개의 문서를 놓고 공부하면서 만들어진 문서들이라 순서들이 매끄럽지 못할 수 있다. 또한 용어선택에 그리 신중을 기하지 않았다. 그래도 대략 읽기에 큰 문제는 없으리라 생각된다.
+
+=== Erlang Shell ===
+Unix, Linux(:12), windows를 포함한 모든 운영체제는 명령어해석기 - command interpreter - 혹은 shell(:12)을 가진다. Erlang도 Erlang 코드의 입력과 실행을 위한 자체의 shell(:12)을 가진다. 이 Erl shell을 이용하면, 즉시 코드를 입력하고 그 결과를 확인할 수 있다. erl shell은 운영체제의 쉘에서 '''erl'''을 입력하는 걸로 실행시킬 수 있다.
+{{{#!plain
+$ erl
+Erlang (BEAM) emulator version 5.6.3 [source] [async-threads:0] [hipe] [kernel-poll:false]
+
+Eshell V5.6.3  (abort with ^G)
+1> 
+}}}
+이제 "2+5."를 입력해서 그 결과를 보도록 하자.
+{{{#!plain
+1> 2+5.
+7
+2> 
+}}}
+
+윈도우에서는 Erlang shell을 더블클릭 하는 것으로 실행할 수 있다고 한다. 어물쩍 넘어가는 이유는 이 문서가 순전히 리눅스 환경을 기준으로 작성되기 때문이다. 이하 윈도우는 고려하지 않고 다룰 것이다.
+
+Erlang shell은 각 줄에 '''1> 2>'''와 같이 라인번호를 가지고 있다. Erlang은 코드가 완성되었다는 것을 '''.'''을 통해서 알려준다. '''.'''이 carriage return의 역할을 하는 셈이다. 다른 종류의 shell들과 마찬가지로 백스페이스를 이용한 문장의 수정도 가능하다. 이외에 다른 편집명령을 알고 싶다면, erlang 메뉴얼 문서를 참고하기 바란다.
+
+이제 좀더 복잡한 계산을 해보도록 하자.
+{{{#!plain
+2> (42+77) * 66 / 3.
+2618.0
+}}}
+괄호와 곱셈, 나눗셈등의 일반적인 연산자들을 사용할 수 있음을 알 수 있다.
+
+'''Ctrl+C'''를 입력하면 Erlang 시스템을 종료할 수 있다. 키를 입력하면 다음과 같은 내용들이 출력된다.
+{{{#!plain
+BREAK: (a)bort (c)ontinue (p)roc info (i)nfo (l)oaded
+       (v)ersion (k)ill (D)b-tables (d)istribution
+a
+# 
+}}}
+여기에서 "a"를 입력하면 Erlang를 종료한다.
+
+Erlang를 종료하는 다른방법으로 halt()를 입력하는 방법이 있다. 마지막에 '''.'''을 입력하는 건 잊지 말도록 하자.
+{{{#!plain
+3> halt().
+#
+}}}
+
+=== 모듈과 함수 ===
+많은 프로그래밍 언어들이 쉘로부터 코드를 직접입력하는 방법외에도 외부로 부터 코드를 불러오는 방법을 사용한다. 보통은 함수들의 모음을 파일로 저장하고, 이 파일들을 불러온다. 그럼 간단한 함수를 포함한 Erlang 파일을 만들고 이를 읽어들이도록 해보자. '''tut.erl''이라는 파일을 만들도록 한다. 이 파일은 다음과 같은 내용을 포함한다. 
+{{{#!plain
+-module(tut).
+-export([double/1]).
+
+double(X) ->
+  2 * X.
+}}}
+이 파일은 double 라는 함수를 포함하는데, 주어진 수에 2를 곱한 값을 리턴한다. 이제 tut.erl 을 컴파일 해보자.  
+{{{#!plain
+1> c(tut).
+{ok,tut}
+}}}
+{ok,tut}는 컴파일을 성공적으로 마쳤음을 의미한다. 실해할경우 "error"를 출력할 것이다.  
+
+이제 컴파일된 프로그램을 실행시켜보도록 하자.
+{{{#!plain
+2> tut:double(20).
+40
+}}}
+
+20에 2를 곱한 값 40이 출력되었음을 알 수 있다.
+
+이제 tut.erl의 코드를 분석해보기로 하자. 
+{{{#!plain
+-module(tut).
+}}}
+모듈의 이름을 '''tut'''로 하겠다는 의미다. '''.'''은 라인의 끝을 의미한다. 모듈이름은 반드시 모듈을 포함하는 파일의 이름 - 확장자 .erl을 제외한 - 과 같아야 한다. 여기에서 파일의 이름을 tut.erl 로 했으므로 모듈의 이름도 tut가 되어야 한다. 모듈이 포함한 함수는 '''module_name:function_name(arguments)'''형식으로 호출할 수 있다. 이제 다음 코드가 이해갈 것이다. 
+{{{#!plain
+2> tut:double(20).
+}}}
+tut 모듈의 double 함수를 인자 20을 줘서 호출하겠다는 의미다.
+
+'''tut.erl'''의 두번째 줄을 보자.
+{{{#!plain
+-export([double/1]).
+}}}
+이것은 tut 모듈이 double라는 함수를 포함하고 있음을 알려준다. 뒤에 1은 double함수가 하나의 인자를 가지고 있음을 명시한다.
+
+이제 좀더 복잡한 함수를 포함한 모듈을 만들어 보도록 하자. 모듈명은 tut1으로 하겠다. 이 모듈은 factorial 함수를 포함한다.
+{{{#!plain
+-module(tut1).
+-export([fac/1]).
+
+fac(1)->
+	1;
+fac(N)->
+	N * fac(N-1).
+}}}
+
+모듈을 컴파일 한다.
+{{{#!plain
+2> c(tut1).
+{ok,tut1}
+}}}
+
+이제 5에 대한 팩토리얼을 계산해보도록 하자.
+{{{#!plain
+3> tut1:fac(5).
+120
+}}}
+
+다음 라인을 보자.
+{{{#!plain
+fac(1)->
+	1;
+}}}
+이것은 1팩토리얼이 1임을 의미한다. 
+
+다음줄이다.
+{{{#!plain
+fac(N)->
+	N * fac(N-1).
+}}}
+N 에 (N-1)을 곱한다. 이 함수는 fac에 1이 인자로 넘어갈때까지 재귀호출됨을 알 수 있다.
+
+이제 tut1 모듈에 두개의 함수를 정의해보도록 하자.
+{{{#!plain
+-module(tut1).
+-export([fac/1, mult/2]).
+
+fac(1) ->
+        1;
+fac(N) ->
+        N * fac(N-1).
+
+mult(X, Y)->
+        X * Y.
+}}}
+2개의 인자를 가지는 mult 라는 함수가 추가 되었다. 
+
+complie:
+{{{#!plain
+3> c(tut1).
+{ok,tut1}
+}}}
+
+함수를 실행:
+{{{#!plain
+4> tut1:mult(21,31).
+651
+}}}
+
+=== Pattern Matching ===
+여기에서 말하는 패턴매칭(:12)이란 Perl등에서 사용되는 정규표현(:12)식에 따른 패턴매칭이 아니라는 걸 먼저 확실히하고 넘어갈 필요가 있을 것 같다.
+
+Erlang에서 말하는 패턴매칭이란 수학에서 변수와 값을 매칭시킨다라는 개념으로 이해해야 한다. 이것은 매우 큰차이다. 다음 식을 보자.  
+{{{#!plain
+X = 1+2
+}}}
+C에서라면 1+2의 결과가 X에 assigned(할당)된다로 해석이 된다. 그러나 Erlang는 '''우항과 좌항이 같다'''즉 매칭된다로 해석이 된다. 
+
+아래와 같은 코드가 있다고 가정해보자 C에서라면 문제가 될리가 없지만 Erlang에서는 문제가 된다.
+{{{#!plain
+X = 1+2
+X = 5
+}}}
+C에서야 값의 할당이기 때문에 문제가 없지만, 수학적 관점에서 보자면 X가 3이면서 또한 X가 5인 경우라는 건 있을 수 없는 일이기 때문이다. Erlang Shell에서 직접 테스트 해보자.
+{{{#!plain
+1> X=1+2.
+3
+2> X=5.
+** exception error: no match of right hand side value 5
+}}}
+matching 에러가 떨어지는 것을 확인할 수 있다.
+
+Erlang가 수학과 마찬가지로 single assignment language이기 때문으로 하나의 값은 반드시 하나의 변수와 매칭이 되며, 일단 매칭이 되면 그 값은 바꿀 수 없다. 즉 Erlang은 C, C++, Java, Perl 에서의 할당개념이 없다. 
+
+==== 함수 호출에서의 패턴 매칭 ====
+간단한 온도변환 프로그램을 이용해서 패턴매칭에 대해서 알아보도록 하자. 이 프로그램은 fahrenheit -화씨-, celsius -섭씨-, Reaumur -열씨-에 대한 온도변환 프로그램이다.
+
+다음은 온도변환과 관련된 함수를 담고 있는 모듈이다.
+{{{#!plain
+-module(temp).
+-export([convert/2]).
+convert({fahrenheit, Temp}, celsius) ->
+	{celsius, 5 * (Temp - 32) / 9};
+convert({celsius, Temp}, fahrenheit) ->
+	{farenheit, 32 + Temp * 9 / 5};
+convert({reaumur, Temp}, celsius) ->
+	{celsius, 10 * Temp / 8};
+convert({celsius, Temp}, reaumur) ->
+	{reaumur, 8 * Temp / 10};
+convert({X, _}, Y) ->
+	{cannot,convert,X,to,Y}.
+}}}
+
+convert가 호출되면, 각 인자의 패턴과 함수의 패턴을 검사해도 일치되는 함수를 실행한다. 매칭되는 함수를 발견하면 '->'이후의 코드를 수행한다.
+{{{#!plain
+2> temp:convert({fahrenheit, 98.6}, celsius).
+{celsius,37.0}
+3> temp:convert({reaumur, 80}, celsius).     
+{celsius,100.0}
+4> temp:convert({reaumur, 80}, fahrenheit).
+{cannot,convert,reaumur,to,fahrenheit}
+}}}
+
+==== match 연산자 "=" ====
+Erlang에서의 "="는 다른언어에서의 대입이 아닌 패턴매칭을 위해서 사용된다. 사용은  '''Pattern = Expression''' 형식을 따른다.
+{{{#!plain
+5> N = {12, banana}.
+{12,banana}
+6> {A, B} = N.
+{12,banana}
+7> A.
+12
+8> B.
+banana
+9> 
+}}}
+
+match 연산자는 복잡한 데이터구조를 unpack 하기 위해서 사용할 수 있다.
+{{{#!plain
+2> {A, B} = {[1,2,3], {x,y}}.
+{[1,2,3],{x,y}}
+3> A.
+[1,2,3]
+4> B.
+{x,y}
+5> {_,L,_}={fred,{likes, [wine, women, song]},
+     {drinks, [whisky, beer]}}.
+{fred,{likes,[wine,women,song]},{drinks,[whisky,beer]}}
+6> L.
+{likes,[wine,women,song]}
+7> 
+}}}
+
+=== 데이터 타입 ===
+erlang는 다음의 데이터 타입들을 지원한다. 
+
+'''Constant''' 데이터 타입
+  * Numbers : Integers, Floats
+  * Atoms
+  * Pids : 프로세스 이름을 저장.
+  * References : 시스템에서 유일한 레퍼런스를 저장.
+
+'''Compound''' 데이터타입
+  * Tuples
+  * List
+
+==== Number ====
+숫자는 다음과 같이 사용할 수 있다.
+{{{#!plain
+   123 -34567 12.345 -27.45e-05
+}}}
+
+$<Char>를 이용하면 문자(character)의 ASCII(:12)값을 얻어올수 있다. 예를들어 $A라면 65가 된다.
+
+<Base>#<Value>를 이용해서 10진수 이외의 표현도 가능하다. 16#ffff는 10진수 65535가 된다. '''base'''는 2..16 범위에서만 사용할 수 있다. 이 범위 안에만 있다면 3진수, 4진수 계산도 가능하다. 쓸일이야 없겠지만
+
+=== Atoms ===
+'''Atoms'''는 Erlang의 독특한 데이터형이다. 이것은 일종의 기호상수인데, C(:12)의 define 상수와는 달리 어떤 수치나 다른 상수값을 대신하지 않는다는 특징이 있다.
+
+atom은 첫문자가 [a-z]로 시작되어야 한다 따움표로 묶을 경우에는 어떠한 문자라도 사용할 수 있다. 
+
+다음은 Atoms의 간단한 사용예다. inch를 centimeter로 centimeter를 inch로 바꾸는 프로그램이다.
+{{{#!plain
+-module(tut2).
+-export([convert/2]).
+
+convert(M,inch)->
+	M / 2.54;
+convert(N,centimeter)->
+	N * 2.54.
+}}}
+테스트를 해보자. 
+{{{#!plain
+1> c(tut2).
+{ok,tut2}
+2> tut2:convert(5,inch).
+1.968503937007874
+3> tut2:convert(5,centimeter).
+12.7
+}}}
+
+만약 C를 이용해서 구현을 했다면, 다음과 같이 분기문을 사용해야 했을 것이다.
+{{{#!plain
+#define inch 1
+#define centimeter 2
+
+float convert(int a, int type);
+int main()
+{
+	printf("%lf\n", convert(5,inch));
+	printf("%lfu\n", convert(5,centimeter));
+}
+
+float convert(int a, int type)
+{
+  if (type == inch)
+  {
+    return a / 2.54;
+  }
+  else if(type == centimeter)
+  {
+    return a * 2.54;
+  }
+}
+}}}
+
+=== tuple === 
+tuple은 수학에서 사용된다. 값을 연속으로 나열한 자료구조로 '''ordered list'''라고 부르기도 한다. 근본적으로 tuple와 list(:12)는 그 차이가 없다고 할 수 있다. tuple이 '''n'''개의 원소를 포함할때 이것을 ''n''-tuple 이라고 부른다. 예를들어서 개인의 생일정보를 저장하기 위해서는 '''Name,Day,Month,Year'''4개의 원소를 가지는 4-tuple가 필요할 것이다.
+
+원소가 0인 것에서 부터 12개인것 까지의 tuple에 대해서는 사용하기 쉽게 특별한 이름이 붙여져 있다. 심심해서 정리해 보았다. unit, singletone, pair, triple 등과 같은 익숙한 용어들도 눈에 띈다.
+ || 0 || Unit      || 4 || Quadruple  || 8  || Octuple   || 12 || Duodecuple ||
+ || 1 || Singleton || 5 || Quintuple  || 9  || Nonuple   ||    ||  ||
+ || 2 || Pair      || 6 || Sextuple   || 10 || Decuple   ||    ||  ||
+ || 3 || Triple    || 7 || Septuple   || 11 || Undecuple ||    ||  ||
+
+수학의 관점에서는 tuple과 list의 차이가 없겠지만 소프트웨어 공학에서는 tuple와 list를 '''mutable'''한지 '''immutable'''한지를 가지고 서로 구분을 한다. 
+  || list  || mutable   || 값을 변경할 수 있다.   ||
+  || tuple || immutable || 값을 변경할 수 없다.   ||
+프로그래밍언어에서 tuple은 구조체나 record와 같은 용도로 사용할 수 있다
+
+다음은 tuple의 예다.
+{{{#!plain
+{yundream, 1974, 'programmer'}
+{1, 2, {3, 4}, {a, {b, c} } }
+{}
+}}}
+
+그럼 실제 Tuple를 사용해보도록 하자. '''tut2'''는 C(:12)보다 훨씬 세련된 프로그래밍 형식을 보여주고 있다.
+{{{#!plain
+tut2:convert(3,inch)
+}}}
+위에서 우린느 3이 inch라는 것을 알 수 있다. 그렇지만 변환된 결과가 centimeter라는 것은 '''프로그램'''은 알 수 없다. 예를들어서 convert프로그램이 제대로 작동하는지를 검증할려고 한다면, 다음과 같이 두번 convert 함수를 호출하면 될 것이다.
+{{{#!plain
+9> F=tut2:convert(3,inch).
+1.1811023622047243
+11> tut2:convert(F,centimeter).
+3.0
+}}}
+9번에서 넘겨준 값 1.1811은 centimeter이라는걸 프로그램은 모르기 때문에, 11번에서 인자로 값과 함께 centimeter를 넘겼다. 
+
+tuple를 이용한다면 값과 함께 값의 단위까지를 함께 넘겨주고 넘겨 받을 수 있다.
+{{{#!plain
+-module(tut3).
+-export([convert_length/1]).
+
+convert_length({centimeter,X})->
+	{inch, X/2.54};
+
+convert_length({inch,Y})->
+	{centimeter, Y * 2.54}.
+}}}
+{단위,값}을 원소로 가지는 tuple를 인자로 넘기고, 역시 {단위,값}의 tuple을 리턴하고 있다. tuple에 단위가 있으므로, 이제 프로그래머가 번거롭게 단위를 명시해줄 필요가 없게 된다.   
+
+다음은 테스트 결과다.
+{{{#!plain
+2> c(tut3).
+{ok,tut3}
+3> tut3:convert_length({inch,5}).
+{centimeter,12.7}
+4> tut3:convert_length(tut3:convert_length({inch,5})).
+{inch,5.0}
+}}}
+4번째줄에서 tut3:convert_length({inch,5})의 결과는 {centimeter,12.7}이 된다. 그러므로 해석을 해보자면 tut3:convert_length({centimeter,12.7})이 최종적으로 수행이 됨을 알 수 있다. tut2에 비해서 훨씬 세련된 코드가 만들어졌다.
+
+=== List ===
+Erlang에서 리스트는 "[]"로 나타낼 수 있다. 다음은 List의 예이다.
+{{{#!plain
+[{moscow, {c, -10}}, {cape_town, {f, 70}}, {stockholm, {c, -4}},
+ {paris, {f, 28}}, {london, {f, 36}}]
+}}}
+
+사용은 간단하다. 다음은 "|"를 이용해서 List를 사용한 예다.
+{{{#!plain
+1> [First|TheRest]=[1,2,3,4,5].
+[1,2,3,4,5]
+2> First.
+1
+3> TheRest.
+[2,3,4,5]
+}}}
+
+| 를 이용해서 좀더 복잡하게 리스트를 다룬 예다.
+{{{#!plain
+6> [E1,E2 | R]=[1,2,3,4,5,6,7].
+[1,2,3,4,5,6,7]
+7> E1.
+1
+8> E2.
+2
+9> R.
+[3,4,5,6,7]
+}}}
+
+다음은 리스트를 응용한 간단한 프로그램이다. 이 프로그램은 리스트가 포함하는 원소의 갯수를 계산한다.
+{{{#!plain
+-module(tut4).
+-export([list_length/1]).
+
+list_length([])->
+  0;
+list_length([First|Rest])->
+  1 + list_length(Rest).
+}}}
+
+tut4를 컴파일하고 실행시켜보았다.
+{{{#!plain
+1> c(tut4).
+{ok,tut4}
+2> tut4:list_length([1,3,5,7,9,11,13,15]).
+8
+}}}
+리스트가 포함한 원소의 갯수를 제대로 계산하고 있다.
+
+라인별로 분석해보도록 하자.
+{{{#!plain
+list_length([])->
+  0;
+}}}
+원소가 없다면 0을 리턴한다.
+
+{{{#!plain
+list_length([First|Rest])->
+  1 + list_length(Rest).
+}}}
+First에는 첫번째 원소가 들어가고 Rest에는 나머지 원소가 들어갈 것이다. 그러므로 1+list_length(Rest)에서 Rest는 -1씩이 되고, 원소의 갯수만큼 호출된후 0이 될 것이다. 결국 원소의 갯수만큼 +1을 반복하게 된다. 2>를 해석해보자면 다음과 같을 것이다.  
+{{{#!plain
+  1+1+1+1+1+1+1+1+list_length([]) = 8
+}}}
+
+erlang는 string 데이터 타입을 지원하지 않는다. 대신 ASCII의 리스트로 재현할 수 있다. 예를들어 [97,98,99] 는 문자열 "abc"와 동일하다.
+{{{#!plain
+2> [97,98,99].
+"abc"
+}}}
+
+=== Clauses - 절 - ===
+각각의 함수는 clauses로 이루어진다. 각 '''절'''은 세미콜론(;)으로 구분이 된다.  각 절은 독립적이며 clause head 와 guard 그리고 body를 가진다. '''guard'''는선택사항이다.
+==== Clauses heads ====
+head는 함수이름과 인자의 갯수로 이루어지며 commas로 구분된다. 각 인자는 매칭될 수 있는 pattern이다. 
+
+함수가 호출하면, 정의된 clauses head에 대한 패턴매칭을 수행해서 매칭되는 함수를 수행한다. 
+==== Clause guards ====
+guards는 clause를 선택하기 전에 주어지는 조건으로, 조건을 만족하는지 간단히 검사해서 cluase를 실행할지를 결정하게 된다. 
+
+조건에 대한 검사는 수치비교, '''Term'''비교 혹은 다른 평가(테스트) 함수를 통해서 이루어진다. guards는 패턴매칭의 확장이라고 볼 수 있을 것이다. 단 유저정의 함수는 guards로 사용할 수 없다. 말그대로 간단한 검사용이다.
+
+다음은 clauses를 이용한 '''factorial'''의 구현이다.
+{{{#!plain
+-module(facguard).
+-export([factorial/1]).
+
+factorial(N) when N == 0 ->
+	1;
+factorial(N) when N > 0 ->
+	N * factorial(N-1).
+}}}
+
+==== Guard tests ====
+다음은 guard 검사에 사용할 수 있는 함수들이다.
+ || Guard         || 성공 조건                    ||
+ || atom(X)       || X가 atom 이라면              ||
+ || constant(X)   || X가 list나 tuple가 아니라면  ||
+ || float(X)      || X가 float라면                ||
+ || integer(X)    || X가 integer라면              ||
+ || list(X)       || X가 list 혹은 [] 라면        ||
+ || number(X)     || X가 float 혹은 integer라면   ||
+ || pid(X)        || X가 process id라면           ||
+ || port(X)       || X가 port라면                 ||
+ || reference(X)  || X가 reference 라면           ||
+ || tuple(X)      || X가 tuple 라면               ||
+ || binary(X)     || X가 binary 라면              ||
+
+==== Term 비교 ==== 
+Term 비교도 guard 검사에 사용할 수 있다.
+ || Operator      || 설명              || Type   ||
+ || X > 0         || X가 Y보다 크다면  || coerce ||
+ || X < Y         || X가 Y보다 작다면  || coerce ||
+ || X =< Y        || X가 Y보다 크거나 같다면 || coerce ||
+ || X >= Y        || X가 Y보다 작거나 같다면 || coerce ||
+ || X == Y        || X가 Y와 같다면          || coerce ||
+ || X /= Y        || X가 Y와 다르다면        || coerce ||
+ || X =:= Y       || X가 Y와 같다면          || exact  ||
+ || X =/= Y       || X가 Y와 다르다면        || exact  ||
+
+Type이 '''coerce'''인 것은 인자를 비교할때, 자동으로 형변환을 해준다는 의미다. 즉 한쪽이 '''interger'''이고 다른 한쪽이 '''float'''이면, integer를 float형으로 변환해서 비교를 수행한다. Type이 '''exact'''인 경우에는 형변환을 하지 않는다.
+
+다음은 clause head에서 guard 사용의 예이다. 
+{{{#!plain
+foo(X, Y, Z) when integer(X), integer(Y), integer(Z), X == Y + Z ->
+foo(X, Y, Z) when list(X), hd(X) == {Y, length(Z)} ->
+foo(X, Y, Z) when {X, Y, size(Z)} == {a, 12, X} ->
+foo(X) when list(X), hd(X) == c1, hd(tl(X)) == c2 ->
+}}}
+
+1번째예를 모듈로 만들어서 간단히 테스트해보도록 했다. 
+{{{#!plain
+-module(foo).
+-export([foo/3]).
+foo(X,Y,Z) when integer(X), integer(Y), integer(Z), X==Y+Z ->
+	Y+Z.
+}}}
+{{{#!plain
+2> c(foo).
+{ok,foo}
+3> foo:foo(1,2,3).
+** exception error: no function clause matching foo:foo(1,2,3)
+4> foo:foo(3,2,1).
+3
+5> foo:foo(3.0,2,1).
+** exception error: no function clause matching foo:foo(3.0,2,1)
+}}}
+==== Clause body ====
+body는 한나 이상의 표현식으로 이루어지는 절로 구성된다. 각각의 표현식은 컴마로 구분된다. 마지막 표현식의 계산값이 이 함수가 리턴하는 값이 된다. 다음은 factorial 함수의 예이다.  
+{{{#!plain
+factorial(N) when N > 0 ->
+	N1 = N-1,              ----+
+	F1 = factorial(N1),        |--> Body
+	N * F1.                ----+
+}}}
+
+=== 조건문 ===
+Erlang는 case와 if문을 제공한다. 프로그래머는 case와 if문을 이용해서 조건을 평가할 수 있다.
+==== case ====
+case는 여러 조건중 하나를 선택하기 위한 목적으로 사용된다.
+{{{#!plain
+    case Expr of
+        Pattern1 [when Guard1] -> Seq1;
+        Pattern2 [when Guard2] -> Seq2;
+        ...
+        PatternN [when GuardN] -> SeqN
+    end
+}}}
+Exprt은 평가대상으로 '''Expr'''의 값과 매칭되는 패턴을 찾을 때까지 Pattern1부터 PatternN까지 검사한다. 만약에 매칭되는 패턴을 찾고 Guard검사가 성공되면 코드를 실행한다. 
+
+==== if ====
+if문은 다음과 같이 사용한다.
+{{{#!plain
+if
+	Guard1 ->
+		Sequence1;
+	Guard2 ->
+		Sequence2;	
+	...
+end
+}}}
+Guard 패턴을 만족하면 각각에 해당하는 Sequence를 실행한다.
+
+==== case와 if의 사용 예 ====
+factorial 함수를 case와 if 문을 이용해서 구현해 보도록 하겠다.
+
+우선 case,if문을 사용하지 않는 일반적인 구현이다.
+{{{#!plain
+-module(fac).
+-export([factorial/1]).
+factorial(0) -> 
+	1;
+factorial(N) ->
+	N * factorial(N-1).
+}}}
+
+if를 이용한 구현
+{{{#!plain
+-module(facif).
+-export([factorial/1]).
+factorial(N) ->
+	if
+		N == 0 -> 1;
+		N > 0 -> N * factorial(N-1)
+	end.
+}}}
+
+guard를 이용한 구현
+{{{#!plain
+-module(facguard).
+-export([factorial]/1).
+factorial(0) -> 
+	1;
+factorial(N) when N > 0 ->
+	N * factorial(N-1).
+}}}
+
+case를 이용한 구현
+{{{#!plain
+-module(facif).
+-export([factorial/1]).
+
+factorial(N) ->
+  if
+    N == 0 -> 1;
+    N > 0 -> N * factorial(N-1)
+  end.
+}}}
+
+=== 산술 표현식 ===
+ || Operator || 설명              || Type       || Operands  || Prio ||
+ || + X      || + X               || Unary      || mixed     || 1    ||
+ || - X      || - X               || Unary      || mixed     || 1    ||
+ || X * Y    || X * Y             || binary     || mixed     || 2    ||
+ || X / Y    || X / Y             || binary     || mixed     || 2    ||
+ || X div Y  || 정수형 나누기     || binary     || integer   || 2    ||
+ || X rem Y  || 나머지값          || binary     || integer   || 2    ||
+ || X band Y || And bit 연산      || binary     || integer   || 2    ||
+ || X + Y    || X + Y             || binary     || mixed     || 3    ||
+ || X - Y    || X - Y             || binary     || mixed     || 3    ||
+ || X bor Y  || or 연산           || binary     || integer   || 3    ||
+ || X bxor Y || xor 연산          || binary     || interger  || 3    ||
+ || X bsl N  || N 만큼 왼쪽으로 shift || binary || integer   || 3    ||  
+ || X bsr N  || N 만큼 오른쪽으로 shift || binary || integer || 3    ||
+
+=== 터미널 출력 ===
+Erlang역시 당연히 '''형식화된 출력'''을 할 수 있는 io:format 함수를 제공한다. 사용방법역시 C(:12)의 printf처럼 간단하다.
+{{{#!plain
+1> io:format("Hello world~n", []).
+Hello world
+ok
+2> io:format("this outputs one Erlang term: ~w~n",[hello]).
+this outputs one Erlang term: hello
+ok
+3> io:format("this outputs two Erang terms: ~w~w~n", [hello,world]).
+this outputs two Erang terms: helloworld
+ok
+4> io:format("this outputs two Erang terms: ~w ~w~n", [hello,world]).
+this outputs two Erang terms: hello world
+ok
+}}}
+format 함수는 2개의 인자를 받아들인다. 첫번째 인자는 출력할 문자열이고, 두번째 인자는 문자열에 포함될 값의 list다. ~w는 C의 printf에서의 %s와 비슷하다. 리스트에서 대응되는 값으로 교체된다. ~n은 '''new line'''을 의미한다. C에서의 "\n"과 동일하다. 
+
+
+== 맺으며 ==
+Erlang 이거 상당히 재미있다.

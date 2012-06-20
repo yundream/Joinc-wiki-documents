@@ -1,0 +1,319 @@
+#title C++에서 Class의 동적적재 
+
+[[TableOfContents]]
+[[UploadFile]]
+=== 이유 ===
+다양한 애플리케이션에 사용가능한 로그분석 프로그램을 만들려고 한다. 이러한 프로그램의 경우 어떤 애플리케이션에서 사용할지 알 수 없기 때문에, 원본소스에는 수정할 필요 없이 로그분석 알고리즘만 적재가능하도록 만들 필요가 있다. 
+
+가장좋은 방법은 main 코드와 알고리즘을 분리시키는 것으로, 이것은 라이브러리(:12)의 동적적재를 이용해서 달성가능 하다. 동적적재는 라이브러리(:12)문서에 언급되어 있다.
+
+즉 알고리즘을 플러그인 형태로 적재하는 기술인데, 여기에 더해서 C++의 클래스를 동적으로 적재시킬 수 있기를 원했다. 그렇다면, 클래스의 추상화를 이용해서, 좀더 일관된 개발자 인터페이스를 제공할 수 있을 것이기 때문이다. 
+
+그러므로 다음의 두가지를 달성하는게 주요 목표가 될 것이다.
+  1. 로그분석 알고리즘을 플러그인 형태로 적재할 수 있도록 한다. 
+  1. 클래스를 적재함으로써, 일관된 개발자 인터페이스를 제공한다. 
+
+이것은 [wiki:Site/SoftWare_engineering/pattern/Strategy_Pattern 전술패턴]의 구현으로 볼 수 있을 것이다.
+
+=== C++로 작성된 라이브러리사용의 문제 ===
+C++에서 클래스의 동적적재 가능성에 대해 생각해 본다.
+
+C에서의 라이브러리의 동적적재는 명료하다. 이에 대한 내용은 라이브러리(:12)만들기 문서를 참고한다. 
+
+C++에서는 name mangling 때문에 dlopen()을 이용해서 라이브러리를 적재하는데, 어려움이 있다. 애시당초 dlopen()이 C++을 염두에 두지 않고 만들었다는 것도 문제일 것이다.   
+
+C와 C++은 함수를 가리키기위한 symbol 테이블을 가지고 있다. 어떤 함수를 호출하면 symbol 테이블을 뒤져서, 이진파일 내에서 함수의 원본의 위치를 알아내어서 읽어들이고 실행하는 것으로 묘사할 수 있다.
+
+C는 symbol이 하나의 함수와 대응한다. 그렇지만 C++은 overloading으로 인하여서, 함수이름과 심볼이 일치하지 않는 경우가 발생한다. 이름은 같지만 인자가 다른 함수가 대표적인 경우다. 그러므로, C++로 공유라이브러리(:12)를 만들고자 할경우, 이 함수는 반드시 유일하다는 것을 컴파일러에게 알려줄 필요가 있다. 
+
+=== extern "C" 를 이용한 해결 ===
+오버로딩으로 인해서 발생하는 문제는 extern "C"를 이용하면 해결할 수 있다. extern "C" 는 해당 함수가 심볼이름과 일치될 것이라는 것을 알려준다. 이를테면 C 함수와 마찬가지로 사용하겠다는 의미다. 대신 C++의 기능인 overload등은 사용할 수 없게 된다.
+
+예컨데 hello란 함수가 있다면, 다음과 같이 extern "C"를 이용해서 정의할 수 있다. 
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+extern "C" void hello()
+{
+	cout << "hello" << "\n";	
+}
+}}}
+
+=== class의 동적적재 ===
+exern "C"를 이용해서, 오버로딩이 필요없는 함수를 적재시키는 법에 대해서 알아봤다. 그렇다면, class는 어떨까.
+
+안타깝게도 class는 dlopen()을 이용해서 호출할 수가 없다. 애초에 dlopen이 class를 염두에 두고 만들어진게 아니기 때문이다. 가장 일반적으로 사용할 수 있는 방법은 class에 대한 포인터를 넘겨주는 '''factory 함수'''를 만들고, 이 포인터를 이용해서 메서드를 호출하는 방법일 것이다.
+
+다음은 factory 함수를 이용해서 클래스를 호출하는 예제 프로그램이다. 프로그램이름은 main.cc로 하겠다.
+{{{#!plain
+#include <dlfcn.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include "mymodule1.h"
+
+int main(int argc, char **argv)
+{
+  void *handle;
+
+  char *error;
+  Test *LTest;
+
+  handle = dlopen("libmymodule.so", RTLD_LAZY);
+  if (!handle)
+  {
+    perror("Open Library\n");
+    exit(0);
+  }
+
+  // Func_Init
+  init_t* init_myFunc = (init_t *)dlsym(handle, "Func_Init");
+  if ((error = dlerror()) != NULL)
+  {
+    printf("ERROR : %s\n",error);
+    exit(0);
+  }
+  LTest = init_myFunc();
+  LTest->Count();
+  LTest->Count();
+  LTest->Print();
+
+  // Func_destory
+  destroy_t *destroy_myFunc = (destroy_t *)dlsym(handle, "Func_destory");
+  destroy_myFunc(LTest);
+}
+}}}
+
+mymodule1.h로 class Test가 선언되어 있다.
+{{{#!plain linenum
+#ifndef _MYMODULE_H_
+#define _MYMODULE_H_
+
+#include <stdio.h>
+#include <string>
+
+using namespace std;
+
+class Test
+{
+  private:
+    int count;
+  public:
+    Test();
+    ~Test()
+    {
+      printf("Destory\n");
+    }
+    void Count();
+    void Print();
+};
+extern "C" class Test* Func_Init();
+extern "C" void Func_destory(class Test *aTest);
+
+typedef void destroy_t(Test*);
+typedef Test* init_t();
+#endif
+}}}
+'''Funic_init'''와 '''Func_destory'''라는 factory 함수가 선언되어있다.
+
+다음은 Test 클래스와 factory 함수가 정의되어 있는 코드로 파일명은 mymodule1.cc다.
+{{{#!plain
+#include "mymodule1.h"
+
+Test::Test()
+{
+    printf("Init\n");
+    count=0;
+}
+
+void Test::Count()
+{
+    count++;
+}
+
+void Test::Print()
+{
+    printf("Count is %d\n", count);
+}
+
+class Test* Func_Init()
+{
+    Test *myTest;
+    myTest = new Test;
+    return myTest;
+}
+
+void Func_destory(class Test *aTest)
+{
+    delete aTest;
+}
+
+void Func_Test(class Test *aTest)
+{
+    aTest->Count();
+    aTest->Print();
+}
+}}}
+
+다음은 컴파일 방법이다. 먼저 mymodule1.cc를 공유라이브러리형태로 컴파일 한다. 
+{{{#!plain
+# g++ -fPIC -c mymodule1.cc
+# g++ -shared -W1,-soname,libmymodule.so.1 -o libmymodule.so.1.0.1 mymodule1.o
+}}}
+
+main.cc를 컴파일 한다.
+{{{#!plain
+g++ -o main main.c -ldl -lmymodule
+}}}
+일반적인 동적적재의 경우 함수원형이 필요 없지만 class의 경우에는 메서드를 호출해야 하기 때문에 '''-l'''옵션을 이용해서 메서드에 대한 정의가 있는 라이브러리 명시적으로 지시해줘야 한다.
+
+만들어진 프로그램을 실행시켜 보자.
+{{{#!plain
+$ ./main
+Init
+Count is 2
+Destory
+}}}
+제대로 실행됨을 알 수 있다.
+
+== 다형성의 구현 ==
+factory 함수를 이용해서 클래스를 로딩할 수 있는 방법을 터득했으니, 이제 로그분석 프로그램 제작에 대한 계획을 세워보기로 하자.
+
+이 로그분석 프로그램은 다음과 같은 사항들을 만족시켜야 한다.
+  1. 다양한 로그에 대응할 수 있도록 플러그인형식으로 적재할 수 있어야 한다. 
+  1. 프로그래머에게 공통의 인터페이스를 제공할 수 있어야 한다.
+1번 요구사항은 라이브러리의 동적적재를 이용해서 해결할 수 있다. 즉 설정파일을 만든다음에, 해당 로그파일에 대응되어서 적재할 라이브러리를 명시해주면 된다. 이것에 대한 간단한 예는 [wiki:article/library_만들기 라이브러리의 사용]에 언급되어 있으니, 응용하는데 문제없을 것이다.
+
+2번 요구사항은 클래스를 적재시키고, 클래스의 메서드를 가상함수화 하는 것으로 달성할 수 있을 것이다. 일종의 Interface 클래스를 만들고, 개발자는 Interface의 메서드를 구현하는 방식으로 필요한 모듈을 개발하는 것이다. 
+
+=== 예전 방식 구현 ===
+예전에도 로그분석 비스무레한 프로그램을 만들었던 적이 있다. '''보안로그분석'''프로그램이였는데, 보안장비로 부터 syslog(:12), snmp(:12) 혹은 전용 socket(:12)으로 부터 보안로그를 받아서 분석하고, 이벤트를 생성하는 프로그램이였다. 기본개념은 [wiki:article/STL_Iterator DOS 공격검사 프로그램의 제작]에 소개된 바가 있다.
+
+기본 시스템/네트워크 구성은 다음과 같다.
+
+attachment:dos.png
+
+보안장비는 다양한 종류의 보안소프트웨어가 설치되어 있으며, 로그 또한 전혀표준화 되어 있지 않으며, 나름대로의 정책을 가지고 만들어진다. 만약 새로운 장비가 추가된다면, 분석소프트웨어는 해당 장비의 보안로그를 분석할 수 있는 기능이 추가되어야 한다.  
+
+이 프로그램은 다음의 조건을 만족할 수 있어야 했다.
+  1. 새로운 보안장비 혹은 새로운 보안 제품이 추가되면, 다음과 같은 이유로 새로운 분석모듈을 개발해야 한다.
+     * 보안로그가 표준화 되어 있지 않았기 때문 
+     * plain text, binary 데이터 혹은 DB로 log를 저장하는 등 방식의 차이
+     * snmp, syslog, 전용 socket(:12) 등 다양한 통신 방법
+  1. 가능한 main 코드는 수정되지 않아야 한다.
+  1. 모듈의 개발은 일관성이 담보될 수 있어야 한다.
+위의 요건들을 만족시키기 위해서 다음의 방법을 사용했다. 일종의 전술패턴의 응용이라고 볼 수 있을 것이다.
+  1. 각 제품에 대응되는 라이브러리를 생성한다. 10개의 제품의 로그를 분석해야 한다면, 10개의 라이브러리가 만들어질 것이다. 
+  1. {해당장비 => 해당장비의 로그를 분석할 수 있는 알고리즘이 포함된 라이브러리}를 선택하도록 전술을 구사한다. 
+이 방식은 [wiki:Site/C/Documents/ProtocolFunction 함수포인터를 이용한 프로토콜 처리]에 비슷하게 구현되어 있으니 참고하기 바란다.
+
+이 방식은 만족시켜야할 조건중 1번과 2번은 어느정도 만족시킬 수 있지만, 3번을 만족시키지는 못했다. 코드가 객체지향적이지 않았기 때문에, 즉 C(:12)로 개발되었기 때문이다. 물론 좀더 노력과 시간을 들였다면, 3번을 만족시킬 수 있는 프로그램의 제작이 가능했겠지만, 그때는 그럴만한 실력을 갖추지 못했다. 
+
+=== 방법의 개선 ===
+그래서 class의 가상함수를 이용해서 개발자 인터페이스를 만들고, 이 인터페이스를 상속받아서 실제 구현을 하도록 하는 방법을 생각했다. 여기에서는 대략적인 개념만 소개하는 정도로 하겠다. 
+
+다음과 같이 순수가상함수를 포함하는 Interface 클래스를 만들도록 한다. interface.h로 하겠다.
+{{{#!plain
+#ifndef _INTERFACE_H_
+#define _INTERFACE_H_
+
+class Log
+{
+  private:
+    int data;
+  public:
+    virtual int Create()=0;
+    virtual int Anly()=0;
+    virtual int Read()=0;
+    virtual int Destroy()=0;
+    virtual ~LogAnly()
+    {
+    }
+};
+
+#endif
+}}}
+ * 이제 개발자는 모듈의 작성시 위의 Log클래스를 상속받고, 각 가상함수를 실구현하면 된다.
+   * Create : 객체를 생성한다. 
+   * Anly : 실제 분석을 한다.
+   * Read : 분석된 데이터를 읽어들인다.
+   * Destroy : 객체를 파괴한다.
+다음은 실구현을 포함한 코드다.
+{{{#!plain
+#include <interface.h>
+#include <iostream>
+
+class TestLogAnly : public Log
+{
+  private:
+  struct _CountData
+  {
+    int count1;
+    int count2;
+  };
+  _CountData CData;
+  Config *Cfg;
+  public:
+    TestLogAnly();
+    int Create(char *);
+    int Anly();
+    int Read();
+    int Destroy();
+    ~TestLogAnly();
+};
+
+using namespace std;
+int TestLogAnly::Create()
+{
+  cout << "Create " << endl;
+  return 1;
+}
+
+int TestLogAnly::Destroy()
+{
+  cout << "Module Anly Destroy" << endl;
+  return 1;
+}
+
+int TestLogAnly::Anly()
+{
+  CData.count1 = 100;
+  CData.count2 = 200;
+  cout << "Log Anly" << endl;
+  return 1;
+}
+int TestLogAnly::Read()
+{
+  cout << "ReadData count 1 : "<< CData.count1 << endl;
+  cout << "ReadData count 2 : "<< CData.count2 << endl;
+}
+
+TestLogAnly::~TestLogAnly()
+{
+  cout << "Module Destroy" << endl;
+}
+
+TestLogAnly::TestLogAnly()
+{
+  memset((void *)&CData, 0x00, sizeof(CData));
+}
+
+// factory 함수의 선언
+extern "C" TestLogAnly *Obj_Create();
+extern "C" void Obj_Destroy(TestLogAnly *);
+
+TestLogAnly *Obj_Create()
+{
+        TestLogAnly *rtv;
+        rtv = new TestLogAnly();
+        return rtv;
+}
+
+void Obj_Destroy(TestLogAnly *aLog)
+{
+        delete aLog;
+}
+}}}
+이것으로 동적적재에도 클래스의 가상화, 추상화, 은닉을 적용할 수 있게 되었다.

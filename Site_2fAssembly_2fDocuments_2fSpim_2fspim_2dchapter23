@@ -1,0 +1,554 @@
+#title 논리와 산술 의사명령
+
+[[TableOfContents]]
+
+===  논리와 산술 의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_1.html
+
+이 장에서는 추가적인 의사명령을 논의한다. 의사명령을 사용하여 프로그램을 하는 경우 컴퓨터가 편리하면서도 풍부한 기계명령들을 가지고 있는것처럼 보인다. 실제로는 그러한 편의를 제공하는 명령들은 기본명령을 사용하여 구현된다. 확장된 어셈블러는 각각의 의사명령을 하나나 그이상의 기본명령들로 전환시킨다. 그러한 후 기초명령들은 기계어로 번역된다.
+
+장의 주제:
+
+    * 비트단위 논리연산:
+          o not 의사명령.
+    * 정수 연산:
+          o abs    의사명령.
+          o addu   의사명령.
+          o subu  의사명령.
+          o negu   의사명령.
+          o mul   의사명령.
+          o div    의사명령.
+          o divu  의사명령.
+          o remu   의사명령.
+    * Rotate 명령:
+          o rol    rotate left  의사명령.
+          o ror    rotate right 의사명령.
+
+질문:
+다음 패턴 0011 1001을 비트단위로 not 연산하면 무엇일까요?
+
+=== 의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_2.html
+
+답:
+NOT( 0011 1001 ) == 1100 0110
+
+|| 비트단위 NOR 작동 ||
+|| 첫번째 피연산자 ||0||0||1||1||
+|| 두번째 피연산자 ||0||1||0||1||
+|| ||-||  	
+||OR||0||1||1||1||
+||not OR||1||0||0||0||
+
+not 의사명령은 레지스터에 있는 각각의 비트를 바꾼다. 1은 0으로 바뀌고 0은 1로 바뀐다. 이러한 것을 비트 뒤집기(flipping) 또는 비트를 반사(reflect)하기라고도 표현한다.
+
+
+{{{#!plain
+not   d,s  # 레지스터 s와 not 연산한 결과를 레지스터 d에 올린다.(의사명령)
+}}}
+
+이것은 일종의 의사명령이다. 어셈블러는 이 의사명령을 기초적인 어셈블리 명령인 nor 명령으로 해석한다. nor 작동을 위에서 테이블로 설명하고 있다. 2개의 비트를 nor 연산하는 것은 비트를 or 연산후 not 연산 하는 것과 같다.  nor 명령은 피연산자로 2개의 레지스터를 사용하고 그 결과를 세번째 레지스터에 쓴다.
+
+{{{#!plain
+nor  d,s,t  # $d <-- 비트작동 NOR를 $s 와 $t에 수행한다.
+            # (기초 명령)
+}}}
+
+테이블에서 첫번째 피연산자의 처음 두열은 0이다. 두 피연산자를 nor 작동하면 두번째 피연산자를 not 작동한 것이다.
+
+질문: 확장된 어셈블러는 다음을 어떤식으로 해석하겠습니까?
+
+{{{#!plain
+not $s1,$t5
+
+into:
+
+nor  _____, _____, _____
+
+}}}
+힌트:$0을 사용해보자.
+
+=== 묵시적 즉시 피연산자(Implicit Immediate Operand) ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_3.html
+
+답:
+{{{#!plain
+not $s1,$t5     =     nor $s1, $t5, $0
+}}}
+
+$t5와 $0의 순서가 바뀌어도 된다.
+
+어떤 의사명령은 사용하는 피연산자의 형태에 따라서 각기 다른 기초명령으로 해석된다. 즉시 피연산자를 사용하는 의사명령은 모든 레지스터를 피연산자로 사용하는 것과는 다른 기초명령으로 해석된다.
+
+때로는 같은 축약코드(mnemonic)가 기초명령과 의사명령 모두에 사용된다. 예를 들자면:
+
+{{{#!plain
+or $s0,$s1,0x00ff   ==  ori $s0,$s1,0x00ff
+}}}
+
+이경우에 확장된 어셈블러는 피연산자가 즉시피연산자임을 주의하여 기초 명령으로 해석한다.결과적으로 기계코드는 32비트의 or immediate으로 해석된다. 하지만 다음의 기초 명령의 경우에는 어셈블리 명령은 변하지 않는다.
+{{{#!plain
+or $s0,$s1,$t1 
+}}}
+결과적으로 기계코드는 32비트 or 명령이다.
+
+and 축약코드(mmenomic)도 유사하다. 피연산자에 따라서 and 또는 andi나 다른 기초 명령으로 해석될 수 있다.
+
+질문: 기초적인 add명령과 add immedaite 명령이 존재합니까?
+
+=== 산술연산 의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_4.html
+
+답: 예
+
+확장되지 않은 어셈블러에서는 하나의 addu d,s,t(여기서 d,s,t 는 레지스터이다) 명령과 하나의 addiu d,s,im (여기서 im은 직접피연산자이다) 명령이 있다.
+확장된 어셈블러에서는 addu d,s,x 명령이 피연산자 x가 레지스터인가,16비트 직접 피연산자인가 또는 더큰크기의 직접 피연산자인가에 따라서 각기 달리 번역된다.
+
+확장된 어셈블러에서 쓰이는 다음명령을 살펴보자.
+
+{{{#!plain
+addu $t0,$s0,40000
+}}}
+
+40000이라는 십진수 값은 16비트로 표현하기에는 크다(16비트의 영역은 -32768과 +32767 사이이다) 그래서 이 명령은 addiu 명령으로 해석될 수 없다. add $s0을 사용하여40000<10>를 더하고 그 결과를 $t0에 올려야 한다.
+
+질문:
+빈칸을 채워보자.
+{{{#!plain
+addu $s1,$s0,40000  ==  
+
+li   _____,40000    # 의사명령 li를 사용한다.
+addu $s1,$s0,_____  # 32비트 덧셈연산을 수행한다. 
+}}}
+
+힌트:레지스터 $at를 사용해보자.
+
+=== 뺄셈 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_5.html
+
+답:
+{{{#!plain
+addu $s1,$s0,40000  ==  
+
+li   $at,40000    
+addu $s1,$s0,$at  
+}}}
+
+위의 답에서 사용한 li 명령도 의사명령이다. 확장된 어셈블러가 기초명령으로 번역한다.
+
+확장된 어셈블러에는 subu d,s,x 의사명령도 있다. 마지막 피연산자가 레지스터,16비트 직접피연산자 또는 32비트 직접피연사자가 올 수 있다. 이명령은 의사명령 addu  d,s,-x로 번역되고 그후에 기초명령으로 번역된다.
+
+negu d,s 의사명령은 레지스터 $s의 2의 보수로 표현된 음수값을 계산해서 레지스터 $d에 저장한다.
+
+{{{#!plain
+negu d,s   # d <-- -s
+}}}
+
+질문:
+빈칸을 채워보자:
+{{{#!plain
+negu $v2,$s3  ==  sub  ____,$0,____
+}}}
+
+=== 곱셈 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_6.html
+
+답:
+{{{#!plain
+negu $v2,$s3  ==  sub  $v2,$0,$s3
+}}}
+
+전에 공부했던 mult와 multu 명령은 결과값을 MIPS 레지스터 hi와 lo에 저장한다. mfhi와 mflo명령을 사용하여 결과값을 레지스터로부터 가져올 수 있다. 의사명령 mul d,s,t는 그러한 기본명령을 사용한다. 레지스터 $s와 $t의 결과값이 lo 레지스터의 32비트 크기 범위내일때 사용된다.
+
+질문: 빈칸을 채워보자.
+
+{{{#!plain
+mul $v2,$s3,$t0  ==  multu  ____, ____
+                     mflo   ____ 
+}}}
+
+=== mul의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_7.html
+
+답:
+{{{#!plain
+mul $v2,$s3,$t0  ==  multu  $s3,$t0
+                     mflo   $v2
+}}}
+
+mul 의사명령을 사용하면 레지스터에 오버플로우 여부를 검사하지 않고 32비트 곱셈결과를 저장하는 것처럼 보일 수 있다.
+
+
+{{{#!plain
+mul  d,s,t # multiply $s by $t. 결과를 레지스터 $d에 저장한다.
+}}}
+
+오버플로우가 발생했는지 검사하지 않느다. hi 비트를 조사하지도 않고 저장하지도 않는다. hi비트를 조사하고 오버플로우시에 여러가지 작동을 취하는 다른 여러가지 의사명령들이 있다. 당분간 그런 명령들은 사용하지 않는다.
+
+나ㅤㄴㅜㄳ셈 연산에서도 비슷한 명령이 있다. 기초명령 div s,t 와 divu s,t 는 결과를 MIPS레지스터 hi와 lo에 올린다. 32비트 크기의 몫(quotient)은 lo 레지스터로 가고 32비트 크기의 나머지는 hi 레지스터로 간다. 몫을 레지스터로 옮기기위해 mflo 명령이 사용된다.
+
+질문:
+빈칸을 채워보자. 피연산자 레지스터는 s와 t이다. 목적 레지스터는 d이다.
+
+{{{#!plain
+div d,s,t  ==  div   ____, ____
+               mflo  ____ 
+
+}}}
+=== div와 divu 의사명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_8.html
+답:
+
+{{{#!plain
+div d,s,t  ==  div  s,t
+               mflo d 
+}}}
+
+확장된 SPIM 어셈블러는 다음 명령들을 포함한다.
+{{{#!plain
+div  d,s,t # $s를 $t 로 나누어보자. 몫을 $d에 집어넣어보자. 피연산자는 2의 보수이다.
+}}}
+{{{#!plain
+divu d,s,t # $s를 $t로 나누어보자 몫을 $t에 저장하자. 피연산자는 unsiged이다. (의사명령)
+}}}
+질문: 정수의 나눗셈에서 나머지 값이 때로는 유용합니까?
+
+=== remu 명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_9.html
+
+답: 물론이다.
+
+
+32비트 정수를 나눗셈 한 뒤에 몫은 lo 레지스터에 있고 나머지는 hi 레지스터에 있다. 다음의 의사명령은 나머지를 계산하기 위해서 여러가지 기초 명령을 사용한다.
+{{{#!plain
+remu d,s,t # $s를 $t로 나눈다. 나머지를 $d에 넣는다. 피연산자는  unsigned이다.
+}}}
+
+정수의 절대값을 만들어 내는 의사명령도 있다.
+{{{#!plain
+abs d,s    # d <-- |s|
+}}}
+
+질문: 만약 물건값이 25$이고 세금이 8%이고 팁이 15%라면 전체 요금은 얼마입니까? (정수 연산을 사용하자)
+
+=== 예제 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_10.html
+
+답:
+
+total = 25 + (25*(8+15))/100 = 25 + (25*23)/100 = 25 + 575/100 = 30
+
+음식값과 8% 세금,15% 팁의 총액을 계산하는 프로그램을 작성해보자. 사용자는 음식 값을 입력한다. 세금과 팁은 고정된 값이다. 다음은 프로그램을 실행한 것이다.
+{{{#!plain
+Enter food cost: 25
+   Tax plus tip:  5
+     Total cost: 30
+}}}
+
+{{{#!plain
+## rest.asm
+##
+## 레스토랑 음식값 계산기
+##
+## 사용하는 레지스터:
+##
+## $s0 tip+tax 
+## $s1 tip rate
+## $s2 tax rate
+## $s3 meal cost
+## $a0 tax+tip dollars
+
+        .globl  main
+
+        # Get meal cost
+main:   li      $v0,4       # prompt를 출력한다 (code 4 put in $v0)
+        la      $a0,prompt  # prompt의 주소를 $a0에 넣는다
+        syscall
+
+        li      $v0,5       # 정수를 입력한다.  (code 5 put in $v0)
+        syscall             # 32-bit 결과는 $v0 에 넣는다.
+        move    $s3,$v0     #  $s3 에 저장한다. 
+        
+        . . . . .
+
+        .data
+tip:    .word   15          # percent로 표현된 팁
+tax:    .word    8          # percent로 표현된 세금
+
+prompt: .asciiz "Enter food cost: "
+head1 : .asciiz "   Tax plus tip: "
+head2 : .asciiz "     Total cost: "
+# end of file
+}}}
+사용자로부터 입력이 필요한 정보는 음식값이다. 음식값을 입력하도록 요구하고 문자로써 입력값을 읽는다. 예외처리자를 통해 문자는 32비트 2의 보수로 표현된 정수로 전환된다. 스핌 예외처리자는 $v0에 입력되는 값이 있다고 간주한다. 예외처리자로 입력값이 전달되고 여러 다른 레지스터를 사용해서 출력값이 산출된다. Appendix G를 보자.
+
+질문: 위의 코드에서 의사명령 축약코드가 무었인지 표시해보자.
+
+=== 계산 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_11.html
+
+답:다음을 보자.
+
+음식값을 읽어드린 이후에 프로그램은 계산을 한다. 계산을 한번에 다처리하고 그 결과를 출력하는 것이 편리하다.
+
+{{{#!plain
+## rest.asm
+##
+## 레스토랑 음식값 계산기
+##
+## 
+## 사용하는 레지스터:
+##
+## $s0 tip+tax 
+## $s1 tip rate
+## $s2 tax rate
+## $s3 meal cost
+## $a0 tax+tip dollars
+
+        .globl  main
+
+        # Get meal cost
+main:       $v0,4       # prompt를 출력한다 (code 4 put in $v0)
+            $a0,prompt  # prompt의 주소를 $a0에 넣는다
+        syscall
+
+            $v0,5       # 정수를 입력한다.  (code 5 put in $v0)
+        syscall           # 32-bit 결과는 $v0 에 넣는다.
+          $s3,$v0     #  $s3 에 저장한다. 
+
+        # Calculations
+        lw      $s1,_____        #  tip rate를 가져온다.
+
+        lw      $s2,_____        # tax rate를 가져온다
+
+        addu    $s3,$s1,$s2      # total rate in percent
+
+        _____   $s4,$s0,$s3      # mealcost*(total rate)
+
+        _____   $s4,$s4,100      # mealcost*(total rate)/100  
+
+        _____   $s5,$s0,$s4      # total bill
+
+       . . . . .
+
+        .data
+tip:    .word   15           # percent로 표현된 팁
+tax:    .word    8          # percent로 표현된 세금
+
+prompt: .asciiz "Enter food cost: "
+head1 : .asciiz "   Tax plus tip: "
+head2 : .asciiz "     Total cost: "
+# end of file
+}}}
+
+질문: 빈칸을 채워보자.
+
+=== 결과를 쓰기 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_12.html
+
+답:
+{{{#!plain
+        # Calculations
+        lw      $s1,tip          # get tip rate
+        lw      $s2,tax          # get tax rate
+        addu    $s3,$s1,$s2      # total rate
+        mul     $s4,$s0,$s3      # 100*(tax + tip)
+        div     $s4,$s4,100      # tax + tip  
+        addu    $s5,$s0,$s4      # total bill
+}}}
+
+프로그램의 마지막 부분은 모니터로 결과를 산출한다.
+{{{#!plain
+## 사용하는 레지스터:
+##
+##    $s0 음식값
+##    $s1 tip rate
+##    $s2 tax rate
+##    $s3 total rate
+##    $s4 tax+tip dollars
+##    $s5 전체 값
+
+        # Output
+
+        ____    $v0,4            # print string
+
+        ____    $a0,head1        # "tax plus tip"
+        syscall
+
+        ____    $a0,$s4          # get tax+tip
+        li      $v0,1            # print integer
+        syscall                  # 
+
+        ____    $v0,4            # print string
+
+        ____    $a0,head2        # "total cost"
+        syscall
+
+        ____    $a0,$s5          # get total
+
+        ____    $v0,1            # print integer
+        syscall                  # 
+
+        li      $v0,10           # exit
+        syscall
+
+        .data
+tip:    .word   15               # tip rate in percent
+tax:    .word    8               # tax rate in percent
+
+prompt: .asciiz "Enter food cost: "
+head1 : .asciiz "   Tax plus tip: "
+head2 : .asciiz "\n     Total cost: "
+}}}
+
+질문:빈칸을 채워보자.
+
+=== 완성된 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_13.html
+
+답:
+
+다음은 완성된 프로그램이다. 편집기로 프로그램을 복사하여 실행해 볼 수 있다. 프로그램을 실행하기 위해서 스핌 셋팅을 의사명령과 예외 처리자 파일을 올리는 것을 허용하도록 하여야한다.
+
+{{{#!plain
+## rest.asm
+##
+## Total restaurant bill calculator
+##
+## Register Use:
+##
+##    $s0 meal cost 
+##    $s1 tip rate
+##    $s2 tax rate
+##    $s3 total rate
+##    $s4 tax+tip dollars
+##    $s5 total bill
+
+        .globl  main
+
+        # Get meal cost
+main:   li      $v0,4            # print prompt
+        la      $a0,prompt   
+        syscall
+        li      $v0,5            # input meal cost
+        syscall
+        move    $s0,$v0          # save it in $s0
+
+        # Calculations
+        lw      $s1,tip          # get tip rate
+        lw      $s2,tax          # get tax rate
+        addu    $s3,$s1,$s2      # (tax + tip) in percent
+        mul     $s4,$s0,$s3      # mealcost*(total rate)
+        div     $s4,$s4,100      # mealcost*(total rate)/100 
+        addu    $s5,$s0,$s4      # total bill
+
+        # Output
+        li      $v0,4            # print string
+        la      $a0,head1        # "tax plus tip"
+        syscall
+
+        move    $a0,$s4          # get tax+tip
+        li      $v0,1            # print integer
+        syscall                  # 
+
+        li      $v0,4            # print string
+        la      $a0,head2        # "total cost"
+        syscall
+
+        move    $a0,$s5          # get total
+        li      $v0,1            # print integer
+        syscall                  # 
+
+        li      $v0,10           # exit
+        syscall
+
+        .data
+tip:    .word   15               # tip rate in percent
+tax:    .word    8               # tax rate in percent
+
+prompt: .asciiz "Enter food cost: "
+head1 : .asciiz "   Tax plus tip: "
+head2 : .asciiz "\n     Total cost: "
+# end of file
+}}}
+
+질문:
+다음 명령다음에 레지스터 $t1의 비트 패턴은 무었일까요?
+{{{#!plain
+li   $t0,0x12345678
+sll  $t1,$t0,8
+}}}
+
+
+=== 비트패턴 회전하기  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_14.html
+
+답: 레지스터 $t1은 0x34567800을 담고있다.
+
+비트 패턴을 왼쪽으로 이동시키는 명령을 사용하면 레지스터 왼쪽 끝에 있는 비트들은 없어지게 된다. 오른쪽 끝으로 이동된 비트들은 항상 0 비트이다.  왼쪽 회전 명령을 사용하면 레지스터의 왼쪽 끝비트가 오른쪽 끝으로 이동한다. 회전명령을 사용하면 32비트 크기의 레지스터는 32비트 패턴을 회전시킨 값을 가지게 된다.
+
+attachment:sll1.gif
+
+그림에서 하나의 비트를  왼쪽으로 회전시키면 10100111은 01001111이 된다. 한번더 왼쪽으로 회전시킨다면 비트 형태는 10011110이 된다.
+
+물론 레지스터는 그림이 보여주는 8비트 크기가 아니라 32비트 크기이다.
+
+오른쪽으로 회전하는 명령은 레지스터의 비트 값을 오른쪽으로 회전시킨다. 레지스터 오른쪽 끝의 비트가 레지스터 왼쪽끝으로 이동한다.
+ 
+질문: 다음 비트를 오른쪽으로 2비트 위치만큼 회전시켜보자.
+
+11001100
+
+=== 회전 명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_15.html
+
+답:
+
+00110011
+
+왼쪽이나 오른쪽 두 회전 명령 모두 의사명령이다.회전명령을 구현하기 위해서 4개의 기초명령이 필요한다. 이동하는 크기는 레지스터에 올려져 있거나 또는 직접피연산자로 주어진다.
+
+{{{#!plain
+rol d,s,t    # s를 왼쪽으로 t만큼 회전하여 d에 저장한다.
+             # (pseudoinstruction)
+
+ror d,s,t    # s를 오른쪽으로 t만큼 회전하여 d에 저장한다.  
+             # (pseudoinstruction)
+}}}
+
+직접피연산자로 음수는 허용되지 않는다. 하지만 세번쩨 피연산자가 레지스터라면 그 값은 음의 정수를 담고 있을 수 있다. 그러한 경우 반대방향으로 회전한다.
+
+질문:
+
+다음 코드를 살펴보자:
+{{{#!plain
+li  $t2,-2
+li  $t1,4
+ror $t0,$t1,$t2
+}}}
+명령이 수행된 후 레지스터 $t0가 담고 있은 값은 무엇일까요?
+
+=== 장끝  ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23_16.html
+
+답:
+{{{#!plain
+0000 0000 0000 0000 0000 0000 0001 0000
+}}}
+
+ $t2가 음수를 담고 있기 때문에 좌측으로 회전되었다.
+
+논의된 주제
+
+    * not 의사명령(pseudoinstruction)
+    * 묵시적 즉시 피연산자(Implicit immediate operands)
+    * addu 의사명령(pseudoinstruction)
+    * subu 의사명령(pseudoinstruction)
+    * mul 의사명령(pseudoinstruction)
+    * div 의사명령(pseudoinstruction)
+    * remu 의사명령(pseudoinstruction)
+    * negu 의사명령(pseudoinstruction)
+    * abs 의사명령(pseudoinstruction)
+    * Bit 회전하기.
+    * Rotate 의사명령(pseudoinstructions)
+[http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23quiz.html 퀴즈]와 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-23/ass23programs.html 과제]를 해봅시다.

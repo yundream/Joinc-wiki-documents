@@ -1,0 +1,763 @@
+#title STL iterator
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>STL(4) - iterator</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>STL(4) - iterator</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>Iterator</A
+></DT
+><DD
+><DL
+><DT
+>1.1&#51208;. <A
+HREF="#AEN11"
+>Iterator 이란</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN17"
+>Output Iterator</A
+></DT
+><DD
+><DL
+><DT
+>1.2.1&#51208;. <A
+HREF="#AEN20"
+>ostream_iterator&#60;T&#62;</A
+></DT
+><DT
+>1.2.2&#51208;. <A
+HREF="#AEN27"
+>front_insert_iterator&#60;FrontInsertionSequence&#62;</A
+></DT
+><DT
+>1.2.3&#51208;. <A
+HREF="#AEN32"
+>back_insert_iterator&#60;BackInsertionSequence&#62;</A
+></DT
+><DT
+>1.2.4&#51208;. <A
+HREF="#AEN37"
+>insert_iterator&#60;Container&#62;</A
+></DT
+></DL
+></DD
+><DT
+>1.3&#51208;. <A
+HREF="#AEN42"
+>Input Iterator</A
+></DT
+><DD
+><DL
+><DT
+>1.3.1&#51208;. <A
+HREF="#AEN45"
+>istream_iterator&#60;T&#62;</A
+></DT
+></DL
+></DD
+><DT
+>1.4&#51208;. <A
+HREF="#AEN50"
+>Forward Iterator</A
+></DT
+><DT
+>1.5&#51208;. <A
+HREF="#AEN55"
+>Bidirectional Iterator</A
+></DT
+><DT
+>1.6&#51208;. <A
+HREF="#AEN61"
+>Random Access Iterator</A
+></DT
+></DL
+></DD
+><DT
+>2&#51208;. <A
+HREF="#AEN68"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. Iterator</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN11"
+>1.1&#51208;. Iterator 이란</A
+></H2
+><P
+>			우리나라 말로 하면 "반복자", "순환자" 정도가 될것이다. 
+			그런데 굳이 번역된 말에 신경쓸필요 없이 C에서 사용되는 포인터 
+			라고 생각하는게 가장 이해하기 쉬울듯하다. 다른말로 
+			pointer 를 객체등에 유연하게 사용할수 있도록 일반화 시킨 버젼 
+			이라고 할수 있다. 포인터와 마찬가지로 iterator 를 증가시키거나 
+			감소 시킴으로써 객체간을 이동할수 있다. 
+		</P
+><P
+>			iterator 는 자료형에 대한 정보를 가지고 있으며, 이러한 정보에 
+			어떻게 접근해야 하는지에 대한 정보를 가지고 있다. 포인터가 
+			자료에 접근하기 위해서 주소정보를 가지고 있는것과 비슷한데, 
+			iterator 는 객체에 접근하기위한 정보를 가지고 있는 또다른 객체이다. 
+		</P
+><P
+>			iterator 는 일반화(generic) 프로그래밍을 하는데 있어서 가장 핵심이 
+			되는 요소중 하나로써, 컨테이너와 알고리즘 사이에서 서로를 연결 
+			시켜주는 인터페이스(가교) 역활을 한다(보통 알고리즘은 iterator 를 
+			아규먼트로 받아들인다). 이렇듯 알고리즘들이 iterator 를 받아 
+			들임으로써 많은 종류의 다른 컨테이너들을 사용할수(적용시킬수) 있게 
+			된다. 예를들어 어떤 컨테이너에 sort 알고리즘을 적용시키기 원한 
+			다면 컨테이너 객체를 넣는대신에, sort 하고 싶은 범위를 iterator 
+			를 통해 지정할수 있음으로(보통은 처음과 끝, 즉 전체가 되겠지만) 
+			좀더 유연하게 프로그래밍 작업이 가능할것이다. 
+		</P
+><P
+>			이렇듯 iterator 의 개념 자체는 간단하지만, iterator 에도 
+			여러가지 종류가 있다. Input Iterator, Output Iterator, Forward 
+			Iterator, Bidirectional Iterator, Random Access Iterator 등이 
+			있다. 헉 뭐가 이리 종류가 많지? 라고 걱정할수 도 있겠지만, 
+			그리 걱정할 필요는 없다. 그냥 상식적? 으로 생각하면 되기 때문이다.  
+			다음장에서는 이러한 Iterator 의 종류에 대해서 알아보도록 할것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>1.2&#51208;. Output Iterator</A
+></H2
+><P
+>	
+			출력 반복자라고 부를수 있으며, 쓰기 전용의 반복자이다. 즉 어떤 컨테이너에 
+			원소를 쓰는건 가능하지만 읽을수는 없는 종류의 iterator 들이다. 이들 이터레이터에는  
+			++ 연산이 가능하(. 	
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>1.2.1&#51208;. ostream_iterator&#60;T&#62;</A
+></H3
+><P
+>				Output Iterator 의 가장 대표적인 iterator class 이다. 출력스트림에 쓰는일을 한다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;string&#62;
+
+int main()
+{
+    vector&#60;string&#62; V;
+    vector&#60;string&#62; V2;
+
+    V.push_back("hello");
+    V.push_back("Myname is yundream");
+
+    copy(V.begin(), V.end(), ostream_iterator&#60;string&#62;(cout, "
+"));
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 컴파일후 실행시키면 vector V 의 원소가 차례로 화면에 
+				출력되는것을 볼수 있을것이다. ostream_iterator 이 왜 Output Iterator 인 이유는 
+				해당 ostream 에 쓰기(Output) 전용이기 때문이다. 기본적으로 Output Iterator 에 
+				속하는 iterator 들은 쓰기 전용이다. 반대로 Input Iterator 에 속하는 
+				iterator 들은 읽기 전용일것이다.   
+			</P
+><P
+>				만약 위의 코드를 copy(V.begin(), V.end(), V2.begin()); 으로 바꾸면 어떻게 될까 ? 컴파일은 
+				문제없이 되지만 실행시 문제가(아마도 세그멘테이션 오류) 생기면서 실행이 중단될 것이다. 
+				V2.begin()이 넘겨주는 iterator 는 어떠한 용도로도 사용가능하지만, V2 컨테이너의 
+				사이즈가 자동적으로 할당되어 있지 않다는게 문제가 되기 때문이다. copy 알고리즘은 
+				컨테이너의 공간을 자동으로 할당해주는 기능을 가지고 있지 않다. 물론 이문제는 
+				컨테이너의 크기를 자동으로 늘려주는 다른 함수를 이용해서 해결가능하다. 이 것은 이 다음장에서 
+				간단하게 다루게 될것이다.   
+			</P
+><P
+>				copy 는 STL 에서 제공하는 Algorithms 의 하나로 iterator 로 주어진 
+				일정한 범위의 요소들을 카피하기 위해서 사용된다. 
+				카피는 쓰기(Output) 행위 이므로 
+				Output iterator 을 사용해야만 할것이다. 그래서 마지막 인자가 Output iterator 인 
+				ostream_iterator 이 쓰였다. 앞으로는 copy 알고리즘을 통해서 iterator 클래스를 
+				설명할것이다. copy 는 다음과 같이 선언되어 있다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>OutputIterator copy(InputIterator first, InputIterator last, OutputIterator result);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN27"
+>1.2.2&#51208;. front_insert_iterator&#60;FrontInsertionSequence&#62;</A
+></H3
+><P
+>				위의 ostream_iterator 은 스트림 쓰기용도도로 사용되는 좀 특이한 경우라고 할수 있다. 
+				여기에 front_insert_iterator 이라는 좀더 STL 다운, 쓰기전용 iterator 가 있다. 
+				이름에서 알수 있듯이 이 iterator 은 컨테이너의 가장 앞부분에 원소를 삽입하고자 할때 
+				사용할수 있다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;list&#62;
+#include &#60;vector&#62;
+
+int main()
+{
+    list&#60;int&#62; L;
+    L.push_front(3);
+
+    front_insert_iterator&#60;list&#60;int&#62; &#62; ml(L);
+
+    *ml++ = 0;
+    *ml++ = 1;
+    *ml++ = 2;
+
+    copy(L.begin(), L.end(), ostream_iterator&#60;int&#62;(cout, " "));
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 코드를 실행시켜 보면 "2 1 0 3" 의 순서로 화면에 출력됨을 볼수 있을것이다. 
+			</P
+><P
+>	
+				위의 코드는 list 를 사용했는데, list 대신 deque 를 그대로 사용해도 문제 없이 실행된다. 
+				그러나 vector 을 사용할경우에는 문제가 된다. 왜냐하면 list 와 deque 같은 경우에는 
+				컨테이너의 가장 앞에 원소를 삽입하기 위한 push_front() 함수를 지원하지만, vector 은 
+				지원이 안되기 때문이다. 이유는 알겠지만, vector 컨테이너 앞에 원소를 삽입하는것은 너무 
+				비효율적이기 때문이다.   
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN32"
+>1.2.3&#51208;. back_insert_iterator&#60;BackInsertionSequence&#62;</A
+></H3
+><P
+>	
+				위의 fornt_insert_iterator 과는 반대로 컨테이너의 가장 뒤에 원소를 삽입하기 위해서 사용한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;list&#62;
+#include &#60;vector&#62;
+
+int main()
+{
+    list&#60;int&#62; L;
+    L.push_front(3);
+
+    back_insert_iterator&#60;list&#60;int&#62; &#62; ml(L);
+
+    *ml++ = 0;
+    *ml++ = 1;
+    *ml++ = 2;
+
+    copy(L.begin(), L.end(), ostream_iterator&#60;int&#62;(cout, " "));
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 프로그램을 실행시켜보면 출력결과가 "3 0 1 2" 로 나올것이다. 
+			</P
+><P
+>	
+				위의 list 는 deque 로 대신 사용할수도 있다. 또한 front_insert_iterator 과는 달리 
+				vector 에도 적용가능하다. 뒤에 원소를 삽입하는거라면 vector 도 효율적으로 수행이 가능하기 
+				때문이다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>1.2.4&#51208;. insert_iterator&#60;Container&#62;</A
+></H3
+><P
+>				insert_iterator 는 다른 컨테이너에 Output Iterator 인터페이스를 제공해주기 위한 
+				iterator adaptor 로 사용된다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;list&#62;
+
+int main()
+{
+    list&#60;int&#62; L;
+    L.push_front(3);
+    L.push_front(4);
+
+    insert_iterator&#60;list&#60;int&#62; &#62; ii(L, L.begin());
+
+
+    *ii++ = 0;
+    *ii++ = 1;
+    *ii++ = 2;
+    copy(L.begin(), L.end(), ostream_iterator&#60;int&#62;(cout, " "));
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 코드를 실행시키면 "0 1 2 4 3"으로 결과가 출력될것이다. insert_iterator 는 
+				다른 Output iterator 들과는 달리 2개의 아규먼트를 가진다. 추가된 아규먼트는 insert 할 
+				위치를 알려주기 위해서 사용된다. 또다른 예를 하나 들어 보겠다.   
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;set&#62;
+#include &#60;algorithm&#62;
+
+int main()
+{
+    int A1[] = {1, 3, 5, 7, 9 ,11};
+    int B1[] = {1, 2, 3, 4, 5, 6};
+
+    vector&#60;int&#62; A;
+    vector&#60;int&#62; B;
+    set&#60;int&#62; Result;
+
+    copy(&#38;A1[0], &#38;A1[6], back_inserter(A));
+    copy(&#38;B1[0], &#38;B1[6], back_inserter(B));
+
+    merge(A.begin(), A.end(), B.begin(), B.end(),
+        inserter(Result, Result.begin()) );
+
+    copy(Result.begin(), Result.end(), ostream_iterator&#60;int&#62;(cout, " "));
+
+    cout &#60;&#60; endl;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 예제는 많은 것을 포함하고 있다. 배열이 어떻게 iterator 처럼 사용될수 있는지 
+				(이미 iterator 를 포인터처럼 사용할수 있다고 앞에서 언급한적이 있다.), 그리고 
+				iterator 를 어떻게 알고리즘에 적용시킬수 있는지를 보여준다. 
+				위의 프로그램은 먼저 배열 A1, B1 을 각각 vector A, B 에 입력한다. 그다음 
+				merge 를 이용해서 A 와 B 의 값을 set 컨테이너인 Result 에 입력한다. 
+				set 은 정렬연관 컨테이너 임으로 A 와 B 의 값은 서로 정렬되어서 결합되게 될것이다. 
+				그러므로 위의 코드 실행 결과는 "1 2 3 4 5 6 7 9 11" 이 될것이다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN42"
+>1.3&#51208;. Input Iterator</A
+></H2
+><P
+>			입력반복자라고 불리우며, 읽기전용의 반복자이다. Output Iterator 과 정반대의 
+			Iterator 이다. 마찬가지로 ++ 연산을 통해서 한쪽방향으로 순환이 가능하도록 
+			되어 있다.    
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN45"
+>1.3.1&#51208;. istream_iterator&#60;T&#62;</A
+></H3
+><P
+>	
+				입력반복자의 가장 대표적인 iterator class 이다. 스트립에 입력된 값을 
+				읽는 일을한다. 위에 ostream_iterator 을 이용해서 화면에 출력시켰던 프로그램을 
+				키보드로 부터 입력받는 프로그램으로 변경해보자.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;string&#62;
+
+int main()
+{
+    vector&#60;string&#62; V;
+
+    copy(istream_iterator&#60;string&#62;(cin), istream_iterator&#60;string&#62;(),
+        back_inserter(V));
+
+    vector&#60;string&#62;::iterator mi;
+    mi = V.begin();
+
+    while(mi != V.end())
+    {
+        cout &#60;&#60; *mi &#60;&#60; endl;
+        *mi++;
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 코드를 컴파일후 실행시켜 보면 키보드 입력을 받아서 vector V 에 키보드 입력이 
+				저장되는것을 볼수 있을것이다. 
+			</P
+><P
+>	
+				이코드를 보면 알겠지만 vector V 에 원소를 집어 넣는 문제를 해결했음을 알수 있다. 
+				바로 back_inserter 이라는 함수를 사용해서 해결했는데, 이것은 iterator adaptor 이다. 
+				즉 Output Iterator 를 사용할수 있도록 인터페이스(가교)를 제공해주는 역활을 한다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN50"
+>1.4&#51208;. Forward Iterator</A
+></H2
+><P
+>			순방향 반복자이며, 한쪽방향으로 진행하며 읽기/쓰기가 모두 가능한 형태의 
+			Iterator 이다. 다중 패스 알고리즘을 적용하기 위해서 사용될수 있다.
+			forward Iterator 를 사용하는 대표적인 알고리즘으로 replace 라는 알고리즘이 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>  	
+template &#60;class ForwardIterator, class T&#62;
+void replace(ForwardIterator first, ForwardIterator last, const T&#38; old_value, const T&#38; new_value)
+			</PRE
+></TD
+></TR
+></TABLE
+>  
+			이 알고리즘은 한쪽방향으로 진행하면서 컨테이너의 원소를 읽어 들이고 또한 그 자리에서 
+			쓰기 까지 가능하다. 단지 읽기만 가능하거나 쓰기만 가능한 Input/Output Iterator 와 
+			비교 되는 기능이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;algorithm&#62;
+
+int main()
+{
+    vector&#60;int&#62; V;
+    V.push_back(1);
+    V.push_back(1);
+    V.push_back(2);
+    V.push_back(3);
+    V.push_back(1);
+    V.push_back(4);
+
+    replace(V.begin(), V.end(), 1, 5);
+
+    for (int i = 0; i &#60; V.size(); i++)
+        cout &#60;&#60; V[i] &#60;&#60; endl;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			실행시켜 보면 모든 1 이 5로 치환되어 있음을 알수 있다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN55"
+>1.5&#51208;. Bidirectional Iterator</A
+></H2
+><P
+>			지금까지의 Iterator 는 한방향으로만 순환이 가능했다. 즉 Iterator 에 대한 ++ 연산만 
+			가능했다 바면 Bidirectional 이란 이름에서 알수 있듯이 이 Iterator 는 양방향 모두로의 
+			순환이 가능하다. 기본적인 특징은 Forward Iterator 과 같다.   
+		</P
+><P
+>			양방향 반복자를 필요로 하는 가장 대표적인 알고리즘으로 reverse 알고리즘이 있다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>template &#60;class BidirectionalIterator&#62;
+void reverse(BidirectionalIterator first, BidirectionalIterator last);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			reverse 는 컨테이너의 원소를 뒤집는 일을한다. 그러므로 이 일을 효율적으로 수행하기 
+			위해서는 컨테이너의 시작과 끝에 동시에 접근해서 원소를 서로 바꿔줄수 있도록 되어야 한다. 
+			그러기 위해서는 Iterator 에 대한 ++, -- 연산이 가능해야 하며, 읽기/쓰기가 가능해야 한다. 
+			Bidirectional 이터페이터는 그러한 기능을 제공해준다. 		
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;algorithm&#62;
+
+int main()
+{
+    vector&#60;int&#62; V;
+    V.push_back(1);
+    V.push_back(2);
+    V.push_back(3);
+    V.push_back(4);
+
+    reverse(V.begin(), V.end());
+
+    for (int i = 0; i &#60; V.size(); i++)
+        cout &#60;&#60; V[i] &#60;&#60; endl;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 코드를 실행시켜 보면 vector 의 요소들이 뒤집어져 있음을 알수 있을것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN61"
+>1.6&#51208;. Random Access Iterator</A
+></H2
+><P
+>			이것은 Bidirectional Iterator 의 특징인 양방향순환의 특징외에도 랜덤하게 원소에 
+			접근할수 있는 특징을 제공한다. 다른 Iterator 들이 컨테이너를 순회하기 위해서 
+			각원소에 차례대로 접근했던것과는 다르다.   	
+		</P
+><P
+>			예를들어 어떤 컨테이너에 대해서 binary search 를 수행한다고 가정해 보자, binary serach 
+			의 특성상 Iterator 는 컨테이너의 임의 지점에 접근이 가능해야 search 가 효율적으로 
+			이루어질수 있을것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;vector&#62;
+#include &#60;algorithm&#62;
+
+int main()
+{
+    vector&#60;int&#62; V;
+    V.push_back(1);
+    V.push_back(2);
+    V.push_back(3);
+    V.push_back(5);
+    V.push_back(7);
+    V.push_back(10);
+    V.push_back(4);
+
+    cout &#60;&#60; binary_search(V.begin(), V.end(), 10) &#60;&#60; endl;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			binary_search 는 다음과 같이 정의되어 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>bool binary_search(ForwardIterator first, ForwardIterator last,
+                   const LessThanComparable&#38; value);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN68"
+>2&#51208;. 결론</A
+></H1
+><P
+>		이상 Iterator 의 종류와 특성에 대해서 간단히 알아보았다. 
+		꽤 혼동될수 있는데 그냥 상식적으로 생각하면 된다. 
+	</P
+><P
+>		예를들어 vector, deque, list 등의 Sequence container 들은 임의 접근이 가능하므로 
+		당연히 Random Access Iterator 를 사용할수 있을것이며, 마찬가지로 이러한 Iterator 를 
+		사용하는 알고리즘들도 사용할수 있을 것이다. 
+	</P
+><P
+>		그러나 map, set 등과 같은 association container 에는 사용할수 없을것이다.   
+	</P
+><P
+>		Iterator 를 사용하는 이유는 가장 간단하게 봤을때 컨테이너원소에 접근하기 위한 
+		용도이며, 특히 알고리즘을 적용시키기 위한 목적으로 사용한다. 
+		그리고 알고리즘에 따라서 받아들일수 있는 Iterator 의 종류가 다를수 있음으로 
+		각 컨테이너가 어떠한 Iterator 를 되돌려줄수 있는지 알고 있어야 한다. 머 그렇다고 
+		걱정할 필요는 없다. 누차 말했듯이 그냥 상식적으로 생각하면 되기 때문이다.   
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

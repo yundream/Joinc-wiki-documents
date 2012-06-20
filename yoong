@@ -1,0 +1,57 @@
+#title 융영의 위키
+
+ || 본명 			|| 김융영							||
+ || Nick			|| yoong, 융영						||
+ || Email			|| [mailto:100460@hanmail.net]		||
+ || 생년월일		|| 1980/12/09						||
+ || 현재 하는일		|| (주) 다음커뮤니케이션 광고 서버 개발			||
+ || 좋아하는 것들	|| Linux/Windows 서버 개발			||
+
+=== 융영 고고 ===
+ 1. [iocp이야기]
+
+=== 테스트코드 ===
+{{{#!plain
+typedef struct {
+    struct sembuf lock;
+    struct sembuf unlock;
+    int semid;
+} semlock ;
+
+int sem_init(slock *pLock)
+{
+    pLock->semid = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600);
+    if (pLock->semid < 0) {
+        perror("semget");
+        return 0;
+    }
+
+    pLock->lock.sem_num = 0;
+    pLock->lock.sem_op = -1;
+    pLock->lock.sem_flg = SEM_UNDO;
+    pLock->unlock.sem_num = 0;
+    pLock->unlock.sem_op = 1;
+    pLock->unlock.sem_flg = SEM_UNDO;
+    return 1;
+}
+
+void sem_lock(slock *pLock)
+{
+    while (semop(pLock->semid, &pLock->lock, 1) < 0) {
+        if (errno != EINTR) {
+            perror("semop");
+            exit(-1);
+        }
+    }
+}
+
+void sem_unlock(slock *pLock)
+{
+    while (semop(pLock->semid, &pLock->unlock, 1) < 0) {
+        if (errno != EINTR) {
+            perror("semop");
+            exit(-1);
+        }
+    }
+}
+}}}

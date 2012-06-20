@@ -1,0 +1,79 @@
+#title Joinc Service Traffic Agent
+
+[[TableOfContents]]
+
+== 소개 ==
+Joinc 사이트의 Service Traffic를 관리하기 위한 목적으로 운용되는 사이트
+ * [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/Jsta Source Tree 보기]
+
+== 다운로드 받기 ==
+ * [http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/Jsta/Jsta.tar.gz?tarball=1 다운로드]
+<!> 작동은 하지만 아직 충분히 테스트되지 않은 코드입니다.
+
+== cvs 관련 작업 ==
+{{{#!plain
+#cvs -d:pserver:yundream@cvs.joinc.co.kr:/home/jcvs/Jsta login 
+#cvs -d:pserver:yundream@cvs.joinc.co.kr:/home/jcvs/Jsta co Jsta 
+}}}
+[wiki:JCvs/Jsta/cvs cvs 저장소 보기]
+
+== Idea ==
+=== 전체 구성 ===
+libpcap(12)를 이용해서 원하는 서비스별로 pps,bps에 대한 Count를 유지하는 Agent를 생성한다. 유지되는 Count 정보는 Manager 프로그램을 이용해서 얻어올 수 있으며, 이를 기본정보로 모니터링을 하게된다.
+
+여기에서는 RRD(12)응용을 한다.
+
+attachment:jstg1.png
+{{{#!plain
+
+ Interface|<--------- JSTA ---------------------->| 
+          |                                       |
+          |  +----------+     +----------------+  |  IPC(:12)    
+      <---|->| libpcap  |---->| Counting Table |  |
+          |  +----------+     |----------------|  |
+          |                   | + port         |<-|----------------------> Manager
+          |                   +----------------+  |
+          |                                       |
+}}}
+
+ 1. JSTA는 pcap을 이용해서 해당 서비스에 대한 bps, pps정보를 가져오고 이에 대한 Count Table을 유지한다.
+ 1. Count Table의 정보는 Manager를 이용해서 가져올 수 있으며, 통신을 위해서 IPC(12)를 이용한다.
+ 1. Manager를 통해 얻어온 정보는 여러가지 방식으로 응용가능하다.
+ 1. 여기에서는 RRD(:12) 응용을 한다.
+
+가장 쉬운 응용은 crontab을 이용한 방법일 것이다. manager를 이용해서 5분간격으로 count 정보를 가져와서 이것을 파일로 저장하거나 혹은 DB에 저장한 후, 웹인터페이스등을 통해서 요청시 이미지 정보를 보여주는 방식이다.
+
+=== JSTA Agent 구성 ===
+Agent는 데이터 수집부와 요청처리부로 나뉜다. 데이터 수집부는 libpcap을 이용해서 패킷을 캡쳐하고 해당 서비스 Port에 대한 Count Table을 유지한다.
+
+요청처리부는 Unix Domain Socket를 통해서 입력된 요청을 받아 분석한 후, 필요한 Count값을 Client에게 보내준다. 요청분석은 PARSER에 넘겨서 문맥을 분석하고 리턴값을 확인하는 방식으로 구현하도록 한다. 궁극적으로는 간단한 sql parser를 구현하는 걸 목적으로 하지만, 여기에서는 NULL 함수로 만들도록 한다.
+
+== 사용 ==
+=== JSTA 실행하기 ===
+인자로 수집하고자 하는 포트번호를 입력하면 된다.
+{{{#!plain
+# ./jsta 80 
+}}}
+=== 사용 예 ===
+다양한 응용이 가능하겠지만, 여기에서는 RRD를 통한 응용을 기준으로 설명하도록 하겠다. 
+
+우선 RRD툴이 설치되어 있어야 한다. [wiki:Site/SNMP/document/RRD RRD 사용하기] 문서를 참고하기 바란다.
+
+crontab등을 이용한 실 응용방법은 [wiki:Site/SNMP/document/Advanced_Sample RRD를 이용한 Service Traffic 통계 그래프 생성]를 참고하기 바란다.
+
+== 실 적용 예 ==
+아래의 그림은 www.joinc.co.kr의 80번 서비스에 대해서 Jsta를 적용한 후 RRD를 통해서 확인한 결과다.
+http://www.joinc.co.kr/modules/rrd/images/bpsday.png
+
+http://www.joinc.co.kr/modules/rrd/images/ppsday.png
+
+http://www.joinc.co.kr/modules/rrd/images/bpsweek.png
+
+http://www.joinc.co.kr/modules/rrd/images/ppsweek.png
+
+== 관련 정보 ==
+ * [wiki:Site/SNMP/document/Advanced_Sample RRD를 이용한 Service Traffic 통계 그래프 생성]
+ * [wiki:article/libpcap을_이용한_프로그래밍 libpcap을 이용한 패킷캡쳐]
+ * [wiki:article/Pcap_패킷캡쳐응용 pcap를 이용한 ID/Password 캡쳐]
+ * [wiki:article/Port_Scannig_검사툴 pcap를 이용한 포트스캐닝 검사 툴 만들기]
+

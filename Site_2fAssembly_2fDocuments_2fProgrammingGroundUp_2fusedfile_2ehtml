@@ -1,0 +1,968 @@
+#title 5장. 파일 다루기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>파일 다루기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="Programming from the Ground Up"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="함수에 대해서 다루기"
+HREF="assemblylanguageprogram.html"><LINK
+REL="NEXT"
+TITLE="레코드 단위의 읽기와 쓰기"
+HREF="recordreadandread.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>Programming from the Ground Up</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="assemblylanguageprogram.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="recordreadandread.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="USEDFILE"
+></A
+>5. 파일 다루기</H1
+><P
+>		컴퓨터 프로그래밍의 많은 부분은 파일을 다루는 작업이다. 컴퓨터가 일단 리붓되면 
+		이전의 작업내용은 단지 파일로만 남기 때문에, 어떤 데이터를 보존하기 위해서 
+		디스크상에 파일로 저장하는 일은 매우 중요한 작업이다. 마찬가지로 프로그램역시 
+		종료하게 되면 메모리에 가지고 있던 모든 내용을 잃어 버리기 때문에, 지속적으로 
+		남겨두어야할 데이터(persistent data 라고 부른다)는 파일로 남겨두어야 한다.
+	</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="INTROFILE"
+></A
+>5.1. 유닉스 파일 소개</H2
+><P
+>			모든 운영체제는 나름대로의 파일을 다루는 방법을 가지고 있다. 리눅스는 
+			유닉스의 파일 다루기 방법을 채택하고 있다. 유닉스 파일을 따르는 이유는 
+			매우 단순하고, 가장 오래, 그리고 널리 사용되고 있는 형식이기 때문이다. 
+			유닉스 파일은 프로그램에 의해서 생성되며, 바이트의 연속된 스트림으로 
+			읽을 수 있다. 시스템 관리자나 프로그래머는 파일에 주어진 고유한 이름으로 
+			파일에 접근할 수 있다. 반면 운영체제는 파일을 이름이 아닌 
+			<B
+CLASS="EMPHASIS"
+>file descriptor</B
+>라고(이하 파일지정번호) 불리우는 
+			숫자로 인식한다.  프로그램상에서 여러분은 파일지정번호를 이용해서 읽거나 
+			쓰는 작업을 할 수 있다. 
+		</P
+><P
+>			우리가 작성한 프로그램은 다음과 같은 방법으로 파일을 다룬다. 	
+			<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					먼저 리눅스에 어떤 파일이름을 열(open)것인지를 요청한다. 파일을 
+					열때는 읽기전용,쓰기전용,읽기/쓰기모두 가능,파일이 존재하지 않을 경우
+					새로 생성등 다양한 방법으로 열 수 있다. 이러한 것은 open(2) 시스템콜
+					을 이용해서 이루어진다. open은 파일의 이름, 모드, 권한등을 인자로 
+					입력받는다. open은 시스템 콜 번호로 5번이다. 파일이름의 첫번째 문자는 
+					%ebx에 저장하면 된다. 두번째 인자인 모드는 %ecx에 저장한다. 만약 
+					읽기로 연다면 0을 쓰기위해서 연다면 03101을 저장하면 된다(반드시 
+					가장 앞에 0을 써줘야 한다). 세번째 인자는 권한(permission)과 관련된 
+					설정을 넘기기 위해서 사용하는데, %edx에 해당 값을 저장하면 된다. 
+					만약 모든 유저에게 읽기/쓰기가 가능하도록 하고 싶다면 0666을 넘기면 
+					된다.  
+				</P
+></LI
+><LI
+><P
+>					open작업이 성공적으로 이루어졌다면 파일 지정자를 리턴하게 된다. 
+					리턴값은 %eax를 통해서 읽어올 수 있다. 리턴된 번호는 파일을 가리키는 
+					역할을 한다. 
+					</P
+></LI
+><LI
+><P
+>					이제 파일 지정자를 이용해서 읽거나 쓰는 작업을 하면 된다. 
+					read(2)는 시스템콜 번호 3번이다. 이 시스템콜은 3개의 인자를 필요로 
+					한다. 첫번째 인자는 읽기 원하는 파일의 지정자이며 %ebx에 저장하면 된다.
+					두번째 인자는 읽어들인 데이터가 저장될 버퍼의 주소를 가리키며 %ecx에 주소값을
+					저장한다. 마지막 인자는 버퍼의 크기로 %edx에 저장한다. 버퍼는 section 
+					.bss를 이용해서 지정할 수 있다. read는 파일로 부터 읽어들인 문자의 갯수를 
+					리턴하거나, 에러 코드를 리턴한다. 에러코드는  (-)값 이므로 정상리턴값과 
+					쉽게 구분할 수 있다.  
+					</P
+><P
+>					write(2)는 시스템콜 번호 4번으로 버퍼에 파일에 쓸 내용을 채워서 전달하는 것을 
+					제외하고 인자는 read와 동일하다. write 시스템콜은 파일에 쓴 데이터의 크기 혹은
+					에러코드를 리턴한다. 
+					</P
+></LI
+><LI
+><P
+>					파일관련된 모든 작업을 마쳤다면, 열린파일을 닫아야 한다. 파일을 닫을 때 사용되는 
+					시스템콜은 6번 번호를 가지는 close(2)이다.단지 닫고자 하는 파일의 지정자만
+					인자로 넘기면 된다.   
+					</P
+></LI
+></OL
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="BUFFERANDBSS"
+></A
+>5.2. 버퍼와 .bss</H2
+><P
+>			이전장에서 버퍼에 대해서 언급했는데, 자세히 설명하지는 않았다. 이번 장에서는 버퍼에 
+			대해서 자세히 설명해보도록 한다. 버퍼는 대량의 데이터를 전달하기 위해서 사용되는 
+			연속되는 블럭영역이다. 당신이 파일로 부터 데이터를 읽기를 원한다면, 요청은 
+			운영체제로 전달되는데, 이때 읽은 데이터를 어디엔가에 저장할 수 있어야 한다. 이러한 
+			장소를 버퍼라고 한다. 일반적으로 버퍼는 데이터의 임시 저장장소로 사용되며, 버퍼를 
+			이용함으로서 프로그램은 데이터를 좀더 쉽게 다룰 수 있게 된다.  
+		</P
+><P
+>			버퍼를 생성할때 여러분은 고정된 크기의 버퍼를 만들지 아니면 필요에 따라 크기가 
+			변하는 버퍼를 생성해야 할지 선택해야 한다. 고정된 크기의 버퍼 생성은 간단하다. 
+			.long 나 .byte 를 이용해서 버퍼로 사용될 크기를 직접 지장하면 된다. 반면 동적으로 
+			변하는 버퍼의 생성은 다루어야할 내용이 많으므로 ??장에서 따로 다루도록 하겠다.   
+			버퍼공간을 확보하는건 간단하긴 하지만 공간확보를 위한 단위로 .byte를 사용해야 한다는 
+			것 때문에 몇가지 문제점이 발생하다. 첫번째는 공간의 크기를 계산해야 하는 문제다. 
+			문자 500자를 저장하는 것과 int형 숫자 500개를 저장하기 위한 예에서 보듯이 
+			저장되는 원소의 갯수는 동일하지만, 원소가 차지하는 크기가 다름으로 필요한 공간계산에서
+			실수가 발생할 수 있다. 특히 어셈블러나 C와 같은 중/저 수준의 언어를 이용할경우 
+			이러한 실수는 일상적으로 발생할 수 있다.  
+		</P
+><P
+>			두번째.. 이러한 공간은 프로그램 실행시 생성된다. 중간에 필요 없다고 해서 없앨 수 없다. 
+			이는 공간이 낭비될 수 있음을 의미한다. 
+		</P
+><P
+>			물론 이들 문제에 대한 해법도 존재하는데 .text, .data 섹션을 사용하는 것이다. 
+			.bss 색션은 저장공간을 확보할 수 있지만 초기화 할수는 없다. .data 섹션의 경우
+			공간을 확보하고 값을 초기화 할 수 있다. 이러한 특성 때문에 값을 초기화할 필요없는 
+			공간을 확보하고자 할때 주로 사용한다. .bss는 다음과 같이 사용할 수 있다.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.section    .bss
+  .lcomm  my_buffer, 500
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			<B
+CLASS="EMPHASIS"
+>.lcomm</B
+>은 500byte의 공간을 할당하고, 공간을 가리키기위한 심볼로 
+			my_buffer을 생성한다. 만들어진 공간은 다음과 같이 사용할 수 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>movl  $my_buffer,  %ecx
+movl  500, %edx
+movl  3, %eax
+int   $0x80
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 코드는 read 시스템콜을 실행시킨 예로, 500바이트만큼의 데이터를 읽어서 my_buffer로 
+			복사한다. C스타일로 바꿔 보자면 아래의 코드 정도가 될것이다.    
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>read(fd, my_buffer, 500);
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			my_buffer을 사용할 때 가장 앞에 달러($)표시가 있음을 주목하기 바란다. $표시가 
+			사용할 경우  immediate 모드 어드레스 상태가 되고 버퍼의 시작위치를 가리키게 된다. 
+			결과적으로 %ecx는 my_buffer의 저장공간의 시작 주소를 가리키게 된다. C언어를 
+			해봤다면 결국은 포인터와 비슷한 개념이라는 생각이 들 것이다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="FILETYPE"
+></A
+>5.3. 표준파일과 특수 파일들</H2
+><P
+>			당신이 프로그램을 실행시키면 기본적으로 여는 파일들이 몇게 있다. 리눅스는 
+			다음과 같은 3개의 파일을 기본적으로 생성시킨다.  
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>STDIN</DT
+><DD
+><P
+>						표준 입력(standard input)으로, 읽기 전용이다. 보통 키보드로부터의 
+						입력을 받아들인다. 표준 입력을 위한 파일지정자는 언제나 0이다.
+					</P
+></DD
+><DT
+>STDOUT</DT
+><DD
+><P
+>						표준 출력(standard output)으로, 쓰기 전용이다. 모니터 화면에 
+						출력하기 위해서 사용된다. 표준 출력을 위한 파일지정자는 언제나 1이다.  
+					</P
+></DD
+><DT
+>STDERR</DT
+><DD
+><P
+>						표준 에러(standard error)으로, 쓰기 전용이다. 모니터 화면에 
+						출력(쓰기)하기 위해서 사용된다. 에러 메시지를 출력한다. 어차피 모니터 화면에
+						출력하는 거라면 STDOUT와 다를게 뭐가 있느냐라고 새각할 수도 있을것 같다. 
+						만약 화면출력을 하는데, 정상적인 메시지와 에러 메시지가 같은 파일지정자를 
+						쓴다면 이를 구분해 내기가 매우 짜증날 것이다. 표준에러를 따로 분리하므로써 
+						에러메시지를 일반메시지와 쉽게 분리할 수 있다.  
+					</P
+></DD
+></DL
+></DIV
+>
+			키보드 입력과 화면 출력같은 것들을 파일로 다룸으로 이들 입/출력을 쉽게 실제파일로 
+			보낼 수도 있다. 이러한걸 재지향(redirected)이라고 한다. 재지향과 관련된 내용은 
+			이 문서의 범위를 벗어나므로 자세히 설명하진 않겠다. 재지향과 관련된 내용은 
+			UNIX 사용과 관련 다른 책들을 참고하기 바란다.  
+		</P
+><P
+>			키보드, 모니터와 같은 것들 외에도 유닉스는 다른 모든 장치들 예를 들면 
+			시리얼 포트, 오디오 장치, 네트워크 연결들까지도 파일로 다룬다. 
+			뿐만 아니라 프로세스간의 통신을 위해서 사용되는 pipe와 같은 것들 역시 파일로 
+			다룬다. 모든것을 파일로 다루게 되므로써 동일한 방법을 써서 이들 장치를 제어할 수
+			있게 된다. 기본적으로 read, write를 이용하는 정도로 이들 모든 장치의 입출력을 
+			해결할 수 있다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="USEDFILEINPROG"
+></A
+>5.4. 프로그램에서 파일의 이용</H2
+><P
+>			이번에는 파일을 다루는 간단한 프로그램을 만들어 보도록 하겠다. 이 프로그램은 
+			두개의 파일을 이용한다. 하나의 파일로부터 문자를 읽어 들이고 읽어들인 문자를 
+			영문 대문자로 변경하는 일을 한다. 이 프로그램의 아래의 주요 부분으로 이루어진다. 
+		</P
+><P
+>			<P
+></P
+><UL
+><LI
+><P
+>					메모리의 블럭에 있는 문자데이터를 대문자로 변경하는 함수를 가진다. 
+					이 함수는 데이터가 있는 메모리블럭의 주소와 크기를 인자로 받는다. 		
+					</P
+></LI
+><LI
+><P
+>					주요 코드중의 하나는 파일로 부터 데이터를 버퍼로 읽어들이는 코드이다. 
+					이 코드는 파일에 더이상 데이터가 없을 때까지 버퍼로 읽어 들이고 위의 
+					대문자 변경함수에 버퍼를 인자로 넘기고 실행해서 결과값을 다른 파일로 
+					저장한다.	
+					</P
+></LI
+></UL
+>
+		</P
+><P
+>			조금 복잡한 프로그램을 작성하다 보면 프로그램 전역적으로 고정되어서 사용해야할 
+			많은 상수 값들이 필요해진다. 예들들어 시스템 콜번호는 변하지 않는 숫자로 구성되어 
+			있는데, 사용할 때마다 숫자로 기억해내서 쓰는건 매우 귀찮은 일일 것이다. 이럴경우
+			<B
+CLASS="EMPHASIS"
+>.equ</B
+>를 이용한다. .equ는 일종의 별칭을 만들어주기 위해서 사용하는
+			지시어로 C의 #define과 비슷한 일을 한다.    
+		</P
+><P
+>			.equ의 실질적인 사용용도를 알아보도록 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.equ LINUX_SYSCALL  0x80
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위와 같이 하면 코드내에서 시스템콜을 호출할 때, 보기 힘든 0x80대신 LINUX_SYSCALL을 
+			사용할 수 있다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int  $LINUX_SYSCALL
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			0x80보다는 훨씬 읽고 기억해내기 쉽다. 복잡한 코드에서 .equ는 가독성을 높이는데 
+			중요한 역할을 한다. 
+		</P
+><P
+>			다음은 실제 작동가능한 문자변한 프로그램이다. 파일명은 file.s로 저장하도록 하자.   
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># 하 는 일 : 파일로 부터 문자를 읽어들이고 대문자로 바꾼후 다른 파일로 저장한다.
+# 프로세스 : 1. 읽을 파일을 연다.
+#            2. 쓸 파일을 연다.
+#            3. 파일의 끝이 아니라면 다음의 프로세스를 반복한다.
+#               1) 파일로 부터 문자열을 읽어서 메모리에 넣는다.
+#               2) 메모리로 부터 각 문자를 대문자로 변경한다.
+#               3) 변경된 문자는 파일로 저장한다.
+
+.section .data
+
+# 상수들 
+.equ  SYS_OPEN,  5
+.equ  SYS_WRITE, 4 
+.equ  SYS_READ,  3
+.equ  SYS_CLOSE, 6
+.equ  SYS_EXIT,  1
+
+# open()에 사용할 옵션 
+# 이들에 대한 내용은 open()함수의 man페이지를 참고한다. 
+.equ  O_RDONLY,  0
+.equ  O_CREAT_WRONLY_TRUNC,  03101
+
+# 표준 파일 지정자
+.equ  STDIN,  0
+.equ  STDOUT, 1
+.equ  STDERR, 2
+
+# 시스템 콜 중단(interrupt)
+.equ  LINUX_SYSCALL, 0x80
+
+.equ  END_OF_FILE,       0  # 파일의 끝을 검사하기 위해서 사용한다.
+                            # read()의 리턴값과 비교한다.
+
+.equ  NUMBER_ARGUMENTS,  2
+
+.section .bss
+# 버퍼 - 파일로 부터 데이터를 읽어들인 데이터를 저장하기 위한 
+#        목적으로 사용된다. 
+#        버퍼의 크기는 여러가지 이유로 16,000을 초과할 수 없다.
+.equ  BUFFER_SIZE,  500
+.lcomm BUFFER_DATA, BUFFER_SIZE
+
+.section .text
+
+# 스택 위치
+.equ  ST_SIZE_RESERVE, 8
+.equ  ST_FD_IN,    -4
+.equ  ST_FD_OUT,   -8
+.equ  ST_ARGC,     0      # 인자의 갯수
+.equ  ST_ARGV_0,   4      # 프로그램의 이름
+.equ  ST_ARGV_1,   8      # 읽어들일 파일의 이름 
+.equ  ST_ARGV_2,   12     # 저장할 파일의 이름 
+
+.globl _start
+
+_start:
+### 초기화 관련 ### 
+# 스택포인터를 저장한다.
+movl  %esp, %ebp
+# 스택에 파일 지정자를 저장하기 위한 공간을 할당한다. 
+subl  $ST_SIZE_RESERVE, %esp
+
+open_files:
+open_fd_in:
+### 읽어들일 파일을 연다 ###
+movl  $SYS_OPEN, %eax             # syscall을 연다. 
+movl  ST_ARGV_1(%ebp), %ebx       # %ebx에 파일이름을 넣는다. 
+movl  $O_RDONLY, %ecx             # read-only 플래그
+movl  $0666, %edx                 # 파일 권한을 0666으로 한다. 누구든지 읽고쓸수 있다.
+int   $LINUX_SYSCALL              # 리눅스 호출
+
+store_fd_in:
+movl  %eax, ST_FD_IN(%ebp)        # 리턴된 파일 지정자를 저장한다. 
+
+open_fd_out:
+### 저장할 파일 열기 ###
+movl  $SYS_OPEN, %eax             # 파일 열기
+movl  ST_ARGV_2(%ebp), %ebx       # 열 파일이름을 지정한다.
+movl  $O_CREAT_WRONLY_TRUNC, %ecx # 쓰기위한 플레그의 설정
+movl  $0666, %edx                 # 파일권한 설정
+int   $LINUX_SYSCALL              # 리눅스 호출
+
+
+store_fd_out:
+movl  %eax, ST_FD_OUT(%ebp)       # 파일 지정자를 저장한다.
+
+### 주요 루프 시작 ###
+read_loop_begin:
+
+### 파일로 부터 읽어들이는 부분 ###
+movl $SYS_READ, %eax
+movl ST_FD_IN(%ebp), %ebx         # 읽어들일 파일 지정자 
+movl $BUFFER_DATA, %ecx           # 읽어들인 데이터를 저장할 버퍼
+movl $BUFFER_SIZE, %edx           # 읽어들일 크기
+int  $LINUX_SYSCALL               # 시스템콜의 실행
+                                  # 리턴값은 %eax에 저장된다.
+
+cmpl $END_OF_FILE, %eax           # 파일의 끝인지 검사한다.
+jle  end_loop                     # 만약 그렇다면 end_loop로 점프한다.
+
+continue_read_loop:
+### 입력된 문자를 대문자로 변경하는 부분 ###
+pushl $BUFFER_DATA                # 버퍼의 위치
+pushl %eax                        # 버퍼의 사이즈
+call  convert_to_upper            # 대문자 변경함수의 호출
+popl  %eax                        
+addl  $4, %esp
+
+### 변경된 문자를 파일에 쓴다 ### 
+movl  %eax, %edx                  # 버퍼의 크기
+movl  $SYS_WRITE, %eax
+movl  ST_FD_OUT(%ebp), %ebx       # 저장에 사용할 파일 지정자
+movl  $BUFFER_DATA, %ecx          # 버퍼의 위치
+int   $LINUX_SYSCALL              # write()를 호출한다. 
+
+### 루프를 계속수행한다. ###
+jmp  read_loop_begin
+
+
+end_loop:
+### 파일을 닫는다. ###
+# 여기에서는 에러체크는 하지 않는다.
+movl  $SYS_CLOSE, %eax
+movl  ST_FD_OUT(%ebp), %ebx
+int   $LINUX_SYSCALL
+
+### 종료 코드 ###
+movl  $SYS_EXIT, %eax
+movl  $0, %ebx
+int   $LINUX_SYSCALL
+
+
+# 하 는 일 : 이 함수는 소문자를 대문자로 변경한다.
+#       
+.equ  LOWERCASE_A, 'a'
+.equ  LOWERCASE_Z, 'z'
+.equ  UPPER_CONVERSION, 'A' - 'a'
+
+.equ  ST_BUFFER_LEN,  8
+.equ  ST_BUFFER, 12
+
+
+convert_to_upper:
+  pushl %ebp
+  movl  %esp, %ebp
+  movl  ST_BUFFER(%ebp), %eax
+  movl  ST_BUFFER_LEN(%ebp), %ebx
+  movl  $0, %edi
+
+  cmpl  $0, %ebx
+  je  end_convert_loop
+
+convert_loop:
+movb  (%eax, %edi, 1), %cl
+
+cmpb  $LOWERCASE_A, %cl
+jl    next_byte
+cmpb  $LOWERCASE_Z, %cl
+jg    next_byte
+
+addb  $UPPER_CONVERSION, %cl
+movb  %cl, (%eax, %edi, 1)
+next_byte:
+incl  %edi
+cmpl  %edi, %ebx
+jne   convert_loop
+
+end_convert_loop:
+movl  %ebp, %esp
+popl  %ebp
+ret
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			위 프로그램을 touuper.s 로 저장하고 다음과 같은 방법으로 컴파일 하도록 하자.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as toupper.s -o toupper.o
+# ld toupper.s -o toupper
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램을 실행 시키면 모든 소문자를 대분자로 변경시킨다. 예를 들어서 
+			toupper.s 를 대문자로 변환시키고 한다면 다음과 같이 하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./toupper toupper.s toupper.uppercase:
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			touuper.uppercase 를 읽어보면 원래의 파일의 모든 내용이 대문자료 변경된걸 
+			확인할 수 있을 것이다. 
+		</P
+><P
+>			그럼 프로그램에 대해서 좀더 자세히 알아보도록 하자.
+		</P
+><P
+>			프로그램의 첫번째 섹션은 <B
+CLASS="EMPHASIS"
+>CONSTANTS.</B
+>로 시작한다. 
+			프로그램에서 상수(constant)는 프로그램이 어셈블 혹은 컴파일 될때 할당되는
+			값으로 변경될 수 없는 값이다. 상수를 언제 할당해서 쓰느냐는 프로그래머의 
+			취향에 따라 달라질 수 있지만, 일반적으로 프로그램의 가장 처음에 두는 것을 
+			원칙으로 한다. 프로그램 전역적으로 영향을 미친다는 상수의 특정상 
+			쉽게 확인 가능한 위치에 두는게 관리하기에 좋기 때문이다. 위의 프로그램에서는
+			파일 지정자와 인자접근, 버퍼크기, 시스템콜 번호 등 결코 바뀌지 않는 모든 
+			값들을 상수로 선언해서 사용하고 있다.  
+		</P
+><P
+>			어셈블리어에서 상수의 선언은 <B
+CLASS="EMPHASIS"
+>.equ</B
+>를 이용한다. 
+			C/C++의 #define 문이라고 볼 수 있다. 상수의 이름을 앞에 쓰고 그다음 
+			값을 쓰면 된다.  	
+		</P
+><P
+>			다음은 <B
+CLASS="EMPHASIS"
+>BUFFERS.</B
+> 섹션으로 프로그램의 버퍼와 관련해서 
+			사용한다. 여기에서도 버퍼의 크기는 BUFFER_SIZE. 상수로 정의해서 사용하고 
+			있다. 만약 버퍼의 크기를 바꾸고 싶다면 BUFFER_SIZE. 상수의 값만 변경해 
+			주면 된다. 버퍼의 이름은 BUFFER_DATA 로 했다. 여기에서 상수를 사용하면서 얻
+			을 수 있는 잇점이 하나 나왔는데. 특정 값을 일관되게 관리할 수 있다는 
+			점이다. 만약 상수를 사용하지 않았다면 버퍼의 크기를 바꿀 때 일일이 
+			버퍼의 크기를 찾아서 바꿔줘야 할것이다. 그만큼 실수를 확률도 많은데 상수의 
+			사용은 이러한 실수도 줄여준다.  
+		</P
+><P
+>			다음은 _start. 섹션인데, 우선은 코드의 마지막에 있는 convert_to_upper정의를 
+			먼저 보도록 하자. 여기는 실제로 문자의 변경을 위해 사용되는 코드 영역이다.  
+			역시 함수의 처음은 함수내에서 사용될 각종 상수를 정의하는 코드가 
+			들어가 있다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>.equ  LOWERCASE_A,   'a'              # a와 z는 소문자인지 체크하기 위한
+.equ  LOWERCASE_Z,   'z'              # 용도로 사용된다.
+.equ  UPPER_CONVERSION, 'A' - 'a'     # 대문자와 소문자간의 크기교정을 위한 용도
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위의 두개의 정의는 변환할 영문이 소문자인지를 체크하기 위한 용도로 사용한다.
+			ASCII(12) 테이블에서 문자 'a'와 'z'가 연속적으로 구성되어 있다는 것에 착안한 
+			코드다. 만약에 우리가 받아들인 문자가 소문자라면 대문자로 변경시켜줘야 
+			하는데, 대문자로 변경하기 위해서는 'A'에서 'a'의 차이 만큼만 더해주면 된다. 
+			다음의 C코드를 확인해 보기 바란다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main()
+{
+	printf("%d\n", 'A' - 'a');
+	printf("%c\n", 'a' + ('A' - 'a'));
+	return 0;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			다음 라인은 스택의 위치를 가리키기 위한 몇개의 상수를 선언하고 있다. 
+			이는 함수에서 인자를 사용하기 위해서는 함수 호출전 스택에 인자를 밀어 넣는데,
+			함수내에서는 이 스택의 위치를 이용해서 인자의 값을 얻어올 수 있기 때문이다.
+			하기 때문이다. 이들 상수는 접두사를 ST로 하고 있는데, 리턴 주소는 4, 
+			버퍼의 길이는 8, 그리고 버퍼의 주소는 12로 결정했다. 이렇게 정의해 놓은 
+			스택주소의 사용용도는 convert_to_upper: 을 보면 좀더 쉽게 이해할 수 있을 
+			것이다.	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>movl  ST_BUFFER(%ebp), %eax
+movl  ST_BUFFER_LEN(%ebp), %ebx
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위코드는 함수의 인자의 값을 스택에서 읽어들이는 일을 한다. 그다음 %edi에 0을
+			복사한다. %edi는 버퍼의 위치를 가리키는 이터레이터용도로 사용된다. 
+			버퍼의 위치는 %eax + %edi 로 계산한다(이를테면 배열에서 첨자를 증가시켜서 
+			위치를 가져오는 방식이다)
+		</P
+><P
+>			만약에 %ebx 즉 버퍼에 있는 데이터의 길이가 0이라면 루프를 종료시킨다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>cmpl  $0, %ebx
+je  end_convert_loop
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그렇지 않고 데이터의 길이가 0보다 크다면 convert_loop:를 돌면서 문자 변환 
+			작업을 수행한다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+movb  (%eax, %edi, 1), %cl
+
+cmpb  $LOWERCASE_A, %cl
+jl    next_byte
+cmpb  $LOWERCASE_Z, %cl
+jg    next_byte
+			</PRE
+></TD
+></TR
+></TABLE
+>	
+			여기에는 movb, cmpb 명령이 사용되고있다. 뒤에 b가 붙었는데, 이는 바이트 
+			단위로 연산을 실시하라는 뜻이 되겠다. %eax로 부터 %edi 만큼 이동한후 
+			1바이트를 %cl로 복사한다. 그후 %cl이 소문자면 대문자로 변경하게 된다.  
+		</P
+><P
+>			이렇게 해서 문자변경과 관련된 코드는 모두 이해하게 되었다. 이제 남은 것은 
+			파일로 부터 읽어들이고 쓰는 부분이다. 이부분을 다루기 위해서는 
+			UNIX의 open() 시스템콜을 어떻게 사용하는지 알아야 한다. 다음은 open() 
+			시스템콜을 사용하기 위한 시스템 콜번호와 인자를 위한 레지스터들 이다.
+			<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>					%eax 는 시스템 콜 번호를 저장한다. open의 시스템 콜번호는 5이다.
+				</P
+></LI
+><LI
+><P
+>					%ebx 에는 열고자 하는 파일의 이름이 들어간다. 파일이름은 반드시 
+					끝이 null로 끝나는 문자열이어야 한다.
+				</P
+></LI
+><LI
+><P
+>					%ecx 에는 파일을 열때 사용할 옵션이 들어간다. 읽기 전용, 쓰기전용, 
+					읽기/쓰기중 선택할 수 있다. 또한 파일이 존재하지 않을 경우 파일을 
+					생성할것인지, 존재할 경우에는 존재하는 파일을 열건지 아니면 
+					에러를 리턴할 건지 등도 결정할 수 있다.
+				</P
+></LI
+><LI
+><P
+>					%edx 는 파일의 권한을 설정하기 위해 사용한다. 여기에는 일반적인 
+					유닉스 권한을 사용할 수 있다. 
+				</P
+></LI
+></OL
+>
+			이 시스템 콜이 실행 후, 우리는 읽기 전용의 파일 지정자를 얻을 수 있다. 이 
+			파일 지정자는 %eax를 통해서 얻어올 수 있다. 
+		</P
+><P
+>			그럼 이제 파일을 열어야 할건데, 이 프로그램의 경우 열어야될 파일 이름을 
+			프로그램 실행인자로 넘겨 받고 있다. 다행스럽게도 프로그램의 실행인자는 
+			쉽게 읽어들일 수 있는 위치에 null-terminate 처리까지 마친 깔끔한 상태로 
+			저장되어 있다. 리눅스에서 프로그램이 실행인자의 저장된 위치를 가리키는 
+			포인터는 스택에 저장이 된다. 인자의 수가 저장된 포인터의 위치는 8(%esp)에
+			프로그램의 위치는 12(%esp) 그리고 실제 인자는 16(%esp)에 저장된다. 
+			C 프로그래밍 언어의 경우에는 argv 배열 값을 통해서 얻어오게 된다.
+		</P
+><P
+>			우리의 첫번째 프로그램에서 최근의 스택 위치는 %ebp에 저장하도록 했다. 그리고 
+			파일 지정자를 저장하기 위한 스택공간을 할당하고 있다. 나중에 여기에 
+			열린파일 지정자가 들어가게 된다.
+		</P
+><P
+>			이 프로그램은 우선 첫번째 실행인자를 얻어온다. 이 실행인자는 우리가 읽어들이기 
+			위한 원본 파일의 이름이된다. 원본 파일의 경우에는 단지 읽기만 하면 되므로 
+			읽기 전용으로 열었다. 파일의 권한은 $0666로 %edx를 를 통해서 넘겼다. 그 후 
+			%eax에 시스템콜의 번호를 저장하고 시스템콜을 실행한다. 실행이 성공적으로 
+			끝나게 되면, 우리는 스택에 있는 파일지정자를 읽어 올 수 있게 된다. 
+		</P
+><P
+>			지금까지와 같은 방법으로 복사될 파일 이름을 쓰기 전용으로 연다. 
+		</P
+><P
+>			이제 파일을 읽고/쓰는 주요 부분에 대해서 알아보자. 우리는 입력된 파일로 부터 
+			고정된 크기의 데이터를 읽어오고, 이것을 대/소문자 변환 함수에 넘긴 후, 
+			그 결과 값을 출력 파일에 쓰게 된다. 대/소문자 변환은 문자하나하나를 차례대로 
+			검사해서 변환하게 된다.   
+		</P
+><P
+>			데이터를 읽기 위해서 우리는 read 시스템 콜을 사용하고 있다. 이 시스템 콜은 
+			파일 지정자로 부터 데이터를 읽어들여서 버퍼에 지정된 크기만큼 복사한다. 
+			이 시스템콜은 실행을 마친후 읽어들인 데이터의 크기를 리턴한다. 만약 
+			파일의 끝을 만나게 되면 0을 리턴한다.
+		</P
+><P
+>			읽기 코드영역은 %eax의 값이 파일의 끝(0)을 가리키게 되면 빠져나오게 된다.   
+		</P
+><P
+>			만약 파일의 끝이 아니라면 읽어들인 데이터를 convert_to_upper함수로 넘겨서 
+			문자를 변환하게 된다. 
+		</P
+><P
+>			마지막으로 write 시스템콜을 이용해서 변환된 문자데이터를 복사할 파일에 쓰게 
+			된다. 모든 데이터의 처리가 다 끝나고 루프를 벗어나면 마지막으로 열린 
+			파일 지정자들을 모두 닫아준다. 파일을 닫기 위해서는 close시스템콜 호출한다. 
+			이 시스템 콜은 %ebx에 닫을 파일지정자를 넘긴다음 호출하면 된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="LASTSTUDY"
+></A
+>5.5. 복습</H2
+><P
+>			<P
+></P
+><UL
+><LI
+><P
+>						버퍼란 무엇인가 ?
+					</P
+></LI
+><LI
+><P
+>						표준 파일 지정자는 무엇이며, 어디에 사용할 수 있는가 ?
+					</P
+></LI
+><LI
+><P
+>						.data 섹션과 .bss 섹션의 차이는 무엇인가 .
+					</P
+></LI
+><LI
+><P
+>						파일로 부터 읽고 쓰기 위해서 사용하는 시스템콜에 대해서 설명하시오.
+					</P
+></LI
+></UL
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="assemblylanguageprogram.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="recordreadandread.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>함수에 대해서 다루기</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>레코드 단위의 읽기와 쓰기</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

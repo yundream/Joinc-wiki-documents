@@ -1,0 +1,567 @@
+#title 오늘의 명령어 모듈만들기
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>"오늘의 명령어" 모듈만들기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>"오늘의 명령어" 모듈만들기</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN20"
+>프로그램 제작</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN22"
+>필요로 하는 기능</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>기능 구현 방법 선택</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN28"
+>php 프로그래밍</A
+></DT
+><DT
+>2.2.2&#51208;. <A
+HREF="#AEN34"
+>C++과 Mysql API를 이용한 프로그래밍</A
+></DT
+></DL
+></DD
+><DT
+>2.3&#51208;. <A
+HREF="#AEN40"
+>기능구현</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN56"
+>다른 구현들</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		사이트에 사람의 시선을 붙들어두고 자주 방문하게 만들기 위해서는 
+		사이트가 정적인 느낌을 주면 안되며, 무언가 일정시간후에 내가 필요로 
+		할수도 있을 어떤 필요한 정보가 사이트에 업데이트 되더라는 느낌, 
+		즉 이 사이트는 동적인 사이트이구나 라는 생각을 방문자가 느낄수 
+		있도록 사이트의 내용을 구성하고 업데이트 시켜줘야 한다.  
+	</P
+><P
+>		특히 이 사이트와 같이 컨텐츠의 양과 질을 중요시 해야하는 사이트일수록 
+		"무언가 새로운 정보가 올라오는구나" 라는 느낌을 가질수 있도록 
+		만들어 줘야 한다. 그래서 흔히 이용하는 기법이 게시판의 게시물중 
+		최근의 게시물을 홈페이지 index 화면에 계속적으로 표시해서, 사이트 방문 
+		때마다 새로운 게시물이 갱신되고 있음을 방문자에게 인지 시켜주는 방법이다. 
+	</P
+><P
+>		필자가 생각 하기에 이 사이트는 강좌의 내용이 weblog 형식으로 방문자에게 
+		보여지는 형태인데, 강좌라는게 매일매일 올라오도록 하기에는 
+		아무래도 벅차므로, 2일에서 3일 간격정도로 자료 업데이트가 
+		이루어지게 된다. 그나마 바쁜주간이거나, 
+		시험공부를 해야 한다거나 하는 일이 
+		있을때는 1주일에 1번 정도 꼴로 업데이트가 되는 사태?가 발생할수도 
+		있다. 
+	</P
+><P
+>		이러한 업데이트 시간은 너무나도 긴 시간이며, 방문자를 지치게 만들수 
+		있다. 그렇다고 게시판의 갱신내용을 index 화면에 걸면 사이트가 좀 
+		지저분해 질거라고 생각이 되었다. 
+		무엇보다 이 사이트의 성격이 게시판 중심은 아니므로 index 화면에 
+		게시판의 내용을 보여주는건 적당하지 않다고 생각했다. 
+		그래서 생각한것이 "매일매일 하루에 
+		한가지씩 Unix 명령을 사용자에게 제공하는 기능의 구현" 이였다. 
+		<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN15"
+></A
+><P
+><B
+>&#44536;&#47548; 1. 오늘의 명령어</B
+></P
+><P
+><IMG
+SRC="/images/articles/todays_command.jpg"></P
+></DIV
+>
+	</P
+><P
+>		이 문서는 이러한 기능을 구현한 과정을 강좌 형식으로 담고 있다.  
+	</P
+><P
+>		이 문서는 sql 에 대한 가장 기본적인이해를 가지고 있다는 가정하에 
+		쓰여졌다. sql 을 알지 못하더라도 크게 문제 될건 없겠지만
+		select 정도의 문법만이라도 익히고 이 강좌를 읽는데 좀더 도움이 
+		될것이다. 이 강좌에서 사용된 sql 을 이해하는데에는 아마 한시간 정도만 
+		sql 공부에 투자하면 충분할것이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2&#51208;. 프로그램 제작</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1&#51208;. 필요로 하는 기능</A
+></H2
+><P
+>		이 프로그램에게 요구 되는 기능은 간단하다. 
+		"유닉스 명령어 사전" 들이 저장되어 있는
+		mysql 테이블에 접근해서 하루에 한가지씩 랜덤하게 명령어 목록을 
+		가져오게 하고 이 명령어에 링크를 걸어주도록 html 코드를 만들면 
+		된다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 기능 구현 방법 선택</A
+></H2
+><P
+>			이러한 기능구현을 위해서 필자는 2가지의 방법중 하나를 
+			택하기로 했다. 하나는 php 프로그래밍을 이용한 방법이고, 
+			다른 하나는 C 를 이용해서 mysql db 에 직접접근하는 
+			방법이였다. 이번장에서는 이 두가지 프로그래밍 방법중 
+			어느방법을 왜 선택했는지에 대해서 언급하도록 하겠다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN28"
+>2.2.1&#51208;. php 프로그래밍</A
+></H3
+><P
+>				php 를 이용해서 프로그래밍을 할경우  개발시간이 
+				매우 빠르고 또한 간단하다는 장점을 가지고 있다.
+			</P
+><P
+>				반면 단점도 있는데, 사용자가 index 페이지를 
+				클릭할때 마다, query 를 재실행해야 한다는 단점을 
+				가지고 있다. 실질적으로 오늘의 명령어로 선택된 
+				명령어는 오늘 하루동안은 바뀔필요가 없는 정적인 데이타이므로 
+				index 페이지를 클릭할때 마다, 명령어 이름과 
+				링크 정보를 가지고 오기 위한 query 를 실행한다는 것은 
+				매우 비효율적인 방법이기 때문이다.  
+			</P
+><P
+>				물론 다른 해결방법이 있기는 했다. 
+				계속해서 query 를 날릴 필요 없이, 한번 query 를 날리면 
+				그 정보를 html 파일로 저장하는 것이다. 
+				그리고 그후에는 쿼리를 날리기전에 파일의 생성날짜를 
+				확인해서 24 시간이 지나지 않았다면, 쿼리를 날리지 않고, 
+				그냥 만들어진 html 파일의 정보를 그대로 사용하는 것이다. 
+				그러면 하루에 한번씩 html 파일이 변경되는걸 보장 받을수 
+				있을것이다. 
+			</P
+><P
+>				하지만 이방법도 단점을 가지고 있었으니, 바로 권한 문제 
+				였다. nobody 권한으로 읽고 쓸수 있도록, 만들어진 html 파일에 
+				대한 권한을 주어야 했음으로 보안문제를 야기시킬수 
+				있었던 것이다. 물론 이러한 보안문제를 피해갈수 있는 방법들이 
+				존재하긴 했지만, 너무 복잡하도고 생각한 필자는 
+				php 프로그래밍을 이용한 구현은 사용하지 않기로 했다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN34"
+>2.2.2&#51208;. C++과 Mysql API를 이용한 프로그래밍</A
+></H3
+><P
+>				그래서 선택한것이 그냥 C++로 하는것이 였다. C++로 mysql DB에 
+				접근하도록 프로그래밍을 해서, 유닉스 명령어 사전 테이블에 
+				서 정보를 랜덤하게 선택해서 이것을 html 파일로 저장해서  
+				방문자에게 보여주는 방법이였다. 
+			</P
+><P
+>				이 프로그램은 하루에 한번 주기적으로 실행되어야 했는데, 
+				crontab(1) 을 이용 해서 해결하기로 했다. 프로그램의 
+				실행시간은 새벽 3시 01 분으로 정했다. 이시간이 되면 
+				crontabe 은 C++로 만들어진 프로그램을 실행시키고, 이 프로그램은 
+				mysql DB에서 유닉스 명령어 중 하나를 랜덤하게 가져와서 
+				html 페이지를 만든다. 
+			</P
+><P
+>				C 를 이용해서 mysql DB 프로그래밍을 하는 방법은 
+				<A
+HREF="/article.php?sid=10"
+TARGET="_top"
+>mysql 프로그래밍</A
+>을 참고하기 바란다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.3&#51208;. 기능구현</A
+></H2
+><P
+>			이렇게 해서 C++와 Mysql API 를 이용해서 프로그래밍을 하기로 
+			했으며, 쏘쓰파일의 이름은 random_command.cc 로 하기로 했다.  
+		</P
+><P
+>			여기에서 왜 C대신 C++을 사용했는지 궁금해 할수도 있을것이다. 
+			사실 이 프로그램은 C++의 객체지향적인 프로그래밍 기법은 전혀 
+			사용하지 않았다(객체지향을 사용할 필요도 없을정도로 단순했음으로). 
+			다만 자료구조의	손쉬운 구현을 위해서 STL 의 vector 을 사용하기 
+			위해서 C++ 을 굳이 사용했다. 컴파일러 역시 
+			gcc 대신 g++ 을 사용하게 되었다. 코드는 vector 사용부분만 
+			빼고는 완전히 C코드이다.  
+		</P
+><P
+>			vector 은 배열을 일반화 
+			시킨것이라고 볼수 있는데, 원소의 크기(몇개의 원소를 
+			가지고 있는지)를 알수 있으며, 모든 타입의 (클래스, 구조체, 문자, 
+			문자열, 숫자) 객체를 그 원소로 할수 있다. 
+			STL에 대한 제사한 내용은 
+			<A
+HREF="http://oopsla.snu.ac.kr/~sjjung/stl"
+TARGET="_top"
+>정승진의 Standard C++
+			Libary</A
+> 와 <A
+HREF="http://www.sgi.com/tech/stl/index.html"
+TARGET="_top"
+>			SGI STL HomePage</A
+>를 참고하기 바란다. 
+		</P
+><P
+>			유닉스 명령어 정보가 저장되는 테이블의 이름은 "nuke_encyclopedia_text"
+			라는 테이블로 다음과 같은 테이블 구조를 가지고 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>+---------+--------------+------+-----+---------+----------------+
+| Field   | Type         | Null | Key | Default | Extra          |
++---------+--------------+------+-----+---------+----------------+
+| tid     | int(10)      |      | PRI | 0       | auto_increment |
+| eid     | int(10)      |      |     | 0       |                |
+| title   | varchar(255) |      |     |         |                |
+| text    | text         |      |     | NULL    |                |
+| counter | int(10)      |      |     | 0       |                |
++---------+--------------+------+-----+---------+----------------+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			tid 는 PRI 키이며, title이 명령어 이름이다. eid 
+			는 "사전의 종류" 인데, 유닉스 명령어 사전은 eid=1 인 값이다.  
+			그러므로 우리는 tid, eid, title 값만 가져오면 완벽한 html 
+			페이지를 만들수 있다. 
+		</P
+><P
+>			아래는 예제의 완전한 쏘쓰파일이다. 물론 DB정보들은 
+			수정한것이다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제: random_command.cc</B
+>	
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;mysql.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;vector&#62;         // STL의 vector를 사용하기 위해서  
+#include &#60;time.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;unistd.h&#62;
+
+// DB 연결정보 
+#define DB_HOST "127.0.0.1"
+#define DB_USER "test"
+#define DB_PASS "test"
+#define DB_NAME "test"
+
+// query 정보를 저장하기 위한 
+// 구조체
+struct title_info
+{
+    char    *tid;     // tid 를 저장한다.  
+    char    *title;   // 명령어 이름 
+};
+
+// 랜덤한 title 번호를 넘겨준다.  
+// 인자 값인 titlemaxno 는 총 검색된 유닉스명령어 갯수이다.    
+int random_title(int titlemaxno);
+
+int main(void)
+{
+    MYSQL                        *connection=NULL, conn;
+    MYSQL_RES                    *sql_result;
+    MYSQL_ROW                    sql_row;
+    int                            query_stat;
+    struct title_info            t_info;
+    vector&#60;struct title_info&#60;    title_name;
+    char                        url_query[255];
+    FILE                        *fp;
+
+    mysql_init(&#38;conn);
+    connection = mysql_real_connect(&#38;conn, DB_HOST,
+                                    DB_USER, DB_PASS,
+                                    DB_NAME, 3306,
+                                    (char *)NULL, 0);
+    if (connection == NULL)
+    {
+        fprintf(stderr, "Mysql connection error: %s", mysql_error(&#38;conn));
+        return -1;    
+    }
+
+    // 쿼리를 내란다. eid가 1번(유닉스 명령어)인 모든 정보를 
+    // 가져온다. 
+    query_stat = mysql_query(connection, "select tid, title from nuke_encyclopedia_text where eid=1");
+    if (query_stat != 0)
+    {
+        fprintf(stderr, "Mysql query error : %s", mysql_error(&#38;conn));
+        return -1;
+    }
+
+    // 쿼리를 실행한 정보를 가져오고, 
+    // 이중 tid 값과 title 값을 t_info 구조체에 
+    // 저장하고 이 값은 다시 title_name vector 에 
+    // 저장한다. 
+    sql_result = mysql_store_result(connection);
+    while((sql_row = mysql_fetch_row(sql_result)) != NULL)
+    {
+        t_info.tid = sql_row[0];
+        t_info.title = sql_row[1];
+        title_name.push_back(t_info);
+    }
+
+    // 위의 정보를 토대로 링크를 구성한다. 
+    // title_name 에 저장된 자료에 임으로 접근하기 위해서 
+    // random_title()함수를 사용했다. 
+    // random_title 함수를 사용하면 임의의 인덱스 번호를 넘겨준다. 
+    sprintf(url_query, "$content = &#92;"&#60;a href=/modules.php?name=Encyclopedia&#38;op=content&#38;tid=%s&#62;%s&#60;/a&#62;&#92;";&#92;n",
+                    title_name[random_title(title_name.size())].tid, 
+                    title_name[random_title(title_name.size())].title);
+
+    fp = fopen("/home/html/public_html/blocks/block-unix_comm.php","w");
+
+    // link 내용을 파일로 저장한다.  
+    if (fp == NULL)
+    {
+        perror("file open error ");
+        exit(0);
+    }
+    fputs("&#60;?&#92;n", fp);
+    fputs(url_query, fp);
+    fputs("?&#62;&#92;n", fp);
+    fclose(fp);
+
+    // 프로그램을 종료한다. 
+    mysql_free_result(sql_result);
+    mysql_close(connection);
+}
+
+int random_title(int titlemaxno)
+{
+    time_t now_time;
+
+    time(&#38;now_time);
+    srandom((unsigned int)now_time);
+    return random()%titlemaxno;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이 프로그램은 아래와 같은 방법으로 컴파일했다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>g++ -o random_command random_command.cc -I/usr/local/include/mysql -L/usr/local/lib/mysql -lmysqlclient
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			그리고 새벽 3시 01분 마다 random_command 프로그램을 실행시키기 
+			위해서 crontab 에 다음과 같은 내용을 추가했다. crontab 내용의 
+			변경은 crontab -e 를 이용하면 된다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# crontab -e
+01 3 * * * /usr/bin/random_command
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN56"
+>2.4&#51208;. 다른 구현들</A
+></H2
+><P
+>			이 프로그램은 매우 다양한 방법으로 구현이 가능하다. 
+		</P
+><P
+>			한가지 예를 들어서 위의 프로그램은 쿼리 결과를 vector 자료구조에 
+			몽땅 저장하도록 되어있고, 이 자료구조중에서 랜덤한 값을 가져오도록 
+			했는데, 자료가 매우 커질경우 vector 자료구조가 너무 커질수도 있을 
+			것이다. 이를 해결하기 위해서 다음과 같은 쿼리를 만들어서  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>select count(tid) from nuke_encyclopedia_text where eid = 1;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			등록된 유닉스 명령어 수만 알아내고, 이 크기 범위 내에서 
+			랜덤한 값을 가져와서, 이 랜덤값의 위치에 있는 유닉스 명령어 정보만을 
+			가지고 오는 방법을 사용할수도 있을것이다. 이때 쿼리의 내용은 대충 
+			아래와 같을것이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>select tid, title from nuke_encyclopedia_text where eid = 1 limit 4,1;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		위의 쿼리에서 '4' 가 랜덤한 index 값이 될것이다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

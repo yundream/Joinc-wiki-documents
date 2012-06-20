@@ -1,0 +1,379 @@
+#title linux man page : gethostbyname - 도메인 이름에 대한 인터넷 주소 목록을 얻어온다. 
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>gethostbyname(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. gethostbyname(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN28"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN31"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN51"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN56"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	네트웍 호스트 목록을 가져온다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+></A
+>1.1. 사용법</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;netdb.h&#62;
+extern int h_errno;
+
+struct hostent *gethostbyname(const char *name);
+
+#include &#60;sys/socket.h&#62;      /* for AF_INET */
+struct hostent *gethostbyaddr(const char *addr,
+  int len, int type);
+
+void sethostent(int stayopen);
+
+void endhostent(void);
+
+void herror(const char *s);
+
+const char * hstrerror(int err);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+></A
+>1.2. 설명</H1
+><P
+>		gethostbyname()함수는 주어진 호스트 <B
+CLASS="EMPHASIS"
+>name</B
+>에 
+		상응하는 <B
+CLASS="EMPHASIS"
+>hostent</B
+>타입의 구조체를 반환한다. 
+		name은 호스트이름이거나 표준 점 표기법의 IPv4주소, 혹은 IPv6주소이다. 	
+		IPv6에 대한 내용은 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=103"
+TARGET="_top"
+>IPv6 환경설정</A
+>을 참고하기 바란다.
+	</P
+><P
+>		만일 name이 IPv4나 IPv6주소라면 어떠한 찾기도 행해지지 않고 단지 
+		name을 <B
+CLASS="EMPHASIS"
+>h_name</B
+>필드에 복사하고 해당 in_addr 구조체를
+		반환하는 hostent 구조체의 h_addr_list[0]에 복사한다. 만일 name이 점으로
+		끝나지 않고 환경변수 <B
+CLASS="EMPHASIS"
+>HOSTALIASES</B
+>가 설정되어 있다면
+		HOSTALIASES가 가리키는 별칭 파일이 name을 위해 우선 탐색된다. 현재 
+		도메인과 상위 도메인은 name이 점으로 끝나지 않는다면 탐색된다.
+	</P
+><P
+>		gethostbyaddr()함수는 길이 <B
+CLASS="EMPHASIS"
+>len</B
+>, 주소타입이 typedls
+		호스트 주소 <B
+CLASS="EMPHASIS"
+>addr</B
+>에 해당하는 
+		<B
+CLASS="EMPHASIS"
+>hostent</B
+>구조체를 리턴한다. 유일하게 유효한 주소 
+		타입은 현재 AF_INET이다.	
+	</P
+><P
+>		만일 stayopen이 참(1)이라면, sethostent()함수는 연결된 TCP소켓이 네임
+		서버 질의를 위해 사용되어야 한다는 것을 가리킨다. 그렇지 않으면 
+		네임 서버질의에 UDP를 이용할 것이다.
+	</P
+><P
+>		endhostent()함수는 네임 서버 질의를 위한 TCP연결을 끝낸다.
+	</P
+><P
+>		herror()함수는 stderr에 현재 값의 h_errno에 상응하는 에러 메시지를 
+		출력한다. 구식으로 사용하지 않는다. 
+	</P
+><P
+>		hsterror()함수는 에러 넘버를 가지며 상응하는 메시지를 반환한다. 
+		구식으로 사용하지 않는다.
+	</P
+><P
+>		도메인 이름 질의는 gethostbyname()에 의해 수행되며 gethostbyaddr()은
+		/etc/host.conf에 있는 order라인의 내용에 의존하여 /etc/hosts에서 
+		라인을 뽑아내 네임서버의 일부나 모두의 조합과 NIS혹은 YP를 사용한다.
+	</P
+><P
+>		hostent 구조체는 &#60;netdb.h&#62;에 다음과 같이 정의되어 있다.	
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct hostent {
+        char    *h_name;        /* 호스트의 공식 이름 */
+        char    **h_aliases;    /* 별칭 리스트 */
+        int     h_addrtype;     /* 호스트 주소 타입 */
+        int     h_length;       /* 주소의 길이 */
+        char    **h_addr_list;  /* 주소 리스트 */
+}
+#define h_addr  h_addr_list[0]  /* 구 버전과의 호환을 위해 */
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN28"
+></A
+>1.3. 반환값</H1
+><P
+>		gethostbyname() 그리고 gethostbyaddr() 함수는 hostent 구조체를 
+		반환하거나 만일 에러가 발생한다면 NULL 포인터를 반환한다.  
+		에러시, h_errno 변수는 에러 넘버를 가진다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN31"
+></A
+>1.4. 에러</H1
+><P
+>		변수 h_errno는 다음 값들을 가진다.
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>HOST_NOT_FOUND</DT
+><DD
+><P
+>	
+					지정된 호스트가 알려지지 않았다.
+				</P
+></DD
+><DT
+>NO_ADDRESS, NO_DATA</DT
+><DD
+><P
+>	
+					요구한 이름이 유효하지만 IP주소를 가지지 않는다.
+				</P
+></DD
+><DT
+>NO_RECOVERY</DT
+><DD
+><P
+>	
+					복구 불가능한 네임 서버에러가 발생했다.
+				</P
+></DD
+><DT
+>TRY_AGIN</DT
+><DD
+><P
+>	
+					일시적으로 발생한 에러로 네임서버 인증시 발생했다. 다시 
+					시도하면 된다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN51"
+></A
+>1.5. 예제</H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;netdb.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;netinet/in.h&#62;
+
+int main(int argc, char **argv)
+{
+    struct hostent     *myent;
+    struct in_addr  myen;
+    long int *add;
+
+    myent = gethostbyname(argv[1]);
+    if (myent == NULL)
+    {
+        perror("ERROR : ");
+        exit(0);
+    }
+
+    printf("%s\n", myent-&#62;h_name);
+
+    while(*myent-&#62;h_addr_list != NULL)
+    {
+        add = (long int *)*myent-&#62;h_addr_list;
+        myen.s_addr = *add;
+        printf("%s\n", inet_ntoa(myen));
+        myent-&#62;h_addr_list++;
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		다음은 테스트 결과다.
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]# ./gethostbyname www.yahoo.com
+www.yahoo.akadns.net                                                           
+66.218.71.83                                                                   
+66.218.71.84                                                                   
+66.218.71.86                                                                   
+66.218.71.87                                          
+66.218.71.89                                                                   
+...
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN56"
+></A
+>1.6. 참고문헌</H1
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_인터넷_주소_변환"
+TARGET="_top"
+>인터넷 주소 변환</A
+>
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

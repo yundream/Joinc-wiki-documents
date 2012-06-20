@@ -1,0 +1,415 @@
+#title linux man page : shmat - 공유메모리 관련 연산을 한다.
+[wiki:docbook_shmat(2) Docbook 원문]
+
+{{{#!html
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML
+><HEAD
+><TITLE
+>shmat(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.7"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. shmat(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN40"
+>반환값</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN43"
+>에러</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN59"
+>예제</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN63"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><P
+>	공유메모리 관련 연산		</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1. 사용법</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/ipc.h&#62;
+#include &#60;sys/shm.h&#62;
+
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2. 설명</A
+></H2
+><P
+>		shmat()는 공유메모리 식별자인<B
+CLASS="EMPHASIS"
+>shmid</B
+>에 공유 메모리 
+		세그먼트를 붙이기 위해서 사용한다. 붙이는 영역은 <B
+CLASS="EMPHASIS"
+>shmaddr</B
+>로
+		결정할 수 있다.   
+	</P
+><P
+>		만약 <B
+CLASS="EMPHASIS"
+>shmaddr</B
+>가 NULL이라면 시스템은 적당한 사용하지 않는 메모리(:12)
+		영역을 붙이게 된다.   
+	</P
+><P
+>		만약 <B
+CLASS="EMPHASIS"
+>shmaddr</B
+>가 NULL이 아니고 SHM_RND가 shmflg로 지정되어 있다면 
+		shmaddr은 SHMLBA의 배수의 주소로 연결이 발생한다. 그렇지 않으면 shmaddr은 연결할 수 
+		있는 정렬된 페이지 주소여야 한다.
+	</P
+><P
+>		만일 <B
+CLASS="EMPHASIS"
+>SHM_RDONLY</B
+>가 shmflg에 지정되었다면, 세그먼트는 읽기전용이 
+		되며 공유메모리 영역에 접근하고자 하는 프로세스는 읽기전용허가 접근권을 가져야 한다. 
+		그렇지 않을경우 세그먼트는 읽기/쓰기로 붙여지며 프로세스(:12)는 (반드시)읽기/쓰기 
+		허가권을 가져야한다. 쓰기전용 공유메모리(:12) 세그먼트를 위한 플래그는 없다.
+	</P
+><P
+>		프로세스가 종료되면 연결된 세그먼트는 자동적으로 분리된다. 동일한 세그먼트는 
+		읽기와 읽기/쓰기로 한번이상 연결시킬 수 있다.  
+	</P
+><P
+>		shmat가 성공하면 시스템은 shmid_ds구조체의 멤버들을 아래와 같이 업데이트 시킨다.
+		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>				shm_atime을 현재 시간으로 수정한다.
+			</P
+></LI
+><LI
+><P
+>				shm_lpid를 현재 호출한 프로세스의 ID로 설정한다.
+			</P
+></LI
+><LI
+><P
+>				shm_nattch는 1 증가 시킨다.
+			</P
+></LI
+></OL
+>
+	</P
+><P
+>		공유메모리 세그먼트가 삭제로 표시될 때에도 마찬가지로 분리된다.
+	</P
+><P
+>		shmdt()는 공유 메모리 영역으로 부터 <B
+CLASS="EMPHASIS"
+>shmaddr</B
+> 주쇼를 분리 
+		시키기 위해서 사용한다. 공유메모리 영역의 분리는 shmat 시스템 콜로 연결된 값과 
+		동일한 <B
+CLASS="EMPHASIS"
+>shmaddr</B
+>을 가지고 있는 연결된 영역들중 하나여야 한다.  
+	</P
+><P
+>		shmdt()가 성공적으로 호출되면 shmid_ds구조체의 멤버를 다음과 같이 변경한다.
+		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>				shm_dtime을 현재 시간으로 변경한다.
+			</P
+></LI
+><LI
+><P
+>				shm_lpid를 현재 호출한 프로세스의 ID로 변경한다.
+			</P
+></LI
+><LI
+><P
+>				shm_nattch을 1 감소 시킨다. 만약 값이 0이되고 세그먼트에 삭제표시가 되어 있다면
+				세그먼트는 삭제된다.
+			</P
+></LI
+></OL
+>
+		호출 프로세스의 유저공간에 점유된 영역은 대응이 풀리지 않는다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.3. 반환값</A
+></H2
+><P
+>		성공하면 attach된 shared memory segment를 반환하고 실패하면 -1을 반환한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN43"
+>1.4. 에러</A
+></H2
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>EACCES</DT
+><DD
+><P
+>	
+					호출한 프로세스가 붙이기 원하는 영역에 대해서 권한을 가지고 있지 않다.
+				</P
+></DD
+><DT
+>EINVAL</DT
+><DD
+><P
+>	
+					잘못된 shmid 값, 혹은 잘못된 shmaddr 값을 가지고 있다. 
+				</P
+></DD
+><DT
+>ENOMEM</DT
+><DD
+><P
+>	
+					메모리할당(:12)을 할 수 없다.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN59"
+>1.5. 예제</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/ipc.h&#62; 
+#include &#60;sys/shm.h&#62; 
+#include &#60;string.h&#62; 
+#include &#60;unistd.h&#62; 
+
+
+int main()
+{
+    int shmid;
+    int pid;
+
+    int *cal_num;
+    void *shared_memory = (void *)0;
+
+
+    // 공유메모리 공간을 만든다.
+		// 크기는 4byte로 한다.
+    shmid = shmget((key_t)1234, sizeof(int), 0666|IPC_CREAT);
+
+    if (shmid == -1)
+    {
+        perror("shmget failed : ");
+        exit(0);
+    }
+
+    // 프로세스 메모리를 공유메모리영역에 붙인다. 
+    shared_memory = shmat(shmid, (void *)0, 0);
+    if (shared_memory == (void *)-1)
+    {
+        perror("shmat failed : ");
+        exit(0);
+    }
+
+    cal_num = (int *)shared_memory;
+    pid = fork();
+    if (pid == 0)
+    {
+        shmid = shmget((key_t)1234, sizeof(int), 0);
+        if (shmid == -1)
+        {
+            perror("shmget failed : ");
+            exit(0);
+        }
+        shared_memory = shmat(shmid, (void *)0, 0666|IPC_CREAT);
+        if (shared_memory == (void *)-1)
+        {
+            perror("shmat failed : ");
+            exit(0);
+        }
+        cal_num = (int *)shared_memory;
+        *cal_num = 1;
+
+        while(1)
+        {
+            *cal_num = *cal_num + 1;
+            printf("child %d\n", *cal_num); 
+            sleep(1);
+        }
+    }
+
+    // 부모 프로세스로 공유메모리의 내용을 보여준다. 
+    else if(pid &#62; 0)
+    {
+        while(1)
+        {
+            sleep(1);
+            printf("%d\n", *cal_num);
+        }
+    }
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>1.6. 참고문헌</A
+></H2
+><P
+>		<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>			<A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_공유메모리와_세마포어를_이용한_프로세스간_데이터처리"
+TARGET="_top"
+>공유 메모리를 이용한 프로세스간 데이터 교환</A
+>
+			</P
+></LI
+><LI
+><P
+>			ftok(3)
+			</P
+></LI
+><LI
+><P
+>			ipc(5)			
+			</P
+></LI
+><LI
+><P
+>			shmctl(2)
+			</P
+></LI
+><LI
+><P
+>			shmat(2)
+			</P
+></LI
+><LI
+><P
+>			shmdt(2)
+			</P
+></LI
+></OL
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

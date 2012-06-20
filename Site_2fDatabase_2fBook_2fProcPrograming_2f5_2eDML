@@ -1,0 +1,261 @@
+#title DML
+[[TableOfContents]]
+=== DML ===
+자 이제부터 완전한 프로그램 예제를 보기로 한다. 대충 기본적인 것들은 모두 배웠다. 일단 조금  배웠으니 한번 써먹어 보자.
+
+먼저 Pro*C/C++ 프로그램을 컴파일 하는 방법에 대해서 알아보도록 한다. Pro*C/C++ 프로그램은 C 컴파일러로 컴파일 하기전에 먼저 프리-컴파일 과정을 거쳐야 하며 프리-컴파일러는 오라클을 설치할 때 같이 설치되거나 추가로 설치해야 한다. $ORACLE_HOME/bin 밑에 proc 라는 이름으로 설치되며 필요한 헤더파일들은 $ORACLE_HOME/precomp/public 밑에 라이브러리 파일들은 $ORACLE_HOME/lib 밑에 들어가며 실제 링킹과정에서 쓰이는 라이브러리 파일은 $ORACLE_HOME/lib/libclntsh.so 파일이다.
+
+프로그램 작성 과정을 살펴보자.
+ 1. 원시 코드파일(.pc) 작성
+    vi, emacs 등 자신이 편한 에디터를 사용하여 프로그래밍 하면 된다.
+ 1. proc 를 이용하여 프리-컴파일 과정을 거쳐 C 코드파일을 생성한다.
+    $ proc [옵션] 원시소스파일
+    옵션의 경우 proc의 help를 참고한다. 일반적인 경우 parse=none 만 주면 컴파일이 되고 다이나믹 SQL이 있는 경우 dynamic=ansi를 추가로 주고 PL/SQL이 포함된 경우에는 sqlcheck=semantics 와 userid=사용자ID/패스워드 를 추가로 주어야 한다. 그 이외의 상황에 대한 경우는 proc의 help나 매뉴얼을 참고하도록 한다.
+ 1. C 컴파일러를 이용하여 컴파일과 링크하여 실행가능한 파일로 만들어 낸다.
+    $ gcc -o 실행파일 C-소스파일 -I$ORACLE_HOME/precomp/public -L$ORACLE_HOME/lib -lclntsh
+
+컴파일하는 방법을 배웠으니 아래의 프로그램을 직접 쳐보고 컴파일, 실행해 보도록 하자.
+이 프로그램은 Pro*C/C++을 이용한 DML작업이다.
+{{{#!plain
+/* --------------------------------------------------------------------------------
+파일 이름 : dml.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+#include <stdio.h>
+#include <stdlib.h>
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+* 호스트 변수 선언
+*/
+exec sql begin declare section;
+    /*
+     * 사용자 ID와 패스워드
+     */
+    char *username;
+    char *password;
+
+    /*
+     * emp 테이블의 칼럼 리스트
+     */
+    int empno;
+    int mgr;
+    int sal;
+    int comm;
+    int deptno;
+    char *ename;
+    char *job;
+    char *hiredate;
+
+    /*
+     * emp 테이블 칼럼들의 Indicator 변수
+     */
+    short ind_empno;
+    short ind_mgr;
+    short ind_sal;
+    short ind_comm;
+    short ind_deptno;
+    short ind_ename;
+    short ind_job;
+    short ind_hiredate;
+exec sql end   declare section;
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 롤백 후에 접속을 종료한다.
+ */
+void sql_error (void)
+{
+    printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+    printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exec sql whenever sqlerror continue;
+    exec sql rollback work release;
+
+    exit (EXIT_FAILURE);
+}
+
+/*
+ * Standard Input 에서 문자열을 받아서 저장하는 함수
+ * 입력이 없으면 -1을 리턴한다.
+*/
+int get_value (char *buf, char *prompt)
+{
+    printf (prompt);
+    fgets (buf, 256, stdin);
+    /*
+     * \r\n을 제거한다.
+     */
+    buf [strlen (buf) - 1] = '\0';
+
+    if (strlen (buf) == 0)
+    {
+        return -1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+/*
+ * 데이터베이스에 접속하고 Insert, Update, Delete를
+ * 진행한 후 접속을 종료한다.
+ */
+int main (void)
+{
+char buf [256];
+
+    printf ("Input Data to Insert\n");
+
+    ind_empno = get_value (buf, "Empno (Max 4) : ");
+    empno = atoi (buf);
+
+    ind_ename = get_value (buf, "Ename (Max 10) : ");
+    ename = (char *)strdup (buf);
+
+    ind_job = get_value (buf, "Job (Max 10) : ");
+    job = (char *)strdup (buf);
+
+    ind_mgr = get_value (buf, "Manager (Max 4) : ");
+    mgr = atoi (buf);
+
+    ind_sal = get_value (buf, "Salary (Max 7) : ");
+    sal = atoi (buf);
+
+    ind_comm = get_value (buf, "Comm (Max 7) : ");
+    comm = atoi (buf);
+
+    ind_deptno = get_value (buf, "Deptno (Max 2) : ");
+    deptno = atoi (buf);
+
+    /*
+     * 사용자 ID와 Password를 설정하고 데이타베이스에 접속하고
+     * sqlca.sqlcode 를 통해 에러가 있는지 검사한다.
+     */
+    username = (char *)strdup ("scott");
+    password = (char *)strdup ("tiger");
+    exec sql
+        connect :username identified by :password;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Connected to Oracle Database\n");
+
+    /*
+     * Insert 를 수행한다. 칼럼 값 뒤에 Indicator를 붙여서
+* NULL이 있을 경우 정확히 NULL을 넣도록 한다.
+* sqlca.sqlcode 를 사용하여 SQL 실행에 에러가 있었는지 검사한다.
+*/
+    exec sql
+        insert into emp
+        values (:empno:ind_empno, :ename:ind_ename, :job:ind_job, :mgr:ind_mgr,
+                sysdate, :sal:ind_sal, :comm:ind_comm, :deptno:ind_deptno);
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Inserted to Emp table in Oracle Database\n");
+
+    /*
+     * Insert 한 후에 데이터를 적용한다.
+* 이때 데이터베이스와 접속이 끊어지지 않도록 주의한다.
+*/
+    exec sql
+        commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+printf ("Input Data to Update\nSalary Increase and Comm Increase\n");
+
+    ind_empno = get_value (buf, "Empmo (Max 4) : ");
+    empno = atoi (buf);
+
+    ind_sal = get_value (buf, "Sal (Max 7) : ");
+    sal = atoi (buf);
+
+    ind_comm = get_value (buf, "Comm (Max 7) : ");
+    comm = atoi (buf);
+
+    /* 
+     * Update 한다.
+     * 데이터를 적용하기전에 SQL 문장이 잘 실행되었나 검사한다.
+     */
+    exec sql
+        update emp
+        set sal = :sal:ind_sal, comm = :comm:ind_comm
+        where empno = :empno;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+    printf ("Updated to Emp table in Oracle Database\n");
+
+    /*
+     * 변경된 데이터 적용한다.
+     */
+    exec sql
+        commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+    printf ("Input Data to Delete\n");
+    /*
+     * 삭제할 사람의 사원 번호를 입력 받는다.
+     */
+    ind_empno = get_value (buf, "Empmo (Max 4) : ");
+    empno = atoi (buf);
+
+    /*
+   * Delete 한다. 역시 SQL 실행 결과를 검사한다.
+   */
+    exec sql
+        delete from emp
+        where empno = :empno;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+printf ("Deleted from Emp table in Oracle Database\n");
+
+    /*
+     * 변경된 데이터를 적용한다.
+     */
+    exec sql
+        commit work;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+
+    /*
+     * 데이터베이스와 접속을 종료한다.
+     * Rollback 으로 접속을 종료한 것은 특별한 이유는 없다. ^^
+     */
+    exec sql
+        rollback work release;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Disconnect from Oracle Database\n");
+
+    exit (EXIT_SUCCESS);
+}
+}}}
+
+코드의 내용은 emp 테이블에 새로운 사람의 직원 정보를 입력한 후 접속을 유지한 상태에서 데이터의 변경을 적용하고 어떤 사람의 정보에서 급여와 상여를 새로 입력받아 수정한 후 적용한다. 그리고 어떤 사람의 사원 번호를 입력받아서 삭제하는 것이다. 프로그램상 어려운 점은 없을 것이다. 프로그램도 쉽게 작성 되었고 주석도 잘 달아놓았다. 한번 분석해보고 실행해보라.
+
+위에 보았던 프로그램은 Pro*C/C++ 에서 가장 기본되는 것이다. 뭐 그렇다고 이런 프로그램은 쓰임새도 없다는 것은 아니다. 실제로 이정도 수준이면 왠만한 응용프로그램 개발에선 만족할 만하다. 실제 대부분의 응용프로그램에서 사용되는 수준이 이정도이다. 단순히 DML정도로 사용자 정보를 가져온다던지 삽입, 삭제, 수정이 대부분의 작업이기 때문이다. 

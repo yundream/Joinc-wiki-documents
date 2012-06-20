@@ -1,0 +1,88 @@
+ * ASync read 를 해보고자 이렇게 만들어 봤습니다.
+ * 윤상배님의 RTS기사를 참조했습니다.
+
+{{{#!vim c
+/* 
+ ASync read simple example
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> 
+*/
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <signal.h>
+
+#ifndef __USE_GNU
+#define __USE_GNU __USE_GNU
+#endif
+#include <fcntl.h>
+
+void DoSignalIO(int s_Signal)
+{ printf("%s : s_Signal = %d\n", __FUNCTION__, s_Signal); }
+
+int main(void)
+{
+ int s_Handle;
+ s_Handle = open("/dev/stdin", O_RDONLY);
+ s_Handle = s_Handle == (-1) ? 0 : s_Handle;
+ if(s_Handle != (-1))
+ {
+  struct siginfo s_SignalInfo;
+  sigset_t s_SignalSet;
+  struct sigaction s_SignalAction;
+  int s_Check, s_ReadBytes, s_Index, s_IsContinue, s_Prompt, s_CursorIndex;
+  unsigned char s_Buffer[ 32 << 10 ];
+  char s_Cursor[] = {'-', '/', '|', '\\'};
+
+  sigemptyset(&s_SignalSet);
+  sigaddset(&s_SignalSet, SIGRTMIN);
+  sigprocmask(SIG_BLOCK, &s_SignalSet, (sigset_t *)0);
+
+  sigemptyset(&s_SignalAction.sa_mask);
+  s_SignalAction.sa_flags = SA_SIGINFO;
+  s_SignalAction.sa_restorer = NULL;
+  s_SignalAction.sa_handler = DoSignalIO;
+
+  fcntl(s_Handle, F_SETFL, O_RDONLY | O_ASYNC  | O_NONBLOCK);
+  fcntl(s_Handle, F_SETSIG, SIGRTMIN);
+  fcntl(s_Handle, F_SETOWN, getpid());
+
+  s_IsContinue = 1;
+  if(sigaction(SIGRTMIN, &s_SignalAction, 0) != (-1))
+  {
+   s_Prompt = 1;
+   s_CursorIndex = 0;
+   do
+   {
+    if(s_Prompt == 1)
+    {
+     printf("\rInput RTS message >>> "); fflush(stdout);
+     s_Prompt = 0;
+    }
+    else
+    {
+     printf(" %c\b\b", s_Cursor[((s_CursorIndex++) / 10) % sizeof(s_Cursor)]); fflush(stdout);
+     usleep(10000);
+    }
+    s_Check = sigwaitinfo(&s_SignalSet, &s_SignalInfo);
+    if(s_Check == SIGRTMIN)
+    {
+     if(s_SignalInfo.si_fd == s_Handle &&( (s_SignalInfo.si_code == POLL_IN) || (s_SignalInfo.si_code == SI_QUEUE) ))
+     {
+      s_ReadBytes = read(s_Handle, &s_Buffer[0], sizeof(s_Buffer) - 1);
+      if(s_ReadBytes > 0)
+      {
+       for(s_Index = 0;s_Index < s_ReadBytes;s_Index++)printf("[0x%02x]", s_Buffer[s_Index]);
+       printf("\n"); 
+       s_Prompt = 1;
+      }
+     }
+    }
+    else printf("Check = %d\n", s_Check);
+   }while(s_IsContinue == 1);
+  }
+  if(s_Handle > 2)close(s_Handle);
+ }
+
+ return 1;
+}
+}}}

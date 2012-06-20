@@ -1,0 +1,40 @@
+#title winapi : ioctlsocket 소켓의 입출력 모드를 변경한다.
+
+== ioctlsocket ==
+소켓의 입출력 모드를 변경한다. 리눅스(:12)의 fcntl(:2)함수와 비슷하다. 소켓을 파일로 다루는 리눅스와 달리 소켓을 다른 핸들로 다루는 윈도 운영체제의 특성이 반영된 것으로 보인다.  
+
+=== 사용 법 ===
+{{{#!plain
+int ioctlsocket(
+  __in     SOCKET s,
+  __in     long cmd,
+  __inout  u_long *argp
+);
+}}}
+=== 매개 변수 ===
+   * s
+     소켓 지시자
+   * cmd
+     소켓에 수행할 명령
+   * argp 
+     명령 cmd에 적용할 값
+
+=== 반환 값 ===
+성공하면 0을 반환한다. 실패하면 SOCKET_ERROR를 반환한다. 에러코드는 WSAGetLastError(:4200)함수로 가져올 수 있다.
+
+=== 설명 ===
+다음은 사용할 수 있는 '''cmd'''명령이다.
+
+FIONBIO
+   소켓을 봉쇄 혹은 비 봉쇄로 만들기 위해서 사용한다. argp의 값이 0이면 비 봉쇄, 1이면 봉쇄가 된다.
+
+   WSAAsyncSelect와 WSAEventSelect함수를 호출하면 소켓은 자동적으로 비 봉쇄 모드가 된다. 
+
+FIONREAD
+   소켓 s로 읽을 수 있는 데이터의 크기 (버퍼 크기)를 구한다. 크기는 argp로 넘어온다.
+
+SIOCATMARK
+   소켓으로 부터 out-of-band 데이터가 모두 읽었는지를 확인하기 위해 사용한다. 값은 argp로 넘어온다. OOB 데이터가 없으면 TRUE, 그렇지 않으면 FALSE가 넘어 온다. setsockopt 함수로 SO_OOBINLINE 옵션을 설정한 SOCK_STREAM  소켓에만 적용할 수 있다. 
+
+=== 예제 ===
+비 봉쇄 소켓을 만드는 예제 프로그램

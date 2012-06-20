@@ -1,0 +1,43 @@
+#title Linux에서 CD굽기
+
+=== 설명 ===
+CD를 굽는 여러가지 도구가 있긴 하지만 여기에서는 콘솔프로그램인 cdrecord를 이용하는 방법에 대해서 알아보도록 하겠다. X를 띄우기 어려운 상황에서 유용하게 사용할 수 있다.  
+
+굽고자 하는 데이터를 raw데이터로 만든다.  
+{{{#!plain
+# mkisofs -R -o cdimage.raw /home/backup_data
+}}}
+
+CD로 굽기 전에 raw 데이터가 제대로 만들어졌는지 mount를 통해서 확인한다.
+{{{#!plain
+# mount cdimage.raw -r -t iso9660 -o loop /mnt/testiso
+}}}
+
+'''scanbus''' 옵션을 이용해서 장치버스를 찾아낸다.   
+{{{#!plain
+# cdrecord -scanbus                      
+Cdrecord 1.10 (i686-pc-linux-gnu) Copyright (C) 1995-2001 Jrg Schilling
+Linux sg driver version: 3.1.20
+Using libscg version 'schily-0.5'
+scsibus0:
+        0,0,0     0) 'PLEXTOR ' 'CD-R   PX-W1210A' '1.08' Removable CD-ROM
+        0,1,0     1) *
+        0,2,0     2) *
+        0,3,0     3) *
+...
+}}}
+
+이제 굽는다.
+{{{#!plain
+# cdrecord -v speed=4 dev=0,0 cdimage.raw
+}}}
+위의 dev에 들어가는 값은 scanbus로 찾아낸 값이다. 
+
+시디가 정말로 제대로 구워졌는지 mount시켜서 한번 확인해 보도록 하자.
+{{{#!plain
+# mount /dev/scd0 /mnt/cdrom
+}}}
+
+좀더 자세한 내용은 [mz_cdrw]를 참고하기 바란다.
+
+=== 변경사항 ===

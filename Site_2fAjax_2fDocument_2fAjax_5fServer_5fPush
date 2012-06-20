@@ -1,0 +1,84 @@
+#title Ajax Server Push
+
+이 문서는 [wiki:Site/Ajax/IRC Ajax를 이용한 IRC 웹클라이언트 구현]을 지원하기 위한 목적으로 작성되었다.
+
+위 프로젝트를 진행하다 보니, 가장 고민이 되는 부분이 Push방식으로 할것인지 아니면, Refresh 방식으로 할것인지를 선택하는 거였다. 최초에는 Refresh 방식으로 선택을 했었다. 구현이 비교적 간단하기 때문일 거라는 생각에서 였는데, 다음과 같은 문제가 발생했다. 기존에 알려진 문제들이다. 
+  1. 페이지가 갱신되므로, 마우스 포커스를 잃어 버린다.  
+  1. 마우스 포커스를 잃어버리는것 자체는 그다지 문제가 되지 않는다고 생각될 수 있는데, 복사하기 위해서 마우스로 긁었을때 문제가 된다. Ctrl+v를 누르기전에 페이지가 갱신되어 버리는 경우가 발생할 수 있기 때문이다.
+  1. 잦은 연결과 종료가 발생하는데, 이는 웹서비스의 성능을 저하시키는 주요요인중 하나다.
+  1. 클라이언트가 일정주기로 데이터를 가져오는 방법을 사용하기 때문에, 시간간격이 생긴다. 채팅과 같은 실시간성이 중요한 서비스에는 적합한 방법이 아니다.
+
+=== multipart/x-mixed-replace 를 이용한 Ajax Push ===
+다행히도 ajax는 content type 을 multipart/x-mixed-replace 를 이용한 서버 push를 지원한다. 이것을 이용하면, 서버와 연결을 유지한체, 컨텐츠를 객체단위로 해서 데이터를 읽어올 수 있다. 컨텐츠를 객체단위로 볼 수 있다는 것은 꽤나 중요한 사항이다. 왜냐하면 일반적인 HTTP응용은 페이지를 하나의 객체단위로 보는데, 이렇게 될경우 연결을 시작해서 연결이 끊어지기 까지 기다려서 일괄 처리를 하기 때문이다.  
+
+ajax push라고 해서, 기존의 코드와 크게 달라질것은 없다. 그냥 multipart 컨텐츠를 다룰 것이라고 명시해주기만 하면 된다.
+{{{#!plain linenum
+<script language="JavaScript" type="text/javascript"> 
+function handleContent (event)
+{
+  var result = event.target.responseText;
+  document.all.BlogComment.innerHTML = result;
+}
+
+function request ()
+{
+  var xrequest = new XMLHttpRequest ();
+  xrequest.multipart = true;
+  xrequest.open ("GET","http://www.joinc.co.kr/ajax/multipart.php",false);
+  xrequest.onload = handleContent;
+  xrequest.send (null);
+  delete xrequest;
+}
+
+</script>
+}}}
+11번째줄에서 xreques.multipart 가 true로 설정되어 있는 것 외에는 기존의 poll방식의 ajax 코드와 다른점이 없음을 알 수 있을 것이다.
+{{{#!html
+<script language="JavaScript" type="text/javascript"> 
+function handleContent (event)
+{
+  var result = event.target.responseText;
+  document.all.BlogComment.innerHTML = result;
+}
+
+
+function request ()
+{
+  var xrequest = new XMLHttpRequest ();
+  xrequest.multipart = true;
+  xrequest.open ("GET","http://www.joinc.co.kr/ajax/multipart.php",false);
+  xrequest.onload = handleContent;
+  xrequest.send (null);
+  delete xrequest;
+}
+
+</script>
+}}}
+
+아래 버튼을 클릭하면 테스트 결과를 확인할 수 있을 것이다.
+{{{#!html
+<input type=button onClick="request ()" value="클릭">
+<div class=Comment>
+<div ID=BlogComment>
+</div>
+</div>
+}}}
+
+다음은 위의 테스트를 위한 서버측 프로그램으로 php로 작성되었다.
+{{{#!plain linenum
+<?
+  header('Content-type: multipart/x-mixed-replace;boundary="rn9012"');
+
+  for($i = 0; $i < 10; $i++)
+  {
+    print "--rn9012\n";
+    print "Content-type: plan/text\n\n";
+    print "Part $i<br>\n";
+    print "--rn9012\n";
+    flush();
+    sleep(1);
+  }
+?>
+}}}
+content-type을 multipart/x-mixed-replace로 정의 했다. 컨텐츠 단위로 구분하기 위해서 boundary 를 사용하고 있다. 이 boundary 에 정의된 문자열로 컨텐츠가 구분이 된다. 
+

@@ -1,0 +1,246 @@
+'''contrib/intarray int4 배열 GiST 인덱스 사용하기'''
+[[br]]'''작성자: 신기배(소타) nonun@nate.com'''
+
+[[TableOfContents]]
+
+== GiST 인덱스 ==
+ * PostgreSQL은 총 4가지의 인덱스를 지원한다. btree, hash, rtree, GiST 이다. (이것들의 조합 변종(?) 인덱스도 있다.)
+ * GiST는 일반적인 서치트리 방식의 인덱스이다. B+-trees, R-trees 등의 많은 인덱스가 GiST에 의존적이다.
+ * PostgreSQL의 contrib중에는 GiST에 의존적인 모듈이 몇가지 있다.
+  1. btree_gist
+  1. cube
+  1. intarray
+  1. ltree
+  1. rtree_gist
+  1. seg
+  1. tsearch
+  1. tsearch2
+
+== intarray? ==
+ * 다른 문서에서 설명했듯이 배열타입에는 보통 인덱스를 사용할 수 없다. 하지만 integer(int4) 형에 대해서는 intarray라는 대책이 있다.
+ * intarray는 어떤 기능들이 들어있는지 살펴보자.
+ === 함수 ===
+  ==== icount ====
+  {{{#!plain
+int icount(int[])
+}}}
+   * int[] 의 배열의 요소 개수를 리턴한다.
+  {{{#!plain
+test=# select icount('{1,2,3}'::int[]);
+ icount
+--------
+      3
+(1 row)
+}}}
+
+  ==== sort ====
+  {{{#!plain
+int[] sort(int[], 'asc' | 'desc')
+}}}
+   * int[]를 정렬한다.
+  {{{#!plain
+test=# select sort('{1,2,3}'::int[],'desc');
+  sort
+---------
+ {3,2,1}
+(1 row)
+}}}
+   * 오름, 내림차순 정렬
+  {{{#!plain
+int[] sort_asc(int[])
+int[] sort_desc(int[])
+}}}
+
+  ==== uniq ====
+  {{{#!plain
+int[] uniq(int[])
+}}}
+   * int[]에서 중복된 요소를 제거하여 유니크한 요소만 담긴 배열을 리턴한다. (단 sort되어 있어야 한다)
+  {{{#!plain
+test=# select uniq(sort('{1,2,3,2,1}'::int[]));
+  uniq
+---------
+ {1,2,3}
+(1 row)
+}}}
+
+  ==== idx ====
+  {{{#!plain
+int idx(int[], int item)
+}}}
+   * int[]에서 item가 앞에서부터 몇번째 인덱스에 위치 해 있는지 리턴한다.
+  {{{#!plain
+test=# select idx('{1,2,3,2,1}'::int[],2);
+ idx
+-----
+   2
+(1 row)
+}}}
+
+  ==== subarray ====
+  {{{#!plain
+int[] subarray(int[],int START [, int LEN])
+}}}
+   * START번째 인덱스부터 LEN개 만큼의 부분집합을 리턴한다. (substr, substring 등과 사용법이 유사하다)
+  {{{#!plain
+test=# select subarray('{1,2,3,2,1}'::int[],2,3);
+ subarray
+----------
+ {2,3,2}
+(1 row)
+}}}
+
+  ==== intarray_push_elem ====
+  {{{#!plain
+int[] intarray_push_elem(int[], int)
+}}}
+   * 배열에 요소를 추가한다.
+
+  ==== intarray_push_array ====
+  {{{#!plain
+int[] intarray_push_array(int[], int[])
+}}}
+   * 배열 두개를 병합한다.
+
+  ==== intarray_del_elem ====
+  {{{#!plain
+int[] intarray_del_elem(int[], int)
+}}}
+   * 배열에서 요소를 뺀다.
+
+  ==== intset_union_elem ====
+  {{{#!plain
+int[] intset_union_elem(int[], int)
+}}}
+
+  ==== intset_subtract ====
+  {{{#!plain
+int [] intset_subtract(int[], _int)
+}}}
+
+ === 연산자 ===
+  ||  int[] && int[]  || 좌측 배열에 우측 배열 요소가 하나라도 포함되면 참이다 ||
+  ||  int[] @  int[]  || 좌측 배열이 우측 배열 요소를 모두 포함하면 참이다. ||
+  ||  int[] ~ int[]   || 우측 배열이 좌측 배열 요소를 모두 포함하면 참이다. ||
+  ||  # int[]         || 배열의 요소 갯수, icount와 동일 ||
+  ||  int[] + int     || 배열뒤에 정수를 배열요소로 추가한다. ||
+  ||  int[] + int[]   || 배열 두개를 병합한다. 좌측 배열의 끝에 우측 배열이 붙는다. ||
+  ||  int[] - int     || 배열에서 정수와 같은 배열 요소를 뺀다. ||
+  ||  int[] - int[]   || 좌측 배열에서 우측 배열을 뺀다. ||
+  ||  int[] | int     || + 와 비슷하지만 이미 배열이 포함하고 있는 정수라면 아무 일도 일어나지 않는다. ||
+  ||  int[] | int[]   || + 와 비슷하지만 이미 배열이 포함하고 있는 배열 요소는 추가되지 않는다. ||
+  ||  int[] & int[]   || 두 배열의 교집합을 리턴한다. ||
+  ||  int[] @@ query_int  || 배열이 query_int와 매치되면 참이다. (query_int 예: '1&(2|3)') ||
+  ||  query_int ~~ int[] || @@ 연산자와 방향만 다르다. ||
+
+== intarray 설치 ==
+ * intarray는 PostgreSQL 소스트리의 contrib 디렉토리 내에 있다. 예의상이라도 README파일을 읽어준다.
+ * '''PostgreSQL은 이미 설치되어 있어야 한다.'''
+ {{{#!plain
+# make
+# make install
+# psql DBNAME < _int.sql
+}}}
+ * 끝이다 -_-;;;; 이제 저 좋은 함수들과 연산자를 사용 할 수 있게 되었다. int형에 대해서지만..
+
+== GiST 인덱스 사용해보기 ==
+ {{{#!plain
+nonun=# CREATE TABLE test(
+nonun(# a int,
+nonun(# b int[]
+nonun(# );
+CREATE TABLE
+nonun=# CREATE INDEX index_test_gist ON test using gist (b);
+CREATE INDEX
+nonun=# COPY test from stdin;
+Enter data to be copied followed by a newline.
+End with a backslash and a period on a line by itself.
+>> 1    {1,2,3}
+>> 2    {8,6,3}
+>> 3    {5,6,1}
+>> 4    {9,11,13}
+>> 5    {7,3,4}
+>> 6    {1,6,1,7,9}
+>> 7    {1,7,8,8,6,1}
+>> \.
+nonun=# SELECT * from test ;
+ a |       b
+---+---------------
+ 1 | {1,2,3}
+ 2 | {8,6,3}
+ 3 | {5,6,1}
+ 4 | {9,11,13}
+ 5 | {7,3,4}
+ 6 | {1,6,1,7,9}
+ 7 | {1,7,8,8,6,1}
+(7 rows)
+
+nonun=# SELECT * from test where b @@ '3';
+ a |    b
+---+---------
+ 1 | {1,2,3}
+ 2 | {8,6,3}
+ 5 | {7,3,4}
+(3 rows)
+
+nonun=# EXPLAIN ANALYZE SELECT * from test where b @@ '3';
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using index_test_gist on test  (cost=0.00..4.82 rows=1 width=36) (actual time=0.074..0.089 rows=3 loops=1)
+   Index Cond: (b @@ '3'::query_int)
+ Total runtime: 0.569 ms
+(3 rows)
+
+nonun=# SELECT * from test where b @@ '3|2';
+ a |    b
+---+---------
+ 1 | {1,2,3}
+ 2 | {8,6,3}
+ 5 | {7,3,4}
+(3 rows)
+
+nonun=# EXPLAIN ANALYZE SELECT * from test where b @@ '3|2';
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using index_test_gist on test  (cost=0.00..4.82 rows=1 width=36) (actual time=0.181..0.198 rows=3 loops=1)
+   Index Cond: (b @@ '3 | 2'::query_int)
+ Total runtime: 0.675 ms
+(3 rows)
+
+nonun=# SELECT * from test where b @@ '3|1';
+ a |       b
+---+---------------
+ 1 | {1,2,3}
+ 2 | {8,6,3}
+ 3 | {5,6,1}
+ 5 | {7,3,4}
+ 6 | {1,6,1,7,9}
+ 7 | {1,7,8,8,6,1}
+(6 rows)
+
+nonun=# EXPLAIN ANALYZE SELECT * from test where b @@ '3|1';
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using index_test_gist on test  (cost=0.00..4.82 rows=1 width=36) (actual time=0.079..0.102 rows=6 loops=1)
+   Index Cond: (b @@ '3 | 1'::query_int)
+ Total runtime: 0.612 ms
+(3 rows)
+
+nonun=# SELECT * from test where 3 = any(b);
+ a |    b
+---+---------
+ 1 | {1,2,3}
+ 2 | {8,6,3}
+ 5 | {7,3,4}
+(3 rows)
+
+nonun=# EXPLAIN ANALYZE SELECT * from test where 3 = any(b);
+                                            QUERY PLAN
+--------------------------------------------------------------------------------------------------
+ Seq Scan on test  (cost=0.00..45.00 rows=500 width=36) (actual time=0.049..0.068 rows=3 loops=1)
+   Filter: (3 = ANY (b))
+ Total runtime: 0.182 ms
+(3 rows)
+}}}
+ * 보시라... 인덱스 아주 잘 타고 계시다! (지금 시퀀셜 스캔이 시간이 덜 걸리는 이유는 데이터가 적기 때문이다. 데이터가 적은 상황에서는 인덱스를 사용하는 것이 비용이 더 들 때도 있다.)
+ * 다른 함수나 연산자는 본인이 직접 해보세요~~

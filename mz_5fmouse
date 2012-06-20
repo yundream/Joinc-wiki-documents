@@ -1,0 +1,208 @@
+= Linux의 Mouse 입력 처리 =
+ * 이 소스는 마우스를 직접 처리할때 사용할수 있겠죠? X가 없이 마우스를 어떻게 입력 받는지에 대한 예제입니다.
+ * 마우스는 거의 대부분 폴링 방식 외에는 뾰족한 수가 없을거 같습니다만 RTS와 연동하면 좀 낳겠군요.
+ * 일반 PS/2 의 3버튼 마우스(또는 2버튼 마우스)의 경우 다음과 같은 3바이트 단위구조의 데이터입력을 처리하면 됩니다.
+ || '''OFFSET''' || '''내용''' ||
+ || 0 || Button 정보 (1=왼쪽, 2=오른쪽, 3=가운데 또는 왼쪽과 오른쪽의 동시 클릭, 그 밖에 휠구조 정보) ||
+ || 1 || X축의 증감값 (부호있는 바이트 char형) ||
+ || 2 || Y축의 증감값 (수학좌표계로서 그래픽 좌표계로 변환하려면 역수를 취함) ||
+ * 누군가 마우스의 입력 구조에 대해서 흉을 본 글이 기억납니다. 우선 3바이트 align을 취해야 한다는 점과 계속 감시를 해야 한다는 점때문이며 그렇다고 더 뾰족한 수는 없어보입니다. 
+ * 16비트 마우스 커서 비트맵 한번 그려봤습니다. 이를 처리할때 bit 0인 곳은 투명 처리를 필요로 하며 각 비트맵은 최소한의 구성으로 만들어지며 이것을이 서로 or연산으로 하나의 커서를 완성합니다. 때문에 마우스 커서를 처리할때 또 다른 하나의 작업영역의 비트맵 메모리를 갖는것이 보통이며 or연산으로 만들어진 비트맵을 cache하는 경우도 있습니다. 마우스에 CPU점유를 전부 할애할수는 없기 때문이겠죠.
+ {{{#!vim c
+unsigned short g_MouseCursorBitmap[5][16]={
+                {0xc000,0xa000,0x9000,0x8800,0x8400,0x8200,0x8100,0x8080, 0x8040,0x8020,0x83e0,0xb900,0xe980,0x0c80,0x0480,0x0780},
+                {0x0000,0x4000,0x6000,0x7000,0x7800,0x7c00,0x7e00,0x7f00, 0x7f80,0x7fc0,0x7c00,0x4600,0x0600,0x0300,0x0300,0x0000},
+                {0x0c00,0x1200,0x1200,0x1200,0x1200,0x13b6,0x1249,0x7249, 0x9249,0x9001,0x9001,0x8001,0x4002,0x4002,0x2004,0x1ff8},
+                {0x0000,0x0c00,0x0c00,0x0c00,0x0c00,0x0c00,0x0db6,0x0db6, 0x6db6,0x6ffe,0x6ffe,0x7ffe,0x3ffc,0x3ffc,0x1ff8,0x0000},
+                {0x0000,0x0012,0x001a,0x0016,0x0012,0x0000,0x0000,0x0000, 0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000}
+               };
+}}}
+
+{{{#!vim c
+/*
+ [ GPL ]
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com>
+ http://minzkn.pe.ky
+*/
+
+#include <sys/types.h>
+#include <sys/select.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <malloc.h>
+
+/* Mouse하나를 처리하기 위해서 다음과 같은 구조가 필요합니다. */
+typedef struct ts_MZ_Mouse
+{
+ int Handle;
+ int GridX, GridY, PreButton, Button;
+ int PrePositionX, PrePositionY, PositionX, PositionY;
+ int Window[ 4 ];
+}t_MZ_Mouse;
+
+t_MZ_Mouse *MZ_OpenMouse(const char *s_DeviceName)
+{
+ const char *c_DeviceTable[] = { /* 마우스 장치를 여기에 지원할수 있는 경우 열거합니다. */
+  "/dev/mouse", "/dev/psaux", (char *)0
+ };
+ int s_Handle, s_Index;
+ t_MZ_Mouse *s_Return;
+ if(s_DeviceName)s_Handle = open(s_DeviceName, O_RDONLY);
+ else s_Handle = (-1);
+ s_Index = 0;
+ while(s_Handle == (-1) && c_DeviceTable[s_Index])s_Handle = open(c_DeviceTable[s_Index++], O_RDONLY);
+ if(s_Handle != (-1))
+ {
+  s_Return = (t_MZ_Mouse *)malloc(sizeof(t_MZ_Mouse));
+  if(s_Return)
+  {
+   s_Return->Handle = s_Handle;
+   s_Return->GridX = s_Return->GridY = 0;
+   s_Return->PreButton = s_Return->Button = 0;
+   s_Return->PrePositionX = s_Return->PrePositionY = s_Return->PositionX = s_Return->PositionY = 0;
+   s_Return->Window[0] = s_Return->Window[1] = s_Return->Window[2] = s_Return->Window[3] = (-1);
+  }
+  else close(s_Handle);
+ }
+ else s_Return = (t_MZ_Mouse *)0;
+ return(s_Return);
+}
+
+t_MZ_Mouse *MZ_CloseMouse(t_MZ_Mouse *s_Handle)
+{
+ if(s_Handle)
+ {
+  if(s_Handle->Handle != (-1))close(s_Handle->Handle);
+  free(s_Handle);
+  s_Handle = (t_MZ_Mouse *)0;
+ }
+ return(s_Handle);
+}
+
+void MZ_SetupMouse(t_MZ_Mouse *s_Handle, int s_Left, int s_Top, int s_Right, int s_Bottom)
+{
+ if(s_Handle)
+ { /* 마우스의 행동범위를 제한하기 위한 영역 변수입니다. */
+  s_Handle->Window[0] = s_Left , s_Handle->Window[1] = s_Top;
+  s_Handle->Window[2] = s_Right, s_Handle->Window[3] = s_Bottom;
+ }
+}
+
+int MZ_DoMouse(t_MZ_Mouse *s_Handle)
+{
+ int s_Return = 0, s_Check, s_ReadBytes;
+ fd_set s_FD_Read;
+ struct timeval s_LocalTimeVal;
+ char s_Buffer[ 3 ]; /* 마우스 데이터 버퍼 */
+ if(s_Handle)
+ {
+  if(s_Handle->Handle != (-1))
+  {
+   s_ReadBytes = 0;
+   s_LocalTimeVal.tv_sec = 0, s_LocalTimeVal.tv_usec = 1; /* 처음 한번은 Non-blocking수준으로 select를 걸도록 합니다. */
+   do
+   { /* 마우스는 3바이트 단위의 데이터를 수신하게 됩니다. 하지만 모든 마우스가 그러한 것이 아니므로 해당 마우스의 spec를 참조하세요. */
+    FD_ZERO(&s_FD_Read);
+    FD_SET(s_Handle->Handle, &s_FD_Read);
+    s_Check = select(s_Handle->Handle + 1, (fd_set *)(&s_FD_Read), (fd_set *)0, (fd_set *)0, (struct timeval *)(&s_LocalTimeVal)); 
+    s_LocalTimeVal.tv_sec = 0, s_LocalTimeVal.tv_usec = 100 * 1000; /* 이 값을 조절하면 마우스가 미칠지도 모릅니다. ^^ */
+    if(s_Check > 0)
+    {
+     s_Check = read(s_Handle->Handle, &s_Buffer[s_ReadBytes], sizeof(s_Buffer) - s_ReadBytes);
+     if(s_Check > 0)s_ReadBytes += s_Check;
+    }
+   }while(s_ReadBytes < sizeof(s_Buffer) && s_Check > 0); 
+   if(s_ReadBytes >= sizeof(s_Buffer))
+   {
+    s_Handle->PreButton     =  s_Handle->Button;
+    s_Handle->Button        =  ((int)s_Buffer[ 0 ]); /* 버튼 정보 */
+    s_Handle->GridX         =  ((int)s_Buffer[ 1 ]); /* X축 */
+    s_Handle->GridY         = -((int)s_Buffer[ 2 ]); /* Y축 역방향수 (그래픽 좌표계의 Y) */
+
+    /* 마우스 가속처리 : 4픽셀 이상 움직이면 그에 2배수를 곱한 이동좌표계로 바꿉니다. 이 작업이 없으면 마우스 움직이는게 답답합니다. 즉, 저 같은 터치패드 사용자들에게는 더욱 속터지는 일이 될겁니다. */
+    if(s_Handle->GridX > 4 || s_Handle->GridX < (-4))s_Handle->GridX *= 2;
+    if(s_Handle->GridY > 4 || s_Handle->GridY < (-4))s_Handle->GridY *= 2;
+
+    s_Handle->PrePositionX  = s_Handle->PositionX;
+    s_Handle->PositionX    += s_Handle->GridX;
+    s_Handle->PrePositionY  = s_Handle->PositionY;
+    s_Handle->PositionY    += s_Handle->GridY;
+    if(s_Handle->Window[0] >= 0 && s_Handle->PositionX < s_Handle->Window[0])s_Handle->PositionX = s_Handle->Window[0];
+    if(s_Handle->Window[1] >= 0 && s_Handle->PositionY < s_Handle->Window[1])s_Handle->PositionY = s_Handle->Window[1];
+    if(s_Handle->Window[2] >= 0 && s_Handle->PositionX > s_Handle->Window[2])s_Handle->PositionX = s_Handle->Window[2];
+    if(s_Handle->Window[3] >= 0 && s_Handle->PositionY > s_Handle->Window[3])s_Handle->PositionY = s_Handle->Window[3];
+    s_Return = 1; 
+   }
+  } 
+ }
+ return(s_Return);
+}
+
+int main(void)
+{
+ int s_Return = 0, s_KeepData = 0;
+ t_MZ_Mouse *s_Mouse;
+ s_Mouse = MZ_OpenMouse((char *)0);
+ if(s_Mouse)
+ {
+  MZ_SetupMouse(s_Mouse, 0, 0, 640, 480);
+  fprintf(stdout, "Left + Right button on exit.\n");
+  do
+  {
+   if(MZ_DoMouse(s_Mouse) > 0)
+   {
+    s_KeepData = 1;
+    fprintf(stdout, "\rx=%3d, y=%3d, gridx=%3d, gridy=%3d, button=0x%02x", 
+            s_Mouse->PositionX, s_Mouse->PositionY, s_Mouse->GridX, s_Mouse->GridY, s_Mouse->Button);
+    fflush(stdout);
+   }
+   else 
+   {
+    if(s_KeepData == 1)
+    {
+     s_KeepData = 0;
+     fprintf(stdout, "\n");
+    }
+    fprintf(stdout, "\rWait mouse%20s", "");
+    fflush(stdout);
+   }
+  }while((s_Mouse->Button & 0x03) != 0x03);
+  fprintf(stdout, "\nEnd of mouse\n");
+  s_Mouse = MZ_CloseMouse(s_Mouse);
+ }
+ else fprintf(stdout, "Can not open mouse !\n");
+ return(s_Return);
+}
+
+/* End of source */
+}}}
+ * 아래의 함수는 마우스 커서비트맵을 그릴때 사용했던 겁니다. 물론 실제 비트맵 뿐만 아니라 다양한 처리루틴이 필요하지만 기본루틴은 이것으로 충분합니다.
+ {{{#!vim c
+static void MZ_DFB_BitmapXx16(t_DFB *s_HANDLE_DFB, int s_nBit, void *s_Buffer, int s_Color, int s_BackColor, i
+nt s_x, int s_y)
+{
+ unsigned int s_Bit, s_CountY, s_CountX;
+ unsigned long s_Blit;
+ for(s_CountY = s_y;s_CountY < (s_y + 16);s_CountY++, ((unsigned long *)s_Buffer)++)
+ {
+  s_Blit = *((unsigned long *)s_Buffer);
+  if(s_Blit == 0lu)
+  {
+   if(s_BackColor != (-1))MZ_DFB_DrawHLine(s_HANDLE_DFB, s_BackColor, s_x, s_x + (s_nBit - 1), s_CountY);
+  }
+  else
+  {
+   for(s_Bit = 0, s_CountX = (s_x + (s_nBit - 1));s_Bit < s_nBit;s_Bit++, s_CountX--)
+   {
+    if(*((unsigned long *)s_Buffer) & (1lu << s_Bit))
+    {
+     if(s_Color != (-1))MZ_DFB_DrawPixel(s_HANDLE_DFB, s_Color, s_CountX, s_CountY);
+    }
+    else if(s_BackColor != (-1))MZ_DFB_DrawPixel(s_HANDLE_DFB, s_BackColor, s_CountX, s_CountY);
+   }
+  }
+ }
+}
+}}}

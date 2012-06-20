@@ -1,0 +1,90 @@
+#title winsock api : getsockname - 소켓 정보를 가져온다. 
+
+== getsockname ==
+getsockname함수는 소켓(:12)정보를 가져온다.
+
+=== 사용 법 ===
+{{{#!plain
+int getsockname(
+  __in     SOCKET s,
+  __out    struct sockaddr *name,
+  __inout  int *namelen
+);
+}}}
+
+=== 매개 변수 ===
+ * s [in]
+   소켓 지시자
+ * name [out] 
+   소켓 주소 정보를 포함한 sockaddr 구조체를 가리키는 포인터
+ * namelen [in, out]
+   name 버퍼의 크기, 바이트 단위
+
+=== 반환 값 ===
+성공적으로 소켓 정보를 가져오면 0을 반환한다. 실패하면 SOCKET_ERROR를 리턴한다. 발생한 에러코드는 WSAGetLastError(:12)함수로 가져올 수 있다.
+
+|| 에러 코드               || 설명                                                    ||
+|| WSANOTINITIALISED       || WSAStartup(:12)함수가 성공적으로 호출된 적이 없다.      ||
+|| WSAENETDOWN             || 네트워크 서브시스템에 문제가 있다.                      ||
+|| WSAEFAULT               || 매개 변수 __name__ 혹은 __namelen__의 주소공간이 잘못되었다. 혹은 __namelen__이 너무 작다  ||
+|| WSAENOTSOCK             || 소켓지시자가 아니다.             ||
+|| WSAEINVAL               || 소켓이 아직 bind()되지 않거나 연결되지 않은 상태에서 호출되었다.       ||
+
+=== 예제 ===
+{{{#!plain
+#include <stdio.h>
+#include <winsock2.h>
+#include <windows.h>
+
+int main(int argc, char **argv)
+{
+	WSADATA wsaData;
+	int iResult;
+	int clilen;
+	SOCKET listenSocket, clisocket;
+    struct sockaddr_in sockaddr, cliaddr;
+
+	iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if(iResult != 0)
+	{
+		printf("WSAStart up Error\n");
+		return 1;
+	}
+		
+	listenSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(listenSocket == INVALID_SOCKET)
+	{
+		WSACleanup();
+		return 1;
+	}
+
+	sockaddr.sin_family=AF_INET;
+	sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	sockaddr.sin_port = htons(3400);
+	
+	if( bind(listenSocket, (SOCKADDR *)&sockaddr, sizeof(sockaddr)) == SOCKET_ERROR)
+	{
+		printf("bind failed\n");
+		return 1;
+	}
+
+	listen(listenSocket, 5);
+	while(1)
+	{
+		clilen = sizeof(cliaddr);
+		clisocket = accept(listenSocket, (SOCKADDR *)&cliaddr, &clilen);
+		if(clisocket == INVALID_SOCKET)
+		{
+			printf("Accept failure\n");
+			closesocket(listenSocket);
+			WSACleanup();
+			return 1;
+		}
+		clilen = sizeof(cliaddr);
+		getsockname(clisocket, (SOCKADDR *)&cliaddr, &clilen);
+		printf("Client Socket Info :: %s (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+	}
+	WSACleanup();
+    return 0;
+}
+}}}

@@ -1,0 +1,70 @@
+#title 4장 echo_server_win.c 코드 에러
+
+== echo_server_win.c ==
+테스트 개발했던 코드를 문서로 옮기면서 아예 엉뚱하게 올라 간것 같습니다. 이에 다음과 같이 코드를 수정합니다.
+
+{{{#!plain linenum
+#include <winsock2.h>
+#include <stdio.h>
+
+#define MAX_PACKETLEN 1024
+#define PORT 3500
+
+int main()
+{
+  WSADATA wsaData;
+  SOCKET listen_s, client_s;
+  struct sockaddr_in server_addr, client_addr;
+  char szReceiveBuffer[MAX_PACKETLEN];
+  int readn, writen;
+  int len;
+
+  if(WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+  {
+    return 1;
+  }
+  listen_s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if(listen_s == INVALID_SOCKET)
+  {
+    return 1;
+  }
+ 
+  ZeroMemory(&server_addr, sizeof(struct sockaddr_in));
+
+  server_addr.sin_family = PF_INET;
+  server_addr.sin_port = htons(PORT);
+  server_addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+  if(bind(listen_s, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
+  {
+    return 0;
+  }
+  if(SOCKET_ERROR == listen(listen_s, 5) == SOCKET_ERROR)
+  {
+    return 0;
+  }
+
+
+  while(1)
+  {
+	ZeroMemory(&client_addr, sizeof(struct sockaddr_in));
+	len = sizeof(struct sockaddr_in);
+    client_s = accept(listen_s, (struct sockaddr *)&client_addr, &len);
+    readn = recv(client_s, szReceiveBuffer, MAX_PACKETLEN, 0);
+    if(readn > 0)
+    {
+      writen = send(client_s, szReceiveBuffer, readn, 0); 
+    }
+    closesocket(client_s);
+  }
+  closesocket(listen_s);
+  WSACleanup();
+  return 0;
+}
+}}}
+5. accept 함수로 기다릴 포트번호를 3500으로 정의한다.  
+
+16. WSAStartup(:12) 함수로 윈속(:12)을 로딩한다.
+
+42 ~ 53. accept 함수로 클라이언트를 기다린다. 만약 연결된다면 recv(:2)함수로 데이터를 읽고 send(:2)함수로 클라이언트에 재 전송한다. 데이터 전송 후 closesocket(:2) 함수를 호출해서 클라이언트 연결을 끊는다. 
+

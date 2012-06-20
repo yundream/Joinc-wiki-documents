@@ -1,0 +1,236 @@
+#title linux man pge : htons - 데이터를 네트워크 바이트 순서로 변환한다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>htons(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. htons(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN24"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN27"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	host byte order을 따르는 데이터를 network byte order로 변경한다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;netinet/in.h&#62;
+
+unsigned short int htons(unsigned short int hostshort);
+unsigned long int htonl(unsigned long int hostshort);
+unsigned short int ntohs(unsigned short int hostshort);
+unsigned long int ntohl(unsigned long int hostshort);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		데이터는 바이트 단위로 저장되지만 저장되는 방식에 있어서 CPU마다 
+		차이가 발생하게 된다. 예를 들어 4바이트 크기의 int자료를 저장한다고 
+		했을 때 어떤 CPU는 가장 낮은 바이트부터 저장을 하는가 하면, 어떤 CPU는
+		가장 높은 바이트 부터 데이터를 저장하기도 한다. 
+		전자를 Little Endian방식, 후자를 Big Endian방식 이라고 한다.     
+	</P
+><P
+>		이런 이유로 서로 다른 데이터 저장 방식을 사용하는 시스템끼리 통신을 
+		하게 될경우 전혀 원하지 않는 값들을 서로 주고 받는 경우가 발생할 수 있다. 
+		한쪽에서는 12345를 보냈는데, 다른 한쪽에서는 엉뚱하게 365779719로 받아 들이는 
+		문제들이 발생한다.    
+	</P
+><P
+>		이런 문제를 해결하기 위해서 데이터 통신을 할때는 명시적으로 
+		네트워크 byte order을 따르도록 데이터의 byte order를 변경한다. 
+		네트워크 byte order는 Big Endiasn을 따른다.   
+	</P
+><P
+>		원격 호스트와 데이터 통신을 하길 원한다면 보낼 때 네트워크 byte order로, 
+		받았을 때는 호스트 byteorder로 변경한다.   
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>htonl()</B
+>함수는 long intger(일반적으로 4byte)데이터를
+		네트워크 byte order로 변경한다.
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>htons()</B
+>함수는 short intger(일반적으로 2byte)데이터를
+		네트워크 byte order로 변경한다.
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>ntohl()</B
+>함수는 long intger 데이터를
+		호스트 byte order로 변경한다.
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>ntohs()</B
+>함수는 short intger 데이터를
+		호스트 byte order로 변경한다.
+	</P
+><P
+>		Endian과 네트워크 byte order에 대한 자세한 내용은 
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=79"
+TARGET="_top"
+>Endian에 대해서</A
+>를 참고하기 바란다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN24"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		네트워크 byte order된 2바이트 값을 넘겨준다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN27"
+>1.4&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/time.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;arpa/inet.h&#62;
+
+int main(int argc, char **argv)
+{
+    int client_sockfd;
+    struct sockaddr_in clientaddr;
+    int data = 123456789;
+    int client_len;
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr("192.168.100.190");
+    clientaddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(clientaddr);
+
+    if (connect(client_sockfd, (struct sockaddr *)&#38;clientaddr, client_len) &#60; 0)
+    {
+        perror("Connect error : ");
+        exit(0);
+    }
+    
+    // 보낼 데이터 네트워크 byte order를 따르도록 변경한다. 
+    data = htonl(data);
+    write(client_sockfd, (void *)&#38;data, sizeof(int));
+
+    // 읽어들인 데이터는 호스트 byte order을 따르도록 변경한다.
+    read(client_sockfd, (void *)&#38;data, sizeof(int));
+    data = ntohl(data);
+    close(client_sockfd);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

@@ -1,0 +1,173 @@
+#title 네트워크 프로그래밍 FAQ 5 - UDP 프로그램의 제작
+
+  5.  Writing UDP/SOCK_DGRAM applications
+
+  5.1.  When should I use UDP instead of TCP?
+
+  UDP is good for sending messages from one system to another when the
+  order isn't important and you don't need all of the messages to get to
+  the other machine.  This is why I've only used UDP once to write the
+  example code for the faq.  Usually TCP is a better solution.  It saves
+  you having to write code to ensure that messages make it to the
+  desired destination, or to ensure the message ordering.  Keep in mind
+  that every additional line of code you add to your project in another
+  line that could contain a potentially expensive bug.
+
+  If you find that TCP is too slow for your needs you may be able to get
+  better performance with UDP so long as you are willing to sacrifice
+  message order and/or reliability.
+
+  UDP must be used to multicast messages to more than one other machine
+  at the same time.  With TCP an application would have to open separate
+  connections to each of the destination machines and send the message
+  once to each target machine.  This limits your application to only
+  communicate with machines that it already knows about.
+
+  5.2.  What is the difference between "connected" and "unconnected"
+  sockets?
+
+  From Andrew Gierth (andrew@erlenstar.demon.co.uk):
+
+  If a UDP socket is unconnected, which is the normal state after a
+  bind() call, then send() or write() are not allowed, since no
+  destination address is available; only sendto() can be used to send
+  data.
+
+  Calling connect() on the socket simply records the specified address
+  and port number as being the desired communications partner. That
+  means that send() or write() are now allowed; they use the destination
+  address and port given on the connect call as the destination of the
+  packet.
+
+  5.3.  of the socket?  Does doing a connect() call affect the receive
+  behaviour
+
+  From Richard Stevens (rstevens@noao.edu):
+
+  Yes, in two ways.  First, only datagrams from your "connected peer"
+  are returned.  All others arriving at your port are not delivered to
+  you.
+
+  But most importantly, a UDP socket must be connected to receive ICMP
+  errors.  Pp. 748-749 of "TCP/IP Illustrated, Volume 2" give all the
+  gory details on why this is so.
+
+  5.4.  How can I read ICMP errors from "connected" UDP sockets?
+
+  If the target machine discards the message because there is no process
+  reading on the requested port number, it sends an ICMP message to your
+  machine which will cause the next system call on the socket to return
+  ECONNREFUSED.  Since delivery of ICMP messages is not guarenteed you
+  may not recieve this notification on the first transaction.
+
+  Remember that your socket must be "connected" in order to receive the
+  ICMP errors.  I've been told, and Alan Cox has verified that Linux
+  will return them on "unconnected" sockets.  This may cause porting
+  problems if your application isn't ready for it, so Alan tells me
+  they've added a SO_BSDCOMPAT flag which can be set for Linux kernels
+  after 2.0.0.
+
+  5.5.  How can I be sure that a UDP message is received?
+
+  You have to design your protocol to expect a confirmation back from
+  the destination when a message is received.  Of course is the
+  confirmation is sent by UDP, then it too is unreliable and may not
+  make it back to the sender.  If the sender does not get confirmation
+  back by a certain time, it will have to re-transmit the message, maybe
+  more than once.  Now the receiver has a problem because it may have
+  already received the message, so some way of dropping duplicates is
+  required.  Most protocols use a message numbering scheme so that the
+  receiver can tell that it has already processed this message and
+  return another confirmation.  Confirmations will also have to
+  reference the message number so that the sender can tell which message
+  is being confirmed.  Confused?  That's why I stick with TCP.
+
+  5.6.  How can I be sure that UDP messages are received in order?
+
+  You can't.  What you can do is make sure that messages are processed
+  in order by using a numbering system as mentioned in ``5.5 How can I
+  be sure that a UDP message is received?''.  If you need your messages
+  to be received and be received in order you should really consider
+  switching to TCP.  It is unlikely that you will be able to do a better
+  job implementing this sort of protocol than the TCP people already
+  have, without a significant investment of time.
+
+  5.7.  How often should I re-transmit un-acknowleged messages?
+
+  The simplest thing to do is simply pick a fairly small delay such as
+  one second and stick with it.  The problem is that this can congest
+  your network with useless traffic if there is a problem on the lan or
+  on the other machine, and this added traffic may only serve to make
+  the problem worse.
+
+  A better technique, described with source code in "UNIX Network
+  Programming" by Richard Stevens (see ``1.5 Where can I get source code
+  for the book [book title]?''), is to use an adaptive timeout with an
+  exponential backoff.  This technique keeps statistical information on
+  the time it is taking messages to reach a host and adjusts timeout
+  values accordingly.  It also doubles the timeout each time it is
+  reached as to not flood the network with useless datagrams.  Richard
+  has been kind enough to post the source code for the book on the web.
+  Check out his home page at http://www.noao.edu/~rstevens.
+
+  5.8.  How come only the first part of my datagram is getting through?
+
+  This has to do with the maximum size of a datagram on the two machines
+  involved.  This depends on the sytems involved, and the MTU (Maximum
+  Transmission Unit).  According to "UNIX Network Programming", all
+  TCP/IP implementations must support a minimum IP datagram size of 576
+  bytes, regardless of the MTU.  Assuming a 20 byte IP header and 8 byte
+  UDP header, this leaves 548 bytes as a safe maximum size for UDP
+  messages.  The maximum size is 65516 bytes.  Some platforms support IP
+  fragmentation which will allow datagrams to be broken up (because of
+  MTU values) and then re-assembled on the other end, but not all
+  implementations support this.
+
+  This information is taken from my reading of "UNIX Netowrk
+  Programming" (see ``1.5 Where can I get source code for the book [book
+  title]?'').
+
+  Andrew has pointed out the following regarding large UDP messages:
+
+  Another issue is fragmentation. If a datagram is sent which is too
+  large for the network interface it is sent through, then the sending
+  host will fragment it into smaller packets which are reassembled by
+  the receiving host. Also, if there are intervening routers, then they
+  may also need to fragment the packet(s), which greatly increases the
+  chances of losing one or more fragments (which causes the entire
+  datagram to be dropped).  Thus, large UDP datagrams should be avoided
+  for applications that are likely to operate over routed nets or the
+  Internet proper.
+
+  5.9.  Why does the socket's buffer fill up sooner than expected?
+
+  From Paul W. Nelson (nelson@thursby.com):
+
+  In the traditional BSD socket implementation, sockets that are atomic
+  such as UDP keep received data in lists of mbufs.  An mbuf is a fixed
+  size buffer that is shared by various protocol stacks.  When you set
+  your receive buffer size, the protocol stack keeps track of how many
+  bytes of mbuf space are on the receive buffer, not the number of
+  actual bytes.  This approach is used because the resource you are
+  controlling is really how many mbufs are used, not how many bytes are
+  being held in the socket buffer.  (A socket buffer isn't really a
+  buffer in the traditional sense, but a list of mbufs).
+
+  For example:  Lets assume your UNIX has a small mbuf size of 256
+  bytes.  If your receive socket buffer is set to 4096, you can fit 16
+  mbufs on the socket buffer.  If you receive 16 UDP packets that are 10
+  bytes each, your socket buffer is full, and you have 160 bytes of
+  data.  If you receive 16 UDP packets that are 200 bytes each, your
+  socket buffer is also full, but contains 3200 bytes of data.  FIONREAD
+  returns the total number of bytes, not the number of messages or bytes
+  of mbufs.  Because of this, it is not a good indicator of how full
+  your receive buffer is.
+
+  Additionaly, if you receive UDP messages that are 260 bytes, you use
+  up two mbufs, and can only recieve 8 packets before your socket buffer
+  is full. In this case, only 2080 bytes of the 4096 are held in the
+  socket buffer.
+
+  This example is greatly simplified, and the real socket buffer
+  algorithm also takes into account some other parameters.  Note that
+  some older socket implementations use a 128 byte mbuf.

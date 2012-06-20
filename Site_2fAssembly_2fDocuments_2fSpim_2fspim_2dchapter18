@@ -1,0 +1,504 @@
+#title Set 명령들
+
+[[TableOfContents]]
+
+ '''번역 : 강웅빈'''
+ '''감수 : 프갤ㅤ&#54973;들'''
+
+
+== Set 명령 ==
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_1.html
+
+이 장에서는 추가적으로 2개의 분기 명령과 조건에 따라 Set하는 명령에 대하여 공부한다. Set 명령은 조건이 참또는거짓인가에 따라 레지스터의 값을 1과 0으로 지정한다. 
+
+장의 주제:
+
+    * 조건 분기 명령:
+
+          bltz 명령 (0보다 작을 경우 분기한다)
+          bgez 명령 (0보다 크거나 같을 경우 분기한다)
+
+    * 조건에 따라 레지스터의 값을 지정하는 Set 명령
+
+          slt 명령 (작을 경우 설정) 
+          slti 명령 (직접피연산자보다 작을 경우 설정) 
+          sltu 명령 (부호상관없는 정수보다 작을 경우 설정) 
+          sltiu 명령 (부호상관없는 직접피연산자보다 작을 경우 설정) 
+
+새로운 명령들은 루프나 조건분기문의 구조를 구현하는것을 보조한다. 이와같은 새로운 명령들을 가지고도 구조를 구현하는 것은 어려운 작업이다. 이 장을 공부함으로써 컴파일러가 여러분을 대신하여 어떤 작업을 하는가 이해하도록 하자.
+
+
+질문:
+ >, <, >=,   <= 같이 관계를 나타내는 비교연산자가 프로그램언어에서 중요합니까?
+
+=== BLTZ(Branch on Less than Zero) 명령과 BGEZ(Branch on Greater than or Equal to zero)명령 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_2.html
+답:물론이다.
+
+MIPS는 다양한 방법으로 비교연산자를구현한다.다음은 추가로 있는 2가지 분기 명령이다. 다음 명령들은 레지스터가 담고있는 비트 패턴을 0과 비교한다. 레지스터가 담고 있는 비트패턴은 2의 보수로 표현되었다고 가정한다.
+
+
+{{{#!plain
+bltz   s,label    #  레지스터 S가 담고있는 2의 보수로 표현된 정수가 0보다 작다면 label로 분기된다.
+                      #  이 명령 다음에는 분기지연 슬롯이 뒤따른다.
+
+bgez   s,label        #레지스터 S가 담고있는 2의 보수로 표현된 정수가 0보다 크거나 같다며 label로 분기된다.
+                             #이 명령 다음에는 분기지연 슬롯이 뒤따른다.   
+}}}
+
+bltz 명령은 정수가 0보다 작을 경우 분기한다. bgez명령은 정수가 0보다 크거나 같을 경우 분기한다. 이러한 분기 명령 다음에는 분기지연구간(branch delay slot)이 뒤따른다. 다시말하면 분기지연 구간에 있는 명령은 항상 실행되고 지연구간의 명령이 실행된 이후에 분기된다.
+
+질문:
+
+다음은 자바나 C에서 볼수 있는 선언문입니다.
+{{{#!plain
+if ( !( a < 0 ) ) { ... }
+}}}
+not 연산자인 !를 사용하지 말고 선언문을 작성해 봅시다.
+{{{#!plain
+if ( a _____ 0  ) { ... }
+}}}
+
+=== SLT명령(Set on Less Than) ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_3.html
+답:
+{{{#!plain
+if ( a >= 0  ) { ... }
+}}}
+
+<와 >= 연산자로 모든 정수값을 포함할 수 있습니다.
+
+
+Set 명령은 비교연산자를 구현하는데 사용한다. 하지만 명령자체가 분기명령처럼 프로그램 제어의 흐름을 바꾸지는 않는다. Set 명령은 레지스터를 1이나 0으로 설정함으로써 두값의 관계를 보여준다. slt명령에서는 2의보수로 표현된 정수를 사용한다.
+
+{{{#!plain
+                   #  $s와 $t는 2의 보수로 표현된 정수를담고 있다.
+                   #
+slt   d,s,t      #  if ( $s < $t )
+                   #    d 의 값은 1이다.
+                   #  else
+                   #    d 의 값은 0이다.
+}}}
+sltu명령은 부호없는 정수를 사용한다.
+{{{#!plain
+                   #  $s와 $t 부호없는 정수를 담고있다.
+                   #
+sltu  d,s,t        #  if ( $s < $t )
+                   #    d 의 값은 1이다.
+                   #  else
+                   #    d 의 값은 0이다.
+}}}
+질문:
+이러한 명령을 정수가 아닌 문자 데이터에도 사용할 수 있습니까?
+
+=== SLTI(Set on Less Than Immediate) ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_4.html
+
+답:예
+만약 두 레지스터의 하위바이트에 문자가 올려졌고 나머지의 비트는 0이라면 slt나 sltu명령 중에 하나를 사용하여 비교할 수 있습니다.
+
+다음의 두 Set 명령은 레지스터의 피연산자값과 명령에 있는 직접피연산자의 값을 비교합니다. 다음명령은 2의 보수로 표현된 정수를 비교합니다.
+{{{#!plain
+                   #  $s와 imm은 2의 보수로 표현된 정수를 담고있다.   
+                   #
+slti  d,s,imm      #  if ( $s < imm )
+                   #    d의 값은 1이다.
+                   #  else
+                   #    d의 값은 0이다.
+}}}
+다음명령은 부호없는 정수를 비교한다.
+{{{#!plain
+                   #  $s와 imm은 부호없는 정수를 담고있다.   
+                  
+sltiu  d,s,imm     #  if ( $s < imm )
+                   #    d의 값은 1이다.
+                   #  else
+                   #    d의 값은 0이다.
+}}}
+두 명령다 기계명령의 직접피연산자(immediate)를 표현하는 필드 값은 16비트 크기이다.
+
+질문:
+비교를 하기위해 16비트 직접피연산자(immediate)를 표현하는 필드값이 어떤 식으로 32비트값으로 확장되겠습니까? 부호확장 되겠습니까 또는 영으로 확장되겠습니까?
+
+    * slti:
+    * sltiu:
+
+=== 온도 영역 측정계 ===
+
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_5.html
+
+답:
+ * slti: 부호로 확장
+ * sltiu: 영으로 확장
+
+attachment:thermometer.gif
+
+로봇 스프레이 페인터를 위한 제어 프로그램을 작성한다고 가정해보자. 페인트 칠을 할 수 있도록 허용되는 온도는 30에서 55도 사이이다. 온도 센서의 장치 드라이버(device driver)가 온도값을 레지스터 $2에 집어 넣는다.
+
+여러분이 작성할 프로그램은 레지스터 $2에 있는 부호 없는 정수값이 허용되는 범위 안에 있는 지를 테스트하게 될 것이다. 온도가 범위 안이라면, 레지스터 $3에 1을, 밖이라면 0을 저장한다.
+
+질문:
+이 프로그램을 위한 플로우차트를 작성해 보자.
+
+=== 프로그램 만들기 시작(Start on the program) ===
+
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_6.html
+
+답:
+아래에 있습니다. 어셈블리어에서는 코딩전에 계획을 세우는 것이 중요합니다.
+
+attachment:tempRange.gif
+프로그램을 위한 플로우차트는 위와 같다. 테스트 전에 기본값에 플래그를 설정하는 것은 자주 쓰이는 기법이다. 프로그램의 아웃라인은 다음과 같다.
+
+{{{#!plain
+## tempRange.asm
+##
+## 30 <= 온도 <= 55 를 확인한다.
+## 범위 안이라면 플래그를 1로, 아니면 0으로 설정한다
+##
+## 레지스터:
+## $2 --- 온도
+## $3 --- 범위 안/밖 표시 플래그
+## $8 --- 잡다한 용도
+
+      .text
+      .globl  main
+# 범위 표시 플래그를 1로 설정한다.
+main:   ori     $3,$0,1         #  1로 설정
+
+# 30 <= temp <= 55 임을 점검
+        sltiu   $8,$2,_____     #  temp <= 55 일 때, $8=1
+        beq     $8,$_____,_____ #  범위 밖일 때 0
+        sll     $0,$0,0         #  분기지연슬롯
+
+       . . . .                  #  다른 명령들
+
+# 범위 밖: 범위 플래그를 0으로 설정
+out:
+       . . . .                  #  0으로 설정
+
+# 계속
+cont:  sll     $0,$0,0         #  jump 대상
+
+## 파일의 끝}}}
+
+범위 검사는 2 부분으로 나뉜다. 첫 부분(이 프로그램에서)은 온도가 55보다 적거나 같은지 검사한다. 그러나 기계 명령은 "보다 적을때 설정(slt)" 이다. 만약 온도가 범위 밖이라면 분기 해서 나온다. 무동작 명령이 분기명령을 따른다.
+
+질문:
+빈칸을 채우세요.
+
+=== 빈칸 채우기 ===
+
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_7.html
+
+답: 아래를 보세요
+
+비교명령에 쓰인 직접피연산자는 slti명령을 사용하여 "55보다 같거나 적은 경우" 를 구현하기 위해 56으로 바뀌어있다. 어셈블리 언어가 온도를 십진수로 표현하는 것을 눈여겨 보자. 어셈블러가 소스파일의 십진수를 자동으로 이진수 패턴으로 변환 하기 때문에 십진수의 사용은 괜찮다.
+
+프로그램의 다음 부분은 온도가 30도보다 낮은지 테스트 할 것이다. 분기명령에서 올바른 주소로 분기 하도록 주의하자.
+
+{{{#!plain
+## tempRange.asm
+##
+## 30 <= 온도 <= 55 를 확인한다.
+## 범위 안이라면 플래그를 1로, 아니면 0으로 설정한다
+##
+## 레지스터:
+## $2 --- 온도
+## $3 --- 범위 안/밖 표시 플래그
+## $8 --- 잡다한 용도
+
+      .text
+      .globl  main
+      .text
+      .globl  main
+# 범위 표시 플래그를 1로 설정한다.
+main:   ori     $3,$0,1         #  1로 설정
+
+# 30 <= temp <= 55 임을 점검
+        sltiu   $8,$2,56        #  temp <= 55 일 때, $8=1
+        beq     $8,$0,out       #  범위 밖일 때 0
+        sll     $0,$0,0         #  분기지연슬롯
+
+        sltiu   $8,$2,_____     #  temp < 30일 때, $8=1
+        beq     $8,$0,_____     #  범위 안일 때 0
+        sll     $0,$0,0         #  분기 지연 슬롯
+
+# 범위 밖: 범위 플래그를 0으로 설정
+out:
+        ori     $3,____,____    #  0으로 설정
+
+cont:   sll     $0,$0,0         #  jump 대상
+
+## 파일의 끝}}}
+
+질문:
+빈 칸을 채워 보세요.
+
+=== 완성된 프로그램 ===
+
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_8.html
+
+답: 완성된 프로그램은 아래와 같다
+
+아래에 파일로 복사해서 SPIM에서 바로 실행 가능한 완성된 프로그램이 있다. 실행시에(항상 하는 것 처럼) PC를 0x0040000으로 설정하고 set value메뉴를 사용해 $2로 온도를 복사하자. 여러가지 온도로 프로그램을 실행하고 $3이 제대로 설정 되었는지 확인 해보자.
+
+{{{#!plain
+## tempRange.asm
+##
+## 30 <= 온도 <= 55 를 확인한다.
+## 범위 안이라면 플래그를 1로, 아니면 0으로 설정한다
+##
+## 레지스터:
+## $2 --- 온도
+## $3 --- 범위 안/밖 표시 플래그
+## $8 --- 잡다한 용도
+
+      .text
+      .globl  main
+      .text
+      .globl  main
+# 범위 표시 플래그를 1로 설정한다.
+main:   ori     $3,$0,1         #  1로 설정
+
+# 30 <= temp <= 55 임을 점검
+        sltiu   $8,$2,56        #  temp <= 55 일 때, $8=1
+        beq     $8,$0,out       #  범위 밖일 때 0
+        sll     $0,$0,0         #  분기지연슬롯
+
+        sltiu   $8,$2,56        #  temp < 30일 때, $8=1
+        beq     $8,$0,out       #  범위 안일 때 0
+        sll     $0,$0,0         #  분기 지연 슬롯
+
+# 범위 밖: 범위 플래그를 0으로 설정
+out:
+        ori     $3,$0,0         #  0으로 설정
+
+cont:   sll     $0,$0,0         #  jump 대상
+
+## 파일의 끝}}}
+
+질문:
+무동작 명령을 제거하면 프로그램이 제대로 실행 될까요?
+
+=== 지연 슬롯 버그 ===
+
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_9.html
+
+답: 아니오.
+
+attachment:delaySlotBug.gif
+첫 지연 슬롯의 무동작 연산을 제거 함으로써 프로그램을 약간 짧게 만들 수는 있다. 첫 지연 슬롯에 있는 명령(sltiu)는 (실행될 필요가 있든 없든 간에) 항상 실행 되지만, 오작동을 일으키지는 않는다.
+
+{{{#!plain
+# 30 <= temp <= 55 임을 점검
+        sltiu   $8,$2,56        #  temp <= 55 일 때, $8=1
+        beq     $8,$0,out       #  범위 밖일 때 0
+        '''sll     $0,$0,0         #  분기지연슬롯'''
+
+        sltiu   $8,$2,56        #  temp < 30일 때, $8=1
+        beq     $8,$0,out       #  범위 안일 때 0
+        '''sll     $0,$0,0         #  분기 지연 슬롯'''
+
+# 범위 밖: 범위 플래그를 0으로 설정
+out:
+        ori     $3,$0,0         #  0으로 설정
+
+cont:   sll     $0,$0,0         #  jump 대상
+
+## 파일의 끝}}}
+
+그러나 두번째 지연 슬롯의 무동작 연산은 필수적이다. 만약 이것을 제거한다면 분기 명령과 관계 없이 그 다음 명령인 ori가 플래그를 0으로 만들어 버린다. 아주 흔히 볼 수 있는 버그이고 올바른 결과가 나올 때도 있기 때문에 발견하기 어려울 수 도 있다. 
+
+질문:
+(복습)지연슬롯 다음에 어떤 종류의 명령이 뒤따릅니까?
+
+=== 카운팅 루프 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_10.html
+답:로드 명령
+attachment:countingLoop.gif
+정수의 초기 값을 설정하고 정수 초기값부터 상위 제한값까지 정수값을 증가시키는 루프 구조를 프로그램에서 흔히 찾아볼 수 있다.이러한 루프구조를 카운팅루프라 한다.집계하는데 쓰이는 정수값은 반복을 제어하는 변수로 표현한다.루프 구조는 조건 분기명령,점프명령,조건에 따라 set하는 명령을 함께 사용하여 구현된다.
+
+루프구조에서 다음 3가지 부분울 정확히 지켜야 한다.
+
+1. 정수값을 초기화 해야한다.
+2. 정수값이 끝나는 조건의 값이면 루프는 종료 되어야한다.
+3. 정수값이 증가되야만 한다.
+
+고차적인 프로그램 언어에서도 이러한 3가지 부분에서 실수하기 쉽다. 하물며 어셈블리어에서는 이러한 부분을 실수하기 정말
+쉽다. 일반적으로 그림에서 보는것처럼 루프 몸체에 들어가기전에 루프의 입장 조건을 시험하는 형태의 루프구조를 자주 사용한다. 어셈블리의 특성상 온갖 이상한 형태의 루프구조가 가능하기 때문에 프로그램하기전에 어떠한 루프구조를 사용할것인지 분명히 해야한다.
+
+질문:
+다음 c로 쓰여진 루프구조는 3가지부분이 정확합니까? 0부터시작하여 10번을 실행하는 루프 구조를 구현한것입니다.
+{{{#!plain
+int j;
+
+j = 0;
+while ( j < 10 )
+{
+   . . .
+   j++ ;
+}
+}}}
+=== 어셈블리 루프 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_11.html
+{{{#!plain
+int j;
+   
+j = 0;
+while ( j < 10 )
+{
+    . . .
+    j++ ;
+}
+}}}
+답: 루프의 모든 부분이 정확하다. j값은 마지막 루프에서 10으로 변화한다.그렇게 값을 변화시켜 루프를 종료하는 것이 정상적인 방법이다.
+attachment:countiToTen.gif
+다음은 어셈블리로 쓰여진 카운팅 루프이다.분기 지연 슬롯 부분이 생략 되었다.  
+{{{#!plain
+#
+#  분기 지연 슬롯 부분이 생략 되었다.
+#
+init:   ori    $8,$0,0        # count = 0
+
+test:   sltiu  $9,$8,10       # count < 10
+        beq    $9,$0,endLp
+
+        . . .                 # 명령들이 생략되었다.
+
+        addiu  $8,$8,1        # count++ ;
+        j      test
+
+endLp:  sll    $0,$0,0        # 분기 목적 어드레스
+}}}
+
+ 
+질문:
+분기 지연 슬롯이 어느 부문에 필요한지 찾아서 채워넣어 보자.
+=== 완성된 루프 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_12.html
+
+답:아래를 보자
+
+다음은 분기지연슬롯을 채워넣어 루프를 완성한 프로그램이다. 좀더 생각 한다면 마지막 무작동 명령을 제거할 방법도 찾을 수 있겠지만 그렇게 하지는 않았다.
+{{{#!plain
+#
+#  분기 지연 슬롯들을 채워넣었다.
+#
+init:   
+        ori    $8,$0,0        # count = 0
+
+test:   sltiu  $9,$8,10       # count < 10
+        beq    $9,$0,endLp    # end loop if count >= 10
+        sll    $0,$0,0        # 분기 지연 슬롯
+
+                              # 명령들....
+
+        addiu  $8,$8,1        # count++ ;
+        j      test
+        sll    $0,$0,0        # 분기 지연 슬롯
+
+endLp:  sll    $0,$0,0        # branch target
+}}}
+endLP의 무작동 명령은 분기 지연 슬롯을 채워넣는 명령이 아니다. 이 명령은 SPIM 프로그램을 실행하기 위해 편의에 따라 쓰인 것이다.
+어셈블리 선언문들과 함께 이제 코드를 실행할 준비가 되었다. 코드를 step기능을 사용하여 한줄 한줄 실행시켜보자. $8 레지스터의 count 값이 0부터 0xA까지 증가하는 것을 주목해서 보자. 
+
+질문:
+위의 프로그램을 어떻께 바꾸면 0부터 9까지 정수값의 합을 계산할 수 있겠습니까?
+
+=== 합을 계산하는 프로그램 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_13.html
+
+루프 자체는 바꿀 필요가 없다. 두개의 어셈블리 구문을 추가하여 합을 구하는 프로그램을 만들었다. 
+{{{#!plain
+##
+##  정수 0 .. 9의 합
+##
+## 사용된 레지스터:
+##  $8  --- 루프를 제어하는 값
+##  $9  --- 임시 저장 값
+## $10  --- 합하는 값 sum
+
+init:   ori    $10,$0,0       # sum = 0
+        ori    $8,$0,0        # count = 0
+test:   sltiu  $9,$8,10       # count < 10
+        beq    $9,$0,endLp    #  if count >= 10 이라면 endLp
+        sll    $0,$0,0        # 분기 지연 슬롯
+
+        addu   $10,$10,$8     # sum += count
+
+        addiu  $8,$8,1        # count++ ;
+        j      test
+        sll    $0,$0,0        # 분기 지연 슬롯
+
+endLp:  sll    $0,$0,0        # 분기 목적지
+}}}
+
+질문:
+위의 프로그램에 있는 sll명령들 중에서 sll 명령을 제거 할시에 가장 위험한 코드는 어떤 것입니까?
+
+=== 18장 끝 ===
+http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18_14.html
+
+답:첫번째 sll명령
+
+이 장에서 논의된 것
+
+    * bltz와 bgez 명령.
+    * slt와 sltu 명령.
+    * stli와 sltiu 명령.
+    * 카운팅 루프.
+
+[http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18quiz.html 퀴즈]를 풀어보고 [http://chortle.ccsu.edu/AssemblyTutorial/Chapter-18/ass18programs.html 프로그램]을 작성하여 봅시다.
+
+
+{{{#!comment
+강웅빈 dec 23 5:13
+내일 새벽에 미국 갑니다.. 일주일간 못들어 오겠습니다.. merry christmas & superfantabulous new year!}}}
+{{{#!comment
+자바하는넘
+여행잘하고 메리크리스마스!
+}}}
+{{{#!comment 
+yundream
+루프보다는 루프나 순환문이 무난할거 같네요.
+}}}
+{{{#!comment
+yundream 2006/12/29 15:56:44
+자바하는넘형..
+http://chortle.ccsu.edu/index.html 여기에 보면 Java5.0 노트있는데, 흠 이 문서 괜찮은거 같아서 번역해볼 생각이야.
+최근 Lucene분석하면서 Java를 다루고 있으니, 이참에 기초부터 함 해볼려고.
+
+그래서 그 교수님한테 메일좀 보내고 싶은데, 영어가 안습수준이라서 T.T.
+음 그래서 좀 귀찮더라도, 메일좀 대신 -.-;;
+
+대략 적인 내용은
+안녕하세요 교수님. http://chortle.ccsu.edu/java5/cs151java.html 문서가 넘 좋은거 같아서, 한글로 번역하고
+공개하려고 합니다. 괜찮은지요.
+정도로..
+
+음.. SPIM문서도 쿨하게 허락해 주셨으니, 문제없을거라 생각되지만서도.
+}}}
+{{{#!comment
+자바하는넘 2006/12/30 04:24:39
+예오늘 메일 보내겠습니다. 저도 도와드리죠.
+}}}
+{{{#!comment
+자바하는넘 2006/12/30 10:18:06
+윤형 다음은 메일보낸 내용입니다. 연말 연시라 여행중이신가 보더군여.자동 답장 받았습니다. 그 전 메일 내용을 봐서도 시작하시고 싶으시면 번역 시작하셔도 문제는 없을 것 같습니다.
+
+Dear Sir,
+
+Through your permission, I am currently translating your programmed introduction to MIPS Assembly language. People really appreciate your teaching and have been giving me a great response. People like your material so much that they have been asking me to translate more.  For a next project, I was hoping you might allow me and another group of people to translate your java tutorial http://chortle.ccsu.edu/java5/cs151java.html into korean. Your Java lecture note will be interpreted into korean by me and the other group of people and the translated material will be accessible to the general public for free.
+
+Again, thank you very much and happy new year.
+}}}
+{{{#!comment
+자바하는넘 2006/12/30 10:22:00
+http://chortle.ccsu.edu/java5/CS151.zip 전체내용이 있는데.책읽자형 번역처럼 양식을따라 번역하는것도 좋을것 같군요.읽는사람이 보기편하고...
+}}}
+{{{#!comment
+yundream 2006/12/30 15:47:01
+오홋 감사.. 
+그럼 오늘부터 함 진행해보죠..
+}}}

@@ -1,0 +1,197 @@
+#title 윈도우즈 멀티 쓰레드 프로그래밍
+
+[[TableOfcontents]]
+== 윈도우즈 쓰레드 프로그래밍 ==
+[wiki:Site/Thread/Beginning/WhatThread Thread 기본 개념]은 리눅스(:12)에서와 별다를 것이 없다는 생각이다. 쓰레드 생성 -> 운용 -> 종료 관련 함수는 리눅스와 큰 차이가 없을 거라고 생각되니, pthread(:12) 제공 함수들과 비교하면서 공부해나가면 될 것 같다. 어느정도 적응이 되면, 동기화 쪽 문서를 보면 되지 않을까 싶다.
+
+=== 커널 오브젝트 ===
+커널에서 생성한 객체로 시스템 리소스의 정보를 담고 있는 데이터 블록이다. 커널에서 프로세스 혹은 쓰레드를 제어하기 위해 사용하는 정보 데이터 블럭이다. 리눅스(:12)환경에서 프로그래밍 하다가 '''커널 오브젝트'''라는 용어를 만나서 생소했었다. 리눅스 커널에서 관리하는 파일, 소켓(:12), 세마포어(:12), 뮤텍스(mutex), 시그널(:12) 등을 커널(:12) 오브젝트라고 보면 된다.
+
+윈도에서 커널의 오브젝트를 가리키는 객체를 '''핸들'''이라고 한다. 역시 리눅스와 용어가 틀릴 뿐이다. 모든 것을 파일(:12)로 다루는 리눅스에서는 '''파일 지정 번호'''가 커널 오브젝트를 가리키는 '''핸들'''의 역할을 한다.  
+
+다음은 윈도 커널 오브젝트의 종류다.
+  * 이벤트 오브젝트
+  * 파일 오브젝트
+  * I/O 포트 오브젝트
+  * 파이프 오브젝트 
+  * 세마포 오브젝트
+  * 쓰레드 오브젝트
+  * 프로세스 오브젝트
+  * 뮤텍스 오브젝트
+  * 메일 슬롯 오브젝트
+
+커널 오브젝트를 만드는 함수는 '''Create'''로 시작한다. CreateFile(:4100), CreateThread(:4100), CreateProcess(:4100), CreatePipe(:4100).. 등이다. 이들 함수는 공통적으로 '''핸들'''을 (반환 값 혹은 매개 변수로)반환한다. 
+
+=== 쓰레드 생성 ===
+
+==== CreateThread ====
+ * Createthread()함수로 쓰레드를 생성한다. 가능하면 Createthread함수를 쓰지말라고 권장한다.
+ * pthread : pthread_create()
+ * win32 thread : HANDLE WINAPI CreateThread
+   대충 pthread_create(:3)함수와 비슷해 보이긴 해서 다행이다. 
+{{{#!plain
+HANDLE WINAPI CreateThread(
+  __in_opt   LPSECURITY_ATTRIBUTES lpThreadAttributes,
+  __in       SIZE_T dwStackSize,
+  __in       LPTHREAD_START_ROUTINE lpStartAddress,
+  __in_opt   LPVOID lpParameter,
+  __in       DWORD dwCreationFlags,
+  __out_opt  LPDWORD lpThreadId
+);
+}}}
+
+==== _beginthread, _beginthreadex ====
+새로운 쓰레드를 만든다. CreateThread와 유사하지만 다음의 차이점이 있다.
+  * 쓰레드에 여러 인수를 전달할 수 있다.
+  * 특정한 C 런타임 라이브러리 변수를 초기화 한단다.. 이게 무슨 의미인지 좀 알아봐야 겠다.
+  * CreateThread는 보안특성을 제어한다. 이 함수로 일시 중단된 상태에서 쓰레드를 시작할 수 있단다. 역시 무슨 의미인지 알아봐야 겠다. 왜이리 말들이 헛갈리냐. 
+
+_beginthread함수는 쓰레드를 생성하자 말자 핸들을 닫아 버리기 때문에, 거의 사용하지 않는다.
+== 예제 ==
+{{{#!plain
+#include <windows.h> 
+#include <tchar.h> 
+#include <strsafe.h> 
+ 
+#define MAX_THREADS 3 
+#define BUF_SIZE 255 
+ 
+DWORD WINAPI MyThreadFunction( LPVOID lpParam ); 
+void ErrorHandler(LPTSTR lpszFunction); 
+ 
+/* 
+  쓰레드에 넘겨 줄 간단한 유저 쓰레드 데이터 
+ */ 
+typedef struct MyData { 
+    int val1; 
+    int val2; 
+} MYDATA, *PMYDATA; 
+ 
+ 
+int _tmain() 
+{ 
+    PMYDATA pDataArray[MAX_THREADS]; 
+    DWORD   dwThreadIdArray[MAX_THREADS]; 
+    HANDLE  hThreadArray[MAX_THREADS];  
+ 
+    // Create MAX_THREADS worker threads. 
+ 
+    for( int i=0; i<MAX_THREADS; i++ ) 
+    { 
+        // 쓰레드 데이터를 위한 메모리 할당 
+        pDataArray[i] = (PMYDATA) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
+                sizeof(MYDATA)); 
+ 
+        if( pDataArray[i] == NULL ) 
+        { 
+            // 메모리 할당에 실패하면 종료한다. 
+            ExitProcess(2); 
+        } 
+ 
+        // 각 쓰레드에 넘겨 줄 데이터의 값을 설정한다. 
+        pDataArray[i]->val1 = i; 
+        pDataArray[i]->val2 = i+100; 
+ 
+        // 쓰레드를 생성한다. 
+        hThreadArray[i] = CreateThread(  
+            NULL,                   // default security attributes 
+            0,                      // use default stack size   
+            MyThreadFunction,       // thread function name 
+            pDataArray[i],          // argument to thread function  
+            0,                      // use default creation flags  
+            &dwThreadIdArray[i]);   // returns the thread identifier  
+ 
+        // 쓰레드가 성공적으로 생성되었는지를 확인한다. 
+        // 생성에 실패하면 프로세스를 종료한다. 
+        if (hThreadArray[i] == NULL)  
+        { 
+           ErrorHandler(TEXT("CreateThread")); 
+           ExitProcess(3); 
+        } 
+    } 
+ 
+    // 쓰레드 종료를 기다린다. 
+    WaitForMultipleObjects(MAX_THREADS, hThreadArray, TRUE, INFINITE); 
+ 
+    // 모든 쓰레드 핸들러를 닫고, 메모리를 해제한다. 
+    for(int i=0; i<MAX_THREADS; i++) 
+    { 
+        CloseHandle(hThreadArray[i]); 
+        if(pDataArray[i] != NULL) 
+        { 
+            HeapFree(GetProcessHeap(), 0, pDataArray[i]); 
+            pDataArray[i] = NULL;  
+        } 
+    } 
+ 
+    return 0; 
+} 
+ 
+ 
+// 쓰레드 함수 
+DWORD WINAPI MyThreadFunction( LPVOID lpParam )  
+{  
+    HANDLE hStdout; 
+    PMYDATA pDataArray; 
+ 
+    TCHAR msgBuf[BUF_SIZE]; 
+    size_t cchStringSize; 
+    DWORD dwChars; 
+ 
+    // 표준출력을 제어하기 위한 콘솔을 만든다. 
+    hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
+    if( hStdout == INVALID_HANDLE_VALUE ) 
+        return 1; 
+ 
+    // Cast the parameter to the correct data type. 
+    // The pointer is known to be valid because  
+    // it was checked for NULL before the thread was created. 
+     pDataArray = (PMYDATA)lpParam; 
+ 
+    // Print the parameter values using thread-safe functions. 
+    StringCchPrintf(msgBuf, BUF_SIZE, TEXT("Parameters = %d, %d\n"),  
+        pDataArray->val1, pDataArray->val2);  
+    StringCchLength(msgBuf, BUF_SIZE, &cchStringSize); 
+    WriteConsole(hStdout, msgBuf, (DWORD)cchStringSize, &dwChars, NULL); 
+ 
+    return 0;  
+}  
+ 
+ 
+ 
+void ErrorHandler(LPTSTR lpszFunction)  
+{  
+    // Retrieve the system error message for the last-error code. 
+ 
+    LPVOID lpMsgBuf; 
+    LPVOID lpDisplayBuf; 
+    DWORD dw = GetLastError();  
+ 
+    FormatMessage( 
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |  
+        FORMAT_MESSAGE_FROM_SYSTEM | 
+        FORMAT_MESSAGE_IGNORE_INSERTS, 
+        NULL, 
+        dw, 
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
+        (LPTSTR) &lpMsgBuf, 
+        0, NULL ); 
+ 
+    // Display the error message. 
+ 
+    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,  
+        (lstrlen((LPCTSTR) lpMsgBuf) + lstrlen((LPCTSTR) lpszFunction) + 40) * sizeof(TCHAR));  
+    StringCchPrintf((LPTSTR)lpDisplayBuf,  
+        LocalSize(lpDisplayBuf) / sizeof(TCHAR), 
+        TEXT("%s failed with error %d: %s"),  
+        lpszFunction, dw, lpMsgBuf);  
+    MessageBox(NULL, (LPCTSTR) lpDisplayBuf, TEXT("Error"), MB_OK);  
+ 
+    // Free error-handling buffer allocations. 
+ 
+    LocalFree(lpMsgBuf); 
+    LocalFree(lpDisplayBuf); 
+} 
+}}}
+== 쓰레드 관련 문서 ==
+[[subindex(Site/win_system_prog/multi_thread,1)]]

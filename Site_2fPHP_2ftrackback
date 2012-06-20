@@ -1,0 +1,119 @@
+#title trackback 보내고 받기 구현
+
+[[TableOfContents]]
+
+trackback를 보내고 받는 모듈을 만들어보기로 했다. 우선은 joinc wiki(:12)에 사용해볼 생각이다. 해당 위키페이지에서 다른 blog 포스트등으로 트랙백을 보내거나 혹은 위키페이지에서 트랙백을 받도록 해볼 생각이다.
+
+개발은 php(:12)를 이용 할 것이다. 이 모듈은 2009/7/5쯤에 완료되어서 joinc wiki 페이지에 적용되기 시작했다. 가장먼저 테스트된 영광의 wiki 페이지는 [wiki:객체지향에 대해서 Site/SoftWare_engineering/OOP]이다. 앞으로 할일은 다음과 같다.
+  * 트랙백이 있는 페이지는 바로 트랙백목록이 있는 하단으로 이동할 수 있도록 앵커추가
+  * 트랙백 모음을 모여주는 간담한 모듈 작성
+== 트랙백 받기 ==
+=== trackback 응답 형식 ===
+trackback 요청 데이터는 POST방식으로 전달이 된다. trackback을 받는 측은, 값들을 처리해서 DB에 집어 넣고, 그 결과를 XML(:12)로 리턴하면 된다. 응답 포맷은 다음과 같다.
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+
+<error>0</error>
+</response>
+}}}
+content-type는 php(:12)의 header() 함수를 이용해서, text/xml로 정해주면 된다.
+{{{#!plain
+header("Content-type: text/xml");
+}}}
+
+=== trackback 주요변수 ===
+trackback로 전송되는 주요 변수들이다. 간단하다.
+  || url    || trackback를 보내는 서버의 URL ||
+  || title  || Post 제목                             ||
+  || blog_name || 블로그 이름           ||
+  || excerpt    || 내용 요약                   ||
+
+=== trackback 저장 테이블 ===
+위 데이터들을 저장하기 위해서 다음과 같은 테이블을 생성했다.
+{{{#!plain
+create table dmf_trackbacks(
+  id  int auto_increment,
+  page varchar(40),
+  url varchar(80),
+  excerpt varchar(255),
+  ip varchar(80),
+  title varchar(255),
+  PRIMARY KEY (id)
+);
+}}}
+page는 트랙백을 받은 페이지의 이름이다.
+
+=== 완전한 코드 ===
+다음은 trackback를 저장하는 완전한 코드다. trackback 데이터를 검사하는 등의 코드는 넣지 않았다.
+{{{#!plain
+header("Content-type: text/xml");
+echo <<<FOOT
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+FOOT;
+
+$url = $_POST['url'];
+$title = $_POST['title'];
+$blogname = $_POST['blog_name'];
+$excerpt = $_POST['excerpt'];
+$ip = getenv('REMOTE_HOST');
+$error;
+
+$title  = mysql_escape_string($title);
+$excerpt  = mysql_escape_string($escerpt);
+$url  = mysql_escape_string($url);
+
+if(!$url || !$title || !$blogname || !$excerpt)
+{
+    $error = 0;
+}
+else
+{
+    $query = "insert into dmf_trackbacks(page, url, excerpt, ip, title) values".
+        "('$page', '$url', '$excerpt', '$ip', '$title')";
+    $result = mysql->query($query);
+    if(!$result) $error = 0;
+    else $error = 1;
+}
+echo <<<FOOT
+<error>0</error>
+</response>
+FOOT;
+}}}
+
+=== joinc wiki trackback ===
+위의 코드를 약간 수정해서 joinc(:12)의 wiki(:12)페이지에 대한 trackback 기능을 만들어 보기로 했다. 이를 위해서 다음과 같은 간단한 테이블을 만들었다.
+|| Field   || Type      || NULL         || Key      || Default   || Extra     ||
+|| tid     || int       ||              || PRI      || NULL      ||           ||
+|| url     || varchar   || YES          ||          || NULL      ||           ||
+|| excerpt || text      || YES          ||          || NULL      ||           ||
+|| ip      || varchar   || YES          ||          || NULL      ||           ||
+|| descpage || varchar(255) ||          ||          ||           ||           ||
+
+테이블은 sqlite(:12)를 이용했다.
+
+== 트랙백 보내기 ==
+joinc 위키의 내용을 다른 블로그등에 트랙백으로 보낼 수 있으면 좋겠다 싶어서 트랙백 보내기 기능도 만들어 보기로 했다.
+
+트랙백 정보는 POST(:12)방식으로 간단히 보낼 수 있다. 
+{{{#!plain
+POST http://teamblog.joinc.co.kr/trackback/5
+Content-Type: application/x-www-form-urlencoded: charst=utf8
+
+title=Hello+world&url=http://www.joinc.co.kr&excerpt=text&blog_name=joinc
+}}}
+
+트랙백을 보낸정보는 DB에 간단히 남기기로 했다. 총 2개의 테이블을 두기로 했다. 하나는 트랙백전송 목록이고, 다른 하나는 트랙백을 보낸 페이지의 excerpt 정보를 남기기 위해서 사용할 것이다. wiki 문서의 특성상 단지 html(:12) 태그만 제거해서는 쓸만한 excerpt 를 생성할 수 없기 때문에 수동으로 입력된 정보를 저장할 테이블을 유지하기로 했다.
+  * 보낸 트랙백 List 페이지
+|| Field     || Type      || NULL         || Key      || Default   || Extra     ||
+|| page_name || varchar   ||              || PRI      ||           ||           ||
+|| url       || varchar   ||              ||          ||           ||           ||
+|| title     || varchar   ||              ||          ||           ||           ||
+|| create_date || datetime ||             ||          ||           ||           ||
+  * excerpt 정보
+|| Field     || Type      || NULL         || Key      || Default   || Extra     ||
+|| page_name || varchar   ||              || PRI      ||           ||           ||
+|| excerpt   || text      ||              ||          ||           ||           ||
+|| create_date || datetime ||             ||          ||           ||           ||
+트랙백정보는 [wiki:Code/PHP/httpSocketConnection php용 http소켓 전송 함수]를 사용해서 전송했다.

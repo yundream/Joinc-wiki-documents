@@ -1,0 +1,291 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>커널 이미지 파일의 구조</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Makefile 분석"
+HREF="chap02.html"><LINK
+REL="PREVIOUS"
+TITLE="부팅 과정의 이해부팅에 관한 좀더 자세한 정보는 LILO의 README를
+		참조하기 바란다."
+HREF="understanding-booting-process.html"><LINK
+REL="NEXT"
+TITLE="bzimage가 만들어지는 과정 추적-Makefile 분석"
+HREF="tracing-bzimage-makeing.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="understanding-booting-process.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>2장. Makefile 분석</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="tracing-bzimage-makeing.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="KERNEL-IMAGE-FILE-STRUCTURE"
+>2.2. 커널 이미지 파일의 구조</A
+></H1
+><P
+>			이미 커널을 컴파일 해본 사람은 최종 커널 이미지 파일이 압축되어 있단 것을 알 수있을 것이다.
+			<A
+NAME="AEN479"
+HREF="#FTN.AEN479"
+>[1]</A
+>이제 LILO가 메모리에 커널을 읽어 올리고 실행해 주기 까지의 과정을 살펴볼 것이다.
+		</P
+><P
+>			그에 앞서 커널 이미지 파일의 구조에 대해 먼저 알아본다. 구조를 알아야 LILO가 커널을 어떤 식으로
+			부팅하게 해주는지 이해가 빠를 것이다.
+		</P
+><P
+>			zImage나 bzImage나 구조는 같다. 단지 메모리에 올려지는 위치나 동작 방식이 약간 차이가 있기 때문에
+			이것이 감안된 각각에 맞는 코드가 사용될 뿐이다.
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="FIG.STRUCT-OF-BZIMAGE"
+></A
+><P
+><B
+>그림 2-2. bzImage의 구조</B
+></P
+><P
+>
+}}}
+attachment:structure-of-kernel-image-file.png
+{{{#!html
+</DIV
+>
+			<A
+HREF="kernel-image-file-structure.html#FIG.STRUCT-OF-BZIMAGE"
+>그림 2-2</A
+>에서 회색 부분이 진짜 리눅스 커널이고 압축되어 있는 상태다.
+			여기에 압축을 풀어주기 위한 'head + misc'가 앞부분에 붙어 있고 다시 이 한 덩어리의 이미지에
+			메모리에 올려진 커널의 압축이 제대로 풀리도록 미리 준비하는 "setup"과 부팅할 때 사용되는
+			"bootsect"가 붙어 최종 커널 이미지 파일을 만든다.
+		</P
+><P
+>			bbootsect나 bsetup의 앞에 붙은 b는 bzImage의 앞에 붙은 b와 같은 의미로 "big kernel"을 의미한다.
+			bbootsect는 플로피로 부팅될 때 즉 부트로더가 없이 커널이 직접 읽혀져 부팅될 때 필요한 부트 섹터다.
+			lilo에 의해 부팅되는 경우는 필요 없는 부분이다.
+		</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN488"
+>2.2.1. 커널의 부팅</A
+></H2
+><P
+>				lilo에 의해 부팅이 시작되면 LILO는 bzImage를 하드 디스크에서 읽어 메모리에 올려 놓고 LILO에 의한
+				부팅일 경우 필요 없는 bbootsect를 건너뛴 bsetup에서부터 실행되도록 해준다. LILO의 역할은 bsetup에
+				실행 권을 넘겨주는데 까지다.
+			</P
+><P
+>				실행된 bsetup은 메모리 세팅을 마치고 압축된 커널 이미지의 압축을 풀기 위한 코드로 실행을 옮긴다.
+				"head + misc"로 표시된 부분이고 이곳이 실행되면 piggy.o는 압축이 풀려 실행 가능한 리눅스 커널이
+				메모리에 존재하게 된다. 압축이 풀릴 때 화면에 "Uncompressing Linux... "란 메시지가 출력된다.
+			</P
+><P
+>				그러나 압축이 풀렸다고 해서 바로 커널을 실행하는 것은 아니고 메모리 낭비를 막기 위한 정리를 한번
+				다시 하고 나서 커널이 실행된다. 압축이 풀리고나면 처음 LILO에 의해 읽혀진 커널 이미지는 필요 없게
+				된다. 그러므로 이 부분을 내버려두면 그만큼 메모리 낭비이므로 압축 풀린 커널 이미지를 옮겨와
+				되도록 많은 메모리를 사용하도록 한 후 커널을 실행해 준다. 커널이 실행되기 시작하면
+				"ok, booting the kernel."이 출려되고 커널에 의한 출력이 화면에 나타나게 된다.
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="ZIMAGE-BZIMAGE-DIFF"
+>2.2.2. zimage와 bzImage의 차이</A
+></H2
+><P
+>				zimage와 bzImage는 무슨 차이가 있는걸까? 필자는 처음에 z와 b의 의미 때문에 gzip으로 압축하거나
+				아니면 bzip2로 압축한 것의 차이인줄 알았지만 압축은 gzip으로 같고 단지 z는 압축했단 의미고
+				b는 'big kernel'이란 뜻인걸 알았다. 왜 이렇게 나눠졌는가? 
+			</P
+><P
+>				이미 <A
+HREF="kernel-compile.html"
+>1.7절</A
+>에서 언급했던 것 처럼 커널의 크기가 너무 커서 압축
+				후에도 일정 크기를 넘어가면 zImage 대신 bzImage를 사용해야한다고 했는데 이유는 다음과 같다.
+			</P
+><P
+>				pc가 처음 만들어질 땐 OS로 도스가 사용됐고 이 때 M$의 유명한 분이 640KB면 충분하다고 했단
+				소릴 들은적이 있을 것이다. 처음 PC가 만들어질 때의 CPU는 8086으로 16bit CPU 였다. 이 프로세서가
+				지원하는 최대의 메모리는 1MB였기 때문에 모든 어드레스 스페이스가 1MB 내로 제한됐다. 그러므로
+				램을 640kb 사용하고 나머지 영역엔 MGA, VGA와 같은 다른 디바이스를 할당해 줬다.
+			</P
+><P
+>				문제는 여기서 시작되는데 AT시절의 PC 기본 구조는 현재까지도 계속 유지되고 있기 때문에 PC가
+				처음 부팅되면 하위 1MB 만을 사용한다고 생각하면 된다. 보호모드라고 알고 있는 386 이상의 
+				cpu가 가진 기능을 사용하지 않고 리얼모드란 8086 호환 모드를 사용하기 때문인데 이는 OS가
+				보호모드를 사용할 상태를 만들고 전환하기 전까지는 계속 리얼모드로 남아있기 때문이다.
+			</P
+><P
+>				리눅스 커널의 크기가 커서 커널을 읽어들이는 프로그램 크기나 시스템에서 사용되는 약간의
+				메모리를 제외한 나머지 램의 빈공간에 읽어 들이지 못하면 하위 1MB가 아니라 그 이상의 연속된
+				메모리에 커널을 읽어 들이고 압축을 푸는 등의 일을 해야할 것이다. 반대로 남은 용량에 커널이
+				들어갈 수 있다면 당연히 읽어 들이고 압축을 풀면 끝날 것이고...
+			</P
+><P
+>				이렇게 메모리에 처음 적재되고 압축 풀리고 하는 절차와 위치가 다르기 때문에 zImage와 bzImage오
+				나뉜 것이고 커널 이미지 파일의 앞부분  bootsect와 setup이 각각에 따라 맞는 것으로 합쳐지게된다.
+				그리고 bzimage의 경우 하위 1M는 사용하지 못하는데 리눅스에선 그렇다!
+			</P
+><P
+>				컴파일 단계에서 make zImage 했을 경우 System is too big. Try using bzImage or modules. 라고
+				에러가 난다면 더 많은 부분을 module로 만들거나 bzImage를 사용해야한다.
+			</P
+></DIV
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>주석</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN479"
+HREF="kernel-image-file-structure.html#AEN479"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>zImage, bzImage 등에서 z가 의미하는 것이 gzip으로 압축됐단 것이다.</P
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="understanding-booting-process.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="tracing-bzimage-makeing.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>부팅 과정의 이해<A
+NAME="AEN455"
+HREF="#FTN.AEN455"
+>[1]</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>bzimage가 만들어지는 과정 추적-Makefile 분석</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

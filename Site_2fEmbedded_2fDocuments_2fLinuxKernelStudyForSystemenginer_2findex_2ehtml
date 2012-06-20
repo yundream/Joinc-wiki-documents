@@ -1,0 +1,900 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="NEXT"
+TITLE="리눅스 커널 컴파일하기"
+HREF="chap01.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="BOOK"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="BOOK"
+><A
+NAME="KERNEL-ANANYSIS-FOR-EMBEDDED-SYSTEM-ENGINEER"
+></A
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>남상규</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><SPAN
+CLASS="SHORTAFFIL"
+>http://ruby.medison.co.kr/~halite<BR></SPAN
+><SPAN
+CLASS="JOBTITLE"
+>선임 연구원<BR></SPAN
+><SPAN
+CLASS="ORGNAME"
+>(주)메디슨<BR></SPAN
+><SPAN
+CLASS="ORGDIV"
+>초음파 연구소<BR></SPAN
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>					halite (at) medison.com<br>
+				</P
+></DIV
+></DIV
+><P
+CLASS="PUBDATE"
+>$Date: 2007/01/09 02:46:16 $<BR></P
+><P
+CLASS="COPYRIGHT"
+>Copyright &copy; 2002 by 남상규</P
+><DIV
+><DIV
+CLASS="ABSTRACT"
+><A
+NAME="AEN19"
+></A
+><P
+></P
+><P
+>				이 문서는 리눅스 커널을 임베디드 시스템에 포팅하려는 엔지니어들을
+				위한 기본 지식 습득을 위해 만들어졌다.
+				리눅스 커널 자체의 원론적인 것 보다는 임베디드 시스템에 리눅스
+				커널을 포팅할 때 엔지니어가 리눅스 커널에 쉽게 접근하기 위한
+				정보나 혹은 방법을 제공하는 것이 목적이다. 그러므로 OS에
+				대한 이론 보다는 OS가 만들어지는 방법이나 부팅되는 순서 메모리에
+				적재되고 실행되는 순서 등에 대해 기술하고 더불어 커널을 만들기
+				위해 필요한 도구들의 사용법에 대해 알아본다.
+			</P
+><P
+>				원문은 <A
+HREF="http://ruby.medison.co.kr/~halite"
+TARGET="_top"
+>				<I
+CLASS="CITETITLE"
+>http://ruby.medison.co.kr/~halite</I
+></A
+>
+				에있고 가장 먼저 업데이트될 것이다.
+			</P
+><P
+>				틀린 내용이 있을 수도 있다. 이런 것에 대해선 <TT
+CLASS="EMAIL"
+>&#60;<A
+HREF="mailto:halite (at) medison.com"
+>halite (at) medison.com</A
+>&#62;</TT
+>
+				으로 연락 바란다.
+			</P
+><P
+></P
+></DIV
+></DIV
+><SPAN
+CLASS="RELEASEINFO"
+>$Revision: 1.1 $<BR></SPAN
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>차례</B
+></DT
+><DT
+>1. <A
+HREF="chap01.html"
+>리눅스 커널 컴파일하기</A
+></DT
+><DD
+><DL
+><DT
+>1.1. <A
+HREF="linux-general.html"
+>리눅스 일반</A
+></DT
+><DD
+><DL
+><DT
+>1.1.1. <A
+HREF="linux-general.html#WHY-LINUX"
+>왜 리눅스인가?</A
+></DT
+><DT
+>1.1.2. <A
+HREF="linux-general.html#LINUX-SRC-DIR-STRUCT"
+>리눅스 소스 디렉토리 구조</A
+></DT
+></DL
+></DD
+><DT
+>1.2. <A
+HREF="lxr.html"
+>LXR</A
+></DT
+><DT
+>1.3. <A
+HREF="get-kernel-source-code.html"
+>소스 코드 얻기</A
+></DT
+><DT
+>1.4. <A
+HREF="unpack-kernel-source-code.html"
+>소스 코드 풀기</A
+></DT
+><DT
+>1.5. <A
+HREF="prepare-compile.html"
+>컴파일 준비</A
+></DT
+><DT
+>1.6. <A
+HREF="kernel-configuration.html"
+>커널 설정</A
+></DT
+><DT
+>1.7. <A
+HREF="kernel-compile.html"
+>커널 컴파일</A
+></DT
+><DT
+>1.8. <A
+HREF="kernel-install-test.html"
+>커널 테스트 및 설치</A
+></DT
+></DL
+></DD
+><DT
+>2. <A
+HREF="chap02.html"
+>Makefile 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.1. <A
+HREF="understanding-booting-process.html"
+>부팅 과정의 이해<A
+NAME="AEN455"
+HREF="#FTN.AEN455"
+>[1]</A
+></A
+></DT
+><DT
+>2.2. <A
+HREF="kernel-image-file-structure.html"
+>커널 이미지 파일의 구조</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1. <A
+HREF="kernel-image-file-structure.html#AEN488"
+>커널의 부팅</A
+></DT
+><DT
+>2.2.2. <A
+HREF="kernel-image-file-structure.html#ZIMAGE-BZIMAGE-DIFF"
+>zimage와 bzImage의 차이</A
+></DT
+></DL
+></DD
+><DT
+>2.3. <A
+HREF="tracing-bzimage-makeing.html"
+>bzimage가 만들어지는 과정 추적-Makefile 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.3.1. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-MAKEFILE"
+>$(topDIR)/Makefile</A
+></DT
+><DT
+>2.3.2. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-MAKEFILE"
+>$(topDIR)/arch/i386/Makefile</A
+></DT
+><DT
+>2.3.3. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-MAKEFILE"
+>$(topDIR)/arch/i386/boot/Makefile</A
+></DT
+><DT
+>2.3.4. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-COMPRESSED-MAKEFILE"
+>$(topDIR)/arch/i386/boot/compressed/Makefile</A
+></DT
+><DT
+>2.3.5. <A
+HREF="tracing-bzimage-makeing.html#TOPDIR-ARCH-I386-BOOT-TOOLS-BUILD.C"
+>$(topDIR)/arch/i386/boot/tools/build.c</A
+></DT
+></DL
+></DD
+><DT
+>2.4. <A
+HREF="tracing-bzimage-log.html"
+>bzImage가 만들어지는 과정 추적-Log 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.4.1. <A
+HREF="tracing-bzimage-log.html#MAKE-BZIMAGE-ORDER"
+>make bzImage 순서 정리</A
+></DT
+><DT
+>2.4.2. <A
+HREF="tracing-bzimage-log.html#MAKE-BZIMAGE-LOG"
+>Log</A
+></DT
+></DL
+></DD
+><DT
+>2.5. <A
+HREF="detail-analysis-of-each-stage.html"
+>단계별 자세한 분석</A
+></DT
+><DD
+><DL
+><DT
+>2.5.1. <A
+HREF="detail-analysis-of-each-stage.html#TEXT-SECTION-START-ADDR"
+>-Ttext 0x0의 의미</A
+></DT
+><DT
+>2.5.2. <A
+HREF="detail-analysis-of-each-stage.html#DETAIL-ANALYSIS-OF-EACH-STAGE-START"
+>분석</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3. <A
+HREF="chap03.html"
+>크로스 컴파일러 만들기</A
+></DT
+><DD
+><DL
+><DT
+>3.1. <A
+HREF="ch03.crosscompiler.html"
+>크로스?</A
+></DT
+><DT
+>3.2. <A
+HREF="ch03.toolchain.html"
+>툴체인</A
+></DT
+><DD
+><DL
+><DT
+>3.2.1. <A
+HREF="ch03.toolchain.html#CH03.TOOLCHAIN.OVERVIEW"
+>배경</A
+></DT
+><DT
+>3.2.2. <A
+HREF="ch03.toolchain.html#CH03.TOOLCHAIN.PREBUILT"
+>미리 만들어진 툴체인</A
+></DT
+><DT
+>3.2.3. <A
+HREF="ch03.toolchain.html#CH03.TOOLCHAIN.BUILDING"
+>툴체인 만들기</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>4. <A
+HREF="chap04.html"
+>ARM 리눅스</A
+></DT
+><DD
+><DL
+><DT
+>4.1. <A
+HREF="arm.mmu.html"
+>ARM 프로세서 MMU(Memory Management Unit)</A
+></DT
+><DD
+><DL
+><DT
+>4.1.1. <A
+HREF="arm.mmu.html#ARM.MMU.1"
+>개요</A
+></DT
+><DD
+><DL
+><DT
+>4.1.1.1. <A
+HREF="arm.mmu.html#AEN1298"
+>TLB</A
+></DT
+><DT
+>4.1.1.2. <A
+HREF="arm.mmu.html#AEN1302"
+>메모리 접근</A
+></DT
+><DT
+>4.1.1.3. <A
+HREF="arm.mmu.html#AEN1318"
+>변환 테이블</A
+></DT
+><DT
+>4.1.1.4. <A
+HREF="arm.mmu.html#AEN1328"
+>도메인</A
+></DT
+></DL
+></DD
+><DT
+>4.1.2. <A
+HREF="arm.mmu.html#AEN1333"
+>변환 절차</A
+></DT
+><DT
+>4.1.3. <A
+HREF="arm.mmu.html#TABLE-BASE"
+>변환 테이블 베이스</A
+></DT
+><DT
+>4.1.4. <A
+HREF="arm.mmu.html#AEN1341"
+>1레벨 읽기</A
+></DT
+><DT
+>4.1.5. <A
+HREF="arm.mmu.html#AEN1349"
+>1레벨 디스크립터</A
+></DT
+><DT
+>4.1.6. <A
+HREF="arm.mmu.html#AEN1358"
+>섹션 디스크립터와 섹션 변환</A
+></DT
+><DT
+>4.1.7. <A
+HREF="arm.mmu.html#AEN1394"
+>페이지 테이블 디스크립터</A
+></DT
+><DT
+>4.1.8. <A
+HREF="arm.mmu.html#AEN1422"
+>2레벨 디스크립터</A
+></DT
+><DT
+>4.1.9. <A
+HREF="arm.mmu.html#AEN1468"
+>큰 페이지 변환</A
+></DT
+><DT
+>4.1.10. <A
+HREF="arm.mmu.html#AEN1475"
+>작은 페이지 변환</A
+></DT
+><DT
+>4.1.11. <A
+HREF="arm.mmu.html#AEN1482"
+>캐시와 쓰기 버퍼 제어</A
+></DT
+><DT
+>4.1.12. <A
+HREF="arm.mmu.html#AEN1522"
+>접근 권한</A
+></DT
+></DL
+></DD
+><DT
+>4.2. <A
+HREF="assabet.kernel.html"
+>Assabet 보드용 커널 컴파일</A
+></DT
+><DT
+>4.3. <A
+HREF="arm.makefile.html"
+>ARM 리눅스 Makefile 분석</A
+></DT
+><DD
+><DL
+><DT
+>4.3.1. <A
+HREF="arm.makefile.html#ARCH.ARM.MAKEFILE"
+>$(TOPDIR)/arch/arm/Makefile</A
+></DT
+><DT
+>4.3.2. <A
+HREF="arm.makefile.html#ARCH.ARM.VMLINUX.LDS"
+>$(TOPDIR)/arch/arm/vmlinux.lds</A
+></DT
+><DT
+>4.3.3. <A
+HREF="arm.makefile.html#ARM.COMPRESSED.VMLINUX.LDS"
+>$(TOPDIR)/arch/arm/boot/compressed/vmlinux.lds</A
+></DT
+><DT
+>4.3.4. <A
+HREF="arm.makefile.html#ARM.LOG-ANALASYS"
+>Log 분석</A
+></DT
+></DL
+></DD
+><DT
+>4.4. <A
+HREF="arm.src.analysis.html"
+>소스 분석</A
+></DT
+><DD
+><DL
+><DT
+>4.4.1. <A
+HREF="arm.src.analysis.html#ARM.SRC.HEAD.S"
+>arch/arm/boot/compressed/head.S</A
+></DT
+><DT
+>4.4.2. <A
+HREF="arm.src.analysis.html#ARM.SRC.HEAD-ARMV.S"
+>arch/arm/kernel/head-armv.S</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>5. <A
+HREF="chap05.html"
+>리눅스 커널 부팅</A
+></DT
+><DD
+><DL
+><DT
+>5.1. <A
+HREF="x1942.html"
+>커널 시작</A
+></DT
+><DT
+>5.2. <A
+HREF="start.kerenl.lockkernel.html"
+>lock_kernel()</A
+></DT
+><DD
+><DL
+><DT
+>5.2.1. <A
+HREF="start.kerenl.lockkernel.html#LOCK-NEEDED"
+>Lock이 왜 필요하지?</A
+></DT
+><DT
+>5.2.2. <A
+HREF="start.kerenl.lockkernel.html#LOCK-GENERAL"
+>Lock - 기초적 설명</A
+></DT
+><DT
+>5.2.3. <A
+HREF="start.kerenl.lockkernel.html#I386-ARM-SPINLOCK"
+>i386, ARM의 스핀락</A
+></DT
+></DL
+></DD
+><DT
+>5.3. <A
+HREF="start.kernel.setuparch.html"
+>setup_arch()</A
+></DT
+><DT
+>5.4. <A
+HREF="start.kernel.trapinit.html"
+>trap_init()</A
+></DT
+><DT
+>5.5. <A
+HREF="start.kernel.irq.html"
+>init_IRQ()</A
+></DT
+><DT
+>5.6. <A
+HREF="start.kernel.sched.html"
+>sched_init()</A
+></DT
+><DT
+>5.7. <A
+HREF="start.kernel.initprocess.html"
+>init()</A
+></DT
+><DT
+>5.8. <A
+HREF="kernel-dmesg.html"
+>dmesg 정리</A
+></DT
+></DL
+></DD
+><DT
+>6. <A
+HREF="chap06.html"
+>디바이스 드라이버</A
+></DT
+><DD
+><DL
+><DT
+>6.1. <A
+HREF="device-devicenum.html"
+>디바이스 번호</A
+></DT
+><DT
+>6.2. <A
+HREF="device-sample.html"
+>샘플 디바이스 드라이버</A
+></DT
+><DT
+>6.3. <A
+HREF="device-understanding.html"
+>모듈 동작의 이해</A
+></DT
+><DT
+>6.4. <A
+HREF="device-learn.html"
+>알아야할 것 들</A
+></DT
+></DL
+></DD
+><DT
+>A. <A
+HREF="app1.html"
+>SEGA DreamCast Linux</A
+></DT
+><DD
+><DL
+><DT
+>A.1. <A
+HREF="linuxsh.html"
+>LinuxSH</A
+></DT
+><DT
+>A.2. <A
+HREF="dc-linux.html"
+>드림캐스트에서 리눅스 실행해 보기</A
+></DT
+></DL
+></DD
+><DT
+>B. <A
+HREF="app2.html"
+>리눅스에 시스템 콜 만들어 넣기</A
+></DT
+><DD
+><DL
+><DT
+>B.1. <A
+HREF="coltrol-flow.html"
+>시스템 콜의 흐름</A
+></DT
+><DT
+>B.2. <A
+HREF="idt.html"
+>IDT(Interrupt Descriptor Table)</A
+></DT
+><DT
+>B.3. <A
+HREF="system-call-table.html"
+>시스템 콜 테이블</A
+></DT
+><DT
+>B.4. <A
+HREF="my-system-call.html"
+>시스템 콜 추가</A
+></DT
+></DL
+></DD
+><DT
+>C. <A
+HREF="app3.html"
+>Inline Assembly</A
+></DT
+><DD
+><DL
+><DT
+>C.1. <A
+HREF="app3.basic.html"
+>인라인 어셈블리 기초</A
+></DT
+><DD
+><DL
+><DT
+>C.1.1. <A
+HREF="app3.basic.html#APP3.BASIC.BASE"
+>알아야할 것 들</A
+></DT
+><DT
+>C.1.2. <A
+HREF="app3.basic.html#APP3.BASIC.ASSEMBLY"
+>어셈블리</A
+></DT
+><DT
+>C.1.3. <A
+HREF="app3.basic.html#APP3.BASIC.INOUTPUT"
+>Output/Input</A
+></DT
+><DD
+><DL
+><DT
+>C.1.3.1. <A
+HREF="app3.basic.html#AEN2778"
+>Constraints</A
+></DT
+><DT
+>C.1.3.2. <A
+HREF="app3.basic.html#AEN2857"
+>Modifier</A
+></DT
+><DT
+>C.1.3.3. <A
+HREF="app3.basic.html#AEN2881"
+>ARM Family Constraints</A
+></DT
+><DT
+>C.1.3.4. <A
+HREF="app3.basic.html#AEN2928"
+>i386 Family Constraints</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>C.2. <A
+HREF="app3.analysis.html"
+>사례 분석</A
+></DT
+><DD
+><DL
+><DT
+>C.2.1. <A
+HREF="app3.analysis.html#APP3.ANALYSIS.STRCPY"
+>strcpy()</A
+></DT
+><DT
+>C.2.2. <A
+HREF="app3.analysis.html#APP3.ANALYSIS.SETGATE"
+>_set_gate()</A
+></DT
+></DL
+></DD
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="LOT"
+><DL
+CLASS="LOT"
+><DT
+><B
+>표 목록</B
+></DT
+><DT
+>1-1. <A
+HREF="prepare-compile.html#TBL.REQ-OF-KERNEL-COMPILE"
+>v2.4.16 커널 컴파일을 위한 최소 요구 사항</A
+></DT
+><DT
+>4-1. <A
+HREF="arm.mmu.html#TABLE.SECTION-DESCRIPTOR"
+>섹션 디스크립터 필드</A
+></DT
+><DT
+>4-2. <A
+HREF="arm.mmu.html#TABLE.SECOND-LEVEL-DESCRIPTOR"
+>페이지 디스크립터 필드</A
+></DT
+><DT
+>4-3. <A
+HREF="arm.mmu.html#TABLE.SECOND-LEVEL-DESCRIPTOR-FORMAT"
+>2레벨 디스크립터 포맷</A
+></DT
+><DT
+>4-4. <A
+HREF="arm.mmu.html#TABLE.SECOND-LEVEL-DESCRIPTOR-ACCESS"
+>2레벨 디스크립터 접근 권한</A
+></DT
+><DT
+>4-5. <A
+HREF="arm.mmu.html#AEN1485"
+>메모리 시스템 속성</A
+></DT
+><DT
+>4-6. <A
+HREF="arm.mmu.html#AEN1496"
+>캐시, 쓰기 버퍼 비트의 의미</A
+></DT
+><DT
+>4-7. <A
+HREF="arm.mmu.html#AEN1525"
+>접근 권한</A
+></DT
+><DT
+>5-1. <A
+HREF="start.kerenl.lockkernel.html#RACE-EXPECTED-RESULT"
+>예상 결과</A
+></DT
+><DT
+>5-2. <A
+HREF="start.kerenl.lockkernel.html#RACE-POSSIBLE-RESULT"
+>가능한 결과</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="LOT"
+><DL
+CLASS="LOT"
+><DT
+><B
+>그림 목록</B
+></DT
+><DT
+>2-1. <A
+HREF="understanding-booting-process.html#AEN465"
+>mbr의 구조</A
+></DT
+><DT
+>2-2. <A
+HREF="kernel-image-file-structure.html#FIG.STRUCT-OF-BZIMAGE"
+>bzImage의 구조</A
+></DT
+><DT
+>4-1. <A
+HREF="arm.mmu.html#FIGURE.1STLEVEL-DESCRIPTOR"
+>변환 테이블 1레벨 디스크립터 접근</A
+></DT
+><DT
+>4-2. <A
+HREF="arm.mmu.html#FIGURE.1STLEVEL-DESCRIPTOR-FORMAT"
+>1레벨 디스크립터 포맷</A
+></DT
+><DT
+>4-3. <A
+HREF="arm.mmu.html#FIGURE.SECTION-TRANSLATION"
+>섹션 변환</A
+></DT
+><DT
+>4-4. <A
+HREF="arm.mmu.html#FIGURE.SECOND-LEVEL-DESCRIPTOR"
+>2레벨 디스크립터 접근</A
+></DT
+><DT
+>4-5. <A
+HREF="arm.mmu.html#FIGURE.SECOND-LEVEL-DESCRIPTOR-FORMAT"
+>2레벨 디스크립터 포맷</A
+></DT
+><DT
+>4-6. <A
+HREF="arm.mmu.html#FIGURE.LARGE-PAGE-TRANSLATION"
+>큰 페이지 변환</A
+></DT
+><DT
+>4-7. <A
+HREF="arm.mmu.html#FIGURE.SMALL-PAGE-TRANSLATION"
+>작은 페이지 변환</A
+></DT
+><DT
+>4-8. <A
+HREF="arm.makefile.html#FIGURE.ARM.MMAP"
+>SA-1110 메모리 맵</A
+></DT
+><DT
+>4-9. <A
+HREF="arm.src.analysis.html#FIGURE.ARM-KERNEL-MMAP"
+>ARM 리눅스 커널 이미지 메모리 맵</A
+></DT
+><DT
+>B-1. <A
+HREF="idt.html#FIGURE.IDT-TABLE"
+>IDT 구조</A
+></DT
+><DT
+>B-2. <A
+HREF="system-call-table.html#FIGURE.FORK-SYSTEM-CALL"
+>fork()가 실행될 때의 흐름</A
+></DT
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="chap01.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>리눅스 커널 컴파일하기</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+
+}}}

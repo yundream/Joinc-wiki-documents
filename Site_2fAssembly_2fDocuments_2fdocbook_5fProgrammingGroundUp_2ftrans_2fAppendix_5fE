@@ -1,0 +1,151 @@
+#title Appendix E. C 사용자를 위한 Assembly
+ * 번역 시작 : [[Date]] 
+ * 예상 종료일 : [[Duedate(20060716)]]
+
+이 문서는 어셈블리어를 배우고자 하는 C 프로그래머에게 도움을 줄 목적으로 만들어졌다. 주로 C와 어셈블리어사이의 구조적인 유사함을 예로 들어서 어셈블리어에 쉽게 적응하도록 하고 있다.  
+
+=== If Statement ===
+C에서 if 문은 '''상태''', '''true 구문''', ''false 구문'''의 3가지 부분으로 나뉜다. 반면 어셈블리어는 구조적언어가 지원하는 블럭을 지원하지 못한다. 당신이 C를 이용해왔다면, 아래와 같은 블럭구조에 익숙할 것이다. 
+{{{#!plain
+if (a == b) 
+{
+  /* True 일 경우 처리할 코드 */
+}
+else
+{
+  /* False 일경우 처리할 코드 */
+}
+}}}
+
+어셈블리어에서는 다음과 같이 쓸 수 있다.
+{{{#!plain
+# 비교할 값을 레지스터로 복사한다.
+movl a, %eax
+movl b, %eax
+
+# 비교
+cmpl %eax, %ebx
+
+# 만약 참이라면 true 문으로 이동한다. 
+je true_branch
+
+false_branch :
+# False 일 경우 처리할 코드 
+
+# 정리를 위한지점으로 점프한다.
+jmp reconverage
+
+true_branch:
+# True 일 경우 처리할 코드
+
+recnverge:
+# 코드를 처리한 후 이런 저런 나머지 처리를 한다.  
+}}}
+
+코드를 보면 알겠지만 어셈블리어는 선형적으로 처리하며, jump를 이용해서 블럭으로의 이동을 한다.
+
+=== 함수 호출 ===
+어셈블리어 에서 함수의 호출은 함수에 사용될 인자를 stack에 넣은 다음 명령을 호출하는 방식으로 비교적간단하다. 호출이 끝난다음에는 스택의 인자를 다시 꺼내와야 한다. 예를 들어
+{{{#!plain
+printf("The number is %d\n", 88);
+}}}
+위의 C코드를 어셈블리 식으로 바꾸면 아래와 같다.
+{{{#!plain
+.section .data
+text_string:
+.ascii "The number is %d\0"
+
+.section .text
+pushl $88
+pushl $text_string
+call printf
+popl %eax
+popl %eax
+
+=== 변수와 할당 ===
+전역 변수와 static 변수는 .data 혹은 .bss 영역에서 할당한다. 지역변수는 함수의 시작시 주어지는 스택공간을 이용해서 선언할 수 있다.  
+
+전역변수와 지역변수의 접근방법에 차이가 없는 C언어와는 달리 어셈블리어는 분명한 차이가 있다. 어셈블리어에서 전역변수는 direct addressing 접근을 사용하는 반면, 지역변수는 pointer addressing방식을 사용해서 접근한다.   
+{{{#!plain
+int my_global_var;
+
+int foo()
+{
+	int my_local_var;
+	
+	my_local_var = 1;
+	my_global_var = 2;
+
+	return 0;
+}
+}}}
+위의 C코드를 어셈블리 형식으로 바꾸어보자.
+{{{#!plain
+.section .data
+.lcomm my_global_var, 4
+.type foo, $function
+
+foo:
+	pushl %ebp             # base pointer를 저장한다.
+	movl %esp, $ebp        # 스택포인터를 복사한다. 
+	subl $4, %esp          # my_local_var를 위한 공간을 만든다.
+	.equ my_local_var, -4  # 지역변수인 my_loal_var를 이용한다. 
+
+	movl $1, my_local_var(%ebp)
+	movl $2, my_global_var
+
+	movl %ebp, %esp
+	popl %ebp
+	ret
+}}}
+
+=== 순환문 ===
+어셈블리어는 jump를 이용해서 순환문을 구현한다. C는 별도의 순환문이 존재하며, 조건을 검사해서 루프를 벗어나갈 수 있다.
+{{{#!plain
+while (a < b)
+{
+  
+}
+
+/* 루프의 종료 */
+}}}
+위의 코드를 어셈블리 형식으로 바꾸면 아래와 같다.
+{{{#!plain
+loop_begin:
+	movl a, %eax
+	movl b, %ebx
+	cmpl %eax, %ebx
+	jge loop_end
+
+loop_body:
+	# 처리코드를 넣는다.
+
+	jmp loop_begin
+
+loop_end:
+	# loop의 종료
+}}}
+어셈블리에서는 cmpl을 통해서 비교하고, jmp를 통해서 순환을 하도록 하고 있음을 알수 있다. 좀더 직관적이지 않다는 걸 제외하고는 형태적으로도 동일하다는 걸 알 수 있다.  
+
+특별히 x86 어셈블리어는 직접적으로 순환문을 지원하고 있다. %ecx라는 카운터 레이지터를 사용하면 0이 될때 종료되게 할 수 있다. 아래와 같은 C코드가 있다고 가정해보자.
+{{{#!plain
+for (i = 0; i < 100; i++)
+{
+}
+}}}
+%ecx 레지스터를 가지는 어셈블리어는 다음과 같이 좀더 직관적인 순환문의 구현이 가능하다.
+{{{#!plain
+loop_initialize:
+	movl $100, %ecx
+
+loop_begin:
+	# 처리코드를 넣는다.
+
+	# %ecx의 값이 감소되고, 측정결과 0이 아니면 loop_begin으로 간다.
+
+rest_of_program:
+
+	loop loop_begin
+}}}
+
+=== 구조체 ===

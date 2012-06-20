@@ -1,0 +1,71 @@
+#title gethostbyname에서 timeout 처리하기
+
+== gethostbyname에서 timeout 처리하기 ==
+gethostbyname은 도메인이름에 대한 주소를 얻어오는 소켓(:12)함수로 '''/etc/resolv.conf'''에 등록된 DNS서버로 질의를 보내서 IP 주소를 가져온다. gethostbyname(:12)관련 내용은 [wiki:Site/Network_Programing/Documents/DomainAddress 인터넷 주소변환]문서를 참고하자.  
+
+이 함수는 편리하게 사용할 수 있으나 입출력 과정이 감추어져 있어서, timeout처리를 할 수 없다는 문제가 있다. timeout 처리를 위한 방법에 대해서 고민해 보려고 한다.
+
+=== 클라이언트 설정 ===
+리눅스는 /etc/resolv.conf에 DNS(Domain Name Server) 목록을 관리하는데, resolv.conf에 옵션으로 '''timeout''' 시간을 변경할 수 있다. resolv.conf에서 timeout 관련된 option의 이름은 '''timeout'''이며 초단위로 설정할 수 있다. 
+{{{#!plain
+nameserver 168.111.63.1
+nameserver 168.111.63.2
+
+options timeout:1
+}}}
+options를 사용하지 않을 경우 5초가 기본 값으로 설정된다.
+
+만약 timeout 시간동안 DNS로부터 응답이 없으면 retry를 시도하는데, 역시 옵션으로 이 값을 조정할 수 있다. timeout과 retry 횟수를 작게하는 것으로 프로그램의 응답속도를 높일 수 있다.
+{{{#!plain
+options timeout:1 retry:1
+}}}
+
+=== 프로그램 차원에서 timeout 설정 ===
+gethostbyname 함수와 getaddrinfo(:3) 함수는 timeout을 설정할 수 없으며, /etc/resolv.con의 timeout을 따른다. resolv.conf에 timeout을 설정하지 않았다면 기본 값을 사용하는데, /usr/include/resolv.h에 '''RES_TIMEOUT'''로 정의돼 있다. (아마 5로 지정되어 있을 것이다.) 
+
+resolv.conf의 timeout 과 retry 값을 수정하면 어느정도 timeout을 적용한 효과를 낼 수 있지만 근본적인 해결책은 아니다. resolv.conf 파일을 수정하려면 루트권한이 필요하다는 부담이 있기 때문이다. 다른 방법을 찾아봐야 할 것 같다.
+
+가장 쉬운 방법은 alarm(2)을 이용하는 방법이다.
+{{{#!plain
+jmp_buf env;
+
+// 시그널 핸들러, env로 값 1을 가지고 jump한다. 
+void sighandler(int signum)
+{
+	printf("longjmp\n");
+	longjmp(env, 1);
+}
+
+void dnslookup(char *request)
+{
+	struct hostent *host = NULL;
+	signal(SIGALRM, sighandler);
+
+	// 1초동안 응답이 없으면 시그널 핸들러가 실행된다.
+	// 시그널 핸들러는 값 1을 가지고 env로 점프하기 때문에 
+	// else 문이 실행된다.
+	if(setjmp(env) == 0)
+	{
+		alarm(1);
+		host = gethostbyname(request);
+		signal(SIGALRM, SIG_DFL);     // SIGALRM 시그널을 기본설정으로 한다.
+		alarm(0);
+		if(host == NULL)
+		{
+		}
+		else
+		{
+			// 목록을 처리한다.
+		}	
+	}
+	else
+	{
+		if(host == NULL)
+		{
+			// timeout
+		}
+	}
+}
+}}}
+
+시그널의 사용이 껄쩍지근하다면, [http://www.chiark.greenend.org.uk/~ian/adns/ adns]같은 라이브러리를 사용하는 것도 방법이겠다.

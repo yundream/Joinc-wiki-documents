@@ -1,0 +1,282 @@
+#title 해쉬, 컨테이너, 테이블, 벤치마크
+
+[[TableOfContents]]
+
+= 해시는 정말로 빠른 것인지? =
+
+표준 C++프로그램 라이브러리가 제공하는 컨테이너 set/map(multiset/multimap)는 통상 2진트리(binary-tree)로 설계되어 있습니다.  요소의 대소 관계에 근거해 트리를 관리하여 삽입/삭제/검색에 필요한 시간 계산량을 절약하도록 만들어진 뛰어난 구조입니다.
+
+그럼 좀 더 고속의 컨테이너는 없는 것일까요? 해시표에 의한 컨테이너가 하나의 방법입니다. 해시표의 사이즈와 해쉬 함수를 적절히 선택하면 좀 더 빠르게 접근할 수가 있습니다. 
+
+그러나 유감스럽지만 표준 C++ 에는 해시·컨테이너는 받아들여지지 않았습니다. 다행스럽게도 표준은 되지 않기는 했지만, 해시·컨테이너는 몇개의 구현이 이루어지고 있습니다. 
+
+그 중에 대표적인 해시·컨테이너들의 구현에 대해, 실제로 그 퍼포먼스 측정을 시도했습니다. 
+
+측정 한 해시·컨테이너는 아래의 3종류입니다:
+
+|| Dinkum Standard Library 2.33 (Dinkumware ) ||  Visual C++에 OEM 제공되고 있는 STL의 제품입니다. ||
+|| STLport 4.5. 1 (STLport ) || SGI판을 베이스로, 각종 OS/컴파일러로 사용할 수 있도록 수정이 더해지고 있습니다. ||
+|| SourcePro/Core (Rogue Wave ) || C++ Builder에 OE공급되고 있는 STL의 제품판입니다. ||
+
+Windows2000, Visual C++ 6.0의 환경에서 아래의 코드를 multi-thread/DLL로 컴파일 하여 측정했습니다.
+
+== int ==
+
+{{{#!plain
+
+#include <windows.h> // GetTickCount
+#include <iostream>  // cout
+#include <set>       // set
+
+#if   defined(BENCH_DINKUM)
+#include <hash_set>
+
+typedef std::hash_set<int> hashset_type;
+
+#elif defined(BENCH_STLPORT)
+#include <hash_set>
+
+typedef std::hash_set<int> hashset_type;
+
+#elif defined(BENCH_SOURCEPRO)
+#include <rw/stdex/hashset.h>
+struct inthash {
+  unsigned long operator()(int x) const { return x; }
+};
+
+typedef rw_hashset<int,inthash,std::equal_to<int>,std::allocator<int> > hashset_type;
+
+#endif
+
+template<class C>
+void bench(const char* msg, C& c, size_t N) {
+  std::cout << msg << '(' << N << ')';
+  int i;
+  long tick = GetTickCount();
+  for ( i = 0; i < N; ++i )
+    c. insert(i);
+  for ( i = 0; i < N; ++i )
+    c. erase(i);
+  tick = GetTickCount() - tick;
+  std::cout << tick << "[ms], " << (double)tick/(double)N << "[ms/element]" << std::endl;
+}
+
+int main() {
+  for ( size_t n = 1000; n < 40000; n += n ) {
+    hashset_type hs;
+    bench("hash table", hs, n);
+    std::set<int> s;
+    bench("bin.   tree", s, n);
+  }
+  return 0;
+}
+}}}
+ 
+
+함수 bench는 int를 요소의 형태로 하는 컨테이너에[0, N)의 범위의 N개의 요소를 삽입/삭제해, 거기에 필요로 하는 시간 및 요소 1개 당의 시간을 출력합니다.
+
+main에서는 요소수 1000, 2000, 4000, ... 32000의 경우에 대해 해시·컨테이너와 2진트리 컨테이너를 bench에게 주어 각각을 비교하고 있습니다. 
+
+=== Dinkum ===
+{{{#!plain
+실행 결과 
+
+hash table(1000)10[ms], 0.01[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000)30[ms], 0.015[ms/element]
+bin.   tree(2000) 10[ms], 0.005[ms/element]
+hash table(4000)100[ms], 0.025[ms/element]
+bin.   tree(4000) 20[ms], 0.005[ms/element]
+hash table(8000)371[ms], 0.046375[ms/element]
+bin.   tree(8000) 50[ms], 0.00625[ms/element]
+hash table(16000)1422[ms], 0.088875[ms/element]
+bin.   tree(16000) 120[ms], 0.0075[ms/element]
+hash table(32000)5658[ms], 0.176813[ms/element]
+bin.   tree(32000) 241[ms], 0.00753125[ms/element]
+}}}
+
+정말 '실망'했습니다. 전혀 빠르지는 않습니다. 요소에 비례해 처리 시간을 소비하고 있습니다. 
+
+=== STLport === 
+{{{#!plain
+실행 결과 
+
+hash table(1000)0[ms], 0[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000)0[ms], 0[ms/element]
+bin.   tree(2000) 0[ms], 0[ms/element]
+hash table(4000)0[ms], 0[ms/element]
+bin.   tree(4000) 20[ms], 0.005[ms/element]
+hash table(8000)20[ms], 0.0025[ms/element]
+bin.   tree(8000) 30[ms], 0.00375[ms/element]
+hash table(16000)20[ms], 0.00125[ms/element]
+bin.   tree(16000) 80[ms], 0.005[ms/element]
+hash table(32000)50[ms], 0.0015625[ms/element]
+bin.   tree(32000) 171[ms], 0.00534375[ms/element]
+}}} 
+
+이것은 역시 빠르다고 알려져있는대로 2진트리에 비해 거의 5배의 스피드를 내고 있습니다.
+
+=== SourcePro/Core ===
+{{{#!plain
+실행 결과 
+
+hash table(1000)11[ms], 0.011[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000)10[ms], 0.005[ms/element]
+bin.   tree(2000) 10[ms], 0.005[ms/element]
+hash table(4000)20[ms], 0.005[ms/element]
+bin.   tree(4000) 20[ms], 0.005[ms/element]
+hash table(8000)60[ms], 0.0075[ms/element]
+bin.   tree(8000) 40[ms], 0.005[ms/element]
+hash table(16000)160[ms], 0.01[ms/element]
+bin.   tree(16000) 90[ms], 0.005625[ms/element]
+hash table(32000)411[ms], 0.0128437[ms/element]
+bin.   tree(32000) 190[ms], 0.0059375[ms/element]
+}}} 
+
+Dinkum정도는 아니지만 2진트리보다 늦은 결과가 나왔습니다. 
+
+해시는 정말로 빠른 것인지? 왜 이러한 결과가 되어 버렸을까요?
+
+해시·컨테이너는 2진트리에 비해 복잡합니다. 해시값를 요구해 그 값에 대응하는 슬롯에 요소를 삽입합니다. 필요에 따라서 전요소의 재배치를 실시하지 않으면 안 되는 것도 있겠지요. 거기에 비교하면 요소의 비교를 반복하는 2진트리가 빠르다고 하는 결과로 비교에 큰 시간을 필요로 하는 요소에서는 스피드가 역전할지도 모릅니다. 
+
+다시 해 봅시다. 이번에는 요소를 길이를 8의 string로 변경합니다:
+
+== string ==
+
+{{{#!plain
+
+#include <windows.h> // GetTickCount
+#include <iostream>  // cout
+#include <set>       // set
+#include <vector>    // vector
+#include <string>    // string
+
+#if   defined(BENCH_DINKUM)
+#include <hash_set>
+
+class str_hash {
+public:
+  enum {bucket_size = 4,
+        min_buckets = 8};
+  size_t operator()(const std::string& x) const {
+    size_t result = 0;
+    for ( int i = 0; i < x. size(); ++i )
+      result = result * 5 + x[i];
+    return result;
+  }
+  bool operator()(const std::string& x, const std::string& y) const
+   { return x < y; }
+};
+
+typedef std::hash_set<std::string, str_hash> hashset_type;
+
+#elif defined(BENCH_STLPORT)
+#include <hash_set>
+
+typedef std::hash_set<std::string> hashset_type;
+
+#elif defined(BENCH_SOURCEPRO)
+#include <rw/stdex/hashset.h>
+struct strhash {
+  unsigned long operator()(const std::string& x) const { 
+    unsigned long result = 0;
+    for ( int i = 0; i < x. size(); ++i )
+      result = result * 5 + x[i];
+    return result;
+  }
+};
+
+typedef rw_hashset<std::string,strhash,std::equal_to<std::string>,
+                   std::allocator<std::string> > hashset_type;
+
+#endif
+
+template<class C>
+void bench(const char* msg, C& c, size_t N) {
+  std::cout << msg << '(' << N << ')';
+  int i;
+  std::vector<std::string> data;
+  for ( i = 0; i < N; ++i ) {
+    char str_val[6];
+    sprintf(str_val,"%08d",i);
+    data. push_back(str_val);
+  }
+  long tick = GetTickCount();
+  for ( i = 0; i < N; ++i )
+    c. insert(data[i]);
+  for ( i = 0; i < N; ++i )
+    c. erase(data[i]);
+  tick = GetTickCount() - tick;
+  std::cout << tick << "[ms], " << (double)tick/(double)N << "[ms/element]" << std::endl;
+}
+
+int main() {
+  for ( size_t n = 1000; n < 40000; n += n ) {
+    hashset_type hs;
+    bench("hash table", hs, n);
+    std::set<std::string> s;
+    bench("bin.   tree", s, n);
+  }
+  return 0;
+}
+}}}
+ 
+그런데, 결과는...
+
+=== Dinkum ===
+
+{{{#!plain
+hash table(1000) 10[ms], 0.01[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000) 40[ms], 0.02[ms/element]
+bin.   tree(2000) 20[ms], 0.01[ms/element]
+hash table(4000) 161[ms], 0.04025[ms/element]
+bin.   tree(4000) 50[ms], 0.0125[ms/element]
+hash table(8000) 370[ms], 0.04625[ms/element]
+bin.   tree(8000) 111[ms], 0.013875[ms/element]
+hash table(16000) 1902[ms], 0.118875[ms/element]
+bin.   tree(16000) 230[ms], 0.014375[ms/element]
+hash table(32000) 2714[ms], 0.0848125[ms/element]
+bin.   tree(32000) 490[ms], 0.0153125[ms/element]
+}}}
+ 
+=== STLport ===
+
+{{{#!plain
+hash table(1000) 0[ms], 0[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000) 0[ms], 0[ms/element]
+bin.   tree(2000) 20[ms], 0.01[ms/element]
+hash table(4000) 10[ms], 0.0025[ms/element]
+bin.   tree(4000) 50[ms], 0.0125[ms/element]
+hash table(8000) 31[ms], 0.003875[ms/element]
+bin.   tree(8000) 100[ms], 0.0125[ms/element]
+hash table(16000) 80[ms], 0.005[ms/element]
+bin.   tree(16000) 220[ms], 0.01375[ms/element]
+hash table(32000) 171[ms], 0.00534375[ms/element]
+bin.   tree(32000) 481[ms], 0.0150312[ms/element]
+}}}
+ 
+=== SourcePro/Core ===
+
+{{{#!plain
+hash table(1000) 10[ms], 0.01[ms/element]
+bin.   tree(1000) 10[ms], 0.01[ms/element]
+hash table(2000) 20[ms], 0.01[ms/element]
+bin.   tree(2000) 30[ms], 0.015[ms/element]
+hash table(4000) 50[ms], 0.0125[ms/element]
+bin.   tree(4000) 60[ms], 0.015[ms/element]
+hash table(8000) 100[ms], 0.0125[ms/element]
+bin.   tree(8000) 130[ms], 0.01625[ms/element]
+hash table(16000) 240[ms], 0.015[ms/element]
+bin.   tree(16000) 271[ms], 0.0169375[ms/element]
+hash table(32000) 621[ms], 0.0194063[ms/element]
+bin.   tree(32000) 571[ms], 0.0178437[ms/element]
+}}}
+
+비교에 필요로 하는 시간이 긴 요소의 경우 2진트리의 처리 속도가 크게 떨어지는 것을 알 수 있겠지요. 해쉬 함수도 int의 경우와 비교하면 해쉬 함수 및 등치 판단이 복잡하게 되었으므로, 그 만큼 늦어지고는 있습니다만, 2진트리정도의 속도는 볼 수 없습니다. 
+
+그러나 그런데도 빨라야 할 해시가 2진트리에는 필적하지 않습니다. 해시는 빠르다고 하는 상식을 뒤집는 결과가 되었습니다. 
+

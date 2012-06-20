@@ -1,0 +1,153 @@
+#title epoll_wait(2)
+[wiki:function_epoll_wait(2) HTML 변환문서]
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/06/17           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>epoll_wait(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+#include &lt;sys/epoll.h&gt;
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;sys/epoll.h&gt;
+
+int  epoll_wait(int  epfd,  struct epoll_event * events, int maxevents,
+                int timeout);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		epoll_wait(2)는 <emphasis>timeout</emphasis>시간동안 epoll 지정자 
+		<emphasis>epfd</emphasis>에 등록된 파일로 부터 입출력 이벤트가 
+		발생하는지 검사한다. 만약 이벤트가 발생했다면 이벤트가 발생한 파일의 
+		epoll 이벤트 구조체<emphasis>events</emphasis>를 되돌려준다. 
+		다음은  정의된 <emphasis>events</emphasis>구조체이다. 
+		<screen>	
+typedef union epoll_data {
+     void *ptr;
+     int fd;
+     __uint32_t u32;
+     __uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+     __uint32_t events;  /* Epoll 이벤트 */
+     epoll_data_t data;  /* 유저 설정 값 */
+};
+		</screen>	
+	</para>
+	<para>
+		<emphasis>timeout</emphasis>는 밀리세컨드 단위이며, -1일 경우 영원히 
+		기다리고, 0일 때는 바로 리턴, 0보다 클때는 timeout밀리초 만큼 이벤트의 
+		발생을 기다린다. 이벤트가 발생하면 epoll_wait(2)는 리턴하며, 이벤트가 
+		발생한 파일의 갯수를 리턴한다. 만약 timeout 시간내에 이벤트가 발생하지 
+		않았다면 0을 리턴한다.
+	</para>
+	<para>
+		epoll_wait(2)는 리턴할 때, epoll_ctl(2)에 의해서 설정된 유저 설정구조체인
+		<emphasis>epoll_data.event</emphasis>가 그대로 넘어온다. 이를 이용해서 
+		우리는 이벤트가 발생했을 때 여러가지 정보를 얻어올 수 있다. 	
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공했을 경우 이벤트가 발생한 파일 지정자의 갯수를 리턴한다. timeout시간
+		동안 이벤트가 발생하지 않았을 경우 0을, 에러가 발생했을 경우에는 -1을 리턴
+		한다.	
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EBADF</term>	
+			<listitem>
+				<para>	
+					epfd가 유요한 파일 지정자가 아니다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EBADF</term>	
+			<listitem>
+				<para>	
+					epfd가 유요한 파일 지정자가 아니다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EFAULT</term>	
+			<listitem>
+				<para>	
+					잘못된 메모리 영역을 가리키고 있다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<section>
+	<title>예제</title>
+	<para>
+		<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_epoll">epoll 연구 위키</ulink>
+		의 예제를 참고하기 바란다.
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_epoll">epoll 연구 위키</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			epoll_ctl(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			epoll_create(2)
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			close(2)		
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

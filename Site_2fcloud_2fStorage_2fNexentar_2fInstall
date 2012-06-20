@@ -1,0 +1,242 @@
+#title Nexentastor install
+
+[[TableOfContents]]
+== Nexentastor 설치 ==
+=== 환경 ===
+Virtualbox로 설치하기로 했습니다. 설치 환경은 다음과 같습니다. 
+  * 설치 Host : 개인 노트북
+  * Host 운영체제 : Ubuntu 11.10
+  * Virtualizer : VirtualBox 4.1.2
+  * Nexentastor Version 3.1.1
+
+JOB가 달려있는 수천만원짜리 장비가 있으나, 문서를 남기기 위해서 테스트하기에는 힘들어서 가상환경에서 구축했습니다. 자세히 들어가면 많은 차이가 있겠으나 설치/설정에는 이 정도로도 충분.
+
+=== 다운로드 ===
+http://www.nexenta.com에 가시면 Free Trial 버전을 다운로드 할 수 있습니다.
+
+=== 설치 ===
+VirtualBox로 설치했습니다. 테스트를 위해서 SAS 컨트롤러를 설치하고, 8개의 디스크를 붙였습니다. 굳이 SAS 컨트롤러를 올릴 필요는 없겠지만 회사 장비가 SAS를 기반으로 하고 있고, 디스크를 여러개 붙일 수 있어서 선택했습니다. Guest 운영체제를 위해서 NAT와 호스트 전용 어뎁터 2개의 인터페이스를 할당했습니다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/J-HgN8XFs__lp3TnVIP2YNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-zCyHLEdajiA/TwmR5e1EtVI/AAAAAAAAB8k/VekcHscN9FU/s400/nexenta07.png" height="356" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+유닉스하면 "설치부터 어렵다"라는 인식을 가질 수도 있겠는데, 윈도우보다 훨씬 쉽습니다. 클릭질 3-4번이면 끝나고 값을 입력하는 거라고 네트워크 설정밖에 없습니다. 오로지 스토리지 관리를 위한 기능을 포함한 서버 어플라이언스 제품이기 때문이죠. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/TFOqce7DwghDNfN6jFPWQdMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-_lidnka8bvo/TwmR3ZywLkI/AAAAAAAAB8g/xvWScRyG9dI/s400/nexenta04.png" height="273" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+네트워크 설정은 대충 건너 뛰려합니다. 설치 후에도 가능하니 그때 알아볼 생각입니다.
+
+==== Trial 등록 ====
+Nexentastor는 기업용 제품으로 구매를 해야 합니다만, 45일간 사용할 수 있는 trial 키를 받아서 사용전 테스트를 할 수 있습니다. 설치 중에 나오는 URL로 가서 Tiral 키를 등록하면 됩니다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/3ceDCh9tMM-bb-g-pPJn-9MTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh6.googleusercontent.com/-KrZ2lmeD1e8/TwmR5kdedRI/AAAAAAAAB8s/7mBWq4tJy9w/s400/nexenta05.png" height="273" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== 로그인 ===
+설치를 마치고 로그인을 합니다. Tiral key를 입력하시면 잠시 후 로그인 프롬프트가 떨어집니다. 기본 계정은 root이고, 기본 패스워드는 nexenta 입니다.
+{{{#!plain
+Mounting ZFS filesystems: (2/2)
+
+Open Storage Appliance (v3.1.1)
+myhost console login : root
+Password : nexenta
+}}}
+
+로그인 한 다음 패스워드를 변경합니다.
+{{{#!plain
+nmc@myhost:/$ setup appliance password 
+<Enter> <?>
+nmc@myhost:/$ setup appliance password 
+Would you like to change root password?  Yes
+New password    : xxxxxx
+Confirm password: xxxxxx
+Password for user root has been changed!
+Would you like to change admin password?  Yes
+New password    : xxxxxx
+Confirm password: xxxxxx
+Password for user admin has been changed!
+}}}
+
+=== 네트워크 설정 ===
+이제 네트워크를 설정합니다. 먼저 현재 네트워크 인터페이스를 확인합니다. 2개의 인터페이스를 볼 수 있겠죠. 하나는 dhcp로 하나는 static로 잡았습니다. setup network interface를 이용해서 간단히 설정할 수 있습니다. 
+{{{#!plain
+nmc@myhost:/$ setup network interface                                                  
+Option ?  e1000g0
+Option ?  dhcp
+Enabling e1000g0 via DHCP ... OK.
+
+nmc@myhost:/$ setup network interface e1000g1
+Option ? static
+e1000g1  IP address   : 192.168.56.2
+e1000g1  netmask      : 255.255.255.0
+e1000g1  mtu          : 1500 
+Enabling e1000g1 as 192.168.56.2/255.255.255.0 mtu 1500 ... OK.
+}}}
+
+=== NMV 확인 ===
+네트워크도 설정했으니 NMV도 잘 작동하는지 확인해 보기로 했습니다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/EScezG_oVQ6A2HOBDAQLxNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-4pLXS-Jl1XM/TwmR5gcXIqI/AAAAAAAAB8o/U6UycrSeDyE/s400/nexenta08.png" height="317" width="400" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== volume 설정 ===
+8개의 디스크를 모두 잡았는지 확인..
+{{{#!plain
+nmc@myhost:/$ show lun
+LUN ID      Device    Type         Size       Volume     Mounted Attach GUID 
+c0d0        cmdk0     disk         16GB       syspool    no      ata    VBOX_=VB7953102c-ea9e9236
+c2t0d0      sd1       disk         4GB                   no      mpt    -
+c2t1d0      sd2       disk         4GB                   no      mpt    -
+c2t2d0      sd3       disk         4GB                   no      mpt    -
+c2t3d0      sd4       disk         4GB                   no      mpt    -
+c2t4d0      sd5       disk         2GB                   no      mpt    -
+c2t5d0      sd6       disk         2GB                   no      mpt    -
+c2t6d0      sd7       disk         2GB                   no      mpt    -
+c2t7d0      sd8       disk         2GB                   no      mpt    -
+}}}
+
+이제 볼륨 구성. setup 명령으로 간단하게 만들 수 있습니다. raidz2로 구성했습니다. 
+{{{#!plain
+nmc@myhost:/$ setup volume create
+Volume                : TestVol
+Group of devices      : c2t0d0, c2t1d0, c2t2d0, c2t3d0, c2t4d0, c2t5d0, c2t6d0, c2t7d0
+Group redundancy type : raidz2
+
+Compression           : on
+Create volume 'TestVol'?  Yes
+volume: TestVol
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        TestVol     ONLINE       0     0     0
+          raidz2-0  ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0
+            c2t2d0  ONLINE       0     0     0
+            c2t3d0  ONLINE       0     0     0
+            c2t4d0  ONLINE       0     0     0
+            c2t5d0  ONLINE       0     0     0
+            c2t6d0  ONLINE       0     0     0
+            c2t7d0  ONLINE       0     0     0
+
+errors: No known data errors
+NAME      SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+TestVol  15.9G   336K  15.9G     0%  1.00x  ONLINE  -
+
+Volume 'TestVol' created successfully. Please take a moment to consider using default snapshot policy
+for this volume. The defaults are as follows: keep 30 daily snapshots and 12 monthly snapshots; take
+snapshots at 12am. Say No if you do not need to periodically snapshot the new volume and all its
+folders, and/or if the defaults are not satisfactory. Note that you can always decide later - see
+'create auto-snap -h' for details.
+Create default auto-snap services for 'TestVol'?  No
+}}}
+
+볼륨 상태 확인. 깔끔하게 잘 구성됐네요.
+{{{#!plain
+$ show volume status
+volume: TestVol
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        TestVol     ONLINE       0     0     0
+          raidz2-0  ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0
+            c2t2d0  ONLINE       0     0     0
+            c2t3d0  ONLINE       0     0     0
+            c2t4d0  ONLINE       0     0     0
+            c2t5d0  ONLINE       0     0     0
+            c2t6d0  ONLINE       0     0     0
+            c2t7d0  ONLINE       0     0     0
+
+errors: No known data errors
+
+volume: syspool
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        syspool     ONLINE       0     0     0
+          c0d0s0    ONLINE       0     0     0
+
+errors: No known data errors
+}}}
+
+=== 폴더 생성 ===
+볼륨을 서비스 하려면 공유 폴더를 만들어야 합니다. Volume아래에 폴더를 만들고 이를 공유했습니다.
+{{{#!plain
+nmc@myhost:/$ create folder TestVol/fs_01                                                         
+NAME           USED    AVAIL   REFER  MOUNTED QUOTA  DEDUP COMPRESS
+TestVol/fs_01  62.8K   11.7G   62.8K  yes     none   off   on
+}}}
+
+=== 파일 공유 서비스 ===
+스토리지 관리 어플라이언스인 만큼 다양한 파일 공유 서비스를 기본 제공합니다.
+{{{#!plain
+nmc@myhost:/$ show network service 
+SERVICE         STATUS      STATUS TIME  ENABL FMRI
+ldap-client     disabled    20:12:31     false svc:/network/ldap/client:default
+cifs-server     disabled    20:12:32     false svc:/network/smb/server:default
+nfs-server      disabled    20:12:32     false svc:/network/nfs/server:default
+rsync-server    disabled    20:12:32     false svc:/network/rsync:default
+snmp-agent      disabled    20:12:32     false svc:/network/snmpd:default
+ndmp-server     disabled    20:12:33     false svc:/system/ndmpd:default
+ftp-server      disabled    20:12:58     false svc:/network/ftp:default
+nmv-server      online      05:01:06     true  svc:/application/nmv:default
+iscsi-initiator online      20:12:56     true  svc:/network/iscsi/initiator:default
+ntp-client      online      20:12:56     true  svc:/network/ntp:default
+iscsi-target    online      20:12:58     true  svc:/network/iscsi/target:default
+rr-daemon       online      20:12:58     true  svc:/network/remote-rep/rrdaemon:default
+webdav-server   online      20:12:59     true  svc:/network/apache2:default
+nfs-client      online      20:12:59     true  svc:/network/nfs/client:default
+ssh-server      online      20:12:59     true  svc:/network/ssh:default
+hal-daemon      online      20:13:01     true  svc:/system/hal:default
+nmdtrace-server online      20:13:05     true  svc:/application/nmdtrace:default
+}}}
+
+share 명령을 이용해서 폴더를 공유할 수 있습니다. 이때 공유 타입을 설정할 수 있습니다. 사용할 수 있는 공유타입은 다음과 같습니다. cifs ftp nfs(:12) rsync(:12) webdav를 서비스할 수 있습니다. nfs로 설정해 봤습니다. 
+{{{#!plain
+nmc@myhost:/$ share folder TestVol/fs_01                                                          
+Option ?  nfs
+Auth Type            :
+      none  dh  krb5  krb5i  krb5p 
+  -----------------------------------------------------------------------------------------------
+  Sharing uses one of tsysspecified security modes. Navigate with arrow keys (or hjkl), or Ctrl-C
+Anonymous            : true
+Anonymous Read-Write : true
+Read-Write           : *
+Read-Only            : 
+Root                 : 
+Extra Options        : 
+Recursive            : false
+Added NFS share for folder 'TestVol/fs_01'
+}}}
+
+이제 network service를 enable 합니다.
+{{{#!plain
+nmc@myhost:/$ setup network service nfs-server enable
+}}}
+
+리눅스에서 마운트 테스트를 해봤습니다. 굳
+{{{#!plain
+root@yundream:/mnt# mount -t nfs 192.168.56.2:/volumes/TestVol/fs_01 sr_01/
+root@yundream:/mnt# cp /home/yundream/다운로드/ubuntu-11.10-server-amd64.iso sr_01 
+}}}
+ZFS는 Dynamic striping을 지원합니다. 그러니 8개의 디스크에 읽기/쓰기가 분산이 될겁니다. iostat로 데이터가 실제 분산되는지 살펴볼 수 있습니다.  
+
+== 마무리 ==
+  * 실제 서비스는 베어메탈을 이용하고 있는데, VM으로 구성하는 게 더 나을 것 같다. 문제가 생기면 복구하기도 쉬울 것 같고. 
+  * 다음 번에는 Volume 구성, 네트워크및 볼륨, 네트워크 서비스들의 세부 설정등을 알아봐야 겠다.
+  * 제대로된 테스트를 하려면 역시 JBOD 같은 물리적인 장비가 필요할 것 같다. 물리적인 환경에서 제대로된 기능/성능 테스트를 계획해야 겠다.
+  * Nexentastor에 대한 테스트를 진행했는데, Opensolaris와 ZFS에 대한 이해가 있다면 그냥 ZFS만으로 스토리지를 관리하는게 훨씬 나을 것 같습니다. plungin 기능만 빼고는 이미 ZFS의 기능을 포장해서 제공할 뿐이라서 ZFS 기능만으로도 모든 관리가 가능합니다. 거기에 애플리케이션을 떡하니 올려놔 버려서, 애플리케이션 자체의 문제들까지 함께 처리해야 하거든요. 그럴 필요가 있을까 라는 생각이 듭니다. 물론 오픈솔라리스와 ZFS에 대한 이해가 충분하다는 가정하에 입니다. 
+  * 성능이 중요한 Root volume에는 ZFS, 일반 데이터는 swift 조합이 좋겠네요. kt ucloud도 swift 도입할 예징이고요. 
+
+== 히스토리 ==
+ * 2011년 1월 7일 작성
+[[tag(nexentastor,ZFS,RAIDZ,cloud)]]

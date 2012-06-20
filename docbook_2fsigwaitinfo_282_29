@@ -1,0 +1,189 @@
+#title sigwaitinfo(2)
+[wiki:function_sigwaitinfo(2) HTML 변환문서]
+
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/02/20           -->
+<!-- 연락처 : yundream@joinc.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>sigwaitinfo(2)</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	대기열의 시그널을 동기적으로 기다린다.  
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;signal.h&gt;
+
+int sigwaitinfo(const sigset_t *set, siginfo_t *info);
+int sigtimedwait(const  sigset_t  *set,  siginfo_t  *info,
+                 const struct timespec timeout);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		sigwaitinfo()는 시그널 셋<emphasis>set</emphasis>에 설정된 
+		시그널중 하나가 전달될 때까지 대기한다. 설정된 시그널 중 하나가
+		전달되면 즉시 리턴한다. 만약 <emphasis>info</emphasis>가 NULL이 
+		아니라면 시그널 관련 정보를 채워준다.     
+	</para>
+	<para>
+		sigtimedwait()는 <emphasis>timeout</emphasis>만큼 신호를 기다리다가 
+		신호가 없을 경우 리턴한다는 걸 제외하고는 sigwaitinfo()와 동일하다.
+		<screen>
+struct timespec 
+{
+    long    tv_sec;         /* seconds */
+    long    tv_nsec;        /* nanoseconds */
+}
+		</screen>
+	</para>
+	<para>
+		다음은 <emphasis>info</emphasis>구조체에 정의된 멤버 변수들이다.  
+		<screen>
+typedef struct siginfo {
+   int si_signo;     /* Signal number */
+   int si_errno;     /* Error code */
+   int si_code;                                                    
+   pid_t si_pid;
+   uid_t si_uid;
+   void *si_addr;
+   union sigval si_value;
+   union {                                                        
+      /* Skipping other fields */
+      struct {
+         int _band;  /* Socket event flags (similar to poll) */   
+         int _fd;    /* Socket fd where event occurred */          
+      } _sigpoll;                                      
+   } _sifields;                                        
+}  siginfo_t;                                        
+                                                          
+#define si_fd     _sifields._sigpoll._fd                  
+		</screen>
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공할 경우 sigwaitinfo(), sigtimedwait()모두 시그널 번호를 리턴한다.
+		실패했을 경우 -1을 리턴한다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EAGIN</term>	
+			<listitem>
+				<para>	
+					sigtimedwait()에서 <emphasis>timeout</emphasis>동안 
+					아무런 신호가 전달되지 않았을 ㅕㅇ우	
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					<emphasis>timeout</emphasis>가 잘못 설정되었다.
+				</para>	
+			</listitem>
+			</varlistentry>
+			<varlistentry>
+			<term>EINTR</term>	
+			<listitem>
+				<para>	
+					시그널 핸들러에 의해서 인터럽트가 걸렸다.
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+
+int main()
+{
+    struct sigaction sigact;
+    siginfo_t info;
+    int signo;
+    printf("My pid %d\n", getpid());
+    sigemptyset(&amp;sigact.sa_mask);
+    sigaddset(&amp;sigact.sa_mask, SIGUSR2);
+    while(1)
+    {
+        signo = sigwaitinfo(&amp;sigact.sa_mask, &amp;info);
+        printf("%d : %d\n", signo, info.si_pid);
+    }
+}
+		</screen>
+		위 프로그램은 <emphasis>SIGUSR2</emphasis>가 전달되는걸 기다린다. 
+		만약 SIGUSR2 시그널을 받는다면 시그널을 전달한 프로세스의 PID를 
+		출력한다.
+	</para>
+	<para>
+		아래 프로그램은 위의 예제를 테스트 하기 위한 프로그램이다. 인자로 SIGUSR2 시그널을 받을 PID를 지정한다. 시그널을 받은 프로그램 측에서 시그널을 보낸 프로세스의 PID를 얻어오는지 확인해 보도록 하자. 
+		<screen>
+#include &lt;signal.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+int main(int argc, char **argv)
+{
+    int pid = atoi(argv[1]);
+    printf("%d\n", getpid());
+    while(1)
+    {
+        kill(pid, SIGUSR2);
+        sleep(1);
+        printf("OK SIG\n");
+    }
+}
+		</screen>
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+			<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/rts1">RTS 개요</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+}}}

@@ -1,0 +1,145 @@
+ * 개요
+
+ 음, 소타님의 의뢰(?)로 만들어본 파싱프로그램입니다. 중도에 의뢰인의 '안해도되겠다는' 엽기발랄한 요청이 있었으나 본좌는 한번 맡은 임무는 의뢰자가 사라져도 끄까지 수행하는 진정한 레옹이므로 -.- 바쁜 와중에 짬짬이 완성해봤습니다... 여러모로 도움이 되기를. :-)
+
+
+ * 의뢰내용
+
+{{{#!vim php
+<?
+$var="{\"direction:row\",\"test_array1\",\"topbar_align:left\",\"test_array2\",\"textset_align:left\",\"textset_lineheight:0\",\"bottombar_align:left\",\"menu:{\"title:{\"0:홈으로\",\"1:공지사항\",\"2:자게\"}\",\"link:{\"1:/?c[pid]=44&c[61][bid]=63\"}\",\"img:{}\",\"img_on:{\"1:/_/dev/c4.jpg\"}\"}\"}";
+
+function strip_pg_array($var)
+{
+}
+
+$return=strip_pg_array($var);
+
+결과값
+
+$return['direction']="row";
+$return[0]="test_array1";
+$return['topbar_align']="left";
+$return[1]="test_array2";
+$return['textset_align']="left";
+$return['textset_lineheight']="0";
+$return['bottombar_align']="left";
+$return['menu']['title'][0]="홈으로";
+$return['menu']['title'][1]="공지사항";
+$return['menu']['title'][2]="자게";
+$return['menu']['link'][1]="/?c[pid]=44&c[61][bid]=63";
+$return['menu']['img_on'][1]="/_/dev/c4.jpg";
+?>
+}}}
+
+ * 구현소스
+{{{#!vim php
+<?php
+                                                                                                               
+/* 재귀호출을 이용하여 주어진 문자열을 배열로 파싱하는 함수
+ *       2004. 2. 19.    code by SaNha
+ */
+                                                                                                               
+function makeArray(&$str, &$index) {
+   $retArray = array();                // 반환하게 될 완성된 배열
+   $c = '';                            // 소스 문자열에서 읽어나가는 한 문자
+   $buff = NULL;                       // 소스 문자열에서 추출해낸 하나의 토큰
+   $name = NULL;                       // name:value
+   $value = NULL;
+   $inQuota = false;                   // 따옴표안이면 true, 밖이면 false
+                                                                                                               
+    while (($c = $str[$index++]) != '}') { 
+      switch ($c) {
+         case NULL :
+            exit("String is not terminated with '}'\n");
+            break;
+         case '{' :
+            $buff = makeArray($str, $index);    // 깊이로 가기위한 재귀호출
+            break;
+         case '"' :
+            if ($inQuota) {            // 따옴표 안에 있던 상태라면
+               $value = $buff;
+               $buff = NULL;
+               $inQuota = false;
+               if ($name) {
+                  $retArray = array_merge_recursive($retArray, array($name=>$value));  // name이 있다면
+               } else {
+                  $retArray = array_merge_recursive($retArray, array($value));         // name이 없다면
+               }
+            } else $inQuota = true;    // 따옴표 밖에 있던 상태라면
+            break;
+         case ':' :
+            $name = $buff;
+            $buff = NULL;
+            break;
+         case ',' :
+            $name = NULL;
+            $value = NULL;
+            break;
+         default :
+            $buff .= $c;
+            break;
+      }
+   }
+   return($retArray);
+}
+                                                                                                               
+/* main 부분 */
+                                                                                                               
+   $src = "{\"direction:row\",\"test_array1\",\"topbar_align:left\",\"test_array2\",\"textset_align:left\",\"textset_lineheight:0\",\"bottombar_align:left\",\"menu:{\"title:{\"0:홈으로\",\"1:공지사항\",\"2:자게\"}\",\"link:{\"1:/?c[pid]=44&c[61][bid]=63\"}\",\"img:{}\",\"img_on:{\"1:/_/dev/c4.jpg\"}\"}\"}";
+                                                                                                               
+   $index = 0;
+   if (substr($src, $index++, 1) == '{') {
+      $array = makeArray($src, $index);
+   } else {
+      exit("String is not started with '{'\n");
+   }
+   print_r($array);
+                                                                                                                
+?>
+}}}
+
+
+ * 결과값
+{{{
+Array
+(
+    [direction] => row
+    [0] => test_array1
+    [topbar_align] => left
+    [1] => test_array2
+    [textset_align] => left
+    [textset_lineheight] => 0
+    [bottombar_align] => left
+    [menu] => Array
+        (
+            [title] => Array
+                (
+                    [0] => 홈으로
+                    [1] => 공지사항
+                    [2] => 자게
+                )
+ 
+            [link] => Array
+                (
+                    [0] => /?c[pid]=44&c[61][bid]=63
+                )
+ 
+            [img] => Array
+                (
+                )
+ 
+            [img_on] => Array
+                (
+                    [0] => /_/dev/c4.jpg
+                )
+ 
+        )
+ 
+)
+}}}
+
+
+ * 부연설명
+
+ name이 숫자인 - 혹은, 문자형숫자이던 - 경우는 array 에선 인덱스로 인식되는데 array_merge 과정에서 그 깊이에서의 넓이순서대로 그 수를 매겨나가게 된다. 때문에, 3 으로 지정했다 하더라도 그 깊이에서 숫자 인덱스로 된 처음 멤버라면 0 으로 인덱스가 매겨지며 0, 1, 2,... 이렇게 증가된다. 그러므로, 의미있는 name을 사용하기 위해서는 문자열형으로 - M1 , M2, M3,.. 식으로 - 지정하면 된다.

@@ -1,0 +1,372 @@
+#title 6.select
+
+=== select ===
+이번에는 Select를 해 보자. Select의 경우 쉬울 것 같지만 예상외로 까다로운 점이 있다. 먼저 호스트 변수와 데이터베이스 칼럼의 데이터 타입을 결정해야 한다. 데이터 구조가 간단하다면 좋겠지만 CLOB, BLOB, LONG, RAW 등의 칼럼이 있다면 이 역시 따로 코드를 작성해야 하는 귀찮은 점이 많다. 칼럼의 수만큼 루프도 돌려야 되고 데이터를 뿌려줄 때 칼럼의 이름도 가져와야 한다.(반드시 필요한 것은 아니지만 대부분의 인터페이스에서 칼럼이 이름과 데이터를 같이 보여주지 않는가?)
+
+구구절절 말로 하는 것 보단 실제로 예제를 하나 보도록 하자.
+{{{#!plain down:select.pc
+/* --------------------------------------------------------------------------------
+파일 이름 : select.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <stdlib.h>
+
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+* 호스트 변수 선언
+*/
+exec sql begin declare section;
+    /*
+     * 사용자 ID와 패스워드
+     */
+    char *username;
+    char *password;
+
+    /*
+     * emp 테이블의 칼럼 리스트
+     */
+    int empno;
+    int mgr;
+    int sal;
+    int comm;
+    int deptno;
+    char ename [11];
+    char job [10];
+    char hiredate [10];
+
+    /*
+     * emp 테이블 칼럼들의 Indicator 변수
+     */
+    short ind_empno;
+    short ind_mgr;
+    short ind_sal;
+    short ind_comm;
+    short ind_deptno;
+    short ind_ename;
+    short ind_job;
+    short ind_hiredate;
+exec sql end declare section;
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 롤백 후에 접속을 종료한다.
+ */
+void sql_error (void)
+{
+    printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+    printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exec sql whenever sqlerror continue;
+    exec sql rollback work release;
+
+    exit (EXIT_FAILURE);
+}
+
+/*
+ * Standard Input 에서 문자열을 받아서 저장하는 함수
+ * 입력이 없으면 -1을 리턴한다.
+*/
+int get_value (char *buf, char *prompt)
+{
+    printf (prompt);
+    fgets (buf, 256, stdin);
+    buf [strlen (buf) - 1] = '\0';
+
+    if (strlen (buf) == 0)
+    {
+        return -1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+int main (void)
+{
+char buf [256] = {'\0', };
+
+    username = (char *)strdup ("scott");
+    password = (char *)strdup ("tiger");
+
+    /*
+     * scott 사용자 계정으로 접속 시도
+     * 접속 시도 후에 성공 여부를 위해 에러를 검사한다.
+     */
+    exec sql
+        connect :username identified by :password;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+    printf ("Connected to Oracle Database\n");
+
+/*
+ * 데이터베이스에 EMP 테이블에서 검색한 사원의 사원 번호를 알아온다.
+ * 사원번호를 입력하지 않았다면 TYPE 레이블로 돌아와서 다시 입력하도록 한다.
+ */
+TYPE:
+
+    ind_empno = get_value (buf, "Type empno to find : ");
+    empno = atoi (buf);
+    if (!empno)
+    {
+        printf ("You must type empno to find\n");
+        goto TYPE;
+    }
+
+    /*
+     * 해당 사원의 사원 정보를 가져온다.
+   * Indicator 변수를 붙여서 NULL이 있는지 검사한다.
+     */
+exec sql
+        select ename, job, mgr, hiredate, sal, comm, deptno
+        into :ename:ind_ename, :job:ind_job, :mgr:ind_mgr, :hiredate:ind_hiredate,
+             :sal:ind_sal, :comm:ind_comm, :deptno:ind_deptno
+        from emp
+        where empno = :empno;
+    /*
+     * SQL 실행후 에러 검사, 코드가 0 이 아닐 경우는 에러
+     * 코드가 1403 일경우는 where 절에 해당되는 데이터가 없는 경우
+     * 이런 경우는 에러로 처리하기보단 데이터가 없다는 메시지를
+     * 뿌려 주는게 더 낫다.
+     */
+    if (sqlca.sqlcode != 0  && sqlca.sqlcode != 1403)
+    {
+        sql_error ();
+    }
+
+    /*
+    * sqlca.sqlerrd [2] 는 위에서도 봤듯이 SQL 문장에 영향을 받은
+    * 행의 개수를 가지는 변수이다. Select를 했을 경우에는 sqlcode를 검사해서
+     * 1403 인 경우나  sqlerrd [2] 를 검사해서 0 인 경우는 같은 것이다.
+ * 이럴 경우는 해당 데이터가 없다는 메시지를 찍어주고 종료한다.
+ */
+if (sqlca.sqlerrd [2] == 0)
+    {
+        printf ("No row Selected\n");
+    }
+    else
+    {
+        /*
+         * Indicator 변수를 검사하여 1 인 경우는 실제 데이터가 NULL 인
+         * 경우 이므로 숫자인 경우 1을 문자인 경우 NULL을 찍어 준다.
+         */
+        printf ("EMPNO ENAME JOB MGR HIREDATE SAL COMM DEPTNO\n");
+        printf ("%5d %10s %9s %4d %9s %7d %7d %2d\n",
+                (ind_empno    == -1) ? -1 : empno,
+                (ind_ename    == -1) ? "NULL" : ename,
+                (ind_job      == -1) ? "NULL" : job,
+                (ind_mgr      == -1) ? -1 : mgr,
+                (ind_hiredate == -1) ? "NULL" : hiredate,
+                (ind_sal      == -1) ? -1 : sal,
+                (ind_comm     == -1) ? -1 : comm,
+                (ind_deptno   == -1) ? -1 : deptno);
+    }
+
+    /*
+     * 데이터베이스와 접속을 종료한다.
+     */
+    exec sql
+        rollback work release;
+    if (sqlca.sqlcode != 0)
+    {
+        sql_error ();
+    }
+printf ("Disconnect from Oracle Database\n");
+    exit (EXIT_SUCCESS);
+}
+}}}
+
+위 프로그램은 Select의 아주 간단한 예제이다. 위와 같 Select의 경우는 SQL 문장이 이미 결정 되어 있는 상태다. 이런 Select는 상당히 쉽다. 그러나 실제로 프로그램 하다가 보면 SQL 을 실행하기 전까지 SQL 문장이 결정되지 않는 경우가 종종 있다. SQL 문장이 런타임시에 결정되는 경우를 예로 들자면 로그인 한 사람의 직급별로 볼 수 있는 칼럼과 볼 수 없는 칼럼이 구분되어 있다던지 데이터를 가져올 테이블의 이름이 날짜별로 다르다던지 하는 경우를 쉽게 생각 해 볼 수 있다. 이럴 경우 SQL 문장을 날리기 전에서야 SQL 문장의 형태를 알 수 있다. 이러한 상황을 Dynamic SQL 이라하는데 이것은 다음 장에서 좀더 자세히 다루도록 하겠다.
+
+위에서 처럼 한의 행만 가져오지 않고 모든 행을 다 가져와야 하는 경우가 발생하였다 가정한다. 이럴때는 어떻게 해야 할 것인가? 뭐 방법은 많다. SQL 을 조금이라도 해본 사람이라면 먼저 커서를 생각할 것이다. 맞다. 커서를 사용한다면 쉽게 작성할 수 있다. 다른 방법은 없을까? 만약 커서에 대해서 모른다거나 사용할 능력이 없다면 소위 말하는 약간의 꽁수를 동원해도 된다. 먼저 select count(*) from emp 를 수행해서 전체 row이 개수를 얻어온다. 그렇게 해서 for 문을 돌려서 행의 개수만큼 각 행을 가져오면 되는 것이다. 어떤 방법을 쓰던지 그건 프로그래머의 자유지만 이왕 프로그램을 작성하는 것 되도록이면 읽기 쉽고 성능 좋은 프로그램을 작성하는 것이 좋을 것이다. 그것이 프로그래머의 능력차가 아니겠는가? 사실 거창하게 말했지만 누구나 다 알고 있는 기본 사실이다.
+
+이번에는 커서를 이용한 예제를 만들어서 데이터베이스에 대상 테이블의 전체 행을 읽어 오는 프로그램을 작성해 보자.
+{{{#!plain down:cursor.pc
+/* --------------------------------------------------------------------------------
+파일 이름 : cursor.pc
+개발 일자 : 2002-10-28
+작성자 : 류명환
+-------------------------------------------------------------------------------- */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdlib.h>
+
+/*
+ * $ORACLE_HOME/precomp/public/sqlca.h 를 포함해 주기 위해서
+ */
+exec sql include sqlca;
+
+/*
+ * 호스트 변수 선언
+ */
+exec sql begin declare section;
+	/*
+	 * 사용자 ID와 패스워드
+	 */
+	char *username;
+	char *password;
+
+	/*
+	 * 칼럼 리스트
+	 */
+	int empno;
+	int sal;
+	int comm;
+	char dname [14];
+	char ename [11];
+	char job [10];
+
+	/*
+	 * 칼럼들의 Indicator 변수
+	 */
+	short ind_empno;
+	short ind_sal;
+	short ind_comm;
+	short ind_dname;
+	short ind_ename;
+	short ind_job;
+exec sql end declare section;
+
+void sql_error (void);
+
+int main (void)
+{
+char buf [256] = {'\0', };
+
+	username = (char *)strdup ("scott");
+	password = (char *)strdup ("tiger");
+
+	/*
+     * scott 사용자 계정으로 접속 시도
+     * 접속 시도 후에 성공 여부를 위해 에러를 검사한다.
+     */
+	exec sql
+		connect :username identified by :password;
+	if (sqlca.sqlcode != 0)
+	{
+		sql_error ();
+	}
+	printf ("Connected to Oracle Database\n");
+
+	/*
+	 * 커서를 선언한다.
+	 * sqlca.sqlcode로 에러 검사
+	 */
+	exec sql
+		declare dept_emp cursor for
+			select d.dname, e.empno, e.ename, e.job, e.sal, e.comm
+			from dept d, emp e
+			where d.deptno = e.deptno;
+	if (sqlca.sqlcode != 0)
+	{
+		sql_error ();
+	}
+
+	/*
+	 * 커서를 연다.
+	 * sqlca.sqlcode로 에러 검사
+	 */
+	exec sql
+		open dept_emp;
+	if (sqlca.sqlcode != 0)
+	{
+		sql_error ();
+	}
+	
+	/*
+	 * 칼럼의 이름을 프린트 한다.
+	 */
+	printf ("DNAME         EMPNO ENAME      JOB       SAL     COMM\n");
+	while (1)
+	{
+		/*
+		 * 한행씩 순서대로 패치한다.
+		 * sqlca.sqlcode로 에러 검사한다.
+		 * 먼저 1403번을 검사하여 모든 행이 패치된 경우를 찾아보고
+		 * 행이 남이 있으면서 에러가 난 경우를 검사한다.
+		 */
+		exec sql
+			fetch dept_emp
+			into :dname:ind_dname, :empno:ind_empno, :ename:ind_ename,
+			     :job:ind_job, :sal:ind_sal, :comm:ind_comm;
+		if (sqlca.sqlcode == 1403)
+		{
+			break;
+		}
+		else if (sqlca.sqlcode != 0)
+		{
+			sql_error ();
+		}
+
+		/*
+		 * 칼럼 내용을 출력한다.
+		 * Indicator 변수를 검사하여 NULL이 있는거 보고
+		 * 정수일 경우 -1을 문자열인 경우 NULL을 찍는다.
+		 */
+		printf ("%10s %5d %10s %9s %-7d %-7d\n",
+		        (ind_dname == -1) ? "NULL" : dname,
+		        (ind_empno == -1) ? -1 : empno,
+				(ind_ename == -1) ? "NULL" : ename,
+				(ind_job   == -1) ? "NULL" : job,
+				(ind_sal   == -1) ? -1 : sal,
+				(ind_comm  == -1) ? -1 : comm);
+	}
+
+	/*
+	 * 커서를 닫는다.
+	 * sqlca.sqlcode로 에러 검사
+	 */
+	exec sql
+		close dept_emp;
+	if (sqlca.sqlcode != 0)
+	{
+		sql_error ();
+	}
+
+	/*
+	 * 데이타베이스와 접속을 종료한다.
+	 * sqlca.sqlcode로 에러 검사
+	 */
+	exec sql
+		rollback work release;
+	if (sqlca.sqlcode != 0)
+	{
+		sql_error ();
+	}
+	printf ("Disconnect from Oracle Database\n");
+
+	exit (EXIT_SUCCESS);
+}
+
+/*
+ * SQL 에러 발생시 실행할 함수
+ * 에러코드를 프린트 하고 커서를 닫고 롤백 후에 접속을 종료한다.
+ */
+void sql_error (void)
+{
+	printf ("SQL Error Code : %d\n", sqlca.sqlcode);
+	printf ("SQL Error Message : %s\n", sqlca.sqlerrm.sqlerrmc);
+
+	exec sql
+		whenever sqlerror continue;
+	exec sql
+		close dept_emp;
+	exec sql
+		rollback work release;
+
+	exit (EXIT_FAILURE);
+}
+}}}
+
+커서를 사용한 예제를 보았다. 뭐 특별한 것은 없다. 위에서 보았듯이 Pro*C/C++ 에서 커서를 선언하여 사용할 수 있다는 것이다. 아마 PL/SQL 을 사용해본 독자라면 매우 익숙한 구문일 것이다. 먼서 호스트 변수를 선언하고 exec sql declare <cursor name> cursor for select … … 를 사용하여 커서를 선언한다. 그 후 exec sql open <cursor name> 을 사용하여 커서를 연다. 이때 해당 SQL 문이 실행되어서 각 행들이 메모리에 올라간다. 이 상황에서 순서대로 각 행을 패치해 오면 되는 것이다. 모든 행을 패치하고 더 이상 패치할 내용이 없다면 sqlcode가 1403번으로 설정되며 이때 Loop을 빠져 나가면 되는 것이다. 아주 전형적으로 작성된 구조적 프로그램이다. 위의 예제에 주석을 잘 달아 놓았으므로 어려운 것은 없을 것이다.

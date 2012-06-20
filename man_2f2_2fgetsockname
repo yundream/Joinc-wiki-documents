@@ -1,0 +1,98 @@
+#title linux man page : getsockname - 소켓 정보를 얻어온다.
+
+[[TableOfContents]]
+== getsockname  ==
+로컬 소켓 정보를 가져온다.
+
+=== 사용 법 ===
+{{{#!plain
+#include <sys/socket.h>
+
+int getsockname(int s, struct sockaddr *name, socklen_t *namelen);
+}}}
+
+=== 설명 ===
+이 함수는 지정한 소켓지정자 '''s''' 에 대한 정보를 반환한다.
+
+=== 반환값 ===
+성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 설정한다.
+
+=== 에러 ===
+ * EBADF
+    s 가 유효한 기술자가 아니다.
+ * ENOTSOCK
+    s 가 소켓이 아닌 파일일경우
+ * ENOBUFS
+    시스템의 리소스가 충분치 않다.
+
+=== 예제 ===
+{{{#!plain
+#include <sys/types.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <arpa/inet.h>
+
+int main()
+{
+    int sockfd;
+    int client_sockfd;
+    int client_len;
+    int state;
+    struct sockaddr_in clientaddr, serveraddr, myaddr,test;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(4444);
+
+
+    state = bind(sockfd , (struct sockaddr *)&serveraddr,
+            sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+    
+
+    state = listen(sockfd, 5);
+    if (state == -1)
+    {
+        perror("listen error : ");
+        exit(0);
+    }
+    client_len = sizeof(clientaddr);
+    client_sockfd = accept(sockfd, (struct sockaddr *)&clientaddr,
+                            &client_len);
+
+
+    // 로컬 소켓의 정보를 가져온다. 
+    // 언어온 정보는 myaddr 에 채워진다. 
+    getsockname(client_sockfd, (struct sockaddr *)&myaddr, &client_len);
+
+    // 얻어온 정보를 출력한다.
+    printf("Port    : %d\n", ntohs(myaddr.sin_port));
+    printf("address : %s\n", inet_ntoa(myaddr.sin_addr));
+
+    close(client_sockfd);
+    close>(sockfd);
+    return 1;
+}
+}}}
+
+연결된 상대 소켓의 주소 정보를 얻어올려면 getpeername(2)함수를 사용해야 한다.
+
+=== 관련 글 ===
+  * [wiki:Site/Network_Programing/Documents/SocketAPI socket api]
+  * [wiki:Site/Network_Programing/Documents/socket_beginning BSD 소켓 프로그래밍 입문]

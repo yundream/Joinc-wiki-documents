@@ -1,0 +1,88 @@
+#title mod_jk설치
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>tomcat 설치</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+>
+<H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>tomcat 설치</A
+></H1
+>
+</html>
+}}}
+[[TableOfContents]]
+ * 작성자 : 이태용 ([mailto:pawang23@hotmail.com])
+
+
+= mod_jk설치 =
+== configure ==
+Apache와 Tomcat을 정지시킨후 mod_jk-1.2.xx.dll을 apache 디렉토리의 modules에 복사한다.
+그리고 tomcat의 설정을 편집해주어야 하는데 tomcat/conf/server.xml을 파일을 찾아서 열어주고 다음을 확인한다.
+{{{#!plain
+<Server Port=8005 shytdown="SHUTDOWN".../>
+<Listener className="org.apache.ajp.tomcat4.config.ApacheConfig"
+modjk="%APAHCE2_HOME%/modules/mod_jk-2.0.xx.dll" jkDebug="info"
+workersConfig="%TOMCAT_HOME%/conf/jk/workers.properties"
+jkLog="TOMCAT_HOME/logs/mod_jk.log"/>
+}}}
+그리고 tomcat의 디렉토리안에 /conf/jk/worker.properties파일을 다음과 같이 편집합니다.
+{{{#!plain
+workerstomcat_home=%TOMCAT_HOME%
+workers.java_home=$(JAVA_HOME)
+ps=\
+
+worker.list=ajp13, ajp14
+worker.ajp13.port=8009
+worker.ajp13.host=localhost
+worker.ajp13.type=ajp13
+worker.ajp13.lbfactor=1
+
+worker.ajp14.port=8010
+worker.ajp14.host=localhost
+worker.ajp14.type=ajp14
+worker.ajp14.credentials=myveryandomentropy
+worker.ajp14.lbfactor=1
+
+worker.loadbalancer.type=lb
+worker.loadbalancer.balanced_workers=ajp13
+worker.inprocess.type=jni
+worker.inprocess.class_path=$(workers.tomcat_home)$(ps) lib$(ps) tomcat.jar
+worker.inprocess.cmd_line=start
+worker.inprocess.jvm_lib=$(workers.java_home)$(ps) jre$(ps) bin$(ps) classic$(ps) jvm.dll
+worker.inprocess.stdout=$(workers.tomcat_home)$(ps) logs$(ps) inprocess.stdout
+worker.inprocess.stderr=$(workers.tomcat_home)$(ps) logs$(ps) inprocess.stderr
+}}}
+그리고 apache의 conf인 httpd.conf파일두 편집한다.
+{{{#!plain
+LoadModules의 제일 마지막부분에 내용을 추가해준다.
+LoadModule jk_module modules/mod_jk-2.0.xx.dll
+}}}
+파일의 가장 하단부분에 아래의 내용을 추가해준다.
+{{{#!plain
+JKWorkersFile "%TOMCAT_HOME%/conf/jk/workers.properties"
+JKLogFile "%TOMCAT_HOME%/logs/mod_jk.log"
+
+JKLogLevel debug
+
+JKMount /examples ajp13
+JkMount /examples/* ajp13
+
+JkMount /jk ajp13
+JkMount /jk/* ajp13
+
+JkMount /cocoon ajp13
+JkMount /cocoon/* ajp13
+}}}
+이부분이 지정된 디렉토리상에서 파일을 어떤서버로 읽을것인지 판단하는것이다.
+== 실행 ==
+이제 apache서버와 tomcat서버를 순서대로 start해주고서 실행해 보면된다.

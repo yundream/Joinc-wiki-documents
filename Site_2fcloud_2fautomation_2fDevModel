@@ -1,0 +1,79 @@
+#title chef 개발 모델
+
+[[TableOfContents]]
+== 목적 ==
+chef로 인프라스트럭쳐를 관리를 하고 있다. chef는 인프라스트럭쳐를 '''코드화''' 해서 관리하기 때문에 코드를 관리해야 한다. 인프라스트럭쳐가 커진다면, 여러 명이 동시에 인프라에 기능을 추가하거나 수정할 수 있으므로 svn이나 git 같은 형상관리 시스템을 반드시 사용해야 한다.
+
+이 문서에서 나는 git/svn을 이용해서 chef 코드를 관리하는 방법을 고민해보려고 한다. 인프라스트럭쳐를 관리한다고는 하지만 어디까지나 코드이기 때문에, 소프트웨어 형상관리와 그다지 큰 차이가 없다.  
+
+== 모델 ==
+=== 2 tier - 1 ===
+2 tier 개발 환경이다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1eJRXYRmfSp704eqBOBHWpUKusyUgZRcRwZn4_11i8aE&amp;w=643&amp;h=450">
+}}}
+
+service infrastructure를 개발한다고 가정해 보자. 서비스 하부구조를 개발한다는 것은 결국 chef 저장소에 있는 코드를 수정한다는 의미다. 이 코드를 직접 수정하는 것은 바람직 하지 않다. 웹 애플리케이션을 개발하는 것처럼, 개발환경과 서비스환경이 서로 분리돼 있어야 한다. 개발환경에서 개발한 코드를 충분히 테스트 해본 후 서비스 환경에 적용해야 하기 때문이다. 
+
+여기에서는 개발 환경과 서비스 환경으로 나누었다. chef 코드는 GIT에 저장이 된다. service infrastructure는 GIT 저장소에서 chef 코드를 읽어서 환경을 만든다. 이때 service는 '''master branch'''를 사용한다. 
+
+만약 service infrastructure에 기능 추가나 수정이 필요하다면, 개발용 branch를 하나 만들어서 코드를 수정한다. 테스트가 완전히 끝나면, master branch에 merge하면 된다. 
+
+그리 크지 않은 인프라스트럭쳐에 적당한 방식이라고 할 수 있다.
+
+=== 3 tier ===
+대규모의 인프라스트럭쳐라면, 개발환경에서 개발과 테스트가 끝났다고 하더라도 곧바로 서비스에 적용할 수 없을 것이다. 이경우 service와 dev 인프라스트럭쳐 사이에 '''staging 인프라스트럭쳐'''를 둬서, 운용 테스트와 품질검사까지 끝낸 후 service에 적용해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1QtzzEDmEA_E09Vtj2fCsug1t66XDSzeqodoC9tISyx4&amp;w=886&amp;h=656">
+}}}
+
+master branch와 dev branch 사이에 '''staging branch'''를 하나 뒀다. 기능 개발이 필요할 경우 staging branch를 만들고, 다시 기능별로 dev brach를 만들어서 개발하는 방식이다. 개발이 끝나면 staging branch에 merge 해서 staging 환경에서 운영테스트를 한다. 모든 dev branch에 대한 검증이 완료 된 시점에서, master branch로 merge한다.     
+
+
+=== 2 tier - 2 ===
+3 tier은 여러 명이 안전하게 서비스를 개발할 수 있다는 장점이 있지만 개발 사이클이 복잡하다는 단점이 있다. 
+
+2 tier를 그대로 이용하되, 적용할 코드의 버전을 명시적으로 명확히 관리하는 방법도 써볼만 하다. dev branch에서 master branch로 직접 merge 하지만, staging에서의 검증이 끝나면 snapshot을 뜨고  정식으로 release 한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1JHyR0SbzuOUZlTsREwdgLS0SVNf1ftHqHVPOA4hO-iU&amp;w=643&amp;h=450">
+}}}
+
+== 개발 주기 ==
+개발 주기는 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1vU-9krc1HhONopSyXuxdbv4EcjWvMyMNL0_v2IzKpB0&amp;w=586&amp;h=256">
+}}}
+  1. chef 코드를 개발한다. 
+  1. 개발 환경에서 충분히 테스트 한다.
+     * 문제가 생기면 1번으로.
+  1. 테스트가 완료되면 staging에서 운영 테스트와 품질 검사를 한다. 
+     * 문제가 생기면 1번으로
+  1. service에 최종 적용한다.    
+  1. 기능 추가나 수정이 있을 경우 1번으로 간다.
+
+== 실전 구성 ==
+여기까지 한거 git-server 구축까지 하면서 개발환경을 구축했다. git admin 수준이 아니기 때문에, 구성이 좀 애매모호할 수도 있겠다. 더 좋은 방안이 있으면 도움주시기 바란다.
+
+=== git server 구축 ===
+git 과 gitosis를 이용해서 git server를 구축했다. 구축 내용은 [wiki:Site/Development/Forum/manager/gitserver git server 구축] 문서를 참고하자.
+
+=== chef server 측 환경 설정 ===
+chef server를 새로 만들었다고 가정하고 진행한다. 
+
+앞서 다룬 개발환경은 각 개인 별로 chef server를 가지고 개발과 테스트를 진행한다. 어차피 인프라 형상은 code 형태로 git에 저장돼 있으니, 개발자는 언제든지 최신의 개발 인프라를 가져와서 테스트 할 수 있다.  
+chef server를 설치하면 /var/chef에 정보들이 저장된다. 이 디렉토리를 git 저장소에 올릴 거다. 그러나 모든 디렉토리를 올리지 않을 것이다. /var/chef에는 여러 디렉토리가 있는데, 몇몇 디렉토리는 운영중에 동적으로 만들어지는 정보를 담고 있거나 코드와 관련 없는 설치환경에 특화된 정보를 가지고 있기 때문이다. 예컨데 ca, cache, solr, solr-jetty등은 중앙에서 관리할 필요가 없다. (관리해서도 안되지 싶다.)
+
+나는 아래의 디렉토리만 git으로 관리하기로 했다.
+  1. cookbooks 
+  1. site-cookbooks
+  1. data_bags 
+  1. roles
+knife로 테스트를 해보자.
+
+== 히스토리 ==
+  * 2012년 3월 1일 
+
+[[tag(cloud,chef,git,svn)]]

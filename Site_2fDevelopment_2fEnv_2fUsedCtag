@@ -1,0 +1,69 @@
+#title ctags를 이용한 소스 분석
+
+[[TableOfContents]]
+== ctags ==
+'''ctags'''를 이용하면, 사용자 정의 함수가 나왔을때, 함수가 정의되어 있는 쏘스파일로 바로 점프할수 있으며, 또한 바로 원래의 쏘스파일로 되돌아올수 있다. 이렇게 함으로써 쏘스분석에 드는 시간을 상당히 줄일수 있다. 
+
+이번 문서에는 사용자가 vi(:12) 를 사용하고 있다는 가정하에 ctags 의 사용법을 설명하도록 하겠다. 
+
+ctags는 공개 소프트웨어로 쉽게 얻을수 있을것이다. 리눅스의 경우 웬만한 배포판은 기본으로 포함되어 있으니, 바로 사용하면 된다. 만약 설치되어 있지 않다면 http://ctags.sourceforge.net 를 방문해보도록 한다.
+
+사용방법은 간단하다. 분석하고자 하는 소스가 있는 디렉토리에서 ctags 명령을 실행시켜주면 된다. 
+{{{#!plain
+# ctags *
+}}}
+위에서 ctags 는 현재 디렉토리에 있는 모든 파일에 대해서 tags 정보를 작성하도록 했는데, 현재 디렉토리 뿐만 아니라 모든 하위디렉토리에 대해서 tags 정보를 작성하고자 한다면 "-R" 옵션을 사용하면 된다.
+{{{#!plain
+# ctags -R
+}}}
+ctags 명령을 실행시키고 나면, ctags를 실행한 디렉토리에 tags 란 파일이 생길것이다. 여기에 각 함수가 어느파일에 설치되어 있는지에 대한 정보가 들어 있고, vi(:12)를 실행 시키면 tags 파일을 참조하여 해당 함수가 정의되어 있는 파일로 자동으로 이동하게 된다.
+
+tags 파일은 아래와 같이 구성되어 있다.
+{{{#!plain
+hello  hello.c   /^void hello(void)$/;"    f
+}}}
+각필드는 "tab" 으로 구분된다. 
+  1. 첫번째 필드는 함수이름 
+  1. 두번째 필드는 함수가 정의된 파일의 이름  
+  1. 세번째 필드는 해당 파일에서 vi가 함수명을 찾아가도록 하기위한 정규표현(:12)식 이다. 
+  1. 네번째 필드는 해당 함수의 타입이다.  "f" 라면 일반 C 함수라는 뜻이며, "c" 는 클래스에 선언된 멤버함수, "d" 는 define 된 값이란 뜻이다.
+
+이제 vi 로 분석하고자 하는 쏘스파일을 열어보자. 분석하는 중에 hello() 라는 알수없는 함수가 나와서 이 함수의 원형이 있는곳으로 이동하고 싶을 때는 hello() 함수에 커서를 위치시키고 '''Ctrl + ]''' 를 누르면 된다. 그러면 곧바로 hello() 함수의 원형으로 이동하게 된다. hello() 함수에 대한 분석이 끝나서, 원래 분석하던 쏘스 파일로 돌아오고 싶다면 '''Ctrl + t'''키를 누르면 된다.
+
+vi에서 사용되는 ctags 관련 커맨드를 정리해 보았다.
+|| Tag Command      || 설명                            ||
+|| Ctrl+]           || 함수가 정의된 파일로 이동       ||
+|| Ctrl+t           || 이동하기 전 단계의 위치로 이동  ||
+|| :tselect <function-name> || 같은 이름의 function-name이 여러개 일때, 목록을 보여준다. 번호를 이용해서 선택할 수 있다 ||
+|| :tnext            || 여러개의 함수이름이 존재할 때, 다음 함수를 선택한다. ||
+|| :tprevious        || 이전 함수를 선택한다.                                ||
+|| :tfirst           || 가장 처음에 찾았던 함수를 선택한다.                  ||
+|| :tlast            || 가장 마지막 함수를 선택한다.                         ||
+
+이상으로 ctags 와 vi 를 이용한 쏘쓰 분석에 대해서 알아보았다.  emacs 용으로는 etags 를 사용하는데, 이에 관한 내용은 나중에 기회가 되면, 설명하도록 하겠다.
+
+== 사용 예 ==
+다음과 같은 vi 명령을 이용해도 된다.
+  * ts <function-name> : function-name 함수의 목록을 보여준다. 번호를 선택해서 함수가 정의된 위치로 이동할 수 있다.
+  * ta <function-name> : function-name이 정의 되어 있는 곳으로 바로 이동한다.
+
+예를 들어 보겠다. 가벼운 웹 서버를 개발할 목적으로 [http://www.lightpd.net lighthttpd]를 분석하게 되었다. 다운로드 받은 다음 ctags를 이용해서 태그를 만들었다. 
+{{{#!plain
+# tar -xvzf lighthttpd-1.4.28.tar.gz
+# cd lighttpd-1.4.28
+# ctags -R
+}}}
+
+코드 분석을 위해서 가장 먼저 해야할 일은 main 함수를 찾는 일일 것이다. grep를 이용해서 확인하는 방법도 있기는 하지만 썩 효율적이지 않음을 알 수 있을 것이다. 게다가 하위 디렉토리까지 검사하려면 쉘(:12) 스크립트에 어느정도 익숙해져야 한다.
+{{{#!plain
+# grep "main(" *
+}}}
+
+그냥 아무 코드나 열어서 :ts 명령으로 main 함수를 포함한 파일을 찾을 수 있다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="http://picasaweb.google.com/lh/photo/jer1U4y7CkzSWe-YobRbGA?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/TKPgZJfCcUI/AAAAAAAABlc/F7JZtYjpRe0/s800/lighthttpd.png" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="http://picasaweb.google.com/yundream/Linux?feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+main 함수를 포함한 5개의 파일을 찾을 수 있다. 대략 이름으로 봐서 server.c가 시작점일 것 같다. 이제 5를 입력하면 server.c의 main 함수 위치로 이동한다. 
+
+[[Category(14)]]

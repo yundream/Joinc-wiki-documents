@@ -1,0 +1,1327 @@
+#title 리눅스 시스템 프로그래밍 : 표준 입출력 다루기 2 
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>stdio.h 사용하기 (2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+></A
+>stdio.h 사용하기 (2)</H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44256;&#52828; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.9</TD
+><TD
+ALIGN="LEFT"
+>2004년 3월 16일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>fopen과 oepn계열의 성능 테스트</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2. <A
+HREF="#AEN23"
+>stdio.h 에서 제공하는 입/출력 함수들</A
+></DT
+><DD
+><DL
+><DT
+>2.1. <A
+HREF="#AEN25"
+>입력 함수들</A
+></DT
+><DD
+><DL
+><DT
+>2.1.1. <A
+HREF="#AEN27"
+>단일 문자입력 함수</A
+></DT
+><DT
+>2.1.2. <A
+HREF="#AEN60"
+>문자열(stream) 입력</A
+></DT
+><DT
+>2.1.3. <A
+HREF="#AEN73"
+>이진(binary) 입력</A
+></DT
+></DL
+></DD
+><DT
+>2.2. <A
+HREF="#AEN79"
+>출력 함수들</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1. <A
+HREF="#AEN81"
+>단일 문자출력 함수</A
+></DT
+><DT
+>2.2.2. <A
+HREF="#AEN102"
+>문자열(stream) 출력</A
+></DT
+><DT
+>2.2.3. <A
+HREF="#AEN119"
+>이진(binary) 출력</A
+></DT
+></DL
+></DD
+></DL
+></DD
+><DT
+>3. <A
+HREF="#FOPENTEST"
+>고수준 입출력 함수의 성능 테스트</A
+></DT
+><DD
+><DL
+><DT
+>3.1. <A
+HREF="#AEN129"
+>테스트 방법</A
+></DT
+><DT
+>3.2. <A
+HREF="#AEN134"
+>1byte 쓰기 테스트</A
+></DT
+><DT
+>3.3. <A
+HREF="#AEN143"
+>1024 바이트 한꺼번에 쓰기</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+></A
+>1. 소개</H1
+><P
+>	
+		이번 기사는 <A
+HREF="modules.php?name=News&file=article&sid=43"
+TARGET="_top"
+>stdio.h</A
+>사용하기에 이은 2번째 stdio.h 에 관련된기사이다. 지난번 기사가 
+		주로 파일 open, close 등에 관련된 내용인 반면, 이번기사는 
+		stdio.h 에서 제공하는 여러가지 문자 입/출력 과 관련된 함수들을 
+		다루게 될것이다.  
+	</P
+><P
+>		이외에도 open()계열의 저수준 파일 입출력 함수와 fopen()계열의 고수준
+		입출력 함수의 성능테스트도 담고 있다. 성능 테스트에 대한 내용은 
+		<A
+HREF="#FOPENTEST"
+>3&#51208;</A
+>을 참고하기 바란다. 
+	</P
+><P
+>		stdio.h 에서 제공하는 여러 입/출력 함수들은 표준 입/출력 함수라고 
+		불리운다. 이문서에서는 특별히 구분되어야할 필요가 없는 한 
+		"표준" 이란 단어를 생략하고 단지 입/출력 함수라고 부르도록 하겠다. 
+		(타이핑 귀찮아서)
+	</P
+><P
+>	
+	<A
+HREF="http://www.joinc.co.kr/article.php?sid=27"
+TARGET="_top"
+>FILE 객체와 파일지시자 와의 차이점..</A
+> 을 참조하면 좀더 이해가 쉬울것이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN23"
+></A
+>2. stdio.h 에서 제공하는 입/출력 함수들</H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+></A
+>2.1. 입력 함수들</H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN27"
+></A
+>2.1.1. 단일 문자입력 함수</H3
+><P
+>				단일 문자입력함수는 말그대로 키보드로 부터 한번에 하나씩의 
+				입력을 읽어들이는 함수들로, 다음과 같은 함수들을 제공한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int    getchar(void);
+int    getc(FILE *stream);
+int    fgetc(FILE *stream);
+int    ungetc(int c, FILE *stream);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수들은 공통적으로 키보드입력된 값을 되돌려주며, 
+				다음 입력을 가르키게 된다. 만약 EOF(end-of-file)을 
+				만나서 더이상의 문자를 읽어들일수 없을경우 이 함수들은 
+				EOF를 되돌려주게 된다. 
+			</P
+><P
+>				getchar 는 기본적으로 stdin 에서 문자를 읽어들인다. 
+				getc와 fgetc 는 지정된 FILE 스트림으로 부터 문자를 
+				읽어들이며, 기본적으로 동일한 일을한다. 
+				ungetc()은 아규먼트로 주어진 'c'를 unsigned char 로 
+				변환한다음 FILE 스트림에 푸쉬(밀어)넣는다. 	
+			</P
+><P
+>				getchar 는 stdin 에서 문자를 읽어들임으로 getc(stdin), 
+				fgetc(stdin)과 동일한 작업을 수행함을 알수 있다. 
+				이처럼 stdio.h 에서 제공하는 입력 함수들은 그 쓰임새가 
+				매우 비슷해서 서로들간에 섞어서 사용할수 있는 유연성을 
+				제공하다. 대부분의 경우 fgetc 만으로도 4가지 함수를 구현할수 
+				있다.   
+			</P
+><P
+>	
+				아래는 각각의 함수들을 어떤식으로 사용가능한지를 나타낸 
+				간단한 예제들이다. putchar 은 stream 을 단지 stdin 으로만 
+				바꾸면 되므로 생략하도록 한다.  
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>getchar()</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+while((c = getchar()) != EOF)
+{
+    입력된 값은 c 로 저장된다. 저장된 c 를 이용한 작업을 한다.  
+} 
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+><DT
+>getc</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+FILE *stream;
+if ((stream = fopen("filename", "r")) != (FILE *)0)
+{
+    while((c = getc(stream)) != EOF)
+    {
+        입력받은 문자로 작업을 한다. 
+    }
+    else
+    {
+        에러처리
+    }
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+><DT
+>fgetc</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+FILE *stream;
+if ((stream = fopen("filename", "r")) != (FILE *)0)
+{
+    while((c = fgetc(stream)) != EOF)
+    {
+        입력받은 문자로 작업을 한다. 
+    }
+    else
+    {
+        에러처리
+    }
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+><DT
+>ungetc</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+FILE *stream;
+if ((stream = fopen("filename", "r")) != (FILE *)0)
+{
+    while((c = fgetc(stream)) != EOF)
+    {
+        문자처리
+        if(some_condition)
+        {
+            ungetc(c, stream);
+            break;
+        } 
+    }
+}
+else
+{
+    에러처리
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+></DL
+></DIV
+>
+			</P
+><P
+>				다음은 간단한 예제이다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>예제: getc.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *stream;
+    int c;
+
+    if (argc &#60; 2)
+    {
+        stream = stdin;
+    }
+    else
+    {
+        stream = fopen(argv[1], "r");
+        if (stream == NULL)
+        {
+            perror("file open error : ");
+            exit(1);
+        }
+    }
+
+    while((c = getc(stream)) != EOF)
+    {
+        printf("%c", c);
+    }
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				프로그램의 이해는 간단할것이다. 아규먼트로 파일이름이 
+				주어질 경우 해당 파일을 읽어들여서 표준출력 시키고, 
+				아규먼트가 없을경우에는 "표준입력" 으로 부터 읽어들여서 
+				표준출력 시키도록 되어있다. 아래와 같은 3가지 방식으로 
+				테스트 가능하다.
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[yundream@localhost test]# ./getc getc.c
+....
+
+[yundream@localhost test]# ./getc 
+hello world
+hello world
+^D
+[yundream@localhost test]# ./getc &#60; getc.c 
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN60"
+></A
+>2.1.2. 문자열(stream) 입력</H3
+><P
+>				열린 stream 으로부터 입력된 문자열을 읽어들인다. 개행문자를 
+				만나거나 EOF를 만날때까지의 라인을 읽어들인다. 즉 라인단위 
+				입력을 받아들인다. 다음과 같은 함수를 제공한다.  
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char *gets(char *s)
+char *fgets(char *s, int size, FILE *stream)
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				fgets 는 stdin(표준입력)으로 부터 문자열을 입력받아 
+				s 에 저장한다. fgets 는 지정된 FILE 객체로 부터 지정된 size 
+				크기만큼의 문자열을 입력받아 s 에 저장한다. 만약 
+				지정된 size 의 문자열을 채우기 전에 "개행문자" 를 만나면 
+				개행문자까지의 문자열을 읽어들인다.    
+			</P
+><P
+>				두함수 모두 비슷한 일을 하긴하지만 gets 는 사용하지 않도록 
+				한다. 입력될 문자열의 크기를 지정할수 없으므로 buffer overflower
+				취약점을 가질수 있다. 
+				gets 대신에 fgets(s, size, stdin)을 사용하도록 한다. 
+			</P
+><P
+>	
+				아래는 각각의 함수들을 어떤식으로 사용가능한지를 나타낸 
+				간단한 예제들이다. gets 는 fgets 와 사용방법이 
+				거의 동일함으로 따로 예를 들지는 않겠다.  
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>fgets</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char s[1024];
+FILE *stream;
+if ((stream = fopen("filename", "r")) != (FILE *)0)
+{
+    while((fgets(s, 1023, stream)) != (char *)0)
+    {
+        받아들인 문자라인 s 에 대한 작업수행
+    }
+}
+else
+{
+    에러 처리
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+></DL
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN73"
+></A
+>2.1.3. 이진(binary) 입력</H3
+><P
+>				이진 데이타 정보를 입력하기 위해서 사용된다. 라인단위 입력 함수를 
+				이용할경우 이진데이터의 입력이 제대로 이루어지지 않는다(NULL 문자등). 
+				이러한 이진데이타는(구조체와 같은) 이진 전용 입력 함수를 사용한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				아래는 fread 함수의 사용법이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int a[10];
+FILE *stream;
+if((stream = fopen ("filename", "r")) != (FILE *)0) 
+{
+    if (fread(a, sizeof(a), 10, stream) &#60; 10)
+    {
+        // 읽기 오류 처리
+    }
+} 
+else 
+{
+    // 열기오류 처리
+} 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN79"
+></A
+>2.2. 출력 함수들</H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN81"
+></A
+>2.2.1. 단일 문자출력 함수</H3
+><P
+>				단일 문자를 장치(화면, 파일, 프린터)에 출력(쓰기) 위한 
+				함수들이며, 다음과 같은 함수들을 제공한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int fputc(int c, FILE *stream);
+int putc(int c, FILE *stream);
+int putchar(int c);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수들은 공통적으로 아규먼트로 가르키는 FILE 객체로 
+				쓰기를 한다. puchar 은 기본으로 stdout 로 쓰기를 한다. 
+				FILE 객체는 보통 화면이나 파일이 될것이다. 
+				putc 와 fputc 는 putc가 stream 에 대해서 몇가지 메크로 검사를 
+				한다는것을 제외하고는 동일하게 사용할수 있다. 
+				puchar(int c)는 putc(int c, stdout)와 동일하다.  
+			</P
+><P
+>	
+				아래는 각각의 함수들을 어떤식으로 사용하는지를 나타내는 
+				간단한 예제들이다.  
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>putc</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+FILE *stream;
+c = 'x';
+if (stream = fopen ("filename", "w")) != (FILE *)0)
+{
+    pubc(c, stream);
+}
+else
+{
+    에러처리
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+><DT
+>fputc</DT
+><DD
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int c;
+FILE *stream;
+c = 'y';
+if (stream = fopen ("filename", "w")) != (FILE *)0)
+{
+    pubc(c, stream);
+}
+else
+{
+    에러처리
+}
+							</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+></DL
+></DIV
+>
+			</P
+><P
+>				다음은 실행가능한 간단한 예제 프로그램으로 하나의 파일을 
+				읽어서 다른 파일로 쓰는 일을 한다. 
+			</P
+><P
+>	
+				<B
+CLASS="EMPHASIS"
+>예제: putc.c</B
+>
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *stream_in, *stream_out;
+    int c;
+
+    if (argc == 2)
+    {
+        stream_out = stdout;
+    }
+    else if(argc == 3)
+    {
+        if (access(argv[2], F_OK) == 0)
+        {
+            printf("이미 파일존재\n");
+            exit(0);
+        }
+        stream_in = fopen(argv[1], "r");
+        if (stream_in == NULL)
+        {
+            perror("file1 open error : ");
+            exit(1);
+        }
+        stream_out = fopen(argv[2], "w");
+        if (stream_out == NULL)
+        {
+            perror("file2 open error : ");
+            exit(1);
+        }
+    }
+    else
+    {
+        printf("Usage : ./copy file1 file2"
+               "        ./copy file1 &#62; file2");
+        exit(1);
+    }
+
+    while((c = getc(stream_in)) != EOF)
+    {
+        putc(c, stream_out);
+    }
+
+    fclose(stream_out);
+    fclose(stream_in);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				아규먼트가 하나 일때는 화면으로(stdout) 출력시키며, 
+				아규먼트가 두개 일때는 파일로 출력시킨다. 
+				만약에 복사할 파일이 이미 존재 한다면, 에러메시지를 
+				발생시킬것이다. 이미 파일이 존재하는지는 access(2) 함수를 
+				이용하였다. 화면으로 출력시킨것은 물론 파일이나 프린터로 로 
+				재지향 시킬수 있으며, 파이프를 통해서 다른 프로세스로 보낼수도 
+				있다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost test]#./putc putc.c | wc
+     57     123     896
+[root@localhost test]#./putc putc.c &#62; test.c
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN102"
+></A
+>2.2.2. 문자열(stream) 출력</H3
+><P
+>				stream 으로 문자열을 출력시킨다. 흔히 줄단위 출력이라고 한다.  
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int fputs(const char *s, FILE *stream);
+int puts(const char *s);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				fputs 와 puts 는 같은일을 한다. 다만 fputs 는 
+				FILE 객체를 지정해줄수 있는 반면 puts 는 stdout 으로만 
+				출력할수 있다는 점이 다르다. 덧붙여 puts 는 
+				stream 마지막에 "개행문자"를 추가한다. 이는 프로그래밍시 가끔
+				혼동될수 있는 사항이므로 가능하면 fputs 만을 사용하는게 
+				좋다. 
+			</P
+><P
+>				아래는 각각의 함수들을 어떤식으로 사용 가능한지를 나타낸 
+				간단한 예제들이다. 
+				<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>fputs</DT
+><DD
+><P
+>								<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char s[1024];
+FILE *stream;
+strcpy(s, "a typical string");
+if ((stream = fopen("filename", "w")) != (FILE *)0)
+{
+    if (fputs(s, stream) == EOF)
+    {
+        에러처리
+    }
+}
+else
+{
+    에러처리
+}
+								</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+><DT
+>puts</DT
+><DD
+><P
+>								<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>char s[1024];
+FILE *stream;
+strcpy(s, "a typical string");
+
+// 화면으로 표준출력 된다. 
+if (puts(s) == EOF)
+{
+    에러처리
+}
+else
+{
+    에러처리
+}
+								</PRE
+></TD
+></TR
+></TABLE
+>
+							</P
+></DD
+></DL
+></DIV
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN119"
+></A
+>2.2.3. 이진(binary) 출력</H3
+><P
+>				말그대로 이진 데이타정보를 출력하기 위해서 사용된다. 보통 이진 데이터 
+				정보는 'NULL' 문자등을 포함하게 된다. 이러한 데이타를 라인단위 출력 
+				함수를 이용하면 데이타가 제대로 저장되지 않게 된다. 구조체와 같은 
+				이진 데이터는 이진 전용 입출력 함수를 써야 한다. 아래는 이러한 이진 
+				출력 함수들이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+><P
+>				아래는 fwrite 함수의 사용방법 이다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int a[10];
+FILE *stream;
+if ((stream = fopen("filename", "r")) != (FILE *)0)
+{
+    if (fwrite(a.sizeof(a), 10, stream) &#60; 10)
+    {
+        // 쓰기 에러 처리
+    }
+}
+else
+{
+    // 열기 에러 처리
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="FOPENTEST"
+></A
+>3. 고수준 입출력 함수의 성능 테스트</H1
+><P
+>		이 내용은 <A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/article_stdio_h_사용하기_2"
+TARGET="_top"
+>stdio.h 활용하기</A
+>을 정리한 것이다.
+
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN129"
+></A
+>3.1. 테스트 방법</H2
+><P
+>			테스트는 3 번에 걸쳐서 이루어 질 것이다. 처음에는 1byte씩 
+			읽고/쓰는 테스트를 할것이다. 다음에는 1M의 크기의 파일을
+			만드는 테스트, 마지막으로 1024바이트씩 (1024 * 100)번 쓰는
+			테스트를 할 것이다.
+		</P
+><P
+>			명확한 성능 테스트는 이런 저런 장황한 과정이 필요한데.. 
+			여기에서는 간단히 <B
+CLASS="EMPHASIS"
+>time</B
+>를 이용해서 
+			테스트 하도록 하겠다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN134"
+></A
+>3.2. 1byte 쓰기 테스트</H2
+><P
+>			테스트 코드는 간단하다 1byte씩 데이터를 써서 1M크기의 
+			파일을 만드는 단순한 코드다. 우선은 open버젼이다. 파일이름은
+			open.c로 하겠다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+
+#define FILE_SIZE 1024 * 1000
+
+int main() {
+   int i;
+   int fp = open("open.txt", O_CREAT | O_TRUNC | O_WRONLY);
+   for (i = 0; i &#60; FILE_SIZE; i++) {
+      write(fp, "A", 1);
+   }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 테스트 결과다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># time ./open
+real    0m5.187s
+user    0m0.519s
+sys     0m4.011s
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			다음은 1byte쓰는 fopen 버젼으로 파일이름은 fopen.c이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;stdio.h&#62;
+
+#define FILE_SIZE 1024 * 1000
+
+int main() {
+   int i;
+   FILE* fp;
+   fp = fopen("fopen.txt", "w+");
+   for (i = 0; i &#60; FILE_SIZE; i++) 
+   {
+      fputc('A', fp);
+   }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 테스트 결과다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>real    0m0.119s
+user    0m0.054s
+sys     0m0.010s
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			테스트 결과를 보면 알겠지만 open버젼이 암울하게 비효율적이라는
+			걸 확인할 수 있다. open버젼의 경우 1024 *1000 만큼의 
+			write()호출이 발생하니 그럴 수 밖에 없을 것이다. 그러나 
+			fopen버젼의 경우 앞장에서 말했듯이 내부적으로 버퍼를 가진다.   
+			버퍼는 하드웨어의 경우 노이즈를 제거해서 안정성을 높이기 위한 
+			목적으로, 소프트웨어의 경우 완충영역을 만들기 위해서 사용한다. 
+			완충영역은 유저영역에 위치하게 된다. 이것은 open()에서와 
+			같이 빈번한 유저영역과 커널영역의 스위치가 있을때 많은 부분을 
+			유저영역에서 처리하므로 영역스위치에 발생하는 성능 저하를 
+			줄일 수 있음을 의미한다.  
+		</P
+><P
+>			실제 fputc()는 문자를 바로 쓰지 않고 내부 버퍼에 담았다가 
+			버퍼가 꽉 차면 write()를 호출해서 데이터를 쓰게 된다. 
+			당연히 효율적일 수 밖에 없다. 	  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN143"
+></A
+>3.3. 1024 바이트 한꺼번에 쓰기</H2
+><P
+>			위의 1바이트 테스트는 눈으로 결과를 보기에 좋긴 하지만 
+			1바이트씩 write()하는 무식한? 코드를 작성해야 하는 경우는 
+			거의 없다고 봐야 한다. 그래서 이번엔 좀더 현실적인 코드로 
+			테스트를 하기로 했다. 이번 코드는 1024바이트씩 쓰는 코드다.
+		</P
+><P
+>			다음은 open버젼이다. 파일이름은 open1024.c 이다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;stdio.h&#62;
+
+#define FILE_SIZE 1024 * 100
+
+int main()
+{
+   int i = 0;
+   char buff[1024];
+   int fd;
+
+   memset(buff, 'A', 1024);
+   buff[1024] = '\n';
+   fd = open("open.txt", O_CREAT|O_WRONLY|O_CREAT);
+   while(i &#60; FILE_SIZE)
+   {
+       write(fd, buff, 1024);
+       i++;
+   }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			다음은 테스트 결과다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>real    0m3.124s
+user    0m0.060s
+sys     0m0.990s
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			다음은 fopen 버젼의 코드와 테스트 결과다.
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;sys/types.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;stdio.h&#62;
+
+#define FILE_SIZE 1024 * 100
+
+int main()
+{
+   int i = 0;
+   char buff[1024];
+   FILE* fp;
+   memset(buff, 'A', 1024);
+   buff[1024] = '\n';
+   fp = fopen("fopen.txt", "w+");
+
+   while(i &#60; FILE_SIZE)
+   {
+       fputs(buff, fp);
+       i++;
+   }
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>real    0m3.491s
+user    0m0.250s
+sys     0m0.570s
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			이경우 확실히 open버젼이 fopen버젼보다 (그리 크진 않지만) 좀더 
+			빠르게 작동하고 있음을 확인할 수 있다. 
+		</P
+><P
+>			언뜻 봤을때 open()계열과 fopen()계열은 그리 큰 성능상의 차이가 
+			없고. 어떤 경우에는 fopen이 더 낳은 성능을 보장해주고 있다. 
+			그렇다면 open()과 fopen() 둘중 어느것을 사용할런지는 순전히 
+			개발자의 기호에 의존하는가 ? 반드시 그렇다고 볼 수 없다. 
+			fopen() 계열의 함수는 재진입불가 함수다. 이 말은 멀티 쓰레드 
+			프로그램에서의 사용이나 비동기적 사건을 다루어야 하는 
+			프로그램에서 사용될 경우 문제가 될 소지가 있음을 의미한다.
+			이 점만을 유의한다면 어느 함수를 쓰건 별 차이는 없을 것으로 
+			생각된다. 
+		</P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+

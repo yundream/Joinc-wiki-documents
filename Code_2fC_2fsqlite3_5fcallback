@@ -1,0 +1,41 @@
+#title 조각 코드 : sqlite3 callback 함수 사용
+
+== 소개 ==
+sqlite3에서 callback 함수를 호출해서 질의 결과를 처리한다. sqlite(:12) 참고
+{{{#!plain linenum
+#include <stdio.h>
+#include <sqlite3.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <string>
+#include <iostream>
+
+static int callback(void *NotUsed, int argc, char **argv, char **azColName)
+{
+    int i;
+    for(i=0; i<argc; i++)
+    {
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    int rc;
+    sqlite3 *mdb;
+    rc = sqlite3_open("test.db", &mdb);
+    if(rc != SQLITE_OK)
+    {
+        return 1;
+    }
+    rc = sqlite3_exec(mdb, "select * from session", callback, 0, NULL);
+    if(rc != SQLITE_OK)
+    {
+        return 1;
+    }
+    sqlite3_close(mdb);
+}
+}}}

@@ -1,0 +1,471 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+> C++ 에서의 메모리 할당</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="C++ Programming HOW-TO"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="File class"
+HREF="fileclass.html"><LINK
+REL="NEXT"
+TITLE="포인터가 문제이다"
+HREF="pointers.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>C++ Programming HOW-TO</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="fileclass.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="pointers.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="MEMORYALLOCATION"
+></A
+>9. C++ 에서의 메모리 할당</H1
+><P
+>C에서는, 메모리의 할당과 해제를 위해 malloc()과 free()를 비롯한 malloc()계열의 함수를 
+쓰지만, 다들 단점을 갖고 있다.
+그래서 C++ 은 메모리를 다루기 위한 연산자들을 도입했고, 이들은 
+<B
+CLASS="EMPHASIS"
+>new</B
+> 와 <B
+CLASS="EMPHASIS"
+>delete</B
+>이다.
+이 연산자들은 실행시에 힙(heap - 혹은 자유 공간)으로부터 메모리를 할당, 해제한다.</P
+><P
+>C++에서는 정말로 꼭 malloc()이나 free()만을 써야하는 상황이 아니라면 언제나 
+<B
+CLASS="EMPHASIS"
+>new</B
+> 와 <B
+CLASS="EMPHASIS"
+>delete</B
+>를 써야한다.
+그러나 주의할 점은, 이 두 가지를 섞어서 쓰면 안된다는 것이다.
+malloc()으로 얻은 메모리를 delete로 해제할 수는 없고, 반대로 new로 얻은 메모리를
+free()시킬 수도 없다.</P
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="ZAP"
+></A
+>9.1. C++ Zap (Delete) 함수</H2
+><P
+>C++에서의 
+<B
+CLASS="EMPHASIS"
+>delete</B
+> 와 <B
+CLASS="EMPHASIS"
+>new</B
+>
+연산자는 C의 malloc, free보다 낫다. 따라서 malloc과 free 대신 new와 zap(delete)를
+쓰도록 하는 것이 좋다.</P
+><P
+><B
+CLASS="EMPHASIS"
+>delete</B
+>  연산자가 좀 더 깔끔하게
+사용되게 하기위해 다음과 같은 Zap() inline 함수를 만들자.
+다음과 같이 zap()을 정의하자.
+
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>// x가 NULL인지 체크하기 위해 assert를 사용하였다.
+// 이는 프로그램의 "논리적" 에러를 미리 잡아내기 위한 것이다.
+// delete가 NULL인 경우에도 잘 동작하긴 하지만, assert를
+// 사용함으로써 좀 더 일찍 에러를 잡아낼 수 있다.
+
+// Zap을 template을 사용하여 정의하자.
+// delete대신 zap을 사용하면 더 깔끔할 것이다.
+template &#60;class T&#62;
+inline void zap(T &#38; x)
+{
+	{assert(x != NULL);}
+	delete x;
+	x = NULL;
+}
+
+// C++에 두 가지 delete 연산자의 용법이 있는 이유는 C++ 에게
+// 한 객체에 대한 포인터와 객체의 배열에 대한 포인터를 구별하도록
+// 말해주는 방법이 필요하기 때문이다.
+// delete연산자는 프로그래머에게 "[]"를 쓰게함으로써 이를 구별한다.
+// 따라서 우리는 포인터의 배열을 지우기 위한 zaparr 함수를 다음과 같이 정의할 수 있다
+template &#60;class T&#62;
+inline void zaparr(T &#38; x)
+{
+	 {assert(x != NULL);}
+     delete [] x;
+     x = NULL;
+}</PRE
+></TD
+></TR
+></TABLE
+>&#13;</P
+><P
+>zap()함수는 포인터를 delete시키고 NULL로 세팅한다.
+이는 똑같은 delete 포인터에 대해 여러번의 zap()이
+불려서 프로그램이 망가지는 것을 방지한다.
+다음의 zap_example()함수를 보아라.
+<A
+HREF="http://www.milkywaygalaxy.freeservers.com"
+TARGET="_top"
+>example_String.cpp</A
+>
+'Source code of C++'을 클릭해라.</P
+><P
+>&#13;<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>	//  example_String.cpp에서 zap_example()를 보라.
+	zap(pFirstname);
+	//zap(pFirstname); // pFirstname이 NULL이므로 코어 덤프가 일어나지 않는다.
+	//zap(pFirstname); // pFirstname이 NULL이므로 코어 덤프가 일어나지 않는다.
+
+	zap(pLastname);
+	zap(pJobDescription);
+
+	int *iiarray = new int[10];
+	zaparr(iiarray);</PRE
+></TD
+></TR
+></TABLE
+>&#13;</P
+><P
+>뭐 특별한 것이 있는 것은 아니고, 이것은 단지 반복적인 코드를 줄이고
+타이핑하는 시간을 아껴주며 프로그램을 좀 더 읽기 좋게 만들어주는 것 뿐이다.
+C++ 프로그래머들은 자주 delete한 pointer를 NULL로 세팅하는 것을 잊는다.
+그리고 이는 코어덤프와 오작동으로 이어질 수 있다.
+zap()은 이러한 문제를 자동으로 처리해준다.
+zap()에 타입 캐스팅을 할 필요는 없다. 만약 위 zap()함수에서 에러가 난다면,
+다른 데서 시작된 에러일 것이다.</P
+><P
+>또한
+<A
+HREF="memoryallocation.html#MY-MALLOC"
+>9.2&#51208;</A
+>
+, my_realloc() 과 my_free() 이
+malloc(), realloc() 그리고 free() 대신 쓰여야 한다.
+이들은 훨씬 깔끔하고, 여러가지 체크도 해준다.
+예를들어, 
+<A
+HREF="memoryallocation.html#MY-MALLOC"
+>9.2&#51208;</A
+> 과 
+my_free() 함수를 사용하는 "String.h" 파일을 보라.</P
+><P
+><B
+CLASS="EMPHASIS"
+>주의 :</B
+> 
+'new'로 할당된 메모리를 해제하기 위해 free()를 쓰거나, malloc()으로 할당된
+메모리를 해제하기 위해 'delete'를 쓰지 말아라. 그렇지 않으면
+결과를 예측할 수 없는 에러에 빠질 것이다.</P
+><P
+><A
+HREF="http://www.milkywaygalaxy.freeservers.com"
+TARGET="_top"
+>example_String.cpp</A
+> 에서 'Source code of C++' 를 클릭한다음, zap함수의 예를 보아라.</P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="MY-MALLOC"
+></A
+>9.2. my_malloc 과 my_free 의 사용</H2
+><P
+>malloc과 realloc 을 최대한 사용하지 말고, <B
+CLASS="EMPHASIS"
+>new</B
+> 와
+<B
+CLASS="EMPHASIS"
+><A
+HREF="memoryallocation.html#ZAP"
+>9.1&#51208;</A
+>(delete)</B
+>을 사용해라.
+그러나 때로는 C++에서 C 스타일의 메모리 할당을 사용해야 할 필요도 있다.
+이 때는 <B
+CLASS="EMPHASIS"
+>my_malloc()</B
+> ,
+<B
+CLASS="EMPHASIS"
+>my_realloc()</B
+> ,
+<B
+CLASS="EMPHASIS"
+>my_free()</B
+> 을 사용해라.
+이 함수들은 적절한 할당과 초기화를 해주고, 메모리 문제를 예방해준다.
+또한 이 함수들은 DEBUG모드에서 메모리 할당을 추적해주고, 프로그램 실행
+전후에 총 메모리 사용량을 표시해준다. 이는 메모리 릭이 있는지를
+알려줄 것이다.</P
+><P
+>my_malloc 과 my_realloc은 다음과 같이 정의되었다.
+이는 약간의 메모리를 더 할당해서 (SAFE_MEM = 5) 초기화시키고,
+메모리를 할당할 수 없으면 프로그램을 종료한다.
+'call_check(), remove_ptr()' 함수는 DEBUG_MEM 가 makefile에서
+((void)0) (이는 NULL을 의미한다)으로 지정되어있을 때에만 작동한다.
+이는 총 메모리 사용량을 추적할 수 있게 해준다.</P
+><P
+>&#13;<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>void *local_my_malloc(size_t size, char fname[], int lineno) 
+{
+	size_t  tmpii = size + SAFE_MEM;
+	void *aa = NULL;
+	aa = (void *) malloc(tmpii);
+	if (aa == NULL)
+		raise_error_exit(MALLOC, VOID_TYPE, fname, lineno);
+	memset(aa, 0, tmpii);
+	call_check(aa, tmpii, fname, lineno);
+	return aa;
+}
+
+char *local_my_realloc(char *aa, size_t size, char fname[], int lineno)
+{
+	remove_ptr(aa, fname, lineno);
+	unsigned long tmpjj = 0;
+	if (aa) // aa !=  NULL
+		tmpjj = strlen(aa);
+	unsigned long tmpqq = size + SAFE_MEM;
+	size_t  tmpii = sizeof (char) * (tmpqq);
+	aa = (char *) realloc(aa, tmpii);
+	if (aa == NULL)
+		raise_error_exit(REALLOC, CHAR_TYPE, fname, lineno);
+
+	// do not memset memset(aa, 0, tmpii);
+	aa[tmpqq-1] = 0;
+	unsigned long kk = tmpjj;
+	if (tmpjj &#62; tmpqq)
+		kk = tmpqq;
+	for ( ; kk &#60; tmpqq; kk++)
+		aa[kk] = 0;
+	call_check(aa, tmpii, fname, lineno);
+	return aa;
+}</PRE
+></TD
+></TR
+></TABLE
+>
+
+my_malloc 의 모든 구현을 보려면 
+<A
+HREF="appendixa.html"
+>23&#51208;</A
+>
+에서 
+<A
+HREF="appendixa.html"
+>23&#51208;</A
+>
+의 헤더파일을 보면 된다.</P
+><P
+>my_malloc 과 my_free 를 쓰는 예는 다음과 같다.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>	char 	*aa;
+	int 	*bb;
+	float	*cc;
+	aa = (char *) my_malloc(sizeof(char)* 214);
+	bb = (int *) my_malloc(sizeof(int) * 10);
+	cc = (float *) my_malloc(sizeof(int) * 20);
+
+	aa = my_realloc(aa, sizeof(char) * 34);
+	bb = my_realloc(bb, sizeof(int) * 14);
+	cc = my_realloc(cc, sizeof(float) * 10);</PRE
+></TD
+></TR
+></TABLE
+>
+my_realloc 에서 data type을 cast 할 필요가 없는 것에 주의해라.
+이는 인자로 받은 변수의 타입에 맞춰서 리턴값을 보내기 때문이다.
+The my_realloc 함수는 char *, int *, float * 타입으로 오버로딩
+되어있다.</P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="GARBAGE"
+></A
+>9.3. C++ 에서의 가바지 콜렉터</H2
+><P
+>C/C++에서 가비지 콜렉션은 표준에서 지원되지 않고, 따라서 메모리를 직접
+할당, 해제하는 것이 어렵고 복잡하며 에러를 내기 쉽다.
+<B
+CLASS="EMPHASIS"
+>가비지 콜렉션(GC:Garbage Collection)</B
+> 은
+구현하는 방법이 여러가지가 있고, 각 프로그램마다 적용될 수 있는 방법이
+다르기 때문에 C++ 표준의 일부가 될 수 없었다.
+전산학자들은 많은 GC 알고리즘을 개발했고, 이들은 각 문제분야에서만
+적용될 수 있는 것들이었다.
+즉, 모든 일반적인 문제에 적용될 수 있는 하나의 범용 GC알고리즘은 없다.
+따라서 GC는 C++ 표준에 들어가지 못했다. 따라서 언제나 하는 일에 맞는
+C++ 라이브러리를 많은 라이브러리들 중에서 고를 수 있다.</P
+><P
+>다음 C++
+<A
+HREF="http://www.xanalys.com/software_tools/mm/glossary/g.html#garbage.collection"
+TARGET="_top"
+>가비지 콜렉션(Garbage Collection)</A
+>
+사이트와 
+<A
+HREF="http://www.xanalys.com/software_tools/mm"
+TARGET="_top"
+>메모리 관리</A
+> 사이트를 가보아라.</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="fileclass.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="pointers.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>File class</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>포인터가 문제이다</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

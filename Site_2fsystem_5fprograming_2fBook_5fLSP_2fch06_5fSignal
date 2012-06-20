@@ -1,0 +1,549 @@
+#title 리눅스 시스템 프로그래밍 6장 - Signal
+
+[[TableOfContents]]
+=== signal의 일반적 정의 ===
+의미를 전달하기 위해서 사용하는 일반적인 방법으로 '''신호'''와 '''메시지'''가 있다. 메시지는 언어기반의 전달방식이며, 여러의미를 내포하고 있는 비교적 복잡한 의미전달 방식이다. 
+
+반면, '''신호'''는 하나의 의미만을 내포한다. 해석이 간단하고 빠른전달이 가능하다는 장점을 지난다. 예를들어 교통신호 표지판은 각각이 하나의 의미만을 가지며, 누구에게나 동일하게 해석이 된다. 
+
+이상은 일반 생활에서의 신호와 메시지의 차이점을 기술한건데, 컴퓨터에서의 의미전달에도 그대로 적용된다.  
+
+==== 시그널 ====
+시그널 즉 신호는 "의미"를 상대방에게 전달하기 위해서 사용하는 소통방식 중 하나로, 아마도 인류의 가장오래된 소통방식 중 하나일 것이다. 하긴 signal은 인간만이 사용할 수 있는 유일한 것은 아니다. 시그널은 그 자체가 복합적이고 추상적인 언어의 성격보다는 구체적이고 단순한, 즉 1:1로 의미가 매칭이 되는 단순한 소통의 방식이기 때문이다. 예컨데, 동물들도 울음소리나 몸동작, 호르몬, 배설물들을 이용해서 다른 동물들에게 신호를 보낸다. 
+
+signal이 동물들과 인간들에게 있어서의 최소한의 의사소통으로 오랫동안 선호되어온 이유는 그 사용방법의 간단함과 의미전달의 효율에 있을 것이다. 언어의 경우에는 매우 간단한 문장이라고 하더라도 다양한 해석이 있을 수 있고, 문화와 환경이 다를 경우에는 전혀 다른 해석이 있을 수 있지만, 정보와 의미가 1:1로 매칭되는 signal은 그 의미를 해석하는데 많은 에너지를 사용할 필요가 없기 때문이다. 빠르고 전달되고 빠르게 해석된다는 장점을 가진다고 볼 수 있겠다.
+
+물론 signal도 단점은 있다. 1:1이기 때문에, 생존에 필요한 최소한의 정보를 정확하게 전달하기에는 매우 효율적이지만, 복잡한 의미를 전달할때에는 오히려 효율이 떨어질 수 있다는 점이다. 
+
+요즘과 같이 복잡한 시대에, 신호와 같은 단순한 것들로는 살아가기가 귀찮을 것 같다고 생각될지도 모르지만, 사실 신호는 오히려 더욱더 널리 사용되는 추세다. 그렇잖아도 복잡한 세상인데, 어느 세월에 그걸 말과 글로 설명하고 앉아 있을 것인가. 
+
+'''지금은 위험하오니 길을 건너지 마시오'''하는 것보다 '''빨간불'''켜주는게 의미를 훨씬더 잘 전달할 수 있다. 신호는 오히려 차고 넘친다. 도로는 온통 신호들로 넘쳐나며, 인터넷 세계역시 이모티콘으로 대표되는 신호들로 가득 채워져 있다.
+
+이들 신호는 주로 다음의 두가지 용도에 특히 잘 사용될 수 있다.
+  1. '''비동기적인 사건이 발생했음을 알리기 위함''' :  즉 예로 들자면 전화벨, 메시지가 도착했음을 알리는 알람  
+  1. '''사건을 동기화 하기 위함''' : 시계알람, 자동차경주에서 출발시각을 맞추기 위함
+==== 메시지 ====
+시그널은 빠르고, 간단하게 이해될 수 있다는 장점이 있지만 복잡한 정보를 전달할 수 없다는 단점을 가진다. 그래서 인간의 언어와 비슷한 형태로 '''메시지'''를 이용해서 정보를 전달하는 방법도 있다.
+
+이 방식을 이용하면 복잡한 정보를 전달할 수 있지만, 메시지의 형식과 해석방법에 대해서 서로 약속이 되어 있어야 한다. '''나는 너를 사랑한다'''라는 인간의 메시지를 예로 들어보자. 이 메시지를 정확히 전달하고 이해할려면 '''주어+동사+목적어'''라는 문장의 형식과 '''나''', '''너''', '''사랑''', '''하다'''의 단어들의 의미를 알고 있어야만 한다. 또한 이러한 약속을 알고 있다고 하더라도, 자신이 처한 문화/사회적 환경과 교육수준에 따라서 전혀 다르게 해석이 되기도 한다.
+
+이처럼 이용하기 복잡하지만 형식과 의미를 이해하고 있다면, 몇개의 단어만을 가지고도 엄청나게 다양한 정보전달이 가능하다는 장점을 가진다.  우리가 일상적으로 사용하는 단어는 수천개에 불과하다. 그렇지만 이 수천개로 거의 무한에 가까운 의미를 전달할 수 있다.
+
+컴퓨터에서는 프로세스간 복잡한 정보교환을 위해서 '''메시지'''를 교환하는 경우가 많다. 인간의 언어와 마찬가지로 이들도 해석될 수 있도록 '''메시지 규약'''을 가지고 있어야 한다. 이러한 메시지 규약을 '''Protocol'''이라고 한다. 예를들어 Web Server는 Web Client와 메시지 통신을 하는데, 이때 따르는 Protocol이 HTTP(HyperText Transfer Protocol)이다. 마찬가지로 파일전송을 위한 일반적인 프로토콜로 FTP(:12)가 있다. 
+ 
+이들 메시지는 내부 프로세스 간의 통신일 경우 IPC(:12)라고 하는 리눅스 운영체제가 제공하는 내부통신메커니즘에 따라서 전달될 수 있다. 멀리떨어진 프로세스, 즉 인터넷으로 연결된 프로세스들이라면 TCP(:12)/IP(:12)를 이용해서 통신이 이루어질 것이다. TCP/IP는 인터넷상에서 데이터를 전송하기 위한 프로토콜이며, 리눅스는 이들 프로토콜을 쉽게 사용할 수 있도록 socket(:12)를 제공한다.   
+
+IPC는 뒷장에서 따로 다룰 것이다. 네트워크상에서 socket을 이용한 프로세스간 통신은 이 문서의 범위를 벗어난다. 아마도 네트워크 프로그래밍 관련된 별도의 문서를 통해서 다루게 될 것이다. 
+
+=== 운영체제에서의 signal ===
+운영체제가 하는 가장 중요한 일은 컴퓨터와 인간이 서로 원할히 소통할 수 있게끔 도와주는 일이 될것이다. 운영체제와 인간 사이에는 다시 응용 소프트웨어가 놓여있고, 인간은 응용 소프트웨어를 통해서 운영체제와 소통을 하게 된다. 
+{{{#!plain
+  +----------+     |    |
+  | Computer |<--->| OS | <-------> 응용 APP    <---------> 사용자
+  |          |     |    | <-------> 응용 APP
+  |          |     |    | <-------> 응용 APP
+  +----------+     |    |
+}}}
+
+운영체제는 이들 응용 소프트웨어간 그리고 응용 소프트웨어와 사용자간의 소통을 위한 몇가지 도구들을 제공한다. 예컨데, IPC(다음 장에서 다루게될)와 같은 것들인데, 이것은 인간의 언어의 형태에 가깝다. 즉 다양한 형태로 해석될 수 있는 '''메시지'''들을 주고 받음으로써, 각각의 객체들간의 소통을 지원한다. 
+
+이들은 '''재해석'''가능한 데이터를 이용하기 때문에, 객체간 복잡한 소통을 할 수 있지만, 반대로 사용하기에 너무 복잡한 면이 있다. 때로는 인간이나 혹은 동물들이 그렇듯이, 아주 간단하게 소통할 수 있는 '''signal'''같은 도구도 필요할 것이다.
+
+그래서 대부분의 운영체제(:12)는 signal을 지원하며, 마찬가지로 Linux도 signal을 지원한다. 시그널은 인간이나 동물이 사용하는 그것과 매우 유사하다. 즉 의미와 정보가 1:1로 매칭되기 때문에, 재해석할 필요없이 즉시 의미를 알아낼 수 있도록 되어 있다. 
+
+리눅스 운영체제는 미리 약속되어 있는 수십가지의 signal을 제공하는데, kill(1)을 이용하면 리눅스가 지원하는 signal의 종류를 알아낼 수 있다.
+{{{#!plain
+# kill -l 
+ 1) SIGHUP       2) SIGINT       3) SIGQUIT      4) SIGILL
+ 5) SIGTRAP      6) SIGABRT      7) SIGBUS       8) SIGFPE
+ 9) SIGKILL     10) SIGUSR1     11) SIGSEGV     12) SIGUSR2
+13) SIGPIPE     14) SIGALRM     15) SIGTERM     16) SIGSTKFLT
+17) SIGCHLD     18) SIGCONT     19) SIGSTOP     20) SIGTSTP
+21) SIGTTIN     22) SIGTTOU     23) SIGURG      24) SIGXCPU
+25) SIGXFSZ     26) SIGVTALRM   27) SIGPROF     28) SIGWINCH
+29) SIGIO       30) SIGPWR      31) SIGSYS      34) SIGRTMIN
+35) SIGRTMIN+1  36) SIGRTMIN+2  37) SIGRTMIN+3  38) SIGRTMIN+4
+39) SIGRTMIN+5  40) SIGRTMIN+6  41) SIGRTMIN+7  42) SIGRTMIN+8
+43) SIGRTMIN+9  44) SIGRTMIN+10 45) SIGRTMIN+11 46) SIGRTMIN+12
+47) SIGRTMIN+13 48) SIGRTMIN+14 49) SIGRTMIN+15 50) SIGRTMAX-14
+51) SIGRTMAX-13 52) SIGRTMAX-12 53) SIGRTMAX-11 54) SIGRTMAX-10
+55) SIGRTMAX-9  56) SIGRTMAX-8  57) SIGRTMAX-7  58) SIGRTMAX-6
+59) SIGRTMAX-5  60) SIGRTMAX-4  61) SIGRTMAX-3  62) SIGRTMAX-2
+63) SIGRTMAX-1  64) SIGRTMAX
+}}}
+여기에서 시그널의 이름과 그 시그널의 고유번호를 알 수 있다. 
+
+상당히 많은 시그널이 있는데, 자주사용되는 것들을 정리해 보자면 다음과 같다. 각각의 시그널은 고유한 단일의 의미를 가지고 있음을 알 수 있을 것이다. 
+  || SIGKILL  || 프로세스를 죽여라                       ||
+  || SIGALARM || 알람을 발생한다                         ||
+  || SIGSTP   || 프로세스를 멈춰라                       ||
+  || SIGCONT  || 멈춰진 프로세스를 움직이게 하라         ||
+  || SIGINT   || 프로세스에 인터럽트하라. 즉 차단하라    ||
+  || SIGSEGV  || 프로세스가 다른 메모리영역을 침범했다.  ||
+이들 시그널의 사용용도는 비동기적인 사건을 전달하는데, 특히 유용하게 사용할 수 있는 소통의 도구다. 즉 프로세스를 죽이는 것은 그 시간을 알 수 없는 비동기적인 사건이다. 프로세스가 다른 메모리영역을 침범한 것 역시, 그 발생시간을 알 수가 없는 비동기적인 사건임을 알 수 있다. 
+
+이들 시그널은 일상생활에서 사용하는 시그널과 마찬가지로 '''비동기적인 사건의 발생'''을 통지하기 위한 용도와 '''사건을 동기화 시키기 위한'''용도로 크게 나눌 수 있다. 위의 경우를 예로 들어서 설명해 보자면, SIGALARM은 사건을 동기화 시키기 위해서, SIGKILL, SIGSEGV는 비동기적인 사건을 통지하기 위해서 사용을 한다.  
+
+=== shell에서 signal의 사용 ===
+shell 프로그램을 다른 프로세스에 signal을 전달할 수 있는 kill(1)이라는 프로그램을 제공한다. 사용방법은 다음과 같다.
+{{{#!plain
+kill -signal pid
+}}}
+예를들어 pid가 100인 프로세스를 죽이고 싶다면, 아래와 같이 kill을 사용하면 된다.
+{{{#!plain
+# kill -SIGKILL 100
+}}}
+혹은 시그널 이름대신에 시그널의 고유번호를 사용하는 방법도 있다.
+{{{#!plain
+#kill -9 100
+}}}
+이제 100번 프로세스로 SIGKILL 시그널이 전달되고, 해당 프로세스는 강제로 종료가 될 것이다. 물론, 그렇다고 해서 아무 프로세스나 마구 시그널을 보낼 수 있는 것은 아니다. 자기가 권한을 가지고 있는 프로세스에 대해서만 시그널을 보낼 수 있다. 아무 프로세스에 관계없이 시그널을 보내기 위해서는 root 권한을 가져야만 한다.  
+
+또한 키보드 입력으로 시그널을 발생시킬 수도 있다. 가장 대표적인게, 프로그램을 종료시키기 위해서 '''Ctrl+C''' 입력하는 것으로, 이 키를 입력하면 해당 프로세스에 SIGINT가 전달이 되어서 프로세스가 종료가 된다. 앞에서 SIGINT는 프로세스의 중단이라고 했는데, 왜 종료가 되는건지가 의문점으로 남을 것이다. 이에 대해서는 다음절에서 설명하도록 할 것이다. Ctrl+C를 입력했을 때, 프로그램(:12)이 종료되는건 어렵지 않게 확인할 수 있을 것이다. 아래의 프로그램으로 확인해 보도록 하자. 프로그램이름은 sigtest.c 로 하겠다. 
+{{{#!plain
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+  int i = 0;
+  while(1)
+  {
+    printf("%d\n", i);
+    i++;
+  }
+}
+}}}
+
+키보드 입력으로 발생시킬 수 있는 시그널은 Ctrl+C 외에도 아래의 몇가지가 있다.
+  || Ctrl+C  || SIGINT    || 프로세스를 종료시킨다.                    ||
+  || Ctrl+Z  || SIGSTP    || 프로세스를 중단시킨다.                    ||
+  || Ctrl+\  || SIGQUIT   || core dump를 남기고 프로세스를 종료시킨다. ||
+
+
+=== 시그널을 받았을 때 ===
+시그널은 고유의 의미를 내포하고 있다. 이러한 시그널을 받은 실행객체인 프로세스는 그에 맞는 행동을 해야 한다. 시그널을 받은 프로세스는 다음중 한가지 행동을 취해야 한다. 
+  1. 그 시그널을 처리할 '''등록된''' 함수를 호출한다. 
+  1. 시그널을 무시한다.
+  1. 시그널을 무시하지 않지만, 그렇다고 해서 특별히 함수를 호출하지도 않는다. 
+전화벨이 울리면 전화를 받거나 무시하거나 할 수 있을 것이다. 각각 1, 2번에 해당한다. 
+
+만약 시그널을 무시하지도 않고, 호출할 함수도 등록하지 않았다면 시그널에 대한 기본행동을 취하게 된다. 이 기본행동에는 다음과 같은 것들이 있다.
+  1. 프로세스가 죽는다. 대부분의 시그널에 대한 기본행동 
+  1. 프로세스가 중단된다.  
+  1. 아무일 없이 지나간다. - 무시된다. 
+예를들어 CTRL+C 을 입력하면, '''SIGINT''' 신호가 발생되는데, 시그널에 대한 행동을 정하지 않았다면, 기본행동인 '''프로세스 종료'''를 취하게 된다.  
+
+시그널에 대해서, 호출될 함수를 등록하건나 혹은 무시하게 만드는 것은 뒤에 따로 다루도록 하겠다. 
+
+=== 시그널의 범주 ===
+시그널은 제어가능한 시그널과 그렇지 못한 시그널이 있다. 여기에서 제어는 시그널을 '''catch'''하는 것에서 부터 시작된다. catch하지 못한다면 (당연히)제어할 수도 없다. 
+
+대부분의 시그널은 catch가 가능하며, 무시하거나, 기본행동을 하게 하거나, 별도의 함수를 실행시킬 수 있다. 그러나 catch 불가능한 함수가 있는데, '''SIGKILL'''과 같은 함수가 대표적이다.
+
+SIGKILL은 프로세스를 무조건 죽이기 위해서 사용하는데, 예컨데 오동작하면서 CPU자원을 무한대로 소비하는 프로세스라면 강제로 종료시켜야 할 것이다. 그런데, 시그널이 catch 되어서 시그널을 무시하게 해버린다면, 시스템 관리자로서는 상당히 난감할 것이다. 그러므로 이 프로세스는 catch하지 못하도록 하고 있다. 
+
+SIGSTOP도 마찬가지로 catch할 수 없다. SIGSTOP를 받은 프로세스는 즉시 중단되어야 하며, 무시할 수 없다. 역시 시스템 관리를 위한 목적으로 사용할 수 있을 것이다.
+
+=== 시그널 프로그래밍 ===
+시그널이 전달되면, 프로세스는 무시하던지, 지정된 함수를 호출하든지 해야 한다. 그렇지 않다면 기본행동을 취하게 된다. 여기에서는 시그널을 제어하는 방법 즉, 시그널을 무시하거나 호출된 함수를 지정하는 방법에 대해서 알아보도록 할 것이다.  
+
+==== kill 함수를 이용한 시그널 보내기 ====
+kill은 프로세스에 시그널을 전달하기 위해서 사용할 수 있는 가장간단한 함수로, 다음과 같이 선언되어 있다.
+{{{#!plain
+#include <sys/types.h>
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+}}}
+ * pid : 프로세스의 PID
+ * sig : 시그널 번호
+
+연습삼아서 프로세스에 원하는 시그널을 보내는 간단한 프로그램을 만들어 보도록 하자.
+{{{#!plain
+#include <sys/types.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+    int pid;
+    int sig_num;
+
+    if (argc != 3)
+    {
+        printf("usage %s [pid] [signum]\n", argv[0]);
+        return 1;
+    }
+    // 실행인자로 pid 번호와 
+    // 전송할 signal 번호를 받아들여서 
+    // 이를 해당 pid 로 보낸다. 
+    pid = atoi(argv[1]);
+    sig_num = atoi(argv[2]);
+    if(!kill(pid, sig_num))
+    {
+        perror("Signal Send error");
+        return 1;
+    }
+    return 0;
+}
+}}}
+다음은 실행 결과다.
+{{{#!plain
+$ ./signal 6653 2
+Signal Send error: Success
+}}}
+
+==== signal 함수를 이용한 시그널 catch ====
+kill은 다른 프로세스에게 시그널을 보내기만 할뿐, 자신에게 전달되는 시그널을 '''catch''' 해서 처리할 수는 없다. 리눅스(:12)는 signal 함수를 제공하는 데, 이를 이용해서 자신에게 전달되는 시그널을 처리할 수 있다.   
+
+signal 함수는 다음과 같이 선언되어 있다. 
+{{{#!plain
+#include <signal.h>
+
+typedef void (*sighandler_t)(int);
+
+sighandler_t signal(int signum, sighandler_t handler);
+}}}
+ 1. signum : 제어할 시그널 번호
+ 1. sighandler_t : '''signum'''을 받았을 때, 호출할 함수
+
+다음은 간단한 예제다. 프로그램이름은 sigint.c로 하자.
+{{{#!plain linenum
+#include <signal.h>
+#include <unistd.h>
+#include <stdio.h>
+
+void sig_handler(int signo);
+
+int main(int argc, char **argv)
+{
+  int i = 0;
+  signal(SIGINT, (void *)sig_handler);
+  while(1)
+  {
+    printf("%d\n", i);
+    sleep(2);
+    i++;
+  }
+}
+
+void sig_handler(int signo)
+{
+  printf("I Received SIGINT(%d)\n", SIGINT);
+}
+}}}
+CTRL+C 를 입력하게 되면, 현재 실행중인 프로세스에 '''SIGINT'''가 전달이 된다. SIGINT에 대한 프로세스의 기본행동은 종료이기 때문에, 특별히 시그널을 제어하지 않을 경우 프로그램은 종료가 된다. 그러나 위에서는 signal함수를 이용해서 SIGINT에 대해서 ''sig_handler''라는 함수를 실행하도록 했다. 이제 CTRL+C를 입력하게 되면, 프로세스가 종료되는 대신 sig_handler를 실행하는걸 확인할 수 있을 것이다.
+
+위 예에서는 시그널함수를 실행시키도록 하고 있는데, 시그널을 무시하거나 시그널의 기본행동으로 되돌아가도록 할 수도 있다. 이경우 sig_handler 대신에 '''SIG_IGN'''과 '''SIG_DFL'''을 이용하면 된다.
+   * SIG_IGN : 시그널을 무시한다.
+   * SIG_DFL : 기본행동을 하도록 한다.  
+위코드의 10번째 줄을 다음과 같이 바꾸고 테스트해보자.
+{{{#!plain
+signal(SIGINT, SIG_IGN);
+}}}
+CTRL+C 키가 아예먹지 않는걸 확인할 수 있을 것이다.
+
+그렇다면 SIG_DFL은 언제 사용되는가 ? 별도의 시그널제어 함수를 사용하지 않는다면, 시그널에 대해서 기본행동을 하도록 되어 있는데, 사용할 필요가 있는가 하는 의문이 생길 수 있을 것이다. SIG_DFL은 다음의 두가지 용도로 주로 사용된다. 
+  * 최초 시그널을 무시했는데, 중간에 시그널을 기본행동으로 해야할 필요가 있을 때.
+  * 자식프로세스를 생성했을때. 
+    fork(2)를 이용해서 자식프로세스를 생성하면, 자식프로세스는 부모의 시그널정책까지를 그대로 복사해서 사용하게 된다. 즉 부모의 특정 시그널에 정책이 SIG_IGN 이였다면, 자식도 그대로 그 정책을 따른다. 때로, 자식의 시그널 정책을 달리할 필요가 있을 것이다. 이 경우 사용할 수 있다.
+
+=== 시그널의 특징 ===
+지금까지 해서, 시그널의 간단한 특징과 시그널을 전송하고 받는 것에 대한 기본적인 정보를 얻게 되었다. 이제 본격적으로 시그널의 제어와 관련된 얘기를 해야 할건데, 그 전에 시그널의 세부적인 특징에 대해서 언급하고 넘어가야 할것 같다.
+
+대상이 무엇이든지 간에, 대상을 제대로 제어하기 위해서는 대상의 특징을 우선알고 있어야 할 것이기 때문이다.
+
+==== 대기열을 가지지 않는다. ====
+시그널의 첫번째 특징은 대기열을 가지지 않는 다는 점이다. 이것은 뭐냐면, 프로세스는 동시에 하나의 시그널만 처리할 수 있다는 얘기가 된다. 예를들어서 '''SIGINT''' 시그널을 받아서, 이에 대한 처리를 하고 있는중에, 다시 SIGINT가 발생하게 된다면, 이 시그널은 '''잃어'''버리게 된다.
+
+다음은 대기열을 가지지 않는 시그널의 특징을 테스트하기 위한 간단한 프로그램이다.
+
+위의 sigint.c에 한줄추가했을 뿐이다.
+{{{#!plain linenum
+#include <signal.h>
+#include <unistd.h>
+#include <stdio.h>
+
+void sig_handler(int signo);
+
+int main(int argc, char **argv)
+{
+  int i = 0;
+  signal(SIGINT, (void *)sig_handler);
+  while(1)
+  {
+    printf("%d\n", i);
+    sleep(2);
+    i++;
+  }
+}
+
+void sig_handler(int signo)
+{
+  printf("I Received SIGINT(%d)\n", SIGINT);
+  sleep(4);
+}
+}}}
+23라인에 sleep()함수가 추가되었다. 이제 프로그램을 실행시키고, CTRL+C를 입력하면 SIGINT가 전달될 것이고, 프로세스는 sig_handler을 실행시킬 것이다. sig_handler는 4초를 기다리는데, 이때 CTRL+C를 다다닥 눌러서 한 10번 정도 실행시켜보자. 
+
+만약 시그널대기열이 있다면, sig_hanler는 4초의 간격을 두고 10번 실행되어야 하겠지만, 단 한번만 실행되는걸 확인할 수 있을 것이다. 왜냐하면 대기열이 없기 때문에, sig_handler이 실행된 후, 오직 하나의 SIGINT만 접수가 되기 때문이다. 
+
+나머지 시그널은 전부 버려진다.
+
+의미를 전달하기 위한 매우 사용하기 편한 방법임에도 불구하고, 시그널의 이러한 특징은 시그널의 사용을 주저하게 만드는 이유가 되기도 한다. 이러한 문제를 해결하기 위해서, 최근에는 시그널이 대기할 수 있는 대기열 매커니즘을 제공하는 RTS(real-time signal)이 사용되기도 한다. '''RTS'''에 대한 내용은 이 문서의 후반부에서 따로 다루도록 하겠다. 
+==== 비신뢰성 ====
+요청에 대한 응답으로 메시지가 전달되었는지 확인하는 쌍방향 통신과는 달리, 시그널은 프로세스에 제대로 전달되었는지 확인할 수 있는 방법이 없다. 
+
+신호가 전달되었는지를 신뢰할 수 없기 때문에 '''비신뢰'''적인 특징을 가진다고 말한다. 
+
+=== signal의 제어 ===
+이제 시그널을 제어하는 방법에 대해서 자세히 알아보도록 하겠다. 시그널의 제어는 크게 3가지 부분으로 이루어진다.
+  1. 시그널의 전송
+     특정 프로세스, 혹은 자식프로세스와 같은 그룹의 프로세스에 시그널을 보내는 방법
+  1. 시그널의 catch 
+     여기에는 시그널을 그룹단위로 처리하거나 특정 시그널을 블럭 하는 등에 대한 내용이 들어간다.
+  1. 시그널의 처리
+
+==== kill을 이용한 시그널의 전송 ====
+signal을 전송하기 위한 가장 간단한 방법은 kill(2) 시스템함수를 이용하는 것으로, kill의 사용방법은 다음과 같다. - shell의 kill 명령과 혼동하지 말자. -
+{{{#!plain
+#include <sys/types.h>
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+}}}
+'''pid'''는 시그널을 받을 프로세스의 pid로 그룹 혹은 특정 pid에 시그널을 보낼 수 있다. 
+  * pid > 0 : pid에 대응되는 프로세스에 시그널을 보낸다. 
+  * pid == 0 : 현재프로세스에 속한 모든 그룹의 프로세스에 시그널을 보낸다. 
+  * pid == -1 : 1번 프로세스 (init) 를 제외한 모든 프로세스에 시그널을 보낸다. 
+  * pid < -1 : pid의 모든 그룹의 프로세스에 signal을 보낸다.  
+
+==== signal를 이용한 비동기적 시그널 처리 ====
+그럼 비동기적으로 발생하는 시그널을 처리하는 방법에 대해서 알아보도록 하겠다. 비동기적이라는 것은 특정 시점에서 시그널이 발생하는 것을 기다리지 않는다는 얘기가 된다. 즉 시간을 일치 시키지 않겠다는 것으로 전화벨이 신호라고 할때, 전화벨이 언제 움직일 지를 알 수 없다. 우리는 전화벨을 기다리지 않는다. 전화벨이 움직이면 반응할 뿐이다. - 물론 기다리는 전화도 있긴 하지만 -
+
+리눅스는 signal(2) 이라는 함수를 제공하는데, 이 함수를 이용해서 비동기적으로 발생하는 시그널에 반응해서 필요한 일을 수행 할수 있다. 다음은 signal 함수의 사용법이다.
+{{{#!plain
+#include <signal.h>
+
+void (*signal(int signum, void  (*handler) (int))) (int);
+}}}
+  1. signum : 제어하고자 하는 시그널 번호
+  1. handler : 시그널이 발생했을 때, 실행할 함수 
+
+다음은 signal 함수를 이용한 간단한 예제 프로그램으로, SIGSTOP가 전달되면 mystop()라는 시그널 등록함수를 실행시킨다. 
+{{{#!plain
+#include <signal.h>
+#include <stdio.h>
+
+void mystop(int signo)
+{
+  printf("I Received Signal : %d\n", signo);
+}
+
+int main(int argc, char **argv)
+{
+  int i =0;
+  signal(SIGQUIT, (void *)mystop);
+
+  while(1)
+  {
+    printf("%d\n", i);
+    i++;
+    sleep(1);
+  }
+  return 1;
+}
+}}}
+
+==== signal을 이용한 동기적 시그널 처리 ====
+동기적 시그널 처리라는 것은 우리가 다른 일을 제쳐두고 애인의 전화벨을 기다리는 것처럼, 작업을 중단하고 시그널을 기다리겠다라는 얘기가 된다. 
+
+리눅스는 sigwait()함수를 제공한다.
+{{{#!plain
+#include <signal.h>
+
+int sigwait(const sigset_t *set, int *sig);
+}}}
+sigwait 는 '''set'''에 등록된 시그널이 발생될 때까지 기다린다. 여기에 '''sigset_t'''라는 데이터타입이 등장하는데, 여기에는 시그널에 대응되는 bit 값이 설정되어 있다.
+
+sigwait를 다루기 위해서는 시그널을 객체로 다루는 방법에 대한 지식이 필요하다. sigaction 함수를 이용하면 시그널을 객체단위로 다룰 수 있는데, (다음 절에서) sigaction을 다루면서 sigwait의 사용방법에 대해서 설명하도록 하겠다. 
+
+=== sigaction 함수군 을 이용한 시그널 객체의 처리 ===
+signal 함수는 간단하게 사용할 수 있기는 하지만 시그널을 객체로 보지 않고, 단일 대상으로 본다는 문제점을 가진다. sigaction을 사용하면 시그널을 객체로 다룰 수 있는데, 이 객체에는 다음과 같은 것들이 포함된다.
+  * 시그널 set
+  * 시그널에 대한 정책
+  * 시그널 함수
+이러한 요소들을 하나의 객체로 볼 경우 분명히 더 쉽게 시그널을 관리할 수 있을 것이다. 리눅스는 이들을 객체로 다루기 위해서 sigaction() 함수를 제공한다. 이 함수는 '''struct sigaction'''을 이용해서 시그널 객체요소를 다룬다. 
+{{{#!plain
+#include <signal.h>
+int sigaction(int signum,  const  struct  sigaction  *act,
+	struct sigaction *oldact);
+}}}
+  1. signum : 제어할 시그널의 번호
+  1. act : 시그널을 제어하기위한 정책을 정의할 수 있다. 이 구조체는 다음과 같이 정의되어 있다.
+     {{{#!plain
+struct sigaction 
+{
+    void (*sa_handler) (int);
+    void (*sa_sigaction) (int, siginfo_t *, void *);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer) (void);
+}
+}}}
+구조체의 각 멤버에 대한 자세한 내용은 sigaction(2) 문서를 확인해 보기 바란다. 여기에서는 간단하게 소개만 하고 넘어가겠다. 
+   1. sa_handler : sigaction의 signum에 해당되는 시그널이 전달되었을 때 실행될 시그널 핸들러
+   1. sa_mask : sa_handler에 등록된 시그널 핸들러가 실행되는 동안 블럭되어야 하는 시그널마스크
+
+sigaction은 시그널을 객체단위로 제어할 수 있음을 알게 되었다. 이때 중요한 시그널 정책이, 시그널 핸들러가 수행되는 도중에 발생하는 시그널들을 '''set'''로 묶어서 관리하는 것이다. 이렇게 시그널을 set 으로 관리하기 위해서 다음의 함수들을 제공한다. 
+{{{#!plain
+int sigprocmask(int  how,  const  sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigismember(sigset_t *set, int signum);
+int sigsuspend(const sigset_t *mask);
+int sigfillset(sigset_t *set);
+int sigaddset(sigset_t *set, int signum);
+int sigemptyset(sigset_t *set);
+int sigdelset(sigset_t *set, int signo);
+}}}
+  1. sigprocmask : 이것은 현재 set으로 등록된 시그널의 블럭 정책을 변경하기 위해서 사용한다. 블럭정책에는 다음의 3가지가 있다. 블럭set에 추가되어 있다면, 시그널은 바로 전달되지 않고 handler가 끝날때까지 블럭된다.
+    1. SIG_BLOCK : set에 설정된 시그널셋을 기존 블럭set에 추가한다.
+    1. SIG_UNBLOCK : set에 설정된 시그널 셋을 기존 블럭set에서 뺀다.
+    1. SIG_SETMASK : set의 시그널셋을 블럭set 정책으로 한다.
+  1. sigpending : 시그널이 블록된 상태에서 어떤 시그널이 발생해서 블록되었는지를 알 수 있다. 
+  1. sigismember : signum이 시그널 set에 포함되어 있는지 확인한다. sigpending와 함께 사용하면, 어떤 시그널에 대해서 블록되었는지를 알고 이에 대한 처리를 할 수 있다. 
+    {{{#!plain
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+
+int main(int argc, char **argv)
+{
+  sigset_t sigset;
+  sigset_t pendingset;
+  int i = 0;
+
+  // 모든 시그널에 대해서 BLOCK 한다.
+  sigfillset(&sigset);
+  sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+  printf("My PID  %d\n", getpid());
+  while(1)
+  {
+    printf("%d\n", i);
+    i++;
+    sleep(1);
+    // BLOCK된 시그널이 있다면
+    if (sigpending(&pendingset) == 0)
+    {
+      // 그리고 BLOCK된 시그널이 SIGUSR1 이라면
+      // 루프를 빠져나간다.
+      if (sigismember(&pendingset, SIGUSR1))
+      {
+        printf("BLOCKED Signal : SIGUSR1\n");
+        break;
+      }
+    }
+  }
+  return 0;
+}
+}}}
+  1. sigfillset : 모든 시그널셋의 bit flag를 on으로 한다. 예를들어 모든 시그널에 대해서 SIG_BLOCK를 적용하길 원한다면, 아래와 같이 하면 된다.  
+    {{{#!plain
+sigset_t sigset, oldset;
+sigfillset(&sigset);
+sigprocmask(SIG_BLOCK, &sigset, &oldset);
+}}}
+  1. sigaddset : signum 번호를 가지는 시그널을 '''set'''에 추가한다. 
+  1. sigemptyset : '''set'''을 모두 비운다.
+  1. sigdelset : signum 번호를 가지는 시그널을 '''set'''에서 지운다.
+
+그럼 간단한 프로그램을 하나 만들어보도록 하겠다. 
+{{{#!plain linenum
+#include <signal.h> 
+#include <unistd.h> 
+#include <string.h> 
+#include <stdio.h> 
+
+void sig_int(int signo);
+void sig_usr(int signo);
+
+int main()
+{
+    int i = 0;
+    struct sigaction intsig, usrsig;
+
+    printf("PID : %d\n", getpid());
+    // SIGUSR2 시그널의 처리 ----------
+    usrsig.sa_handler = sig_usr;  // 시그널 핸들러 등록
+    sigemptyset(&usrsig.sa_mask); // 시그널 마스크 초기화
+    usrsig.sa_flags = 0;
+    if (sigaction(SIGUSR2, &usrsig, 0) == -1)
+    {
+        printf ("signal(SIGUSR2) error");
+        return -1;
+    }    
+    // ---------------------------------
+
+    // SIGINT (CTRL+C) 시그널의 처리 ---
+    intsig.sa_handler = sig_int;
+    sigemptyset(&intsig.sa_mask);
+    intsig.sa_flags = 0;
+    if (sigaction(SIGINT, &intsig, 0) == -1)
+    {
+        printf ("signal(SIGINT) error");
+        return -1;
+    }    
+    // ---------------------------------
+
+    while(1)
+    {
+        printf("%d\n", i);
+        i++;
+        sleep(1);
+    }
+}
+
+void sig_int(int signo)
+{
+    sigset_t sigset, oldset;
+    sigemptyset(&oldset);
+
+    // SIGUSR2와 SIGUSR1은 블럭된다.
+    // 이들 시그널은 핸들러가 종료되면 전달된다.
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGUSR2);
+    sigaddset(&sigset, SIGUSR1);
+    if (sigprocmask(SIG_BLOCK, &sigset, &oldset) < 0)
+    {
+        printf("sigprocmask %d error \n", signo);
+    }
+
+    // SIGINT 를 UNBLOCK 한다.
+    // 핸들러가 수행중이더라도 즉시 전달된다.
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGINT);
+    if (sigprocmask(SIG_UNBLOCK, &sigset, &oldset) < 0)
+    {
+        printf("sigprocmask %d error \n", signo);
+    }
+
+    printf("sig_int\n");
+    sleep(5);
+}
+
+void sig_usr(int signo)
+{
+    printf("sig_usr2\n");
+}
+}}}
+ * 50~58 :  SIGUSR1과 SIGUSR2 시그널을 블럭시켰다. 핸들러가 수행되는 5초동안 이들 시그널이 도착하면, 시그널은 BLOCK이 된다. 그러다가 시그널핸들러가 종료하면, 전달이 된다. 
+ * 60 ~68 : SIGINT를 UNBLOCK로 했다. 시그널핸들러가 수행되는 동안 동일한 시그널이 발생하게 되면, 시그널은 BLOCK이 된다. SIGINT에 대해서 UNBLOCK를 했으므로 SIGINT가 도착하게 되면, 곧바로 시그널이 전달되고 sig_int 시그널핸들러가 수행이 된다. 이 코드를 주석처리 한다음에 SIGINT를 여러번 발생시켜보기 바란다.  
+
+=== 마치며 ===
+이상 간단하게 시그널에 대해서 알아보았다. 시그널의 활용과 관련된 내용은 thread(:12)를 설명하는 장을 비롯한 다른 몇몇 장에서, 다루게 될 것이다.
+
+[[ShowComment(405)]]

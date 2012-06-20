@@ -1,0 +1,724 @@
+ [[TableOfContents]]
+
+== 공지 사항 ==
+ 1. JOINC 기사로 옮김 : [http://www.joinc.co.kr/modules.php?name=News&file=article&sid=150 assembly 하우투] 2003/11/26
+ 1. 참조 URL추가 2003/11/27 - yundream
+ 1. 관련 위키 [Linux_asm] 
+
+== Docbok 원문 ==
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>assembly 기초다지기</title>
+
+	<author>
+		<surname>윤상배</surname>
+
+		<affiliation>
+			<address>
+				<email>dreamyun@joinc.co.kr</email>
+			</address>
+		</affiliation>
+	</author>
+	<revhistory>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2003년 11월 26일 23시</date>
+			<revremark>최초 문서작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+<section>
+	<title>시작하기 전에</title>
+	<section>
+		<title>스터디를 시작하게된 이유</title>
+		<para>
+			유닉스 환경에서 C와 C++을 주로해서 시스템/네트워크 프로그래밍을 
+			하다보니 어찌어찌 하다가 커널모듈 프로그래밍과 같은 매우 낮은 
+			수준에서 프로그래밍을 해야될 필요성을 느끼게되었다. 또한 
+			굳이 그러하지 않더라도 유닉스의 시스템환경을 제대로 이해하고 이를 
+			통해서 효과적이고 효율적인 프로그래밍을 하기 위해서는 결국 어셈블리어를 
+			해야 한다는 결론에 도달했다.    
+
+			예를 들어 쓰레드 프로그래밍을 위해서 보통 Pthread를 사용하는데, 
+			대부분의 경우 충분한 성능을 보여준다. 그러나 가끔 Pthread를 이용한 
+			쓰레드 생성이 너무 무겁다고 느껴지는 그러한 경우도 발생한다. 이럴경우 좀더 
+			가벼운 쓰레드를 직접 구현해야 하는데, 어셈블리어의 활용없이는 
+			거의 불가능하다는 결론에 도달한다. 
+			특히 리눅스의 경우 clone()와 세마포어를 이용해서 쓰레드를 생성하는데, 
+			매우 많은 비용이 드는 작업이다. 이럴경우 어셈블리를 이용할 수 있을 것이다. 
+			커널관련 프로그램을 작성하는데 있어서는 물론 많은 도움을 얻을 수 있을 것이다. 
+
+			결론적으로 특수한 상황에 대처할 수 있는 프로그래밍 능력을 키우려면 어셈블리어가 
+			필수라는 결론에 도착하게 되었다. 만약 필자가 시스템/네트워크 프로그래머가 
+			아닌 좀더 높은 수준의 응용 프로그래머였더라면 이런 필요성을 
+			느끼지 못했을 것이다(혹은 아직까지는).  
+		</para>
+	</section>
+</section>
+
+<section>
+	<title>소개</title>
+	<section>
+		<title>숫자 시스템(Number System)</title>
+		<para>
+			컴퓨터는 모든 정보를 숫자로 다룬다. 이 때 컴퓨터 메모리는 이러한 
+			숫자를 10진수 형태로 저장하지 않는다. 하드웨어는 가능하면 
+			단순해야 하는데 10진수는 인간에게는 친숙하겠지만 하드웨어로 
+			이를 다루기는 너무 복잡한 면이 있다. 그래서 2진수 형태로 다루게 된다.  
+
+			10개의 스위치를 가진 하드웨어와 2개의 스위치를 가진 하드웨어 어느쪽이 
+			더 설계가 쉬울지를 생각해 보면 될것이다.  
+		</para>
+		<section>
+			<title>10진수</title>
+			<para>
+				인간에게 매우 친숙한 진수로써 0-9까지의 10개의 숫자의 조합으로 
+				이루어진다. 각 자리의 값은 자릿수 곱하기 10의 자승으로 
+				계산될 수 있다. 예를 들어 234는 다음과 같이 계산할 수 있다.  
+				<screen>
+234 = 2x(10^2) + 3x(10^1) + 4x(10^0)
+				</screen>
+			</para>
+		</section>
+		<section>
+			<title>2진수</title>
+			<para>
+				binary라고 하며 0과 1 2개의 숫자만 사용된다. 
+				각 자리의 값은 자릿수 곱하기 2의 자숭으로 계산된다. 
+				다음의 예를 참고하기 바란다.   
+				<screen>
+11001 = 1x(2^4) + 1x(2^3) + 0x(2^2) + 0x(2^1) + 1x(2^0) 
+      = 16 + 8 + 1
+      = 25
+				</screen>
+				위의 예는 2진수로 표현된 값을 10진수로 변환하는 
+				과정을 보여주고 있다. 위의 예제에서 2진수 값이 어떻게 
+				계산되어지는지를 알 수 있다. 
+				다음은 0에서 15까지의 10진수를 2진수로 변환한 결과이다. 
+				<table>
+					<title>10진수에서 2진수로의 변환</title>	
+					<tgroup cols=4>
+					<tbody>
+						<row>
+							<entry>10진수</entry>
+							<entry>2진수</entry>
+							<entry>10진수</entry>
+							<entry>2진수</entry>
+						</row>
+						<row>
+							<entry>0</entry>
+							<entry>0000</entry>
+							<entry>8</entry>
+							<entry>1000</entry>
+						</row>
+						<row>
+							<entry>1</entry>
+							<entry>0001</entry>
+							<entry>9</entry>
+							<entry>1001</entry>
+						</row>
+						<row>
+							<entry>2</entry>
+							<entry>0010</entry>
+							<entry>10</entry>
+							<entry>1010</entry>
+						</row>
+						<row>
+							<entry>3</entry>
+							<entry>0011</entry>
+							<entry>11</entry>
+							<entry>1011</entry>
+						</row>
+						<row>
+							<entry>4</entry>
+							<entry>0100</entry>
+							<entry>12</entry>
+							<entry>1100</entry>
+						</row>
+						<row>
+							<entry>5</entry>
+							<entry>0101</entry>
+							<entry>13</entry>
+							<entry>1101</entry>
+						</row>
+						<row>
+							<entry>6</entry>
+							<entry>0110</entry>
+							<entry>14</entry>
+							<entry>1110</entry>
+						</row>
+						<row>
+							<entry>7</entry>
+							<entry>0111</entry>
+							<entry>15</entry>
+							<entry>1111</entry>
+						</row>
+					</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</section>
+		<section>
+			<title>16진수(Hexdecimal)</title>
+			<para>
+				16진수는 0-9A-F 의 10개의 숫자와 6개의 영문으로 값을 나타내며, 
+				2진수를 간단하게 표현하기 위해서 사용한다. 솔직히 십진수 
+				15를 1111로 나타내는건 너무 길기도 하고 복잡하기도 하다. 
+				16진수로 표현하면 간단하게 F로 표현가능하다. A는 10을 
+				B는 11을 나타내는 식으로 16까지 표현한다. 
+				다음은 16진수를 나타내는 방법에 대한 예이다.
+				<screen>
+2BD = 2x(16^2) + 11x(16^1) + 13x(16^0)
+    = 512 + 176 + 13
+    = 701
+				</screen>
+			</para>
+			<para>
+				위의 예를 보면 16진수의 값이 어떻게 계산되며 어떻게 10진수로 
+				변환할 수 있는지 알수 있을 것이다. 위에서 16진수는 2진수를 
+				간단하게 표현할 수 있는 용도로 사용된다고 설명했다. 
+				2BD를 2진수로 변경해 보면 1010111101인데 일단 길이가 길뿐만 아니라 
+				이것을 다른 10진수등으로 변경하기 위해서는 여러번의 계산과정을 
+				거쳐야 한다. 16진수는 단 3개의 숫자와 문자로 나타낼 수 있으며 
+				2진수에서 16진수로도 쉽게 변환  가능하다. 
+				16진수는 (2^4)의 크기를 가지므로 변경하고자 하는 2진수를 4자리씩 
+				나누어서 변경하면 된다.  예를 들어 110000001011010011111110이라는 	
+				2진수가 있다면 다음과 같은 방법으로 쉽게 변경가능하다.
+				<figure>
+					<title>2진수의 16진수로의 표현</title>
+					<graphic fileref=http://www.joinc.co.kr/albums/album01/aff.gif>
+				</figure>
+				위의 그림을 보면 2진수값을 4bit씩 나누어서 표기하고 있는데, 
+				이들 4bit의 숫자들을 nibble라고 부른다. 각각의 nibble은 하나의 
+				16진수 값으로 변경된다. nibble이 2개 모이면 byte가되며 2-digit 
+				16진수가 된다. byte는 2진수로 0에서 11111111 까지이며, 
+				16진수로는 0에서 FF, 10진수로는 0에서 255의 값을 가진다. 
+			</para>
+		</section>
+	</section>
+</section>
+
+<section>
+	<title>컴퓨터 구조</title>
+	<section>
+		<title>메모리(Memory)</title>
+		<para>
+			메모리는 데이터가 저장되는 영역으로 byte를 기본 저장단위로 한다. 
+			32메가 바이트의 메모리를 가지고 있는 컴퓨터는 32백만 바이트의 
+			정보를 저장할 수 있다. 저장된 정보는 필요할 때 꺼내올 수 있어야 
+			하므로 메모리는 각각의 바이트 마다 유일한 주소값을 가지고 있다. 
+			이러한 주소는 다음과 같이 메겨진다.  
+			<figure>
+				<title>메모리에 데이터 저장방식</title>
+				<graphic fileref=http://www.joinc.co.kr/albums/album01/afl.gif>
+			</figure>
+			메모리의 기본유닛은 byte인데, byte만으로 메모리단위를 나타내기는 
+			부족한 감이 있다. 그런 이유로 아래와 같이 byte를 더 
+			큰단위로 묶어서 사용하고 있다. 
+			<table>
+				<title>byte 묶음 단위</title>	
+				<tgroup cols=2>
+				<tbody>
+					<row>
+						<entry>word</entry>
+						<entry>2 bytes</entry>
+					</row>
+					<row>
+						<entry>double word</entry>
+						<entry>4 bytes</entry>
+					</row>
+					<row>
+						<entry>quad word</entry>
+						<entry>8 bytes</entry>
+					</row>
+					<row>
+						<entry>paragraph word</entry>
+						<entry>16 bytes</entry>
+					</row>
+				</tbody>
+				</tgroup>
+			</table>
+		</para>
+		<para>
+			메모리에 저장된 모든 데이터는 숫자다. 문자의 저장은 문자코드와 
+			매핑되는 숫자를 이용해서 이루어진다. 가장 일반적으로 사용되는 
+			문자코드는 ASCII(American Standard Code for Information Interchange)다. 
+			ASCII코드는 표현할 수 있는 문자의 종류가 제한되므로 최근에는 
+			Unicode가 사용되어지고 있다. ASCII코드로 표시할 수 있는 문자의 종류가 
+			제한되는 이유는 하나의 바이트가 하나의 문자에 대응되기 때문으로 영어와 같은 
+			문자라면 1바이트로 표현가능하지만 한글, 한문, 일어와 같은 경우 표현가능하지 
+			않기 때문이다. 유니코드는 하나의 캐릭터를 나타내기 위해서 2바이트(워드)를 
+			사용하기 때문에 이들 문자역시 표현가능하다.      
+		</para>
+	</section>
+	<section>
+		<title>CPU</title>
+		<para>
+			중앙 연산 장치(Central Processing Unit)인 CPU는 연산(명령)을 하는 
+			물리적인 장치다. CPU에서 수행하는 이러한 명령들은 보통 매우 
+			단순하다 - 만약 CPU에서 복잡한 명령들을 수행해야 한다면 CPU제작에 
+			엄청난 비용이 소모될 것이다 -. 이러한 명령을 수행하기 위해서는 
+			데이터를 필요로 하는데 CPU는 이러한 데이터를 register이라고 하는 특별한 
+			저장공간에 데이터를 넣어두고 연산을 수행한다. CPU에서 사용하는 register는 
+			일반 데이터가 저장되는 memory보다 더 빠르게 접근할 수 있다. 
+		</para>
+		<para>
+			CPU의 명령 수행은 CPU에 의존적인 기계어(machine language)에 
+			의해서 이루어진다. 기계어는 (C, pascal 과 같은)고급 언어에 
+			비해서 매우 단순한 구조를 가지고 있다. 그러나 단순한 구조를 
+			가지고 있다고 해서 쉽게 사용할 수 있을거라고 생각하지는 마라. 
+			기계어는 인간이 쉽게 인지할 수 있는 텍스트 포맷이 아닌 숫자로 
+			이루어져 있기 때문이다. 이들 기계어는 CPU에서 매우 빨리 해석하고 
+			수행할 수 있으므로 최적의 성능을 보여주긴 하겠지만 인간이 이용하기 
+			쉽지 않다는 단점이 있다. 게다가 이들 기계어는 CPU에 의존적이여서 
+			다른 CPU를 사용한다면 기계어 역시 달라진다. 
+		</para>
+		<para>
+			컴퓨터는 CPU를 이용한 명령의 수행의 동기화를 위해서 clock를 이용한다. 
+			clock의 진동(pulse)는 클럭속도(clock speed)라고 불리는 고정된 값을 가진다. 
+			당신의 컴퓨터가 1.5GHz 컴퓨터를 샀다면, 이 컴퓨터는 1.5GHz의 클럭속도를 가진다는 뜻이다. 
+		</para>
+		<section>
+			<title>80x86 CPU</title>
+			<para>
+				IBM형식 PC들은 Intel의 80x86 CPU군을 포함한다. 이 CPU들은 명령을 
+				수행하기 위해서 모두 동일한 기계어를 사용한다. 또한 가장 많이 사용되고 
+				접하기도 쉬운 CPU들 이기도 하다. 80x86 CPU군에는 다음과 같은 CPU들을 포함하고 있다. 
+				<screen>
+8088,8086,80286,80386,80486/Pentium/Pentium Pro/Pemtium MMX/Pentium II
+				</screen>
+				뒤로 갈수록 최근에 개발된 CPU이다.   
+			</para>
+		</section>
+		<section>
+			<title>8086 16-bit Registers</title>
+			<para>
+				일반 8086 CPU는 AX, BX, CX, DX 4개의 16bit register를 제공한다. 
+				이들 각각의 레지스터들은 2개의 8bit 레지스터로 다시 분리된다. 
+				예를들어 AX 레지스터의 경우 아래의 그림처럼 AH와 AL레지스터로 분리된다. 
+				<figure>
+					<title>16비트 AX레지스터</title>
+					<graphic fileref=http://www.joinc.co.kr/albums/album01/afm.gif>
+				</figure>
+			</para>
+			<para>
+				AH레지스터는 AX의 상위 8비트를 포함하고 AL레지스터는 AX의 하위 8비트를 
+				포함한다. 종종 AH와 AL은 1바이트 레지스터리에 종속되기도 한다. 
+				이들 레지스터는 데이터의 이동과 산수연산을 위해서 많이 사용된다.   
+			</para>
+			<para>
+				또한 SI와 DI 2개의 16비트 index 레지스터가 있다. 이들은 종종 포인터를 
+				위해서 사용되지만 위의 레지스터들과 마찬가지로 데이터 이동과 산수연산을 
+				위해서 사용되기도 한다. 그러나 8bit레지스터로 분리할 수는 없도록 되어 있다.  
+			</para>
+			<para>
+				2개의 16비트 BP, SP 레이스터가 있는데 이들은 기계어 스택(stack)에 있는 
+				데이터를 가리키기(pointer)위한 용도로 사용된다. 자세한 내용은 나중에 다루도록 하겠다.     
+			</para>
+			<para>
+				16비트 CS, DS, SS, ES 레지스터는 세그먼트(segment)레지스터이다. 
+				이 레지스터들은 프로그램의 각 부분에서 사용되는 데이터를 표시하기 위해서 
+				사용된다. CS는 Code세그먼트를 위해서, DS는 데이터 세그먼트, SS는 
+				스택세그먼트, ES는 확장(Extra)세그먼트를 표시하기 위해서 사용된다.     
+			</para>
+			<para>
+				IP(Instruction Pointer)레지스터는 CS레지스터와 함께 사용되는데, 
+				CPU에의해서 실행되는 다음 명령의 주소의 경로를 명시하기 위해서 사용된다. 
+				일반적으로 명령이 실행되면 IP는 메모리상의 다음에 실행될 명령을 가리킨다.  
+				FLAGS레지스터는 이전에 실행된 명령의 결과를 저장하기 위한 용도로 사용된다. 
+				이 결과는 레지스터에 단일 비트로 저장된다.
+			</para>
+		</section>
+		<section>
+			<title>80386 32-bit Registers</title>
+			<para>
+				80386과 이 이후의 CPU들은 확장된 레지스터를 가지고 있다. 
+				예를 들어 16비트 AX레지스터는 32비트로 확장 되었다. 
+				그러나 하위 호환성을 위해서 AX는 여전히 16비트 레지스터를 사용할 수 
+				있도록 되어 있다. AX를 예로 들어보자면 AX를 이용해서 16비트 레지스터를 
+				여전히 사용될수 있으며, EAX(Extended EX)를 이용해서  32비트 레지스터를 사용할수 있다. 
+				AX를 사용할 경우 EAX의 하위 16비트만을 사용한다. AX를 이용할 경우 
+				EAX의 상위 16비트를 사용할 수 없게 된다.   
+			</para>
+			<para>
+				세그먼트 레지스터는 80386에서도 여전히 16비트를 유지하고 있으며, 
+				FS와 GS 두개의 세그먼트 레지스터가 더 추가되었다.   
+			</para>
+		</section>
+		<section>
+			<title>Real Mode</title>
+			<para>
+				리얼 모드에서 메모리는 1메가 바이트(2^20 바이트)로 크기가 한정된다. 
+				주소영역으로 나타내자면 0000에서 FFFFF까지가 된다. 이들 어드레스는 
+				20bit의 공간을 필요로한다. 8086의 16비트 레지스터에는 20비트 정보를 
+				집어 넣을수 없다. 이러한 문제의 해결을 위해서 인텔은 주소를 나타내기 
+				위해서 2개의 16비트를 이용하는 방법을 사용했다. 첫번째 16비트에 저장된 
+				값은 selector이라고 부른다. selector값은 세그먼트 레지스터에 저장된다. 
+				두번째 16비트에 저장된 값은 offset이라고 부르며, 물리적 주소를 참조하기 위한 
+				목적으로 사용된다. 다음은 2개의 16비트 값인 selector와 offset을 이용해서 주소를 
+				계산하내기 위한 공식이다.  
+				<screen>
+16 * selector + offset
+				</screen>
+				에를 들어서 047C:0048의 물리적 주소를 참조해야할 경우 다음과 같은 
+				간단한 계산을 통해서 위치를 찾을 수 있다. 
+				<screen>
+    047C0
+    +0048
+   ------
+    04808
+				</screen>
+			</para>	
+			<para>	
+				Real 세그먼트 주소는 다음과 같은 단점을 가진다. 
+				<itemizedlist>
+				<listitem>
+					<para>
+ 						단일 selector 값은 단지 64K메모리만을 참조할 수 있다. 
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						메모리에 있는 각 바이트들은 유일한 세그먼트 주소를 가질수 없다. 
+						계산방식의 문제 때문인데 예를 들어 04808의 물리적 주소의 참조는 
+						047C:0048, 047D:0038, 047E::0028등 여러가지 계산에 
+						의해서 참조가능해 진다. 이것은 세그먼트 주소의 비교를 위해서 
+						복잡한 계산이 필요하게 만든다. 
+					</para>
+				</listitem>
+				</itemizedlist>
+			</para>
+		</section>
+		<section>
+			<title>16-bit Protected Mode</title>
+			<para>
+				80286의 16비트 보호 모드(protected Mode)에서 selector 값은 
+				real mode에서와는 다른 방법으로 게산된다. 리얼 모드에서 
+				selector값은 물리적 메모리의 paragraph값이다. 보호모드에서 selector값은 
+				descriptor table의 index가 된다. 양쪽 모드 모두 프로그램은 
+				세그먼트를 분할해서 사용한다. 리얼모드 에서 이들 세그먼트는 물리적 메모리에서 
+				고정되며 selector값은 세그먼트의 시작지점으로 부터 paragraph수로 표시된다. 
+				보호모드에서 세그먼트는 물리적 메모리에서 고정된 위치에 있지 않는다. 
+			</para>
+			<para>
+				보호모드는 가상메모리(virtual memory)라는 기법을 이용한다. 
+				가상메모리의 기본적인 아이디어는 프로그램이 지금 이용하는 
+				데이터와 코드를 메모리에 두는 것이다. 다른 데이터와 코드는 
+				다시 사용될때 까지 디스크에 임시(temporarily)로 저장된다. 
+				when a segment is returned to memory from disk, it is very likely that 
+				is will be put into a different area of memory that it was in before being moved to disk. 
+			</para>
+			<para>
+				보호모드에서 각각의 세그먼트는 descriptor table에 할당된다. 
+				이 테이블은 시스템이 세그먼트를 다루기 위해서 필요한 모든 정보들을 
+				가지고 있다. 여기에는 만약 메모리에 있다면 메모리에서의 현재 위치와 
+				접근권한(읽기 전용과 같은)등의 정보가 포함된다. 테이블에 있는 세그먼트의 
+				인덱스는 selector 값으로 세그먼트 레지스터에 저장된다.
+			</para>
+			<para>
+				16비트 보호모드의 큰 단점은 offset할수 있는 크기가 16비트라는 
+				점이다. 이러한 이유로 여전히 세그먼트 크기는 64K로 제한된다.            
+			</para>
+		</section>
+		<section>
+			<title>32-bit Protected Mode</title>
+			<para>
+				83086은 32비트 보호모드를 제공한다. 386 32비트와 286 16비트 
+				보호모드에는 다음과 같은 2가지의 커다란 차이점을 가지고 있다. 
+				<orderedlist>
+				<listitem>
+					<para>
+						offset이 32비트로 확장되었다. 
+						그러므로 세그먼트는 4billion(4gigabyte)크기를 가질 수 있다. 
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						세그먼트는 page(페이지)라고 불리우는 4K보다 작은 크기로 나눌수 있다. 
+						가상 메모리 시스템은 세그먼트 대신 이 페이지를 이용하게 된다. 
+					</para>
+				</listitem>
+				</orderedlist>
+				Windows 9X, Windows NT/200/XP, OS/2와 리눅스는 32비트 보호모드에서 작동한다. 
+				보호모드에 대한 좀더 자세한 내용은 
+				<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/보호모드">보호모드</ulink>를 
+				참고하기 바란다. 
+			</para>
+		</section>
+		<section>
+			<title>Interrupts</title>
+			<para>
+				일반적으로 봤을 때 프로그램 자신의 맡은 일을 시작 부터 종료할 때까지 
+				중단 없이 끝내도록 하는게 매우 간단해 보이긴 하지만 이런 저런 이유로 
+				외부에서 "중단(Interrupts)"이 요청되게 된다. 예를 들자면 마우스의 
+				움직임이 있을 때 발생하는 것과 같은 인터럽트로 마우스 장치는 마우스가 
+				움직일 때 현재의 프로세스에 인터럽트를 발생시키게 된다. 
+				이렇게 인터럽트가 발생하게 되면 인터럽트 핸들러(''interrupt handler'')가 수행된다. 
+				인터럽트 핸들러는 프로그램을 중단시키는 루틴을 수행한다. 
+			</para>
+			<para>
+				인터럽트는 마우스와 같은 주변장치에서 발생하는 하드웨어 인터럽트와 
+				소프트웨어에서 인위적으로 발생시키는 소프트웨어 인터럽트가 있는데, 
+				합해서 256가지의 인터럽트를 가지게 되며, 각각의 인터럽트는 고유한 
+				번호를 가지게 된다. 인터럽트 핸들러는 인터럽트가 발생한 물리적인 메모리의 
+				위치를 기억하기 위한 세그먼트 어드레스를 포함하게 된다. 그래서 인터럽트 핸들러가 
+				끝난후 중단된 프로세스에서 다시 하던 일을 계속하도록 지시할 수 있다.    
+			</para>
+			<para>
+				이러한 인터럽트의 행동방식은 지극히 상식적이다. 일상생활에서 우리가 
+				업무중에 전화등으로 인한 인터럽트가 발생했을경우 전화요청을 다 처리한다음 
+				중단된 업무부터 다시 일을 시작해 나가는 것과 마찬가지다. 이럴 경우 내가 
+				어디까지 업무를 진행하다가 중단하고 전화를 받았는지를 기억하고 있어야 할것이다. 
+			</para>
+			<para>
+				하드웨어 인터럽트 들은 CPU외의 다른 장치들에서 발생한다. 
+				키보드, 디스크 드라이브, CD-ROM, 사운드 카드, 마우스와 같은 
+				장치들이 이에 포함된다. 내부 인터럽트는 CPU로 부터 발생하는 운영오류 등이 
+				포함된다.  이러한 인터럽트들은 트랩(traps)이라고 부르기도 한다. 
+			</para>
+			<para>
+				소프트웨어 인터럽트 들은 말그대로 프로그램에서 필요에 따라 발생시키는 
+				인터럽트 들로 고유의 API(Application Programming Interface)를 
+				이용해서 발생시킨다. 유닉스와 윈도우즈 같은 현대적인 대부분의 운영체제들은 
+				C로된 소프트웨어 인터럽트 인터페이스를 가진다.  
+			</para>
+		</section>
+	</section>
+	<section>
+		<title>Assembly 언어</title>
+		<section>
+			<title>기계어</title>
+			<para>
+				모든 CPU는 자신의 기계어만을 이해할수 있다. 기계어에서 명령은 메모리에 
+				저장된 일련의 숫자이며 각각의 명령은 operation code또는 (줄여서)opcode라고 
+				불리우는 유일한 번호를 가지고 수행된다. 
+			</para>
+			<para>
+				기계어로 프로그램을 만드는 것은 매우 어려운 작업이며 숫자로된 명령어 코드으 
+				뜻을 인간이 판독하기 위해서는 대단한 인내력을 요구한다. 
+				예를 들어서 EAX와 EBX 레지스터를 더해서 그 결과를 EXA에 저장하는 기계어 코드는 
+				다음과 같은 모습을 가진다. 
+				<screen>
+03C3  
+				</screen>
+				위의 코드는 알아보기 매우 힘들다. 그러나 다행히도 assembler라고 불리우는 언어를 
+				이용해서 프로그래머는 좀더 쉽게 프로그램을 작성할 수 있다. 
+			</para>
+		</section>
+		<section>
+			<title>Assembly 언어</title>
+			<para>
+				어셈블리언어로 된 프로그램은 (다른 고수준 언어들과 마찬가지로)문자로 
+				만들어지고 저장된다. 각각의 어셈블리 명령은 하나의 기계 명령으로 재해석된다. 
+				위의 EAX와 EBX를 더하는 코드는 어셈블리어로 다음과 같이 코딩할 수 있다.  
+				<screen>
+add eax, ebx
+				</screen>
+				언뜻 봐도 기계어보다 훨씬 이해하기 쉬울 것이다. 위에서 add를 
+				mnemomonic라고 부른다. 어셈블리어의 일반적인 형식은 다음과 같다.   
+				<screen>
+mnemonic operand(s)
+				</screen>
+				(assembler)어셈블러는 어셈블리 명령어들로 이루어진 텍스트파일을 기계어 
+				코드로 변경하는 일을 한다. 보통 고수준언어에서 사용하는 컴파일러와 매우 비슷하다. 
+				그러나 어셈블러는 이러한 컴파일러 보다는 훨씬더 간단하다. 
+				모든 어셈블리 언어는 기계 명령으로 일대일 해석이 가능하기 때문이다. 
+				알다 시피 고수준 언어에서 이런일을 하기 위해서는 많은 기계어 명령들을 필요로 한다.   
+			</para>	
+			<para>	
+				어셈블리와 고수준 언어와의 또다른 중요한 차이점은 어셈블리언어의 경우 
+				CPU의 종류에 따라서 매우 달라질 수 있다는 접이다. 다른 구조를 가지는 
+				컴퓨터간의 포팅작업은 고수준 언어에 비해서 매우어려운게 보통이다. 대개의 고수준 
+				언어들은 단지 컴파일러를 한번 돌려주는 정도로 코드의 수정없이 포팅이 가능하지만 
+				(예를 들어 인텔 리눅스에서 작성된 코드는 거의 수정없이 스팍 솔라리스로 
+				포팅이 가능하다) 어셈블리언어의 경우 많은 시간과 노력을 들여야 한다.  
+			</para>
+		</section>
+		<section>
+			<title>operands의 소개</title>
+			<para>
+				기계 코드 명령은 변수와 operand(이하 오퍼랜드)의 타입으로 구분되며, 
+				각각의 명령은 고정된 오퍼랜드의 숫자들(0에서 3)을 가지게 된다. 
+				오퍼랜드는 아래와 같은 타입들을 가진다.  
+				<orderedlist>
+				<listitem>
+					<para>
+						register : 이 오퍼랜드는 CPU의 레지스터를 직접 참조한다.   
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						memory : 메모리의 데이터를 참조한다. 
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						immediate : 이 고정된 값들은 명령그 자신의 목록이다. 
+						이것들은 데이터 세그먼트가 아닌 명령자체에 저장된다.   
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						implied : 이 오퍼랜드는 정확하게 명시되어 있지 않다.   
+					</para>
+				</listitem>
+				</orderedlist>
+			</para>
+		</section>
+		<section>
+			<title>어셈블리어의 기본문법에 대해서</title> 
+			<para>
+				어셈블리어의 경우 크게 Intel과 AT&amp;T의 두가지 계열의 문법이 있으며 서로 
+				호환되지 않는다. 그러므로 둘중 하나의 문법을 선택해야 한다. 
+				필자는 리눅스 계열에서 '''as'''를 이용해서 스터디를 할 생각인데 as는 
+				AT&amp;T문법을 따른다. 고로 앞으로 모든 설명과 예제는 AT&amp;T문법을 기준으로 
+				이루어질 것이다. AT&amp;T문법에 대한 내용은 다음 문서를 참고하기 바란다.  
+				<orderedlist>
+				<listitem>
+					<para>
+						<ulink url="http://www.gnu.org/manual/gas-2.9.1/as.html">linux assembly 메뉴얼</ulink> 
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						<ulink url="http://www.linuxassembly.org">리눅스 어셈블리 홈페이지</ulink>
+					</para>
+				</listitem>
+				</orderedlist>
+				Linux에서 <emphasis>as</emphasis>를 이용한 AT&amp;A문법을 이용한 어셈블리 
+				프로그래밍의 개론적인 내용은
+				<ulink url="http://www.joinc.co.kr/modules/moniwiki/wiki.php/Linux_asm">Linux_asm 위키</ulink>를 
+				통해서 꾸준히 다루어 나가도록 하겠다. 
+			</para>
+		</section>
+	</section>
+	<section>
+		<title>첫번째 예제 : hello world</title>
+		<para>
+			<screen>
+# File : hello.s
+# Code : sang bae Yun &lt;yundream@joinc.co.kr&gt;
+# Date : 2003/11/23
+
+.data
+msg:
+    .ascii "hello world\n"
+
+.text
+    .global _start
+
+_start:
+
+    movl $0,%edx    # 3번째 아규먼트에 0이 복사된다.
+    add  $12,%edx   # 3번째 아규먼트에 12가 복사된다.
+    movl $msg,%ecx  # 2번째 아규먼트에 "hello world"가 복사된다
+    movl $1,%ebx    # 첫번째 아규먼트에 1(stdout)이 복사된다.
+    movl $4,%eax    # sys_write 시스템콜 번호
+    int  $0x80      # 커널 호출 
+
+    movl $1, %ebx   # exit코드의 첫번째 아규먼트 즉 exit의 리턴값
+    movl $1, %eax   # sys_exit의 시스템콜 번호
+    int $0x80       # 커널 호출
+			</screen>
+				다음과 같은 방식으로 as를 이용해서 object를 만들고 ld를 이용해서 
+				링크시켜서 실행파일을 만들고 테스트 해볼 수 있다. 리눅스 시스템 콜에 대한 
+				내용은 
+				<ulink url="http://minzkn.codns.com:2745/screenshot/LSCT.html">리눅스 시스템 콜 테이블</ulink>을 
+				참고하기 바란다. 
+			<screen>
+# as -o hello.o hello.s 
+# ld -s -o hello hello.o
+			</screen>
+			크기를 확인해 본 결과 396바이트 였다. 동일한 일을 하는 C언어로 
+			컴파일된 실행파일의 크기가 11k인것에 비하면 엄청나게 
+			작다는걸 알 수 있다. 그래도 실행파일이 크다고 생각이 되면 다음과 같은 
+			방법으로 크기를 더 줄일 수도 있다.   
+			<screen>
+# strip --remove-section .comment --remove-section .bss hello 
+			</screen>
+			필자의 리눅스 박스에서 확인해 본결과 약 40byte정도가 줄어듦을 확인 했다.
+		</para>
+		<para>
+			위의 어셈블리 코드를 보면 아규먼트로 1을 주고 exit시스템 호출을 
+			했음을 알수 있다. 정말로 우리가 예상한대로 1을 리턴했는지 다음과 같이 간단히 확인해 보자. 
+			<screen>
+# ./hello
+# echo $? 
+1
+#
+			</screen>
+			그럼 1이 리턴 되었음을 확인할 수 있다. 참고로 <emphasis>$?</emphasis>는 bash쉘에서 
+			가장 최근에 실행 종료된 프로그램의 종료값을 출력하는 특수변수다. 
+			확인을 마쳤다면 1외의 다른 값을 주고 테스트 해보도록 하자. 
+		</para>
+		<para>
+			간단한 코드인데 지금 잘 이해가 가지 않는다고 해도 걱정할 건 없다. 다음번에는 AT&amp;A문법을 
+			기준으로 자세한 설명에 들어갈 것이기 때문이다.  
+		</para>
+	</section>
+</section>
+<section>
+	<title>관련 자료</title>
+	<para>
+		<orderedlist>
+		<listitem>
+			<para>
+				<ulink url="http://www.linuxassembly.org">리눅스 어셈블리 홈페이지</ulink>		
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://www.joinc.co.kr/modules.php?name=Downloads&amp;d_op=getit&amp;lid=24">어셈블리 하우투</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://asmlove.co.kr">어셈블리 사용자 모임</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://www.tldp.org/HOWTO/Assembly-HOWTO">리눅스 어셈블리 하우투</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://www.gnu.org/manual/gas-2.9.1/as.html">gnu as 메뉴얼</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://minzkn.codns.com:2745/moniwiki/wiki.php?clear">clear 예제 코드</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://minzkn.codns.com:2745/moniwiki/wiki.php?cpuclock">cpuclock 예제 코드</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://minzkn.codns.com:2745/screenshot/LSCT.html">리눅스 시스템 콜 테이블</ulink>
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<ulink url="http://www.linuxassembly.org/articles/linasm.html">Using Assembly Language in Linux</ulink>
+			</para>
+		</listitem>
+		</orderedlist>
+	</para>
+</section>
+</article>
+
+}}}
+
+== HTML 변환 문서 ==
+[[getnews(150)]]

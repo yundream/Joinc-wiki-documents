@@ -1,0 +1,94 @@
+#title 클라우드 인프라 아키텍쳐  
+
+[[TableOfContents]]
+== 클라우드 인프라 아키텍쳐 ==
+클라우드 인프라의 일반적인 구조를 기술해 보고자 한다. 다양한 구조가 있을 수 있겠으나 클라우드스택에서 묘사한 구조로 살펴보려고 한다. 즉 zone, pod, cluster 거기에 region까지 더해서 클라우드 인프라에 대해서 살펴본다. 
+
+== region, zone, pod, cluster ==
+=== zone, pod, cluster ===
+zone은 데이터 센터 개념, pod는 rack을 의미한다. cluster은 storage를 공유하는 단위로 하이퍼바이저에 따라서 cluster 구성이 달라질 수 있다. 하나의 zone은 하나 이상의 pod로 구성되며, 하나의 pod는 하나 이상의 cluster로 구성할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Tvz_UVbjVXuHOhp74OjM5EuDc8LYvW1Jv5AlvJ5qbdA&amp;w=613&amp;h=589">
+}}}
+
+굳이 하나의 pod를 하나 이상의 cluster로 구성하는 이유는 하이퍼바이저의 특성에 따라서 효율적인 구성이 달라질 수 있기 때문이다. 예를 들어 xenserver(:12)의 경우 '''xen pool'''을 구성하고, pool에 있는 노드 들 중 하나의 노드가 master가 되어서 pool을 관리하게 된다. master가 관리하는 pool크기에 따라서 운영 안정성이나 효율들이 결정될 수 있는데, 일반적으로 하나의 master가 8대의 node를 관리하는게 효율적이라고 보고되고 있다. 그래서 만약 하나의 pod가 16개의 node로 구성돼 있다면, 하나의 클러스터로 하지 않고 8개씩의 node를 관리하는 두개의 클러스터로 구성한다.   
+
+=== region, availability zone ===
+region은 물리적인 지역을 의미한다. 하나의 region은 여러 개의 zone을 가질 수 있다. 이들 zone은 하나하나가 독립적인 데이터센터로서의 역할을 하지만 같은 지역에 있기 때문에, 리소스 공유가 가능하다. 예를 들어서 zone A와 zone B로 이루어진 '''seoul region'''이 있다면, seoul region에 포함된 Account A는 zone A와 zone B 모두에 virtual machine을 만들 수 있다. 혹은 zone A의 VM을 zone B로 migration 할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1L6xQakR4tmyxHEKwLdmMd_f4VRIGZgxQ4rWwjHgzmsY&amp;w=609&amp;h=319">
+}}}
+
+zone을 하나의 데이터 센터라고는 하지만 보통은 물리적으로 같은 지역에 있으며, 두 zone의 네트워크를 묶을 수 있다. 클라우드 인프라를 region까지 확장하면, region을 데이터 센터로 zone은 데이터 센터의 각 층이라고 구분하면 될 것 같다. 
+
+Region은 AWS에서 사용하는 개념으로, 여기에서 '''availability zone'''이라는 개념이 나온다. zone은 하나의 aggregation switch 밑에 위치하는데, 이 aggregation network에 문제가 생기면 zone에 있는 모든 서비스가 중단 될 것이다. 유저가 zone A와 zone B에 VM을 나눠서 배치하면 가용성을 높일 수 있을 것이다.  
+
+Region은 다른 Region과 독립적으로 작동한다. 네트워크, VM 모든 것이 독립된다. 예를들어 '''Seoul region'''과 '''kwang-ju region'''이 완전히 독립된다. 지리적으로 멀리 떨어져 있기 때문에, 하나의 네트워크로 연결해서 관리하기가 힘들다. 그래서 Region간의 VM 마이그레이션이나, Account 자원 공유등은 지원하지 않는다.
+
+== POD의 물리적 구성 ==
+cloud 인프라는 '''물리적인 요소'''와 물리적인 요소들을 연결하기 위한 '''네트워크적인 요소'''로 구성된다. 여기에서는 POD의 물리적 구성을 살펴본다. zone과 region은 논리적인 구성요소로 네트워크 관점에서 바라보는게 일반적이믈 여기에서는 다루지 않는다.  
+
+=== cnode - computing node ===
+클라우드는 스토리지와 cpu, 메모리를 통합하고 유저에게 필요한 만큼 (rent)대여하는 서비스라고 볼 수 있다. cnode는 cpu와 메모리를 제공하는 단위 요소다. 하이퍼바이저가 올라가는 일반적인 서버 컴퓨터라고 보면 된다. cnode의 cpu core와 메모리 크기가 곧 POD에서 제공하는 cpu core와 메모리 크기가 된다. 6 core x 2 와 64Gbyte cnode 16개로 구성된 POD는 마치 384 core와 1024 G byte 메모리를 가지는 단일 컴퓨터 처럼 작동한다.
+  * 2 개의 cpu 슬롯에 하이퍼 스레딩을 지원하는 6 core cpu가 장착될 경우 : (6 x 2 x 2) x 16 = 354
+
+cnode의 core 개수와 메모리 크기를 어느 정도로 할지에 대해서는 고민이 필요하다. 웹 서비스를 주로 할 경우 1 core에 1G 정도일테니, core와 메모리를 1:1로 가져가면 될 것이다. 6 core x 2, 32G로 구성된 POD는 약 350개 정도의 VM을 만들 수 있을 것이다. 
+
+=== snode - storage node ===
+cnode가 cpu와 메모리를 제공한다면, snode는 볼륨을 제공한다. 커널을 포함하는 Root disk를 로컬디스크에 보관하지 않고 원격 디스크에 보관하는데, 이 원격 디스크를 관리하는 노드가 snode다. 
+
+snode는 두 가지 타입이 있다. Root volume과 Data volume을 제공하는 primary storage와 template와 snapshot을 저장하는 secondary storage다. 예컨데 Primary storage는 파일 스토리지고, Secondary storage는 오브젝트 스토리지다. 
+
+==== primary storage ====
+Root volue과 Data volume을 제공하는 snode로 일반적으로 iscsi(:12)를 이용해서 cnode에 볼륨을 서비스 한다. JBOD와 같은 disk array 장치를 이용해서 디스크를 집중해서 관리한다. 파일 시스템은 software raid와 LVM으로 구성을 한다. Throughput이 중요하다.
+
+=== TOR ===
+'''Top Of Rack'''의 줄임말이다. 말그대로 Rack 윗부분에 추가되는 node다. POD를 관리하기 위한 소프트웨어가 설치된다. 모니터링을 위한 툴들이 그것인데, 가장 중요한 용도는 DHCP서비스일 것이다. dhcp를 이용해서 POD에 cnode 설치를 자동화 할 수 있기 때문이다. 각각의 POD는 서로 다른 subnet을 가지는게 보통이므로, POD network안에 dhcp 서버를 둬야한다.
+
+TOR 서비스를 두는 것은 단순하긴 하지만, 별도의 비용이 소모된다는 단점이 있다. pod에 dhcp를 서비스하는게 목적이라면 dhcp relay를 이용하는 방법을 생각해 볼 수도 있다.
+
+==== secondary storage ====
+Template와 Snapshot같은 정적인 데이터를 저장하는 스토리지다. NFS 혹은 iSCSI로 저장공간을 마운트 해서 사용한다. 요즘에는 swift같은 분산 파일 시스템이 주목받고 있다. 
+
+== Network, network ==
+다음은 일반적인 POD 네트워크 구성이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1g0TLkwDd-h494C5pJm82LbjHT20G3l7rCa544L5xu6M&amp;w=414&amp;h=528">
+}}}
+ 1. Storage network : cnode에 볼륨을 제공하기 위한 네트워크  
+ 1. Mgmt network : cloud infra를 관리하기 위한 네트워크 
+ 1. Public network : 게스트 VM이 인터넷으로 나가기 위한 네트워크 
+
+=== Mgmt network ===
+Cloud 인프라를 관리하기 위한 트래픽이 흐르는 네트워크다. 클라우드스택과 같은 클라우드 관리 소프트웨어, 자동화 소프트웨어, 모니터링 소프트웨어등의 트래픽이 흐른다. 이 외에 운영체제 설치를 자동화 하기 위한 tftp(:12) 서버, yum repository, kickstart(:12) 서버, dhcp 서버등이 사용한다. 
+
+이들 클라우드 관리 소프트웨어들은 mnode에 따로 집중해서 관리한다. mnode에 있는 snode는 클라우드스택의 secondary storage로 template와 snapshot을 저장한다. 
+
+여기에서 신경써야 할 것은 pod 자동화를 위한 dhcp 서버의 운용이다. pod 관리를 위한 Mgmt가 10.50.0.0/16을 사용한다면, 각 pod는 24bit subnet을 사용하는 식으로 구성할 것이다. 이경우 dhcp는 각 pod마다 있어야 하는데, 그럴려면 pod 네트워크 관리를 위한 별도의 node가 있어야 한다. 이 node에 dhcp 서버외에 pod 모니터링 소프트웨어 등을 둘 수는 있겠지만 낭비라는 생각이 든다. dhcp relay를 고려해 보면 어떨까 싶다. 
+
+=== storage network === 
+각 pod 마다 primary storage를 둘 것인가에 대해서는 고민이 필요할 것 같다. 아래와 같이 EBS style의 storage를 둘 수도 있겠다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1O9c4qR2eyLhiGl9hUiR2vk83X4ACO56oaHejHLyWxds&amp;w=549&amp;h=382">
+}}}
+
+pod마다 두는게 좋은 건지 아니면 중앙에 storage를 두는게 좋은지 아직은 잘 모르겠다. 중앙에 두면 같은 subnet에 storage를 둘 수 있으니, volume 관리에는 분명 도움이 될거 같다. 예컨데, pod 단위로 storage를 두면 storage 공간을 낭비하는 pod가 있을 테다. 반대로 공간이 부족한 pod도 있을 텐데, 관리하기가 매우 까다로워진다. storage를 효율적으로 관리하려면, storage도 cloud 구조에 맞게 구성해야할 필요가 있다.   
+
+중앙에 volume을 집중하기 때문에, 다양한 크기의 볼륨 서비스도 가능하다. 예컨데 1G 부터 1T까지의 유연한 볼륨 서비스를 할 수 있다.  
+
+효율적인 EBS의 구성에 대해서는 따로 고민을 해야 할 것 같다.
+
+=== guest network ===
+게스트 vm은 이 네트워크를 통해서 public network로 나간다. 
+
+16개의 cnode로 구성된 pod이라면 guest network는 1G정도로 하면 충분할 것이다. 10G로 하면 성능이 올라 갈 것 같지만 aggregation switch가 처리하지도 못할 뿐더러 30G 백본망을 가지고 있다고 하더라도 전혀 현실성 없는 고비용 구성이다. 1G로 하고 outlink port만 10G로 해도 충분하다고 생각한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1p1N0J_rWdE8OFi1yB-dNV88vgfdk5FztYIVhMHJsmq0&amp;w=558&amp;h=341">
+}}}
+
+[[Tag(cloud,cloudstack)]]

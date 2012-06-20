@@ -1,0 +1,51 @@
+#title linux man page : mq_receive - 메시지 큐로부터 메시지를 받는다.
+
+== mq_receive ==
+=== 사용 법 ===
+{{{#!plain
+ssize_t mq_receive(mqd_t mqdes, char *msg_ptr,
+                   size_t msg_len, unsigned *msg_prio);
+
+#define _XOPEN_SOURCE 600
+#include <time.h>
+#include <mqueue.h>
+
+ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr,
+                   size_t msg_len, unsigned *msg_prio,
+                   const struct timespec *abs_timeout);
+
+-lrt를 링크해야 한다.
+}}}
+
+=== 설명 ===
+mq_receive함수는 mqdes가 가리키는 메시지 큐로 부터 가장 높은 우선순위를 가지는 메시지를 가져오고 메시지의 우선순위를 msg_prio에 복사한다. 만약 msg_prio가 NULL이면 무시한다. msg_ptr은 이 메시지를 가리킨다. msg_len은 msg_ptr이 가리키는 영역에서 읽어올 데이터의 크기로 __mg_msgsize__보다 커야 한다. 
+
+만약 큐가 비어있다면 mq_receive는 읽을 메시지가 있을 때까지, 혹은 시그널(:12)에 의해 인터럽트가 걸릴 때까지 봉쇄된다. 만약 메시지 큐 지시자가 '''O_NONBLOCK''' 플래그 상태라면, 즉시 실패하고 '''EAGAIN'''을 반환한다. 
+
+'''mq_timedreceive'''함수는 큐가 비어있고 '''O_NONBLOCK'''상태가 아닌 경우, 즉 봉쇄 모드일 경우 timeout 시간만큼 기다린후 반환한다는 점을 제외하고 mq_timedreceive함수와 동일하다. 기다리는 시간은 1970년 1월 1일 00:00:00부터를 기준으로 계산한다. 시간은 timespec 구조체로 지정한다.  
+{{{#!plain
+struct timespec
+{
+	time_t tv_sec;  /* 초 */
+	long tv_nsec;   /* 나노 초 */
+}
+}}}
+
+=== 반환 값 ===
+성공하면, mq_receive 와 mq_timedreceive 함수는 읽은 메시지의 바이트 크기를 반환한다. 에러가 발생하면 -1을 반환한다.  
+
+=== 에러 ===
+  EAGAIN
+    O_NOMBLOCK 플래그가 설정된 상태에서, 큐가 비어있다. 
+  EBADF 
+    메시지 큐 지정자인 mqdes가 잘못되었다.
+  EINTR
+    함수를 호출하는 중에 시그널 핸들러에 의해서 인터럽트가 걸렸다.
+  EMSGSIZE
+    msg_len이 메시지큐의 mq_msgsize보다 작다. 
+
+=== 예제 ===
+ 1. [wiki:Site/system_programing/IPC/MessageQueue IPC - 메시지큐]
+
+=== 관련 글 ===
+ me_send(3), mq_close(3), mq_open(3), time

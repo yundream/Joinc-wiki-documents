@@ -1,0 +1,98 @@
+#title RRD를 이용한 네트워크 서비스 통계
+
+[[TableOfContents]]
+== 서비스별 트래픽 분석과 통계 데이터 생성 ==
+좀더 실질적인 예를 들어서 RRD의 응용에 대해서 알아보도록 한다. 
+
+수집할 데이터는 선태한 서비스에 대한 트래픽 정보다. 이를 위해서 선택된 서비스에 대해서 트래픽 정보를 수집할 Agent 프로그램을 만들 것이다. 
+
+=== (JSTA Agent) Joinc Server Traffic 수집 Agent ===
+서비스별 트래픽 통계를 위해서는 Netflow(:12) 데이터를 수집하고 분석하는게 일반적일 것이다. 그러나 우선은 localhost에서 패킷을 캡쳐해서 데이터를 수집하는 프로그램을 만들어 보도록 하겠다. Netflow를 이용한 서비스별 트래픽 분석에 대해서는 기회가 되면 알아보도록 한다.  
+
+구현관련된 내용은 [wiki:JCvs/Jsta Jsta CVS 페이지]를 참고하기 바란다.
+==== 테스트 Source 파일 다운로드 받기 ====
+[http://www.joinc.co.kr/cgi-bin/JCvs/cgi/viewcvs.cgi/Jsta/Jsta.tar.gz?tarball=1 tarball 받기]
+
+명령행 라인에서의 테스트는 jsta를 실행시킨 후 다음과 같이 테스트하면 된다.
+{{{#!plain
+# ./agent -e "get" -s ":"
+100620:610318:572:664
+}}}
+
+옵션없이 실행시키면 프롬프트가 떨어지고 아무 문자나 입력하면 결과가 출력될 것이다. 
+
+=== RRD DB 생성 ===
+{{{#!plain
+# rrdtool create service_80.rrd --start 1130228000 --step 300 \ 
+DS:inbps:COUNTER:600:U:U \ 
+DS:outbps:COUNTER:600:U:U \ 
+DS:inpps:COUNTER:600:U:U \
+DS:outpps:COUNTER:600:U:U \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797
+
+}}}
+Dats Source는 inbps, outbps, inpps, outpps의 4가지다.
+=== RRD 데이터 생성 ===
+다음과 같은 같단한 쉘 스크립트 프로그램을 만들고 cron(:12)에 등록시켜서 5분 단위로 80번 포트에 대한 정보가 쌓이도록 했다.   
+
+일단 80번 포트에 대한 정보를 수집하도록 jsta를 실행시켰다.
+{{{#!plain
+# ./jsta 80
+}}}
+
+간단한 쉘스크립트를 하나 만든다.
+{{{#!plain
+#!/bin/sh
+TIME=`date +%s`
+VALUE=`/usr/local/bin/client -e "get" -s ":"`
+/usr/local/bin/rrdtool update /usr/local/site/joinc/rrd/service_80.rrd $TIME:$VALUE
+}}}
+
+5분 주기로 정보를 요청하도록 crontab에 등록시킨다.
+{{{#!plain
+0,5,10,15,20,25,30,35,40,45,50,55 * * * * /usr/local/bin/rrd.sh 
+}}}
+[[sadsense(click)]]
+=== 테스트 화면 ===
+현재 joinc.co.kr에 위 jsta를 돌리면서 만드는 중이다. 하루 정도 데이터가 만들어지면 이를 그래프로 표시한다. 다음은 생성된 이미지다.
+{{{#!plain
+# rrdtool graph /rrd/images/bps.png \
+-s 1130281620 -e 1130292420 --vertical-label Bytes/second \
+DEF:linea=/rrd/service_80.rrd:inbps:AVERAGE \
+STACK:linea#0000FF:"inbps" \
+"GPRINT:linea:AVERAGE:%3.2lf Avg" \
+"GPRINT:linea:MAX:%3.2lf MAX" \
+"GPRINT:linea:MIN:%3.2lf MIN\n" \
+DEF:lineb=/rrd/service_80.rrd:outbps:AVERAGE \
+STACK:lineb#00FF00:"outbps" \
+"GPRINT:lineb:AVERAGE:%3.2lf Avg" \
+"GPRINT:lineb:MAX:%3.2lf MAX" \
+"GPRINT:lineb:MIN:%3.2lf MIN\n" \
+HRULE:100000#FF0000:"Maximum allowed" 
+}}}
+
+==== 최근 3시간 동안 Web Service 트래픽 현황 ====
+다음과 같은 명령을 이용해서 그래프를 생성했다. 나머지 3개의 그래프는 아래의 명령을 약간만 수정하면 된다. 
+
+http://www.joinc.co.kr/modules/rrd/images/bps.png
+
+http://www.joinc.co.kr/modules/rrd/images/pps.png
+
+==== 최근 하루 동안 Web Service 트래픽 현황 ====
+http://www.joinc.co.kr/modules/rrd/images/bpsday.png
+
+http://www.joinc.co.kr/modules/rrd/images/ppsday.png
+
+==== 최근 일주일 동안의 Web Service 트래픽 현황 ====
+http://www.joinc.co.kr/modules/rrd/images/bpsweek.png
+
+http://www.joinc.co.kr/modules/rrd/images/ppsweek.png
+
+
+=== 기타 ===
+ * RRD php module를 하나 만든다. 다음의 기능을 가진다.
+   1. 날짜와 시간을 입력해서, 기간별 서비스 사용율을 표시하도록 한다. 
+   1. 시간별 비교(예: 어제와 오늘)가 가능하도록 인터페이스를 제공한다.    

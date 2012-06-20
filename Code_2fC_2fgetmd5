@@ -1,0 +1,94 @@
+#title md5 축약 생성
+
+----
+ 1. getmd5 
+ 1. 파일로 부터 md5 메시지 축약을 만들어낸다.
+ 1. [yundream]
+ 1. Version 0.2 
+ 1. 2004/02/04 
+----
+
+=== 설명 ===
+입력된 파일이름에 대한 md5축약을 만들어낸다. 이것을 통해서 파일 변조를 검사할 수 있으며, 특히 인터넷등을 통하여 쏘쓰코드/바이너리를 배포하고자 할때 유용하게 사용할 수 있을 것이다. 
+
+[http://www.openssl.org openssl]에서 제공하는 md5관련 함수들을 사용했다.
+
+자세한 응용은 [wiki:article_파일변조검사]를 참고하기 바란다. 
+
+=== 사용방법 ===
+{{{#!plain
+#include <openssl/md5.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/types.h>
+
+int getmd5(char *filename, char *md5str);
+}}}
+ 1. filename : md5 메시지를 얻고자 하는 파일의 이름 
+ 1. md5str   : 축약 메시지가 저장될 공간
+ 1. 리턴값   : 성공하면 1 그렇지 않으면 0보다 작은 정수 
+
+{{{#!plain
+int main(int argc, char **argv)
+{
+    char md5str[128] = {0x00,};
+    getmd5(argv[1], md5str);
+    printf("md5 : %s\n", md5str);
+    return 1;
+}
+}}}
+
+=== 코드 ===
+{{{#!plain
+#include <openssl/md5.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/types.h>
+
+int getmd5(char *filename, char *md5str)
+{
+    MD5_CTX lctx;
+    unsigned int i;
+    int fd;
+    struct stat status;
+    char *data;
+    unsigned char digest[16];
+
+    // 파일의 내용을 읽기 위해서 연다.
+    fd = open(filename, O_RDONLY);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    // 파일의 크기를 얻어온 후 
+    // 파일의 크기만큼 내용을 담을 공간을 확보한다.
+    fstat(fd, &status);
+    data = (char *)malloc(status.st_size);
+    read(fd, data, status.st_size);
+
+    MD5_Init(&lctx);
+    MD5_Update(&lctx, data, status.st_size);
+    MD5_Final(digest, &lctx);
+
+    // md5 문자열을 복사한다.
+    for (i = 0; i < sizeof(digest); ++i)
+    {
+        sprintf(md5str+(i*2), "%02x", digest[i]);
+    }
+    free(data);
+    close(fd);
+    return 1;
+}
+}}}
+
+컴파일 방법은 아래와 같다. 
+{{{#!plain
+# gcc -o getmd5 getmd5.c -I/usr/include/openssl -lssl -lcrypto
+}}}
+=== 변경사항 ===

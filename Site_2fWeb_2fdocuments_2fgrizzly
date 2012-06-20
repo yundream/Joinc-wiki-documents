@@ -1,0 +1,72 @@
+#title grizzly 웹서비스 개발 프레임워크
+
+HTTP를 기반으로 하는 중계서버를 개발할려고 하다보니 찾게된 녀석이다. Java(:12)의 새로운 I/O API 인 '''NIO'''를 지원하고 있다고 한다. 문서를 찾아보니 리눅스 구현의 경우 epoll(:12)의 구현인 것으로 되어 있다. epoll(:12)인 만큼 성능에 있어서 잇점을 얻을 수 있지 싶다.  
+
+아래는 grizzly 를 이용해서 만든 간단한 웹서버다.
+{{{#!plain
+import com.sun.grizzly.http.SelectorThread;
+import com.sun.grizzly.tcp.Adapter;
+import com.sun.grizzly.tcp.OutputBuffer;
+import com.sun.grizzly.tcp.Request;
+import com.sun.grizzly.tcp.Response;
+import com.sun.grizzly.util.buf.ByteChunk;
+
+import java.net.HttpURLConnection;
+
+public class HttpServer implements Adapter {
+	public static void main(String[] args)
+	{
+		SelectorThread st = new SelectorThread();
+		st.setPort(8087);
+		st.setAdapter(new HttpServer());
+		System.out.println("My Test Web Server");
+		try
+		{
+			st.initEndpoint();
+			st.startEndpoint();
+		}
+		catch(Exception e)
+		{
+			System.out.println("Exception in SelectorThread"+e);
+			
+		}
+		finally
+		{
+			if(st.isRunning())
+			{
+				st.stopEndpoint();
+			}
+		}
+	}
+	public void service(Request request, Response response) throws Exception
+	{
+		String requestURI=request.requestURI().toString();
+		
+		System.out.println("New Incomming request with URI: "+requestURI);
+		System.out.println("Request Method is : "+request.method());
+		if(request.method().toString().equalsIgnoreCase("GET"))
+		{
+			response.setStatus(HttpURLConnection.HTTP_OK);
+			byte[] bytes = "Here is my response text".getBytes();
+			
+			ByteChunk chunk = new ByteChunk();
+			response.setContentLength(bytes.length);
+			response.setContentType("text/plain");
+			chunk.append(bytes, 0, bytes.length);
+			OutputBuffer buffer = response.getOutputBuffer();
+			buffer.doWrite(chunk, response);
+			response.finish();
+		}
+	}
+	public void afterService(Request request, Response response)
+	{
+		request.recycle();
+		response.recycle();
+	}
+
+	public void fireAdapterEvent(String string, Object object)
+	{
+		
+	}
+}
+}}}

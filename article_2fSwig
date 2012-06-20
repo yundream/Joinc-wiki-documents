@@ -1,0 +1,934 @@
+#title Swig
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Swig</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Swig</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>swig 에 대해서</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN18"
+>swig 를 사용한 프로그래밍</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN20"
+>swig 설치하기</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN25"
+>예제를 통한 swig 의 간단한 사용방법</A
+></DT
+><DD
+><DL
+><DT
+>2.2.1&#51208;. <A
+HREF="#AEN30"
+>Interface file 제작</A
+></DT
+><DT
+>2.2.2&#51208;. <A
+HREF="#AEN34"
+>Python module 만들기</A
+></DT
+><DT
+>2.2.3&#51208;. <A
+HREF="#AEN41"
+>Perl module 만들기</A
+></DT
+><DT
+>2.2.4&#51208;. <A
+HREF="#AEN46"
+>C++ 을 module 로 만들기</A
+></DT
+><DD
+><DL
+><DT
+>2.2.4.1&#51208;. <A
+HREF="#AEN48"
+>Class 의 사용</A
+></DT
+><DT
+>2.2.4.2&#51208;. <A
+HREF="#AEN60"
+>이외의 것들</A
+></DT
+></DL
+></DD
+></DL
+></DD
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN63"
+>Pop 체크프로그램을 만들어 보자</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN68"
+>pop 체크를 위한 python 모듈 제작</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN82"
+>wxpython 을 이용한 GUI 프로그래밍</A
+></DT
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN86"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. swig 에 대해서</A
+></H1
+><P
+>		swig 는 C나 C++ 과 다른 여러가지 언어들을 간단하게 연결시켜서 사용할 
+		수 있도록 도와주는 언어이다. 즉 C나 C++ 로 만들어진 여러가지 
+		코드들을 Perl, Python, Tcl, Ruby, Java 등에서 사용가능하도록 만들어 
+		준다. 	
+	</P
+><P
+>		우리가 자주사용하는 스크립트 언어인 Perl, Python 은 매우 강력하긴 
+		굳이 C와 C++ 을 선택해서 코딩하도록 하는 몇가지 단점들을 가지고 있다. 
+		즉 컴파일되지 않아서 쏘쓰코드가 보인다는 점과, 속도에 매우 민감한 
+		효율적인 코드를 작성할 필요가 있을때 문제가 될수 있다라는 점이다. 
+	</P
+><P
+>		물론 꽤 오래전부터 Perl, Python 컴파일러가 
+		존재하지만(상용, 공개 모두), 이들이 만들어낸 실행파일은  
+		과연이게 효율적으로 돌아갈수 있을런지를 
+		의심스럽게 만들 정도로 비정상적으로 실행파일이 커진다. 
+		속도문제 역시 마찬가지다. 여러가지 다양한 조사와 이들 스크립트 언어의 
+		성능개선을 통해서, 또는 컴퓨터의 성능의 개선을 통해서 대부분의 경우 
+		매우 좋은 성능을 보여주긴 하지만 여전히 최적화된 C/C++ 보다 나은 
+		성능을 기대하기는 어려울것으로 보여진다. 
+	</P
+><P
+>		그래서 만들어진게 swig 이다. 즉 인터페이스 부분은 매우 빠르고 손쉽게 
+		개발이 가능한 Perl, Python 등으로 개발을 하고 코드를 숨겨야 되거나 
+		혹은 나은 성능을 필요로 하는 부분은 C 로 작성하도록 해서 서로 
+		연결 시키는 것이다. 이를테면 GUI 프로그램을 만들적에 
+		배우고 사용하기 까다로운 QT, GTK 대신 wxpython 을 사용하고 
+		실지 작동하는 부분을 C/C++ 로 작성한다음 서로 연결 시키는 것이다. 
+		이렇게 함으로써 개발속도 향상, 효율성, 코드 숨김의 2마리 토끼를 
+		동시에 잡을수 있게 된다. 
+	</P
+><P
+>		이 문서는 swig 의 사용에 대한 문서이다. swig 의 아주 세세한 
+		부분을 언급하지는 않으며, 주로 어떻게 사용하는지에 촛점을 
+		맞추게 될것이다. swig 가 지원하는 여러가지 언어중에서 
+		Python 과 Perl 을 C,C++ 과 연결시키는 방법에 대해서만 다룰것이다. 
+		이외의 자세한 정보들은 <A
+HREF="http://www.swig.org"
+TARGET="_top"
+>swig 홈페이지</A
+>
+		를 참고하기 바란다. 
+	</P
+><P
+>		참고로 swig 가 지원하는 언어는 Perl, Python, Java, Guile, Ruby, Php, 
+		Tcl 등이 있다. 이들중 Perl 과 Python 을 다루는 이유는 필자가 Perl 과 Python 에 
+		좀더 익숙하기 때문이다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+>2&#51208;. swig 를 사용한 프로그래밍</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>2.1&#51208;. swig 설치하기</A
+></H2
+><P
+>	
+			우선은 swig 를 다운받아서 설치해야 할것이다. swig 는 현재(2002년 7월 20일) 1.3.12 버젼 
+			까지 나와 있다. <A
+HREF="http://www.swig.org"
+TARGET="_top"
+>swig 홈페이지</A
+> 에서 다운 받도록 하자. 
+			최신버젼인 1.3.12 는 C++ namespace 와 C++ templates 까지 추가로 지원한다. 또한 
+			윈도우즈도 지원한다. 여기에서는 linux 버젼을 중심으로 설명하겠다.  
+		</P
+><P
+>	
+			일단 다운 받았으면 적당한 디렉토리로 옮기고 컴파일 후 설치하도록 한다. 
+			./configure, make, make install 의 전형적인 설치 방법을 따르면 된다. 
+			특별히 옵션을 주지 않고 ./configure 스크립트를 돌린후 설치했다면 
+			/usr/local/bin 밑에 swig 실행 파일이 설치될 것이다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN25"
+>2.2&#51208;. 예제를 통한 swig 의 간단한 사용방법</A
+></H2
+><P
+>			C 코드와 python 을 결합하는 간단한 예제를 통해서 swig 의 사용방법에 
+			대해서 알아보도록 하겠다. 
+		</P
+><P
+>			우리가 C 로 만들함수는 "hello world" 를 출력해주는 함수이다. 쏘스파일의 
+			이름은 hello.c 로 하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>void echo()
+{
+	printf("Hello World!!
+");
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN30"
+>2.2.1&#51208;. Interface file 제작</A
+></H3
+><P
+>	
+				이제 위의 C 함수를 위한 interface 파일을 만들어야 한다. 이파일은 
+				swig가 C 함수를 다른 언어와 연결시키기 위한 정보파일을 만들기 위해서 이용된다. 
+				Interface file 은 다음과 같이 작성된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>%module sample 
+%{
+%}
+
+extern void echo();
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 파일이름은 hello.i 로 저장하자. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN34"
+>2.2.2&#51208;. Python module 만들기</A
+></H3
+><P
+>				이제 위의 인터페이스 파일인 hello.i 를 이용해서 Python 모듈을 만들면 된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# swig -python hello.i
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그러면 현재 디렉토리에 hello_wrap.c 라는 파일이 생길것이다. 
+				이제 미리만들어 놓은 hello.c 와 hello_wrap.c 를 이용해서 라이브러리를 만들도록 한다. 
+				include 디렉토리는 시스템에 따라서 다를수 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# gcc -c hello.c hello_wrap.c -I/usr/include/python1.5 -I/usr/lib/python1.5/config
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				그러면 hello.o 와 hello_wrap.o 파일이 만들어 졌을것이다. 
+				만들어진 object 파일을 ld 명령어를 
+				이용해서 공유라이브러리 형태로 만들자 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# ld -shared hello.o hello_wrap.o -o hellomodule.so
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이로써 모든 작업이 끝났다. 이제 python 에서 모듈로써 사용가능하다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# python
+Python 1.5.2 (#1, Oct 13 2001, 09:06:03)  [GCC 2.96 20000731 (Red Hat Linux 7.1 2 on linux-i386
+Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam
+&#62;&#62;&#62; import hello
+&#62;&#62;&#62; hello.echo()
+Hello World!!
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				어떤가 너무 간단하지 않은가 ? 이렇게 해서 아주 간단하게 C 의 함수를 python 에서 
+				사용가능한 모듈로 만들었다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>2.2.3&#51208;. Perl module 만들기</A
+></H3
+><P
+>				Perl module 역시 Python module 를 만드는것과 같은 순서로 만들수 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# swig -perl5 hello.i 
+[root@localhost swig]# gcc -c hello.c hello_wrap.c -I/usr/lib/perl5/5.6.0/i386-linux/CORE
+[root@localhost swig]# ld -G hello.o hello_wrap.o -o hello.so
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				실제로 Perl 에서 이용가능한지 확인해 보도록 하자. 	
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost swig]# perl
+use hello
+hello::echo();
+Hello World!!
+...
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				역시 제대로 잘 작동한다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN46"
+>2.2.4&#51208;. C++ 을 module 로 만들기</A
+></H3
+><DIV
+CLASS="SECTION"
+><H4
+CLASS="SECTION"
+><A
+NAME="AEN48"
+>2.2.4.1&#51208;. Class 의 사용</A
+></H4
+><P
+>					C++ 의 경우는 C 와는 달리 몇가지 신경써줘야 할것이 있다. 
+					특히 class 의 경우에는 단순히 함수만 호출한다고 되는게 아니고, 
+					class 를 이용해서 객체를 생성하고 객체의 메서드를 불러와야 된다. 
+				</P
+><P
+>					머 그렇다고 해서 Interface 를 만들거나 module 를 만드는 방법이 크게 차이가 나는건 
+					아니다. 일단 다음과 코드를 python module 로 만들어보도록 하자.  
+				</P
+><P
+>					우리가 만들 C++ 코드는 2개의 숫자를 입력받아서 멤버변수로 저장하고 각각 덧셈, 곱셈, 
+					뺄샘을 하는 3개의 메서드를 이용해서 각 연산의 결과 값을 되돌려주는 일을 한다. 
+					이 프로그램은 2개의 파일로 구성된다. 파일이름은 각각 cal.h 와 cal.cc 로 하겠다. 
+					먼저 cal.h 이다. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>class Cal
+{
+    private:
+        int a, b;
+    public:
+        Cal(){;}
+        void Set(int, int);
+        int  Sum();
+        int  Mul();
+        int  Min();
+};
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				다음은 cal.cc 파일이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include "hello.h"
+
+void Cal::Set(int d1, int d2)
+{
+    a = d1;
+    b = d2; 
+}
+
+int Cal::Sum()
+{
+    return a +  b;
+}
+
+int Cal::Mul()
+{
+    return a * b;
+}
+
+int Cal::Min()
+{
+    return a - b;
+}
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					이제 cal.i 라는 이름을 가지는 interface 파일을 만들어 보자. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c++]# swig -c++ -python cal.i 
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					이제 컴파일 과정을 거쳐서 calmodule.so 라는 이름의 라이브러리를 생성하도록 하자. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c++]# g++ -c -fpic cal.cc cal_wrap.cxx -I/usr/include/python1.5 
+-I/usr/lib/python1.5/config
+[root@localhost c++]# g++ -shared hello.o hello_wrap.o -o calmodule.so
+					</PRE
+></TD
+></TR
+></TABLE
+>
+				</P
+><P
+>					이렇게 해서 우리는 python 모듈을 만들었다. 이제 실제로 테스트를 해보도록 하자. 
+					<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost c++]# python
+Python 1.5.2 (#1, Oct 13 2001, 09:06:03)  [GCC 2.96 20000731 (Red Hat Linux 7.1 2 on linux-i386
+Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam
+&#62;&#62;&#62; import cal
+&#62;&#62;&#62; c = cal.new_Cal()
+&#62;&#62;&#62; cal.Cal_Set(c, 100, 200) 
+&#62;&#62;&#62; print cal.Cal_Min(c)
+-100
+&#62;&#62;&#62; print cal.Cal_Sum(c)
+300
+&#62;&#62;&#62; print cal.Cal_Mul(c)
+20000
+&#62;&#62;&#62; 
+					</PRE
+></TD
+></TR
+></TABLE
+>
+					위의 python 코드를 보면 알겠지만 기존의 C 와는 약간 다르다는걸 알수 있을것이다. 
+					우선 Cal class 의 객체를 만들어야 하는데, new_classname 의 형식으로 작성된다. 
+					우리가 만들어야할 객체의 class 이름은 Cal임으로 new_Cal() 과같은 방법으로 
+					만들어야 할것이다. 이렇게 해서 c 로 Cal 클래스를 할당받았다. 
+					이제 클래스 멤버함수들을 사용해야 하는데 사용방법은 
+					classname_methodname(객체변수, 아규먼트) 이 된다. 그러므로 Cal의 Set 메서드를 
+					사용하기 위해서는 Cal_Set(c, 100, 200) 이런식으로 사용해야 할것이다.  
+				</P
+><P
+>					c++ 클래스의 경우 사용방법이 약간 특이하긴 하지만 사용하는데 크게 어려움은 없을것이다. 
+				</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H4
+CLASS="SECTION"
+><A
+NAME="AEN60"
+>2.2.4.2&#51208;. 이외의 것들</A
+></H4
+><P
+>					STL과, 구조체, enum 과 같은 자료형을 어떻게 써야하는지는 swig 메뉴얼을 찾아보기 바란다. 
+					swig 를 받으면 Example 파일들이 있으며, 여기에는 이러한 각각의 자료구조와 라이브러리를 
+					어떻게 해서 python 이나 Perl 등에서 사용할수 있는지에 대한 방법을 예를들어서 설명하고 있다. 
+				</P
+></DIV
+></DIV
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN63"
+>3&#51208;. Pop 체크프로그램을 만들어 보자</A
+></H1
+><P
+>		이번에는 swig 를 이용한 본격적인 응용을 해보도록 하겠다. 
+		이번에 만들 응용은 pop3 서버에 몇개의 메일이 도착했는지를 확인하는 프로그램인데, 
+		우리는 이미 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=55&mode=&order=0&thold=0"
+TARGET="_top"
+>POP3 메일 체크 프로그램 만들기</A
+> 에서 다루어본적이 있다.
+	</P
+><P
+>		위의 예제 프로그램은 C 와 Python 을 연결시키기 위해서 pipe 를 사용했는데, 왠지 연결이 좀 불완전해 
+		보인다. 그래서 C 에서 메일숫자 가져오는 부분을 아예 python 모듈로 만들어서 python 과 부드럽게 
+		연결하도록 할것이다. 이 연결은 swig 를 이용할것이다. 
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN68"
+>3.1&#51208;. pop 체크를 위한 python 모듈 제작</A
+></H2
+><P
+>			우선 메일 숫자를 가져오기 위한 C 코드를 만들어야 한다. 이 코드는 pop.h 와 pop.c 2개의 파일로 
+			이루어진다. 
+		</P
+><P
+>			<B
+CLASS="EMPHASIS"
+>pop.h</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;netinet/in.h&#62;
+#include &#60;stdio.h&#62;
+    
+int get_mail_num(char *address, int port, char *id, char *passwd);
+int put_command(char *command, FILE *fp_in);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>pop.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include "pop.h"
+
+char buf_in[255];
+int get_mail_num(char *address, int port, char *id, char *passwd)
+{
+    int client_len;
+    int client_sockfd;
+    int mail_num;
+    FILE *fp_in;
+    char command[255];
+    char blank[25];
+    
+    struct sockaddr_in clientaddr;
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr(address);
+    clientaddr.sin_port = htons(port);
+    client_len = sizeof(clientaddr);
+
+    if (connect(client_sockfd, (struct sockaddr *)&#38;clientaddr, client_len)&#60;0)
+    {
+        return -1;
+    }
+    fp_in = fdopen(client_sockfd, "r+");
+    if(put_command(NULL, fp_in) != 1) 
+    {
+        printf ("접근 에러
+");
+    }
+
+    memset(command, 0x00, 255);
+    sprintf(command, "user %s
+", id);
+
+    if (put_command(command, fp_in) != 1)
+        return -2;
+
+    sprintf(command, "pass %s
+", passwd);
+    if (put_command(command, fp_in) != 1)
+        return -2;
+
+    if (put_command("stat
+", fp_in) != 1) 
+        return -3;
+
+    sscanf(buf_in,"%s%d",blank,&#38;mail_num);
+    return mail_num;    
+}
+
+int put_command(char *command, FILE *fp_in)
+{
+    if (command != NULL)
+        fputs(command, fp_in);
+
+    fgets(buf_in, 255, fp_in);
+    if (strncasecmp(buf_in, "+ok", 3) == 0)
+        return 1;
+    return 0;
+}
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이제 swig 를 이용해서 python 모듈을 만들어 보도록하자. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>/* pop.i */
+%module pop
+
+%{
+#include "pop.h"
+%}
+
+%include "pop.h"
+			</PRE
+></TD
+></TR
+></TABLE
+>
+
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost pop]# swig -python pop.i 
+[root@localhost pop]# gcc -c -fpic pop.c pop_wrap.c  -I/usr/include/python1.5 -I/usr/lib/python1.5/config
+[root@localhost pop]# gcc -shared pop.o pop_wrap.o -o popmodule.so
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+><P
+>			이제 python 을 이용해서 테스트 해보도록 하자. 물론 테스트할수 있는 pop 계정이 준비되어있어야 
+			할것이다. 필자의 경우는 Linux 박스에 qpopper 을 설치해서 테스트 해보았다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@localhost pop]# python
+Python 1.5.2 (#1, Oct 13 2001, 09:06:03)  [GCC 2.96 20000731 (Red Hat Linux 7.1 2 on linux-i386
+Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam
+&#62;&#62;&#62; import pop
+&#62;&#62;&#62; print pop.get_mail_num("127.0.0.1", 110, "yundream", "1234")
+1
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			제대로 작동함을 알수 있다. 그렇다면 이젠 wxpython 을 이용해서 pop 메일을 가져오는 GUI 
+			응용 프로그램을 만들어 보도록 하겠다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN82"
+>3.2&#51208;. wxpython 을 이용한 GUI 프로그래밍</A
+></H2
+><P
+>			다음은 완전한 프로그램은 아니다. 프로그램 종료시 쓰레드를 어떻게 처리해야 
+			할지를 명시하지 않았다. 아마도 EVENT 를 이용해서 혹은 좀 복잡하게 한다면 
+			mutex 잠금등을 이용해서 해결가능하겠지만 이것의 처리는 각자의 몫으로 남겨 놓겠다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#!/usr/bin/python
+from wxPython.wx import * 
+from threading import *
+import time, sys, os, pop 
+
+EVT_RESULT_ID = wxNewId()
+
+def EVT_RESULT(win, func):
+	win.Connect(-1, -1, EVT_RESULT_ID, func)
+
+class ResultEvent(wxPyEvent):
+	def __init__(self, data):
+		wxPyEvent.__init__(self)
+		self.SetEventType(EVT_RESULT_ID)
+		self.data = data 
+
+class MainFrame(wxFrame):
+	def __init__(self, parent, id):
+		wxFrame.__init__(self, parent, id, 'pop test', size=(100, 20))
+		self.status = wxStaticText(self, -1, '', pos=(0, 100))
+		EVT_RESULT(self, self.OnResult)
+		EVT_CLOSE(self, self.OnExit)
+
+		self.worker=MyThread(self)
+		self.worker=None
+
+	def OnResult(self, event):
+		self.status.SetLabel('도착한메일: %d' % pop.get_mail_num("127.0.0.1", 110, "yundream", "1234"))
+
+	def OnExit(self, event):
+		self.Destroy()
+
+class MyThread(Thread):
+	def __init__(self, notify_window):
+		Thread.__init__(self)
+
+		self._notify_window = notify_window
+		self.start()
+
+	def run(self):
+		while 1:
+			wxPostEvent(self._notify_window,ResultEvent(1))
+			time.sleep(1)
+
+
+class MainApp(wxApp):
+	def OnInit(self):
+		self.frame = MainFrame(NULL, -1)
+		self.frame.Show(true)
+		self.SetTopWindow(self.frame)
+		return true;
+
+app = MainApp(0)
+app.MainLoop()
+
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN86"
+>4&#51208;. 결론</A
+></H1
+><P
+>		이상 swig 에 대한 내용을 수박 겉핥기 식으로 훑어 보았다. 
+		그렇긴 하지만 swig 를 어떨때 유용하게 사용할수 있을런지에 대한 감을 잡아주기에는 
+		충분한 정도의 내용이라고 생각된다. 
+	</P
+><P
+>		swig 를 이용하면 다른 유용한 스크립트 언어들과 C, C++ 을 결합하여, 빠르고 손쉽게 작성할수 있으면서도 
+		C/C++ 언어의 특징인 효율성과 쏘스코드 감춤등의 기능까지도 가지는 프로그램의 제작이 가능하다. 
+	</P
+><P
+>		이 기사의 내용을 가지고 어떻게 실제 환경에서 써먹고, 가지고 놀건지는 여러분의 하기나름에 
+		달려있다고 생각된다. 아무쪼록 swig 를 잘 이용해서 
+		멋진 개발환경을 한번 구축해 보길 바라는 바이다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

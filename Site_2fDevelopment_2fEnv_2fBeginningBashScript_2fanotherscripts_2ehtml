@@ -1,0 +1,348 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>또 다른 스크립트들... </TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="BASH 프로그래밍 입문 하우투"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="Tables "
+HREF="tables.html"><LINK
+REL="NEXT"
+TITLE="문제가 생겼을 때(디버깅 방법) "
+HREF="debuging.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECT1"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>BASH 프로그래밍 입문 하우투</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="tables.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="debuging.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECT1"
+><H1
+CLASS="SECT1"
+><A
+NAME="ANOTHERSCRIPTS"
+></A
+>12. 또 다른 스크립트들...</H1
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="AEN447"
+></A
+>12.1. 예제 : 초간단 백업 스크립트-조금 발전된 버전</H2
+><P
+> 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#!/bin/bash 
+SRCD="/home/" 
+TGTD="/var/backups/" 
+OF=home-$(date +%Y%m%d).tgz 
+tar -cZf $TGTD$OF $SRCD </PRE
+></TD
+></TR
+></TABLE
+> </P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="AEN451"
+></A
+>12.2. 예제 : 파일이름 바꾸는 프로그램(renna)</H2
+><P
+> 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#!/bin/sh 
+# renna: 여러 파일의 이름을 규칙에 따라 한번에 바꿀 수 있는 프로그램
+# 페릭스 허드슨이 2000년 1월에 만들었다. 
+
+
+if [ $1 = p ]; then 
+
+prefix=$2 ; shift ; shift 
+
+
+if [$1 = ]; then 
+echo "no files given" 
+exit 0 
+fi 
+
+for file in $* 
+do 
+mv ${file} $prefix$file 
+done 
+
+exit 0 
+fi 
+
+if [ $1 = s ]; then 
+suffix=$2 ; shift ; shift 
+
+if [$1 = ]; then 
+echo "no files given" 
+exit 0 
+fi 
+
+for file in $* 
+do 
+mv ${file} $file$suffix 
+done 
+
+exit 0 
+fi 
+
+if [ $1 = r ]; then 
+
+shift 
+
+if [ $# -lt 3 ] ; then 
+echo "usage: renna r [expression] [replacement] files... " 
+exit 0 
+fi 
+
+OLD=$1 ; NEW=$2 ; shift ; shift 
+
+for file in $* 
+do 
+new=`echo ${file} | sed s/${OLD}/${NEW}/g` 
+mv ${file} $new 
+done 
+exit 0 
+fi 
+
+echo "usage;" 
+echo " renna p [prefix] files.." 
+echo " renna s [suffix] files.." 
+echo " renna r [expression] [replacement] files.." 
+exit 0 &#13;</PRE
+></TD
+></TR
+></TABLE
+> </P
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="AEN455"
+></A
+>12.3. 간단하게 파일 이름 바꾸기</H2
+><P
+> 
+파일 이름을 바꾸기 위해서는 mv 명령을 사용할 수 있지만, 다음의 방법을 
+사용하여 파일 이름을 변경해 보자. </P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#!/bin/bash 
+# renames.sh 
+# 간단한 파일 이름 바꾸기 프로그램
+
+criteria=$1 
+re_match=$2 
+replace=$3 
+
+for i in $( ls *$criteria* ); 
+do 
+src=$i 
+tgt=$(echo $i | sed -e "s/$re_match/$replace/") 
+mv $src $tgt 
+done </PRE
+></TD
+></TR
+></TABLE
+></DIV
+><DIV
+CLASS="SECT2"
+><H2
+CLASS="SECT2"
+><A
+NAME="AEN459"
+></A
+>12.4. 아침마다 신문 만화를 배경 화면으로 사용하기</H2
+><P
+> 
+이 프로그램은 GNOME에서 제대로 동작한다. 다른 환경에서 사용할 때에는 
+환경 설정파일을 새로 만드는 부분을 수정해야 할 것이다. 이 프로그램은
+그 날의 날짜로 파일 이름을 만드는 신문 만화의 규칙성을 이용하여
+파일을 받는 프로그램으로, crontab에 지정해 두면 더욱 편리하다.</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+> 
+#!/bin/bash
+# bgimg.sh
+# 그날의 날짜로 된 신문 만화를 받아온다. 아래의 주소 부분에는
+# 상황에 따라 적어 준다.
+filename="http://www.domain.com/pwd/"$(date +%Y%m%d)"07_0.jpg"
+wget $filename
+
+mv $(date +%Y%m%d)*07_0.jpg ./bgimages
+
+imagename="/mypwd/bgimages/"$(date +%Y%m%d)".jpg"
+confname="./.gnome/Background"
+rm $confname
+touch $confname
+
+echo "[Default]" &#62;&#62; $confname
+echo "color1=#5477a0" &#62;&#62; $confname
+echo "color2=#5477a0" &#62;&#62; $confname
+echo "simple=solid" &#62;&#62; $confname
+echo "gradient=vertical" &#62;&#62; $confname
+echo "wallpaperAlign=1" &#62;&#62; $confname
+echo "Enabled=true" &#62;&#62; $confname
+
+comm="wallpaper="$imagename
+
+echo $comm &#62;&#62; $confname</PRE
+></TD
+></TR
+></TABLE
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="tables.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="debuging.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>Tables</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>문제가 생겼을 때(디버깅 방법)</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

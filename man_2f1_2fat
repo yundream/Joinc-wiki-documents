@@ -1,0 +1,385 @@
+#title 스케쥴 관리 
+
+{{{#!html
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN""http://www.w3.org/TR/html4/loose.dtd">
+<HTML
+><HEAD
+><TITLE
+>AT</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.79"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. AT</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3. <A
+HREF="#AEN40"
+>옵션</A
+></DT
+><DT
+>1.4. <A
+HREF="#AEN72"
+>파일</A
+></DT
+><DT
+>1.5. <A
+HREF="#AEN76"
+>관련명령</A
+></DT
+><DT
+>1.6. <A
+HREF="#AEN90"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>at, batch, atq, atrm - 나중에 실행할 작업에 대한 설정,검사,삭제</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1. 사용법</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>at [-V] [-q queue] [-f file] [-mldbv] TIME
+at -c job [job...]
+atq [-V] [-q queue]
+atrm [-V] job [job...]
+batch [-V] [-q queue] [-f file] [-mv] [TIME]
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2. 설명</A
+></H2
+><P
+>		at와 batch는 나중에 /bin/sh를 이용하여 실행할 명령을 표준 입력이나 지정한 파일에서 읽어들인다.
+		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>at</DT
+><DD
+><P
+>	
+					지정된 시간에 명령을 실행한다.
+				</P
+></DD
+><DT
+>atq</DT
+><DD
+><P
+>	
+					현재 사용자의 등록된 작업목록을 보여준다. 슈퍼유저라면 모든 사용자의 작업 목록을
+					보여준다. 출력 형식은 각 작업당 한 줄로 작업 번호, 날짜, 시간, 작업 구분 순이다.
+				</P
+></DD
+><DT
+>batch</DT
+><DD
+><P
+>	
+					시스템 부하 수준이 낮을 때 명령을 수행한다; 즉, 부하 평균이 0.8 이하 또는 
+					atrun으로 지정한 값 이하로 떨어졌을 때.
+				</P
+></DD
+></DL
+></DIV
+>	
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>At</B
+>은 POSIX.2 표준까지 포함하여 매우 복잡한 시간 형식도 지정할 수 있다. 
+		그 날의 특정 시간에 작업을 수행하기 위해 <B
+CLASS="EMPHASIS"
+>HH:MM</B
+> 형식으로 시간을 지정한다. 
+		(만약 시간이 이미 지났다면 다음날로 생각한다.) 또한 midnight, noon, 또는 teatime (4pm) 같은 문자와 
+		아침 또는 저녁을 나타내기 위해 <B
+CLASS="EMPHASIS"
+>AM</B
+>또는 <B
+CLASS="EMPHASIS"
+>PM</B
+>와 같은 접미사를 
+		사용할 수 있다. 또한 작업을 수행할 날짜에 대해서 month-name day year 형식으로 지정하거나 
+		MMDDYY 또는 MM/DD/YY 또는 DD.MM.YY 형식으로 지정할 수 있다. 날짜 지정은 반드시 시간 지정 다음에 
+		나와야 한다. 시간을 now + count time-units 형식으로 지정 할 수 있으며, time-units은 
+		minutes, hours, days 또는 weeks 가 될 수 있다. 오늘 수행할 작업에는 today를, 
+		내일 수행할 작업에는 <B
+CLASS="EMPHASIS"
+>tomorrow</B
+>를 붙일 수 있다.
+	</P
+><P
+>		예를 들어, 지금부터 3일후 오후 4시에 작업을 수행하려면 <B
+CLASS="EMPHASIS"
+>at 4pm + 3 days</B
+>, 
+		7월 31일 오전 10:00에 작업을 수행하려면 <B
+CLASS="EMPHASIS"
+>at 10am Jul 31</B
+> 내일 오후 1시에 작업을 
+		수행하려면 <B
+CLASS="EMPHASIS"
+>at 1am tomorrow</B
+>과 같이 하면 된다.
+	</P
+><P
+>    
+		at과 batch 둘 다 표준 입력이나 -f 옵션으로 지정한 파일에서 명령을 읽어 수행한다. 작업 디렉토리,
+		환경 변수 (TERM, DISPLAY와 _ 변수는 제외) 와 umask는 호출 당시의 것이 유지된다.
+		su(1) 쉘로 부터 실행된 at ? 또는 batch ? 명령은 현재 사용자 ID를 유지할 것이다.
+		표준 에러나 표준 출력로 출력되는 명령 수행 결과가 있다면 메일로 받게 된다.
+    		메일은 /usr/sbin/sendmail 명령을 사용하여 보내진다. 만약 at이 su(1) 쉘에서 실행되었다면
+		시간 지정에 대한 정확한 정의는 /usr/doc/packages/at/timespec에 되있다.
+	</P
+><P
+>		슈퍼 유저는 어떤 경우에도 이 명령들을 사용할 수 있으나 다른 사용자는 /etc/at.allow과 /etc/at.deny의 내용에 따라 사용 권한이 결정된다.	
+	</P
+><P
+>		만약 /etc/at.allow 파일이 존재하면, 그 파일에 명시된 사용자만이 at 명령을 사용할 수 있다.
+	</P
+><P
+>		만약 /etc/at.allow이 존재하지 않으면, /etc/at.deny에 명시되지 않은 모든 사용자가 at을 사용할 수 있다.
+	</P
+><P
+>		만약 두 파일이 모두 존재하지 않으면, 슈퍼 유저만이 at을 사용할 수 있다.
+	</P
+><P
+>		/etc/at.deny를 빈 파일로 두면 모든 사용자가 명령을 사용할 수 있고, 이것이 초기 설정이다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>1.3. 옵션</A
+></H2
+><P
+>		<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>-v</DT
+><DD
+><P
+>	
+					표준 에러로 버전 번호를 출력한다
+				</P
+></DD
+><DT
+>-q queue</DT
+><DD
+><P
+>					명시한 큐를 사용한다. 큐 이름은 한 단어로 되어있다; 유효한 이름은 a부터 z까지와 A부터 Z까지이다. a 큐는 at의 초기값이고 b 큐는 batch의 초기값이다. 알파벳 순서로 뒤의 이름을 갖는 큐는 더 큰 niceness 값을 갖는다. 특별히 "=" 큐는 현재 수행되는 작업에 대한 큐로 예약되어 있다.
+  					대문자 이름의 큐에 추가된 작업은 batch의 작업처럼 처리된다. atq에 큐 이름이 지정되면, 그 큐에 있는 작업들만 보여준다.
+				</P
+></DD
+><DT
+>-m</DT
+><DD
+><P
+>						출력 결과가 없더라도 작업이 완료될 때 사용자에게 메일을 보낸다. 보여준다.
+					</P
+></DD
+><DT
+>-f file</DT
+><DD
+><P
+>						표준입력이 아닌 file에서 작업명령을 읽는다.
+					</P
+></DD
+><DT
+>-l</DT
+><DD
+><P
+>						atq와 동일
+					</P
+></DD
+><DT
+>-d</DT
+><DD
+><P
+>						atrm과 동일
+					</P
+></DD
+><DT
+>-v</DT
+><DD
+><P
+>						작업이 수행될 시간을 보여준다.
+  						환경 변수 POSIXLY_CORRECT이 설정되있지 않으면 "1997-02-20 14:50" 형식으로 
+						시간이 표시되고, 설정되있는 경우에는 "Thu Feb 20 14:50:00 1996" 형식이 될 것이다.
+					</P
+></DD
+></DL
+></DIV
+>	
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN72"
+>1.4. 파일</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>/var/spool/atjobs
+/var/spool/atspool
+/proc/loadavg
+/var/run/utmp
+/etc/at.allow
+/etc/at.deny			
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN76"
+>1.5. 관련명령</A
+></H2
+><P
+>     <P
+></P
+><UL
+><LI
+><P
+>					cron(1)
+				</P
+></LI
+><LI
+><P
+>					nice(1)
+				</P
+></LI
+><LI
+><P
+>					sh(1)
+				</P
+></LI
+><LI
+><P
+>					umask(2)
+				</P
+></LI
+><LI
+><P
+>					atd(8)
+				</P
+></LI
+></UL
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN90"
+>1.6. 예제</A
+></H2
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>// 14시에 주의를 환기시키는 메일을 발송한다.			
+# echo "mail -s '중요한 약속 있음' P@joinc.co.kr &#60; /dev/null" | at 14:00
+
+// 01시에 특정 URL페이지를 긁어온다.
+# echo "wget url" | at 01:00
+
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

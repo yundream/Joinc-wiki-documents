@@ -1,0 +1,52 @@
+#title netstat 정보 확인
+
+netstat(1)은 네트워크 연결정보를 확인하기 위해서 사용하는 툴이다. 네트워크 상황을 디버깅 하기 위한 용도로 주로 사용한다. 만약 특정 Port(:12)에 대한 연결이 갑자기 늘어난다면, 이 서비스에는 문제가 있는 것으로 판단할 수 있다. 그러므로 주기적으로 이 정보를 모니터링 할 수 있다면, 서비스 관리를 위해서 유용하게 사용할 수 있을 것이다.
+
+다음은 netstat 정보를 얻어오는 간단한 perl 스크립트다. zenoss(:12)의 zen command 형식으로 호출해서 사용하도록 되어 있다. 약간만 수정한다면, RRD(:12)등에 사용될 수 있는 데이터 형태로 변경할 수 있을 것이다.
+{{{#!plain
+#!/usr/bin/perl
+
+$argnum = $#ARGV+1;
+if ($argnum < 1)
+{
+    print "Usage : $0 [PORT]\n";
+    exit(1);
+}
+
+$port = @ARGV[0];
+open(FP,"netstat -na | grep :$port| grep -v LISTEN|") || die "Error";
+$est = 0;
+$notest = 0;
+while($line = <FP>)
+{
+    if ($line =~ m/ESTABLISHED/)
+    {
+        $est++;
+    }
+    else
+    {
+        $noest++;
+    }
+}
+$status = "FAILURE";
+$tot = $est + $noest;
+if ($tot > 0)
+{
+    $status = "OK";
+    print "NetStat $port $status |tot=$tot|est=$est","|noest=$noest\n";
+}
+else
+{
+    print "NetStat $status\n";
+}
+}}}
+
+사용법
+{{{#!plain
+# ./netstat.pl 80
+NetStat 80 OK |tot=23|est=6|noest=17
+}}}
+  * tot : 총 연결 갯수
+  * est : ESTABLISHED 상태의 연결
+  * noest : ESTABLIST 상태가 아닌 것들 - TIME_WAIT 상태 등 -
+'''ESTABLISHED''' 상태를 따로 얻어낸 이유는 TIME_WAIT 상태가 지나치게 많이 생성되는걸 확인하기 위함이다. 

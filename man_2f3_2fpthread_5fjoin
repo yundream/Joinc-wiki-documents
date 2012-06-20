@@ -1,0 +1,206 @@
+#title linux man page : pthread_join 쓰레드가 종료되는 걸 기다린다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>ptread_join(3)</title><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></head><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1장. ptread_join(3)</a></h1><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>차례</b></dt><DT
+>1.1절. <A
+HREF="#AEN4"
+>사용법</a></dt><DT
+>1.2절. <A
+HREF="#AEN8"
+>설명</a></dt><DT
+>1.3절. <A
+HREF="#AEN23"
+>반환값</a></dt><DT
+>1.4절. <A
+HREF="#AEN27"
+>에러</a></dt><DT
+>1.5절. <A
+HREF="#AEN41"
+>예제</a></dt></dl></div><P
+>	다른 쓰레드가 종료되는걸 기다린다. </p><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1절. 사용법</a></h1><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include <pthread.h>
+
+int pthread_join(pthread_t th, void **thread_return);
+		</pre></td></tr></table>
+	</p></div><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2절. 설명</a></h1><P
+>		<B
+CLASS="EMPHASIS"
+>pthread_join</b> 는 실별번호 <B
+CLASS="EMPHASIS"
+>th</b> 
+		로 시작된 쓰레드가 종료되는걸 기다린다. 이러헌 쓰레드의 종료는 
+		<B
+CLASS="EMPHASIS"
+>pthread_exit(3)</b>로 종료되거나 혹은 리턴되는 
+		경우 발생한다.  
+	</p><P
+>		만약 <B
+CLASS="EMPHASIS"
+>thread_return</b>값이 NULL 이 아니라면, 
+		<B
+CLASS="EMPHASIS"
+>th</b>의 리턴값이 저장된 영역이 전달되게 된다. 
+	</p><P
+>		<B
+CLASS="EMPHASIS"
+>th</b> 식별번호를 가지는 쓰레드가 join 되기 
+		위해서는 반드시 joinable 상태의 쓰레드로 작동하고 있어야지만 한다. 
+		만약 기다리는 쓰레드가 <B
+CLASS="EMPHASIS"
+>pthread_detach(3)</b> 함수를 
+		통해서 detached 상태가 되었거나 혹은 
+		<B
+CLASS="EMPHASIS"
+>pthread_create(3)</b>로 실행될때 
+		<B
+CLASS="EMPHASIS"
+>PTHREAD_CREATE_DETACHED</b> 특성으로 실행되었다면 
+		join 으로 기다릴수 없게 된다.  
+	</p><P
+>		joinable 쓰레드가 종료되면, 종료된다고 하더라도 즉시 
+		메모리 자원등이 해제 되지 않는다. pthread_join 함수를 만나야지만 
+		자원이 해제된다. 그럼으로 모든 joinable 쓰레드에 대해서는 
+		반드시 pthread_join 을 호출해주어야 한다. 그렇지 않을경우 
+		메모리 누수가 발생할것이다.    	
+	</p></div><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN23"
+>1.3절. 반환값</a></h1><P
+>		성공할경우 쓰레드식별자인 <B
+CLASS="EMPHASIS"
+>thread</b>에 
+		쓰레드 식별번호를 저장하고, 0을 리턴한다. 실패했을경우 0 이 아닌 
+		에러코드 값을 리턴한다. 
+	</p></div><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN27"
+>1.4절. 에러</a></h1><P
+>		<P
+></p><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>ESRCH</dt><DD
+><P
+>	
+					식별번호 <B
+CLASS="EMPHASIS"
+>th</b>가 잘못된 식별번호 
+					일 경우
+				</p></dd><DT
+>EINVAL</dt><DD
+><P
+>	
+					식별번호 <B
+CLASS="EMPHASIS"
+>th</b> 쓰레드가 detached 
+					상태일경우
+				</p></dd></dl></div>	
+	</p></div><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>1.5절. 예제</a></h1><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+>
+}}}
+{{{#!html adsense
+<PRE
+CLASS="SCREEN"
+>#include &lt;pthread.h>
+#include &lt;stdlib.h>
+
+// 쓰레드 함수
+void *test(void *data)
+{
+    int i;
+    int a = *(int *)data;
+    for (i = 0; i < 10; i++)
+    {
+        printf("%d\n", i*a);
+    }
+    return (void *)(i * 100);
+}
+
+int main()
+{
+    int a = 100;
+    pthread_t thread_t;
+    int status;
+
+    // 쓰레드를 생성한다. 
+    if (pthread_create(&thread_t, NULL, test, (void *)&a) < 0)
+    {
+        perror("thread create error:");
+        exit(0);
+    }
+
+    // 쓰레드가 종료되기를 기다린후 
+    // 쓰레드의 리턴값을 출력한다. 
+    pthread_join(thread_t, (void **)&status);
+    printf("Thread End %d\n", status);
+    return 1;
+}
+		</pre></td></tr></table>
+	</p></div></div></body></html>
+}}}
+  * [wiki:Site/Thread/Beginning/PthreadApiReference Pthread API 레퍼런스]
+  * [wiki:Site/Thread Thread 미니사이트]

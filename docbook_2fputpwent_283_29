@@ -1,0 +1,187 @@
+#title docbook chapter Template
+[wiki:function_putpwent(3) HTML 변환문서]
+{{{#!plain
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<chapter lang=ko>
+<!-- 작성자 : yundream             -->
+<!-- 작성일 : 2004/01/03           -->
+<!-- 연락처 : dreamyun@yahoo.co.kr -->
+
+<!-- 함수 이름을 입력합니다 -->
+<title>putpwent</title>
+
+<!-- 이건 함수에 대한 대략적인 설명이구요 -->
+<para>
+	유저 패스워드 정보를 파일에 쓴다.  
+</para>
+ 
+<!-- 여기에 함수의 간단한 사용법이 들어갑니다 -->
+<section>
+	<title>사용법</title>
+	<para>
+		<screen>
+#include &lt;pwd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+
+int putpwent(const struct passwd *p, FILE *stream);
+		</screen>
+	</para>
+</section>
+
+<!-- 여기엔 함수의 자세한 설명 이 들어갑니다 -->
+<section>
+	<title>설명</title>
+	<para>
+		putpwent()함수는 <emphasis>stream</emphasis>에 연결된 파일에
+		패스워드 구조체 정보<emphasis>p</emphasis>를 이용해서 패스워드내용을 
+		추가한다. 
+	</para>
+	<para>
+		passwd구조체는 &lt;pwd.h&gt;에 다음과 같이 정의되어 있다.
+		<screen>
+struct passwd {
+        char    *pw_name;       /* user name */
+        char    *pw_passwd;     /* user password */
+        uid_t   pw_uid;         /* user id */
+        gid_t   pw_gid;         /* group id */
+        char    *pw_gecos;      /* real name */
+        char    *pw_dir;        /* home directory */
+        char    *pw_shell;      /* shell program */
+};
+		</screen>
+	</para>
+</section>
+
+<!-- 함수가 되돌려주는 값이구요 -->
+<section>
+	<title>반환값</title>
+	<para>
+		성공할경우 0을 실패했을경우에는 -1을 반환하며, 적당한 errno 값을 
+		설정한다. 
+	</para>
+</section>
+
+<!-- 에러가 발생했을때 되돌려주는 값들입니다 -->
+<section>
+	<title>에러</title>
+	<para>
+		<variablelist>	
+			<varlistentry>
+			<term>EINVAL</term>	
+			<listitem>
+				<para>	
+					잘못된 값이 인자로 사용되었다.	
+				</para>	
+			</listitem>
+			</varlistentry>
+		</variablelist>	
+	</para>
+</section>
+
+<!-- 마지막으로 에제 입니다                                                 -->
+<!-- 여기에는 완전한 예제가 들어가 있는데, 굳이 완전한 예제를 만들필요 없이 -->
+<!-- 코드 일부분만 작성해서 올려주셔도 됩니다                               --> 
+<!-- "<", ">", "&" 등은 변환해 주셔야 하는데, 귀찮으시면 :-) 변환 하지 않   -->
+<!-- 아도 됩니다. 제가 검사 해서 올리겠습니다                               -->
+<!-- 예제에 대한 간단한 설명을 적어주셔도 되구요                            -->
+<section>
+	<title>예제</title>
+	<para>
+		<screen>
+#include &lt;pwd.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+#define USER_DEFAULT_DIR "/home/%s"
+#define USER_DEFAULT_SHELL "/bin/sh"
+void help()
+{
+    fprintf(stderr, "Usage: useradd2 [username] -d usr_dir -s usr_shell\n");
+}
+
+int main(int argc, char **argv)
+{
+    int opt;
+    struct passwd lpass; 
+    char user_dir[80];
+    char user_name[32];
+    FILE *pwfp;
+
+    memset((void *)&amp;lpass, 0x00, sizeof(lpass));
+    while((opt = getopt(argc, argv, "s:d:h")) != -1)
+    {
+        switch(opt)
+        {
+            case 's':
+                lpass.pw_shell = optarg; 
+                break;
+            case 'd':    
+                lpass.pw_dir = optarg; 
+                break;
+            case 'h':
+                help();
+                exit(0);
+                break;
+            case '?': 
+                help();
+                break;
+        }
+    }
+
+    if (optind &gt; argc)    
+    {
+        snprintf(user_name, 32, "%s", argv[optind]);
+        lpass.pw_name = user_name;
+    }
+    else
+    {
+        help();
+        exit(1);
+    }
+
+    if(!lpass.pw_dir)
+    {
+        sprintf(user_dir, USER_DEFAULT_DIR, user_name);
+        lpass.pw_dir = user_dir;
+    }
+    if(!lpass.pw_shell)
+    {
+        lpass.pw_shell = USER_DEFAULT_SHELL;
+    }     
+    printf("User id    : %s\n", lpass.pw_name);
+    printf("User shell : %s\n", lpass.pw_shell);
+    printf("User dir   : %s\n", lpass.pw_dir);
+
+    pwfp = fopen("/etc/passwd", "a");
+    putpwent(&amp;lpass, pwfp);
+    fclose(pwfp);
+}
+		</screen>
+		fopen()을 통하여 파일을 열때 "w"로 열지 않도록 주의해야 한다. 그럴 경우 기존 파일의 
+		내용을 모두 잃어버리게 된다.  
+	</para>
+	<para>
+		그리고 위의 프로그램은 작동방식만을 설명하는 수준의 프로그램이다. 제대로 작동하도록 
+		만들려면 getpwent(3)등의 함수를 이용해서 패스워드 목록을 가져오고 중복된 이름이 있는지 
+		확인하고, uid와 gid를 결정하는 등의 루틴이 포함되어야 한다. putpwent()함수는 uid와 gid를 
+		결정해 주지 않기 때문이다.
+	</para>
+</section>
+<section>
+	<title>참고문헌</title>
+	<para>
+		<orderedlist>
+			<listitem>
+				<para>
+					<ulink url="http://www.joinc.co.kr/modules.php?name=News&amp;file=article&amp;sid=9">getopt(3)를 이용한 프로그램 인자처리</ulink>
+				</para>
+			</listitem>
+		</orderedlist>
+	</para>
+</section>
+</chapter>
+
+}}}
+
+== 변경사항 ==

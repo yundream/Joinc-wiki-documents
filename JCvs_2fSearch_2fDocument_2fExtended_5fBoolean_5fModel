@@ -1,0 +1,61 @@
+#title 검색엔진 : 확장 불리언 모델 (Extended Boolean Model)
+
+원래는 boolean(:12) model 만을 따로 다루려고 했지만 비교적 간단한 내용이라고 생각해서 extend boolean model에 포함을 시켰다.
+
+=== boolean model ===
+boolean model은 IR(Information retrive)을 위한 가장 전통적인 모델이다. 불리언 모델은 그 이름에서 알 수 있듯이, '''AND''', '''OR''', '''NOT''' 연산을 이용한다. 
+
+불리언 모델은 간결하며, 빠르지만 문서 유사도를 계산할 수 없다는 단점을 가진다. 이 단점은 문서의 양이 많아질때 두드러진다. 때문에 문서정보검색 쪽에서는 거의 사용되지 않는 모델이다. 현재 대부분의 검색엔진은 Vector:::space:::model(:12) 을 사용하고 있다. 
+
+불리언 모델은 색인된 Term과 문서의 집합으로 구성될 수 있다. 여기에 사용자 쿼리가 주어지면 문서가 Term을 포함하는지, 아닌지를 통해서 문서를 찾아내게 된다. 간단하게 다음과 같은 문제가 있음을 생각해 낼 수 있다. 
+  1. exact match 만 가능하다.
+  1. 참, 거짓의 불리언 연산이므로 유사도와 같은 범위값을 부여할 수가 없다. 
+
+그렇지만 텍스트 검색이 아닌 RDBMS(:12)나 '''사용자 질의 처리기'''등에서는 여전히 널리 사용되고 있다.
+
+불리언 모델은 사용자 질의 처리를 위한 단순한 방법을 제공한다. 예를들자면 '''리눅스'''를 포함하지만 '''윈도우'''를 포함하지 않은'''것 과 같은 질의어를 손쉽게 생성할 수 있다. 검색서비스에서도 사용자 질의 처리기는 불리언모델을 사용해서 분석하고 검색결과는 Vector:::space:::model(:12)을 사용하는 형식으로 구성이 된다.  
+
+불리언 모델을 따르는 질의어는 다음과 같이 만들어질 수 있을 것이다.
+  * A '''AND''' B 
+  * A '''AND''' (B '''OR''' C)
+  * (A '''OR''' B ) AND (B '''AND''' C)
+
+=== Extended Boolean model ===
+''' Vector:::space:::model(:12)'''과 boolean model 의 장점을 취해서 만들어진 모델이다. boolean model 에 기반을 두고 있으며, '''가중치'''를 부여할 수 없다는 단점을 해결하는데 촛점을 맞추고 있다.
+
+이 모델은 Document:::Term:::Weight(:12)간의 유클리드 거리를 구해서 유사도를 찾아낸다. 그러므로 Document Term Weight를 구해야 하는데, vector:::space:::model(:12)의 term:::frequency(:12) - inverse:::document:::frequency(:12) 모델을 사용해서 구한다.
+
+=== Boolean OR ===
+예를 들어서 사용자가 검색어 '''Q'''를 입력하였다고 가정해보자. 검색어 Q는 '''k1''''과 '''k2''' 두개의 Term으로 이루어졌다. 그렇다면 Term 공간에 다음과 같은 두개의 극단적인 - 최고 거리를 가지는 - 포인트를 찍을 수 있을 것이다. 
+  * 두개의 Term을 포함하며, 완전한 유사도를 가지는 문서. (1, 1)
+  * 어떠한 Term도 포함하지 않는 유사도 0인 문서 (0,0)
+
+이제 이 두개의 포인트를 이용해서, 포인트 사이의 최대 거리인 '''dmax = 1.41'''을 구할 수 있을 것이다. 문서들의 유사도는 0과 1.41 사이에 존재하게 될 것이다.
+
+attachment:dmax.gif
+
+따라서 OR 쿼리의 유클리드 거리인 (w_k1, w_k2)는 그림에서 처럼 반드시 1.41 보다 작음을 유추해 낼 수 있다. '''d < 1.41''' 
+
+attachment:OR-boolean.gif
+
+=== Boolean AND ===
+And 쿼리어 라면, dmax인 (1, 1)에서 (w_k1, w_k2) 까지의 거리를 구한다.
+
+attachment:AND-boolean.gif
+
+=== Similarity Score 일반화(Normalized) ===
+이제 dmax에 대해서 Similarity를 일반화 시킬 필요가 있음으로 다음과 같이 Term의 갯수로 나누어주도록 한다. 
+
+attachment:normalized-scores.gif
+
+=== p-Norm ===
+이제 우리는 '''m'''개의 Term에 대해서 유사도를 구할 수 있게 되었다. 그리고 여기에 Term과 독립적인 p-parameter을 부여한다. 이것을 '''p-norm'''이라고 한다.
+
+attachment:p-norm.gif
+
+'''p-Norm'''은 매우 흥미로운 인자다. 만약 '''p == 1'''이 된다면, 간단한 vector:::space:::model(:12)과 같은 효과를 얻게 될 것이다.
+=== AND OR 조합 ===
+p-Norm은 1에서 무한대까지의 범위를 가진다. 이 값을 조절함으로써 우리는 vector-like 한 모델로 갈것인지 boolean-like 한 모델로 갈것인지를 조정할 수 있다. 이제 AND, OR 두개를 조합해서 계산하면 문서의 유사도를 계산해 낼 수 있다. 
+
+attachment:combinations.gif
+

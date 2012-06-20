@@ -1,0 +1,220 @@
+#title file 관련 정보 얻어오기
+
+=== 파일의 종류 ===
+Unix 에서는 디렉토리, 장치, 소켓, FIFO 등 모든것이 파일로 존재한다. 그러므로
+우선 우리는 작업을 하고자 하는 파일이 어던 종류의 파일인지를 먼저 판단할수
+있어야 한다. Unix 상에서 "ls -al" 을 이용하면 아래와 같은 결과물을 볼수
+있을것이다.
+{{{#!plain
+[yundream@localhost test]# ls -al
+...
+-rw-r--r--    1 root     root          249  9월 10 11:25 wc.1
+drwxr-xr-x    2 root     root         4096 12월  5 18:01 web_install
+srwxr-xr-x    1 root     root            0  1월 14 18:05 loging_socket
+...
+}}}
+
+위의 결과에서 가장 앞부분 10자리가 그 파일의 특성과 권한을 나타내는데, 그중
+제일 앞부분이 파일의 종류를 나타내고, 우리는 가장 앞부분의 한바이트의 문자를
+이용해서 어떤 종류의 파일인지를 알아낼수 있다.<br>
+Unix 에서 자주 사용하는 파일의 종류를 아래 테이블에 정리해 두었으니 참고
+바란다.
+{{{#!html
+<table width=100%>
+<tr bgcolor=E0E0E0>
+    <td>-</td>
+    <td>일반 파일</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>s</td>
+    <td>소켓파일</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>d</td>
+    <td>디렉토리</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>p</td>
+    <td>FIFO</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>l</td>
+    <td>심볼링 링크된 파일</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>b</td>
+    <td>블럭 디바이스</td>
+</tr>
+<tr bgcolor=E0E0E0>
+    <td>c</td>
+    <td>캐릭터 디바이스</td>
+</tr>
+</table>
+}}}
+
+=== 파일 정보 가져오기 ===
+파일의 정보는 stat(2)를 통해서 가지고 오며, 가지고온 정보는
+struct stat 구조체에 저장된다. stat 구조체는 다음과 같은 내용을 가지고
+있다.
+
+{{{#!plain
+struct stat
+{
+    dev_t              st_dev;         /* device */
+    ino_t               st_ino;          /* inode */
+    mode_t            st_mode;      /* protection */
+    nlink_t             st_nlink;       /* number of hard links */
+    uid_t                st_uid;        /* user ID of owner */
+    gid_t                st_gid;        /* group ID of owner */
+    dev_t               st_rdev;      /* device type (if inode device) */
+    off_t                 st_size;      /* total size, in bytes */
+    unsigned long   st_blksize;  /* blocksize for filesystem I/O */
+    unsigned long   st_blocks;   /* number of blocks allocated */
+    time_t               st_atime;    /* time of last access */
+    time_t               st_mtime;    /* time of last modification */
+    time_t               st_ctime;    /* time of last change */
+};
+}}}
+
+위의 구조체의 정보는 inode 테이블을 참조해서 가지고오며, 우리가 필요로
+하는(그 이상의) 상세한 정보를 가져온다는 것을 알수 있을것이다. inode
+테이블에 대한 내용을 원한다면 /usr/src/linux/include/fs.h 의 sturct inode
+를 참조하면 된다.
+
+그럼 간단한 예제 프로그램을 만들어 보겠다. 이 프로그램은 아규먼트로 파일이름을
+받아서 그 파일의 정보를 되돌려주는 프로그램으로,
+파일의 권한, 퍼미션, 파일의 크기, 마지막에 수정된 날짜, 파일의 종류 등을
+되돌려줄것이며, 존재하지 않는 파일의 경우 적절한 에러메시지를 출력하고
+종료하게 될것이다. <br>
+이 예제의 이름은 file_info 로 하겠다. <br><br>
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;pwd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;grp.h&gt;
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>int</font></b> return_stat;
+    <b><font COLOR=#0000ff>char</font></b> *file_name; 
+    <b><font COLOR=#0000ff>struct</font></b> stat file_info; 
+
+    <b><font COLOR=#0000ff>struct</font></b> passwd *my_passwd;
+    <b><font COLOR=#0000ff>struct</font></b> group  *my_group;
+
+    mode_t file_mode;
+ 
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font> )
+    {
+        printf(<font COLOR=#ff0000>"Usage : ./file_info [file name]&#92;n"</font>);
+        exit(<font COLOR=#a900a9>0</font>); 
+    }
+    file_name = argv[<font COLOR=#a900a9>1</font>]; 
+    
+    <b><font COLOR=#0000ff>if</font></b> ((return_stat = stat(file_name, &file_info)) == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"Error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    file_mode = file_info.st_mode;
+    printf(<font COLOR=#ff0000>"파일이름 : %s&#92;n"</font>, file_name);
+    printf(<font COLOR=#ff0000>"=======================================&#92;n"</font>);
+    printf(<font COLOR=#ff0000>"파일 타입 : &#92;n"</font>); 
+    <b><font COLOR=#0000ff>if</font></b> (S_ISREG(file_mode))
+    { 
+        printf(<font COLOR=#ff0000>"정규파일&#92;n"</font>);
+    }
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISLNK(file_mode))  
+    {  
+        printf(<font COLOR=#ff0000>"심볼릭 링크&#92;n"</font>);
+    } 
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISDIR(file_mode))
+    {
+        printf(<font COLOR=#ff0000>"디렉토리&#92;n"</font>);
+    }
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISCHR(file_mode))
+    { 
+        printf(<font COLOR=#ff0000>"문자 디바이스&#92;n"</font>);
+    }
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISBLK(file_mode))
+    {
+        printf(<font COLOR=#ff0000>"블럭 디바이스&#92;n"</font>);
+    }
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISFIFO(file_mode))
+    {
+        printf(<font COLOR=#ff0000>"FIFO&#92;n"</font>);
+    }
+    <b><font COLOR=#0000ff>else</font></b> <b><font COLOR=#0000ff>if</font></b> (S_ISSOCK(file_mode))
+    {
+        printf(<font COLOR=#ff0000>"소켓&#92;n"</font>);
+    }
+
+    my_passwd = getpwuid(file_info.st_uid);
+    my_group  = getgrgid(file_info.st_gid);
+    printf(<font COLOR=#ff0000>"OWNER : %s&#92;n"</font>, my_passwd->pw_name);
+    printf(<font COLOR=#ff0000>"GROUP : %s&#92;n"</font>, my_group->gr_name);
+    printf(<font COLOR=#ff0000>"FILE SIZE IS : %d&#92;n"</font>, file_info.st_size);
+    printf(<font COLOR=#ff0000>"마지막 읽은 시간 : %d&#92;n"</font>, file_info.st_atime);
+    printf(<font COLOR=#ff0000>"마지막 수정 시간 : %d&#92;n"</font>, file_info.st_mtime);
+    printf(<font COLOR=#ff0000>"하드링크된 파일수 : %d&#92;n"</font>, file_info.st_nlink);
+}
+</pre>
+</td></tr>
+</table>
+}}}
+완벽하진 않지만 그럭저럭 작동하는 프로그램이다.
+
+프로그램은 아마 설명이 필요 없을 정도로 간단할것이다. 단지 마지막의
+file_info.st_nlink (하드링크) 부분이 약간 헷갈릴 것이다. 하드링크란
+보통 C 의 link(2) 함수와 쉘 코멘드인 link 에 -d 옵션을 줌으로서 만들어
+진다. cp 를 이용한 복사와 하드링크를 혼동하지 말라, cp 를 이용한
+복사는 자신만의 inode 를 가지는 전혀 새로운 파일을 만들지만, 하드링크의
+경우 동일한 inode 를 가지고 파일이름을 만든다. 하드링크는 inode 를 가지고
+파일이름을 만들므로 서로 다른 파일시스템 사이로 연결할수는 없다.<br>
+그 이유는
+inode 가 해당 파일시스템에서만 유일하기 때문으로 여러개의 파일시스템을
+사용할경우 다른 쪽 파일시스템에서 그 inode 가 유일함을 보장할수 없기 때문이다.
+
+==== stat 는 너무 복잡합니다. 더 간단한 함수는 없을까요? ====
+우리가 어떤 프로그램을 만들때, 우리는 종종 그 프로그램이 사용하는
+파일(설정파일, 데이타 파일)들이 존재하는지 등을 검사할 필요가 있다. 이때에도
+위의 stat 를 이용해서 해결 할수 있지만, 왠지 복잡하다는 생각이든다. <br>
+이때는 access(2) 를 사용하면된다.
+
+access 는 검사할 파일에 대하여 4가지 항목, 읽을수 있는지(R_OK),
+쓸수 있는지 (W_OK), 실행가능 한지 (X_OK), 존재하는 파일인지(F_OK) 등에
+대한 정보를 돌려준다.
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+<font COLOR=#00b800>#include</font> <unistd.h>
+<font COLOR=#00b800>#include</font> <stdio.h>
+    
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{   
+    <b><font COLOR=#0000ff>if</font></b> (access(argv[<font COLOR=#a900a9>1</font>], F_OK) != <font COLOR=#a900a9>0</font>)
+        perror(<font COLOR=#ff0000>"파일이 존재하지 않음 : "</font>);
+    else
+        printf(<font COLOR=#ff0000>"파일 존재함&#92;n"</font>);
+}
+    
+</pre>
+</td></tr>
+</table>
+}}}    
+
+{{{#!plain
+[yundream@localhost test]# gcc -o access access. 
+파일이 존재하지 않음 : : No such file or directory
+}}}
+
+=== 파일 정보 변경하기 ===
+파일 정보 들을 보면 시간과 관련된 정보들이 있다. 파일에 대한 접근, 수정 시간이 이들인데, utime(2)을 이용해서 변경할 수 있다. 자세한 내용은 함수링크를 참조하기 바란다. 

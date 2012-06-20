@@ -1,0 +1,2674 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>bzimage가 만들어지는 과정 추적-Makefile 분석</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="Makefile 분석"
+HREF="chap02.html"><LINK
+REL="PREVIOUS"
+TITLE="커널 이미지 파일의 구조"
+HREF="kernel-image-file-structure.html"><LINK
+REL="NEXT"
+TITLE="bzImage가 만들어지는 과정 추적-Log 분석"
+HREF="tracing-bzimage-log.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="kernel-image-file-structure.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>2장. Makefile 분석</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="tracing-bzimage-log.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="TRACING-BZIMAGE-MAKEING"
+>2.3. bzimage가 만들어지는 과정 추적-Makefile 분석</A
+></H1
+><P
+>			bzimage가 만들어지는 과정을 살펴 보고 이를 따라가면서 Makefile의 자세한 내용을 알아본다.
+			정확한 것은 <A
+HREF="tracing-bzimage-log.html#MAKE-BZIMAGE-LOG"
+>2.4.2절</A
+>을 참조하기 바란다.
+		</P
+><P
+>			시작은 물론 $(topDIR)/Makefile로 부터 시작한다.
+		</P
+><P
+>			커널 makefile은 몇 부분으로 나눌 수 있다.
+			<P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>기본 정보 정의</P
+></LI
+><LI
+><P
+>커널 설정</P
+></LI
+><LI
+><P
+>커널 소스 의존성 만들기</P
+></LI
+><LI
+><P
+>모듈 만들기</P
+></LI
+><LI
+><P
+>커널 실행 파일 만들기</P
+></LI
+><LI
+><P
+>모듈 설치하기</P
+></LI
+></OL
+>
+			각 부분이 명확하게 구분되는 것은 아니지만 make의 동작을 이해하는 사람이라면
+			대충 구분을 지어 이해할 수 있을 것이다. 구분은 커널을 컴파일 하는 절차에 따라 나눈 것으로
+			이해 하면 쉬울 것이다. 일반적으로 많이 쓰이지 않는 부분은 넘어가고 중요한 부분만을 자세히
+			이해하자.
+		</P
+><P
+>			시작에 앞서 사용되는 Makefile들을 설명해 놓는다. 이것 들을 참조로 추적해나가므로 시작하기에
+			앞서 한번 쯤 훑어 보는 것도 좋을 것이다.	
+		</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TOPDIR-MAKEFILE"
+>2.3.1. $(topDIR)/Makefile</A
+></H2
+><P
+>				아래 makefile에 (1), (2)와 같이 표시된 것은 아래 줄에 대한 설명을 달아 놓은 것으로 Makefile의 
+				끝 부분에 붙어 있는 설명을 참조해가면서 분석하면되겠다.
+			</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>version = 2
+patchlevel = 4
+sublevel = 16
+extraversion =
+
+kernelrelease=$(veRSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
+
+<A
+NAME="MAKEFILE.ARCH"
+><B
+>(1)</B
+></A
+>
+arch := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
+
+<A
+NAME="MAKEFILE.KERNELPATH"
+><B
+>(2)</B
+></A
+>
+kernelpath=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//")
+
+<A
+NAME="MAKEFILE.CONFIG-SHELL"
+><B
+>(3)</B
+></A
+>
+config-shell := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
+	  else if [ -x /bin/bash ]; then echo /bin/bash; \
+	  else echo sh; fi ; fi)
+
+<A
+NAME="MAKEFILE.TOPDIR"
+><B
+>(4)</B
+></A
+>
+topdir	:= $(shell /bin/pwd)
+
+hpath   	= $(topdIR)/include
+findhpath	= $(hpatH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
+
+<A
+NAME="MAKEFILE.HOST"
+><B
+>(5)</B
+></A
+>
+hostcc  	= gcc
+hostcflags	= -wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+
+<A
+NAME="MAKEFILE.CROSS"
+><B
+>(6)</B
+></A
+>
+cross-compile 	=
+
+<A
+NAME="MAKEFILE.PGM"
+><B
+>(7)</B
+></A
+>
+#
+# include the make variables (CC, etc...)
+#
+as		= $(cross-coMPILE)as
+ld		= $(cross-coMPILE)ld
+cc		= $(cross-coMPILE)gcc
+cpp		= $(cc) -e
+ar		= $(cross-coMPILE)ar
+nm		= $(cross-coMPILE)nm
+strip		= $(cross-COMPILE)strip
+objcopy		= $(crosS-COMPILE)objcopy
+objdump		= $(crosS-COMPILE)objdump
+makefiles	= $(topdIR)/.config
+genksyms	= /sbin/genksyms
+depmod		= /sbin/depmod
+modflags	= -dmoduLE
+cflags-kernel	=
+perl		= perl
+
+<A
+NAME="MAKEFILE.EXPORT"
+><B
+>(8)</B
+></A
+>
+export	version paTCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
+	config-shell topDIR HPATH HOSTCC HOSTCFLAGS CROSS-COMPILE AS LD CC \
+	cpp ar nm strip OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
+
+all:	do-it-all
+
+<A
+NAME="MAKEFILE.CONFIGDEP"
+><B
+>(9)</B
+></A
+>
+#
+# make "config" the default target if there is no configuration file or
+# "depend" the target if there is no top-level dependency information.
+#
+ifeq (.config,$(wildcard .config))
+include .config
+ifeq (.depend,$(wildcard .depend))
+include .depend
+do-it-all:	version vmlinux
+else
+<A
+NAME="MAKEFILE.NODEP"
+><B
+>(10)</B
+></A
+>
+configuration = depend
+do-it-all:	depend
+endif
+else
+<A
+NAME="MAKEFILE.NOCONFIG"
+><B
+>(11)</B
+></A
+>
+configuration = config
+do-it-all:	config
+endif
+
+<A
+NAME="MAKEFILE.INSTALL-PATH"
+><B
+>(12)</B
+></A
+>
+#
+# install-path specifies where to place the updated kernel and system map
+# images.  uncomment if you want to place them anywhere other than root.
+#
+#export	install-paTH=/boot
+
+<A
+NAME="MAKEFILE.MODULE-PATH"
+><B
+>(13)</B
+></A
+>
+#
+# install-mod-path specifies a prefix to MODLIB for module directory
+# relocations required by build roots.  This is not defined in the
+# makefile but the arguement can be passed to make if needed.
+#
+modlib	:= $(instaLL-MOD-PATH)/lib/modules/$(KERNELRELEASE)
+export modlib
+
+#
+# standard cflags
+#
+cppflags := -d--keRNEL-- -I$(HPATH)
+
+cflags := $(cppflaGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
+aflags := -d--asseMBLY-- $(CPPFLAGS)
+
+<A
+NAME="MAKEFILE.ROOT-DEV"
+><B
+>(14)</B
+></A
+>
+#
+# root-dev specifies the default root-device when making the image.
+# this can be either FLOPPY, CURRENT, /dev/xxxx or empty, in which case
+# the default of fLOPPY is used by 'build'.
+# this is i386 specific.
+#
+export root-dev = CURRENT
+
+<A
+NAME="MAKEFILE.SVGA-MODE"
+><B
+>(15)</B
+></A
+>
+#
+# if you want to preset the SVGA mode, uncomment the next line and
+# set svga-mode to whatever number you want.
+# set it to -dsvga-MODE=NORMAL-VGA if you just want the EGA/VGA mode.
+# the number is the same as you would ordinarily press at bootup.
+# this is i386 specific.
+#
+export svga-mode = -DSVGA-MODE=NORMAL-VGA
+
+<A
+NAME="MAKEFILE.RAMDISK"
+><B
+>(16)</B
+></A
+>
+#
+# if you want the RAM disk device, define this to be the size in blocks.
+# this is i386 specific.
+#
+#export ramdisk = -DRAMDISK=512
+
+<A
+NAME="MAKEFILE.CORE-FILES"
+><B
+>(17)</B
+></A
+>
+core-files	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
+networks	=net/network.o
+
+libs		=$(topdir)/lib/lib.a
+subdirs		=kernel drivers mm fs net ipc lib
+
+<A
+NAME="MAKEFILE.DRIVERS"
+><B
+>(18)</B
+></A
+>
+drivers-n :=
+drivers-y :=
+drivers-m :=
+drivers-  :=
+
+drivers-$(config-aCPI) += drivers/acpi/acpi.o
+drivers-$(config-pARPORT) += drivers/parport/driver.o
+drivers-y += drivers/char/char.o \
+	drivers/block/block.o \
+	drivers/misc/misc.o \
+	drivers/net/net.o \
+	drivers/media/media.o
+drivers-$(config-aGP) += drivers/char/agp/agp.o
+drivers-$(config-dRM) += drivers/char/drm/drm.o
+drivers-$(config-nUBUS) += drivers/nubus/nubus.a
+drivers-$(config-iSDN) += drivers/isdn/isdn.a
+drivers-$(config-nET-FC) += drivers/net/fc/fc.o
+drivers-$(config-aPPLETALK) += drivers/net/appletalk/appletalk.o
+drivers-$(config-tR) += drivers/net/tokenring/tr.o
+drivers-$(config-wAN) += drivers/net/wan/wan.o
+drivers-$(config-aRCNET) += drivers/net/arcnet/arcnetdrv.o
+drivers-$(config-aTM) += drivers/atm/atm.o
+drivers-$(config-iDE) += drivers/ide/idedriver.o
+drivers-$(config-fC4) += drivers/fc4/fc4.a
+drivers-$(config-sCSI) += drivers/scsi/scsidrv.o
+drivers-$(config-fUSION-BOOT) += drivers/message/fusion/fusion.o
+drivers-$(config-iEEE1394) += drivers/ieee1394/ieee1394drv.o
+
+ifneq ($(config-cd-NO-IDESCSI)$(CONFIG-BLK-DEV-IDECD)$(CONFIG-BLK-DEV-SR)$(CONFIG-PARIDE-PCD),)
+drivers-y += drivers/cdrom/driver.o
+endif
+
+drivers-$(config-sOUND) += drivers/sound/sounddrivers.o
+drivers-$(config-pCI) += drivers/pci/driver.o
+drivers-$(config-mTD) += drivers/mtd/mtdlink.o
+drivers-$(config-pCMCIA) += drivers/pcmcia/pcmcia.o
+drivers-$(config-nET-PCMCIA) += drivers/net/pcmcia/pcmcia-net.o
+drivers-$(config-nET-WIRELESS) += drivers/net/wireless/wireless-net.o
+drivers-$(config-pCMCIA-CHRDEV) += drivers/char/pcmcia/pcmcia-char.o
+drivers-$(config-dIO) += drivers/dio/dio.a
+drivers-$(config-sBUS) += drivers/sbus/sbus-all.o
+drivers-$(config-zORRO) += drivers/zorro/driver.o
+drivers-$(config-fC4) += drivers/fc4/fc4.a
+drivers-$(config-aLL-PPC) += drivers/macintosh/macintosh.o
+drivers-$(config-mAC) += drivers/macintosh/macintosh.o
+drivers-$(config-iSAPNP) += drivers/pnp/pnp.o
+drivers-$(config-sGI-IP22) += drivers/sgi/sgi.a
+drivers-$(config-vT) += drivers/video/video.o
+drivers-$(config-pARIDE) += drivers/block/paride/paride.a
+drivers-$(config-hAMRADIO) += drivers/net/hamradio/hamradio.o
+drivers-$(config-tC) += drivers/tc/tc.a
+drivers-$(config-uSB) += drivers/usb/usbdrv.o
+drivers-$(config-iNPUT) += drivers/input/inputdrv.o
+drivers-$(config-i2O) += drivers/message/i2o/i2o.o
+drivers-$(config-iRDA) += drivers/net/irda/irda.o
+drivers-$(config-i2C) += drivers/i2c/i2c.o
+drivers-$(config-pHONE) += drivers/telephony/telephony.o
+drivers-$(config-mD) += drivers/md/mddev.o
+drivers-$(config-bLUEZ) += drivers/bluetooth/bluetooth.o
+drivers-$(config-hOTPLUG-PCI) += drivers/hotplug/vmlinux-obj.o
+
+<A
+NAME="MAKEFILE.DRIVERS-Y"
+><B
+>(19)</B
+></A
+>
+drivers := $(driveRS-y)
+
+<A
+NAME="MAKEFILE.CLEAN"
+><B
+>(20)</B
+></A
+>
+# files removed with 'make clean'
+clean-files = \
+	kernel/ksyms.lst include/linux/compile.h \
+	vmlinux system.map \
+	.tmp* \
+	drivers/char/consolemap-deftbl.c drivers/video/promcon-tbl.c \
+	drivers/char/conmakehash \
+	drivers/char/drm/*-mod.c \
+	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
+	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
+	drivers/sound/bin2hex drivers/sound/hex2hex \
+	drivers/atm/fore200e-mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
+	drivers/scsi/aic7xxx/aicasm/aicasm-gram.c \
+	drivers/scsi/aic7xxx/aicasm/aicasm-scan.c \
+	drivers/scsi/aic7xxx/aicasm/y.tab.h \
+	drivers/scsi/aic7xxx/aicasm/aicasm \
+	drivers/scsi/53c700-mem.c \
+	net/khttpd/make-times-h \
+	net/khttpd/times.h \
+	submenu*
+# directories removed with 'make clean'
+clean-dirs = \
+	modules
+
+<A
+NAME="MAKEFILE.MRPROPER"
+><B
+>(21)</B
+></A
+>
+# files removed with 'make mrproper'
+mrproper-files = \
+	include/linux/autoconf.h include/linux/version.h \
+	drivers/net/hamradio/soundmodem/sm-tbl-{afsk1200,afsk2666,fsk9600}.h \
+	drivers/net/hamradio/soundmodem/sm-tbl-{hapn4800,psk4800}.h \
+	drivers/net/hamradio/soundmodem/sm-tbl-{afsk2400-7,afsk2400-8}.h \
+	drivers/net/hamradio/soundmodem/gentbl \
+	drivers/sound/*-boot.h drivers/sound/.*.boot \
+	drivers/sound/msndinit.c \
+	drivers/sound/msndperm.c \
+	drivers/sound/pndsperm.c \
+	drivers/sound/pndspini.c \
+	drivers/atm/fore200e-*-fw.c drivers/atm/.fore200e-*.fw \
+	.version .config* config.in config.old \
+	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
+	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
+	.menuconfig.log \
+	include/asm \
+	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
+	$(topdir)/include/linux/modversions.h \
+	kernel.spec
+
+# directories removed with 'make mrproper'
+mrproper-dirs = \
+	include/config \
+	$(topdir)/include/linux/modules
+
+<A
+NAME="MAKEFILE.ARCH-MAKEFILE"
+><B
+>(22)</B
+></A
+>
+include arch/$(arcH)/Makefile
+
+<A
+NAME="MAKEFILE.EXPORT2"
+><B
+>(23)</B
+></A
+>
+export	cppflags cFLAGS AFLAGS
+
+export	networks dRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
+
+<A
+NAME="MAKEFILE.ASM-COMPILE"
+><B
+>(24)</B
+></A
+>
+.s.s:
+	$(cpp) $(aflags) -traditional -o $*.s $&#60;.s.o:
+	$(cc) $(aflags) -traditional -c -o $*.o $&#60;
+version: dummy
+	@rm -f include/linux/compile.h
+
+boot: vmlinux
+	@$(make) cflags="$(CFLAGS) $(CFLAGS-KERNEL)" -C arch/$(ARCH)/boot
+
+<A
+NAME="MAKEFILE.VMLINUX"
+><B
+>(25)</B
+></A
+>
+vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
+	$(ld) $(linkflagS) $(HEAD) init/main.o init/version.o \
+		--start-group \
+		$(core-files) \
+		$(drivers) \
+		$(networks) \
+		$(libs) \
+		--end-group \
+		-o vmlinux
+	$(nm) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort &#62; System.map
+
+<A
+NAME="MAKEFILE.SYMLINKS"
+><B
+>(26)</B
+></A
+>
+symlinks:
+	rm -f include/asm
+	( cd include ; ln -sf asm-$(ARCH) asm)
+	@if [ ! -d include/linux/modules ]; then \
+		mkdir include/linux/modules; \
+	fi
+
+<A
+NAME="MAKEFILE.CONFIG"
+><B
+>(27)</B
+></A
+>
+oldconfig: symlinks
+	$(config-shell) scripts/Configure -d arch/$(ARCH)/config.in
+
+xconfig: symlinks
+	$(make) -c scripts kconfig.tk
+	wish -f scripts/kconfig.tk
+
+menuconfig: include/linux/version.h symlinks
+	$(make) -c scripts/lxdialog all
+	$(config-shell) scripts/Menuconfig arch/$(ARCH)/config.in
+
+config: symlinks
+	$(config-shell) scripts/Configure arch/$(ARCH)/config.in
+
+include/config/marKER: scripts/split-include include/linux/autoconf.h
+	scripts/split-include include/linux/autoconf.h include/config
+	@ touch include/config/MARKER
+
+<A
+NAME="MAKEFILE.LINUXSUBDIRS"
+><B
+>(28)</B
+></A
+>
+linuxsubdirs: $(patsubst %, -dir-%, $(SUBDIRS))
+
+<A
+NAME="MAKEFILE.MAKE-SUBDIR"
+><B
+>(29)</B
+></A
+>
+$(patsubst %, -dir-%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
+	$(make) cflags="$(CFLAGS) $(CFLAGS-KERNEL)" -C $(patsubst -dir-%, %, $@)
+
+$(topdir)/include/linux/version.h: include/linux/version.h
+$(topdir)/include/linux/compile.h: include/linux/compile.h
+
+newversion:
+	. scripts/mkversion &#62; .tmpversion
+	@mv -f .tmpversion .version
+
+<A
+NAME="MAKEFILE.COMPILE.H"
+><B
+>(30)</B
+></A
+>
+include/linux/compile.h: $(CONFIGURATION) include/linux/version.h newversion
+	@echo -n \#define UTS-VERSION \"\#`cat .version` &#62; .ver
+	@if [ -n "$(confIG-SMP)" ] ; then echo -n " SMP" &#62;&#62; .ver; fi
+	@if [ -f .name ]; then  echo -n \-`cat .name` &#62;&#62; .ver; fi
+	@echo ' '`date`'"' &#62;&#62; .ver
+	@echo \#define lINUX-COMPILE-TIME \"`date +%T`\" &#62;&#62; .ver
+	@echo \#define lINUX-COMPILE-BY \"`whoami`\" &#62;&#62; .ver
+	@echo \#define lINUX-COMPILE-HOST \"`hostname`\" &#62;&#62; .ver
+	@if [ -x /bin/dnsdomainname ]; then \
+	   echo \#define LINUX-COMPILE-DOMAIN \"`dnsdomainname`\"; \
+	 elif [ -x /bin/domainname ]; then \
+	   echo \#define LINUX-COMPILE-DOMAIN \"`domainname`\"; \
+	 else \
+	   echo \#define LINUX-COMPILE-DOMAIN ; \
+	 fi &#62;&#62; .ver
+	@echo \#define lINUX-COMPILER \"`$(CC) $(CFLAGS) -v 2&#62;&#38;1 | tail -1`\" &#62;&#62; .ver
+	@mv -f .ver $@
+
+<A
+NAME="MAKEFILE.VERSION.H"
+><B
+>(31)</B
+></A
+>
+include/linux/version.h: ./Makefile
+	@echo \#define uTS-RELEASE \"$(KERNELRELEASE)\" &#62; .ver
+	@echo \#define lINUX-VERSION-CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)` &#62;&#62; .ver
+	@echo '#define kERNEL-VERSION(a,b,c) (((a) &#60;&#60; 16) + ((b) &#60;&#60; 8) + (c))' &#62;&#62; .ver
+	@mv -f .ver $@
+
+init/version.o: init/version.c include/linux/compile.h include/config/MARKER
+	$(cc) $(cflags) $(CFLAGS-KERNEL) -DUTS-MACHINE='"$(ARCH)"' -c -o init/version.o init/version.c
+
+<A
+NAME="MAKEFILE.MAIN.C"
+><B
+>(32)</B
+></A
+>
+init/main.o: init/main.c include/config/MARKER
+	$(cc) $(cflags) $(CFLAGS-KERNEL) $(PROFILING) -c -o $*.o $&#60;
+<A
+NAME="MAKEFILE.MAKE-SUBDIR2"
+><B
+>(33)</B
+></A
+>
+fs lib mm ipc kernel drivers net: dummy
+	$(make) cflags="$(CFLAGS) $(CFLAGS-KERNEL)" $(subst $@, -dir-$@, $@)
+
+<A
+NAME="MAKEFILE.TAGS"
+><B
+>(34)</B
+></A
+>
+# emacs, vi용 tag를 만든다.
+tags: dummy
+	etags `find include/asm-$(ARCH) -name '*.h'`
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
+	find $(subdirs) init -name '*.[ch]' | xargs etags -a
+
+# exuberant ctags works better with -I
+tags: dummy
+	ctagsf=`ctags --version | grep -i exuberant &#62;/dev/null &#38;&#38; echo "-I --initdata,--exitdata,EXPORT-SYMBOL,EXPORT-SYMBOL-NOVERS"`; \
+	ctags $$ctagsf `find include/asm-$(ARCH) -name '*.h'` &#38;&#38; \ find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a &#38;&#38; \
+	find $(subdirs) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+
+ifdef config-modulES
+ifdef config-modveRSIONS
+modflags += -dmodvERSIONS -include $(HPATH)/linux/modversions.h
+endif
+
+<A
+NAME="MAKEFILE.MODULES"
+><B
+>(35)</B
+></A
+>
+.phony: modules
+modules: $(patsubst %, -mod-%, $(SUBDIRS))
+
+.phony: $(patsubst %, -mod-%, $(SUBDIRS))
+$(patsubst %, -mod-%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
+	$(make) -c $(patsubst -mod-%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING-MODULES=1 modules
+
+.phony: modules-install
+modules-install: -modinst- $(patsubst %, -modinst-%, $(SUBDIRS)) -modinst-post
+
+.phony: -modinst-
+-modinst-:
+	@rm -rf $(modlib)/kernel
+	@rm -f $(modlib)/build
+	@mkdir -p $(modlIB)/kernel
+	@ln -s $(topdir) $(MODLIB)/build
+
+<A
+NAME="MAKEFILE.SYSTEM.MAP"
+><B
+>(36)</B
+></A
+>
+# if system.map exists, run depmod.  This deliberately does not have a
+# dependency on system.map since that would run the dependency tree on
+# vmlinux.  this depmod is only for convenience to give the initial
+# boot a modules.dep even before / is mounted read-write.  However the
+# boot script depmod is the master version.
+ifeq "$(strip $(inSTALL-MOD-PATH))" ""
+depmod-opts	:=
+else
+depmod-opts	:= -b $(INSTALL-MOD-PATH) -r
+endif
+.phony: -modinst-post
+-modinst-post: -modinst-post-pcmcia
+	if [ -r system.map ]; then $(DEPMOD) -ae -F System.map $(depmod-opts) $(KERNELRELEASE); fi
+
+# backwards compatibilty symlinks for people still using old versions
+# of pcmcia-cs with hard coded pathnames on insmod.  Remove
+# -modinst-post-pcmcia for kernel 2.4.1.
+.phony: -modinst-post-pcmcia
+-modinst-post-pcmcia:
+	cd $(modlib); \
+	mkdir -p pcmcia; \
+	find kernel -path '*/pcmcia/*' -name '*.o' | xargs -i -r ln -sf ../{} pcmcia
+
+.phony: $(patsubst %, -modinst-%, $(SUBDIRS))
+$(patsubst %, -modinst-%, $(SUBDIRS)) :
+	$(make) -c $(patsubst -modinst-%, %, $@) modules-install
+
+# modules disabled....
+
+else
+modules modules-install: dummy
+	@echo
+	@echo "the present kernel configuration has modules disabled."
+	@echo "type 'make config' and enable loadable module support."
+	@echo "then build a kernel with module support enabled."
+	@echo
+	@exit 1
+endif
+
+clean:	archclean
+	find . \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f -print \
+		| grep -v lxdialog/ | xargs rm -f
+	rm -f $(clean-fiLES)
+	rm -rf $(clean-dIRS)
+	$(make) -c documentation/DocBook clean
+
+mrproper: clean archmrproper
+	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
+	rm -f $(mrproper-FILES)
+	rm -rf $(mrpropeR-DIRS)
+	$(make) -c documentation/DocBook mrproper
+
+<A
+NAME="MAKEFILE.DISTCLEAN"
+><B
+>(37)</B
+></A
+>
+distclean: mrproper
+	rm -f core `find . \( -not -type d \) -and \
+		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
+
+backup: mrproper
+	cd .. &#38;&#38; tar cf - linux/ | gzip -9 &#62; backup.gz
+	sync
+
+sgmldocs: 
+	chmod 755 $(topdIR)/scripts/docgen
+	chmod 755 $(topdIR)/scripts/gen-all-syms
+	chmod 755 $(topdIR)/scripts/kernel-doc
+	$(make) -c $(topDIR)/Documentation/DocBook books
+
+psdocs: sgmldocs
+	$(make) -c documentation/DocBook ps
+
+pdfdocs: sgmldocs
+	$(make) -c documentation/DocBook pdf
+
+htmldocs: sgmldocs
+	$(make) -c documentation/DocBook html
+
+sums:
+	find . -type f -print | sort | xargs sum &#62; .SUMS
+
+dep-files: scripts/mkdep archdep include/linux/version.h
+	scripts/mkdep -- init/*.c &#62; .depend
+	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` &#62; .hdepend
+	$(make) $(patsubst %,-sfdep-%,$(SUBDIRS)) -FASTDEP-ALL-SUB-DIRS="$(SUBDIRS)"
+ifdef config-modveRSIONS
+	$(make) update-modverfile
+endif
+
+ifdef config-modveRSIONS
+modverfile := $(toPDIR)/include/linux/modversions.h
+else
+modverfile :=
+endif
+export	modverfile
+
+depend dep: dep-files
+
+checkconfig:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+
+checkhelp:
+	find * -name [cc]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+
+checkincludes:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+
+ifdef configuratioN
+..$(configuration):
+	@echo
+	@echo "you have a bad or nonexistent" .$(CONFIGURATION) ": running 'make" $(CONFIGURATION)"'"
+	@echo
+	$(make) $(configURATION)
+	@echo
+	@echo "successful. Try re-making (ignore the error that follows)"
+	@echo
+	exit 1
+
+#dummy: ..$(configURATION)
+dummy:
+
+else
+
+dummy:
+
+endif
+
+<A
+NAME="MAKEFILE.RULES.MAKE"
+><B
+>(38)</B
+></A
+>
+include rules.make
+
+<A
+NAME="MAKEFILE.MKDEP.C"
+><B
+>(39)</B
+></A
+>
+#
+# this generates dependencies for the .h files.
+#
+
+scripts/mkdep: scripts/mkdep.c
+	$(hostcc) $(hostCFLAGS) -o scripts/mkdep scripts/mkdep.c
+
+scripts/split-include: scripts/split-include.c
+	$(hostcc) $(hostCFLAGS) -o scripts/split-include scripts/split-include.c
+
+<A
+NAME="MAKEFILE.RPM"
+><B
+>(40)</B
+></A
+>
+#
+# rpm target
+#
+#	if you do a make spec before packing the tarball you can rpm -ta it
+#
+spec:
+	. scripts/mkspec &#62; kernel.spec
+
+#
+#	build a tar ball, generate an rpm from it and pack the result
+#	there arw two bits of magic here
+#	1) the use of /. to avoid tar packing just the symlink
+#	2) removing the .dep files as they have source paths in them that
+#	   will become invalid
+#
+rpm:	clean spec
+	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
+	set -e; \
+	cd $(topdir)/.. ; \
+	ln -sf $(topdir) $(KERNELPATH) ; \
+	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
+	rm $(kernelpath) ; \
+	cd $(topdir) ; \
+	. scripts/mkversion &#62; .version ; \
+	rpm -ta $(topdir)/../$(KERNELPATH).tar.gz ; \
+	rm $(topdir)/../$(KERNELPATH).tar.gz
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.ARCH"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						arch는 아래와 같이 uname으로 얻어지는 아키텍쳐를 지칭하는 값을 갖는다.
+						intel 계열에선 i386이 되고 ARM 계열에선 arm이 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.KERNELPATH"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						kernelPATH는 kernel-2.4.16이 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CONFIG-SHELL"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						현재 사용 중인 shell을 알아낸다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.TOPDIR"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						topdir은 커널 소스 코드가 들어있는 최상위 디렉토리
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.HOST"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						host가 붙은 것은 커널이 cross compile 되서 다른 아키텍쳐용 바이너리를
+						만들 수도 있기 때문에 실제 커널을 구성하는 코드 외에 커널을 만들기
+						위해 필요한 몇 몇 프로그램을 호스트 상에서 돌리기 위한 컴파일러를 지정
+						하는 것이다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CROSS"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						보통의 경우 HOST와 TARGET이 같으면 CROSS-COMPILE에 아무 것도 없으나
+						target이 다르면 여기에 컴파일러의 prefix를 적어줘야한다.
+						예를 들어 PDA에 많이 사용되는 arm processor를 TARGET으로한 경우엔
+						cross-COMPILE = arm-linux- 와 같이 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.PGM"
+><B
+>(7)</B
+></A
+></DT
+><DD
+>						위에서 정의한 CROSS-COMPILE이 컴파일러 등의 prefix로 쓰이는데
+						arm processor의 경우엔 CC = arm-linux-gcc 와 같이 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.EXPORT"
+><B
+>(8)</B
+></A
+></DT
+><DD
+>						여기 까지 정의된 변수들은 커널 컴파일 전반에 사용될 것들이므로 아래와
+						같이 해서 각 디렉토리 등에 들어있는 Makefile로 값을 전달해 준다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CONFIGDEP"
+><B
+>(9)</B
+></A
+></DT
+><DD
+>						리눅스 커널은 컴파일 전에 반드시 설정/의존성설정이 되어있어야 하므로
+						어느 경우든 두 절차를 검사한다. 먼저 .config가 있다는 것은 커널 설정이
+						된 상태를 의미하고 .depend는 의존성설정이 끝난 것을 의미한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.NODEP"
+><B
+>(10)</B
+></A
+></DT
+><DD
+>						.config는 있지만 .depend는 없는 경우
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.NOCONFIG"
+><B
+>(11)</B
+></A
+></DT
+><DD
+>						.config가 없는 경우엔 커널 설정을 먼저하도록 한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.INSTALL-PATH"
+><B
+>(12)</B
+></A
+></DT
+><DD
+>						커널 컴파일이 끝나고 설치될 디렉토리를 지정한다. 보통은 사용되지 않는다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MODULE-PATH"
+><B
+>(13)</B
+></A
+></DT
+><DD
+>						module이 설치될 디렉토리를 지정한다.
+						보통은 /lib/modules/2.4.16 과 같이된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.ROOT-DEV"
+><B
+>(14)</B
+></A
+></DT
+><DD
+>						i386 아키텍쳐에서 루트 디바이스를 지정한다.
+						currenT는 커널 컴파일 할 당시의 root device를 의미한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.SVGA-MODE"
+><B
+>(15)</B
+></A
+></DT
+><DD
+>						i386 아키텍쳐에서 초기 부팅시의 화면 모드를 설정한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.RAMDISK"
+><B
+>(16)</B
+></A
+></DT
+><DD
+>						i386에서 램디스크가 필요한 경우 사용한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CORE-FILES"
+><B
+>(17)</B
+></A
+></DT
+><DD
+>						core-fILES는 리눅스 커널을 이루는 근간이 되는 몇 몇 부분을 나타낸다.
+						리눅스 커널은 아래와 같이 kernel, drivers, mm, fs, ipc, network, lib로
+						구분된다고 볼수 있다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.DRIVERS"
+><B
+>(18)</B
+></A
+></DT
+><DD
+>						커널 설정할 때 어떤 기능을 yes, no, module로 설정할 수 있는데 yes로하면
+						driverS-y에, no는 DRIVERS-n에, module은 DRIVERS-m에 모이게 된다.
+					</DD
+><DD
+><P
+>						예를 들어 ACPI 기능을 사용하지 않는다고 했을 경우엔 아래 줄이
+						driverS- += drivers/acpi/acpi.o가 된다.
+						.config의 내용을 한번 읽어보면 금방 이해될 것이다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.DRIVERS-Y"
+><B
+>(19)</B
+></A
+></DT
+><DD
+>						실제 커널에 포함되는 드라이버는 모두 DRIVERS에 기록된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CLEAN"
+><B
+>(20)</B
+></A
+></DT
+><DD
+>						make clean 했을 때 지워지는 file들을 지정한다.
+						clean은 object 등을 지울 뿐 커널 설정 등은 지우지 않는다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MRPROPER"
+><B
+>(21)</B
+></A
+></DT
+><DD
+>						mrproper는 세팅까지도 지워버리고 완전히 초기화 시켜버린다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.ARCH-MAKEFILE"
+><B
+>(22)</B
+></A
+></DT
+><DD
+>						리눅스 커널은 여러 종류의 타켓을 지원하므로 처음 Makefile에서 확인한
+						아키텍처에 따른 Makefile을 읽어 사용하게 된다.
+						make bzImage 등을 했을 때 사용되는 Makefile은 여기서 include 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.EXPORT2"
+><B
+>(23)</B
+></A
+></DT
+><DD
+>						필요한 플래그를 export 해서 하위 디렉토리 등에서 make 할 때도 여기에서 적용된
+						사항들이 같이 적용될 수 있도록 한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.ASM-COMPILE"
+><B
+>(24)</B
+></A
+></DT
+><DD
+>						어셈블리 코드 컴파일 방법을 지정
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.VMLINUX"
+><B
+>(25)</B
+></A
+></DT
+><DD
+>						컴파일된 커널이 일차적으로 하나로 뭉쳐 vmlinux를 만들어낸다. 이 것을 압축하고
+						부팅에 관계된 코드를 덧붙여주면 커널이 완성된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.SYMLINKS"
+><B
+>(26)</B
+></A
+></DT
+><DD
+>						include 디렉토리 내의 심볼릭 링크를 설정한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.CONFIG"
+><B
+>(27)</B
+></A
+></DT
+><DD
+>						커널 세팅하는 방법에 따라 설정에 필요한 프로그램을 만들고 설정을 시작한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.LINUXSUBDIRS"
+><B
+>(28)</B
+></A
+></DT
+><DD
+>						linuxsubdirs는 SUBDIRS에 정의된 것들에서 앞에 -dir-을 붙여 새로운 이름을
+						하나씩 만들어낸다.
+					</DD
+><DD
+><P
+>						patsubst는 $(patsubst PATTERN, REPLACEMENT, TEXT)의 형식으로 TEXT에서
+						patterN과 일치하는 부분을 REPLACEMENT로 교체한다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MAKE-SUBDIR"
+><B
+>(29)</B
+></A
+></DT
+><DD
+>						각 하위 디렉토리를 make 한다. patsubst에 의해 실제 디렉토리로 이동하게 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.COMPILE.H"
+><B
+>(30)</B
+></A
+></DT
+><DD
+>						컴파일한 시간, 누가 했는가, gcc 버전 등이 기록된다. 내용은 아래와 같다.
+					</DD
+><DD
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#define uts-versioN "#11 2002. 01. 25. (금) 16:35:16 KST"
+#define linux-compILE-TIME "16:35:16"
+#define linux-compILE-BY "root"
+#define linux-compILE-HOST "halite"
+#define linux-compILE-DOMAIN ""
+#define linux-compILER "gcc version 2.95.3 20010315 (release)"</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.VERSION.H"
+><B
+>(31)</B
+></A
+></DT
+><DD
+>						include/linux/version.h는 현재 컴파일 될 리눅스 커널의 버전 정보를 담는 헤더
+						파일이고 아래 스크립트에 의해 만들어진다. 내용은 아래 3줄과 같다.
+					</DD
+><DD
+><P
+>						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+># #define uts-releASE "2.4.16"
+# #define linux-veRSION-CODE 132112
+# #define kernel-vERSION(a,b,c) (((a) &#60;&#60; 16) + ((b) &#60;&#60; 8) + (c))</PRE
+></TD
+></TR
+></TABLE
+>
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MAIN.C"
+><B
+>(32)</B
+></A
+></DT
+><DD
+>						main.c엔 start-kernel()이 들어있고
+						이 함수는 LILO등에 의해 메모리에 올려진 커널이 불리게되는 시작 위치다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MAKE-SUBDIR2"
+><B
+>(33)</B
+></A
+></DT
+><DD
+>						하위 디렉토리는 위에 정의된 하위 디렉토리 make 방법에 따라 make 된다.
+						즉 $(patsubst %, -dir-%, $(SUBDIRS))에 의해 make 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.TAGS"
+><B
+>(34)</B
+></A
+></DT
+><DD
+>						emacs, vi용 tag를 만든다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MODULES"
+><B
+>(35)</B
+></A
+></DT
+><DD
+>						module로 지정된 놈들을 다 만들어준다.
+					</DD
+><DD
+><P
+>						.phony를 사용하면 정의된 이름이 file이 아님을 알려주고 퍼포먼스를 올려준다. 자세한 것은
+						'info make'를 해서 참조 바란다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.SYSTEM.MAP"
+><B
+>(36)</B
+></A
+></DT
+><DD
+>						커널을 컴파일할 때 System.map이 만들어지는데 이게 존재하는 경우
+						module의 dependency를 만들어준다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.DISTCLEAN"
+><B
+>(37)</B
+></A
+></DT
+><DD
+>						distclean은 현재 커널 버전 개발을 끝내고 release하려할 때 실행한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.RULES.MAKE"
+><B
+>(38)</B
+></A
+></DT
+><DD
+>						리눅스 커널은 많은 하위 디렉토리가 있고 여기에 각각의 Makefile이 존재하는데
+						공통으로 사용될 수 있는 것을을 모아 Rules.make로 만들고 이를 사용한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.MKDEP.C"
+><B
+>(39)</B
+></A
+></DT
+><DD
+>						커널 설정을 마친 후 헤더와 소스사이의 의존관계를 만들어주는 실행 파일을 만든다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#MAKEFILE.RPM"
+><B
+>(40)</B
+></A
+></DT
+><DD
+>						rpm 배포용 spec 파일과 rpm 파일을 만든다.
+					</DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TOPDIR-ARCH-I386-MAKEFILE"
+>2.3.2. $(topDIR)/arch/i386/Makefile</A
+></H2
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+><A
+NAME="I386.MAKEFILE.INCLUDE"
+><B
+>(1)</B
+></A
+>			
+#
+# i386/makefile
+#
+# this file is included by the global makefile so that you can add your own
+# architecture-specific flags and dependencies. Remember to do have actions
+# for "archclean" and "archdep" for cleaning up and making dependencies for
+# this architecture
+#
+# this file is subject to the terms and conditions of the GNU General Public
+# license.  see the file "COPYING" in the main directory of this archive
+# for more details.
+#
+# copyright (c) 1994 by Linus Torvalds
+#
+# 19990713  artur Skawina &#60;skawina@geocities.com&#62;
+#           added '-march' and '-mpreferred-stack-boundary' support
+#
+
+<A
+NAME="I386.MAKEFILE.LD"
+><B
+>(2)</B
+></A
+>			
+ld=$(cross-compile)ld -m elf-i386
+objcopy=$(cross-coMPILE)objcopy -O binary -R .note -R .comment -S
+ldflags=-e stext
+linkflags =-t $(toPDIR)/arch/i386/vmlinux.lds $(LDFLAGS)
+
+cflags += -pipe
+
+<A
+NAME="I386.MAKEFILE.CFLAGS"
+><B
+>(3)</B
+></A
+>
+# prevent gcc from keeping the stack 16 byte aligned
+cflags += $(shell if $(CC) -mpreferred-stack-boundary=2 -S -o /dev/null -xc /dev/null &#62;/dev/null 2&#62;&#38;1; then echo "-mpreferred-stack-boundary=2"; fi)
+
+ifdef config-m386
+cflags += -march=i386
+endif
+
+ifdef config-m486
+cflags += -march=i486
+endif
+
+ifdef config-m586
+cflags += -march=i586
+endif
+
+ifdef config-m586tSC
+cflags += -march=i586
+endif
+
+ifdef config-m586mMX
+cflags += -march=i586
+endif
+
+ifdef config-m686
+cflags += -march=i686
+endif
+
+ifdef config-mpentIUMIII
+cflags += -march=i686
+endif
+
+ifdef config-mpentIUM4
+cflags += -march=i686
+endif
+
+<A
+NAME="I386.MAKEFILE.K6"
+><B
+>(4)</B
+></A
+>
+ifdef config-mk6
+cflags += $(shell if $(CC) -march=k6 -S -o /dev/null -xc /dev/null &#62;/dev/null 2&#62;&#38;1; then echo "-march=k6"; else echo "-march=i586"; fi)
+endif
+
+<A
+NAME="I386.MAKEFILE.ATHLON"
+><B
+>(5)</B
+></A
+>
+ifdef config-mk7
+cflags += $(shell if $(CC) -march=athlon -S -o /dev/null -xc /dev/null &#62;/dev/null 2&#62;&#38;1; then echo "-march=athlon"; else echo "-march=i686 -malign-functions=4"; fi) 
+endif
+
+ifdef config-mcrusOE
+cflags += -march=i686 -malign-functions=0 -malign-jumps=0 -malign-loops=0
+endif
+
+ifdef config-mwincHIPC6
+cflags += -march=i586
+endif
+
+ifdef config-mwincHIP2
+cflags += -march=i586
+endif
+
+ifdef config-mwincHIP3D
+cflags += -march=i586
+endif
+
+ifdef config-mcyriXIII
+cflags += -march=i586
+endif
+
+head := arch/i386/kernel/head.o arch/i386/kernel/init-task.o
+
+subdirs += arch/i386/kernel arch/i386/mm arch/i386/lib
+
+core-files := arch/i386/kernel/kernel.o arch/i386/mm/mm.o $(CORE-FILES)
+libs := $(topdir)/arch/i386/lib/lib.a $(LIBS) $(TOPDIR)/arch/i386/lib/lib.a
+
+ifdef config-math-EMULATION
+subdirs += arch/i386/math-emu
+drivers += arch/i386/math-emu/math.o
+endif
+
+arch/i386/kernel: dummy
+	$(make) linuxsubdirs SUBDIRS=arch/i386/kernel
+
+arch/i386/mm: dummy
+	$(make) linuxsubdirs SUBDIRS=arch/i386/mm
+
+makeboot = $(make) -C arch/$(ARCH)/boot
+
+vmlinux: arch/i386/vmlinux.lds
+
+force: ;
+
+.phony: zimage bzimage compressed zlilo bzlilo zdisk bzdisk install \
+		clean archclean archmrproper archdep
+
+zimage: vmlinux
+	@$(makeboot) zimage
+
+<A
+NAME="I386.MAKEFILE.BZIMAGE"
+><B
+>(6)</B
+></A
+>
+bzimage: vmlinux
+	@$(makeboot) bzimage
+
+compressed: zimage
+
+zlilo: vmlinux
+	@$(makeboot) booTIMAGE=zImage zlilo
+
+tmp:
+	@$(makeboot) booTIMAGE=bzImage zlilo
+bzlilo: vmlinux
+	@$(makeboot) booTIMAGE=bzImage zlilo
+
+zdisk: vmlinux
+	@$(makeboot) booTIMAGE=zImage zdisk
+
+bzdisk: vmlinux
+	@$(makeboot) booTIMAGE=bzImage zdisk
+
+install: vmlinux
+	@$(makeboot) booTIMAGE=bzImage install
+
+archclean:
+	@$(makeboot) clean
+
+archmrproper:
+
+archdep:
+	@$(makeboot) dep
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.INCLUDE"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						이 makefile은 $(TOPDIR)/Makefile에 의해 읽여 들여지므로 export된 많은 변수들을
+						그대로 사용 가능하다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.LD"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						ld는 최종 output을 elf-i386의 형태로 만든다.
+					</DD
+><DD
+><P
+>						objcopy는 입력에서 .note, .comment 섹션을 삭제하고 리로케이션 정보와 심볼 정보를 삭제한다.
+						출력 포맷은 binary.  링크할 땐 $(TOPDIR)/arch/i386/vmlinux.lds란 파일에 기록되어 있는
+						방법을 따라 링크한다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.CFLAGS"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						gcc가 스택을 16 byte 단위로 정렬하지 못하도록 한다.
+					</DD
+><DD
+><P
+>						사용되는 옵션은 다음과 같은 의미를 갖는다.
+						<P
+></P
+><UL
+><LI
+><P
+>-mpreferred-stack-boundary=2 :
+								스택을 2<SUP
+>2</SUP
+> byte로 정렬하도록 한다.
+								(=4면 2<SUP
+>4</SUP
+>)</P
+></LI
+><LI
+><P
+>-S : 컴파일 스테이지까지만 하고 어셈블은 하지 않는다.</P
+></LI
+><LI
+><P
+>-xc : c 언어로 컴파일 한다.</P
+></LI
+></UL
+>
+						즉 스택 바운더리 정렬이 4 바이트로 가능한지 알아봐서 가능하면 4 바이트 정렬을 사용한다.
+						만약 4 바이트 정렬을 지원하지 않으면 컴파일 중에 에러가 날 것이다. 이땐 기본 값을 사용한다.
+					</P
+></DD
+><DD
+><P
+>						/dev/null이 $(CC)의 입력으로 지정됐으므로 /dev/null을 읽어 컴파일한다.
+						/dev/null을 읽으면 EOF를 돌려주므로 컴파일된 출력은 다음과 같을 것이지만 바로
+						/dev/null로 출력되어 화면에는 나타나지 않는다.
+					</P
+></DD
+><DD
+><P
+>						컴파일되면 다음과 같은 결과가 나온다.
+						<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>	.file   "null"  
+	.version    "01.01" 
+gcc2-compiled.:
+	.ident  "gcc: (gNU) 2.95.3 20010315 (release)"
+						</PRE
+></TD
+></TR
+></TABLE
+>
+						에러 없이 컴파일이 끝나면 $(CC)의 결과는 true가 될 것이고 에러가 있다면 false가 될 것이다.
+						&#62;/dev/null 2&#62;&#38;1은 출력되는 에러 메시지는 화면에 나오게 하지 않고 결과가
+						true인지 false인지만을 판별 하기 위해 넣은 것이다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.K6"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						amd k6 CPU는 지원하는지 여부에 따라 지원하지 않을 경우엔 i586으로 간주한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.ATHLON"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						athlon을 사용한다고 했지만 지원하는지 판단 후 지원하지 않으면 i686으로 간주하고 정렬을 16 바이트로 한다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#I386.MAKEFILE.BZIMAGE"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						bzimage를 만들 경우엔 먼저 vmlinux를 만들고 나서 $(TOPDIR)/arch/i386/boot에서 make bzImage를 다시 실행한다.
+					</DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TOPDIR-ARCH-I386-BOOT-MAKEFILE"
+>2.3.3. $(topDIR)/arch/i386/boot/Makefile</A
+></H2
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#
+# arch/i386/boot/makefile
+#
+# this file is subject to the terms and conditions of the GNU General Public
+# license.  see the file "COPYING" in the main directory of this archive
+# for more details.
+#
+# copyright (c) 1994 by Linus Torvalds
+#
+
+boot-incl =	$(topdIR)/include/linux/config.h \
+		$(topdir)/include/linux/autoconf.h \
+		$(topdir)/include/asm/boot.h
+
+<A
+NAME="BOOT.MAKEFILE.IMAGE"
+><B
+>(1)</B
+></A
+>
+zimage: $(configurE) bootsect setup compressed/vmlinux tools/build
+	$(objcopy) compressed/vmlinux compressed/vmlinux.out
+	tools/build bootsect setup compressed/vmlinux.out $(ROOT-DEV) &#62; zImage
+
+<A
+NAME="BOOT.MAKEFILE.BZIMAGE"
+><B
+>(2)</B
+></A
+>
+bzimage: $(configuRE) bbootsect bsetup compressed/bvmlinux tools/build
+	$(objcopy) compressed/bvmlinux compressed/bvmlinux.out
+	tools/build -b bbootsect bsetup compressed/bvmlinux.out $(ROOT-DEV) &#62; bzImage
+
+compressed/vmlinux: $(TOPDIR)/vmlinux
+	@$(make) -c compressed vmlinux
+
+compressed/bvmlinux: $(TOPDIR)/vmlinux
+	@$(make) -c compressed bvmlinux
+
+zdisk: $(bootimage)
+	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
+
+zlilo: $(configure) $(BOOTIMAGE)
+	if [ -f $(instalL-PATH)/vmlinuz ]; then mv $(INSTALL-PATH)/vmlinuz $(INSTALL-PATH)/vmlinuz.old; fi
+	if [ -f $(instalL-PATH)/System.map ]; then mv $(INSTALL-PATH)/System.map $(INSTALL-PATH)/System.old; fi
+	cat $(bootimage) &#62; $(INSTALL-PATH)/vmlinuz
+	cp $(topdir)/system.map $(INSTALL-PATH)/
+	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
+
+install: $(configuRE) $(BOOTIMAGE)
+	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL-PATH)"
+
+<A
+NAME="BOOT.MAKEFILE.BUILD"
+><B
+>(3)</B
+></A
+>
+tools/build: tools/build.c
+	$(hostcc) $(hostCFLAGS) -o $@ $&#60; -I$(TOPDIR)/include
+
+bootsect: bootsect.o
+	$(ld) -ttext 0x0 -s --oformat binary -o $@ $&#60;
+
+bootsect.o: bootsect.s
+	$(as) -o $@ $&#60;
+
+bootsect.s: bootsect.S Makefile $(BOOT-INCL)
+	$(cpp) $(cppflagS) -traditional $(SVGA-MODE) $(RAMDISK) $&#60; -o $@
+
+<A
+NAME="BOOT.MAKEFILE.BBOOTSECT.O"
+><B
+>(4)</B
+></A
+>
+bbootsect: bbootsect.o
+	$(ld) -ttext 0x0 -s --oformat binary $&#60; -o $@
+
+bbootsect.o: bbootsect.s
+	$(as) -o $@ $&#60;
+
+<A
+NAME="BOOT.MAKEFILE.BBOOTSECT.S"
+><B
+>(5)</B
+></A
+>
+bbootsect.s: bootsect.S Makefile $(BOOT-INCL)
+	$(cpp) $(cppflagS) -D--BIG-KERNEL-- -traditional $(SVGA-MODE) $(RAMDISK) $&#60; -o $@
+
+setup: setup.o
+	$(ld) -ttext 0x0 -s --oformat binary -e begtext -o $@ $&#60;
+
+setup.o: setup.s
+	$(as) -o $@ $&#60;
+
+setup.s: setup.s video.S Makefile $(BOOT-INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
+	$(cpp) $(cppflagS) -D--ASSEMBLY-- -traditional $(SVGA-MODE) $(RAMDISK) $&#60; -o $@
+
+<A
+NAME="BOOT.MAKEFILE.BSETUP"
+><B
+>(6)</B
+></A
+>
+bsetup: bsetup.o
+	$(ld) -ttext 0x0 -s --oformat binary -e begtext -o $@ $&#60;
+
+bsetup.o: bsetup.s
+	$(as) -o $@ $&#60;
+
+bsetup.s: setup.s video.S Makefile $(BOOT-INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
+	$(cpp) $(cppflagS) -D--BIG-KERNEL-- -D--ASSEMBLY-- -traditional $(SVGA-MODE) $(RAMDISK) $&#60; -o $@
+
+dep:
+
+clean:
+	rm -f tools/build
+	rm -f setup bootsect zImage compressed/vmlinux.out
+	rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
+	@$(make) -c compressed clean
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.IMAGE"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						현재 커널은 zImage, bzImage 두 가지가 존재 한다.
+					</DD
+><DD
+><P
+>	
+						zimage는 gzip으로 압축되고 하위 1M 메모리 내에 적재될 수 있는 크기의 커널
+						<A
+NAME="AEN704"
+HREF="#FTN.AEN704"
+>[1]</A
+>
+					</P
+></DD
+><DD
+><P
+>						bzimage는 gzip으로 압축되고 하위 1M 메모리 내에 적재될 수 없는 크기의 커널
+					</P
+></DD
+><DD
+><P
+>						$(objcOPY)는 $(TOPDIR)/arch/i386/Makefile에서 정의된 것을 따른다. 즉
+						'objcoPY=$(CROSS-COMPILE)objcopy -O binary -R .note -R .comment -S'가 된다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.BZIMAGE"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						bvmlinux를 objcopy를 사용해 심볼 등을 빼고 build란 것을 사용해 최종 커널을 만든다.
+						build는 bbootsect(512 bytes)+bsetup+bvmlinux.out을 합쳐 하나의 bzImage를 만든다
+						(<A
+HREF="kernel-image-file-structure.html#FIG.STRUCT-OF-BZIMAGE"
+>그림 2-2</A
+>).
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.BUILD"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						build 프로그램은 최종 커널을 만드는 유틸리티다. 더 자세한 것은 여기에서 다룬다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.BBOOTSECT.O"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						어셈블 끝난 bbootsect.o를 링크한다. 사용된 옵션은
+					</DD
+><DD
+><P
+>						-ttext 0x0 : 코드의 시작을 0번지 부터 시작한다고 하고 링크한다. 이렇게 하면
+						링크된 최종 출력물은 특별한 위치를 가리지 않고 메모리의 아무 위치에나 적재가
+						가능하고 실행 가능해진다.
+					</P
+></DD
+><DD
+><P
+>						-s : 출력물에서 심볼 정보를 모두 없앤다.
+					</P
+></DD
+><DD
+><P
+>						--oformat binary : 출력물의 포맷을 바이너리로 한다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.BBOOTSECT.S"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						bootsect.S를 프리컴파일하는데 --BIG-KERNEL--을 정의해 bzImage의 부트 섹터를 만든다.
+						초기 vga 모드와 램디스크 크기 등을 정보로 전달해 준다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BOOT.MAKEFILE.BSETUP"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						bsetup 또한 bbootsect와 같은 방법으로 만들어진다.
+					</DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TOPDIR-ARCH-I386-BOOT-COMPRESSED-MAKEFILE"
+>2.3.4. $(topDIR)/arch/i386/boot/compressed/Makefile</A
+></H2
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>#
+# linux/arch/i386/boot/compressed/Makefile
+#
+# create a compressed vmlinux image from the original vmlinux
+#
+
+head = head.o
+system = $(topdir)/vmlinux
+
+objects = $(head) misc.o
+
+zldflags = -e startup-32
+
+<A
+NAME="COMPRESSED.MAKEFILE.OFFSET"
+><B
+>(1)</B
+></A
+>
+# zimage-offset is the load offset of the compression loader
+# bzimage-offset is the load offset of the high loaded compression loader
+#
+zimage-offset = 0x1000
+bzimage-offset = 0x100000
+
+zlinkflags = -ttext $(ZIMAGE-OFFSET) $(ZLDFLAGS)
+bzlinkflags = -ttext $(BZIMAGE-OFFSET) $(ZLDFLAGS)
+
+all: vmlinux
+
+vmlinux: piggy.o $(OBJECTS)
+	$(ld) $(zlinkflaGS) -o vmlinux $(OBJECTS) piggy.o
+
+<A
+NAME="COMPRESSED.MAKEFILE.BVMLINUX"
+><B
+>(2)</B
+></A
+>
+bvmlinux: piggy.o $(OBJECTS)
+	$(ld) $(bzlinkflAGS) -o bvmlinux $(OBJECTS) piggy.o
+
+<A
+NAME="COMPRESSED.MAKEFILE.HEAD"
+><B
+>(3)</B
+></A
+>
+head.o: head.s
+	$(cc) $(aflags) -traditional -c head.S
+
+misc.o: misc.c
+	$(cc) $(cflags) -c misc.c
+
+<A
+NAME="COMPRESSED.MAKEFILE.PIGGY"
+><B
+>(4)</B
+></A
+>
+piggy.o:	$(system)
+	tmppiggy=-tmp-$$$$piggy; \
+	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
+	$(objcopy) $(sysTEM) $$tmppiggy; \
+	gzip -f -9 &#60; $$tmppiggy &#62; $$tmppiggy.gz; \
+	echo "sections { .data : { input-len = .; LONG(input-data-end - input-data) input-data = .; *(.data) input-data-end = .; }}" &#62;gt; $$tmppiggy.lnk; \
+	$(ld) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-i386 -T $$tmppiggy.lnk; \
+	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk
+
+clean:
+	rm -f vmlinux bvmlinux -tmp-*
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#COMPRESSED.MAKEFILE.OFFSET"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						zimage와 bzImage의 메모리 적재 위치가 서로 달라 zImage는 0x1000에서 부터 메모리에 
+						적재되고 bzImage는 0x100000에 적재된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#COMPRESSED.MAKEFILE.BVMLINUX"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						bvmlinux는 vmlinux와 마찬가지로 heas.o, misc.o, piggy.o가 합쳐져 만들어진다. 그러나 링크
+						플래그가 서로 다르게 설정되어있다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#COMPRESSED.MAKEFILE.HEAD"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						커널의 압축을 풀고 메모리에 적재 하는 등의 일을 하는 부분이다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#COMPRESSED.MAKEFILE.PIGGY"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						커널의 핵심 부분이 모두 컴파일되 링크되면 elf type으로 $(TOP-DIR)/vmlinux가 만들어지는데
+						이것에서 디버깅 정보 등을 없애고 압축해서 만든 것이 piggy.o가 된다. 압축은 gzip으로 한다.
+					</DD
+><DD
+><P
+>						$$$$piggy의 4개의 $는 4자리의 임의의 숫자로 채워진다. 즉 tmppiggy=-tmp-1234piggy와 같이된다.
+						더불어 $$tmppiggy.gz 은 -tmp-1234piggy.gz, tmppiggy.lnk는 -tmp-1234piggy.lnk와 같이 된다.
+					</P
+></DD
+><DD
+><P
+>						piggy.o는 head.o, misc.o와 합쳐져 하나의 다른 file로 만들어져야하므로 다시 링커를 통해
+						elf-i386 포맷으로 만들어진다.
+					</P
+></DD
+><DD
+><P
+>						$(objcOPY)에 사용된 옵션은 다음과 같다.
+						<P
+></P
+><UL
+><LI
+><P
+>-O : output format. 여기선 binary</P
+></LI
+><LI
+><P
+>-R : 지정된 section 이름을 지운다. .note, .comment는 없앤다.</P
+></LI
+><LI
+><P
+>-S : input file을 지정한다.</P
+></LI
+></UL
+>
+						$(ld)에 사용된 옵션은 다음과 같다.
+						<P
+></P
+><UL
+><LI
+><P
+>-m elf-i386 : ld가 elf-i386을 emulation 하도록 지정한다.</P
+></LI
+><LI
+><P
+>-r : relocatable, 메모리에 적재될 때 재배치 가능하도록 한다.</P
+></LI
+><LI
+><P
+>-b binary : input file의 format을 말한다. 여기선 $$tmppiggy.gz은 binary</P
+></LI
+><LI
+><P
+>-T : linker script file을 지정한다.</P
+></LI
+><LI
+><P
+>-b elf32-i386 : output을 elf-i386 format으로 지정한다.</P
+></LI
+></UL
+>
+					</P
+></DD
+></DL
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="TOPDIR-ARCH-I386-BOOT-TOOLS-BUILD.C"
+>2.3.5. $(topDIR)/arch/i386/boot/tools/build.c</A
+></H2
+><P
+>				$(topdir)/arch/i386/boot/tools/build는 커널 이미지 만드는 과정의 최종 단계에서 몇 개의 파일을
+				합쳐 하나의 커널 이미지를 만들어낸다. 이런 일을 담당하는 프로그램을 분석해야 이미 나온 부팅
+				과정에서의 동작을 이해할 수 있을 것이다.
+			</P
+><P
+>				최종 만들어지는 이미지는 <A
+HREF="kernel-image-file-structure.html#FIG.STRUCT-OF-BZIMAGE"
+>그림 2-2</A
+>이 된다. 부팅할 때 bootsect는
+				build에 의해 기록된 루트 디바이스, setup의 크기, 압축 커널의 크기를 바탕을 부팅 절차를 계속
+				진행한다.
+			</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>/*
+ *  $id: chap2.sgml,v 1.8 2002/02/15 15:59:43 halite Exp $
+ *
+ *  copyright (c) 1991, 1992  Linus Torvalds
+ *  copyright (c) 1997 Martin Mares
+ */
+
+/*
+ * this file builds a disk-image from three different files:
+ *
+ * - bootsect: exactly 512 bytes of 8086 machine code, loads the rest
+ * - setup: 8086 machine code, sets up system parm
+ * - system: 80386 code for actual system
+ *
+ * it does some checking that all files are of the correct type, and
+ * just writes the result to stdout, removing headers and padding to
+ * the right amount. It also writes some system data to stderr.
+ */
+
+/*
+ * changes by tytso to allow root device specification
+ * high loaded stuff by Hans Lermen &#38; Werner Almesberger, Feb. 1996
+ * cross compiling fixes by Gertjan van Wingerde, July 1996
+ * rewritten by martin Mares, April 1997
+ */
+
+#include &#60;stdio.h&#62;
+#include &#60;string.h&#62;
+#include &#60;stdlib.h&#62;
+#include &#60;stdarg.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;sys/sysmacros.h&#62;
+#include &#60;unistd.h&#62;
+#include &#60;fcntl.h&#62;
+#include &#60;asm/boot.h&#62;
+
+typedef unsigned char byte;
+typedef unsigned short word;
+typedef unsigned long u32;
+
+#define default-maJOR-ROOT 0
+#define default-miNOR-ROOT 0
+
+/* minimal number of setup sectors (see also bootsect.S) */
+#define setup-sectS 4
+
+byte buf[1024];
+int fd;
+int is-big-kernel;
+
+void die(const char * str, ...)
+{
+	va-list args;
+	va-start(args, str);
+	vfprintf(stderr, str, args);
+	fputc('\n', stderr);
+	exit(1);
+}
+
+void file-open(const char *name)
+{
+	if ((fd = open(name, O-RDONLY, 0)) &#60; 0)
+		die("unable to open `%s': %m", name);
+}
+
+void usage(void)
+{
+	die("usage: build [-b] bootsect setup system [rootdev] [&#62; image]");
+}
+
+int main(int argc, char ** argv)
+{
+	unsigned int i, c, sz, setup-sectors;
+	u32 sys-size;
+	byte major-root, minor-root;
+	struct stat sb;
+
+<A
+NAME="BUILD.B"
+><B
+>(1)</B
+></A
+>
+	if (argc &#62; 2 &#38;&#38; !strcmp(argv[1], "-b"))
+	  {
+	    is-big-kernel = 1;
+	    argc--, argv++;
+	  }
+	if ((argc &#60; 4) || (argc &#62; 5))
+		usage();
+	if (argc &#62; 4) {
+<A
+NAME="BUILD.ROOT-CHK"
+><B
+>(2)</B
+></A
+>
+		if (!strcmp(argv[4], "CURRENT")) {
+			if (stat("/", &#38;sb)) {
+				perror("/");
+				die("couldn't stat /");
+			}
+			major-root = major(sb.st-dev);
+			minor-root = minor(sb.st-dev);
+		} else if (strcmp(argv[4], "FLOPPY")) {
+			if (stat(argv[4], &#38;sb)) {
+				perror(argv[4]);
+				die("couldn't stat root device.");
+			}
+			major-root = major(sb.st-rdev);
+			minor-root = minor(sb.st-rdev);
+		} else {
+			major-root = 0;
+			minor-root = 0;
+		}
+	} else {
+		major-root = dEFAULT-MAJOR-ROOT;
+		minor-root = dEFAULT-MINOR-ROOT;
+	}
+	fprintf(stderr, "Root device is (%d, %d)\n", major-root, minor-root);
+
+<A
+NAME="BUILD.BOOTSECT"
+><B
+>(3)</B
+></A
+>
+	file-open(argv[1]);
+	i = read(fd, buf, sizeof(buf));
+	fprintf(stderr,"Boot sector %d bytes.\n",i);
+	if (i != 512)
+		die("boot block must be exactly 512 bytes");
+	if (buf[510] != 0x55 || buf[511] != 0xaa)
+		die("boot block hasn't got boot flag (0xAA55)");
+	buf[508] = minor-root;
+	buf[509] = major-root;
+	if (write(1, buf, 512) != 512)
+		die("write call failed");
+	close (fd);
+
+<A
+NAME="BUILD.SETUP"
+><B
+>(4)</B
+></A
+>
+	file-open(argv[2]);				    /* Copy the setup code */
+	for (i=0 ; (c=read(fd, buf, sizeof(buf)))&#62;0 ; i+=c )
+		if (write(1, buf, c) != c)
+			die("write call failed");
+	if (c != 0)
+		die("read-error on `setup'");
+	close (fd);
+
+<A
+NAME="BUILD.SETUP.FILL"
+><B
+>(5)</B
+></A
+>
+	setup-sectors = (i + 511) / 512;	/* Pad unused space with zeros */
+	/* for compatibility with ancient versions of LILO. */
+	if (setup-sectors &#60; SETUP-SECTS)
+		setup-sectors = SETUP-SECTS;
+	fprintf(stderr, "Setup is %d bytes.\n", i);
+	memset(buf, 0, sizeof(buf));
+	while (i &#60; setup-sectors * 512) {
+		c = setup-sectors * 512 - i;
+		if (c &#62; sizeof(buf))
+			c = sizeof(buf);
+		if (write(1, buf, c) != c)
+			die("write call failed");
+		i += c;
+	}
+
+<A
+NAME="BUILD.SETUP.VMLINUX"
+><B
+>(6)</B
+></A
+>
+	file-open(argv[3]);
+	if (fstat (fd, &#38;sb))
+		die("unable to stat `%s': %m", argv[3]);
+	sz = sb.st-size;
+	fprintf (stderr, "System is %d kB\n", sz/1024);
+	sys-size = (sz + 15) / 16;
+	/* 0x28000*16 = 2.5 MB, conservative estimate for the current maximum */
+	if (sys-size &#62; (is-big-kernel ? 0x28000 : DEF-SYSSIZE))
+		die("system is too big. Try using %smodules.",
+			is-big-kernel ? "" : "bzImage or ");
+	if (sys-size &#62; 0xefff)
+		fprintf(stderr,"warning: kernel is too big for standalone boot "
+		    "from floppy\n");
+	while (sz &#62; 0) {
+		int l, n;
+
+		l = (sz &#62; sizeof(buf)) ? sizeof(buf) : sz;
+		if ((n=read(fd, buf, l)) != l) {
+			if (n &#60; 0)
+				die("error reading %s: %m", argv[3]);
+			else
+				die("%s: unexpected EOF", argv[3]);
+		}
+		if (write(1, buf, l) != l)
+			die("write failed");
+		sz -= l;
+	}
+	close(fd);
+
+	if (lseek(1, 497, SEEK-SET) != 497)		    /* Write sizes to the bootsector */
+		die("output: seek failed");
+	buf[0] = setup-sectors;
+	if (write(1, buf, 1) != 1)
+		die("write of setup sector count failed");
+	if (lseek(1, 500, SEEK-SET) != 500)
+		die("output: seek failed");
+	buf[0] = (sys-size &#38; 0xff);
+	buf[1] = ((sys-size &#62;&#62; 8) &#38; 0xff);
+	if (write(1, buf, 2) != 2)
+		die("write of image length failed");
+
+	return 0;					    /* Everything is OK */
+}
+			</PRE
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="CALLOUTLIST"
+><DL
+COMPACT="COMPACT"
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.B"
+><B
+>(1)</B
+></A
+></DT
+><DD
+>						build의 command line에 -b 옵션을 주면 이는 big kernel 임을 의미하게 된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.ROOT-CHK"
+><B
+>(2)</B
+></A
+></DT
+><DD
+>						루트 디바이스의 major, minor 번호를 알아낸다.
+					</DD
+><DD
+><P
+>						currenT는 /의 major, minor number를 사용한다. 필자의 리눅스 박스는 hda1이 /이므로
+						major=0x03, minor=0x01이 될것이다.
+					</P
+></DD
+><DD
+><P
+>						플로피가 루트 디바이스로 지정됐으면 major=minor=0이 된다.
+					</P
+></DD
+><DD
+><P
+>						command line에 아무 것도 지정되지 않으면 기본 값이 사용된다(기본 값은 사실 플로피와
+						같은 값을 갖는다).
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.BOOTSECT"
+><B
+>(3)</B
+></A
+></DT
+><DD
+>						부트 섹터 파일을 읽어 512 byte가 아니면 에러를 낸다. 부트 섹터는 정확히 512 byte여야
+						하기 때문이다. 그리고 MagicNumber를 체크해 정말 부트 섹터인지 확인한다.
+					</DD
+><DD
+><P
+>						또 508(0x1FC), 509(0x1FD) 번째 바이트에 루트 디바이스의 minor, major 번호를 써 넣는다.
+					</P
+></DD
+><DD
+><P
+>						수정 후 표준 출력으로 bootsect의 512 byte를 출력한다(원래 512 byte 였으므로 수정 내용을
+						포함해 그대로 출력될 것이다).
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.SETUP"
+><B
+>(4)</B
+></A
+></DT
+><DD
+>						setup은 크기가 정확히 얼마인지 알수 없으므로 1024 byte 단위로 읽으면서 크기를 변수 i에
+						기억해 놓는다. 읽은 1KB는 읽는 즉시 표준 출력을 출력된다.
+					</DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.SETUP.FILL"
+><B
+>(5)</B
+></A
+></DT
+><DD
+>						setup을 512 byte 단위로 끊고 적어도 SETUP-SECTOR(값은 4) 만큼이 되는지 확인해 모자란 부분은
+						0으로 채워 넣는다. 디스크는 섹터 단위로 입출력한다는 것을 기억하기 바란다.
+					</DD
+><DD
+><P
+>						예를 들어 setup의 크기가 4768 byte라면 4768/512=9.3125 이므로 9 섹터를 차지하고
+						10번째 섹터는 다 사용하지 않고 조금만 사용하게 된다. 10번째 섹터의 경우 160 byte를 제외한
+						352 byte 만큼을 0으로 채워 넣는다.
+					</P
+></DD
+><DT
+><A
+HREF="tracing-bzimage-makeing.html#BUILD.SETUP.VMLINUX"
+><B
+>(6)</B
+></A
+></DT
+><DD
+>						압축된 커널의 크기를 계산해 zImage의 경우 0x7F000 보다 큰지 확인하고, bzImage는
+						0x280000 보다 큰지 확인한다. 만약 지정된 크기보다 크다면 현재로서는 수용할 수 없는 크기의
+						커널이므로 에러를 낸다. 또 플로피 부팅의 경우 플로피에 들어갈 수 있는 크기인지 확인한다.
+					</DD
+><DD
+><P
+>						1024 byte 단위로 읽어 표준 출력에 출력하고 bootsect의 497(0x1F1)에 setup이 몇 섹터를
+						차지하는지 기록하고 500(0x1F4)에 압축 커널의 크기를 16 byte 단위로 기록해준다.
+					</P
+></DD
+></DL
+></DIV
+></DIV
+></DIV
+><H3
+CLASS="FOOTNOTES"
+>주석</H3
+><TABLE
+BORDER="0"
+CLASS="FOOTNOTES"
+WIDTH="100%"
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="5%"
+><A
+NAME="FTN.AEN704"
+HREF="tracing-bzimage-makeing.html#AEN704"
+>[1]</A
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+WIDTH="95%"
+><P
+>하위 1M에 대한 것은 <A
+HREF="kernel-image-file-structure.html#ZIMAGE-BZIMAGE-DIFF"
+>2.2.2절</A
+>을 참조한다.</P
+></TD
+></TR
+></TABLE
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="kernel-image-file-structure.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="tracing-bzimage-log.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>커널 이미지 파일의 구조</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap02.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>bzImage가 만들어지는 과정 추적-Log 분석</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

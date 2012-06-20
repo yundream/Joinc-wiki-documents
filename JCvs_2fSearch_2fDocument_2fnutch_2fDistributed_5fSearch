@@ -1,0 +1,85 @@
+#title Nutch Distributed Search
+
+[[UploadFile]]
+=== 소개 ===
+Nutch는 기본적으로 hadoop(:12) Global 파일시스템에서 검색이 이루어지도록 만들어져 있다. 분산파일 시스템을 이용하기 때문에 매우 유연한 방식이긴 하지만, 검색해야 하는 문서의 양이 많이 질경우 엄청나게 늦어질 수 있다는 단점을 가진다. 
+
+Hadoop 자체가 자바가상머신위에서 파일시스템을 추상화시킨 도구이기 때문에 태생적으로 느릴 수 밖에 없다.
+
+이 경우 성능을 높이기 위해서 Segment를 여러개로 나눈다음에 몇개의 서버에 두고, 각각의 서버에서는 Hadoop이 아닌 Local에서 검색을 하고 그 결과를 Web Server측에 던져주는 것을 생각할 수 있다. Nutch는 이러한 방식의 Distributed Search 를 지원하고 있다. 구성은 다음과 같다.
+
+attachment:Dist.png
+
+전형적인 Server&Client 모델을 따른다. 이경우 Web Server이 Search Client 가 되고, 다른 하위 노드들이 Search Server가 된다. Search Server는 해당포트로 열린상태로 기다렸다가, Search Client로부터의 요청이 오면 로컬 색인파일을 검색해서 결과를 가져오고, Search Client로 보내게 된다. rpc(:12)를 이용해서 요청을 보내고 프로시져를 실행시키고 그 결과를 리턴한다.
+
+이 분산검색을 적용하려면 색인을 할때, 각 시스템에서 처리할 최대 segments의 크기를 지정해서 여러개의 세그먼트가 생기도록 해야 할 것이다. 만약 예상 색인 문서의 갯수가 500만이라면, 100만개의 크기를 가지는 5개의 sgement로 생성되게 하면 될 것이다. 그럼 5대의 search server에서 자신이 담당할 segment를 Hadoop에서 로컬로 복사를 하는 것으로 기본적인 구성을 마칠 수 있다.
+
+하나의 서버가 100만개 정도의 문서를 처리할때, 성능에 큰 문제가 없는 것으로 생각된다.
+
+=== 설정 ===
+==== 서버 구성 ====
+다음과 같은 서버구성에서 테스트를 했다.
+{{{#!plain
+scluster01
+scluster02
+scluster03
+scluster04
+}}}
+scluster01이 master node로 search clinet가 되며, tomcat 서버가 운용될 것이다. 나머지 02~04는 search server 가 된다.
+==== search client ====
+연결할 search server의 정보를 알려줘야 할 것이다. 이 정보는 '''search-servers.txt'''라는 파일에 다음과 같은 <Server Name, Port> 포맷으로 저장이 된다.
+{{{#!plain
+# ServerName Port
+scluster02  1234 
+scluster03  1235
+scluster04  1236
+}}}
+
+이 설정파일은 nutch-site.xml의 searcher.dir에 정의되어 있는 색인루트디렉토리에 위치해야 한다. nutch-site.xml 파일은 톰캣 루트디렉토리의 WEB-INF/classes 밑에 있으니, 수정하기 바란다. 
+{{{#!plain
+<property>
+    <name>searcher.dir</name>
+    <value>/scluster01/idx</value>
+</property>
+}}}
+searcher.dir의 경로가 위와 같이 되어 있다면 /scluster02/idx 밑에 search-server.txt를 가져다 놓으면 된다.
+
+이제 tomcat/bin에 있는 startup.sh를 이용해서 서버를 가동시키면 된다. 이제 server client 단의 nutch는 검색쿼리가 주어질 경우 search-server.txt에 있는 서버들에 연결을 해서 결과를 전송 받게 된다. 
+
+nutch는 searcher.dir 경로에 search-server.txt가 있다면, client로 작동을 하게 된다. 그러므로 search server에는 search-server.txt 파일이 있으면 안될 것이다.
+
+==== search server ====
+각각의 search server에 대해서 아래와 같은 작업을 동일하게 해주면 된다. 우선 색인파일 검색이 hadoop이 아닌 local에서 이루어지도록 hadoop-site.xml 파일을 수정한다. 
+{{{#!html
+<property>
+  <name>fs.default.name</name>
+  <value>local</value>
+  <description>was "local", The name of the default file system.  Either the
+  literal string "local" or a host:port for DFS.</description>
+</property>
+
+<property>
+  <name>mapred.job.tracker</name>
+  <value>local</value>
+  <description>was "local", The host and port that the MapReduce job tracker runs
+  at.  If "local", then jobs are run in-process as a single map
+  and reduce task.
+  </description>
+</property>
+}}}
+
+이제 nutch 명령을 이용해서 server 모드로 실행시키면 된다. 이때 port 번호는 반드시 search client의 search-server.txt의 내용과 일치되도록 해야 한다.
+{{{#!plain
+scluster02 # bin/nutch server 1234 /scluster02/idx 
+}}}
+
+=== 문제 해결 ===
+만약 최신의 Linux라면 IPv6 커널 모듈이 동작중일 거다. 이경우 search server를 실행시키면 다음과 같은 에러메시지를 출력한다. (후 이 문제 때문에 고생 좀 했습니다.)  
+    Exception: java.net.SocketException: Invalid argument or cannot assign requested address on Fedora Core 3 or 4
+
+이 문제는 bin/nutch 의 옵션을 수정해야 한다.
+{{{#!plain
+JAVA_IPV4=-Djava.net.preferIPv4Stack=true
+# run it exec "$JAVA" $JAVA_HEAP_MAX $NUTCH_OPTS $JAVA_IPV4 -classpath "$CLASSPATH" $CLASS "$@" 
+}}}
+

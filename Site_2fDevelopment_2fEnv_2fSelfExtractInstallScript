@@ -1,0 +1,109 @@
+#title Self Extract Install Script 만들기
+
+=== 리눅스 프로그램 배포의 문제 ===
+윈도우즈는 통일된 단일한 방식을 통해서, 스스로 설치되는 프로그램을 만들 수 있다. 보통 Install Shield의 형태로 관리되며, 거의 모든 윈도우 버젼에 동일하게 적용시킬 수 있다. 
+
+그러나 리눅스에 배포할 경우 많은 문제가 따른다. 일단 리눅스(:12)만으로 목표를 한정한다고 해도, RedHat, Debian, Zentoo, ubuntu 등 배포판 고유의 전혀다른 배포방식을 제공하며, 일반적으로 호환되지 않는다. 리눅스에서 개발되고 다른 유닉스(:12)로 포팅된 프로그램을 배포하는 데에도 역시 동일한 문제가 발생한다.
+
+단순하게 tar(:12)로 묶어서 배포하면 된다. 이건 논외로 하기로 한다. 여기에서는 Install Shield와 같이 유저와 상호대화 가능하면서 간단하게 배포가능한 방법에 대해서 논할 것이다.
+
+=== shell script와 tail로 구현하는 간단한 Install Script 만들기 ===
+그렇다면 리눅스 뿐만이 아닌 다른 유닉스에서도 사용가능한 Install Script 프로그램을 만드는 방법에 대해서 알아보겠다. 일단 만들 Install script는 모든 유닉스에서 작동이 될 수 있다는 것을 보장해야 하므로, 유닉스에 기본적으로 설치되는 명령만을 가지고 작성을 해야 한다.
+
+이 문서를 제대로 이해하고 활용하기 위해서는 Bash 스크립트 프로그래밍에 대한 지식을 가지고 있어야 한다. [wiki:Site/Development/Env/BeginningBashScript 초보자를 위한 Bash 스크립트 프로그래밍]문서를 참고하기 바란다.
+
+여기에서는 모든 유닉스에 기본적으로 제공된다고 생각되는 sh, tail(:12), tar를 통해서 Install Script를 만드는 방법에 대해서 알아보도록 하겠다.
+
+당신이 mypackage-1.2.3.tgz이란 프로그램을 배포한다고 가정해보자. 당신은 실행하면, 여러가지 환경변수를 검사하고 유저의 입력을 받아서 자동으로 해당 디렉토리에 압축이 풀리는 스크립트를 만들기를 원할 것이다. 아래와 같은 방법으로 간단하게 만들 수 있다. 
+{{{#!plain
+cat sfx-header mypackage-1.2.3.tgz > mypackage-1.2.3.sh
+}}}
+
+핵심은 sfx-header인데, 다음과 같은 내용을 포함한다.
+{{{#!plain
+#!/bin/sh
+echo ""
+echo "MyPackage v99.99 - extracting archive... please wait"
+echo ""
+
+# take the archive portion of this file and pipe it to tar
+# the NUMERIC parameter in this command should be one more
+# than the number of lines in this header file
+tail +12 $0 | tar xz
+
+exit 0
+}}}
+tail +12 는 12번째 줄 부터 출력을 하라는 명령이다. 즉 mypackage-1.2.3.sh의 12번째줄 부터 출력을 해서 tar로 풀어라 이런 명령이 된다. 12번째 줄은 cat으로 가져다붙인 mypackage-1.2.3.tgz이 있으니, 최종적으로 현재 디렉토리에 mypackage-1.2.3.tgz의 압축을 풀게 된다. 
+
+=== Advanced Install Script ===
+위의 Install Script는 별 문제 없이 돌아가지만, 본격적으로 사용하기에는 몇 가지 문제가 있다.
+ 1. tail로 출력한 라인수를 수동으로 계산해주어야 한다. 만약 sfx-header이 사용자에 의해서 수정된다거나 라인수를 잘못 입력했다하면, 제대로 작동하지 않게 된다. 
+ 1. 현재 디렉토리에 압축이 풀리는데, 사용자가 원하는 디렉토리에 풀리도록 해야 할것이다. 사용자의 입력을 받아들일 수 있어야 할 것이다. 
+ 1. 만약의 경우를 대비해서, 임시디렉토리에서 압축을 푸는 등의 관련작업을 한 다음, 성공했을 경우 지정된 디렉토리로 옮기도록 한다. 
+
+다음은 위의 문제들을 해결하도록 수정된 스크립트다.
+{{{#!plain
+#!/bin/sh
+
+DEFDIR="/usr/local"
+TEMPDIR="/tmp/myapp"
+WORKDIR=$PWD
+
+clear
+echo "====================================================="
+echo "ESM Package V1.0 - extracting archive ... please wait"
+echo "====================================================="
+
+if [ $UID != 0 ];
+then
+	echo "Your not Root !!"
+	exit 1
+fi
+
+echo -n "Install Directory ($DEFDIR): "
+read UDIR
+if [ "$UDIR" = "" ];
+then
+	UDIR=$DEFDIR
+else
+	UDIR="$UDIR"
+fi
+
+echo "Install Dir is $UDIR"
+test -d $UDIR
+if [  $? -eq 1 ];
+then
+	mkdir $UDIR
+	if [ $? -ne 0 ];
+	then
+		echo "Directory Create failure : $UDIR"
+	fi
+fi
+
+
+SKIP=`awk '/^__ARCHIVE_FOLLOWS__/ { print NR + 1; exit 0; }' $0`
+
+mkdir $TEMPDIR
+cp $0 $TEMPDIR
+cd $TEMPDIR 
+tail -n +$SKIP $0 | tar x
+mv * $UDIR
+cd $WORKDIR
+
+if [ $? -eq 0 ];
+then
+	echo "======================================================="
+	echo " Program Install Success"
+	echo "======================================================="
+else
+	echo "======================================================="
+	echo " Program Install Failure"
+	echo "======================================================="
+fi
+exit 0
+
+__ARCHIVE_FOLLOWS__
+}}}
+read 명령을 이용해서 프로그램이 설치될 경로를 사용자가 직접 입력할 수 있도록 했다. 만약 아무것도 입력하지 않는다면, 기본경로인 '''DEFDIR'''에 설치되도록 했다. 그다음 test 명령을 이용해서 사용자가 입력한 경로가 존재하는지를 확인하고, 존재하지 않는다면 mkdir(1)로 해당 디렉토리를 설치하도록 한다. 자동으로 압축을 풀어야할 줄을 계산하기 위해서 awk(1) 명령을 이용하고 있다. awk를 이용해서 __ARCHIVE_FOLLOWS__를 찾게하고, 이 문자열의 줄수를 얻어와서 tail로 넘기도록 했다. 마지막으로 임시디렉토리를 만든다음 설치파일을 복사하고, 압축을 푼다음, 풀린 파일을 설치 디렉토리로 이동하도록 한다. 모든 작업을 마친다음 원래 작업 경로로 이동하는 걸로 설치 스크립트가 끝난다. 
+
+[[Category(14)]]

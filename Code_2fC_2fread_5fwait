@@ -1,0 +1,68 @@
+----
+ 1. read_wait
+ 1. 시간제한을 가진 표준입력 함수 
+ 1. yundream
+ 1. Version 0.2 
+ 1. 2004/01/27
+----
+
+=== 설명 ===
+select(2)를 이용한 시간제한 기능을 가진 표준입력을 받아들이는 함수 입니다. 필요할 때 마다 select(2)메뉴얼을 뒤적이면서 다시 만들어야 되는게 귀찮아서 간단하게 함수화 시켰습니다. 
+
+=== 사용방법 ===
+{{{#!plain
+int read_wait(char *buf, size_t size, int sec)
+}}}
+ 1. buf : 입력된 데이터를 저장할 공간  
+ 1. size : 읽어들일 데이터의 크기 
+ 1. sec : 시간제한(단위 : 초)  
+ 1. 리턴값 : 성공하면 읽어들인 데이터의 크기를 리턴하고, 타임아웃이 발생했을 때는 -1을 리턴한다. 
+
+{{{#!plain
+int main()
+{
+    char buf[80] = {0x00,};
+    int n;
+    if ((n = read_wait(buf, 80, 5)) < 0)
+    
+       printf("Time out\n");
+    }
+    else
+    {
+        printf("%s\n", buf);
+    }
+}
+}}}
+
+=== 코드 ===
+{{{#!plain
+#include <sys/select.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int read_wait(char *buf, size_t size, int sec)
+{
+    fd_set rfds;
+    struct timeval tv;
+    int n, retval;
+
+
+    FD_ZERO(&rfds);
+    FD_SET(0, &rfds);
+    tv.tv_sec = sec;
+    tv.tv_usec = 0;
+
+    retval = select (1, &rfds, NULL, NULL, &tv);
+    if (retval)
+    {
+        n = read(0, buf, size);
+        return n;
+    }
+    else
+    {
+        return -1;
+    }
+}
+}}}
+
+=== 변경사항 ===

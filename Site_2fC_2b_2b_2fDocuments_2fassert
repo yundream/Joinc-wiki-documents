@@ -1,0 +1,146 @@
+#title assert와 매크로 함수를 이용한 디버깅 정보 얻기
+
+== assert ==
+assert는 디버깅을 위해서 사용하는 함수로, 정해진 조건을 위반하는지를 검사하기 위한 목적으로 사용한다. 예컨데 객체의 할당 여부, 분모가 0이 되는 것 같은 잘못된 값 입력등이 그것이다.
+{{{#!plain
+#include <assert.h>
+#include <iostream>
+
+using namespace std;
+
+int foo(int a, int b)
+{
+    assert(b !=0 );
+    cout << a << "/" << b << endl;
+    return a/b;
+}
+
+
+int main(int argc, char **argv)
+{
+    cout << foo(100, 10) << endl;
+    cout << foo(100, 0) << endl;
+    return 0;
+}
+}}}
+
+이 프로그램을 실행하면 다음과 같은 결과를 보여준다.
+{{{#!plain
+$ ./assert 
+100/10
+10
+assert: assert.cc:8: int foo(int, int): Assertion `b !=0' failed.
+}}}
+
+도달해서는 안되는 문맥에 도달했음을 알리기 위한 목적으로 사용할 수도 있다. HTTP 기반의 응용 프로그램을 만든다고 가정해 보자. 이 프로그램은 유저 Method에 따라 if-else 분기를 한다. 만약 HTTP의 프로토콜을 완전하게 이해하고 있다면 문제될게 없지만 그렇지 않을 경우에는 예상치 못한 Method가 들어 올 수 있으므로 assert처리를 해줄 필요가 있다. 
+{{{#!plain
+if( method == HTTP_GET)
+	...
+else if(method == HTTP_POST)
+	...
+else if
+    ...
+else
+    assert(!"Unknown Method");
+}}}
+
+프로그램을 배포할 때는 assert를 제거해야 한다. NDEBUG를 정의하면 컴파일시 assert문이 제외시킨다. 
+{{{#!plain
+$ g++ -o assert assert.cc -DNDEBUG
+}}}
+
+== assert 매크로를 이용한 디버깅 로그 출력 ==
+assert결과를 보면 파일명, 함수명, 호출된 줄 수와 같은 정보를 출력하는 걸 볼 수 있다. C++의 경우 클래스 명까지 출력한다. assert.h를 열어보면, 이들 정보를 얻기 위해서 몇가지 매크로를 사용하는 걸 확인할 수 있다. 
+{{{#!plain
+  1. __func__ : 함수명을 가져온다. 
+  2. __FILE__ : 파일명을 얻어온다. 
+  3. __LINE__ : 줄수를 가져온다.
+  4. __DATE__ : 컴파일 된 날짜.
+  5. __TIME__ : 컴파일 된 시간
+  6. __FUNCTION__ : C++에서 사용 __func__와 동일하다.
+  7. __PRETTY_FUNCTION__ : 클래스 이름과 함수명, 매개 변수까지 함께 보여준다. 
+}}}
+
+__ func __는 함수이름만을 가져온다. C++에서 클래스와 함께 사용할 경우 메서드 이름만 가져올 뿐, 클래스 이름을 가져올 수 없다. 클래스 이름까지 가져오기 위해서 __ PRETTY_FUNCTION __을 사용할 수 있는데 g++ 확장으로 표준이 아니다. 컴파일러 호환성을 고려한다면 아래와 같이 편법을 사용해야 한다.
+{{{#!plain
+class DB
+{
+private:
+	const char *mclassName;
+public:
+	DB() { mclassName = __func__; }
+}
+}}}
+
+이벤트 로깅을 위한 간단한 예제
+{{{#!plain
+#include <iostream>
+#include <typeinfo>
+#include <assert.h>
+
+using namespace std;
+
+#define DB_OPEN_ERROR 100 
+
+class CLog
+{
+private:
+	int merrnum;
+	const char *mfuncname;
+	int mlinenum;
+public:
+	CLog(int errnum, const char *func_name, int linenum)
+	{
+		merrnum = errnum;
+		mfuncname = func_name;
+		mlinenum = linenum;
+	}
+	~CLog(){};
+	void Logging()
+	{
+		cout << "Logging " << "[" << merrnum << "] " << mfuncname << " : " << mlinenum << endl;
+	}
+};
+
+class DB 
+{
+private:
+	const char* class_name;
+public:
+	DB(int a)
+	{
+		class_name = __func__;
+	}
+	int set(int a)
+	{
+		if(a < 0) throw CLog(100, __PRETTY_FUNCTION__, __LINE__);
+		cout << "set " << a << endl;
+		return 1;
+	}
+};
+
+int main()
+{
+	DB *myDB;
+	myDB = new DB(1);
+
+	try
+	{
+		myDB->set(-100);
+	}
+	catch (CLog &e)
+	{
+		e.Logging();
+	}
+	return 0;
+}
+}}}
+
+== assert를 사용할 필요가 있을까 ? ==
+assert를 사용한다는 것은 최소한 그 자리에 예외 상황이 발생할 수 있다는 것을 인지하는 상황임을 의미한다. 그렇다면 깔끔하게 에러처리를 하는게 낫지 않을까 ? 그게 비록 프로그램 개발 중이라고 하더라도 말이다. 물론 특정한 영역에 예외 상황이 발생할 거라는 걸 예측은 하고 있지만, 에러 처리 코드를 작성할만한 정보를 얻지 못했을 때는 assert를 사용이 필요할 수도 있다. 위에서 언급한 HTTP 기반 애플리케이션 개발이 그런 예이다. if , else if 후 마지막 else에 assert를 배치해서 예외를 추적할 수 있다. 
+
+또는 상황 예측이 어려운 경우도 있을 수 있다. 예컨데 자원해제의 경우인데, 자원이 여기저기 함수와 클래스를 넘나들다 보면 해제하는 자원이 유효한 자원이지 애매모호할 때가 있다. 이경우 assert를 이용해서 자원을 두번 해제 하는문 등의 문제를 추적할 수 있다. 
+
+추적할 수만 있다면, 문제는 해결된거마 마찬가지라고 볼 수 있으니, assert는 그 역할을 훌륭히 해냈다고 볼 수 있다.
+
+[[tag(디버그,에러처리,로그)]]

@@ -1,0 +1,261 @@
+#title 예제로 알아보는 소켓 프로그래밍
+
+  * 예제가 쓸데 스럽게 복잡함. 예제 프로그램을 echo 로 바꿔야 겠음. -- 2011/02/22 --
+이문서에서 소켓(:12)의 모든것을 다루진 않겠다.(다룰수도 없다 --;) 소켓은 UNIX, INET, AX25, IPX, APPLETALK, X25 등의 다양한 소켓패밀리와, 도메인을 지원할뿐만 아니라, 6가지 정도의 소켓타임을 가지고 있으며, 이에 대해서 제대로 설명하려면 책 몇권으로도 부족하다.
+
+여기에서는 이 사이트의 취지에 맞도록 가장 간단하게 접근할수 있는 방법, 즉 "문고리"를 잡는데에 까지만을 설명하도록 하며, Unix(Linux) 상에서가장 널리, 그리고 일반적으로 사용되는 INET(TCP/IP 를 이용한 인터넷 주소 패밀리)와 데이타 연결지향의 신뢰성이 높은 Stream(흔히 TCP 라고 하는) 에 대해서 다루도록 하겠다.
+
+소켓 프로그램은 주로 서버-클라이언트 의 2개의 프로그램 쌍으로 이루어 진다. 서버는 서비스를 제공하는 프로그램이고 클라이언트는 서비스를 요청하는
+프로그램이다. FTP 를 예로 들자면, proftpd, wu-ftpd 등이 서버 프로그램이고, ncftp, cuteftp 등이 클라이언트 프로그램이다.
+
+이러한 서버프로그램은 우리가 흔히 말하는 포트(port)에 대기 하며 클라이언트의 연결을 기다리고 (listen) 있다가, 클라이언트가 접근을 요청하면 이를 받아들여서(Accept) 서버-클라이언트 연결을 설정하고, 클라이언트의 여러 명령을 받아서 필요한 서비스를 하게 된다.
+
+서버-클라이언트 환경을 만들기 위한 과정을 서버측에서 보자면 다음의 과정을 거치게 된다. 
+{{{#!plain
+    Socket 생성 -> Socket 에 이름연결 (bind)
+    -> 클라이언트의 연결을 기다림(listen)
+    -> 클라이언트를 받아들임 (Accept)
+    -> 클라이언트의 명령을 받아서 적절한 서비스를 수행
+}}}
+클라이언트측에서 서버에 접근하기 위해서는 단순히 소켓을 생성후 서버에 연결(connect) 하기만 하면 된다.
+{{{#!plain
+    Socket 생성 -> 서버에 연결 시도(connect) -> 서버에 각종 명령을 전달
+}}}
+C 를 통해서 서버 클라이언트를 프로그래밍하는 방법은 위의 내용들을 그대로 프로그램에 옮기는 과정이다. 그럼 실제로 소켓을 이용한 서버 클라이언트 프로그램을 만들어 보도록 하자.
+
+일단 어떤 서비스를 제공하는 프로그램을 만들것인가를 정해아 한다. 우리가 만들 서버는 클라이언트에서 동이름을 입력하면 우편번호를 되돌려주는 우편번호 검색 프로그램이다. 우편번호는 파일로 저장되어 있으며, 클라이언트에서 지역 이름을 입력하면, 서버는 지역이름을 받아들이고, 파일을 라인단위로 읽어들여서 해당 지역이름을 포함하는 라인이 있는지 찾아서 이를 화면에 클라이언트측에 전달해주는 프로그램이다.
+
+quit 를 클라이언트측에서 보내면 프로그램을 끝내도록한다.(우편 번호를 저장한 파일은 대충 테스트용으로 하나 만들어서 사용하기 바란다)
+
+여기에서는 한번에 하나의 클라이언트만을 받아들이는 단일서버 단일클라이언트 프로그램을 작성하도록 한다. 예제 프로그램들에는 여러가지 에러상황에 대한 코드를 생략하도록 하겠다. 그럼 먼저 서버 프로그램을 만들어 보도록 하겠다.
+
+'''예제: zipcode.c'''
+{{{#!html
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;netinet/in.h&gt;
+<font COLOR=#00b800>#include</font> &lt;arpa/inet.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+    <b><font COLOR=#0000ff>int</font></b> server_sockfd, client_sockfd;
+    <b><font COLOR=#0000ff>int</font></b> state, client_len;
+    <b><font COLOR=#0000ff>int</font></b> pid;
+
+    FILE *fp;
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_in clientaddr, serveraddr;
+
+    <b><font COLOR=#0000ff>char</font></b> buf[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>char</font></b> line[<font COLOR=#a900a9>255</font>];
+
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font>)
+    {
+        printf(<font COLOR=#ff0000>"Usage : ./zipcode [port]&#92;n"</font>);
+        printf(<font COLOR=#ff0000>"예  : ./zipcode 4444&#92;n"</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    memset(line, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+    state = <font COLOR=#a900a9>0</font>;
+
+    // 주소 파일을 읽어들인다.
+    client_len = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+    <b><font COLOR=#0000ff>if</font></b>((fp = fopen(<font COLOR=#ff0000>"zipcode.txt"</font>, <font COLOR=#ff0000>"r"</font>)) == NULL)
+    {
+        perror(<font COLOR=#ff0000>"file open error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    // internet 기반의 소켓 생성 (INET)
+    <b><font COLOR=#0000ff>if</font></b> ((server_sockfd = socket(AF_INET, SOCK_STREAM, <font COLOR=#a900a9>0</font>)) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"socket error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    bzero(&serveraddr, <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[<font COLOR=#a900a9>1</font>]));
+
+    state = bind(server_sockfd , (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&serveraddr,
+            <b><font COLOR=#0000ff>sizeof</font></b>(serveraddr));
+    <b><font COLOR=#0000ff>if</font></b> (state == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"bind error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    state = listen(server_sockfd, <font COLOR=#a900a9>5</font>);
+    <b><font COLOR=#0000ff>if</font></b> (state == -<font COLOR=#a900a9>1</font>)
+    {
+        perror(<font COLOR=#ff0000>"listen error : "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        client_sockfd = accept(server_sockfd, (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&clientaddr,
+                               &client_len);
+        <b><font COLOR=#0000ff>if</font></b> (client_sockfd == -<font COLOR=#a900a9>1</font>)
+        {
+            perror(<font COLOR=#ff0000>"Accept error : "</font>);
+            exit(<font COLOR=#a900a9>0</font>);
+        }
+        <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+        {
+            rewind(fp);
+            memset(buf, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+            <b><font COLOR=#0000ff>if</font></b> (read(client_sockfd, buf, <font COLOR=#a900a9>255</font>) &lt;= <font COLOR=#a900a9>0</font>)
+            {
+                close(client_sockfd);
+                <b><font COLOR=#0000ff>break</font></b>;
+            }
+
+            <b><font COLOR=#0000ff>if</font></b> (strncmp(buf, <font COLOR=#ff0000>"quit"</font>,<font COLOR=#a900a9>4</font>) == <font COLOR=#a900a9>0</font>)
+            {
+                write(client_sockfd, <font COLOR=#ff0000>"bye bye"</font>, <font COLOR=#a900a9>8</font>);
+                close(client_sockfd);
+                <b><font COLOR=#0000ff>break</font></b>;
+            }
+
+            <b><font COLOR=#0000ff>while</font></b>(fgets(line,<font COLOR=#a900a9>255</font>,fp) != NULL)
+            {
+                <b><font COLOR=#0000ff>if</font></b> (strstr(line, buf) != NULL)
+                {
+                    write(client_sockfd, line, <font COLOR=#a900a9>255</font>);
+                }
+                memset(line, '<font COLOR=#a900a9>0</font>', <font COLOR=#a900a9>255</font>);
+            }
+            write(client_sockfd, <font COLOR=#ff0000>"end"</font>, <font COLOR=#a900a9>255</font>);
+            printf(<font COLOR=#ff0000>"send end&#92;n"</font>);
+        }
+    }
+    close(client_sockfd);
+}
+</pre>
+}}}
+[[adsense]]
+서버 프로그램은 클라이언트의 연결을 기다린다음, 연결이 만들어지면 클라이언트로 부터 검색을 원하는 지역이름을 입력받는다. 지역이름을 입력받으면,
+각 지역이름과 우편번호가 저장되어 있는 파일의 내용을 읽어들여서,지역이름 포함한 라인을 클라이언트측에 전송하게 된다. 만약 클라이언트로 '''quit''' 문자열을 입력받으면 연결을 끊게 된다.
+
+가장 먼저 소켓을 생성해야 하는데 이는 socket(2) 함수를 이용하게 된다. 여기에는 3개의 매개 변수가 전달되는데, 각각 통신 도메인의 종류, 통신타입, 사용할 프로토콜을 지원하게 된다. 일반적인 인터넷 어플리케이션의경우 도메인종류로 AF_INET, 그리고 연결지향의 신뢰성 있는 통신을 위해서 SOCK_STREAM 타입을 사용한다.
+
+프로토콜은 특별히 지정된게 없으며, 그냥 0을 사용하도록 한다. socket 를 만들었으면 통신 환경에 맞게, sockaddr_in 구조체를 체워주게 된다. 이 구조체의 내용은 다음과 같다.
+{{{#!plain
+struct in_addr  
+{           
+    short int           sin_family;
+    unsigned short int  sin_port;
+    struct in_addr      sin_addr;
+}           
+}}}
+  
+sin_family 는 소켓타입이며,  sin_port 는 연결에 사용되는 port(:12) 번호이고, sin_addr 은 연결을 받아들일 IP 어드레스이다. 예제에서는 INADDR_ANY 를 사용했는데, 이는 모든 IP에 대해서
+연결을 받아들이라는 뜻이다. 
+
+socket() 이용해서 만든 소켓에 이름을 할당하여 실지로 어플리케이션이 사용가능한 상태로 만들어 줘야 하는데 이를 "소켓에 이름을 할당한다" 라고 하며 bind(2) 함수를 이용해서 구현한다. <br>
+그다음에 listen(2)를 이용해서 연결을 기다리고, accetp(2) 를 이용해서 연결을 받게 된다. accept 를 이용해서 연결이 완성되면 accept(2) 는소켓과 연결되는 "파일 지시자"를 돌려주고 이 "파일 지시자" 를 통해서 클라이언트와 서버간의 메시지를 주고 받게 된다. 
+
+일단 연결이 이루어진다음에 서버가 하는일은 간단하다. 클라이언트의 문자열을 읽어들이고(지역이름), 파일에서 이 지역을 포함한 주소가 있는지 확인해서, 이를 클라이언트측에 전송해주면 된다. 주소검색이 모두 끝났다면 "end" 문자열을 클라이언트에 돌려줌으로써, 모든 검색이 끝났음을 클라이언트에게 알려준다.
+
+클라이언트측에서 "quit" 문자열을 보내기 전까지 이 프로그램은 계속해서 클라이언트와 연결해서 업무를 수행한다. "quit"문자열을 받게 되면, close(2) 를 이용해서 클라이언트와의 연결을 끊고, 새로운 클라이언트를 받아들일 준비를 하게 된다.
+
+이제 클라이언트 예제이다.
+'''예제: zipcode_cli.c'''
+{{{#!html
+<pre>
+<font COLOR=#00b800>#include</font> &lt;sys/types.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/stat.h&gt;
+<font COLOR=#00b800>#include</font> &lt;sys/socket.h&gt;
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt;
+<font COLOR=#00b800>#include</font> &lt;netinet/in.h&gt;
+<font COLOR=#00b800>#include</font> &lt;arpa/inet.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt;
+<font COLOR=#00b800>#include</font> &lt;stdlib.h&gt;
+<font COLOR=#00b800>#include</font> &lt;string.h&gt;
+
+<b><font COLOR=#0000ff>int</font></b> main(<b><font COLOR=#0000ff>int</font></b> argc, <b><font COLOR=#0000ff>char</font></b> **argv)
+{
+
+    <b><font COLOR=#0000ff>int</font></b> client_len;
+    <b><font COLOR=#0000ff>int</font></b> client_sockfd;
+
+    FILE *fp_in;
+    <b><font COLOR=#0000ff>char</font></b> buf_in[<font COLOR=#a900a9>255</font>];
+    <b><font COLOR=#0000ff>char</font></b> buf_get[<font COLOR=#a900a9>255</font>];
+
+    <b><font COLOR=#0000ff>struct</font></b> sockaddr_in clientaddr;
+
+    <b><font COLOR=#0000ff>if</font></b> (argc != <font COLOR=#a900a9>2</font>)
+    {
+        printf(<font COLOR=#ff0000>"Usage : ./zipcode_cl [port]&#92;n"</font>);
+        printf(<font COLOR=#ff0000>"예    : ./zipcode_cl 4444&#92;n"</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+
+
+    client_sockfd = socket(AF_INET, SOCK_STREAM, <font COLOR=#a900a9>0</font>);
+    clientaddr.sin_family = AF_INET;
+    clientaddr.sin_addr.s_addr = inet_addr(<font COLOR=#ff0000>"127.0.0.1"</font>);
+    clientaddr.sin_port = htons(atoi(argv[<font COLOR=#a900a9>1</font>]));
+
+    client_len = <b><font COLOR=#0000ff>sizeof</font></b>(clientaddr);
+
+    <b><font COLOR=#0000ff>if</font></b> (connect(client_sockfd, (<b><font COLOR=#0000ff>struct</font></b> sockaddr *)&clientaddr, client_len) &lt; <font COLOR=#a900a9>0</font>)
+    {
+        perror(<font COLOR=#ff0000>"Connect error: "</font>);
+        exit(<font COLOR=#a900a9>0</font>);
+    }
+    <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+    {
+        printf(<font COLOR=#ff0000>"지역이름 입력 : "</font>);
+        fgets(buf_in, <font COLOR=#a900a9>255</font>,stdin);
+
+        buf_in[strlen(buf_in) - <font COLOR=#a900a9>1</font>] = '<font COLOR=#a900a9>0</font>';
+        write(client_sockfd, buf_in, <font COLOR=#a900a9>255</font>);
+        <b><font COLOR=#0000ff>if</font></b> (strncmp(buf_in, <font COLOR=#ff0000>"quit"</font>, <font COLOR=#a900a9>4</font>) == <font COLOR=#a900a9>0</font>)
+        {
+            close(client_sockfd);
+            exit(<font COLOR=#a900a9>0</font>);
+        }
+        <b><font COLOR=#0000ff>while</font></b>(<font COLOR=#a900a9>1</font>)
+        {
+            read(client_sockfd, buf_get, <font COLOR=#a900a9>255</font>);
+            <b><font COLOR=#0000ff>if</font></b> (strncmp(buf_get, <font COLOR=#ff0000>"end"</font>, <font COLOR=#a900a9>3</font>) == <font COLOR=#a900a9>0</font>)
+                <b><font COLOR=#0000ff>break</font></b>;
+
+            printf(<font COLOR=#ff0000>"%s"</font>, buf_get);
+        }
+    }
+
+    close(client_sockfd);
+    exit(<font COLOR=#a900a9>0</font>);
+}
+</pre>
+}}}
+클라이언트는 서버에 비해서 좀더 간단하다.
+
+sockaddr_in 구조체만 설정하고 해당 서버에 연결(connect(20) 하는걸로 서버연결을 마칠수가 있다. 연결이 만들어 지고 나면, fgets() 를 이용해서 사용자의 표준입력 문자열을 입력받게 된다. 인력받은 문자열은 write() 를 통해서 서버에 전달되며, read 를 이용해서 서버측에서의 검색결과를 읽어온다. 검색결과는 서버측에서 검색결과를 마쳤을시 전송되는 "end"를 만나기 전까지 계속 해서 읽어오게 된다.
+{{{#!plain
+[yundream@localhost test]# ./zipcode 4444&
+[2] 9675
+[yundream@localhost test]# ./zipcode_cl 4444
+지역이름 입력 : 역삼
+서울시 강남구 역삼동:100-500
+지역이름 입력 : 강남구
+서울시 강남구 역삼동:100-500
+서울시 강남구 삼성동:108-508
+지역이름 입력 : quit
+[yundream@localhost test]#
+}}}
+
+이상 간단하게 나마 "소켓"을 이용한 서버-클라이언트 의 기초적인 내용을 알아보았습니다. 도움이 되었는지 모르겟군요. 다음번에는 파일기반의 소켓을 이용한 내부 프로세스의 통신(AF_UNIX)의
+방법을 예제를 통해서 알아보도록 하겠습니다.
+
+좀더 좋은 내용을 준비하도록 최선의 노력을(--;) 다하겠습니다. 그럼 좋은 하루 되세요..

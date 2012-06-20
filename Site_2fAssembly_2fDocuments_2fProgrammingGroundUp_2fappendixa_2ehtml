@@ -1,0 +1,663 @@
+#title Appendix A. GUI 프로그래밍
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Appendix A. GUI 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><LINK
+REL="HOME"
+TITLE="Programming from the Ground Up"
+HREF="index.html"><LINK
+REL="PREVIOUS"
+TITLE="최적화"
+HREF="optimization.html"><LINK
+REL="NEXT"
+TITLE="Appendix B. Common x86 Instructions"
+HREF="appendixb.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>Programming from the Ground Up</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="optimization.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+></TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="appendixb.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="APPENDIXA"
+></A
+>11. Appendix A. GUI 프로그래밍</H1
+><P
+>		이번장의 Graphical User Interface를 작성하기 위한 방법을 가리치는게 
+		목적이 아니다. 단지 다른 응용을 작성하면서, 어떻게 GUI적인 부분을 
+		구현해야 할것인지, 그러한 구현을 위한 어떠한 도구와 라이브러리가 있는지 
+		정도만을 소개하도록 할 것이다. 여기에서 소개한 라이브러리를 제대로 사용
+		하기 위해서는 별도로 학습을 해야 할것이다.  
+	</P
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1111"
+></A
+>11.1. GNOME 라이브러리</H2
+><P
+>			GNOME는 리눅스 유저에게 데스크탑환경을 제공해주기 위한 목적으로 시작된
+			여러 프로젝트중 하나로, Linux 에서는 QT(:12)와 함께 데스크탑라이브러리의
+			양대산맥으로 자리잡고 있다. GNOME 프로젝트는 응용을 실행시키기 위한
+			launcher(실행기)와 실행된 응용을 배열할 수 있는 panel, 응용의 표준이 
+			되는 파일관리,세션 관리, 설정관리등과 관련된 API를 제공한다. 
+		</P
+><P
+>			GNOME라이브러리는 특성상 커다른 데이터 구조를 생성하고 유지하는 일련의 
+			작업을 수행하지만 프로그래머로 하여금 메모리를 어떻게 관리해야 할지등의
+			고민을 하지 않도록 구현되어 있다. 이러한 구현의 핵심은 모든 GUI 
+			구조체 데이터를 함수호출을 통해서 처리하도록 하는데 있다. 이러한 
+			라이브러리 디자인은 유지보스 측면에서 많은 도움을 준다. 예를 들어서 
+			라이브러리의 버젼이 바뀌었다고 가정을 해보자. 이럴경우 데이터 구조도
+			변경될 수 있는데, 데이터 구조 자체를 라이브러리에서 모두 처리하기 때문에
+			라이브러리를 사용하는 응용측에서는 버젼이 바뀜에 따른 코드 수정을 
+			최소화 시킬수가 있다. 그냥 컴파일한 다시 해주면 사용하는데, 문제가 
+			없다. GNOME는 라이브러리와 응용간의 데이터 교환을 위해서, 실데이터를 
+			전송하는 대신에, 객체를 가리키는 포인터를 주고 받게 되며, 프로그래머는 
+			자료구조에 포함되어 있는 여러가지 데이터들에대해서 신경쓸 필요가 
+			없더록 구성되어 있다.
+		</P
+><P
+>			이번장에서는 GNOME의 기본적인 개념과 프로그래밍 방법에 대해서 알아보도록
+			할것이다. GNOME 프로그래밍에 본격적으로 뛰어들고 싶다면 GNOME 개발자
+			사이트인 http://developer.gnome.org를 방문하길 바란다. 이 사이트는 
+			자습서, 메일링리스트, API 문서등 GNOME환경에서 프로그래밍을위한 다양한
+			문서를 제공한다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1116"
+></A
+>11.2. 다양한 언어를 이용한 간단한 GNOME 프로그램 작성</H2
+><P
+>			그럼 quit 버튼을 포함한 간단한 윈도우 프로그램을 만들어 보도록 하겠다.	
+			이 프로그램은 버튼을 클릭하게 되면, 정말 프로그램을 종료시킬 것인지를 
+			물어보는 대화창이 뜨고 yes를 클릭하면 종료하는 간단한 일을 한다.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># PURPOSE : GNOME Library를 이용한 간단한 GUI 프로그램 제작 예를 보여준다.
+# INPUT   : 사용자로 부터 Quit 버튼 클릭 이벤트를 받으면 윈도우를 종료한다.
+# OUTPUT  : 프로그램의 종료
+#
+# PROCESS : 만약 유저가 "Quit" 버튼을 클릭하면, 확인을 위한 대화창을 뛰운다. 
+#           유저가 Yes를 클릭하면 종료되고, 그렇지 않으면 계속 실행된다.
+#
+
+.section .data
+
+### Gnome 정의  
+#   C언어에서의 헤더파일과 같은 일을 한다. 각종 정의된 값이 들어간다.
+#
+
+# GNOME 버튼 이름
+GNOME_STOCK_BUTTON_YES:
+.ascii "Button_Yes\0"
+GNOME_STOCK_BUTTON_NO:
+.ascii "Button_No\0"
+
+# Gnome 메시지 박스 타입
+GNOME_MESSAGE_BOX_QUESTION:
+.ascii "question\0"
+
+# NULL에대한 표준 정의
+.equ NULL, 0
+
+# GNOME 시그널 정의
+signal_destroy:
+.ascii "destory\0"
+signal_delete_event:
+.ascii "delete_event\0"
+signal_clicked:
+.ascii "clicked\0"
+
+
+### 애플리케이션 관련 정의들
+
+# 애플리케이션 정보
+app_id:
+.ascii "gnome-example\0"
+app_version:
+.ascii "1.000\0"
+app_title:
+.ascii "Gnome Example Program\0"
+
+# 버튼및 윈도우창에 사용될 문장들 
+button_quit_text:
+.ascii "I Want to Quit the GNOME Example Program\0"
+
+quit_question:
+.ascii "Are you sure you want to quit?\0"
+
+
+.section .bss
+
+# 위젯관련된 변수 저장
+.equ WORD_SIZE, 4
+.lcomm appPtr, WORD_SIZE
+.lcomm btnQuit, WORD_SIZE
+
+.section .text
+
+.globl main
+.type main,@function
+
+main:
+	pushl %ebp
+	movl %esp, %ebp
+
+	# GNOME 라이브러리 초기화	
+	pushl 12(%ebp)       # argv
+	pushl 8(%ebp)        # argc
+	pushl $app_version
+	pushl $app_id
+	call gnome_init
+	addl $16, %esp       # 스택 복구
+
+	# 새로운 애플리케이션 윈도우 생성
+	pushl $app_title     # 윈도우 타이틀
+	pushl $app_id        # 애플리케이션 ID
+	call gnome_app_new
+	addl $8, %esp        # 스택 복구
+	movl %eax, appPtr    # 윈도우 포인터 저장
+
+	# 새로운 버튼 생성
+	pushl $button_quit_text        # 버튼 문자
+	call gtk_button_new_with_label 
+	addl $4, %esp        # 스택복구
+	movl %eax, btnQuit   # 버튼포인트 저장
+
+	# 버튼을 애플리케이션 윈도우 안에 배치 
+	pushl btnQuit
+	pushl appPtr
+	call gnome_app_set_contents
+	addl $8, %esp
+
+	# 배치된 버튼 위젯을 보여준다. 
+	pushl btnQuit
+	call gtk_widget_show
+	addl $4, %esp
+
+	# 애플리케이션 윈도우를 보여준다. 
+	pushl appPtr
+	call gtk_widget_show
+	addl $4, %esp
+
+	# delete 이벤트 헨들러 설정
+	pushl $NULL             # 함수에 넘길 NULL 값
+	pushl $delete_handler     
+	pushl $signal_delete_event
+	pushl appPtr 
+	call gtk_signal_connect
+	addl $16, %esp					# 스택 복구
+
+	# destory 이벤트 핸들러 설정	
+	pushl $NULL   
+	pushl $destroy_handler  #
+	pushl $signal_destroy
+	pushl appPtr        
+	call gtk_signal_connect
+	addl $16, %esp    			# 스택 복구 
+
+	# 클릭 이벤트가 발생했을 때, 호출될 함수의 설정
+	pushl $NULL
+	pushl $click_handler
+	pushl $signal_clicked
+	pushl btnQuit
+	call gtk_signal_connect
+	addl $16, %esp
+
+	#Transfer control to GNOME. Everything that
+	#happens from here out is in reaction to user
+	#events, which call signal handlers. This main
+	#function just sets up the main window and connects
+	#signal handlers, and the signal handlers take
+	#care of the rest
+	call gtk_main
+	#After the program is finished, leave
+	movl $0, %eax
+	leave
+	ret
+	#A "destroy" event happens when the widget is being
+	#removed. In this case, when the application window
+
+	#is being removed, we simply want the event loop to
+	#quit
+	destroy_handler:
+	pushl %ebp
+	movl %esp, %ebp
+	#This causes gtk to exit it’s event loop
+	#as soon as it can.
+	call gtk_main_quit
+	movl $0, %eax
+	leave
+	ret
+	#A "delete" event happens when the application window
+	#gets clicked in the "x" that you normally use to
+	#close a window
+	delete_handler:
+	movl $1, %eax
+	ret
+	#A "click" event happens when the widget gets clicked
+	click_handler:
+	pushl %ebp
+	movl %esp, %ebp
+	#Create the "Are you sure" dialog
+	pushl $NULL                       #End of buttons
+	pushl $GNOME_STOCK_BUTTON_NO      #Button 1
+	pushl $GNOME_STOCK_BUTTON_YES     #Button 0
+	pushl $GNOME_MESSAGE_BOX_QUESTION #Dialog type
+	pushl $quit_question              #Dialog mesasge
+	call gnome_message_box_new
+	addl $16, %esp                    #recover stack
+
+	#%eax now holds the pointer to the dialog window
+	#Setting Modal to 1 prevents any other user
+	#interaction while the dialog is being shown
+	pushl $1
+	pushl %eax
+	call gtk_window_set_modal
+	popl %eax
+	addl $4, %esp
+
+	#Now we show the dialog
+	pushl %eax
+	call gtk_widget_show
+	popl %eax
+
+	#This sets up all the necessary signal handlers
+	#in order to just show the dialog, close it when
+	#one of the buttons is clicked, and return the
+	#number of the button that the user clicked on.
+	#The button number is based on the order the buttons
+	#were pushed on in the gnome_message_box_new function
+	pushl %eax
+	call gnome_dialog_run_and_close
+	addl $4, %esp
+
+	#Button 0 is the Yes button. If this is the
+	#button they clicked on, tell GNOME to quit
+	#it’s event loop. Otherwise, do nothing
+	cmpl $0, %eax
+	jne   click_handler_end
+	call  gtk_main_quit
+	click_handler_end:
+
+	leave</PRE
+></TD
+></TR
+></TABLE
+>
+		 	만들어진 코드는 다음과 같은 방법으로 빌드하면 된다.
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># as gnome-example.s -o gnome-example.o
+# gcc gnome-example.o `gnome-config --libs gnomeui` -o gnome-example</PRE
+></TD
+></TR
+></TABLE
+>
+			이 프로그램은 Gnome에서 제공하는 함수들을 이용해서, 필요한 위젯을 생성하고 이들을 
+			제어하고 있다. 이 프로그램에서 사용된 Gnome 함수들은 다음과 같다.
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>gnome_init</DT
+><DD
+><P
+>					명령행인자와 인자의 갯수, 애플리케이션 id, 버젼등의 정보를 가지고 Gnome 라이브러리를
+					초기화 한다.
+				</P
+></DD
+><DT
+>gnome_app_new</DT
+><DD
+><P
+>					새로운 애플리케이션 윈도우를 만들고 포인터를 리턴한다. 인자로 애플리케이션 id와 
+					윈도우 제목을 받아들인다. 
+				</P
+></DD
+><DT
+>gtk_button_new_with_label</DT
+><DD
+><P
+>					새로운 버튼을 만들고 포인터를 리턴한다. 인자로 버튼에 사용될 문자열을 받아들인다.
+				</P
+></DD
+><DT
+>gnome_app_set_contents</DT
+><DD
+><P
+>					애플리케이션 윈도우에 포함시킬 위젯을 설정한다.
+				</P
+></DD
+><DT
+>gtk_widget_show</DT
+><DD
+><P
+>					위젯을 생성시킨 후, 실제로 보이게 하려면 반드시 호출해야 한다.
+				</P
+></DD
+><DT
+>gtk_signal_connect</DT
+><DD
+><P
+>					위젯은 버튼클릭과 같은 이벤트가 발생하게 되는데, 이러한 이벤트 시그널이 발생했을 때 
+					처리해줄 callback 함수를 등록시키기 위해서 사용한다. 이 함수는 시그널을 발생시키는 
+					위젯의 포인터와 callback 함수와 기타 필요한 데이터 포인터를 필요로 한다.
+					이 함수를 실행시키면, 특정 이벤트가 발생될 때, 해당 이벤트를 처리할 함수가 호출된다.
+					이 프로그램의 경우 기타 데이터를 필요로 하지 않기 때문에 NULL로 처리했다.
+				</P
+></DD
+><DT
+>gtk_main</DT
+><DD
+><P
+>					GNOME의 main 루프함수다.	
+				</P
+></DD
+><DT
+>gtk_main_quit</DT
+><DD
+><P
+>					GNOME의 main 루프를 빠져나오기 위한 함수다.
+				</P
+></DD
+><DT
+>gnome_message_box_new</DT
+><DD
+><P
+>					응답이 가능한 대화창을 만든다. 대화창은 질의의 특징에 따라서 warning, question 등의
+					타입을 정의할 수 있다.
+				</P
+></DD
+><DT
+>gtk_window_set_modal</DT
+><DD
+><P
+>					modal 타입의 창을 만든다. modal 타입의 창은 해당 창이 닫히기 전에는 부모창을 
+					선택할 수 없다.
+				</P
+></DD
+></DL
+></DIV
+>
+		</P
+><P
+>			다음은 C언어로 작성된 동일한 프로그램이다. 
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;gnome.h&#62;
+
+#define MY_APP_TITLE "Gnome Example Program"
+#define MY_APP_ID "gnome-example"
+#define MY_APP_VERSION "1.000"
+#define MY_BUTTON_NEXT "I Want to Quit the Example Program"
+#define MY_QUIT_QUESTION "Are you sure you want to quit?"
+
+int destroy_handler(gpointer window, 
+		GdkEventAny *e,
+		gpointer data);
+int delete_handler(gpointer window,
+		GdkEventAny *e,
+		gpointer data);
+int click_handler(gpointer window,
+		GdkEventAny *e,
+		gpointer data);
+
+int main(int argc, char **argv)
+{
+	gpointer appPtr;
+	gpointer btnQuit;
+
+	gnome_init(MY_APP_ID, MY_APP_VERSION, argc, argv);
+	appPtr = gnome_app_new(MY_APP_ID, MY_APP_TITLE);
+
+	btnQuit = gtk_button_new_with_label(MY_BUTTON_NEXT);
+
+	gnome_app_set_contents(appPtr, btnQuit);
+
+	gtk_widget_show(btnQuit);
+
+	gtk_widget_show(appPtr);
+	gtk_signal_connect(appPtr, "delete_event",
+		GTK_SIGNAL_FUNC(delete_handler), NULL);
+	gtk_signal_connect(appPtr, "destroy",
+		GTK_SIGNAL_FUNC(destroy_handler), NULL);
+	gtk_signal_connect(btnQuit, "clicked",
+		GTK_SIGNAL_FUNC(click_handler), NULL);
+	
+	gtk_main();
+
+	return 0;
+}
+
+int destroy_handler(gpointer window,
+		GdkEventAny *e,
+		gpointer data)
+{
+	gtk_main_quit();
+	return 0;
+}
+
+int delete_handler(gpointer window,
+		GdkEventAny *e,
+		gpointer data)
+{
+	return 0;
+}
+
+int click_handler(gpointer window,
+		GdkEventAny *e,
+		gpointer data)
+{
+	gpointer msgbox;
+	int buttonClicked;
+
+	msgbox = gnome_message_box_new(
+		MY_QUIT_QUESTION,
+		GNOME_MESSAGE_BOX_QUESTION,
+		GNOME_STOCK_BUTTON_YES,
+		GNOME_STOCK_BUTTON_NO,
+		NULL);
+
+	gtk_window_set_modal(msgbox, 1);
+	gtk_widget_show(msgbox);
+
+	buttonClicked = gnome_dialog_run_and_close(msgbox);
+
+	if(buttonClicked == 0)
+	{
+		gtk_main_quit();
+	}
+	return 0;
+}&#13;</PRE
+></TD
+></TR
+></TABLE
+>
+			다음과 같이 컴파일 하면 된다.	
+<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># gcc gnome-example-c.c `gnome-config --cflags \
+  --libs gnomeui` -o gnome-example-c</PRE
+></TD
+></TR
+></TABLE
+>
+			성공적으로 컴파일을 끝냈다면 <B
+CLASS="EMPHASIS"
+>./gnome-example-c</B
+>로 실행하도록 한다.	
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN1166"
+></A
+>11.3. GUI Builders</H2
+><P
+>			여기에서 제시한 예제들은 UI를 만들기 위해서 필요한 함수를 프로그래머가 직접
+			불러서 사용하는 방식이였다. 그러나 UI는 특성상 비쥬얼한 환경에서 디자인할 수 
+			있는 툴을 이용해서 코드를 생성하는게, 개발시간을 아낄 수 있다. 그래서 GNOME역시
+			UI를 디자인할 수 있는 <B
+CLASS="EMPHASIS"
+>GLADE</B
+>라는 UI 디자인 툴을 제공한다. 
+			이 툴을 이용하면, 개발자는 비쥬얼한 환경에서 윈도우의 각 요소들을 배치할 수 있다.  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="optimization.html"
+ACCESSKEY="P"
+>&#51060;&#51204;</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+ACCESSKEY="H"
+>&#52376;&#51020;&#51004;&#47196;</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="appendixb.html"
+ACCESSKEY="N"
+>&#45796;&#51020;</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>최적화</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+>&nbsp;</TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>Appendix B. Common x86 Instructions</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

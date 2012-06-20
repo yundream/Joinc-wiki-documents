@@ -1,0 +1,207 @@
+#title 버퍼사이즈가 읽기/쓰기 성능에 미치는 영향
+
+=== 소개 ===
+파일을 읽고 쓸때, 한번에 읽어들이는 데이터의 크기에 따라 읽기/쓰기 성능이 달라진다는 것은 상식선에서 알고 있을 것이다. 대략 알고 있는 바로는 1024 바이트 단위로 읽어올 때 가장 효과적인 것으로 알고 있다. 실제, 이러한 우리의 상식이 올바른지를 확인하기 위해서 버퍼 크기에 따른 읽기/쓰기 성능에 대한 자료를 만들어보기로 했다.
+
+다음은 테스트를 위해서 만든 간단한 프로그램(:12)이다. 32 부터 4096 까지 버퍼사이즈를 2배씩 증가시키면서, 동일한 데이터를 읽고 쓰는데 걸리는 시간을 체크했다. 파일의 크기는 256M로 했다.
+{{{#!plain
+#include <stdlib.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
+
+int wtest(int cycle, int block_size);
+int rtest(int cycle, int block_size, char *file);
+int main(int argc, char **argv)
+{
+  int fd;
+  int i =  1;
+  int cycle = 0;
+  int total_size = 1024*1024*256;
+  int minblock = 16;
+  int maxblock = 4096;
+  int defaultblock = minblock;
+
+  printf("========== Write Perf\n");
+  while(minblock = minblock * 2)
+  {
+    if (minblock > maxblock)
+    {
+      break;
+    }
+    wtest(total_size/minblock,minblock);
+  }
+
+  printf("========== Read Perf\n");
+  minblock = defaultblock;
+  while(minblock = minblock * 2)
+  {
+    if (minblock > maxblock)
+    {
+      break;
+    }
+    rtest(total_size/minblock,minblock,"temp.1");
+  }
+
+  close(fd);
+}
+
+// 쓰기 성능 테스트
+int wtest(int cycle, int block_size)
+{
+  int i;
+  int fd;
+  clock_t sclock, eclock;
+  char *wdata;
+  struct timeval stime, etime, rtime;
+
+  unlink("temp.1");
+  wdata = (char *)malloc(block_size);
+  fd = open("temp.1", O_CREAT|O_WRONLY,S_IRUSR|S_IWUSR);
+  if (fd < 0)
+  {
+      perror("file open error");
+      return 1;
+  }
+  gettimeofday(&stime, NULL);
+  sclock = clock();
+  for (i = 0; i < cycle; i++)
+  {
+      write(fd, (void *)&wdata, block_size);
+  }
+  eclock = clock();
+  gettimeofday(&etime, NULL);
+  timersub(&etime, &stime, &rtime);
+  printf("block=%d size=%d time=%d.%d clock=%.3fs\n", block_size, cycle*block_size, 
+     rtime.tv_sec, rtime.tv_usec, (double)(eclock-sclock)/CLOCKS_PER_SEC);
+  close(fd);
+}
+
+// 읽기 성능 테스트
+int rtest(int cycle, int block_size, char *file)
+{
+  char *buff;
+  int fd;
+  clock_t sclock, eclock;
+  int readn;
+  struct timeval stime, etime, rtime;
+  buff = (char *)malloc(block_size);
+  fd = open(file, O_RDONLY);
+  if (fd < 0)
+  {
+    perror("file open error");
+    return 0;
+  }
+  gettimeofday(&stime, NULL);
+  sclock = clock();
+  while(readn = read(fd, buff, block_size))
+  {
+  }
+  eclock = clock();
+  gettimeofday(&etime, NULL);
+  timersub(&etime, &stime, &rtime);
+  printf("block=%d size=%d time=%d.%d clock=%.3fs\n", block_size, cycle*block_size, 
+     rtime.tv_sec, rtime.tv_usec, (double)(eclock-sclock)/CLOCKS_PER_SEC);
+  return 1;
+}
+}}}
+
+다음은 실행결과다.
+{{{#!plain
+$ ./rwtest
+========== Write Perf
+block=32 size=268435456 time=29.196705 clock=21.370s
+block=64 size=268435456 time=15.144043 clock=10.640s
+block=128 size=268435456 time=12.217236 clock=6.880s
+block=256 size=268435456 time=9.473108 clock=5.060s
+block=512 size=268435456 time=9.154647 clock=3.000s
+block=1024 size=268435456 time=9.28617 clock=2.230s
+block=2048 size=268435456 time=7.589446 clock=1.750s
+block=4096 size=268435456 time=8.126196 clock=1.470s
+========== Read Perf
+block=32 size=268435456 time=7.366217 clock=6.950s
+block=64 size=268435456 time=3.579088 clock=3.400s
+block=128 size=268435456 time=1.771714 clock=1.650s
+block=256 size=268435456 time=1.19989 clock=0.930s
+block=512 size=268435456 time=0.545688 clock=0.510s
+block=1024 size=268435456 time=0.332906 clock=0.320s
+block=2048 size=268435456 time=0.229784 clock=0.210s
+block=4096 size=268435456 time=0.179176 clock=0.160s
+}}}
+
+텍스트로는 보기가 힘들어서, 그래프로 나타내기로 했다. 처음에는 gnuplot(:12)를 사용할까 생각했었는데, [http://code.google.com/apis/chart/ google chart]를 사용하기로 했다. google chart는 별도의 프로그램없이, 웹상에서 쉽게 챠트를 만들어낼 수 있다.
+
+=== 버퍼크기에 따른 쓰기 성능 ===
+{{{#!html
+<img src="http://chart.apis.google.com/chart?
+chs=600x200
+&amp;chd=t:29.1,15.1,12.2,9.4,9.1,9.2,7.5,8.1|
+21.3,10.6,6.8,5.0,3.0,2.2,1.7,1.4
+&amp;chds=0,30
+&amp;chco=FF0000,FF9900
+&amp;chdl=Write Time|Clock
+&amp;cht=lc
+&amp;chg=14.2,25
+&amp;chxt=x,y
+&amp;chxr=1,0,30
+&amp;chxl=
+0:|32|64|128|256|512|1024|2048|4096"
+alt="Sample chart" />
+}}}
+
+=== 버퍼크기에 따른 읽기 성능 ===
+{{{#!html
+<img src="http://chart.apis.google.com/chart?
+chs=600x200
+&amp;chd=t:7.3,3.5,1.7,1.1,0.5,0.3,0.2,0.1|
+6.9,3.4,1.6,0.9,0.5,0.3,0.2,0.1
+&amp;chds=0,10
+&amp;chco=FF0000,FF9900
+&amp;chdl=Read Time|Clock
+&amp;cht=lc
+&amp;chg=14.2,25
+&amp;chxt=x,y
+&amp;chxr=1,0,10
+&amp;chxl=
+0:|32|64|128|256|512|1024|2048|4096"
+alt="Sample chart" />
+}}}
+
+=== 테스트 환경 ===
+테스트 환경은 다음과 같다.
+ * 개인 데스크탑 PC
+ * Linux yundream-desktop 2.6.24-19-generic #1 SMP Wed Jun 4 16:35:01 UTC 2008 i686 GNU/Linux
+ * CPU
+   {{{#!plain
+processor	: 0
+vendor_id	: AuthenticAMD
+cpu family	: 15
+model		: 79
+model name	: AMD Athlon(tm) 64 Processor 3800+
+stepping	: 2
+cpu MHz		: 1000.000
+cache size	: 512 KB
+bogomips	: 2005.97
+clflush size	: 64
+}}} 
+  * HD Disk : IDE
+    {{{#!plain
+# fdisk -l
+
+Disk /dev/sda: 200.0 GB, 200049647616 bytes
+255 heads, 63 sectors/track, 24321 cylinders
+Units = cylinders of 16065 * 512 = 8225280 bytes
+Disk identifier: 0xcab10bee
+}}}
+
+=== 결과 ===
+결과는 예상했던바와 크게 다르지 않다. 단 쓰기에 있어서, 버퍼의 크기가 256를 넘어가게 되면, 쓰기시간에 있어서 성능의 개선이 기대되지 않는 반면, Clock 시간은 꾸준히 감소함을 알 수 있다. 그렇다면, Clock 시간을 감안해서 1024 byte 정도를 선택하는게 가장 무난할듯 싶다. 
+
+읽기의 경우도 1024 byte(:12)정도로 버퍼크기를 잡는게 가장무난할듯 하다. 파일의 크기가 크다면 1024 byte이상을 잡아도 어느정도의 성능향상은 기대할 수 있을 것 같다.
+
+이상 버퍼크기에 따른 읽기/쓰기 성능측정을 해보았는데, 이것은 DB와 같이, 랜덤 access가 일어나는 어플리케이션을 위해서는 쓸만한 정보를 주기 힘들 것이다. 시간이 된다면 랜덤 access의 성능측정을 해보는 것도 재미있을 것 같다. 이외에 seek(:12)시간등에 대한 성능측정을 해보는 것도 괜찮을것 같다.
+

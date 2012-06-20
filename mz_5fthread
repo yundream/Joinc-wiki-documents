@@ -1,0 +1,380 @@
+= 선점형 Thread의 구현 =
+[[TableOfContents]]
+ * 작성자 : 조재혁 ([mailto:minzkn@infoeq.com])
+== 개요 ==
+  * 이 문서는 일반적으로 Kernel의 진입점과 기타 상황에서의 최대한 간단한 Thread의 기초구현을 위한 내용을 적어볼까 합니다.
+  * 비선점형 Thread의 경우는 좀 복잡할뿐 이 내용을 이해한 독자라면 충분히 개성있는 소스를 창조하실수 있을거라 믿어 의심치 않습니다.
+  * 설명과 예제는 C로 구성하려고 나름대로 노력하겠지만 필자가 구현한 실제는 100% 어셈블리 입니다. 그러한 과정에서 일부 성능상 최적화가 기대치만큼 이뤄지지 않을수 있습니다.
+
+  * 실제로 컴파일 가능한 2차 예제 버젼은 [http://minzkn.wowdns.com:2744/phpBB2/viewtopic.php?t=580] 에서 다운로드 받아볼수 있습니다.
+
+== Thread의 개요 ==
+  * 이것이 무엇인고?
+== Thread design ==
+=== 일반 비선점형 thread와의 차이점 ===
+선점형은 하나의 thread가 전체 시간을 독식할수 없음을 의미합니다. 그런면에서 RTOS(Real Time O/S)와는 거리가 멀어질수도 있다는 점이 구현상 까다롭게 접근해야 합니다. 보통은 선점형의 경우 Task전환 시점을 Interrupt의 "iret"명령시점에서 행해지도록 만들게 되는데 Interrupt gate의 특성을 효과적으로 이용할수 있는 방법일겁니다. 
+
+하지만 Interrupt가 상당히 자주 발생할때와 그렇지 못할경우 및 중첩해서 발생하는 경우에 따라서 Scheduler의 구현을 상당히 고민좀 해야 할겁니다. 반대로 비선점형은 하나의 thread가 자신에게 권한이 주어진 순간부터 마음만 먹으면 얼마든지 CPU를 독식할수 있게 됩니다. 이는 설계시에 상당히 고려해야 할 부분이 많다는 것을 뜻하며 RTOS에 가까운 방법일겁니다. 그리고 Kernel의 초기화 과정에서 H/W의 초기화를 수행하는데 있어서 정확한 시간을 맞춰줄수 있는 기회가 훨씬 많다는 점에서 적어도 Kernel의 초기화 과정에서는 비선점형 thread가 효과적일수 있을겁니다. 
+
+=== 컴파일러의 최적화에 따른 비의도적 결과 ===
+최적화에 의한 Thread code의 의도되지 않은 현상이 발생할수있습니다. 일단 그러한 부분에 대해서는 불가피하게 Assembly로 구현하여 저는 해결방법을 모색하였습니다. 그러나 함수 자체의 Frame의 최적화가 이뤄질때면 방법이 난해합니다. 이에 대한 고민은 반드시 필요합니다. 이에 대한 충분한 고려가 되지 않으면 오직 자신의 PC에서만 실행되는 기형적인 Thread code가 될것입니다. 
+
+=== Stack의 가변적 검출 ===
+각 Thread는 고유의 Stack을 소유하게 설계됩니다.
+하지만 그것이 고정적이라면 지역변수로 커다란 배열을 선언하여 사용하는데 부담이 아닐수 없겠습니다.
+때문에 Stack을 가변적으로 늘려줄수 있는 방법이 요구됩니다.
+
+=== How to swap ===
+이것은 Stack이 Swap되는것에 대한 고민이 필요하다는데 있습니다. 무턱대고 모두 Swap이 알아서 되면 좋겠지만 잘 생각해보시면 Thread의 Stack은 과연 Swap이 필요한가를 생각해봐야 합니다. 잘못하면 오히려 부작용이 만만치 않다는데 중점을 두고 생각해볼 문제임이 분명합니다. 필자의 소견은 "Stack은 Heap과 다르다" 입니다. 결코 Swap이 되지 않고 아예 고려되지 않는것이 좋다는 생각입니다. 여러분들의 생각은 어떠신지요? 각자 만들어보고 성능의 평가를 할수 있는 기회가 언젠가 주어졌으면 좋겠군요.
+
+== Stack(Process)의 관리요소 ==
+  * 가장먼저 Thread를 이해했다면 Stack을 이해한것입니다. 각 구성 Thread간에는 고유한 개별정보가 있으며 상호 공유되는 정보도 있을겁니다. Thread에서는 전역변수나 static변수는 모두 공유됩니다. 하지만 자동변수나 함수가 호출되었다가 돌아갈때 돌아갈 주소는 각 Thread별로 고유한 영역을 가집니다. 바로 그 고유하게 유지되어야 하는 것이 Stack에 통일적으로 있다는 것이 Thread의 구현에 대한 시발점이 되겠습니다. 즉, 원형 Task관리 링크드 리스트에서 각 Thread간의 Stack만 절체해주면 가장 간단한 Thread가 만들어 질수 있게 됩니다.
+  * C++의 Class에서 소멸자에 대한 특수한 처리가 필요합니다. 안하면 소멸자가 호출되지 않게 되는 경우가 있는데 굉장히 중요한 요소이겠죠?
+
+== 예제 ==
+  아래의 예제 소스는 실제 필자가 만들고 있는 운영체제의 일부를 발췌한것입니다. 발췌하면서 약간의 불필요한 부분과 나름대로의 주요 소스는 발췌하지 않았습니다. 
+  차후에는 완전한 Thread예제를 공개하도록 노력하겠습니다. 하지만 현시점에서는 이 이상의 소스는 공개하지 않을 방침입니다.
+{{{#!vim c
+/*
+ [ GPL ]
+ Code by JaeHyuk Cho <mailto:minzkn@infoeq.com> KOREA
+
+ MZ Local Thread library v0.0.1b
+
+ - Simple is best !
+*/
+
+#if !defined(DEF_SOURCE_thread_c)
+#define DEF_SOURCE_thread_c "thread.c"
+
+typedef struct ts_STACK
+{
+ void *Stack;
+ int StackSize, StackPointer;
+}t_STACK;
+
+typedef struct ts_THREAD_TASK
+{
+ struct ts_THREAD_TASK *Next;
+ t_STACK *Stack;
+ unsigned int TaskID, ESP, Tick, Active;
+ void * (*Entry)(void *, void *); 
+ void *Argument;
+}t_THREAD_TASK;
+
+typedef struct ts_THREAD
+{
+ t_THREAD_TASK *Task;
+ t_THREAD_TASK *CurrentTask;
+ unsigned int TaskCount, MakeID;
+}t_THREAD;
+
+t_THREAD *ML_CreateTHREAD(void);
+t_THREAD *ML_DestroyTHREAD(t_THREAD *s_THREAD);
+t_THREAD *ML_AddTHREAD(t_THREAD *s_THREAD, void * (*s_ThreadFunction)(void *, void *), void *s_Argument, int s_StackSize);
+t_THREAD *ML_RunTHREAD(t_THREAD *s_THREAD);
+int ML_SleepTHREAD(t_THREAD *s_THREAD);
+
+t_STACK *ML_CreateSTACK(int s_StackSize);
+t_STACK *ML_DestroySTACK(t_STACK *s_STACK);
+int ML_PushSTACK(t_STACK *s_STACK, int s_Value);
+int ML_PopSTACK(t_STACK *s_STACK, int *s_Value);
+int ML_SetSTACK(t_STACK *s_STACK, int s_StackPointer);
+
+void __ML_ReturnTHREAD__(void);
+
+static void *__ML_ManagerTHREAD__(void *s_ThreadHandle, void *s_Argument)
+{
+ static t_THREAD *sg_THREAD = (t_THREAD *)0;	
+ if(sg_THREAD != (t_THREAD *)s_ThreadHandle)sg_THREAD = (t_THREAD *)s_ThreadHandle;
+ ML_SleepTHREAD((t_THREAD *)s_ThreadHandle);
+ if(((t_THREAD *)s_ThreadHandle)->Task->Active == 0)return(s_Argument);
+ t_inline_asm(
+  "__ML_ReturnTHREAD__:\n\t"
+  "pushl $__ML_ReturnTHREAD__\n\t" /* Retry push return address */
+ );
+ t_inline_asm(
+  "\n\t"
+  : "=a"(((t_THREAD *)s_ThreadHandle)->CurrentTask->Argument) 
+ );
+ ((t_THREAD *)s_ThreadHandle)->CurrentTask->Active = 0;
+ ML_SleepTHREAD((t_THREAD *)s_ThreadHandle);
+ return(s_Argument);
+}
+
+t_THREAD *ML_CreateTHREAD(void)
+{
+ t_THREAD *s_Return;
+ s_Return = (t_THREAD *)ML_Alloc(sizeof(t_THREAD));
+ if(s_Return)
+ {
+  s_Return->Task = s_Return->CurrentTask = (t_THREAD_TASK *)0;
+  s_Return->TaskCount = s_Return->MakeID = 0u;
+  s_Return = ML_AddTHREAD(s_Return, __ML_ManagerTHREAD__, (void *)0, (4 << 10));
+ }
+ return(s_Return);
+}
+
+t_THREAD *ML_DestroyTHREAD(t_THREAD *s_THREAD)
+{
+ t_THREAD_TASK *s_THREAD_TASK;	
+ if(s_THREAD)
+ {
+  while(s_THREAD->Task && s_THREAD->TaskCount--)
+  {
+   s_THREAD_TASK = s_THREAD->Task;
+   s_THREAD->Task = s_THREAD->Task->Next;
+   if(s_THREAD_TASK->Stack)(void)ML_DestroySTACK(s_THREAD_TASK->Stack);
+   (void)ML_Free(s_THREAD_TASK);
+  }
+  (void)ML_Free(s_THREAD);
+  s_THREAD = (t_THREAD *)0;
+ }	 
+ return(s_THREAD);
+}
+
+t_THREAD *ML_AddTHREAD(t_THREAD *s_THREAD, void * (*s_ThreadFunction)(void *, void *), void *s_Argument, int s_StackSize)
+{
+ t_THREAD_TASK *s_THREAD_TASK;	
+ if(s_THREAD == (t_THREAD *)0)s_THREAD = ML_CreateTHREAD();
+ if(s_THREAD)
+ {
+  if(s_THREAD->Task)
+  {
+   s_THREAD_TASK = s_THREAD->Task;
+   while(s_THREAD_TASK->Next && s_THREAD_TASK->Next != s_THREAD->Task)s_THREAD_TASK = s_THREAD_TASK->Next;  
+   s_THREAD_TASK->Next = (t_THREAD_TASK *)ML_Alloc(sizeof(t_THREAD_TASK));
+   s_THREAD_TASK = s_THREAD_TASK->Next;
+   if(s_THREAD->CurrentTask == (t_THREAD_TASK *)0)s_THREAD->CurrentTask = s_THREAD->Task;
+  }
+  else s_THREAD->Task = s_THREAD->CurrentTask = s_THREAD_TASK = (t_THREAD_TASK *)ML_Alloc(sizeof(t_THREAD_TASK)); 
+  if(s_THREAD_TASK)
+  {
+   if(s_StackSize < ( 4 << 10 ))s_StackSize = ( 4 << 10 ); 	   
+   s_THREAD_TASK->Next = s_THREAD->Task; 
+   s_THREAD_TASK->Stack = ML_CreateSTACK(s_StackSize);
+   s_THREAD_TASK->TaskID = (s_THREAD->MakeID++);
+   s_THREAD_TASK->Tick = 0;
+   s_THREAD_TASK->Active = 1;
+   s_THREAD_TASK->Entry = s_ThreadFunction;
+   s_THREAD_TASK->Argument = s_Argument;
+   s_THREAD_TASK->ESP = (unsigned int)s_THREAD_TASK->Stack->Stack + s_THREAD_TASK->Stack->StackPointer;
+   s_THREAD->TaskCount++; 
+  }
+ }
+ return(s_THREAD);
+}	
+
+t_THREAD *ML_RunTHREAD(t_THREAD *s_THREAD)
+{
+ struct { unsigned int eax, ebx, ecx, edx, esi, edi, ebp, esp, flags; }s_Register;
+ t_THREAD_TASK *s_THREAD_TASK;
+ unsigned int s_RegisterAddress, s_TempEBX; 
+ if(s_THREAD)
+ {
+  if(s_THREAD->Task)
+  {
+   s_RegisterAddress = (unsigned int)(&s_Register);	  
+   t_inline_asm(
+    "\n\t"
+    "movl %%ebx, %1\n\t"
+    "movl %0, %%ebx\n\t" 
+    "movl %%eax, 0(%%ebx)\n\t"
+    "movl %1, %%eax\n\t"
+    "movl %%eax, 4(%%ebx)\n\t"
+    "movl 0(%%ebx), %%eax\n\t"
+    "movl %%ecx, 8(%%ebx)\n\t"
+    "movl %%edx, 12(%%ebx)\n\t"
+    "movl %%esi, 16(%%ebx)\n\t"
+    "movl %%edi, 20(%%ebx)\n\t"
+    "movl %%ebp, 24(%%ebx)\n\t"
+    "movl %%esp, 28(%%ebx)\n\t"
+    "pushfl\n\t"
+    "popl 32(%%ebx)\n\t"
+    "movl 4(%%ebx), %%ebx\n\t"
+    "\n\t"
+    :
+    : "m"(s_RegisterAddress), "m"(s_TempEBX)
+   );
+   s_THREAD_TASK = s_THREAD->Task;
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.flags);
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.esp);
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ebp);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.edi);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.esi);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.edx);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ecx);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ebx);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD_TASK->Argument);	   
+   ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD);
+   s_THREAD_TASK->ESP = (unsigned int)s_THREAD_TASK->Stack->Stack + s_THREAD_TASK->Stack->StackPointer;
+   s_THREAD_TASK = s_THREAD_TASK->Next;
+   while(s_THREAD_TASK && s_THREAD_TASK != s_THREAD->Task)
+   {
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD_TASK->Argument);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD); 
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)__ML_ReturnTHREAD__);
+
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD_TASK->Argument);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD); 
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)__ML_ReturnTHREAD__);
+
+    ML_PushSTACK(s_THREAD_TASK->Stack, (int)s_THREAD_TASK->Entry);  /* First swich entry */
+    
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.flags);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ebp);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.edi);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.esi);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.edx);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ecx);	   
+    ML_PushSTACK(s_THREAD_TASK->Stack, s_Register.ebx);	   
+    s_THREAD_TASK->ESP = (unsigned int)s_THREAD_TASK->Stack->Stack + s_THREAD_TASK->Stack->StackPointer;
+    s_THREAD_TASK = s_THREAD_TASK->Next;
+   }
+   t_inline_asm(
+    "\n\t"
+    "movl %1, %%ecx\n\t"
+    "movl %0, %%ebp\n\t"
+    "movl %%ebp, %%esp\n\t"
+    "call *%%ecx\n\t"
+    "addl $4 + 4, %%esp\n\t"
+    "popl %%ebx\n\t"
+    "popl %%ecx\n\t"
+    "popl %%edx\n\t"
+    "popl %%esi\n\t"
+    "popl %%edi\n\t"
+    "popl %%ebp\n\t"
+    "popl %%eax\n\t" /* Change stack (x86) */
+    "popfl\n\t"
+    "movl %%eax, %%esp\n\t"
+    "\n\t"
+    :
+    : "m"(s_THREAD->Task->ESP), "m"(s_THREAD->Task->Entry) 
+   );
+  }
+ }
+ return(s_THREAD);
+}
+
+int ML_SleepTHREAD(t_THREAD *s_THREAD)
+{
+ s_THREAD->CurrentTask->Tick++;
+ t_inline_asm(
+  "\n\t"
+  "movl %%esp, %%eax\n\t"
+  "subl $28, %%eax\n\t"
+  "\n\t"
+  : "=a"(s_THREAD->CurrentTask->ESP)
+ ); 
+ do
+ {
+  s_THREAD->CurrentTask = s_THREAD->CurrentTask->Next;	
+  if(s_THREAD->CurrentTask == s_THREAD->Task)
+  {
+   if(s_THREAD->Task->Active == 1)
+   {
+    s_THREAD->CurrentTask->Active = 0;	  
+    continue;
+   }
+   else break;
+  }
+ }while(s_THREAD->CurrentTask->Active == 0);
+ if(s_THREAD->CurrentTask != s_THREAD->Task)s_THREAD->Task->Active = 1;	  
+ t_inline_asm(
+  "\n\t"
+  "pushfl\n\t"
+  "pushl %%ebp\n\t"
+  "pushl %%edi\n\t"
+  "pushl %%esi\n\t"
+  "pushl %%edx\n\t"
+  "pushl %%ecx\n\t"
+  "pushl %%ebx\n\t"
+  "movl %0, %%esp\n\t"
+  "popl %%ebx\n\t"
+  "popl %%ecx\n\t"
+  "popl %%edx\n\t"
+  "popl %%esi\n\t"
+  "popl %%edi\n\t"
+  "popl %%ebp\n\t"
+  "popfl\n\t"
+  "\n\t"
+  : 
+  : "a"(s_THREAD->CurrentTask->ESP)
+ );
+ return(1);
+}
+
+t_STACK *ML_CreateSTACK(int s_StackSize)
+{
+ t_STACK *s_Return;
+ if(s_StackSize < (4 << 10))s_StackSize = (4 << 10);
+ s_Return = (t_STACK *)ML_Alloc(sizeof(t_STACK)); 
+ if(s_Return)
+ {
+  s_Return->Stack = (void *)ML_Alloc(s_StackSize);	 
+  s_Return->StackSize = s_Return->StackPointer = s_StackSize;
+ }
+ return(s_Return);
+}
+
+t_STACK *ML_DestroySTACK(t_STACK *s_STACK)
+{
+ if(s_STACK)
+ {
+  if(s_STACK->Stack && s_STACK->StackSize > 0)(void)ML_Free(s_STACK->Stack);
+  (void)ML_Free(s_STACK);
+  s_STACK = (t_STACK *)0;
+ }	 
+ return(s_STACK);
+}
+
+int ML_PushSTACK(t_STACK *s_STACK, int s_Value)
+{
+ if(s_STACK)
+ {
+  if(s_STACK->Stack && s_STACK->StackSize >= sizeof(s_Value) && s_STACK->StackPointer >= sizeof(s_Value))
+  {
+   s_STACK->StackPointer -= sizeof(s_Value);	  
+   ML_PokeDoubleWord(s_STACK->Stack, s_STACK->StackPointer, s_Value);
+   return(s_STACK->StackPointer);
+  }
+ }	 
+ return(0); 
+}
+
+int ML_PopSTACK(t_STACK *s_STACK, int *s_Value)
+{
+ int s_Return = (-1);
+ if(s_STACK)
+ {
+  if(s_STACK->Stack && s_STACK->StackSize >= sizeof(int) && s_STACK->StackPointer <= (s_STACK->StackSize - sizeof(int)))
+  {
+   s_Return = ML_PeekDoubleWord(s_STACK->Stack, s_STACK->StackPointer); 	  
+   s_STACK->StackPointer += sizeof(int);
+  }
+ }
+ if(s_Value)*(s_Value) = s_Return;
+ return(s_Return); 
+}
+
+int ML_SetSTACK(t_STACK *s_STACK, int s_StackPointer)
+{
+ if(s_STACK)
+ {
+  s_STACK->StackPointer = s_StackPointer;
+  return(s_STACK->StackPointer);
+ }
+ return(0);
+}
+
+#endif
+
+/* End of source */
+}}}
+== 참고자료 ==
+ * 아직은 없지만 찾아볼께요~
+== 문서를 마치면서 ==
+ * 이 문서에서 틀린 부분이나 고쳐야 할부분이 있으면 꼭 알려주십시요.
+== 저작권 ==
+ * 본 문서는 [http://www.gnu.org/licenses/fdl.html GFDL]의 라이센스를 기반으로 작성되었고 유지됩니다.
+----

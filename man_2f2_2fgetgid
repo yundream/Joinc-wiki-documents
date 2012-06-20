@@ -1,0 +1,192 @@
+#title getgid(2)
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>(2)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>(2)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN17"
+>에러</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN20"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>	그룹 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=식별자">식별자</a>(identity)를 알아낸다.</P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+gid_t <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>(void);
+gid_t <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getegid">getegid</a>(void);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		<B
+CLASS="EMPHASIS"
+>getgid</B
+>는 현재 프로세스의 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=실제">실제</a>(real) 그룹 ID를 
+		리턴한다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>getegid</B
+>는 현재 프로세스의 <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=유효">유효</a>(effective) 
+		그룹 ID를 리턴한다. 
+	</P
+><P
+>		실제 그룹 아이디는 프로세스를 실행시킨 유저의 그룹 아이디를 말하며, 
+		유효 그룹 ID는 프로세스 실행중에 
+		<B
+CLASS="EMPHASIS"
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getegid">getegid</a>(2)</B
+>등의 함수를 이용해서 임시로 만들어진 
+		그룹 아이디로 프로세스가 실행되는 동안 파일생성등에 영향을 미친다. 
+		모든 파일은 실제 그룹 아이디가 아닌 유효 그룹 ID로 생성된다.  
+	</P
+><P
+>		최초 프로세스가 실행되면 실제 그룹 ID와 유효 그룹 ID는 동일한 
+		값을 가진다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>1.3&#51208;. 에러</A
+></H1
+><P
+>		이 함수들은 항상 성공한다.
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN20"
+>1.4&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;unistd.h&#62;
+
+#include &#60;stdlib.h&#62;
+#include &#60;sys/types.h&#62;
+#include &#60;sys/stat.h&#62;
+#include &#60;fcntl.h&#62;
+
+int <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=main">main</a>()
+{
+    int fd;
+    // 최초 실행될 때는 실제 그룹 아이디와 유효 그룹아이디가 
+    // 동일하다.     
+    printf("GID is %d : %d&#92;n", <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getegid">getegid</a>(), <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>());
+
+    // 유효 그룹 아이디를 506으로 변경한 후 파일을 생성한다. 
+    // 생성된 파일은 506그룹소유로 생성된다.
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=setegid">setegid</a>(506);
+    fd = open("ok.txt", O_WRONLY|O_CREAT, S_IRWXU);
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(fd);
+    printf("GID is %d : %d&#92;n", <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getegid">getegid</a>(), <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>());
+
+    // 유효 그룹 아이디를 원래대로 되돌린다.
+    setegid(getgid());
+    fd = open("ok2.txt", O_WRONLY|O_CREAT, S_IRWXU);
+
+    printf("GID is %d : %d&#92;n", <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getegid">getegid</a>(), <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=getgid">getgid</a>());
+    <a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=close">close</a>(fd);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

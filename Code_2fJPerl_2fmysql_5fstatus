@@ -1,0 +1,48 @@
+#title Perl - Mysql Status 얻어오기
+
+=== 소개 ===
+mysqladmin status의 정보를 읽어와서 출력한다. 
+
+=== 코드 ===
+{{{#!plain
+#!/usr/bin/perl
+# $mysqladmin status 의 결과물 
+#  Uptime: 348365  Threads: 6  Questions: 144988 \ 
+#  Slow queries: 1  Opens: 286  Flush tables: 1 \ 
+#  Open tables: 64  Queries per second avg: 0.416
+
+$argnum = $#ARGV+1;
+if ($argnum < 3 )
+{
+	print "Usage : $0 [host] [id] [password]\n";
+	exit(1);
+}
+
+my $host = $ARGV[0];
+my $user = $ARGV[1];
+my $pass = $ARGV[2];
+
+open(SQL, "mysqladmin -h $host -u $user --password=$pass stat|") || die "Mysql Status FAILURE\n";
+@msg = ("uptime=", "threads=", "questions=", 
+	"slowquery=", "opens=", "flushtable=", 
+	"opentables=", "qps=");
+$msg = "";
+
+$rtvmsg = "Mysql Status OK|";
+while($line = <SQL>)
+{
+	@_ = split /: +/,$line;
+}
+$msg = $rtvmsg;
+for (my $i = 1; $i <= $#_-1; $i++)
+{
+	@val = split / +/,$_[$i];
+	$msg .= $msg[$i].$val[0]." ";
+}
+print $msg,"\n";
+
+exit(0);
+}}}
+=== 관련글 ===
+ * [wiki:Site/QOS/DB_Tool/Mysql_Admin Mysql 정보얻기]
+ * [wiki:Site/Mysql Mysql 미니사이트]

@@ -1,0 +1,199 @@
+#title linux man page : fgets - 열린 파일로부터 문자열을 읽어 온다.
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+><a href="/modules/moniwiki/wiki.php/manSearch?google=none&name=fgets">fgets</a>(3)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="CHAPTER"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="CHAPTER"
+><H1
+><A
+NAME="AEN1"
+>1&#51109;. fgets(3)</A
+></H1
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1.1&#51208;. <A
+HREF="#AEN4"
+>사용법</A
+></DT
+><DT
+>1.2&#51208;. <A
+HREF="#AEN8"
+>설명</A
+></DT
+><DT
+>1.3&#51208;. <A
+HREF="#AEN13"
+>반환값</A
+></DT
+><DT
+>1.4&#51208;. <A
+HREF="#AEN16"
+>예제</A
+></DT
+></DL
+></DIV
+><P
+>열린 파일(:12) 스트림으로 부터 문자열을 입력받는다. </P
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN4"
+>1.1&#51208;. 사용법</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62; 
+
+
+char *fgets(char *s, int size, FILE *stream);
+		</PRE
+></TD
+></TR
+></TABLE
+>
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN8"
+>1.2&#51208;. 설명</A
+></H1
+><P
+>		fgets 는 최대크기가 size 이하의 문자를 stream 으로 부터 읽어서 
+		s 에 저장한다. 이때 stream 은 fopen(3)으로 만든 파일스트림이 될것이다.     
+	</P
+><P
+>		fgets 는 비록 최대크기 size 이하 만큼을 stream 으로 부터 읽지만, 
+		중간에 EOF 혹은 개행문자("\n") 를 만나면 읽기를 멈춘다. 
+	</P
+><P
+>		버퍼에 대한 쓰기를 다했다면 fgets 는 buf 의 마지막 다음문자를 '\0'로 변경한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN13"
+>1.3&#51208;. 반환값</A
+></H1
+><P
+>		성공할경우 문자열의 포인터(:12) s 를 반환한다. 에러가 발생하거나 파일의 마지막에 
+		도달했을경우, 또는 아무런 문자를 입력받지 못한경우에는 NULL(:12) 을 반환한다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN16"
+>1.4&#51208;. 예제</A
+></H1
+><P
+>		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+>
+}}}
+{{{#!html adsense
+<PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+
+#include &#60;string.h&#62;
+#include &#60;unistd.h&#62;
+
+int main(int argc, char **argv)
+{
+    FILE *fp_stdin;
+    FILE *fp_out;
+
+    char buf_in[255];
+
+    if (argc != 2)
+    {
+        printf("Usage : ./line_edit [저장파일이름]\n");
+        exit(0);
+    }
+
+    if (access(argv[1], F_OK) == 0) 
+    {
+        printf("이미 파일이 존재하고 있음 : %s\n", argv[1]);
+        exit(0);
+    }
+
+    fp_out  = fopen(argv[1], "w");    
+    if (fp_out == NULL)
+    {
+        perror("file open error 1 : ");
+        exit(0);
+    }
+
+    while(fgets(buf_in, 255, stdin) != NULL)
+    {
+        if ( strncmp(buf_in,"quit\n", 5) == 0)
+            break;
+        fputs(buf_in, fp_out); 
+    }
+
+    fclose(fp_out);
+}
+		</PRE
+></TD
+></TR
+></TABLE
+>
+
+		위 예제는 표준입력(:12) <B
+CLASS="EMPHASIS"
+>stdin</B
+>로 부터 문자열을 읽어들여서 
+		아규먼트로 주어진 파일로 저장하는 일을하는 프로그램이다. 
+		이 프로그램은 Ctrl+D 나 "quit" 를 만나기 전까지 계속실행하면서 
+		표준입력으로 읽은 문자열을 fputs(3) 를 통해서 파일로 쓴다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

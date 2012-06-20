@@ -1,0 +1,216 @@
+ * 개요
+
+ C로된 CGI를 할때 필요한 클래스이며, 현재는 POST방식의 데이터만 받아 처리할 수 있다.
+
+
+ * 예정
+
+ GET은 POST에 비해 처리가 더 쉬우며, 다음 버젼에서 구현해 놓을것이다. 또한, http request, response 등도 용이하게 사용할 수 있도록 확장될것이다.
+
+
+ * 특징
+
+ 링크드리스트와 재귀호출, 포인터사용과 메모리관리 등에 관심을 갖고 보면 좋겠다.
+
+
+ * 흐름
+
+ 예제는 이 CGI 가 POST방식으로 ID, PW를 넘겨받고, 이 PW를 mysql의 password() 방식으로 암호화한뒤 ok.php 로 ID, 암호화된PW 를 넘겨주는 과정이다.
+
+
+ * 소스
+
+{{{#!vim cpp
+/* CGI Class
+ *
+ * KarlLy corp. 2004. 2. 20. - code by SaNha
+ */
+                                                                                                               
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+                                                                                                               
+using namespace std;
+                                                                                                               
+class GetPost {
+                                                                                                               
+   class Pair {
+      public:
+         char* name;
+         char* value;
+         Pair* next;
+         Pair(void) {
+            name = value = NULL;
+            next = NULL;
+         }
+         virtual ~Pair(void) {
+            delete[] name;
+            delete[] value;
+            delete next;
+         }
+   };
+                                                                                                               
+   private:
+      int buffLen;         // 데이터크기
+      int pairNum;         // 데이터 쌍 갯수
+      char* buff;          // post 데이터를 담을 그릇
+      Pair* pair;          // name:value 쌍들에 대한 포인터
+      void delLinkedList(Pair* list);  // 링크드 리스트를 해제하는 메소드
+                                                                                                               
+   public:
+      GetPost(void);
+      virtual ~GetPost(void);
+      void errMsg(const char* msg);
+      int getData(void);
+      int parseData(void);
+      char* getValue(const char* name);
+                                                                                                               
+};
+                                                                                                               
+GetPost :: GetPost(void) {
+   buff = NULL;
+   pair = NULL;
+}
+                                                                                                               
+GetPost :: ~GetPost(void) {
+   delete[] buff;
+   delLinkedList(pair);
+}
+                                                                                                               
+void GetPost :: delLinkedList(Pair* list) {
+   if (list->next) {                                  // 다음 링크가 있다면
+      this->delLinkedList(list->next);                // 재귀호출
+   } else {                                           // 다음 링크가 없다면
+      delete list;                                    // 메모리 해제
+   }
+}
+                                                                                                               
+void GetPost :: errMsg(const char* msg) {       // 에러메세지 뿌림
+   printf("Content-type: text/html\n\n");
+   printf(msg);
+}
+                                                                                                               
+/*  POST방식으로 들어온 데이터를 buff에 크기할당하며 저장
+ *  <반환값>  0 이상: 데이터크기,  실패: -1
+ */
+int GetPost :: getData(void) {
+   int i, num;
+   buffLen = atoi(getenv("CONTENT_LENGTH"));       // POST 데이터의 크기
+   buff = new char[buffLen];                       // 저장소 확보
+   if (buffLen > 0) {                              // 데이터가 있다면
+      if (fread(buff, buffLen, 1, stdin)) {        // 한번에 읽는게 성공했다면
+         return(buffLen);                          // 데이터크기 반환
+      } else {                                     // 읽기가 실패했다면
+         return(-1);
+      }
+   } else {                                        // 데이터가 없다면
+      return(0);
+   }
+}
+                                                                                                               
+/* name=value&name2=value2 형식의 buff 데이터를 파싱하여 Pair객체배열에 담음
+ * <반환값>   Pair의 갯수
+ */
+int GetPost :: parseData(void) {
+   if (buffLen > 0) {                                    // 읽은 데이터가 있다면
+      Pair* nowPair;
+      int i, pairNum, readNum;
+      char* nextP = buff;
+      pairNum = 1;
+      readNum = 0;
+      nowPair = pair = new Pair;                         // 링크드리스트를 위한 객체생성
+      for (i = 0; i < buffLen; i++) {
+         switch (buff[i]) {
+            case '=':
+               nowPair->name = strndup(nextP, readNum);  // name 복사
+               nextP = &buff[i + 1];                     // value복사 시작점을 위한 기억
+               readNum = 0;
+               break;
+            case '&':
+               nowPair->value = strndup(nextP, readNum); // value 복사
+               nextP = &buff[i + 1];
+               readNum = 0;
+               nowPair = nowPair->next = new Pair;       // 새 객체생성
+               pairNum++;
+               break;
+            default:
+               readNum++;
+               break;
+         }
+      }
+      nowPair->value = strndup(nextP, readNum);          // 끝까지 갔으면 value 복사
+      return(pairNum);
+   } else {                                              // 읽은 데이터가 없다면
+      return(0);
+   }
+}
+                                                                                                               
+char* GetPost :: getValue(const char* name) {
+   Pair* nowPair = pair;
+   while (nowPair) {                         // not NULL 인 동안에
+      if (strcmp(nowPair->name, name)) {     // 일치하지 않는다면
+         nowPair = nowPair->next;
+      } else {                               // 일치한다면
+         return(nowPair->value);
+      }
+   }
+   return(NULL);
+}
+
+/* mysql의 password() 구현 */
+
+void hash_password(unsigned long *result, const char *password) {
+   register unsigned long nr=1345345333L, add=7, nr2=0x12345671L;
+   unsigned long tmp;
+   for (; *password ; password++) {
+      if (*password == ' ' || *password == '\t') continue;       /* skipp space in password */
+      tmp= (unsigned long) (unsigned char) *password;
+      nr^= (((nr & 63)+add)*tmp)+ (nr << 8);
+      nr2+=(nr2 << 8) ^ nr;
+      add+=tmp;
+   }
+   result[0]=nr & (((unsigned long) 1L << 31) -1L); /* Don't use sign bit (str2int) */;
+   result[1]=nr2 & (((unsigned long) 1L << 31) -1L);
+   return;
+}
+                                                                                                               
+void make_scrambled_password(char *to,const char *password) {
+   unsigned long hash_res[2];
+   hash_password(hash_res,password);
+   sprintf(to,"%08lx%08lx",hash_res[0],hash_res[1]);
+}
+
+void putResponse(const char* addr, const char* ID, const char* PW) {
+   printf("Content-type: text/html\n\n");
+   printf("<body onLoad='document.login.submit()'>\n");
+   printf("<form name='login' method='post' action='%s'>\n", addr);
+   printf("<input type='hidden' name='ID' value='%s'>\n", ID);
+   printf("<input type='hidden' name='PW' value='%s'>\n", PW);
+   printf("</form>\n");
+   printf("</body>\n");
+}
+                                                                                                               
+int main(void) {
+   char result[20];           // password로 암호화된 PW의 저장소
+   char* ID;
+   char* PW;                  // POST의 데이터중 PW부분
+   GetPost post;
+   if (post.getData() < 0) {
+      post.errMsg("Get POST data failed");
+   } else if (post.parseData() != 2) {
+      post.errMsg("Wrong POST data numbers");
+   } else if ((ID = post.getValue("ID")) && (PW = post.getValue("PW"))) {
+      make_scrambled_password(result, PW);
+      putResponse("ok.php", ID, result);
+      exit(EXIT_SUCCESS);
+   } else {
+      post.errMsg("Wrong POST members");
+   }
+   exit(EXIT_FAILURE);
+}
+}}}
+
+
+ * 기타
+
+ 이 소스를 IIS등에서 사용하고 싶으신분은 strndup부분을 memory allocation, memory copy, add NULL character 의 세부분으로 풀어서 소스를 수정하셔서 visual C++을 깔면 생기는 CL (Console compile) 을 이용하여 컴파일 하시면 exe파일을 얻어낼 수 있을것이다.

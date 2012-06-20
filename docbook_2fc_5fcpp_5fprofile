@@ -1,0 +1,199 @@
+#title C C++ 프로그램 최적화 
+
+[wiki:article/c_cpp_profile]
+{{{#!plain
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<article lang="ko">
+
+<!--           -->
+<!-- 문서 정보 -->
+<!--           -->
+<articleinfo>
+	<title>GProf profiler를 이용한 C/C++ 프로그래밍 최적화</title>
+	<author>
+		<surname>Arnout Engelen</surname>
+
+		<affiliation>
+			<address>
+				<email>arnouten@bzzt.net</email>
+			</address>
+		</affiliation>
+	</author>
+	<othercredit role="translator">
+		<surname>윤상배</surname>
+		<affiliation>
+			<address>
+				<email>dreamyun@yahoo.co.kr</email>
+			</address>
+		</affiliation>
+	</othercredit>
+	<revhistory>
+		<revision>
+			<revnumber>0.8</revnumber>
+			<date>2005년 5월 7일 23시</date>
+			<revremark>최초 문서작성</revremark>
+		</revision>
+	</revhistory>
+</articleinfo>
+
+
+<!--                                                                 -->
+<!-- 섹션 시작                                                       -->
+<!--                                                                 -->
+<section>
+	<title></title>
+	<para>	
+		지금은 하드웨어의 성능이 워낙에나 좋아진데다가 컴파일러 역시 그에 발맞추어
+		최적화되어있기 때문에, 성능보다 개발속도와 유지보수를 중요시하는 경우가 
+		많겠지만 여전히 최적의 성능을 요구하는 프로그램을 작성해야 하는 필요가 
+		생긴다. 이럴 경우 프로그램 최적화는 필수 적인 작업이된다.
+	</para>	
+	<para>	
+		최적화를 통해서 어떤 함수가 0.04초 정도 수행시간을 단축시켰다고 가정해 보자.
+		고작해야 0.04초 아껴서 뭐하느냐라고 생각할 수도 있겠지만 이 함수가 1초 동안 		100번 호출된다고 하면 무려 4초를 아끼게 된다. 컴퓨터로 어떤일을 처리하는데 
+		4초라면 거의 무한에 가까운 시간이라고 볼 수 있을 것이다.
+	</para>	
+	<para>	
+		문제는 하나의 프로그램은 작게는 수십에서 많게는 수백/수천개의 함수로 이루어
+		질것인데, 이중 어떤 함수를 선택해서 최적화를 시켜줘야 하는지이다.
+		시간만 충분하다면 모든 함수를 라인단위로 하나하나 분석해가면서 최적화 
+		시킬 수도 있겠지만, 시간도 충분하지 않을 뿐더러, 효과대비 너무나 많은 시간이
+		소모될 수도 있다.
+	</para>	
+	<para>	
+		여기에서는 이러한 문제의 해결을 위해 <emphasis>gprop</emphasis>라는 프로그램을 사용하는 방법에 
+		대해서 알아보도록 하겠다. 이 툴을 이용하면 개발자는 프로그램의 각 함수별로 
+		호출빈도와 소모된 시간등에 대한 성능정보를 얻어올 수 있다.
+	</para>	
+	<para>	
+		문서의 원문은 <ulink url="http://www.linuxfocus.org/English/March2005/article371.shtml">linuxfocus</ulink>를 확인하기 바란다. 
+	</para>	
+</section>
+<section>
+	<title>grpop를 사용한 프로그램 최적화</title>
+	<section>
+		<title>gprop의 개념</title>
+		<para>
+			grop의 작동방식은 간단하다. 프로그램 수행시간동안 각 함수의 호출횟수와 
+			함수 호출시 진입에서 종료할 때 까지의 시간을 기록해두고 이 정보에 대한 
+			통계를 제공하는 방식이다. 
+		</para>
+		<para>
+			저러한 일을 하기 위해서는 각 함수가 호출될 때마다 횟수를 세게하고, 시간함수를
+			일일이 넣어줘야 하지 않겠느냐고 생각할 수 있겠지만, 걱정할 필요 없다. 
+			컴파일시 <emphasis>-pg</emphasis>옵션만 주면 알아서 저러한 정보들이 생성된다. 
+			그 후 개발자는 gprop를 써서 통계정보를 얻어오기만 하면 된다.
+		</para>
+	</section>
+	<section>
+		<title>Pathalizer를 통한 테스트</title>
+		<para>
+			이해를 쉽게 하기 위해서 <ulink url="http://pathalizer.bzzt.net/">pathalizer</ulink>이라는 
+			프로그램을 통해서 테스트를 해보도록 하겠다.
+		</para>
+		<para>
+			일단 위 프로그램을 받아서 컴파일 하도록 하자. 컴파일 방법은 간단하니 설명하지
+			않도록 하겠다.
+		</para>
+	</section>
+	<section>
+		<title>프로그램 수행 시간</title>
+		<para>
+			프로그램의 수행 시간을 측정하기 위해서 필자는 apache의 로그파일을 pathalizer를 
+			통해서 분석해보도록 했다. 이 apache로그파일은 약 500000줄의 정보를 포함하고 
+			있다. 
+			<screen>
+[root@ns src]# time ./event2dot logfile
+real    3m36.316s
+user    0m55.590s
+sys     0m1.070s
+			</screen>
+		</para>
+	</section>
+	<section>
+		<title>profiling</title>
+		<para>
+			그럼 위의 프로그램을 분석하기 위해서 profile 정보를 남겨보도록 하겠다. 아래와 
+			같이 -pg 옵션이 사용되도록 Makefile을 수정하도록 하자.	
+			<screen>
+all: event2dot apache2events
+
+OPTIONS=-O2 -g -pg
+
+apache2events: config.o apache2events.o
+...
+...
+			</screen>
+			다시 make를 시도해서 재 컴파일을 하고 <emphasis>./event2dot apache_access_log</emphasis>를 수행하도록 한다. 
+			프로그램을 수행하고 나면 해당 디렉토리에 <emphasis>gmon.out</emphasis>라는 
+			파일이 생성된걸 확인할 수 있을 것이다. 이제 다음과 같이 grpof를 이용해서 
+			각 함수별 성능정보를 확인할 수 있다.
+			<screen>
+# gprof ./event2dot | less
+ % cumulative  self              self     total
+ time seconds  seconds  calls s/call s/call name
+43.32   46.03  46.03 339952989  0.00  0.00 CompareNodes(Node *,Node *)
+25.06   72.66  26.63    55000   0.00  0.00 getNode(char *,NodeListNode *&)
+16.80   90.51  17.85 339433374  0.00  0.00 CompareEdges(Edge *,AnnotatedEdge *)
+12.70  104.01  13.50    51987   0.00  0.00 addAnnotatedEdge(AnnotatedGraph *,Edge *)
+ 1.98  106.11   2.10    51987   0.00  0.00 addEdge(Graph *,Node *,Node *)
+ 0.07  106.18   0.07        1   0.07  0.07 FindTreshold(AnnotatedEdge *,int)
+ 0.06  106.24   0.06        1   0.06 28.79 getGraphFromFile(char *,NodeListNode *&,Config *)
+ 0.02  106.26   0.02        1   0.02 77.40 summarize(GraphListNode *,Config *)
+ 0.00  106.26   0.00    55000   0.00  0.00 FixName(char *)
+			</screen>
+			여기에서 가장 중요한 필드는 첫번째 필드로, 프로그램이 실행되는 동안 해당함수가 소비한 시간의 
+			백분율을 보여준다. 
+		</para>
+	</section>
+	<section>
+		<title>gprof 결과를 이용한 프로그램 최적화</title>
+		<para>	
+			그럼 이제 프로그램을 최적화를 해보도록 하자. 모든 함수를 최적화 하면 좋겠지만 역시 시간대비 효율의
+			문제가 있음으로 가능하면 조그마한 수정으로 큰 효과를 얻을 수 있는 함수를 선택하는게 좋을 것이다. 
+			그렇다면 여러번 호출되는 함수중에서 수행시간이 많이 걸리는 함수를 선별해서 수정하는게 
+			가장 좋을 것이다. 
+		</para>	
+		<para>	
+			여기에서 우리는 CompareNodes라는 함수가 매우 많은 시간을 소비하고 있음을 알 수 있다. 
+			그래서 CompareNodes함수를 분석해서 비효율적인 부분을 개선을 하기로 결정했다. 
+		</para>	
+		<para>	
+			몇번의 분석을 통해서 자료구조의 유지를 위해서 사용하는 링크드리스트가 매우 비효율적으로 되어있다는
+			것을 발견하고 e-edges를 이진트리로 변경하기로 결정을 했다.    
+		</para>	
+		<para>	
+			코드를 변경한다음 테스트를 한결과 다음과 같은 결과를 보여줬다. 1초이상의 시간을 단축시켰음을 
+			알 수 있다.
+			<screen>
+real    2m19.314s
+user    0m36.370s
+sys     0m0.940s
+			</screen>
+		</para>	
+	</section>
+	<section>
+		<title>최적화 후 gprof 결과</title>
+		<para>
+			다음은 코드 최적화 후 프로그램의 gprof 결과다.
+			<screen>
+%   cumulative self           self    total
+ time   seconds seconds calls  s/call  s/call name
+87.01     25.25  25.25  55000    0.00    0.00 getNode(char *,NodeListNode *&)
+10.65     28.34   3.09  51987    0.00    0.00 addEdge(Graph *,Node *,Node *)
+			</screen>
+			각 함수에서 2배가까이 시간을 절약한걸 확인할 수 있을 것이다.
+		</para>
+	</section>
+	<section>
+		<title>다른 profile 프로그램들</title>
+		<para>
+			GUI화면을 선호하다면 
+			<ulink url="http://kprof.sf.net/">kProf</ulink>와 
+			<ulink url="http://mvertes.free.fr/">cgprof</ulink>cgprof같은 프로그램도 있으니 관심있다면 사용을 해보기 바란다.
+		</para>
+	</section>
+</section>
+</article>
+
+}}}

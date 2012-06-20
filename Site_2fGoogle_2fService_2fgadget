@@ -1,0 +1,146 @@
+#title 구글 Gadget
+
+참고 : http://www.google.com/apis/gadgets/index.html 
+[[UploadFile]]
+
+.... 이것 저것 잡다하게 하고 싶은게 많아서 큰일이다. 다른 할것도 많은데, 이제 Gadget에 눈길이 간다. Gadget을 보다가 보니, 이걸로 사이트의 컨텐츠를 풍부하게 할 수 있지 싶은 생각이 든다. 가젯을 배포해서 사이트 방문객을 늘릴 수도 있겠고. 무엇보다 재미있을 거 같다.
+
+해서 한번 써먹어 보기로 했다. 일차적인 목적은 다음과 같다.
+  1. Joinc Wiki의 최근 변경된 문서의 제목 목록을 출력해주는 가젯
+  1. 조인씨 [wiki:man/1004/pool 투표 시스템]의 TopN 문서를 표시해주는 가젯
+
+== 가젯? ==
+사전을 찾아봤더니, '''소규모의 장치'''를 의미를 가지고 있다. 실제 구글 홈페이지를 방문해서 알아봤더니, 웹이나 데스크 상에서 간단히 사용할 수 있는 작은 프로그램이라고 소개하고 있다. 별다를 거 없어 보이긴 하지만, '''인터넷'''을 가로질러서 사용할 수있다는점, 구글의 자원을 사용할 수 있다는점, 게다가 매우 간단하게 유용한 프로그램을 만들 수 있다는 점이 장점이다.
+
+배포도 무진장 쉽다. 색상 같은 몇개 인자를 수정하고 확인 버튼만 누르면 스크립트가 생성되고, 이걸 그냥 가져다 붙이면 된다. 이미 수많은 가젯이 만들어져서 배포되고 있으니 방문해서 한번 확인해보기 바란다. 구글 개인화 홈페이지에 로그인 한다음 '''콘텐츠 추가''' 버튼을 따라가면, 수많은 가젯을 만나볼 수 있다. 좋아보이는걸 선택하면 개인화 홈에 바로 가져다 붙일 수 있으며, 생성된 스크립트로 자신의 홈페이지에 가져다 붙일 수도 있다. 
+
+가젯은 웹에서 사용가능한 '''Universal Gadget'''과 데스크탑에서 사용가능한 '''Desktop Gadget'''이 있다. 개인적으로 데스크탑 가젯에 관심이 끌리기는 하지만, 안타깝게도 리눅스에서 만들 수 있는 방법이 아직제공되지 않아서, 유니버샬 가젯을 이용해 보기로 했다.
+
+ * http://www.google.com/ig/directory?synd=open 에서 다양한 가젯을 볼 수 있다.
+
+== Hello World ==
+아래의 가젯은 '''Hello World'''를 출력하는 간단한 가젯이다.
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8" ?>
+	<Module>
+	<ModulePrefs title="hello world example" />
+	<Content type="html">
+		<![CDATA[ 
+         Hello, world!
+     ]]>
+	</Content>
+</Module>
+}}}
+위의 가젯은 구글에서 셈플용으로 이미 만들어진 것이다. 이것을 구글 개인화 홈페이지에 추가해보도록 하자. 
+
+  1. 구글 개인화 홈페이지에 접속한다. http://www.google.co.kr/ig
+  1. 가젯을 추가하기 위해서는 구글 개인화 홈페이지에 접속을 해야만 한다. 로그인을 했다면 '''콘텐츠 추가'''링크를 클릭하도록 한다. 
+  1. 이제 홈페이지에 사용할 수 있는 다양한 종류의 가젯을 소개한 페이지를 볼 수 있을 것이다. 여기에는 다른 개발자들에 의해서 만들어진 가젯들이 등록되어 있다.
+  1. 너무 많아서 Hello world 가젯을 찾을 수 없다. 
+  1. 그러니 URL로 찾아보도록 하자. '''url로 추가'''버튼을 클릭하고 http://www.google.co.kr/ig/modules/hello.xml 을 입력한다. 
+  1. 이제 개인화 홈페이지에 가면, 다음과 같이 가젯이 추가되어 있는걸 확인할 수 있을 것이다.
+
+브라우저의 URL 입력창에 http://www.google.co.kr/ig/modules/hello.xml 로 직접 소스코드를 확인해 보면, Hello world 가젯의 소스코드를 확인할 수 있을 것이다.
+
+Hello World 가젯을 통해서 다음과 같은 사실을 알게 되었다.
+  1. 가젯은 XML(:12)로 만들어진다. 소스코드의 첫번째 줄은 코드의 내용이 XML로 작성되어 있음을 알려주고 있다.
+  1. <Module> 태그는 이 XML 파일이 가젯을 포함하고 있다는 것을 알려준다.
+  1. <ModulePrefs> 테그는 타이틀, 설명, 작성자와 같은 가젯의 부가 정보를 포함하고 있다.
+  1. <Content type="html">을 통해서, 가젯이 포함하는 컨텐츠의 타입이 HTML(:12)임을 알 수 있다.
+  1. <![CDATA[ ...insert HTML here... ]]> 에 HTML 코드를 포함한다. '''CDATA'''가 선언되면, 이후의 텍스트를 XML 파싱하지 않고, 있는 그대로 출력하게 된다. CDATA를 선언하지 않을 경우, HTML테그를 XML 테그로 인식하기 때문에 원하는 결과를 얻을 수 없게 된다.
+  1.  </Content> 내용이 끝났음을 알려준다.
+
+아래는 Hello World 가젯이 개인화 홈페이지에 적용된 모습을 보여준다.
+
+attachment:ig.png
+
+== 가젯을 만들기 위한 요소 ==
+가젯은 순수한 웹응용으로 XML(:12), HTML(:12), JavaScript 기술을 사용한다. 
+
+== 자신의 가젯 만들기 ==
+가젯의 대략적인 모습과 이미 만들어진 가젯을 사용하는 방법을 알아봤으니, 직접 가젯을 만드는 방법에 대해서 알아보도록 하겠다.
+
+ 1. 자신의 가젯을 만들어서 테스트 하려면, 운영하는 웹서버가 있어야 한다. 만약 제어가능한 웁서버가 없다면, 구글에서 제공하는 가젯호스팅을 이용할 수도 있는데, 이에 대한 설명은 하지 않도록 하겠다.
+ 1. 자신의 서버에서 가젯서비스를 한다고 해서, 프로그래밍 기법등에서 달라지지는 않는다. 가젯의 위치가 자신의 호스트에 있다는 것만 달라질 뿐이다. 다음과 같은 가젯을 어서 자신의 서버에 올려놓도록 하자. 여기에서는 http://www.joinc.co.kr/modules/gadget 을 기본디렉토리로 테스트 하도록 하겠다.
+  {{{#!plain
+<?xml version="1.0" encoding="UTF-8" ?> 
+<Module>
+  <ModulePrefs title="My first gadget" /> 
+  <Content type="html"> 
+  <![CDATA[ 
+    <B>Welcome to my first gadget!!!</B> 
+  ]]> 
+  </Content> </Module>
+}}} 
+ 1. 구글개임화 홈페이지에 들어간다음, '''컨텐츠추가 < url로 추가'''를 선택한다음, http://www.joinc.co.kr/modules/gadget/first.xml 을 입력하면, 만들어진 가젯이 추가될 것이다.
+
+=== 개발자용 가젯 추가하기 ===
+가젯을 만들어서 등록하는 것은 완전히 공개되어 있기 때문에, 지금도 수많은 개발자들이 새로운 가젯을 만들어내고 있다. 그러므로 자신이 만든 가젯과 함께, 이러한 가젯들을 관리할 필요가 있는데, 구글은 이러한 개발자 가젯을 위한 '''command center''' 가젯을 제공하고 있다. 이 가젯을 개인홈페이지에 추가하면, 새로추가된 가젯을 보거나 관리할 수 있게 된다. 
+
+http://www.google.com/ig/add?moduleurl=developer.xml 가젯을 추가하도록 하자. 방금전에 생성한 first 가젯이 포함되어 있는걸 확인할 수 있을 것이다. 
+
+attachment:dgs.png
+
+이 개발자 가젯을 이용하면, 선택된 가젯의 XML 코드내용과 링크정보등을 확인할 수 있다. 이것은 개발자를 위한 일종의 셈플역할로, 어떻게 가젯을 만들고 활용할수 있는지에 대한 좋은 보기가 될 수 있다.
+
+=== Gadget Spec 만들기 ===
+사용가능한 가젯을 만들기 위한 가젯의 구성요소에 대해서 알아보도록 하겠다. 가젯은 다음과 같은 3개의 요소로 구성되어 있다.
+  * '''Gadget Preferences''' : <ModulePrefs> 섹션으로, 가젯의 제목, 작성자, 크기와 같은 가젯을 설명하기 위한 내용들이 들어간다.
+  * '''User Preferences''' : <UserPrefs> 섹션
+  * '''Content Section''' : <Content> 섹션은 가젯이 수행할 작업 코드가 들어가는 곳이다. HTML, Javascript 코드로 이루어진 로직이 들어간다.  
+
+=== Content 정의 ===
+<content> 섹션은 가젯의 두뇌에 해당되는 영역이다. 여기에서는 컨텐츠의 타입이 정해지며 자신의 영역에 코드를 가질 것인지, 아니면 링크를 따라갈 것인지등이 결정된다. 그리고 가젯을 실행시키기 위한 프로그래밍 로직이 들어간다. 
+
+가젯을 만드는 가장 간단한 방법은 <content> 영역에 HTML(:12) 코드를 집어 넣는 것이다. 필요에 따라서는 Flash, JavaScript 등을 넣을 수도 있다. 콘텐츠는 고유한 타입을 가지고 있는데, 이에 대한 정보는 [http://www.google.com/apis/gadgets/fundamentals.html#Content_Type Choosing a Content Type] 문서를 참고하기 바란다. 다음은 yundream의 picasa 앨범을 새창으로 띄우는 간단한 예제 가젯이다.
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs title="Go to Photo Album" height="250" scaling="false" />
+  <Content type="html">
+  <![CDATA[
+    <div style="text-align:center"><a
+      id="yalbum" title="Yundream's Photo Album" target="_blank"
+      href="http://picasaweb.google.co.kr/yundream">
+      <img border="0" alt="Photo" src="http://lh5.google.co.kr/image/yundream/RbC1nUX3nRI/AAAAAAAAAHg/9PPCENrYiqY/prev.jpg?imgmax=576"
+      title="Click Here"></a>
+    </div>
+  ]]>
+  </Content>
+</Module>
+}}}
+가젯의 URL은 http://www.joinc.co.kr/modules/gadget/album.xml 이며, 직접 확인할 수 있다. 다음은 처음으로 만들어본 '''yundream album'''가젯이다.
+
+{{{#!html
+<script src="http://gmodules.com/ig/ifr?url=http://www.joinc.co.kr/modules/gadget/album.xml&amp;synd=open&amp;w=320&amp;h=250&amp;title=Yundream's+Photo+Album&amp;border=%23ffffff%7C3px%2C1px+solid+%23999999&amp;output=js"></script>
+}}}
+
+== 가젯을 디렉토리에 등록시키기 ==
+지금까지 만들어진 가젯은 가젯 디렉토리에 정식으로 등록되지 않은 상태로, 개인화 홈페이지에서는 사용할 수 있지만 일반 홈페이지로는 배포할 수 없다. 일반 홈페이지로 배포하려면 만들어진 가젯에 대해서 submit (인증)을 받아야 한다.  
+인증은 http://www.google.com/ig/submit 를 통해서 이루어지며, '''Gadget URL'''에 만든 가젯의 URL을 등록시키고 보내면 된다. 다만 등록된 가젯은 전 세계에 배포가 되므로 가젯의 <ModulePrefs> 섹션에 '''title, description, author, author_email'''을 필수로 등록시켜줘야 한다. yundream's photo album을 submit 받기 위해서 필수 요소를 포함시킨 가젯이다. 
+{{{#!plain
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs 
+    title="Yundream's Photo Album" 
+    height="250" 
+    scaling="false" 
+    author="yundream"
+    author_email="yundream@gmail.com" />
+  <Content type="html">
+  <![CDATA[
+    <div style="text-align:center"><a
+      id="yalbum" title="Yundream's Photo Album" target="_blank"
+      href="http://picasaweb.google.co.kr/yundream">
+      <img border="0" alt="Photo" src="http://lh5.google.co.kr/image/yundream/RbC1nUX3nRI/AAAAAAAAAHg/9PPCENrYiqY/prev.jpg?imgmax=576"
+      title="Click Here"></a>
+    </div>
+  ]]>
+  </Content>
+</Module>
+}}}
+http://gmodules.com/ig/creator?synd=open&url=http://www.joinc.co.kr/modules/gadget/album.xml&source=submit 페이지를 방문하면, 기본 가젯의 크기, 색깔 등을 정의할 수 있다. 여기에서 '''Get the Code'''를 클릭하면 웹페이지에 임베디드 가능한 자바스크립트 코드를 얻을 수 있다.
+
+== 유저변경 정의 ==
+가젯의 특성에 따라서 유저의 정보를 받아들일 수 있어야 한다. 예를들어 게임과 같은 경우에는 난이도 등을 받아들일 수 있어야 한다. <UserPref> 섹션을 사용하면, 사용자 변경가능한 Input 필드를 만들어 낼 수 있다. 
+

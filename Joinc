@@ -1,0 +1,234 @@
+ [[TableOfContents]]
+=== Joinc 싸이트 운영 정책들 ===
+==== Joinc wiki 정책 ====
+ 1. Joinc wiki는 로그인사용자에 한해서 쓰기/수정 권한이 부여됩니다.
+ 1. wiki는 문서사전작업을 위한 용도로 사용되며 최종적인 결과물은 docbook스타일이
+ 됩니다.
+ 1. docbook에 익숙하다면 wiki 페이지를 만들때 docbook article template를 선택해>
+서 아예 docbook 스타일로 wiki페이지를 유지할 수 있습니다.
+
+==== 참여하기 ====
+ 1. 관심있는 분야에 대한 위키를 만들고 공유하는 것많으로도 많은 도움이 됩니다. >
+어느정도 문서로서의 틀이 만들어지면 docbook로 변환하면 되구요.
+ 1. 처음부터 docbook문서를 만들고 싶다면 페이지를 만들때 docbook article templat
+e로 만들면 됩니다. 그럼 좀더 쉽게 docbook스타일의 문서를 작성할 수 있습니다. 어>
+느정도 완성되었다고 판단되면 html문서로 변환시키면 됩니다. 직접변환 하셔도 되고,
+ 변환할 환경이 안된다면 저에게 요청하셔도 됩니다. 요청은 메일([mailto:yundream@j
+oinc.co.kr]) 혹은 [Joinc]에 메시지를 남기는 방법을 사용하시면 됩니다.
+
+==== 작업일지 ====
+===== APM 최신버젼에 Joinc를 대응시키기 위한 작업 2005/9/28 =====
+ 1. Apache 2.x, Mysql 4.x, PHP 5.x 로 업그레이드를 위한 작업을 한다.
+ 1. Note Book에 [wiki:APM APM] 환경을 구축한다.
+ 1. Joinc의 모든 테이블과 컨텐츠를 복사한 다음 새로 구축된 APM에 대응시키고 테스트를 한다.
+ 1. 충분히 테스트된 시점에서 Joinc Host에 8080으로 서비스 테스트를 한다음
+ 1. 80으로 정식 서비스 한다.
+===== 인덱스 페이지 메뉴 정리 2004/06/07 =====
+현재 인덱스 페이지에 다음과 같은 문제가 있음.
+ 1. 인덱스의 메뉴가 너무 복잡하고 많음
+ 1. 보물찾기하는 기분임
+ 1. 1024*768 화면에 모든 컨텐츠가 보이도록
+{{{#!html
+<img src=http://www.joinc.co.kr/albums/album02/aaw.png border=0>
+}}}
+ * Title Menu 
+   1. HOME      : Index 페이지로 링크 
+   1. WIKI      : 위키변경 페이지로 링크 
+   1. 사이트맵  :
+   1. RSS       : Joinc RSS 
+
+ * Left 메뉴
+   * WIKI 페이지 
+     1. 함수분류    
+     1. 미니사이트
+     1. 기사목록
+     1. 조각코드
+     1. 닥북원문 
+     1. 용어사전
+     1. JCVS
+     1. 링크
+   * Login
+     1. 아이디 / 패스워드
+     1. 메시지
+     1. 북마크
+   * 게시판
+     1. 묻고답하기  
+     1. 끄적이기
+     1. 새소식
+     1. 광고/홍보
+     1. 제안및 의견
+
+ * Center 메뉴
+   1. 공지사항 : 사이트 알림 
+   1. Contents : 최근 10개만 올린다.
+
+ * Right 메뉴
+   * Google 찾기
+   * 방문객 정보
+   * Banner
+
+ * Bottom 메뉴
+   1. 라이센스 정책
+   1. 관리자 Email
+
+===== 자주찾는 검색어 분류기능 추가 2004/05/19 =====
+Google를 통한 검색어중 자주 검색되는 단어에 대에 인덱스를 만들도록 한다. 
+
+이를위해서 아래와 같은 간단한 테이블을 작성한다.
+{{{#!plain
+create table google_key
+(
+	keyword varchar(80) NOT NULL,
+	count int default 0,
+	primary key(keyword)
+)
+}}}
+
+google에서 키워드를 넣고 submit버튼을 누르면, 작성한 php페이지를 호출하고 키워드를 단어로 분류한뒤 테이블에 입력한 후, google페이지로 넘어가도록 한다. 
+
+===== 12번 섹션에 대해서 Term으로 리프레쉬 2004/05/11 =====
+12번 man 섹션을 가지는 페이지 이름에 대해서는 Term_으로 자동 리프레쉬 하도록 페이지 수정
+{{{#!plain
+wiki.php
+============
+3232 if (eregi("function_",$pagename))
+3233 {
+3234   if (eregi("\(12\)", $pagename))
+3235   {
+3236     $lurl = eregi_replace("function_", "Term_", $pagename);
+3237     $lurl = eregi_replace("\(12\)", "", $lurl);
+3238     echo "<meta http-equiv=\"refresh\" content=\"0;URL=http://www.joinc.co.kr/modules/moniwiki/wiki.php/$lurl\">";
+3239     exit;
+3240   }
+3241 }
+}}}
+
+===== Term과 함수 자동링크를 위한 정규표현 수정 2004/05/11 =====
+wiki내용중에 출력되는 용어와 함수를 각각 Term_용어, function_함수로 자동 링크 시키기 위한 정규표현 함수추가
+{{{#!plain
+wiki.php
+=============================
+function _joinc_replace($line)
+{
+  $line = ereg_replace("([a-zA-Z0-9\_]+)\(12\)", "<a href=\"http://www.joinc.co.kr/modules/moniwiki/wiki.php/Term_\\1\">\\1</a>", $line);
+  $line = ereg_replace("([a-zA-Z0-9\_]+)(\([a-zA-Z0-9\:\#\;\_\.\"\,\&\* ]*\))", "<a href=\"http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_\\1\\2\">\\1</a>\\2", $line);
+  return $line;
+}
+}}}
+
+===== 링크 깨진것 복구 2004/01/08 =====
+예전에 기사의 링크가 article.php를 통해서 만들어 졌던적이 있었는데, phpnuke버젼이 올라가면서 파일이 쓸모가 없어졌다. 그런데 구글검색결과 몇몇페이지가 article.php로 기사를 참조하고 있음을 발견했다. 구글 외에도 타 사이트에서 위의 페이지를 링크로 사용하고 있는 경우가 있어서 페이지 찾을 수 없음 상태가 된다. 
+
+이의 해결을 위해서 article.php파일을 만들고 관련된 기사로 '''refresh''하도록 HTML코드를 입력했다. 
+
+===== 함수 자동 링크 2004/01/06 =====
+wiki 페이지의 컨텐츠에 포함된 함수들은 자동으로 함수 링크가 걸리도록 수정, 모든 함수메뉴얼 페이지는 '''function_[a-zA-Z0-9\_]([0-9])'''의 형식을 가지므로 문서중 함수라고 판된되는 문자열이 발견되면 위의 페이지를 링크하도록 치환하면 된다. php의 정규치환 함수를 이용했다.  
+
+wiki.php
+{{{#!plain
+2451 :  $text = ereg_replace("([a-z0-9\_]+)(\([a-zA-Z0-9:\_\.\"\,\&\* ]*\))", 
+            "<a href=http://www.joinc.co.kr/modules/moniwiki/wiki.php/function_\\1\\2>\\1</a>\\2", $text);   
+}}}
+
+위의 코드에는 약간의 문제가 있다. 만약 '''function_함수()'''자체가 문자열로 나왔을 경우 function_function_함수()로 치환되어 버리게 된다. - 이러한 문자열은 페이지 목록 보기 등에서 쉽게 발견된다. - 따라서 위의 '''function_'''이 연속으로 발생될 경우 이것을 치환해주어야 한다. 
+
+wiki.php
+{{{#!plain
+3189 :  $pagename = ereg_replace("function_function_","function_", $pagename);
+}}}
+위의 방법이 가능한 이유는 위키가 위키페이지에 대한 링크를 내부 함수에서 처리한후 fopen()으로 열어서 내용을 전송하기 때문이다. 잘못된 링크라고 하더라도 필요에 따라 올바르게 교정하기만 하면 fopen()하는데 전혀 문제가 없다. 
+
+함수 자동 링크를 만들기 위해서 문자열을 치환할 경우 정확한 페이지 이름이 나오기 힘들다. 예를 들어 fopen()함수의 정확한 위키 메뉴얼 페이지 이름은 '''function_fopen(3)'''가 되겠지만 실제 페이지 내에서는 '''fopen("test.txt", "r")'''등으로 되어 있기 때문이다. 
+
+위 문제의 해결을 위해서 위키페이지가 등록된 디렉토리를 뒤져서 '''function_fopen('''으로 시작되는 페이지를 읽어 들이고 이 페이지를 출력하게 끔 만들었다.  
+
+wiki.php
+{{{#!plain
+3191 : 
+    if (eregi("function_[a-zA-Z0-9\_]+\(", $pagename))
+    {
+      if($handle = opendir("./data/text"))
+      {
+        $t1 = ereg_replace("_","_5f",$t1);
+        while($file = readdir($handle))
+        {
+          if(eregi("function_5f$t1", $file))
+          {
+            if (eregi("function_5f$t1\_28", $file))
+            {
+              $file = ereg_replace("_5f","_",$file);
+              $file = ereg_replace("_28","(",$file);
+              $file = ereg_replace("_29",")",$file);
+              $pagename = $file;
+              break;
+            }
+          }
+        }
+      }
+    }
+}}}
+
+===== TIMEZONE을 KST로 변경 2003/12/11 =====
+/usr/share/zoneinfo/ROK 를 /etc/localtime로 복사
+{{{#!plain
+# cp /usr/share/zoneinfo/ROK /etc/localtime
+# rdate -s time.bora.net
+}}}
+
+
+==== 건의사항 ====
+ * 코드모음 인터페이스를 확립한다.
+    1. 쉽게 검색할 수 있도록 언어별 분류/정열 추가 - 인터페이스는 함수모음과 비슷한 분위기로 유도한다.  
+
+ * WIKI활성화를 위한 JOINC메뉴 정립
+ * WIKI와 연동 JOINC와의 연동
+   1. 완전한 연동에는 시간이 걸리겠지만 가능한 것부터 수행하도록 한다.
+   1. JMark(JOINC 북마크)와 연동되도록 한다. -- 완료 2003/11/16
+   1. WIKI의 주요 컨텐츠를 JOINC블럭에서 제공한다. -- 완료 2003/11/19
+   1. WIKI에서 JOINC컨텐츠 페이지를 만들고 컨텐츠 검색이 가능하도록 한다.
+   1. GOGOOL을 통해서 완전검색이 가능하도록 링크 페이지를 만든다. wiki의 경우 GO
+GOOL로봇이 링크 검색을 제대로 하는 것으로 보이므로 WIKI에 JOINC기사 링크 페이지>
+를 만들도록 한다.
+
+==== 백업 정책 ====
+|| 최종백업일 || 2003/11/08 22:50:00                    	||
+|| 백업 주기 || 4일 단위, 대규모 데이터 변경이 발생했을시	||
+|| 백업 내용 || DB, 사이트의 모든파일, 웹/DNS 설정파일 		||
+|| 백업 저장 || 백업된 데이터는 개인 PC에 저장하며 500M가 넘을 경우 CD로 옮긴다 ||
+ * 최종 백업일 : 2003/11/25(화)
+ * 최종 백업일 : 2003/11/17(일)
+
+==== 사이트 크래킹 대비 ====
+|| 1 || 모든 POST에 대해서 Method를 검사하고 Refere를 검사하도록 페이지 수정한다 .   ||
+|| 2 || GET방식일 경우 입력에 대한 체크를 한다.                                 	 ||
+|| 3 || 유효하지 않은 POST, GET요청에 대해서는 IP정보를 남긴다.                 	 ||
+|| 5 || DOS로 여겨지는 요청에 대해서는 관리자가 인지 할수 있도록 장치를 마련한다 	 ||
+|| 6 || PHP, APACHE, DB 서버에 대한 보안 권고 정보를 수집한다                   	 ||
+위의 내용을 지속적으로 점검해서 가능한 문제가 발생하지 않도록 한다.  
+
+=== 해야할 일들 ===
+
+==== wiki와 Joinc의 인터페이스 통합 ====
+ 1. 시작일 : 20003/12/12  
+ 1. phpnuke에서 wiki의 페이지를 fopen을 통해서 읽어와서 출력하는 형식으로  
+
+==== 함수사전의 내용들을 wiki로 통합 ====
+ 1. '''function_함수명'''형식으로 작성한다.  
+ 1. 간단한 스크립트를 만들어서 일괄작업이 가능하도록 한다. 
+
+
+=== 낙서장 (주기적으로 정리되는 영역) ===
+ * 와~ [minzkn]이 첫번째 가입자가 되도다~
+ * 헤헤 [yundream]이 첫번째 이지롱요...
+ * 함수사전 메크로 추가 03/11/16
+ * 프레임 버퍼로 운영체제 부팅하기
+{{{#!plain
+$ vi /etc/lilo.conf
+# vag부분을 주목
+image=/boot/vmlinuz-2.4.2-2
+        label=linux
+        read-only
+        root=/dev/hda7
+        vga=0x0317
+# lilo
+}}}

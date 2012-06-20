@@ -1,0 +1,124 @@
+#title winsock : socket 함수
+
+== socket ==
+socket는 endpoint  socket을 생성한다. BSD:::socket(:12)의 경우 파일 descriptor를 반환한다. winsock(:12) socket 함수는 소켓 기술자 (socket descriptor) '''SOCKET'''반환 한다. SOCKET 는 unsigned int 형으로 BSD 소켓의 int형과 약간의 차이가 있다. int를 써도 (경고는 발생할 수 있지만) 큰 문제는 없다. 모든게 파일로 재현되는 유닉스와 달리 윈도는 파일 기술자 와 소켓 기술자가 반드시 일치한다고 볼 수 없으므로 SOCKET을 사용하는게 낫다. 
+{{{#!plain
+SOCKET socket
+{
+    int af,
+    int type,
+    int protocol
+};
+}}}
+
+== Parameter ==
+    '''af'''
+        주소영역을 정의하기 위해서 사용한다. Winsock2.h 헤더파일에 정의되어 있다. 네트워크는 다양한 주소영역을 가진다. 우리가 알고 있는 IP(:12)v4 기반의 인터넷은 AF_INET 을 사용한다. 만약 IPv6(:12) 주소 기반으라면 AF_INET6를 사용할 것이다. 기타 IPX, APPLETALK 등의 영역들이 있다.
+        || AF_UNSPEC || 0  || 정의되지 않은 주소영역   ||
+        || AF_INET         || 2  || IPv4 주소영역                    ||
+        || AF_IPX            || 6  || IPX/SPX 주소영역에서 사용된다. windows vista 이후 부터는 지원하지 않는다.  ||
+        || AF_APPLETALK  || 17 || AppleTalk 에서 사용된다. vista 이후부터는 지원하지 않는다.  ||
+        || AF_NETBIOS   || 17 ||  NetBIOS 주소영역에서 사용된다. ||
+        || AF_INET6         || 23 || Internet Protocol version 6 (IPv6) 주소영역에서 사용된다.  ||
+        || AF_IRDA           || 26 || Infrared Data Association 주소영역에서 사용한다.    ||
+        || AF_BTH             || 32 || bluttooth 주소영역에서 사용한다. windows xp with SP2 이후 버전부터 지원한다. ||
+    '''type'''
+        소켓의 통신 타입을 지정하기 위해서 사용한다. Winsock2.h 헤더파일에 정의되어 있다.
+        || SOCK_STREAM   || 1 || 연결지향, 양방향의 TCP/IP 기반의 통신을 위해서 사용된다.   ||
+        || SOCK_DGRAM    || 2 || UDP/IP 기반의 통신을 위해 사용한다.                                          ||
+        || SOCK_RAW          || 3 || IP 헤더를 직접 제어하기 위한목적으로 사용한다.                      ||
+    '''protocol'''
+        호스트간 통신에 사용할 프로토콜을 결정하기 위해서 사용한다.
+        || BTHPROTO_RFCOMM  || 3 || Bluetooth Radio Frequency 통신을 위해서 사용한다. SOCK_STREAM과 함께 사용한다. ||
+        || IPPROTO_TCP      || 6 || TCP를 사용한다. AF_INET 혹은 AF_INET6 af와 SOCK_STREAM type과 함께 사용한다. ||
+        || IPPROTO_UDP      || 6 || UDP를 사용한다. AF_INET 혹은 AF_INET6 af와 SOCK_DGRAM type과 함께 사용한다. ||
+
+== 리턴값 ==
+성공하면 scoket를 리턴한다. 실패하면 '''INVALID_SOCKET'''를 리턴하고 다음과 같은 error code 를 설정한다. WSAGetLastError()를 이용하면 error code를 가져올 수 있다.
+ || WSANOTINITIALISED  || WSAStartup의 성공적인 호출 없이 사용했음  ||
+ || WSAENETDOWN         || 네트워크(:12) 서브시스템 혹은 서비스 프로바이더에 에러 발생 ||
+ || WSAEAFNOSUPPORT   || 지정된 주소 체계가 지원되지 않음  ||
+ || WSAEMFILE                 || 할당할 수 있는 소켓 기술자가 없어서 더 이상 소켓을 생성할 수 없음. ||
+ || WSAENOBUFS              || 사용할 수 있는 버퍼가 없어서 소켓을 생성할 수 없음  ||
+ || WSAEPROTOTYPE        || 잘못된 프로토콜을 사용했음   ||
+ || WSASOCKTNOSUPPORT   || 잘못된 주소체계를 사용했음 ||
+
+== 예제 ==
+{{{#!plain
+#include <winsock.h>
+#include <stdio.h>
+
+#define MAX_PACKETLEN 512
+#define PORT 5552
+
+int main()
+{
+	WSADATA wsaData;
+	int status;
+	int SockLen;
+	int Readn,Writen;
+	SOCKET EndpointSocket, ClientSocket;
+	struct sockaddr_in SockInfo, ClientSockInfo;
+	char ReadBuffer[MAX_PACKETLEN];
+
+
+	if(WSAStartup(MAKEWORD(2,2),&wsaData)!= 0)
+	{
+		printf("error\r\n");
+		return 0;
+	}
+
+	EndpointSocket = socket( AF_INET, SOCK_STREAM, 0 );
+	if( EndpointSocket == INVALID_SOCKET )
+		return 1;
+
+	printf("Success socket create\r\n");
+	ZeroMemory(&SockInfo, sizeof( struct sockaddr_in ));
+
+	SockInfo.sin_family = AF_INET;
+	SockInfo.sin_port = htons( PORT );
+	SockInfo.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+	status = bind( EndpointSocket, (struct sockaddr*)&SockInfo, sizeof( struct sockaddr_in) );
+	if( status == SOCKET_ERROR) 
+	{
+		printf("Bind Error\n");
+		return 0;
+	}
+	if( SOCKET_ERROR == listen( EndpointSocket, 5 ))
+	{
+		printf("listen Error\n");
+		return 0;
+	}
+
+	while(1)
+	{
+		ZeroMemory( &ClientSockInfo, sizeof( struct sockaddr_in ) );
+		SockLen = sizeof(struct sockaddr_in);
+		ClientSocket = accept( EndpointSocket, (struct sockaddr*)&ClientSockInfo, &SockLen );
+		if(ClientSocket == INVALID_SOCKET)
+		{
+			printf("Accept Error\n");
+			closesocket(EndpointSocket);
+			WSACleanup();
+			return 1;
+		}
+		printf("Accept Client\n");
+		Readn = recv( ClientSocket, ReadBuffer, MAX_PACKETLEN,0 );
+		if( Readn > 0 )
+		{
+			Writen = send( ClientSocket, ReadBuffer, Readn, 0 );
+		}
+		else
+		{
+			printf("read Error\n");
+		}
+		closesocket(ClientSocket); 
+	}
+	closesocket( EndpointSocket ); 
+	WSACleanup();
+	return 0;
+
+}
+
+}}}

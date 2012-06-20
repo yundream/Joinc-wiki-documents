@@ -1,0 +1,228 @@
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>소스 코드 풀기</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.69
+"><LINK
+REL="HOME"
+TITLE="임베디드 시스템 엔지니어를 위한 리눅스 커널 분석"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="리눅스 커널 컴파일하기"
+HREF="chap01.html"><LINK
+REL="PREVIOUS"
+TITLE="소스 코드 얻기"
+HREF="get-kernel-source-code.html"><LINK
+REL="NEXT"
+TITLE="컴파일 준비"
+HREF="prepare-compile.html"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="SECTION"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="NAVHEADER"
+><TABLE
+SUMMARY="Header navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TH
+COLSPAN="3"
+ALIGN="center"
+>임베디드 시스템 엔지니어를 위한 리눅스 커널 분석</TH
+></TR
+><TR
+><TD
+WIDTH="10%"
+ALIGN="left"
+VALIGN="bottom"
+><A
+HREF="get-kernel-source-code.html"
+>이전</A
+></TD
+><TD
+WIDTH="80%"
+ALIGN="center"
+VALIGN="bottom"
+>1장. 리눅스 커널 컴파일하기</TD
+><TD
+WIDTH="10%"
+ALIGN="right"
+VALIGN="bottom"
+><A
+HREF="prepare-compile.html"
+>다음</A
+></TD
+></TR
+></TABLE
+><HR
+ALIGN="LEFT"
+WIDTH="100%"></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="UNPACK-KERNEL-SOURCE-CODE"
+>1.4. 소스 코드 풀기</A
+></H1
+><P
+>			먼저 커널을 컴파일하기 위해 root의 권한을 가져야한다.
+			시스템에 root로 로그인하거나 su를 사용해 root가 된후 다음 절차를 시작한다.
+		</P
+><P
+>			보통의 커널은 /usr/src 밑에 위치하게 된다.
+			필자는 여기에 각 버전 번호를 가지고 디렉토리를 만들고 각각에 압축을 풀어
+			놓고 사용 중이다. 현재 사용되고 있는 커널 버전을 linux란 이름으로
+			링크시켜 놓고 사용 중이다.
+			즉 /usr/src/linux는 현재 사용되고 있는 커널을 가리키게 된다.
+		</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>[root@localhost src]# ls -l
+lrwxrwxrwx    1 root     root           12 12월 24 15:23 linux -&#62; linux-2.4.16
+lrwxrwxrwx    1 root     root           14 12월 24 15:22 linux-2.4 -&#62; linux-2.4.7-10
+drwxr-xr-x   14 root     root         8192  2월  5 11:00 linux-2.4.16
+drwxr-xr-x   16 root     root         4096 12월 24 15:22 linux-2.4.7-10
+drwxr-xr-x    7 root     root           40 12월 24 15:21 redhat
+		</PRE
+></TD
+></TR
+></TABLE
+><P
+>			이렇게한 이유는 /usr/include에 linux와 asm 이란 리눅스 커널 소스코드
+			내의 디렉토리를 링크하게 되어 있는데 사용하는 커널 버전이 자주 바뀌거나
+			여러 커널을 같이 사용 중이라면 변하지 않는 패스를 사용하지 않는 한엔
+			linux와 asm의 링크가 자꾸 변하게되 불편을 감수해야하기 때문에 이 두 링크는
+			언제나 /usr/src/linux/include/linux와 /usr/src/linux/include/asm을
+			가리키도록 해놓고 /usr/src/linux만을 변경해 주도록 했다.
+		</P
+><TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="PROGRAMLISTING"
+>[root@localhost include]# ls -l linux asm
+lrwxrwxrwx    1 root     root           26  1월 17 10:46 asm -&#62; /usr/src/linux/include/asm
+lrwxrwxrwx    1 root     root           28  1월 17 10:45 linux -&#62; /usr/src/linux/include/linux
+		</PRE
+></TD
+></TR
+></TABLE
+><P
+>			압축을 풀기 전에 주의해야할 것은 압축된 커널의 소스코드는 모두 linux란
+			이름의 디렉토리로 시작하므로 만약 /usr/src에 linux란 링크나 디렉토리가
+			있는 상태에서 여기에 압축을 풀어버리면 다른 버전의 코드를 엎어쓸
+			가능성이 있으므로 조심해야한다.
+		</P
+><P
+>			우선 /usr/src/linux의 링크를 없애고 tar를 사용해 압축을 푼 후
+			/usr/src/linux를 해당 버전으로 바꿔준다. 절차는 다음과 같다.
+		</P
+><P
+></P
+><UL
+><LI
+><P
+>cd /usr/src</P
+></LI
+><LI
+><P
+>rm -f linux</P
+></LI
+><LI
+><P
+>tar xvjf somewhere/linux-2.4.16.tar.bz2</P
+></LI
+><LI
+><P
+>mv linux linux-2.4.16</P
+></LI
+><LI
+><P
+>ln -s linux-2.4.16 linux</P
+></LI
+></UL
+></DIV
+><DIV
+CLASS="NAVFOOTER"
+><HR
+ALIGN="LEFT"
+WIDTH="100%"><TABLE
+SUMMARY="Footer navigation table"
+WIDTH="100%"
+BORDER="0"
+CELLPADDING="0"
+CELLSPACING="0"
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+><A
+HREF="get-kernel-source-code.html"
+>이전</A
+></TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="index.html"
+>처음으로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+><A
+HREF="prepare-compile.html"
+>다음</A
+></TD
+></TR
+><TR
+><TD
+WIDTH="33%"
+ALIGN="left"
+VALIGN="top"
+>소스 코드 얻기</TD
+><TD
+WIDTH="34%"
+ALIGN="center"
+VALIGN="top"
+><A
+HREF="chap01.html"
+>위로</A
+></TD
+><TD
+WIDTH="33%"
+ALIGN="right"
+VALIGN="top"
+>컴파일 준비</TD
+></TR
+></TABLE
+></DIV
+></BODY
+></HTML
+>
+}}}

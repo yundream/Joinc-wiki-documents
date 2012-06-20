@@ -1,0 +1,133 @@
+''' socket close()와 관련된 연구 ''' 
+
+|| [http://1nfamus.netfirms.com/fw_c.html]		||
+=== 개요 ===
+소켓에서의 close()상태에서 발생가능한 문제점에 대해서 알아본다. 
+
+==== 발생문제 ====
+인터넷 상에서 많은 데이터가 오고갈때 패킷이 붙은 상태로 오고갈 수 있는데.. close()시 발생하는 FIN에 대해서도 이러한 일이 발생할 수 있는지.. 만약 소켓이 FIN을 일반 데이터와 같은 수준에서 다룬다면 분명 FIN데이터(크기 0)이 이전 데이터에 붙어 버릴수 있는 문제가 발생할 수 있기 때문이다. 상식적으로 TCP헤더에 FIN을 두었다는 것은 일반 데이터와 구분하기 위해서 인것으로 생각되는데 TCP/IP스팩을 좀더 참고 해봐야 할것 으로 보인다. joinc채널에서 minzkn님은 패킷 우선순위가 있고 FIN의 경우 최우선 순위를 가진다고 했는데.. 이것역시 확인해봐야 한다.
+
+==== 테스트 코드 ====
+산하님이 작성해서 보내준 코드
+{{{#!vim c
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/un.h>
+#include <sys/poll.h>
+#include <sys/stropts.h>
+
+#define SERVER_PORT 7070
+// #define SERVER_IP "220.92.182.51"
+#define MAX_LISTEN 1000
+#define POLLRDNORM 0x0040
+
+int main(int argc, char **argv) {
+    int many = 1;
+    int i, r, maxi, n;
+    int len, cli;
+    int sockfd, connfd, taskfd;
+    char line[30];
+    struct pollfd client[30];
+    struct sockaddr_in address, cliaddr;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) perror("sock creating failed");
+    len = sizeof(address);
+    bzero(&address, len);
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(SERVER_PORT);
+    if (bind(sockfd, (struct sockaddr *)&address, len) < 0) perror("binding failed");
+    if (listen(sockfd, MAX_LISTEN) < 0) perror("listening failed");
+    client[0].fd = sockfd;
+    client[0].events = POLLRDNORM;
+    for (i = 1; i < 30; i++)  client[i].fd = -1;
+    maxi = 0;
+    sleep(5);
+    while (1) {
+        r = poll(client, maxi + 1, -1);
+        if (client[0].revents & POLLRDNORM) {
+            cli = sizeof(cliaddr);
+            connfd = accept(sockfd, (struct sockaddr *)&cliaddr, &cli);
+            printf("Connection established\n");
+            for (i = 1; i < 30; i++) {
+                if (client[i].fd < 0) {
+                    client[i].fd = connfd;
+                    client[i].events = POLLRDNORM;
+                    break;
+                }
+            }
+            if (i == 30) perror("connecting is full");
+            if (i > maxi) maxi = i;
+            if (--r <= 0) continue;
+        }
+        for (i = 1; i <= maxi; i++) {
+            if ((taskfd = client[i].fd) < 0) continue;
+            if (client[i].revents & (POLLRDNORM | POLLERR)) {
+                if ((n = read(taskfd, line, 30)) < 0) {
+                    if (errno == ECONNRESET) {
+                        printf("ECONNRESET get\n");
+                        close(taskfd);
+                        client[i].fd = -1;
+                    } else perror("read error");
+                } else if (n == 0) {
+                    close(taskfd);
+                    client[i].fd = -1;
+                    printf("%d Connection is closed\n",many++);
+                } else {
+                    printf("Data received : %s\n", line);
+                }
+                if (--r <= 0) break;
+            }
+        }
+    }
+}
+}}}
+
+{{{#!vim c 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#define SERVER_IP "220.92.182.51"
+#define SERVER_PORT 7070
+
+int main() {
+    sleep(10);
+    int sockfd;
+    int len;
+    struct sockaddr_in address;
+    int result;
+    char ch[] = "Data sent";
+    char ch2[] = "abcd";
+    char in[5];
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    len = sizeof(address);
+    bzero(&address, len);
+    address.sin_family = AF_INET;
+    inet_pton(AF_INET, SERVER_IP, &address.sin_addr);
+    address.sin_port = htons(SERVER_PORT);
+    printf("connecting...");
+    result = connect(sockfd, (struct sockaddr *)&address, len);
+    if (result == -1) {
+        perror("oops: client1");
+        
+    }
+    printf("Data will sent\n");
+    write(sockfd, ch, sizeof(ch) + 1);
+    close(sockfd);
+    exit(0);
+}
+}}}
+
+==== 테스트 결과 ====
+
+
+==== 테스트 결과가 나온 원인에 대한 고찰 ====

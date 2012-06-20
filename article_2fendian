@@ -1,0 +1,438 @@
+[[TableOfContents]]
+
+== Big-Endian과 Little-Endian ==
+
+'''작성자:''' mwyun ([멍])
+
+다음 링크는 Endian에 대한 자료이므로 먼저 보시기 바립니다.
+
+http://www.joinc.co.kr/modules.php?name=News&file=article&sid=79
+
+http://terms.co.kr/big-endian.htm
+
+http://docs.hp.com/ko/5990-8178/ch02s10.html
+
+{{{#!plain
+정리를 하자면 빅 엔디안과 리틀 엔디안은 컴퓨터 메모리에 저장된 바이트들의 순서를 설명하는 용이이며, 정수형 데이터를 저장하며,
+빅 엔디안은 메모리의 낮은 번지에 큰 쪽을 먼저 저장되는 순서이며, 리틀 엔디안은 작은 쪽을 먼저 저장하는 방식입니다.
+
+큰 쪽: 상위바이트이며 바이트의 열에서 가장 큰 값
+작은 쪽: 하위바이트이며 바이트의 열에서 가장 작은 값
+
+2바이트 정수인 경우 정수 1234를 저장하면 16진수 0x04d2이고 상위바이트값은 04이고 하위바이트값은 d2입니다.
+이때 빅 엔디안과 리틀 엔디안은 각각 다음과 같이 저장됩니다.
+
+빅 엔디안
+    +- 0byte -+- 1byte -+
+    |         |         |
+    +---------+---------+
+    |    04   |    d2   |
+    +---------+---------+
+    ^                   ^ 
+    |                   |
+메모리의 낮은 번지  메모리의 높은 번지
+
+리틀 엔디안
+
+    +- 0byte -+- 1byte -+
+    |         |         |
+    +---------+---------+
+    |    d2   |    04   |
+    +---------+---------+
+    ^                   ^ 
+    |                   |
+메모리의 낮은 번지  메모리의 높은 번지
+
+4바이트 정수인 경우 정수 123456789를 저장하면 16진수 0x075bcd15이고 상위바이트값은 07이고 하위바이트값은 15입니다.
+이때 빅 엔디안과 리틀 엔디안은 각각 다음과 같이 저장됩니다.
+
+상위 바이트 07부터 하위 바이트 15까지 저장한다.
+저장되는 바이트 순서: 07 5b cd 15
+  ->
+0x075bcd15
+
+빅 엔디안
+    +- 0byte -+- 1byte -+- 2byte -+- 3byte -+
+    |         |         |         |         |
+    +---------+---------+---------+---------+
+    |    07   |   5b    |    cd   |   15    |
+    +---------+---------+---------+---------+
+    ^                                       ^ 
+    |                                       |
+메모리의 낮은 번지                      메모리의 높은 번지
+
+하위바이트 15부터 상위 바이트 07까지 저장한다.
+저장되는 바이트 순서: 15 cd 5b 07
+        <-
+0x075bcd15
+
+리틀 엔디안
+    +- 0byte -+- 1byte -+- 2byte -+- 3byte -+
+    |         |         |         |         |
+    +---------+---------+---------+---------+
+    |    15   |   cd    |    5b   |   07    |
+    +---------+---------+---------+---------+
+    ^                                       ^ 
+    |                                       |
+메모리의 낮은 번지                      메모리의 높은 번지
+}}}
+
+i386 GNU 리눅스에서 실행한 다음의 소스 코드로 위의 결과를 확인해볼 수 있습니다.
+
+=== 소스코드 1 ===
+{{{#!plain
+#include <stdio.h>
+#include <netinet/in.h>
+
+int main(int argc, char **argv)
+{
+        int data = 1234;
+        int data2 = 123456789;
+        int data3;
+
+        printf("%04x\n", data);
+        printf("%04x\n", data2);
+        printf("network byte order 2byte: 0x%04x\n", htons(data));
+        printf("network byte order 4byte: 0x%08x\n", htonl(data2));
+
+        return 0;
+}
+}}}
+
+=== 실행결과 1 ===
+{{{#!plain
+[mwyun@iokorea project]$ ./endian2
+04d2
+75bcd15
+network byte order 2byte: 0xd204
+network byte order 4byte: 0x15cd5b07
+}}}
+
+'''묻고 답하기'''의 '''blueyear77'''님의 다음 질문에 대한 대변입니다.
+테스트한 실행 결과를 올립니다.
+
+http://www.joinc.co.kr/modules.php?op=modload&name=Forum&file=viewtopic&topic=30943&forum=1&2
+
+=== 소스코드 2 ===
+{{{#!plain
+#include <stdio.h>
+
+typedef struct __bitmemory {
+unsigned int bit1: 1; // 한 비트만 쓰겠다는 의미
+unsigned int bit2: 1;
+unsigned int bit3: 1;
+unsigned int bit4: 1;
+unsigned int bit5: 1;
+unsigned int bit6: 1;
+unsigned int bit7: 1;
+unsigned int bit8: 1;
+unsigned int bit9: 1;
+unsigned int bit10: 1;
+unsigned int bit11: 1;
+unsigned int bit12: 1;
+unsigned int bit13: 1;
+unsigned int bit14: 1;
+unsigned int bit15: 1;
+unsigned int bit16: 1;
+unsigned int bit17: 1;
+unsigned int bit18: 1;
+unsigned int bit19: 1;
+unsigned int bit20: 1;
+unsigned int bit21: 1;
+unsigned int bit22: 1;
+unsigned int bit23: 1;
+unsigned int bit24: 1;
+unsigned int bit25: 1;
+unsigned int bit26: 1;
+unsigned int bit27: 1;
+unsigned int bit28: 1;
+unsigned int bit29: 1;
+unsigned int bit30: 1;
+unsigned int bit31: 1;
+unsigned int bit32: 1;
+} bitmemory;
+
+void printbitfield(unsigned int a);
+
+int main(int argc, char **argv)
+{
+	unsigned int a = 0x11223344;
+	char *ptr = &a;
+	int i;
+
+	printf("1byte print: %x %x %x %x\n",
+		*ptr, *(ptr+1), *(ptr+2), *(ptr+3));
+	
+	for (i = 31; i >= 0; i--)
+	{
+		printf("%d", (a >> i) & (unsigned int)0x01);
+		if (i % 4 == 0)
+			printf(" ");
+	}
+	printf("\n");
+	
+	printbitfield(a);
+
+	return 0;
+}
+
+void printbitfield(unsigned int a)
+{
+	bitmemory aa;
+	memset(&aa, 0x00, sizeof(aa));
+	memcpy(&aa, &a, 4);
+
+	printf("%d", aa.bit1);
+	printf("%d", aa.bit2);
+	printf("%d", aa.bit3);
+	printf("%d", aa.bit4);
+	printf(" ");
+	printf("%d", aa.bit5);
+	printf("%d", aa.bit6);
+	printf("%d", aa.bit7);
+	printf("%d", aa.bit8);
+	printf(" ");
+	printf("%d", aa.bit9);
+	printf("%d", aa.bit10);
+	printf("%d", aa.bit11);
+	printf("%d", aa.bit12);
+	printf(" ");
+	printf("%d", aa.bit13);
+	printf("%d", aa.bit14);
+	printf("%d", aa.bit15);
+	printf("%d", aa.bit16);
+	printf(" ");
+	printf("%d", aa.bit17);
+	printf("%d", aa.bit18);
+	printf("%d", aa.bit19);
+	printf("%d", aa.bit20);
+	printf(" ");
+	printf("%d", aa.bit21);
+	printf("%d", aa.bit22);
+	printf("%d", aa.bit23);
+	printf("%d", aa.bit24);
+	printf(" ");
+	printf("%d", aa.bit25);
+	printf("%d", aa.bit26);
+	printf("%d", aa.bit27);
+	printf("%d", aa.bit28);
+	printf(" ");
+	printf("%d", aa.bit29);
+	printf("%d", aa.bit30);
+	printf("%d", aa.bit31);
+	printf("%d", aa.bit32);
+	printf("\n");
+}
+}}}
+
+=== 실행결과 2 ===
+{{{#!plain
+[mwyun@iokorea project]$ ./endian
+1byte print: 44 33 22 11
+0001 0001 0010 0010 0011 0011 0100 0100
+0010 0010 1100 1100 0100 0100 1000 1000
+}}}
+
+==== 첫번째 결과 분석 ====
+{{{#!plain
+1byte print: 44 33 22 11
+}}}
+INTEL CPU은 리틀 엔디안 방식이므로 정상적인 결과입니다.
+
+==== 두번째 결과 분석 ====
+{{{#!plain
+0001 0001 0010 0010 0011 0011 0100 0100
+}}}
+메모리에 저장된 방식이 저렇다는 것이며 실제 올바른 값 11223344에서 최상위 비트부터 하나씩 출력하였으므로 위와 같이 출력되는 건 정상입니다.
+   
+
+==== 세번째 결과 분석 ====
+
+{{{#!plain
+0010 0010 1100 1100 0100 0100 1000 1000
+}}}
+
+의외의 결고가 나왔네요 ^^;
+
+일단 위의 2진수 값을 16진수로 변환하면  22cc4488로 전혀 이상한 값이 나왔습니다.
+
+왜 그럴까여?
+
+아마도 비트 필드를 써서 실제로 메모리에 저장되는 방식이 달라서 그럴꺼 같습니다.
+
+참조사이트
+ * http://www.winapi.co.kr/clec/cpp1/11-4.htm
+  
+구조체 자체의 크기는 모든 비트 멤버의 총 비트수와 같으며 참조사이트의 그림을 보면 aa.bitmemory2.bit1~aa.bitmemory2.bit32순으로 최하비트부터 최상비트까지 순서대로 저장됩니다.
+
+그런데 님은 bit1부터 출력하였으므로 결과가 거꾸로 찍히게 된겁니다.
+
+바이트열을 역순으로 출력하면 0001 0001 0010 0010 0011 0011 0100 0100으로 원하는 올바른 결과가 나오게 됩니다.
+
+님이 비트 필드가 어떻게 저장되는지 잘못 이해한듯 합니다.
+
+자세한건 소스코드 3를 참조하세요!
+
+
+=== 소스코드 3 ===
+{{{#!plain
+#include <stdio.h>
+
+typedef struct __bitmemory {
+unsigned int bit1: 1;
+unsigned int bit2: 1;
+unsigned int bit3: 1;
+unsigned int bit4: 1;
+unsigned int bit5: 1;
+unsigned int bit6: 1;
+unsigned int bit7: 1;
+unsigned int bit8: 1;
+unsigned int bit9: 1;
+unsigned int bit10: 1;
+unsigned int bit11: 1;
+unsigned int bit12: 1;
+unsigned int bit13: 1;
+unsigned int bit14: 1;
+unsigned int bit15: 1;
+unsigned int bit16: 1;
+unsigned int bit17: 1;
+unsigned int bit18: 1;
+unsigned int bit19: 1;
+unsigned int bit20: 1;
+unsigned int bit21: 1;
+unsigned int bit22: 1;
+unsigned int bit23: 1;
+unsigned int bit24: 1;
+unsigned int bit25: 1;
+unsigned int bit26: 1;
+unsigned int bit27: 1;
+unsigned int bit28: 1;
+unsigned int bit29: 1;
+unsigned int bit30: 1;
+unsigned int bit31: 1;
+unsigned int bit32: 1;
+} bitmemory;
+
+typedef union __uint32 {
+	unsigned int bitmemory1;
+	struct __bitmemory bitmemory2;
+} uint32;
+
+void printuint32_1(unsigned int a);
+void printuint32_2(unsigned int a);
+
+int main(int argc, char **argv)
+{
+	unsigned int a = 0x11223344;
+
+	printuint32_1(a); // <- 잘못된 출력
+	printuint32_2(a); // <- 올바른 출력
+
+	return 0;
+}
+
+void printuint32_1(unsigned int a)
+{
+	uint32 aa;
+	aa.bitmemory1 = a;
+
+	printf("%d", aa.bitmemory2.bit1);
+	printf("%d", aa.bitmemory2.bit2);
+	printf("%d", aa.bitmemory2.bit3);
+	printf("%d", aa.bitmemory2.bit4);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit5);
+	printf("%d", aa.bitmemory2.bit6);
+	printf("%d", aa.bitmemory2.bit7);
+	printf("%d", aa.bitmemory2.bit8);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit9);
+	printf("%d", aa.bitmemory2.bit10);
+	printf("%d", aa.bitmemory2.bit11);
+	printf("%d", aa.bitmemory2.bit12);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit13);
+	printf("%d", aa.bitmemory2.bit14);
+	printf("%d", aa.bitmemory2.bit15);
+	printf("%d", aa.bitmemory2.bit16);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit17);
+	printf("%d", aa.bitmemory2.bit18);
+	printf("%d", aa.bitmemory2.bit19);
+	printf("%d", aa.bitmemory2.bit20);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit21);
+	printf("%d", aa.bitmemory2.bit22);
+	printf("%d", aa.bitmemory2.bit23);
+	printf("%d", aa.bitmemory2.bit24);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit25);
+	printf("%d", aa.bitmemory2.bit26);
+	printf("%d", aa.bitmemory2.bit27);
+	printf("%d", aa.bitmemory2.bit28);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit29);
+	printf("%d", aa.bitmemory2.bit30);
+	printf("%d", aa.bitmemory2.bit31);
+	printf("%d", aa.bitmemory2.bit32);
+	printf("\n");
+	printf("0x%08x\n", aa.bitmemory1);
+}
+
+void printuint32_2(unsigned int a)
+{
+	uint32 aa;
+	aa.bitmemory1 = a;
+
+	printf("%d", aa.bitmemory2.bit32);
+	printf("%d", aa.bitmemory2.bit31);
+	printf("%d", aa.bitmemory2.bit30);
+	printf("%d", aa.bitmemory2.bit29);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit28);
+	printf("%d", aa.bitmemory2.bit27);
+	printf("%d", aa.bitmemory2.bit26);
+	printf("%d", aa.bitmemory2.bit25);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit25);
+	printf("%d", aa.bitmemory2.bit24);
+	printf("%d", aa.bitmemory2.bit22);
+	printf("%d", aa.bitmemory2.bit21);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit20);
+	printf("%d", aa.bitmemory2.bit19);
+	printf("%d", aa.bitmemory2.bit18);
+	printf("%d", aa.bitmemory2.bit17);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit16);
+	printf("%d", aa.bitmemory2.bit15);
+	printf("%d", aa.bitmemory2.bit14);
+	printf("%d", aa.bitmemory2.bit13);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit12);
+	printf("%d", aa.bitmemory2.bit11);
+	printf("%d", aa.bitmemory2.bit10);
+	printf("%d", aa.bitmemory2.bit9);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit8);
+	printf("%d", aa.bitmemory2.bit7);
+	printf("%d", aa.bitmemory2.bit6);
+	printf("%d", aa.bitmemory2.bit5);
+	printf(" ");
+	printf("%d", aa.bitmemory2.bit4);
+	printf("%d", aa.bitmemory2.bit3);
+	printf("%d", aa.bitmemory2.bit2);
+	printf("%d", aa.bitmemory2.bit1);
+	printf("\n");
+	printf("0x%08x\n", aa.bitmemory1);
+}
+}}}
+
+=== 실행결과 3 ===
+{{{#!plain
+[mwyun@iokorea project]$ ./endian3
+0010 0010 1100 1100 0100 0100 1000 1000 <- 잘못된 출력
+0x11223344
+0001 0001 0010 0010 0011 0011 0100 0100 <- 올바른 출력
+0x11223344
+}}}

@@ -1,0 +1,63 @@
+#title Out-of-Band 데이터 통신
+
+== Out-Of-Band ==
+Out Of Band는 TCP(:12)통신에서 쓰인다. Out Of Band는 갓길을 의미하는데, TCP에서는 긴급한 데이터의 통신을 위해서 사용한다. '''OOB'''라고 줄여서 부른다.
+
+TCP에서는 URG필드 를 1로 설정하는 것으로 OOB데이터임을 명시한다. URG는 URGENT를 의미한다. TCP 헤더 정보는 [wiki:Site/TCP_IP/TCP_Header TCP 헤더 자세히 보기] 문서를 참고하기 바란다.
+
+OOB 데이터라고 해서, 다른 패킷에 우선해서 도착하거나 높은 우선순위로 재조정된다거나 하지 않는다. 왜냐하면 별도의 패킷으로 전달되지 않고, 일반 데이터에 포함되어서 전달이 되기 때문이다. TCP 헤더의 Urgent Pointer로 긴급 데이터가 시작되는 위치를 알 수 있다.  
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/lhvw6ON8MKZHkDsM5Pa0Xg?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S7g9AADXnhI/AAAAAAAABVo/4H8q-hMds4Q/s800/oob.png" /></a>
+}}}
+
+OOB 데이터를 전달 받은 운영체제(:12)는 SIGURG 시그널(:12)을 발생한다. 응용 애플리케이션은 SIGURG에 대한 시그널 핸들러를 설치해서, OOB 데이터를 처리할 수 있다.
+
+OOB 데이터를 사용하기 위해서는 read(:2)함수와 write(:2)함수가 아닌 recv(:2)와 send(:2)같은 소켓 함수를 이용해야 한다. 
+{{{#!plain
+int send(int s, const void *msg, size_t len, int flags);
+}}}
+flags를 '''MSG_OOB'''로 설정하면 된다.
+=== 필요성 ===
+  1. 예외 처리
+  1. 서버에게 보내진 요청을 취소하기 위해서
+
+=== SIGNAL 처리 ===
+OOB 데이터가 도착하면 SIGURG 시그널이 발생한다. 이 시그널에 대한 시그널 핸들러를 설치함으로써, OOB 데이터를 처리하는 방식이다.
+
+{{{#!plain
+int main()
+{
+    signal(SIGURG, urg_handler);
+    fcntl(sockfd, F_SETOWN, getpid());
+}
+
+void urg_handler(int signo)
+{
+    int readn;
+    char buf[MAX_LINE];
+    printf("SIGURG Receive\n");
+    memset(buf, 0x00, MAX_LINE);
+    readn = recv(sockfd, buf, MAX_LINE-1, MSG_OOB);
+    printf("URG DATA %s\n", buf);
+}
+}}}
+
+=== OOB를 보내는 측 ===
+보내는 측은 MSG_OOB를 설정해서 전송하면 된다.
+{{{#!plain
+send(sockfd, "AA", 2, MSG_OOB);
+}}}
+
+=== OOB를 받는 측 ===
+OOB를 받는 측은 fcntl(:2)함수로 읽을 소켓에서 발생하는 시그널을 받도록 처리해 주어야 한다. 그 후 SIGURG에 대한 시그널 핸들러를 설치하면 된다. 시그널 핸들러에서 recv함수로 긴급 데이터를 읽으면 된다.
+{{{#!plain
+void sig_handler(signo)
+{
+    int oob_data[10] = {0x00,};
+    recv(sockfd, oob_data, 16, MSG_OOB);
+    // 적당한 처리
+}
+}}}
+
+[[tag(네트워크 프로그래밍,TCP,리얼 타임 시그널,시그널)]]

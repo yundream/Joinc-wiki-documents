@@ -1,0 +1,420 @@
+#title 다양한 예제로 알아보는 Pthread
+
+[[TableOfContents]]
+
+== Posix Thread Example ==
+
+'''작성자:''' mwyun([멍])
+
+쓰레드 생성후 자동 종료하는 간단한 예제입니다.
+
+== pthread 예제1 ==
+
+=== pthread1.c 소스코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+pthread_t threads[5];
+int done[5];
+
+void *thread_main(void *);
+
+int main(void)
+{
+	int i;
+	int rc;
+	int status;
+	
+	printf("pid=%d\n", getpid());
+	
+	for (i = 0; i < 5; i++)
+	{	
+		done[i] = 0;
+		pthread_create(&threads[i], NULL, &thread_main, (void *)i);
+		printf("%d, %d\n", i, threads[i]);
+	}
+
+	for (i = 4; i >= 0; i--)
+	{
+		done[i] = 1;
+	         rc = pthread_join(threads[i], (void **)&status);
+		if (rc == 0)
+		{
+			printf("Completed join with thread %d status= %d\n",i, status);
+		}
+		else
+		{
+			printf("ERROR; return code from pthread_join() is %d, thread %d\n", rc, i);
+         		         return -1;
+		}
+	}
+
+	return 0;
+}
+
+void *thread_main(void *arg)
+{
+	int i;
+	double result=0.0;
+
+	printf("therad: %d, %d\n", (int)arg, getpid());
+
+	while (!done[(int)arg])
+	{
+	   for (i=0; i < 1000000; i++)
+   	   {
+     	      result = result + (double)random();
+   	   }
+   	   printf("thread: %d, result = %e\n", (int)arg, result);
+	}
+
+	pthread_exit((void *) 0);
+}
+}}}
+
+=== pthread1 실행결과 ===
+{{{#!plain
+[mwyun@ns mwyun]$ gcc -o pthread1 pthread1.c -lpthread
+[mwyun@ns mwyun]$ ./pthread1
+pid=2790
+therad: 0, 2790
+0, 1082346288
+therad: 1, 2790
+1, 1090738992
+therad: 2, 2790
+2, 1099131696
+therad: 3, 2790
+3, 1116957488
+therad: 4, 2790
+4, 1125350192
+thread: 2, result = 1.073082e+15
+thread: 1, result = 1.074421e+15
+thread: 4, result = 1.073731e+15
+Completed join with thread 4 status= 0
+thread: 0, result = 1.073430e+15
+thread: 3, result = 1.074102e+15
+Completed join with thread 3 status= 0
+thread: 2, result = 2.146727e+15
+Completed join with thread 2 status= 0
+thread: 1, result = 2.147847e+15
+Completed join with thread 1 status= 0
+thread: 0, result = 2.148343e+15
+Completed join with thread 0 status= 0
+[mwyun@ns mwyun]$
+}}}
+
+생성된 쓰레드가 정상적으로 동작하고 pthread_exit함수를 통해서 0값을 리턴하고 종료하였으므로 pthread_join함수에서 status값 0이 출력된다.
+
+
+== pthread 예제2 ==
+
+쓰레드 생성후 강제로 종료시키는 간단한 예제입니다.
+
+=== pthread2.c 소스코드 ===
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+pthread_t threads[5];
+int done[5];
+
+void *thread_main(void *);
+
+int main(void)
+{
+	int i;
+	int rc;
+	int status;
+	
+	printf("pid=%d\n", getpid());
+
+	for (i = 0; i < 5; i++)
+	{	
+		done[i] = 0;
+		pthread_create(&threads[i], NULL, &thread_main, (void *)i);
+		printf("%d, %d\n", i, threads[i]);
+	}
+
+	for (i = 4; i >= 0; i--)
+	{
+		rc = pthread_cancel(threads[i]); // 강제종료
+		if (rc == 0)
+		{
+			// 자동종료
+			rc = pthread_join(threads[i], (void **)&status);
+			if (rc == 0)
+			{
+				printf("Completed join with thread %d status= %d\n",i, status);
+			}
+			else
+			{
+				printf("ERROR; return code from pthread_join() is %d, thread %d\n", rc, i);
+         			return -1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+void *thread_main(void *arg)
+{
+	int i;
+	double result=0.0;
+
+	printf("therad: %d, %d\n", (int)arg, getpid());
+
+	while (!done[(int)arg])
+	{
+	  for (i=0; i < 1000000; i++)
+  	  {
+  		result = result + (double)random();
+	  }
+  	  printf("thread: %d, result = %e\n", (int)arg, result);
+	}
+
+	pthread_exit((void *) 0);
+}
+}}}
+
+=== pthread2 실행결과 ===
+{{{#!plain
+[mwyun@ns mwyun]$ gcc -o pthread2 pthread2.c -lpthread
+[mwyun@ns mwyun]$ ./pthread2
+pid=2845
+therad: 0, 2845
+0, 1082346288
+therad: 1, 2845
+1, 1090738992
+therad: 2, 2845
+2, 1099131696
+therad: 3, 2845
+3, 1116957488
+therad: 4, 2845
+4, 1125350192
+thread: 3, result = 1.073353e+15
+thread: 4, result = 1.074336e+15
+thread: 0, result = 1.073328e+15
+Completed join with thread 4 status= -1
+thread: 1, result = 1.074552e+15
+thread: 2, result = 1.073090e+15
+thread: 3, result = 2.147247e+15
+Completed join with thread 3 status= -1
+thread: 0, result = 2.147519e+15
+thread: 1, result = 2.147391e+15
+thread: 2, result = 2.147080e+15
+Completed join with thread 2 status= -1
+thread: 0, result = 3.221195e+15
+thread: 1, result = 3.221001e+15
+Completed join with thread 1 status= -1
+thread: 0, result = 4.295871e+15
+Completed join with thread 0 status= -1
+[mwyun@ns mwyun]$
+}}}
+
+pthread_cancel 함수를 사용하여 강제적으로 종료하였으므로 pthread_join함수에서 status값 -1이 출력된다.
+
+== pthread 예제3 ==
+
+쓰레드 생성후 쓰레드를 분리시키는 간단한 첫번째 예제입니다.
+
+=== pthread3.c 소스코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+pthread_t threads[5];
+int done[5];
+
+void *thread_main(void *);
+
+int main(void)
+{
+	int i;
+	int rc;
+	int status;
+	
+	printf("pid=%d\n", getpid());
+
+	for (i = 0; i < 5; i++)
+	{	
+		done[i] = 0;
+		pthread_create(&threads[i], NULL, &thread_main, (void *)i);
+		printf("%d, %d\n", i, threads[i]);
+	}
+
+	for (i = 4; i >= 0; i--)
+	{
+		done[i] = 1;
+		rc = pthread_join(threads[i], (void **)&status); /* detach thead에서는 사용할 필요 없다. */
+		if (rc == 0)
+		{
+			printf("Completed join with thread %d status= %d\n",i, status);
+		}
+		else
+		{
+			printf("ERROR; return code from pthread_join() is %d, thread %d\n", rc, i);
+         		return -1;
+		}
+	}
+
+	return 0;
+}
+
+void *thread_main(void *arg)
+{
+	int i;
+	double result=0.0;
+
+	pthread_detach(pthread_self()); /* 쓰레드 분리 */
+
+	printf("therad: %d, %d\n", (int)arg, getpid());
+
+	while (!done[(int)arg])
+	{
+        	for (i=0; i < 1000000; i++)
+   		{
+     			result = result + (double)random();
+   		}
+   		printf("thread: %d, result = %e\n", (int)arg, result);
+	}
+
+	pthread_exit((void *) 0);
+}
+}}}
+
+=== pthread3 실행결과 ===
+{{{#!plain
+[mwyun@ns mwyun]$ gcc -o pthread3 pthread3.c -lpthread
+[mwyun@ns mwyun]$ ./pthread3
+pid=2949
+therad: 0, 2949
+0, 1082346288
+therad: 1, 2949
+1, 1090738992
+therad: 2, 2949
+2, 1099131696
+therad: 3, 2949
+3, 1116957488
+therad: 4, 2949
+4, 1125350192
+ERROR; return code from pthread_join() is 22, thread 4
+[mwyun@ns mwyun]$
+}}}
+
+결과를 보면 에러가 발생하는 것을 볼 수 있다.
+
+참조사이트의 Thread Management > Joining Threads를 보면 
+
+It is impossible to join a detached thread (discussed next)
+
+이라고 나온다.
+
+즉, detached thread된 것은 join이 불가능하므로 pthread_join함수를 사용할 필요가 없다.
+
+참고로 pthread_joinc은 waitpid와 비교될 수 있다.
+
+== pthread 예제4 ==
+
+쓰레드 생성후 쓰레드를 분리시키는 간단한 두번째 예제입니다.
+
+pthread3.c에서 pthread_joinc에 관련된 코드를 삭제하였습니다.
+
+=== pthread4 소스코드 ===
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+pthread_t threads[5];
+int done[5];
+
+void *thread_main(void *);
+
+int main(void)
+{
+	int i;
+	int rc;
+	int status;
+	
+	printf("pid=%d\n", getpid());
+
+	for (i = 0; i < 5; i++)
+	{	
+		done[i] = 0;
+		pthread_create(&threads[i], NULL, &thread_main, (void *)i);
+		printf("%d, %d\n", i, threads[i]);
+	}
+
+	for (i = 4; i >= 0; i--)
+	{
+		done[i] = 1;
+	}
+	
+	/* 쓰레드들이 실행하고 종료할 때 까지 잠시 기다린다.
+	   sleep을 주지 않으면 메인이 종료되므로 자동으로 생성된 쓰레드도 강제종료되므로
+	   올바른 테스트 진행되지 않아서 이다. */
+	sleep(5);
+
+	return 0;
+}
+
+void *thread_main(void *arg)
+{
+	int i;
+	double result=0.0;
+
+	pthread_detach(pthread_self());
+
+	printf("therad: %d, %d\n", (int)arg, getpid());
+
+	while (!done[(int)arg])
+	{
+        	for (i=0; i < 1000000; i++)
+   		{
+     			result = result + (double)random();
+   		}
+   		printf("thread: %d, result = %e\n", (int)arg, result);
+	}
+
+	printf("thread %d terminated....\n", (int)arg);
+	pthread_exit((void *) 0);
+}
+}}}
+
+=== pthread4 실행결과 ===
+{{{#!plain
+[mwyun@ns mwyun]$ gcc -o pthread4 pthread4.c -lpthread
+[mwyun@ns mwyun]$ ./pthread4
+pid=3140
+therad: 0, 3140
+0, 1082346288
+therad: 1, 3140
+1, 1090738992
+therad: 2, 3140
+2, 1099131696
+therad: 3, 3140
+3, 1116957488
+therad: 4, 3140
+4, 1125350192
+thread: 0, result = 1.074314e+15
+thread 0 terminated....
+thread: 4, result = 1.073499e+15
+thread 4 terminated....
+thread: 1, result = 1.073339e+15
+thread 1 terminated....
+thread: 2, result = 1.074428e+15
+thread 2 terminated....
+thread: 3, result = 1.073145e+15
+thread 3 terminated....
+[mwyun@ns mwyun]$
+}}}
+
+== 참조사이트 ==
+ 1. http://www.llnl.gov/computing/tutorials/workshops/workshop/pthreads/MAIN.html
+ 1. [wiki:docbook_Pthread_API_Reference pthread API 레퍼런스]

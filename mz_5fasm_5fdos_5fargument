@@ -1,0 +1,43 @@
+이것은 DOS에서 어셈블리로 인자를 받는것에 대한 예제 입니다.
+
+----
+{{{#!vim plain
+.386
+
+                ASSUME CS:CODE, DS:CODE, ES:NOTHING, SS:STACK_AREA
+CODE            SEGMENT PARA PUBLIC USE16 'CLASS_CODE'
+L_STARTUP:
+                ; DS:0080H - PSP area : DS세그먼트는 실행시 값이 넘겨져 옵니다.
+                MOV SI, 0080H
+               
+                CLD
+                LODSB
+
+                XOR CH, CH
+                MOV CL, AL
+L_PRINT_LOOP:
+                JCXZ L_EXIT 
+                LODSB
+                MOV DL, AL
+                MOV AH, 02H
+                INT 21H
+                DEC CX  
+                JMP L_PRINT_LOOP            
+L_EXIT:                 
+                MOV AX, 4C00H
+                INT 21H
+                HLT
+                JMP $
+CODE            ENDS
+
+                ASSUME DS:DATA
+DATA            SEGMENT WORD PUBLIC USE16 'CLASS_DATA'
+DATA            ENDS
+
+                ASSUME SS:STACK_AREA
+STACK_AREA      SEGMENT PARA STACK USE16 'CLASS_STACK'
+                DB 4096 DUP (?)
+STACK_AREA      ENDS
+                END L_STARTUP
+}}}
+----

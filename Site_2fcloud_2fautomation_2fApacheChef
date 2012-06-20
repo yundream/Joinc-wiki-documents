@@ -1,0 +1,85 @@
+#title apache chef 설정 
+
+== 목적 ==
+[wiki:Site/cloud/automation/chefInstall chef install]에서 간단하게 chef 설치와 설정을 알아봤으니, 이제 좀 그럴듯하게 자동화 환경을 구축해 보려고 한다. 이번에는 chef를 이용해서 apache 서버를 설치할 계획인데, 그냥 설치만 하면 심심하니 나름 시나리오를 만들어서 구성하려 한다.
+
+== 자동화 구성 ==
+웹 서비스를 개발하고 서비스하기 위한 인프라를 chef를 이용해서 구축하기로 했다. 인프라는 실 서비스를 위한 '''servcie''' 도메인과 개발을 위한 '''dev''' 도메인으로 나누기로 했다. 전체 인프라는 chef의 '''data bag'''으로 구상할 것이다. 대략 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Ydo6LjP2-u8Zy8_ekA5SrI56fDZJr-iORIrzeiNM2BI&amp;w=878&amp;h=473">
+}}}
+
+service.a.com에는 서비스 인프라를를 위한 정보들을 그리고 dev.a.com에는 개발 인프라를 위한 정보들이 들어간다. 
+  1. domain : 노드의 도메인 이름 
+  1. network 정보 
+     * ip
+     * subnetmask
+     * gateway
+     * mac address
+인프라에 새로운 노드가 추가 되면, 이 정보들은 data bag에 저장한다. 그리고 dhcp 서버의 설정 정보를 변경한다. 이 dhcp 서버 역시 chef 클라이언트가 설치돼 있다. 이제 추가된 노드를 PXE Boot으로 설치하면, MAC을 키로 node를 설정한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1aCClT4OuenpdcJgrOnhZv38jiJ1lpKEFPLWvs-G5dVA&amp;w=624&amp;h=210">
+}}}
+
+이제 node의 chef client를 실행하면, chef server는 node의 도메인 이름을 분석해서 알맞는 설정을 내릴 수 있다. 예를 들어 도메인 이름이 service-apache.a.com 이면, 이 노드는 service를 위한 apache가 설치되는 노드이므로 service 설정 코드를 적용하면 된다. 
+
+즉 이 chef 인프라의 키는 MAC과 도메인 이름 두 개다.
+  1. MAC : 노드의 네트워크 설정을 위한 키로 사용한다.  
+  1. 도메인 이름 : 노드에 애플리케이션 환경을 위한 키로 사용한다.
+
+=== data bag 준비 ===
+  * data bag으로 전체 형상을 설계한다.
+  * data bag은 도메인으로 구성 
+  * node가 어떤 도메인 이름을 가지는지로 어떤 설정을 적용할 것인지 결정한다. 
+
+=== 지원 서버들 준비 ===
+  1. YUM Package Repository를 준비한다.
+  1. PXE Boot Server를 준비한다. 
+     * tftp server
+     * kickstart와 Repository에 접근하기 위한 apache server
+  1. dhcp server 준비 
+    * dhcp로 추가 node의 domain name을 정할 수 있다. 
+
+=== 시나리오 ===
+  1. 웹 서비스를 위해서 node를 하나 추가하라는 요청이 전달됐다.
+  1. dhcp server에 추가할 node의 정보를 설정한다.  
+     * ip 
+     * netmastk
+     * MAC 
+     * '''domain name''' : service-apache.a.com 이름을 가져야 한다. chef server는 node의 도메인이름을 이용해서 어떤 설정을 적용해야 하는지 결정할 수 있다. 
+     * 적당한 부트로더를 준비한다.  
+  1. node가 물리적인 공간에 배치 된다.
+  1. pxe-boot를 시작한다.
+     * IPMI를 이용 자동화 할 수 있을 것이다.
+     * chef-client가 설치된다.
+  1. 부팅이 끝나고 운영체제가 올라온다.  
+  1. chef-client를 수행, 설정을 적용한다.
+     * chef server는 node의 도메인 정보를 이용해서 적당한 run-list를 다운로드 해줄 수 있다.
+     * apache를 설치한다. 
+     * apache설정 적용
+     * mysql을 설치한다.
+     * mysl 설벙 적용
+     * mysql & apache 실행
+
+=== data bag 작업 ===
+data bag을 만든다.
+
+
+=== cookbook 작업 ===
+apache cookbook create 
+{{{#!plain
+# knife cookbook create apache
+** Creating cookbook apache
+** Creating README for cookbook: apache
+** Creating metadata for cookbook: apache
+}}}
+
+attributes/default.rb   
+{{{#!plain
+default.apache.is_primary = true
+}}}
+
+=== 할일 ===
+  1. role 구성해보기

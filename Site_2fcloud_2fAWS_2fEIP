@@ -1,0 +1,99 @@
+#title EIP - Elastic IP
+
+[[TableOfContents]]
+== 소개 ==
+EC2의 EIP를 분석한다. EIP의 소개를 위한 페이지가 아니다. EIP와 같은 서비스를 하려면 어떠한 구조를 가져야 하는지를 분석한다.
+
+
+== EIP ==
+Amazon 서비스는 모든 자원을 대여하는 개념이다. IP 역시 마찬가지로 소유의 개념가 아닌 대여의 개념이다. 유저가 처음 VM을 생성하면, private ip와 public ip가 생긴다. private ip는 다른 vm들 끼리의 통신을 위해서 사용하며, public ip는 외부 통신을 위해서 사용한다. 이때 public ip는 vm에 고정적으로 할당된 IP가 아닌 언제든지 회수가능한 IP다.
+
+때문에 이 public ip는 관리를 위한 목적으로 사용할 수 있지만 서비스를 위해서는 사용할 수 없다. 서비스를 위해서 그러니까 고정된 IP를 사용하기 위해서는 '''EIP'''를 구입해야 한다. 
+
+'''EIP'''는 VM에 아닌 계정에 할당되는 IP다. 즉 유저는 EIP를 자신의 VM에 자유롭게 '''붙이거나 떼어낼 수 있다'''. 자유롭게 붙이거나 뗄 수 있다는 특징 때문에 '''EIP'''라고 한다.
+
+=== EIP 영역 ===
+EIP는 IP를 뗏다 붙였다 할 수 있어야 하기 때문에, 네트워크 장비를 통해서 서로 연결될 수 있는 네트워크 영역에서만 사용 가능하다. 그래서 EIP는 region을 넘어가지 못한다. 같은 region에 속해있는 zone간에는 자유롭게 EIP를 사용할 수 있지만 region을 뛰어넘어서 사용할 수 없다. 이는 당연해 보인다. 서울 region에 있는 VM들끼리야 네트워크 자원을 공유할 수 있겠지만 서울과 LA간 네트워크 자원을 공유할 수는 없는 노릇 아니겠는가. ?
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1PmOTtrj-PgC6BlmiBX50SMEQW7NNy6F80Qf91sD86dg&amp;w=792&amp;h=445">
+}}}
+
+
+=== EIP Lifecycle ===
+EIP Lifecycle이다. 아마존의 EIP lifecycle도 여기에서 크게 벗어나지 않을 것이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10nYzp-efwtDiYebsk3Uz59Ze-ksrHRTAHa7Btl5jOOQ&amp;w=858&amp;h=420">
+}}}
+  1. VM을 만든다.
+  1. VM에 Public IP(:12)와 Private IP가 할당된다. VM은 하나의 network interface를 가지고 있다. Public ip는 NAT로 할당된다.
+  1. EIP를 사용하기로 했다면, VM의 NAT IP는 EIP가 된다. Public IP는 detach 된다. 즉 VM은 하나의 공인 IP만을 가지는 1:1 NAT다. 
+  1. EIP를 사용하지 않기로 했다면, EIP가 detach가 되고, Public IP가 attach 된다. 
+  1. VM이 destroy되면, public ip와 private ip가 회수 된다. 
+
+== EIP NAT Device ==
+EC2에서 VM을 만들면 VM은 하나의 네트워크 인터페이스만을 가진다. 그리고 이 네트워크 인터페이스는 하나의 private ip만을 가지고 있다. NAT를 이용해서 Public IP와 EIP를 서비스 한다는 것을 의미하는데, 여기에서 NAT 장비들을 어떻게 구성할 것인지 하는 문제가 생긴다. 
+
+=== weak point ===
+NAT는 private network와 public network 사이에 위치한다. 모든 트래픽이 NAT를 통과하게 되고, NAT 자체가 약점이 된다. public cloud의 경우에는 NAT가 놓임으로서 생겨나는 약점을 어떻게 극복할지를 반드시 고민해야만 한다. 
+
+보안정책을 세우고 보안사고가 터졌을 때, 대응하기 위한 보안대응팀의 운용이 필요하다. 물론 어디까지나 규모가 상당히 큰 public cloud의 경우에 한한다.
+
+이 문제를 회피하는 몇 가지 구성을 생각해 볼 수는 있다. 
+
+첫째는 cluster nat을 구성하는 방식이다. 이 경우 statelss nat 방식으로 작동하는 appliance를 직접 개발해야 할 것이다. 자세한 내용은 다른 문서로 다루어야 할 것 같다. 여기에서는 문서 아래부분에서 간단히 다루도록 하겠다. 
+
+두번째 구성은 NAT 기능을 하는 가상의 router를 두는 것이다. 클라우드스택(:12)의 경우 Advanced network model을 사용하는 방법이다. (이 NAT 기능을 하는 가상의 router를 router VM 줄여서 RVM이라고 한다.) RVM은 Account 단위로 만들 수 있다. Account에 할당되는 Network device라고 생각하면 되며, Account의 VM들은 RVM을 gateway로 묶인다. 이렇게 구성하면 NAT 기능이 여러 RVM으로 분산되므로, 공격이 발생하더라도 공격이 향하는 RVM만 문제가 생기게 된다. 문제의 발생 범위를 제한할 수 있는 구조다. 별도의 VM이 뜨게 되므로 자원을 그만큼 소모하며, 성능이 그다지 좋지 않을 수 있다는 문제가 있다. 
+
+세번째 각 host그러니까 dom-0가 NAT 역할을 수행하는 구성도 생각할 수 있다. 오픈스택이 이 방법을 사용하고 있는 것으로 안다. 별도의 VM을 실행할 필요가 없으며, 위험이 host 단위로 분산된다는 장점이 있다.  
+
+개인적으로 첫번째와 두번째 방식 중 하나를 선택하면 될 것 같다. 자원을 모두 분산해서 관리한다는 측면에서 보자면 세번째 구조가 클라우드 스럽기는 한데, NAT의 경우에는 중앙에 있는 게 관리하기가 용이할 것 같아서이다. 예컨데, 성능관리 측면에서 보자면, 기능이 지나치게 분산돼서 다른 기능들과 섞여 있으면 관리 포인트를 찾기가 힘들어질 수 있다. 뭔가 성능에 문제가 생겼다고 가정했을 때, host를 이루고 있는 여러 컴포넌트들 중 어느 컴포넌트가 이 문제에 영향을 미치고 있는지를 확인하기가 쉽지 않다. 
+
+
+==== NAT 방식에 대한 고민 ====
+Scale-out 구성을 가지고 있어야 한다. cluster 형식으로 NAT Device들을 관리 할 수 있어야 한다. 문제는 하드웨어 장비에서 이런 솔류션을 찾기가 쉽지 않다는데 있다. 일단 NAT 전용 디바이스라는게 없다. 보통은 범용 네트워크 장비가 가진 여러 기능들 중 하나의 기능이다. 그러한 만큼 cloud라는 특수한 환경에 사용하기에 적합하지 않은 경우가 많다. 물론 사용은 할 수 있을 테지만 비용이 올라간다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=18pwZ-Lyeq5cItviNr4zOsq0_GhpIJB0iYg1HPNWBE3o&amp;w=508&amp;h=359">
+}}}
+
+범용 네트워크 장비는 stateful 방식으로 NAT 트래픽을 처리를 한다. 모든 connection을 추적한다는 이야기인데 standby - standby 형식으로 scale-out 하게 구성할 경우 모든 네트워크 장비가 connection 정보를 서로 공유해야 한다. 메모리 사용량이 x N 만큼 증가하므로 scale-out에 한계가 있다. 
+
+따라서 보안 공격에 약할 수 있다. 특히 syn flood 류의 connection 공격에 매우 취약할 것으로 보인다. connection tracking 정보의 급격한 증가로, 대역폭을 채우기 전에 다른 리소스 문제로 NAT 장비가 기능을 하지 않을 수 있기 때문이다.
+
+그러므로 stateless 방식으로 NAT를 서비스를 고민해 볼 만 하다. NAT 디바이스는 connection tracking 정보를 유지하지 않으며, NAT룰에 의해서 source ip와 destination ip만 변환한다. NAT 룰만 공유하면 되기 때문에, cluster 구성이 단순하다. connection tracking을 하지 않기 때문에 1:1 NAT만 가능하다는 단점이 있다. 예컨데, 하나의 VM에 2개의 Public IP를 할당하는 등의 일은 할 수 없다. 
+
+하나의 VM에 두 개의 Public IP를 할당할 수 없는게 심각한 문제인지는 생각해볼 필요가 있다. 참고로 아마존의 경우 VM에 단지 하나의 public ip만 할당 할 수 있는데, 아마존 역시 scale-out 문제를 해결하기 위해서 stateless NAT 방식을 채택하고 있는게 아닌가 하는 생각이다.
+
+== Cloud 타입별 EIP 전략 ==
+public cloud는 풍부한 네트워크 자원을 가지고 있을 거라고 가정할 수 있다. IP 자원 역시 충분할 것이니, 모든 VM에 public ip를 할당해도 큰 문제가 없을 것이다. 하지만 private cloud는 네트워크 자원이 풍부할 거라고 장담할 수 없다. 네트워크 구성이나 서비스도 달라질 수 있다. 이에 대한 생각을 공유하려 한다.  
+
+=== Public Cloud ===
+아마존과 같은 public cloud는 모든 VM에 public ip를 할당하는 정책을 펴야 할 것이다. 이를 위해서는 충분한 수의 public ip를 소유하고 있어야 한다. 모든 VM에 대해서 public ip를 할당 해야 한다는 점이 부당하게 보일 수 있을 것 같다. Account에 하나의 public ip가 할당하고 VM들은 (PAT)port forwarding으로 관리를 하다가, 인터넷 서비스가 필요할 경우 static nat 룰을 추가하면 public ip를 아낄 수 있기 때문이다.  
+
+하지만 이 경우 stateful NAT을 해야 하는데, scale-out에 문제가 생긴다. 아마존이 PAT 방식을 사용하지 않고 public ip를 주는 이유도 scale-out 문제로 stateless NAT을 선택했기 때문으로 보인다. 
+
+=== Private Cloud ===
+Private cloud는 scale-out 문제에서 상대적으로 자유롭다. 그리고 고객의 특이한 요구사항에 맞춰서 네트워크를 구성해야 할 필요가 있다. 
+
+내 생각에 private cloud라면 VLAN 기반의 L2 네트워크 구조도 고려해볼 만 하다. 예컨데 클라우드스택의 Advanced network 모드다. PAT 방식을 사용하기 때문에 Public IP를 아낄 수 있으며, 로드밸런싱, VPN 구성 등의 서비스를 쉽게 제공할 수 있다. 이 경우 VM형태의 네트워크 디바이스를 사용 함으로써, 네트워크 성능에 문제가 생길 수 있다는 단점과 VLAN(:12)의 사용에 따른 확장의 문제가 있을 수 있다.
+
+고객 상황에 따라서 public cloud와 같은 네트워크 구조로 구성할 수도 있을 테다. 어느 방식을 선택할런지는 상황에 따라 달라질 것이다.    
+
+== EIP와 DNS 정책 ==
+=== Public DNS ===
+Public cloud의 경우 VM은 하나의 네트워크 인터페이스를 가지며 private ip가 할당된다. 인터넷은 NAT을 이용해서 서비스 한다. EIP가 할당되기 전에 유저는 public ip를 이용해서 vm에 접근해야 하는데, public ip는 항상 변할 수 있다는 문제가 있다. 이 문제를 해결하기 위해서는 Public DNS가 필요하다. 
+
+vm에 도메인 이름을 주면, public ip가 변경되더라도 도메인 이름을 이용해서 접근할 수 있기 때문이다. Public DNS 서버는 TTL을 빠르게 가져가야 할 필요가 있다.  
+
+=== Private DNS ===
+내부 VM끼리의 접근은 private DNS를 이용하도록 한다. 기본적으로 도메인 이름은 public dns의 도메인 이름과 동일하다. Private DNS를 두는 이유는 아래와 같다.  
+  1. 사설 네트워크를 이용한 통신 
+     public ip로 통신을 할경우 NAT Device까지 패킷이 올라갔다가 다시 내려온다. 통신 효율이 떨어질 뿐더러 NAT 장비에 부담을 줄 수 밖에 없다. 사설 IP를 이용한다면, 효율적인 데이터 통신이 가능할 것이다. 
+  1. IP 변경에 유연하게 대처 
+     cloud는 사설 IP도 변경될 수 있음을 가정한다. 때문에 변할 수 있는 사설 IP 대신 도메인이름을 사용하는 것을 권장할 수 있다.
+
+이들 정책은 하나의 가이드일 뿐이며, 클라우드 환경에 따라 변경될 수 있다. 예컨데, VM이 destroy 되기 전에는 사설 IP의 변경이 없다고 정책이 세워져 있는 경우도 있을 수 있다. 그렇다면, 굳이 Private DNS를 둘 필요가 없을 것이다. 여기에 VM 마이그레이션 같은 상황도 고려해서 정책을 세울 필요가 있다. VM이 다른 pod나 zone으로 마이그레이션 된다면, network subnet이 아예 변경될 수 있기 때문이다. 
+
+[[tag(cloud,eip,amazon)]]

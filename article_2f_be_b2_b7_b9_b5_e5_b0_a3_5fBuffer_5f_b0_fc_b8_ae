@@ -1,0 +1,231 @@
+#title 쓰레드간 버퍼 관리
+
+=== 쓰레드간 버퍼 관리의 필요성 ===
+다음과 같은 여러개의 모듈로 구성된 서버 시스템이 있다고 생각해보자.
+{{{#!plain
+ Internet 
+           |                          +---------------------------+
+           |                          |  Worker Module            |
+           |     +-------------+ IPC  |  +--------+  +--------+   |
+ <---------|---->| Comm Module |<-----|->| I/O    |->| Worker |   |
+           |     +-------------+      |  | Thread |  | Thread |   |
+           |                          |  +--------+  +--------+   |
+           |                          +---------------------------+
+}}}
+'''Comm Module''' 은 클라이언트의 요청을 받아들인다. 요청에 대한 처리는 Worker Module 로 넘기게 된다. Worker Module은 IPC(12)를 통해서 Comm Module로 부터 전달된 요청 데이터를 받고 데이터를 처리하게 된다. 
+
+Work Module은 내부적으로는 데이터 입출력을 담당하는 I/O Thread와 실제 처리를 하는 Worker Thread로 구성이 되어 있다. 이렇게 통신 모듈과 다른 단위 모듈들을 별도의 Process로 분리하고 서로 IPC를 통해서 연결하는 구조는 3Tier이상되는 시스템을 구성하고자 할 때 흔히 사용되는 구조다.
+
+이 때 Worker Module에서 Buffer를 사용하지 않을 경우 문제가 발생할 수 있다. Worker Thread에서 처리할 수 있는 데이터의 양을 초과해서 I/O Thread로 부터 데이터가 유입되는 경우이다. 이 경우 문제에 대한 대처방안은 다음 두가지 정도가 될 것이다. 
+ 1. 그냥 서비스를 지연한다.
+ 1. 버퍼를 두어서 요청을 쌓아두고 한가할 때 처리한다.
+
+우리는 이중 2번째 방안에 대해서 알아보도록 할 것이다. 이경우 시스템 구성은 아래와 같을 것이다.
+{{{#!plain
+ Internet 
+           |                        +----------------------------------+
+           |                        |  Worker Module                   |
+           |   +-------------+ IPC  |  +--------+  +--+   +--------+   |
+ <---------|-->| Comm Module |<-----|->| I/O    |--|bu|-->| Worker |   |
+           |   +-------------+      |  | Thread |  |ff|   | Thread |   |
+           |                        |  +--------+  +--+   +--------+   |
+           |                        +----------------------------------+
+}}}
+쓰레드 중간에 buffer가 존재한다는 것만 제외하고는 첫번 구성과 완전히 동일하다.
+
+=== Buffer 구성 방안 ===
+Buffer를 구성하는 것은 비교적 단순하다. queue 형식의 자료구조를 하나 만들고 관리해주기만 하면된다. 
+
+그러나 하나 생각해야 하는게 있는데 queue에 자료가 0건이 있을 경우의 처리 방안이다. 자료가 한건 이상 있을 때야 무조건 빼오기만 하면 되니 문제는 없지만 0일경우에는 그렇게 할 수가 없다. busy wait 상태에 놓이면서 자료가 들어올 때까지 기다리는 방법은 너무 비효율적이다. sleep(2)등의 함수를 이용해서 루프를 도는 방법도 있긴 하겠지만 역시 문제가 많은 방법이다.
+
+최선의 방법은 자료가 0일경우 자료가 하나 이상 쌓일 때까지 block되도록 하는 것이다. 여기에 대한 몇가지 방안에 대해서 알아보고 이중 맘에 드는것 하나를 선택하도록 하겠다.
+
+==== signal 의 사용 ====
+buffer로 부터 데이터를 모두 가져왔을 경우 sigwait(2)를 호출해서 블럭되는 방법을 생각할 수 있다. 비교적 단순한 방법 같지만, 자료를 쌓는 측에서 언제 시그널을 전송할 것인가 하는 문제가 남는다. 자료를 쌓을 때 마다 시그널을 날리는 방법은 별로 좋아보이지 않는다. 자료의 크기가 0인 시점에서 새로운 데이터가 들어왔을 경우 시그널을 날리도록 해야 할 것이다. 
+
+sigwait(2)를 호출한 시점에서 새로운 데이터가 들어올 경우 signal을 발생시키는 방법을 생각해 볼 수 있을 것 같다. 그러나 이 방법 역시 sigwait(2)를 호출했다는 것을 다른 쓰레드에 알려줘야 한다는 문제가 생긴다. 전역변수를 두고 이 값을 변경하는 것으로 알려 줄 수 있겠지만, 동기화 문제가 발생한다. 
+
+위 방법 대로라면 
+ 1. 전역변수의 값을 변경하고 
+ 1. sigwait(2)를 호출하는
+방식을 사용해야 할 것인데, 전역변수의 값을 변경하고 sigwait(2)를 호출하기 전에 다른 쓰기 쓰레드에서 전역변수의 값을 읽고 signal을 발생시킬 수 있기 때문이다. 문제는 mutex를 이용하면 해결 할 수 있을 것이다. 혹은 realtime signal을 사용할 수도 있을 것이다. 
+
+==== Mutex 의 사용 ====
+자료를 읽을 때 크기가 0이라면 pthread_cond_wait(3) 함수를 호출해서 기다린다. 깨우는 시점은 자료를 넣는 시점에서 이전 자료의 크기가 0일 경우 pthread_cond_signal()을 호출한다.  
+
+==== 세마포어의 사용 ====
+데이터를 읽을 때 세마포어를 검사하는 방법이다. 자료를 얻는 측에서는 최근 자료의 크기가 0이라면 세마포어 값을 증가시키고 기다리게 될 것이다. 자료를 얻는 측에서는 자료입력이 0에서 증가한다면 세마포어 값을 감소 시키는 방식을 사용한다.
+
+비교적 명료한 방법이다.
+
+==== 파일 잠금의 사용 ====
+자료를 얻는 측에서는 최근의 자료의 크기가 0이라면 파일을 잠그고 잠금이 풀릴 때까지 기다린다. 자료를 입력하는 측에서 자료를 입력하고 잠금을 풀면 비로서 자료를 얻어 올 수 있을 것이다. 라고 생각할 수 있겠지만... 불행하게도 fcntl(2)을 통한 파일잠금은 프로세스 단위이다. 즉 하나의 프로세스에서는 단지 하나의 잠금만을 제어할 수 있을 뿐이다. 프로세스간 임계영역 지정을 위한 목적으로 사용할 수 있겠지만, 쓰레드간 임계영역 지정을 위해서 사용하기에는 문제가 있다. 
+
+=== Mutex를 이용한 쓰레드간 데이터 공유 ===
+다음은 템플릿으로 구현한 stack 클래스다. 
+{{{#!plain
+#include <iostream>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <vector>
+
+using namespace std;
+
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t io_sync  = PTHREAD_COND_INITIALIZER;
+
+template <typename T1>
+class Queue
+{
+  private:
+    int MaxSize;
+    int DataIndex;
+    int QueueSize;
+    //T1  *Array;
+    vector<T1> Array;
+    int PushNum;
+  public:
+    // 생성자로써 디폴트 아규먼트로
+    // 큐의 사이즈를 지정했다.
+    // 아규먼트로 넘어온 크기만큼 Array 의 크기를
+    // 할당하고 기타 멤버변수들의 값을 적당히 초기화 한다.
+    Queue(int size=40)
+    {
+      MaxSize = size;
+      QueueSize = 0;
+      DataIndex = 0;
+      PushNum   = 0;
+      Array.resize(size);
+    }
+    // 소멸자 자원을 해제한다.
+    ~Queue()
+    {
+    }
+    // Array에 원소를 입력한다.
+    // 만약에 Array 의 크기를 초과해서 원소가 들어갈경우
+    // MaxSize*2 크기만큼 메모리의 크기를 재할당한다.
+    void push_back(T1 x)
+    {
+      pthread_mutex_lock(&io_mutex);
+      if (QueueSize == 0)
+        pthread_cond_signal(&io_sync);
+      if (QueueSize > MaxSize - 1)
+      {
+        MaxSize *= 2;
+        Array.resize(MaxSize);
+      }
+      Array[PushNum%MaxSize] = x;
+      PushNum++;
+      QueueSize++;
+      pthread_mutex_unlock(&io_mutex);
+    }
+    // 데이타를 꺼낸다.
+    T1 pop()
+    {
+      pthread_mutex_lock(&io_mutex);
+      if (QueueSize == 0)
+      {
+        pthread_cond_wait(&io_sync, &io_mutex);
+      }
+      QueueSize--;
+      DataIndex++;
+      pthread_mutex_unlock(&io_mutex);
+      return Array[(DataIndex-1)%MaxSize];
+    }
+    // 큐에 있는 데이타의 갯수를 얻어온다.
+    int size()
+    {
+      return QueueSize;
+    }
+    // 큐의 크기를 얻어온다.
+    int capacity()
+    {
+      return MaxSize;
+    }
+    // 원소를 삭제한다.
+    // 실제 데이타를 free 시키지는 않고, Index
+    // 값들을 조정해서 삭제한것 처럼 보이게 한다.
+    void clear()
+    {
+      QueueSize = 0;
+      DataIndex = 0;
+      PushNum   = 0;
+    }
+};
+}}}
+
+위의 예제코드는 '''queue.h''' 로 저장을 했다. 다음은 테스트를 위한 코드다.
+{{{#!plain
+#include <vector>
+#include <unistd.h>
+#include <signal.h>
+#include <queue.h>
+#include <stdio.h>
+
+#include <pthread.h>
+#include <string>
+
+using namespace std;
+
+Queue<string> MQueue(20);
+
+pthread_mutex_t sync_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sync_cond  = PTHREAD_COND_INITIALIZER;
+
+void *work_thread(void *rtsnum)
+{
+  int signum = *((int *)rtsnum);
+
+  // Mutex 동기화
+  pthread_mutex_lock(&sync_mutex);
+  cout << "Sig Num is " << signum << endl;
+  pthread_cond_signal(&sync_cond);
+  pthread_mutex_unlock(&sync_mutex);
+  // --------------------
+
+  while(1)
+  {
+    cout << MQueue.size() << " : "<< MQueue.pop();
+    usleep(10);
+  }
+}
+
+int main(int argc, char **argv)
+{
+  int thread_num = 5;
+
+  vector<void *(*)(void *)> thread_list;
+  vector<pthread_t> tident(thread_num);
+
+  thread_list.push_back(work_thread);
+
+  for (int i = 0, rtsnum = 1; i < thread_list.size(); i++, rtsnum++)
+  {
+    pthread_mutex_lock(&sync_mutex);
+    pthread_create(&tident[i], NULL, thread_list[i], (void *)&rtsnum);
+    pthread_cond_wait(&sync_cond, &sync_mutex);
+    pthread_mutex_unlock(&sync_mutex);
+  }
+
+  char buf[256];
+
+  int i = 1;
+  while(1)
+  {
+    sprintf(buf, "My Data %d\n", i);
+    MQueue.push_back(buf);
+	// 5번 루프를 돈 후에 1000 msec를 쉬어준다. 
+    if ((i % 5) == 0)
+      usleep(1000);
+
+	// 500번 루프를 돈 후에 3초를 쉬어준다.	
+    if ((i % 500) == 1)
+      sleep(3);
+    i++;
+  }
+}
+}}}
+데이터를 읽는 work_thread는 10msec 를 계속 쉬면서 데이터를 읽어들인다. 반면 데이터를 쓰는 측은  5번 루프돌때 마다 1000msec를 쉰다. 결국 데이터를 읽어들이는 속도보다 데이터를 쓰는 속도가 더 빠르므로, 계속 해서 데이터가 늘어나게 될 것이다. 그러다가 500번 루프를 돈 후에 3초를 쉬어주게 되는데, 이 시간동안 work_thread는 버퍼에 있는 데이터를 모두 처리하게 된다. 위의 프로그램을 돌리면 테스트가 가능할 것이다.  
+

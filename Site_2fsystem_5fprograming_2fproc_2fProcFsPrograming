@@ -1,0 +1,1335 @@
+#title Proc 파일시스템 프로그래밍 
+
+[wiki:docbook_Proc_filesystem_프로그래밍 Docbook 원문]
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Proc filesystem 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>Proc filesystem 프로그래밍</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 3월 1일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#WHY"
+>왜 proc파일시스템을 이용하는가</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN22"
+>파일 시스템 오버헤드를 줄일 수 있다.</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN30"
+>물리적인 파일시스템 장치를 필요로 하지않는다</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN33"
+>최적화된 파일작업 수행</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN37"
+>proc 파일시스템을 어디에 사용할 수 있을까</A
+></DT
+><DD
+><DL
+><DT
+>3.1&#51208;. <A
+HREF="#AEN41"
+>커널 모듈 프로그래밍</A
+></DT
+><DT
+>3.2&#51208;. <A
+HREF="#AEN45"
+>임베디드 프로그래밍</A
+></DT
+></DL
+></DD
+><DT
+>4&#51208;. <A
+HREF="#AEN49"
+>proc 프로그래밍</A
+></DT
+><DD
+><DL
+><DT
+>4.1&#51208;. <A
+HREF="#AEN52"
+>proc 구조체 및 API</A
+></DT
+><DD
+><DL
+><DT
+>4.1.1&#51208;. <A
+HREF="#AEN54"
+>proc_dir_entry 구조체</A
+></DT
+></DL
+></DD
+><DT
+>4.2&#51208;. <A
+HREF="#AEN66"
+>proc API</A
+></DT
+><DD
+><DL
+><DT
+>4.2.1&#51208;. <A
+HREF="#AEN69"
+>create_proc_entry</A
+></DT
+><DT
+>4.2.2&#51208;. <A
+HREF="#AEN79"
+>create_proc_read_entry</A
+></DT
+><DT
+>4.2.3&#51208;. <A
+HREF="#AEN84"
+>create_proc_info_entry</A
+></DT
+><DT
+>4.2.4&#51208;. <A
+HREF="#AEN89"
+>proc_mkdir</A
+></DT
+><DT
+>4.2.5&#51208;. <A
+HREF="#AEN93"
+>proc_symlink</A
+></DT
+><DT
+>4.2.6&#51208;. <A
+HREF="#AEN97"
+>remove_proc_entry</A
+></DT
+></DL
+></DD
+><DT
+>4.3&#51208;. <A
+HREF="#AEN102"
+>기타 포장 함수들</A
+></DT
+><DD
+><DL
+><DT
+>4.3.1&#51208;. <A
+HREF="#AEN105"
+>proc_net_create</A
+></DT
+><DT
+>4.3.2&#51208;. <A
+HREF="#AEN109"
+>proc_net_remove</A
+></DT
+></DL
+></DD
+><DT
+>4.4&#51208;. <A
+HREF="#AEN113"
+>일반 유저와의 데이터 교환</A
+></DT
+><DD
+><DL
+><DT
+>4.4.1&#51208;. <A
+HREF="#AEN119"
+>데이터 읽기</A
+></DT
+><DT
+>4.4.2&#51208;. <A
+HREF="#AEN123"
+>데이터 쓰기</A
+></DT
+></DL
+></DD
+><DT
+>4.5&#51208;. <A
+HREF="#AEN128"
+>Proc파일 시스템을 이용한 예제</A
+></DT
+></DL
+></DD
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>		유닉스에서 사용되는 proc파일 시스템은 운영체제의 각종 정보를 
+		커널모드가 아닌 유저모드에서 쉽게 접근할 수 있도록 만들어 줌으로 
+		시스템 정보를 일반 프로그래머가 쉽게 접근 할 수 있도록 도와준다. 
+	</P
+><P
+>		특히 리눅스에서는 프로세스 정보뿐만 아닌 다른 시스템 정보들까지 
+		광범위 하게 제공해 준다. 이말은 proc파일시스템을 제대로 이해할 경우 
+		리눅스 운영체제를 좀더 깊이 있게 다룰 수 있다는 말이 된다. 
+		실제 ps와 같은 프로세스 상황감시에서 부터, CPU사용율, 인터럽트, 
+		네트워크 패킷전송량, 적재된 모듈, IDE-SCSI와 같은 장치정보, 
+		CPU정보등의 데이터를 어렵지 않게 얻어 올 수 있다. 다른 대부분의 
+		유닉스에서 이러한 정보를 얻어올려면 상당한 애로사항을 격게 될것이다. 
+	</P
+><P
+>		이제 proc파일시스템에서 데이터를 읽어오는 것을 지나서 proc파일 시스템에
+		필요한 데이터를 쓰는 방법에 대해서 알아보도록 하겠다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="WHY"
+>2&#51208;. 왜 proc파일시스템을 이용하는가</A
+></H1
+><P
+>		우리는 이미 일반 파일 시스템을 이용해서 필요한 데이터를 남기는 
+		방법을 알고 있다. read(2), open(2), write(2) 이 3개의 함수만 사용할 
+		줄 안다면, 필요한 모든 데이터를 읽고 쓰는데 별 부족함이 없다. 
+		그렇다면 왜 굳이 proc파일시스템을 이용해야 하는지에 대해서 
+		알아 보도록 하겠다.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.1&#51208;. 파일 시스템 오버헤드를 줄일 수 있다.</A
+></H2
+><P
+>			일반적으로 사용되는 파일 시스템은 상당한 오버헤드를 
+			가지고 있다. 각 파일의 inode와 superblocks와 같은 객체를 
+			관리해야 하며 이러한 정보를 필요할때 마다 운영체제에 
+			요청해야 한다. 이들 파일 시스템의 데이터들은 서로 
+			어긋날수도 있으며, 단현화 현상등이 발생할 수도 있다. 
+			운영체제는 이러한 모든 것을 관리해 주어야 하며, 당연히 
+			상당한 오버헤드가 발생하게 된다.   
+		</P
+><P
+>			proc파일 시스템은 이러한 일반 파일시스템의 문제점을 없애기 
+			위해서 리눅스 커널에서 직접 파일시스템을 관리하는 방법을 
+			채택하고 있다.  
+		</P
+><P
+>			지금 여러분의 리눅스 시스템에서 mount명령을 내리면 
+			다음과 같이 proc 파일 시스템이 자동으로 마운트 되어 있는 
+			것을 확인할 수 있을 것이다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># mount
+/dev/hda7 on / type ext3 (rw)
+none on /proc type proc (rw)
+/dev/hda5 on /usr type ext3 (rw)
+...
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			여러분이 최초에 리눅스 운영체제를 설치할 때 proc파일 시스템을 
+			위해서 별도로 파티션작업을 한적이 없을 것이므로 mount정보에 
+			표시되는게 이상할 수도 있을 것이다. 이유는 앞에서 말했듯이 
+			proc파일 시스템은 리눅스 커널에서 직접 관리하는 것으로 운영체제가 
+			부팅 되었을 때 생성되는 파일 시스템이기 때문이다. mount정보를 
+			보면 알겠지만 어떤 장치에도 마운트되어 있지 않음을 확인할 
+			수 있다. proc파일 시스템은 커널메모리에서 돌아가는 
+			일종의 <B
+CLASS="EMPHASIS"
+>가상 파일 시스템</B
+>이다. 
+		</P
+><P
+>			메모리에서 그것도 커널이 직접관리를 하게 되니.. 당연히 빠를 수 
+			밖에 없다.
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN30"
+>2.2&#51208;. 물리적인 파일시스템 장치를 필요로 하지않는다</A
+></H2
+><P
+>			/proc는 커널메모리에서 유지하는 파일 시스템이다. 때문에 
+			별도의 장치(하드디스크 같은)을 필요로 하지 않는다. 
+			이러한 특징은 임베디드시스템을 설계하고자 할때 중요한 요소가 
+			된다.   
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN33"
+>2.3&#51208;. 최적화된 파일작업 수행</A
+></H2
+><P
+>			일반적인 파일 시스템 계층은 은 프로그래머를 위해서 POSIX 형식의 
+			인터페이스를 제공한다. open, read, write, close등이 이것이다. 
+			데이터 블럭들은 용이한 확장을 위해서 추상화 되어 있으며 
+			상속가능한 형태로 구성된다.    
+		</P
+><P
+>			이러한 일반 파일 시스템은 대용량의 데이터를 다루어야 하는 
+			경우 매우 유용하지만, 고정적이고 처리해야할 데이터의 
+			양이 적은 분야에는 오히려 비효율적이다. proc파일 시스템에서 
+			다루어야 할 정보는 대부분 정해져 있으며, 데이터의 양도 
+			그리 많지 않다. 고로 일반 파일시스템에서 제공하는 인터페이스를 
+			사용하지 않고 필요한 작업에 최적화된 인터페이스를 
+			사용할 수 있다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN37"
+>3&#51208;. proc 파일시스템을 어디에 사용할 수 있을까</A
+></H1
+><P
+>		<A
+HREF="#WHY"
+>2&#51208;</A
+>에서 proc 파일시스템을 사용했을 때 얻을 수 있는 
+		잇점에 대해서 알아보았다. 그럼 어느 용도에 유용하게 사용할 수 
+		있을지에 대해서 알아보자.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN41"
+>3.1&#51208;. 커널 모듈 프로그래밍</A
+></H2
+><P
+>			proc파일 시스템(이하 proc) 자체가 커널과 밀접하게 연관있는 이유로 
+			일반 애플리케이션에서 proc를 사용하는 일은 드물다. 위에서 설명 
+			했듯이 커널메모리에서 proc를 유지하게 되므로 많은 양의 데이터를 
+			처리하는 애플리케이션의 용도와는 맞지 않다는 점도 있다.  
+		</P
+><P
+>			그런점에서 proc는 커널모듈과 같이 커널과 밀접하게 관계있는 
+			프로그램에서 유용하게 사용할 수 있다. 커널 모듈 프로그램은 
+			주로 장치를 올리기 위한 용도로 사용되는데, 커널 레벨에서 
+			작동하다 보니 모듈의 작동상황이나 성능등을 알아오기가 그리 쉽지 
+			않다. 그렇다고 해서 일반 파일 시스템을 IPC를 사용하는 것 역시 
+			그리 좋은 생각은 아니다. 이럴 때 proc를 이용하면 문제를 깔끔하게 
+			해결 할 수 있다.  
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN45"
+>3.2&#51208;. 임베디드 프로그래밍</A
+></H2
+><P
+>			임베디드 시스템은 파일 시스템을 가지지 않는 경우가 많거나 
+			가지고 있다고 하더라도 매우 제한적인 경우가 많다. 
+			이럴 때 proc를 이용해서 관리자 환경이라든지 데이터 입출력 
+			환경을 만들 수 있다.
+		</P
+><P
+>			물론 이경우는 리눅스커널을 기반의 임베디드 환경에 해당된다.
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN49"
+>4&#51208;. proc 프로그래밍</A
+></H1
+><P
+>		이번장에서는 커널에서 제공하는 proc API들에 대해서 살펴볼 것이다. 
+		다루어 지는 내용들은 커널 2.4.x를 기준으로 하고 있다.  
+	</P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN52"
+>4.1&#51208;. proc 구조체 및 API</A
+></H2
+><DIV
+CLASS="SECTION"
+><H3
+CLASS="SECTION"
+><A
+NAME="AEN54"
+>4.1.1&#51208;. proc_dir_entry 구조체</A
+></H3
+><P
+>				proc에 있어서 가장 중요한 구조체로써 다음과 같이 
+				정의되어 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct proc_dir_entry {
+    unsigned short low_ino;
+    unsigned short namelen;
+    const char *name;
+    mode_t mode;
+    nlink_t nlink;
+    uid_t uid;
+    gid_t gid;
+    unsigned long size;
+    struct inode_operations * proc_iops;
+    struct file_operations * proc_fops;
+    get_info_t *get_info;
+    struct module *owner;
+    struct proc_dir_entry *next, *parent, *subdir;
+    void *data;
+    read_proc_t *read_proc;
+    write_proc_t *write_proc;
+    atomic_t count;     /* use count */
+    int deleted;        /* delete flag */
+    kdev_t  rdev;
+};
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				<B
+CLASS="EMPHASIS"
+>name</B
+>은 proc파일의 이름이다. 
+				<B
+CLASS="EMPHASIS"
+>mode</B
+>는 proc파일의 권한으로 
+				일반파일에 사용되는 권한과 동일하게 사용할 수 있다. 
+				mode에 대한 자세한 내용은 stat(2)의 man페이지를 참고하기 
+				바란다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>struct proc_dir_entry *next ...</B
+>는 
+				proc파일이 위치하는 디렉토리로 일반 파일에서의 디렉토리 권한과 
+				동일하게 사용되며, 링크드 리스트로 관리된다.
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>data</B
+> proc에서 읽은 데이터를 리턴하기 
+				위해서 사용된다. 
+			</P
+><P
+>				<B
+CLASS="EMPHASIS"
+>read_proc, write_proc</B
+> 유저영역의 
+				프로세스는 직접 커널영역에 데이터를 읽거나 쓸수 없다. 
+				때문에 모듈 프로그램등이 중간에서 커널과 유저영역 사이의 
+				데이터전달을 해주어야 한다. 이러한 데이터 전달은 callback함수를
+				통해서 이루어진다. read_proc는 커널로 부터 읽은 데이터를 
+				유저영역 프로세스로 되돌려주기 위해서 write_proc는 유저역역 
+				프로세스에서 쓴데이터를 커널메모리 영역으로 복사하기 위해서 
+				사용한다.  
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN66"
+>4.2&#51208;. proc API</A
+></H2
+><P
+>			proc는 사용하기 간단한 몇개의 API만을 제공하는데, 이들 API는 
+			커널의 메이저 버젼에 따라서 차이가 있을 수 있다. 
+			만약 여러분이 2.4.x외의 다른 커널 버젼을 사용하길 원한다면 
+			해당 커널버젼의 커널 문서를 참고해야 할 것이다. 
+			그렇다고 해서 이 문서가 전혀 필요 없지는 않을 것이다. 대부분의 
+			경우 커널의 메이저 버젼이 업그레이드 된다고 하더라도 함수 API가 
+			아주 크게 변하는 경우는 없기 때문이다. 이 문서를 익혀 놓는다면 
+			다른 커널 버젼에도 쉽게 적응할 수 있을 것이다.  
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN69"
+>4.2.1&#51208;. create_proc_entry</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct proc_dir_entry *create_proc_entry
+(
+    const char *name,
+    mode_t     mode,
+    struct proc_dir_entry *parent);
+);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수는 첫번째 인자인 <B
+CLASS="EMPHASIS"
+>name</B
+>을 
+				이름으로 하는 
+				proc파일을 생성한다. <B
+CLASS="EMPHASIS"
+>mode</B
+>는 생성 될때의 
+				파일 모드로 open(2)에 사용되는 것과 동일하게 사용된다. 
+				<B
+CLASS="EMPHASIS"
+>mode</B
+>에 대한 자세한 내용은 man페이지를 
+				참고하기 바란다.  
+			</P
+><P
+>				마지막 인자인 <B
+CLASS="EMPHASIS"
+>parent</B
+>는 
+				<B
+CLASS="EMPHASIS"
+>name</B
+>로 만들어진 proc파일이 위치할 
+				디렉토리다. proc파일은 루트디렉토리가 "/"아닌 "/proc"에서 부터
+				시작하게 된다. 만약 NULL이라면 /proc 디렉토리 밑에 위치하게 
+				된다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN79"
+>4.2.2&#51208;. create_proc_read_entry</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>static inline
+struct proc_dir_entry *create_proc_read_entry
+(
+    const char *name,
+    mode_t mode,
+    struct proc_dir_entry *base,
+    read_proc_t * read_proc, 
+    void *data
+);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이 함수는 create_proc_entry의 포장(wrapper)함수다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>static inline
+struct proc_dir_entry *create_proc_read_entry
+(
+    const char     *name,
+    mode_t         mode,
+    struct proc_dir_entry *base,
+    read_proc_t  *read_proc, 
+    void         *data
+)
+{
+    struct proc_dir_entry *res = create_proc_entry(name, mode, base);
+    if (res)
+    {
+        res-&#62;read_proc = read_proc;
+        res-&#62;data=data;
+    }
+   return res;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				create_proc_read_entry는 쉽게 읽기용 proc파일을 만들 수 
+				있도록 도와준다.  
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN84"
+>4.2.3&#51208;. create_proc_info_entry</A
+></H3
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>static inline 
+proc_dir_entry *create_proc_info_entry
+(
+    const char *name,
+    mode_t     mode,
+    get_info_t *get_info
+);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				마찬가지로 create_proc_entry의 포장함수이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>ststic inline
+struct proc_dir_entry *create_proc_info_entry
+(
+    const char            *name,
+    mode_t                mode,
+    struct proc_dir_entry *base,
+    get_info_t            *get_info
+)
+{
+    struct proc_dir_entry *res = create_proc_entry (name, mode, base);
+    if (res) res-&#62;get_info = get_info;
+    return res;
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN89"
+>4.2.4&#51208;. proc_mkdir</A
+></H3
+><P
+>				proc파일 시스템에 디렉토리를 생성한다. 만들어 지는 디렉토리는 
+				proc파일 시스템의 최상위 디렉토리(/proc)를 기준으로 한다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>extern struct proc_dir_entry *proc_mkdir
+(
+    const char *dir_name,
+    struct proc_dir_entry *parent
+) 
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN93"
+>4.2.5&#51208;. proc_symlink</A
+></H3
+><P
+>				심볼릭 링크를 만들기 위해서 사용된다. 
+				단지 실제 사용자(real user)만이 사용가능하다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>extern struct proc_dir_entry *proc_symlink
+(
+    const char    *file_name,
+    struct proc_dir_entry *parent,
+    const char    *symlink_name  
+);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN97"
+>4.2.6&#51208;. remove_proc_entry</A
+></H3
+><P
+>				커널 모듈 프로그램밍시 celanup_module()함수에서 
+				proc 파일을 지워주지 않을 경우 시스템에 좋지 않은 영향을 
+				미칠 수 있다. 일단 proc를 생성했다면 프로그램 종료시 
+				반드시 이 함수를 호출해서 proc파일을 지워주도록 하자.  
+			</P
+><P
+>				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>extern void *remove_proc_entry
+(
+    const char            *name,
+    struct proc_dir_entry parent
+);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN102"
+>4.3&#51208;. 기타 포장 함수들</A
+></H2
+><P
+>			모듈 프로그래밍시 proc파일 시스템은 매우 자주 이용된다. 
+			그러므로 이왕이면 쓰기편한 함수들이 준비되면 좋을 것이다. 
+			여기에서 설명하는 함수들은 기존의 proc함수들을 사용하기 
+			편하도록 포장한 함수들이다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN105"
+>4.3.1&#51208;. proc_net_create</A
+></H3
+><P
+>				이 함수는 create_proc_info_entry의 /proc/net정보에 대한 
+				포장함수이다. 네트워크 서브시스템에 대해서 쉽게 접근하도록 
+				도와준다.  
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>static inline
+struct proc_dir_entry *proc_net_create
+(
+    const char *name,
+    mode_t     mode,
+    get_info_t *get_info
+)
+{
+    return create_proc_info_entry(name, mode, proc_net, get_info);
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN109"
+>4.3.2&#51208;. proc_net_remove</A
+></H3
+><P
+>				네트워크 서브 시스템에 대한 remove_proc_entry의 포장함수이다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>static inline void proc_net_remove(const char *name)
+{
+    remove_proc_entry(name, proc_net)
+}
+				</PRE
+></TD
+></TR
+></TABLE
+>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN113"
+>4.4&#51208;. 일반 유저와의 데이터 교환</A
+></H2
+><P
+>			일반 파일에서 유저와의 데이터 교환은 매우 단순하며, 별로 신경쓸 
+			필요도 없다. 프로그램이 파일에 쓴 내용 그대로를 유저가 보며, 
+			유저가 파일에 쓴 내용그대로를 다시 프로그램이 읽어들인다. 
+		</P
+><P
+>			그러나 proc파일 시스템에서의 데이터는 실제 파일에 저장되는 
+			것과는 달리 커널메모리에 저장된다. 알다 시피 커널메모리는 유저레벨
+			에서 직접 접근할 수 없다. 유저가 cat(혹은 read함수)등을 통해서 
+			파일의 내용을 읽을려고 하면 커널에서 데이터를 유저에게 
+			일정한 포맷으로 뿌려주게 된다. 마찬가지로 유저가 어떤 내용을 
+			proc파일에 쓰게되면 데이터를 받아들인후 가공해서 커널메모리에 
+			적재하게 된다.     
+		</P
+><P
+>			이를 위해서 커널과 일반유저 사이에 데이터를 서로에게 전달해 
+			주는 어떤 함수가 필요하고 이 함수가 다룰 수 있는 표준적인 
+			자료구조가 있어야 한다. 유저가 데이터를 읽고 쓰기 위해서는 
+			읽기와 쓰기를 위한 callback함수를 등록시켜서 사용 해야한다.	 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>struct proc_dir_entry *entry;
+
+entry-&#62;read_proc = read_proc_foo;
+entry-&#62;write_proc = write_proc_foo;
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			위에서 처럼 pric_dir_entry에 읽기/쓰기를 위한 콜백함수를 
+			등록하면 된다.
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN119"
+>4.4.1&#51208;. 데이터 읽기</A
+></H3
+><P
+>				콜백함수로 등록되는 읽기함수는 유저영역 프로세스의 요청을 
+				받으면 커널로 부터 데이터를 읽어들여서 알맞은 포맷으로 
+				변경한다음 유저영역 프로세스로 되돌려준다. 읽기함수는 
+				다음과 같은 모습을 가진다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int read_func(char* page, char** start, off_t off, int count, int* eof, void* data);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				읽기함수는 일어들인 정보를 page에 쓰게 된다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN123"
+>4.4.2&#51208;. 데이터 쓰기</A
+></H3
+><P
+>				쓰기 콜백함수는 유저영역 프로세스로 부터 데이터를 받은다음 
+				커널이 읽기에 적당한 형식으로 변경후 커널에 넘겨준다. 
+				쓰기함수는 다음과 같은 모습을 가진다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int write_func(struct file* file, const char *buffer, unsigned long count,
+			void *data);
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				쓰기함수는 <B
+CLASS="EMPHASIS"
+>buffer</B
+>로 부터 유저가 
+				쓴 데이터를 읽어들인다. buffer는 유저 데이터 이므로 
+				copy_from_user을 이용해서 커널메모리영역으로 데이터를 
+				복사한다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN128"
+>4.5&#51208;. Proc파일 시스템을 이용한 예제</A
+></H2
+><P
+>			그럼 간단한 예제를 만들어 보도록 하겠다. 예제는 일반 애플리케이션이 
+			아닌 커널 모듈 프로그램이다. 커널 모듈프로그래밍에 대한 
+			내용은 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=144"
+TARGET="_top"
+>커널 모듈 프로그래밍</A
+>을 참고하기 바란다.  
+		</P
+><P
+>			프로그램의 이름은 my_proc.c로 하겠다. 이 모듈은
+			proc파일 시스템에 myproc라는 디렉토리를 만들고 이 모듈 아래에 
+			foo와 jiffies라는 파일을 만든다. 만약 유저가 cat등을 통해서 
+			이들 파일을 열면 모듈은 모듈 정보를 적당한 포맷으로 
+			만들어서 사용자에게 보여주게 된다. foo파일의 경우에는 파일에 
+			내용을 쓸수도 있도록 되어 있어서 사용자가 내용을 바꾸면 
+			이 내용은 모듈에서 읽어 들이게 된다. 
+		 </P
+><P
+>			여러분이 커널 모듈 프로그래밍에 대한 이해가 있다는 가정하에 
+			설명은 주석으로 대신하도록 하겠다. 
+			모듈에서 main()함수에 해당하는 module_init()함수에서 
+			차근차근 분석해나가면 좀더 쉽게 이해할 수 있을 것이다. 
+		 </P
+><P
+>			<B
+CLASS="EMPHASIS"
+>예제 : myproc.c</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;linux/module.h&#62;
+#include &#60;linux/tty.h&#62;
+#include &#60;linux/init.h&#62;
+#include &#60;linux/kernel.h&#62;
+#include &#60;linux/proc_fs.h&#62;
+#include &#60;linux/sched.h&#62;
+#include &#60;asm/uaccess.h&#62;
+
+#define MODULE_VERSION	"1.0"
+
+// 모듈의 이름이다. 
+// 이 모듈이름으로 /proc밑에 디렉토리가 생성된다. 
+#define MODULE_NAME		"myproc"
+
+// 생성된 /proc/MODULE_NAME 밑에 아래 2개의 파일이 
+// 생성된다. 
+#define FOO_FILE		"foo"
+#define JIFFIE_FILE		"jiffies" 
+
+#define FOOBAR_LEN 8
+
+// foo 파일에 저장될 데이터 구조체
+struct fb_data_t
+{
+	char name[FOOBAR_LEN + 1];
+	char value[FOOBAR_LEN + 1];
+};
+struct fb_data_t foo_data;
+
+
+static struct proc_dir_entry *example_dir, *foo_file, *jiffies_file;
+
+// 사용자가 cat등을 통해서 /proc/[MODULE_NAME]/jiffies파일을 열면 
+// 커널은 이 함수를 호출해서 해당 정보를 넘겨준다. 
+static int proc_read_jiffies(char *page, char **start, off_t off,
+			   int count, int *eof, void *data)
+{
+	int len;
+
+	MOD_INC_USE_COUNT;
+	// 사용자가 이해하기 쉬운 포맷으로 만든다. 
+	// cat, vi등을 사용해서 이 파일을 열경우 
+	// jiffies = 1234 와 같은 형식으로 보인다. 
+	len = sprintf(page, "jiffies = %ld&#92;n", jiffies);
+	// 해당 내용을 printk를 통해서 로그로 남긴다.  
+	// 이 데이터는 /var/log/message로 출력된다.
+	printk("&#60;1&#62; read jiffies = %ld&#92;n", jiffies);
+	MOD_DEC_USE_COUNT;
+
+	return len;
+}
+
+// 사용자가 /proc/[MODULE_NAME]/foo 파일을 열었을 때 
+// 출력해주는 정보 
+static int proc_read_foobar(char *page, char **start, off_t off, 
+							int count, int *eof, void *data)
+{
+	int len;
+	struct fb_data_t *fb_data = (struct fb_data_t *)data;
+
+	MOD_INC_USE_COUNT;
+	// fb_data구조체의 내용을 보시쉽게 만들어서 출력해준다. 
+	len = sprintf(page, "%s = %s",
+					fb_data-&#62;name, fb_data-&#62;value);
+	MOD_DEC_USE_COUNT;
+	return len;
+}
+
+// 사용자는 /proc/[MODULE_NAME]/foo에 내용을 쓰기를 원할때도 있을 것이다.
+// 이 때 이함수가 호출된다.
+static int proc_write_foobar(struct file *foke, const char *buffer,
+							unsigned long count, void *data)
+{
+	int len;
+	struct fb_data_t *fb_data = (struct fb_data_t *)data;
+
+	MOD_INC_USE_COUNT;
+	if (count &#62; FOOBAR_LEN)
+		len = FOOBAR_LEN;
+	else
+		len = count;
+
+	printk("&#60;1&#62; DATA COPY %d&#92;n", len);
+	// echo "xxxxx" &#62; /proc/[MODULE_NAME]/foo 등으로 입력받은 값을
+	// fb_data-&#62;value에 저장한다. 
+	if (copy_from_user(fb_data-&#62;value, buffer, len))
+	{
+		MOD_DEC_USE_COUNT;
+		return -EFAULT;
+	}
+
+	fb_data-&#62;value[len] = 0x00;
+	MOD_DEC_USE_COUNT;
+
+	return len;
+
+}
+
+// 커널 모듈 초기화 함수
+static int init_myproc(void)
+{
+	int rv = 0;
+
+	printk("&#60;1&#62; Module Start&#92;n");
+	example_dir = proc_mkdir(MODULE_NAME, NULL);
+	if (example_dir == NULL)
+	{
+		rv = -ENOMEM;
+		printk("&#60;1&#62; mkdir failure&#92;n");
+		goto out;
+	}
+
+	// JIFFILE파일의 경우 단지 읽기만 허용한다.
+	example_dir-&#62;owner = THIS_MODULE;
+	jiffies_file = create_proc_read_entry(JIFFIE_FILE, 0444, example_dir,
+									proc_read_jiffies, NULL);
+	if (jiffies_file == NULL)
+	{
+		rv = -ENOMEM;
+		printk("&#60;1&#62; read entry failure&#92;n");
+		goto no_jiffies;
+	}
+	printk("&#60;1&#62; OK MAKE MODULE&#92;n");
+	jiffies_file-&#62;owner = THIS_MODULE; 
+
+	// FOO_FILE의 경우 읽기와 쓰기 모두 가능해도록 해야 하며 
+	// 각각의 경우에 호출될 함수를 지정해 줘야 한다. 
+	foo_file = create_proc_entry(FOO_FILE, 0644, example_dir);
+	if (foo_file == NULL)
+	{
+		rv = -ENOMEM;
+		goto no_foo;
+	}
+
+	strcpy(foo_data.name, "foo");
+	strcpy(foo_data.value, "dream");
+
+	// 커널 자료구조에 저장될 데이터 
+	foo_file-&#62;data = &#38;foo_data;
+	// 읽기를 요청했을 때 호출될 함수
+	foo_file-&#62;read_proc = proc_read_foobar;
+	// 쓰기가 요청되었을 때 호출될 함수
+	foo_file-&#62;write_proc = proc_write_foobar;
+	foo_file-&#62;owner = THIS_MODULE;
+
+	printk("&#60;1&#62; %s %s initialised&#92;n", "myproc", "1.0");
+
+	// 제대로 초기화가 이루어졌다면 0을 리턴해야 한다. 
+	return 0;
+	no_foo:
+		remove_proc_entry(FOO_FILE, example_dir);
+	no_jiffies:
+		remove_proc_entry(MODULE_NAME, NULL);
+	out:
+		return rv;
+}
+
+// cleanup 함수
+static void cleanup_myproc(void) 
+{
+	printk("&#60;1&#62; END&#92;n"); 
+	remove_proc_entry(FOO_FILE, example_dir);
+	remove_proc_entry(JIFFIE_FILE, example_dir);
+}
+
+module_init(init_myproc);
+module_exit(cleanup_myproc);
+
+MODULE_AUTHOR("yundream");
+MODULE_DESCRIPTION("Sanmpe proc");
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		 </P
+><P
+>			다음은 위 프로그램을 컴파일 하기 위한 make파일이다.
+		 </P
+><P
+>			<B
+CLASS="EMPHASIS"
+>Makefile</B
+>
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>WARN    := -W -Wall -Wstrict-prototypes -Wmissing-prototypes    
+INCLUDE := -isystem /lib/modules/`uname -r`/build/include    
+CFLAGS  := -O2 -DMODULE -D__KERNEL__ ${WARN} ${INCLUDE}    
+CC      := gcc                                 
+TARGET  := my_proc 
+     
+my_proc.o: my_proc.c
+	${CC} ${CFLAGS} -c my_proc.c 
+                                     
+.PHONY: clean                                                      
+                                          
+clean:                                    
+	rm -rf ${TARGET}.o    
+			</PRE
+></TD
+></TR
+></TABLE
+>
+		 </P
+><P
+>			insmod를 이용해서 모듈을 올린후 cat, echo 등을 통해서 
+			직접 테스트가 가능하다.  
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># echo "okok" &#62; /proc/myproc/foo
+# cat /proc/myproc/foo
+foo = okok 
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			작성된 모듈프로그램의 작동상황은 /var/log/message의 내용을 
+			확인하면 된다. 만약 syslog와 klogd가 떠있다면 tail등의 도구를 
+			이용해서 모듈작동상황을 확인할 수 있을 것이다. 
+		 </P
+></DIV
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

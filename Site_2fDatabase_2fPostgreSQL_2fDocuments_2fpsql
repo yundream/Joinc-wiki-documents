@@ -1,0 +1,106 @@
+'''PostgreSQL 기본 클라이언트 psql 사용하기'''
+[[br]]'''작성자: 신기배(소타) nonun@nate.com'''
+
+[[TableOfContents]]
+
+== psql ==
+ === 시작하기 ===
+ {{{#!plain
+[root@linux root]# psql
+psql: FATAL:  database "root" does not exist
+}}}
+  * 이런 에러가 나온다면?
+ {{{#!plain
+[root@linux root]# createdb
+CREATE DATABASE
+[root@linux root]# psql
+Welcome to psql 7.4.1, the PostgreSQL interactive terminal.
+
+Type:  \copyright for distribution terms
+       \h for help with SQL commands
+       \? for help on internal slash commands
+       \g or terminate with semicolon to execute query
+       \q to quit
+
+root=#
+}}}
+  * 일단 시작했으니 절반은 한거다! ㅋㅋ
+
+ === 도움말 ===
+  ==== \? ====
+  * 한번 해보자.. 많은 명령어가 있다.
+  ==== \h ====
+  * 한번 해보자.. 많은 명령어가 있다.
+
+== psql 쉘 옵션 ==
+ {{{#!plain
+[root@linux root]# psql --help
+This is psql 7.4.1, the PostgreSQL interactive terminal.
+
+Usage:
+  psql [OPTIONS]... [DBNAME [USERNAME]]
+
+General options:
+  -d DBNAME       specify database name to connect to (default: "root")
+  -c COMMAND      run only single command (SQL or internal) and exit
+  -f FILENAME     execute commands from file, then exit
+  -l              list available databases, then exit
+  -v NAME=VALUE   set psql variable NAME to VALUE
+  -X              do not read startup file (~/.psqlrc)
+  --help          show this help, then exit
+  --version       output version information, then exit
+
+Input and output options:
+  -a              echo all input from script
+  -e              echo commands sent to server
+  -E              display queries that internal commands generate
+  -q              run quietly (no messages, only query output)
+  -o FILENAME     send query results to file (or |pipe)
+  -n              disable enhanced command line editing (readline)
+  -s              single-step mode (confirm each query)
+  -S              single-line mode (end of line terminates SQL command)
+
+Output format options:
+  -A              unaligned table output mode (-P format=unaligned)
+  -H              HTML table output mode (-P format=html)
+  -t              print rows only (-P tuples_only)
+  -T TEXT         set HTML table tag attributes (width, border) (-P tableattr=)
+  -x              turn on expanded table output (-P expanded)
+  -P VAR[=ARG]    set printing option VAR to ARG (see \pset command)
+  -F STRING       set field separator (default: "|") (-P fieldsep=)
+  -R STRING       set record separator (default: newline) (-P recordsep=)
+
+Connection options:
+  -h HOSTNAME     database server host or socket directory (default: "local socket")
+  -p PORT         database server port (default: "5432")
+  -U NAME         database user name (default: "root")
+  -W              prompt for password (should happen automatically)
+
+For more information, type "\?" (for internal commands) or "\help"
+(for SQL commands) from within psql, or consult the psql section in
+the PostgreSQL documentation.
+
+Report bugs to <pgsql-bugs@postgresql.org>.
+}}}
+ || -d DBNAME || 사용할 DB를 선택한다 (기본적으로 사용자의 ID이다. 이 문서에서는 root ||
+ || -c COMMAND || -c "SQL" 형식으로 한개의 쿼리만을 처리한 후 종료한다. ||
+ || -f FILENAME || 파일 내의 SQL을 처리한 후 종료한다. ||
+ || -l || DB의 목록을 표시한 후 종료한다. (psql 사용시 \l 과 동일) ||
+ || -h HOSTNAME || 원격 호스트로 접속한다. (pg_hba.conf 에 대한 문서는 나중에..) ||
+ || -p POST || pgsql 서버의 포트 ||
+ || -U NAME || 접근할 사용자 이름 ||
+  * 대충 이정도가 그나마 많이 사용되는 옵션이다. 자세한 내용은 --help 하면 나옵니다 :)
+== psql 사용하기 ==
+  * 일단 이 문서에서는 SQL과 관련된 내용은 언급하지 않겠다.
+ === 많이 사용되는 명령어 ===
+ || \d || 테이블, 인덱스, 시퀀스, 뷰의 목록이 표시된다. (\d+ 하면 각 테이블의 코멘트가 표시된다.) ||
+ || \dt {TABLENAME} || 테이블 목록이 표시된다. (\dt+ 하면 각 테이블과 필드의 코멘트가 표시된다.) ||
+ || \di {INDEXNAME} || 인덱스 목록이 표시된다. (\di+ 하면 각 인덱스의 코멘트가 표시된다.) ||
+ || \ds {SEQUENCENAME} || 시퀀스 목록이 표시된다. (\ds+ 하면 각 시퀀스의 코멘트가 표시된다.) ||
+ || \dv {VIEWNAME} || 뷰 목록이 표시된다. (\dv+ 하면 각 뷰와 필드의 코멘트가 표시된다.) ||
+ || \dn {SCHEMANAME} || 스키마 목록이 표시된다. (최근에 추가된 개념이다. 오라클의 네임스페이스와 비슷하다.) ||
+ || \du {USERNAME} || 사용자 목록이 표시된다. ||
+ || \l || DB 목록이 표시된다. (\l+ 하면 각 DB의 코멘트가 표시된다.) ||
+ || \i FILENAME || 파일 내의 SQL을 처리한다. ||
+ || \c DBNAME {USERNAME} || 다른 DB에 접속한다. 사용자 이름을 바꿔 접속 할 수 있다. ||
+ || \q || 종료 (중요하다. 처음에 몰라서 버벅댔다. 참고로 컨트롤C 안먹는다 -_-;) ||

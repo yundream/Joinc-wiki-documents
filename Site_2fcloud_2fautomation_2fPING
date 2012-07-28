@@ -1,0 +1,160 @@
+#title PING을 이용한 Bare metal provisioning
+
+[[TableOfContents]]
+== PING ==
+PING는 Partimage Is Not Ghost의 줄임 말이다. 이름에서 알 수 있듯이, PING는 Ghost와 같은 용도로 사용하기 위한 소프트웨어다. 
+
+PING [wiki:man/12/Linux Linux] live CD 형태로 제공이 된다. 이를테면 백업,복구를 위한 리눅스 배포판이다. 아이디어는 이렇다. 
+  1. 데이터를 백업할 장비를 PING 으로 부팅한다. 
+  1. PING 리눅스가 뜬다.  
+  1. 백업할 장치를 마운트 해서 백업한다. 
+     어차피 완전한 리눅스 배포판이기 때문에, 마운트해서 백업하는 데 문제가 될게 없다. 그냥 [wiki:man/1/dd dd]를 이용해도 되지 않겠는가. 
+  1. 로컬 백업은 물론 네트워크 백업도 가능하다.
+     로컬 백업이라면 로컬 장치 하나 마운트해서 백업하면 될것이고, 네트워크 백업이 필요하다면 네트워크 설정 한 다음 NFS든 [wiki:man/12/FTP FTP]든 연결해서 백업하면 된다. 
+  1. 복원도 마찬가지로 장치를 마운트 한 다음에, 복원 이미지를 읽어와서 복사하면 된다. 
+아이디어 좋다. 완전한 리눅스 운영체제이기 때문에, 리눅스가 가진 모든 기능을 이용해서 백업과 복원을 할 수 있다.   
+
+== 테스트 준비 ==
+장비가 하나 있어야 하겠는데, 장비가지고 테스트하려니 영 귀찮지 싶다. 그래서 그냥 VM을 이용하기로 했다. 가상화 툴로는 [wiki:Site/cloud/virtualbox virtualbox]를 사용했다. 
+
+테스트 방법
+  1. 리눅스 VM을 하나 만든다. VM의 이름은 '''PingTest'''로 한다.
+  1. cd-rom에 PING ISO로 부팅한다.
+     PING ISO 이미지는 [http://http://ping.windowsdream.com 다운로드]에서 다운로드 한다.
+  1. PING ISO 부팅 후, 리눅스의 모든 파티션을 백업 테스트
+  1. 복원 테스트 
+
+아래와 같이 게스트 VM의 cd-rom 드라이버를 이용해서 PING 리눅스로 Live 부팅 하면 된다. 
+
+https://lh5.googleusercontent.com/-dOvKPlc2_Jo/T-5b5EPqp1I/AAAAAAAACJ0/PSToYayR31U/s640/PING01.png
+
+=== Local 백업/복원 ===
+====  백업 ====
+먼저 로컬 백업. 로컬 백업을 하려면, 남는 디스크가 하나 있어야 한다. PingTest에 8G 디스크를 하나 추가 했다. 
+
+
+PING은 두 가지 모드가 있다. 처음 부팅하면 모드를 선택할 수 있는 프롬프트가 뜬다. 
+  1. curse 기반의 위자드  
+    https://lh6.googleusercontent.com/-XqwhPYRyA5s/T_EiEHBcXhI/AAAAAAAACKE/eyiywkT4j2E/s640/PING08.png
+  1. 일반 리눅스 쉘 
+나는 위자드를 이용하지 않고 리눅스 쉘을 이용해서 백업 리스토어 작업을 했다. 리눅스 쉘에서도 모든 작업을 할 수 있으며, 나중에 과정을 스크립트로 만들면 응용 툴 개발에도 도움이 될거라고 생각했기 때문이다.  
+
+PING 이미지로 부팅한 다음. '''>>''' 프롬프트가 뜨면 '''x'''를 입력하자. 그러면 일반 리눅스 로그인 과정을 거쳐서 리눅스 쉘을 직접 사용할 수 있다. 패스워드 없이 '''root'''로 로그인하면 된다.
+
+fdisk로 파티션 상황을 살펴보자. 중요하지 않은 내용은 삭제했다.
+{{{#!plain
+# fdisk -l
+
+Disk /dev/sda: 4294 MB, 4294967296 bytes
+Disk identifier: 0x000c4ce1
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048      499711      248832   83  Linux
+/dev/sda2          501758     8386559     3942401    5  Extended
+/dev/sda5          501760     8386559     3942400   8e  Linux LVM
+
+Disk /dev/sdb: 8589 MB, 8589934592 bytes
+255 heads, 63 sectors/track, 1044 cylinders
+}}}
+
+/dev/sda를 /dev/sdb로 백업하면 된다. 
+{{{#!plain
+# mkfs.ext3 /dev/sdb 
+# mount /dev/sdb /mnt/linux
+# dd if=/dev/sda of=/mnt/linux/LinuxBackup01.img
+}}}
+
+====  복원 ====
+복원이 잘 되는지 확인하기 위해서 '''PingTest''' VM의 루트볼륨을 삭제하고 새로운 볼륨을 만들어서 테스트 했다. 제대로 복원이 된다면, PintTest 이미지로 운영체제가 제대로 올라와야 할 것이다.
+
+PingTest의 루트볼륨을 삭제한 다음 PING Live cd로 부팅을 해서, fdisk로 disk 상태를 확인했다. 
+{{{#!plain
+# fdisk -l
+
+Disk /dev/sda: 4294 MB, 4294967296 bytes
+255 heads, 63 sectors/track, 522 cylinders
+Units = Cylinder of 16065 * 512 = 8225280 bytes
+
+Disk /dev/sda doesn't contain a valid partition table
+
+Disk /dev/sdb: 8589 MB, 8589934592 bytes
+255 heads, 63 sectors/track, 1044 cylinders
+Units = cylinders of 16065 * 512 = 8225280 bytes
+
+Disk /dev/sdb doesn't contain a valid partition table
+}}}
+/dev/sda의 파티션이 모두 날라간걸 확인할 수 있다.
+
+이제 복원을 한다. 복원 이지미가 있는/dev/sdb를 mount 한 다음, 이미지 파일을 확인한다. 
+{{{#!plain
+# mount /dev/sdb /mnt/linux
+# cd /mnt/linux
+# ls
+LinuxBackup01.img
+}}}
+
+LinuxBackup01.img로 루트볼륨을 복원한다.
+{{{#!plain
+# dd if=LinuxBackup01.img of=/dev/sda
+8388608+0 records in
+8388608+0 records out 
+4294967296 bytes (4.3 GB) copies, 697.187 seconds, 6.2 MB/s
+}}}
+VM 환경이라서 로컬복사가 발생하는 까닭에 복원시간이 좀 걸렸다. 이제 복원한 VM이 제대로 올라오는지 확인하면 된다. 
+
+=== Network 백업/복원 ===
+백업 이미지가 로컬에 있는지 원격에 있는지를 제외하고는 전혀 다를 바가 없다. 위의 정보에 약간의 네트워크 관리 기술이 필요할 뿐이다. 여기에서는 다루지 않겠다.
+
+
+== 활용 ==
+
+=== 파일 백업 ===
+그냥 sync 사용하자.
+
+=== 운영체제 + 애플리케이션 설치 ===
+Ghost 처럼 애플리케이션 + 운영체제 환경 만들어서 설치하는 용도로 괜찮을 것 같다. [wiki:Site/System_management/PXEBoot PXE-Boot]까지 지원하면 원격에서 관리 가능하다. 
+
+=== Bare metal provisioning ===
+이글을 쓴 목적이다. Bare metal provisioning은 크게 두가지 방안이 있다.
+  1. PXEBoot + [wiki:Site/System_management/KickStart kickstart] + [wiki:Site/cloud/automation chef]와 같은 자동화 솔류션 : 널리 사용하는 기술이다. 노하우도 많아서 정보를 얻기도 쉽다.  
+  1. PING : 운영체제와 애플리케이션의 이미지를 만든 다음, 그대로 Bare metal에 올리는 방식이기 때문에 chef같은 툴을 이용해서 설정을 관리할 필요가 없다는 장점이 있다. 예컨데 자주 사용하는 운영체제 + 애플리케이션의 템플릿 이미지를 만들어서 설치하는 방식이다. 
+
+초기 구축은 PING가 더 빠를 것 같다. 하지만 향후 유지/보수 및 운영 측면을 보면 1번 방식으로 가는게 나을 것 같다. 
+
+
+=== P2V & V2P ===
+Physical-to-Virtual의 줄임말로, 물리적인 환경을 가상화 환경으로 만드는 기술이다. 가상화 시스템을 도입하려는 대부분의 회사는 이미 물리적인 환경에서 서비스를 운용하고 있을 거다. 그렇다면 기존의 물리적 환경에서 작동하던 서비스들을 어떻게 하느냐 라는 문제가 생긴다.  
+
+고전적인 해결 방안은 기존 물리환경에서 돌아가는 서비스는 그대로 두고, 새로운 서비스 부터 가상화를 적용하는 것이다. 그리고 기존의 물리환경에서 돌아가는 서비스는 점차적으로 가상화 환경으로 이전하는 식이다.
+
+다른 방안이 P2V를 이용해서 물리환경을 가상 환경으로 이전하는 것이다. 어느 방법이 좋을지는 물리환경과 가상환경 구성에 따라 달라질 수 있다. 예컨데 하이퍼바이저로 Xen을 사용한다면, 게스트 운영체제의 커널 수정이 필요할 수 있으므로 P2V가 상당히 까다로워 질 수 있다. 반면 [wiki:man/12/KVM KVM]을 사용한다면 운영체제에 상관없이 비교적 수월하게 이전할 수 있을 것이다. 환경을 분석해서 P2V 기술을 이용할지, 아니면 점진적으로 가상환경으로 이전할지를 결정해야 할 것이다.
+
+P2V 테스트는 PING을 이용해서 진행했다. 
+  1. 목표 : 물리 환경에서 돌아가는 리눅스 [wiki:man/12/운영체제 운영체제]를 [wiki:man/12/KVM KVM]가상화 환경으로 이전한다. 
+  1. PING을 이용해서 [wiki:man/12/virtualbox virtualbox]의 리눅스의 볼륨을 백업한다. 정확히 말하자면 VirtualBox 이미지를 KVM 이미지로 이전하는 거라고 볼 수 있다. 하지만 물리적인 환경에서의 테스트와 차이가 없다고 할 수 있다. [wiki:man/12/NFS NFS] 등을 이용해서 원격저장공간(여기에서는 호스트 PC)에 저장을 한다.  
+  1. KVM 으로 백업한 이미지로 부팅한다.
+   {{{#!plain
+# kvm -m 512 -hda LinuxBackup01.img
+}}}
+kvm이 raw image를 지원하기 때문에 간단히 된거고, Xenserver나 VMware라면 (테스트 해본적이 없어서 확실하지 않지만)아마도 이미지 변환 작업이 필요할 것이다.
+
+V2P는 반대로 가상환경을 물리환경으로 이전하는 기술이다.
+
+=== 클라우드 서비스로 유저 서비스를 이전 ===
+P2V의 연장이다. 사내에서 운영중인 서비스를 퍼블릭 클라우드로 이전하려는 경우에 사용할 수 있을 것이다.
+  1. 운영중인 서비스의 디스크 이미지 생성
+  1. 클라우드 VM 생성 
+  1. VM을 PING으로 실행
+  1. 디스크 이미지를 VM의 루트볼륨으로 복사 
+클라우드 인프라를 구성하는 하이퍼바이저가 KVM이라면 비교적 쉽게 이전할 수 있을 것이다. Xen의 경우에는 버전에 따라서 고민거리가 있을 것 같다. Xen 4.2이라면 PV-on-HVM 방식으로 운영체제와 상관없이 이전할 수 있을 거다. 이전 버전이 어떨지는 좀.. 살펴봐야 겠다.      
+
+== 마무리 ==
+  * Live CD로 부팅해서 dd 하나면 모든게 끝. 시스템 어드민 경험이 있다면 굳이 PartImage로 작업할 필요는 없음.
+  * PartImage를 이용하면 편하게 작업할 수 있음. 
+  * PartImage를 사용하면 압축 기능 같은 몇 가지 유용한 기능을 사용할 수 있음.
+  * 자기의 운영환경에 맞는 백업/복구용 배포판 하나 만드는 것도 괜찮을 것 같음. 그럴러면 Linux live CD 만드는 법을 알아야 함. 언제 한번 해봐야지
+
+== 히스토리 ==
+ * 2012년 7월 4일
+
+[[TAG(PING,dd,시스템 관리,백업,복구,KVM)]]

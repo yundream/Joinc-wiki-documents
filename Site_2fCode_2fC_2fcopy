@@ -1,0 +1,122 @@
+#title 파일복사 함수
+
+=== 설명 ===
+유닉스 표준함수에는 파일을 복사함수를 지원하지 않는다. link(2)를 통해서 하드링크(:12)를 만들 수 있지만 파일 복사와는 엄연히 틀리며 하드링크인 관계로 네트워크 파일 시스템이나 다른 장치사이에서는 이용할 수가 없다. 
+
+파일 복사 함수는 단지 open(2), read(2), write(2)만 있음 될것 같지만.. 권한, 소유자등을 일치시켜줘야 하기 때문에 부가적인 몇 가지 시스템 함수들이 추가된다. 
+=== 사용방법 ===
+{{{#!plain
+int copy(const char *src, const char *dst);
+}}}
+ 1. src : 원본 파일 
+ 1. dst : 목적 파일
+
+{{{#!plain
+int main()
+{
+    if ((copy("test.c", "test2.c") < 0)
+	{
+		exit(1);
+	}
+	exit(0);
+}
+}}}
+
+=== 코드 ===
+{{{#!plain
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <termios.h>
+
+// yes/no를 물어본다.
+// 비정규모드(NONE ICANON)모드로 터미널 설정을 변경해서 
+// 개행문자의 입력없이 바로 결과가 적용되도록 했다.  
+int yorno(char *prompt)
+{
+    struct termios old_set, new_set;
+    int loop = 1;
+    char in;
+    int retval;
+    tcgetattr(0, &old_set);
+    new_set = old_set;
+    new_set.c_lflag &= (~ICANON);
+    tcsetattr(0, TCSANOW, &new_set);
+
+    while(loop)
+    {
+        printf("\n%s", prompt);
+        in = getc(stdin);
+        switch(in)
+        {
+            case 'y':
+            case 'Y':
+                retval = 1;
+                loop = 0;
+                break;
+            case 'n':
+            case 'N':
+                retval = 0;
+                loop = 0;
+                break;
+            default:
+                break;
+        }
+    }
+    tcsetattr(0, TCSANOW, &old_set);
+    printf("\n");
+    return retval;
+}
+
+int copy(const char *src, const char *dst)
+{
+    int src_fd, dst_fd;
+    struct stat srcstat;
+    char in;
+    int n;
+    char buf[1024] = {0x00,};
+    if ((src_fd = open(src, O_RDONLY)) <0 )
+    {
+        fprintf(stdout, "Can not open src file : %s\n", src);
+        return -1;
+    }
+
+    // 원본파일의 mode를 읽어온다.
+    // 나중에 생성될 파일의 mode와 권한변경에 사용된다. 
+    fstat(src_fd, &srcstat);
+
+    // 만약 파일이 존재한다면
+    // 덮어쓸건지 물어본다.
+    if (access(dst, F_OK) == 0)
+    {
+        if (!yorno("Overwrite file ? "))
+        {
+            exit(0);
+        }
+    }
+
+    // 파일을 생성한다. 
+    if ((dst_fd = open(dst, O_WRONLY|O_CREAT, srcstat.st_mode)) <0 )
+    {
+        fprintf(stdout, "Can not open dst file : %s\n", dst);
+        close(src_fd);
+        return -1;
+    }
+    // 내용을 복사한다. 
+    while((n = read(src_fd, buf, 1024)) > 0)
+    {
+        write(dst_fd, buf, n);
+    }
+
+    // 파일의 소유 권한을 변경한다.
+    fchown(dst_fd, srcstat.st_uid, srcstat.st_gid);
+    close(src_fd);
+    close(dst_fd);
+
+    return 0;
+}
+}}}
+
+=== 변경사항 ===

@@ -1,4 +1,31 @@
 #title FTP
 
 === FTP ===
-'''File'''ile '''T'''ransfer '''P'''rotocol의 줄임말이다. 
+'''File'''ile '''T'''ransfer '''P'''rotocol의 줄임말이다. 하나의 호스트에서 다른 호스트로 파일을 옮기기 위한 [wiki:man/12/TCP TCP]기반 프로토콜이다. 보통 FTP는 웹상에 파일을 올리기 위한 목적으로 널리 사용되고 있다. FTP는 서버&클라이언트 모델을 따른다. 클라이언트는 서버에 연결해서 파일 업로드 및 다운로드 요청을 하고, 요청을 받은 서버가 응답 데이터로 파일을 전송하거나 수신한다. 
+
+=== Anonymous FTP ===
+인증 과정없이 유저의 접근을 허용한다. 인증과정 없이 접근 한 유저를 '''Anonymous''' 유저라고 한다. Anonymous 유저에게는 읽기 권한만을 주는게 일반적이다. 파일을 공유하기 위한 목적으로 주로 사용한다.  
+
+=== NAT traversal ===
+[wiki:man/12/NAT NAT]는 [wiki:man/12/IP IP] 기반의 기술이다. FTP는 L7 프로토콜이기 때문에, 기본적으로는 NAT와 상관없이 작동할 수 있다. 하지만 Host relay 기능을 사용하는 FTP 서버는 NAT 하에서 문제가 될 수 있다. FTP 서버는 유저 데이터 영역에 relay할 호스트의 IP 정보를 입력을 한다. 클라이언트는 유저데이터를 읽어서 realy 호스트의 주소를 읽고, 해당 서버로 연결을 시도하는데 relay 주소가 Private IP를 가르키기 때문에 relay ftp 서버로 연결을 할 수 없게 된다. 
+
+NAT 장비는 이 문제를 해결하기 위해서, 특정 포트에서 출발하는 패킷을 열어서 데이터를 수정하는 방법을 사용한다. 예를 들어 22번 포트에서 출발하는 FTP 패킷은 유저 데이터를 읽은 다음 relay ip 주소를 masquerade 주소로 변환한다음 전송하는 식이다.
+
+=== 웹 브라우저 지원 ===
+모든 웹 브라우저는 FTP 프로토콜을 지원한다. 직접 FTP 클라이언트가 돼서, FTP 서버에 연결할 수 있다. 접근 방법은 다음과 같다.
+{{{#!plain
+주소창 : ftp://public.ftp-server.com
+주소창 : ftp://user001:secretpassword@private.ftp-server.example.com
+}}}
+
+=== Secure FTP ===
+FTP는 암호화를 지원하지 않는다. 암호화를 위해서는 '''Secure FTP'''를 이용해야 한다. Secure FTP를 위한 몇 가지 방안을 소개한다.
+
+==== FTPS ====
+Explicit FTPS는 표준 FTP의 확장으로 데이터를 암호화 해서 전송할 수 있게 한다. 
+
+==== SFTP ====
+SSH File Transfer Protocol이다. 이름이 SFTP이지만 FTP와는 관계 없는 기술로 [wiki:man/12/SSH SSH]를 이용해서 파일을 전송하는 기술이다. FTP 커멘드를 사용하지 않기 때문에, 표준 FTP 클라이언트로는 SFTP를 사용할 수 없다.
+
+==== FTP over SSH ====
+FTP over SSH는 SFTP가 아니다. SSH를 이용해서 터널을 만들고, 이 터널에서 FTP 세션을 맺는 방식으로 작동한다. 

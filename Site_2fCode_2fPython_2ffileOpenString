@@ -1,0 +1,55 @@
+#title file open 및 string 수정
+
+== 설명 ==
+moniwiki의 wiki파일을 읽어서 색인 파일을 만드는 간단한 프로그램입니다.
+모니위키의 파일 형식은 아래와 같습니다. URI encoding을 하고나서 %를 _로 치환을 해서 저장을 합니다. 
+{{{#!plain
+Site_2fLinux_2fProgramming
+}}}
+위 파일을 읽어서 wiki 제목 문자열을 가져온다음에 해당 정보를 파일에 저장합니다. 타이틀은 다음과 같이 저장됩니다.
+{{{#!plain
+# cat Site_2fLinux_2fProgramming
+#title 리눅스 프로그래밍
+....
+}}}
+첫 줄을 읽은 다음에 #title을 떼고 파일을 URI 인코딩 한 다음에 다음과 같이 저장합니다.
+{{{#!plain
+Site/Linux/Programming 리눅스 프로그래밍
+}}}
+위 파일은 3단계 깊이의 디렉토리 구성을 가집니다. 해서 depth.3 이름의 파일에 저장을 합니다.
+
+{{{#!plain
+import sys
+import os
+import re
+import urllib
+
+filelist = []
+maxdepth = 0
+for file in os.listdir('./text'):
+    if re.match("^Site_2f|^man_2f",file):
+        depth = file.count('_2f')
+        filelist.append(file)
+        if depth > maxdepth:
+            maxdepth = depth
+
+infopath = 'dirinfo'
+fhandle = [-99]
+for i in range(1, maxdepth+1):
+    filename = "{0}{1}{2}".format(infopath,"/depth.",i)
+    fhandle.append(open(filename,'w'))
+
+for file in filelist:
+    depth = file.count('_2f')
+
+    f = open("text/"+file)
+    title = f.readline()
+    if title.find("#title") != -1:
+        titles = re.split(" +", title,1)
+        title = titles[1]
+    else:
+        title = 'no title\n'
+    file = file.replace('_', '%')
+    fhandle[depth].write("{0} {1}".format(urllib.unquote(file),title))
+    f.close()
+}}}

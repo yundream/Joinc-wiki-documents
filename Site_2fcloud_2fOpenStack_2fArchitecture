@@ -1,0 +1,88 @@
+#title OpenStack Architecture
+
+[[TableOfcontents]]
+== 소개 ==
+주로 CloudStack(클라우드스택)을 가지고 놀았는데, 여차저차한 이유로 오픈스택에도 관심을 가지게 됐다. 클라우드 소프트웨어를 두 개씩이나 알 필요가 있을까란 생각을 하기도 했는데 
+  * Private cloud에 적합한 구조를 가지는 클라우드 스택과 달리 오픈 스택은 매우 유연한 구조를 가지고 있다. 비교 분석하는 것만으로도 큰 도움이 될 것이다.
+  * 클라우드 소프트웨어의 도입시 다양한 시각을 가질 수 있다.
+  * 오픈스택이 대세라고 한다.
+  * 회사 내부적으로도 오픈스택을 연구하고 있다.
+해서 오픈스택을 가지고 놀아보기로 했다. 어디부터 접근해야 좋을까 하다가, 아무래도 '''구조'''부터 알아야 겠지 싶어서 오픈스택 아키텍쳐 부터 조사를 시작했다.
+
+오픈스택은 크게 3가지 컴포넌트로 구성된다.
+  1. Swift : Amazon S3와 같은 boject/blob 저장소.  
+  1. Glance : VM 이미지, 스토리지와 같은 클라우드 자원을 검색하기 위한 컴포넌트 
+  1. Nova : Amazon EC2와 비슷하다. 컴퓨팅자원을 할당해서 VM을 만들기 위한 컴포넌트.   
+이들은 각각 독립된 프로젝트로 이들이 서로 협력해서 클라우드 인프라를 구축한다. 독립된 컴포넌트/프로젝트라는게 중요한 것 같다. 클라우드스택은 하나의 프로젝트로 하나의 통합된 애플리케이션 형태로 제공된다. 이런 형태는 패키징과 배포, 설계가 쉽다는 장점이 있다. 실제 클라우드스택은 쓸만한 UI와 안정된 기능, 무엇보다 간단하게 설치할 수 있다. 반면 확장이 쉽지 않다는 문제가 있다. 각 모듈들이 같은 도메인에서 서로서로 단단하게 결합되어 있기 때문이다.
+
+반면 오픈스택은 각 컴포넌트들이 매우 느슨하게 연결 되어 있어서, 확장 개발이 용이하다는 장점을 가진다. 물론 느슨하게 연결된 컴포넌트들을 통합해서 하나의 제품으로 만드는 까다로운 작업이있다. 오픈스택은 클라우드스택에 비해서 통일된 패키지를 만들기가 쉽지 않고, 설치도 매우 힘든 것으로 알고 있다. 
+
+== 클라우드 컨셉 아키텍쳐 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10Y9P0zVu2xyWqBtrpOd87QwK8IcGqU1d3gQOkAes2Es&amp;w=696&amp;h=421">
+}}}
+
+클라우드의 일반적인 아키텍쳐다. 여기에는 App Dev, Dev Ops, App Owner, Cloud Ops의 4개의 유저집단이 있다. 
+  1. Presentation 계층 
+     유저와 직접 상호작용하는 계층이다. 개발자 유저는 API를 이용해서, VM을 생성하거나 새로운 애플리케이션을 만들 수 있다. 서비스 사용자라면, (웹 UI 기반의)개인 포탈을 이용해서 클라우드 서비스를 사용한다. 클라우드 운영자는 Admin API와 모니터링 정보를 이용해서 전체 클라우드 시스템을 관리한다.
+  1. Logic 계층
+     클라우드 자원(resource)을 운용하기 위한 기능들을 가지고 있다. 이 기능들은 API를 이용해서 제어한다. 요청의 흐름을 제어하고(Orchestration), 요청한 리소스를 맵핑하고 (Scheduling), 정책을 세우고(Disk, CPU, Network Quota..)  VM 인스턴스에 대한 메타정보를 만들고(Image Registry) 로그를(Logging) 남긴다.
+  1. Resources 계층
+     클라우드 서비스를 컴퓨팅 파워, 볼륨, 네트워크가 위치한다. 이 아래에 물리적인 계층이 있을 것이다. 
+  1. Integration : 이들을 통합해서 서비스 형태로 제공하기 위해서는 Billing과 계정 시스템이 필요하다.  
+  1. Management : 클라우드 시스템 관리 시스템.  
+
+오픈스택도 이 컨셉을 따른다. 기존에 다루었던 클라우드스택 역시 이 모델에서 벗어나지 않는다. 
+== OpenStack Nova 아키텍쳐 ==
+OpenStack Nova는 위의 클라우드 아키텍처의 컨셉을 구현하기 위한 소프트웨어 프레임워크로 다음의 구조를 가진다.
+
+https://lh4.googleusercontent.com/-sr8YzW3TRPQ/T_rmm4Pmq5I/AAAAAAAACMI/1bHHjgD13bQ/s640/nova-cactus-logical.gif
+  * Dev Ops, App Dev와 App Owner, 기타 다른 오픈스택 컴포넌트들은 '''nova-api'''를 이용해서 오픈스택에 (클라우드 리소스에 대한 접근을)요청할 수 있다. 
+  * 이러한 '''요청'''은 '''Queue'''에 들어가고, 작업 결과는 nova database에 유지 된다.
+  * Nova에는 작업 정보만 들어간다.
+  * 실제 작업은 nova와 분리된 openstack glance에서 수행한다. 예컨데 nova는 glance로의 인터페이스를 제공하는 소프트웨어 계층으로 볼 수 있다.
+
+각각의 컴포넌트들을 자세히 살펴보자.
+  * '''Nova-api''' 데몬은 OpenStack Nova의 심장으로, 다른 문서에서는 '''Cloud Controller'''라고 부르기도 한다. API를 통해서 유저 요청을 받아서 다른 콤포넌트에 전달하고, 결과를 유저에게 알려준다. 인스턴스를 실행하고, 정책을 적용하는 등 클라우드 환경이 원할히 돌아가도록 지휘하는 일을 한다.  
+  * '''Nova-schedule'''는 오픈스택 노바에서 가장 간단한 콤퍼넌트다. 스케쥴이라는 용어 때문에, 작업 순서를 스케쥴링 하는 것으로 오해할 수 있는데, 시간 스케쥴러가 아니라 공간 스케쥴러다. VM 인스턴스가 올라갈 가장 적합한 컴퓨팅 노드를 선택하는 일을 한다. 비록 간단한 콤포넌트라고는 하지만 향후 가장 복잡한 콤퍼넌트가 될 것으로 보인다. 클라우드 규모가 커지면, 적합한 컴퓨팅노드를 선택하는게 어려워지기 때문이다. Nova-schedule는 유저가 선택 알고리즘을 직접 끼워 넣을 수 있게 돼 있다. 아마도 앞으로 가장 많은 개발이 필요한 컴포넌트가 될 것이다. 
+  * '''Nova-compute'''는 VM 인스턴스를 관리하는 데몬으로, VM 인스턴스의 실행, 종료, 리부팅, Volume attach및 detach, 콘솔 화면 출력 등의 일을 한다. 하는일은 간단하지만 복잡한 작업을 수행한다. [wiki:Site/Database/DataStructure/Queue Queue]로 부터 요청을 가져온 다음 (KVM 인스턴스 실행과 같은) 시스템 명령을 수행하고, 데이터베이스 정보를 업데이트한다.
+  * '''Nova-volume'''은 컴퓨트 인스턴스에 볼륨을 붙이거나 떼어낸다. Amazon의 EBS와 비슷한 일을 한다. [wiki:Site/System_management/iSCSI iSCSI], [wiki:man/12/AoE AoE]등의 볼륨 인터페이스를 사용할 수 있다.
+  * SQL 데이터베이스는 클라우드 인프라의 모든 상태정보를 저장한다. 여기에는 사용 가능한 자원의 용량, 사용중인 인스턴스, 네트워크에 대한 정보가 저장된다. 현재 sqlite3, MySQL, PostgreSQL을 지원한다. 
+  * '''Nova-network'''는 nova-compute와 nova-volume와 비슷한 일을 한다. 노바 네트워크는 큐로 부터 [wiki:man/12/네트워크 네트워크]와 관련된 요청을 가져와서, iptables 룰을 변경하거나 브릿지 인터페이스를 설정하는 등의 일을 한다.
+  * 오픈스택 Glance는 오픈스택 노바와 분리된 프로젝트지만 그림에서는 노바와 함께 표시했다.
+
+== Nova conceptual Mapping ==
+노바 아키텍쳐를 클라우드 아키텍쳐 컨셉에 맞게 맵핑해 보았다. 그림에서 노바의 각 컴포넌트가 클라우드 아키텍쳐의 어느 부분을 담당하는 지를 표현하고 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1pcD4HPpbaLJVRcBxXZ_HhXp5TdtGVmkOcBuCfu4zfXY&amp;w=696&amp;h=421">
+}}}
+  * 노바가 커버하지 못하는 가장 큰 영역은 Billing와 identity, 그리고 logging 부분이다. 노바가 이 부분을 신경쓰지 않는 이유는, 오픈스택을 도입하는 회사들이 이미 이들 컴포넌트를 가지고 있다고 가정하기 때문이다. 빌링이나 로깅은 회사 환경에 따라서 달라지는 부분이기 때문에 노바에서 처리할 필요가 없는 영역이기도 하다.
+  * Customer portal이 클라우드 인프라를 통합한다. 유저에게는 대쉬보드 형태로 보이는데, 실행중인 인스턴스 정보, 새로운 인스턴스 실행 정보를 보여준다. 또한 빌링 정보와 모니터링 정보도 제공한다.  
+  * 서비스 제공자 입장에서는 '''Cloud monitering'''이 굉장히 중요하다. 노바는 nova instancemonitor을 제공하는데, 이를 이용해서 컴퓨트 노드의 사용정보를 추적할 수 있다. 이외에 몇 개의 서드파티 모니터링 툴을 제공한다. 비록 노바가 모니터링 툴을 제공하긴 하지만, 회사마다 인프라 및 서비스 환경이 다르기 때문에 많은 개발이 필요하다. 특히 [wiki:Site/cloud/AWS/AutoScaling Auto-scaling] 서비스를 제공하려면, 정교한 모니터링 & 이벤트 시스템을 갖춰야 한다.  
+  * '''Scheduling'''는 최근 노바에서 가장 많은 이슈를 가지고있는 영역이다. 플로그인 방식으로 기능을 추가할 수 있는데, Random host assignment, least loaded, availability zone에서의 random node 방식을 제공한다. 
+
+== Object Store ==
+오픈스택 swift는 유연하게 확장가능한 Object storage를 제공한다. swift는 다음과 같은 컴포넌트들로 구성된다.
+
+Swift는 따로 시간을 내서 상세히 다루어야겠다.
+
+== Image Store ==
+Glance를 이용해서 이미지를 서비스한다. 이미지의 메타정보를 관리하고 검색하며, Virtual disk image를 전달하는 일을 한다. Glance는 다양한 형태의 가상디스크 이미지를 처리할 수 있다.
+  * RAW 
+  * VHD : Hyper-V
+  * VDI : [wiki:Site/cloud/virtualbox VirtualBox] 
+  * qcow2 : [wiki:Site/cloud/Qemu KVM] 
+  * VMDK : VMWare 
+  * OVF : VMWare
+
+클라우드스택의 Secondary Storage를 통한 가상디스크 Template관리와 비슷한 일을 하는 컴포넌트로 보인다. 클라우드스택의 경우 Sencond Storage에 메타정보를 포함한 Template Image를 저장해 두고, 유저가 요청할 때 이 Template으로 부터 VM을 생성한다. 즉, Secondary storage로 부터 Template Image를 Primary storage로 복사 한 다음, Primary storage에 있는 이미지로 부터 VM을 생성한다. Primary storage에서 secondary stroage로 이미지를 복사 할때 많은 시간이 걸릴 수도 있는데, 캐쉬를 두는 방식으로 이 문제를 해결할 수 있다.
+
+== 참고 ==
+ * http://ken.pepple.info/openstack/2011/04/22/openstack-nova-architecture
+ * http://feiskyer.blogspot.kr/2012/07/revisiting-openstack-architecture-essex.html
+
+== 히스토리 ==
+ * 작성일 : [[Date(2012-07-10T04:22:22)]]
+
+[[Tag(Cloud,openstack,nova)]]

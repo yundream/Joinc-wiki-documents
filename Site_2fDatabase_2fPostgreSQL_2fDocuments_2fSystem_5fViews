@@ -1,0 +1,740 @@
+'''배열컬럼을 이용한 일반적인 테이블 설계'''
+[[br]]'''작성자: 신기배(소타) nonun@nate.com'''
+
+[[TableOfContents]]
+
+== 시스템 카탈로그 테이블들 ==
+ {{{#!plain
+nonun=# \dS
+                     List of relations
+   Schema   |           Name           |  Type   |  Owner
+------------+--------------------------+---------+----------
+ pg_catalog | pg_aggregate             | table   | postgres
+ pg_catalog | pg_am                    | table   | postgres
+ pg_catalog | pg_amop                  | table   | postgres
+ pg_catalog | pg_amproc                | table   | postgres
+ pg_catalog | pg_attrdef               | table   | postgres
+ pg_catalog | pg_attribute             | table   | postgres
+ pg_catalog | pg_cast                  | table   | postgres
+ pg_catalog | pg_class                 | table   | postgres
+ pg_catalog | pg_constraint            | table   | postgres
+ pg_catalog | pg_conversion            | table   | postgres
+ pg_catalog | pg_database              | table   | postgres
+ pg_catalog | pg_depend                | table   | postgres
+ pg_catalog | pg_description           | table   | postgres
+ pg_catalog | pg_group                 | table   | postgres
+ pg_catalog | pg_index                 | table   | postgres
+ pg_catalog | pg_indexes               | view    | postgres
+ pg_catalog | pg_inherits              | table   | postgres
+ pg_catalog | pg_language              | table   | postgres
+ pg_catalog | pg_largeobject           | table   | postgres
+ pg_catalog | pg_listener              | table   | postgres
+ pg_catalog | pg_locks                 | view    | postgres
+ pg_catalog | pg_namespace             | table   | postgres
+ pg_catalog | pg_opclass               | table   | postgres
+ pg_catalog | pg_operator              | table   | postgres
+ pg_catalog | pg_proc                  | table   | postgres
+ pg_catalog | pg_rewrite               | table   | postgres
+ pg_catalog | pg_rules                 | view    | postgres
+ pg_catalog | pg_settings              | view    | postgres
+ pg_catalog | pg_shadow                | table   | postgres
+ pg_catalog | pg_stat_activity         | view    | postgres
+ pg_catalog | pg_stat_all_indexes      | view    | postgres
+ pg_catalog | pg_stat_all_tables       | view    | postgres
+ pg_catalog | pg_stat_database         | view    | postgres
+ pg_catalog | pg_stat_sys_indexes      | view    | postgres
+ pg_catalog | pg_stat_sys_tables       | view    | postgres
+ pg_catalog | pg_stat_user_indexes     | view    | postgres
+ pg_catalog | pg_stat_user_tables      | view    | postgres
+ pg_catalog | pg_statio_all_indexes    | view    | postgres
+ pg_catalog | pg_statio_all_sequences  | view    | postgres
+ pg_catalog | pg_statio_all_tables     | view    | postgres
+ pg_catalog | pg_statio_sys_indexes    | view    | postgres
+ pg_catalog | pg_statio_sys_sequences  | view    | postgres
+ pg_catalog | pg_statio_sys_tables     | view    | postgres
+ pg_catalog | pg_statio_user_indexes   | view    | postgres
+ pg_catalog | pg_statio_user_sequences | view    | postgres
+ pg_catalog | pg_statio_user_tables    | view    | postgres
+ pg_catalog | pg_statistic             | table   | postgres
+ pg_catalog | pg_stats                 | view    | postgres
+ pg_catalog | pg_tables                | view    | postgres
+ pg_catalog | pg_trigger               | table   | postgres
+ pg_catalog | pg_type                  | table   | postgres
+ pg_catalog | pg_user                  | view    | postgres
+ pg_catalog | pg_views                 | view    | postgres
+ pg_catalog | pg_xactlock              | special | postgres
+}}}
+ * 이것들이 모두 뷰는 아니다. \dS(시스템테이블들 보는 명령어) 해보면 3가지 종류의 목록이 나온다. table, view, special 이다.
+ * 사실 본인이 이것들을 모두 파악하고 있는게 아니기 때문에 이중에 해석 가능한 몇가지 view를 중심으로 설명하겠다.
+ * 시스템 카탈로그 뷰만 보는 방법은 \dSv 이고 테이블만 보는 법은 \dSt 이다. 참고하시라.
+
+== 시스템 카탈로그 뷰 ==
+ === pg_indexes ===
+  ==== 설명 ====
+  * 이 뷰는 현재 DB의 모든 스키마의 인덱스의 정보를 가지고 있다.
+  || schemaname || 스키마 ||
+  || tablename || 인덱스와 의존 관계에 있는 테이블 ||
+  || indexname || 인덱스의 이름 ||
+  || indexdef || 인덱스의 DDL ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_indexes
+        View "pg_catalog.pg_indexes"
+   Column   | Type | Modifiers | Description
+------------+------+-----------+-------------
+ schemaname | name |           |
+ tablename  | name |           |
+ indexname  | name |           |
+ indexdef   | text |           |
+View definition:
+ SELECT n.nspname AS schemaname, c.relname AS tablename, i.relname AS indexname, pg_get_indexdef(i.oid) AS indexdef
+   FROM pg_index x
+   JOIN pg_class c ON c.oid = x.indrelid
+   JOIN pg_class i ON i.oid = x.indexrelid
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char" AND i.relkind = 'i'::"char";
+}}}
+
+ === pg_locks ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_locks
+           View "pg_catalog.pg_locks"
+   Column    |  Type   | Modifiers | Description
+-------------+---------+-----------+-------------
+ relation    | oid     |           |
+ database    | oid     |           |
+ transaction | xid     |           |
+ pid         | integer |           |
+ mode        | text    |           |
+ granted     | boolean |           |
+View definition:
+ SELECT l.relation, l."database", l."transaction", l.pid, l."mode", l.granted
+   FROM pg_lock_status() l(relation oid, "database" oid, "transaction" xid, pid integer, "mode" text, granted boolean);
+}}}
+
+ === pg_rules ===
+  ==== 설명 ====
+  * 이 뷰는 현재 DB의 모든 스키마의 룰의 정보를 가지고 있다.
+  || schemaname || 스키마 ||
+  || tablename || 인덱스와 의존 관계에 있는 테이블 ||
+  || rulename || 룰의 이름 ||
+  || definition || 룰의 DDL ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_rules
+         View "pg_catalog.pg_rules"
+   Column   | Type | Modifiers | Description
+------------+------+-----------+-------------
+ schemaname | name |           |
+ tablename  | name |           |
+ rulename   | name |           |
+ definition | text |           |
+View definition:
+ SELECT n.nspname AS schemaname, c.relname AS tablename, r.rulename, pg_get_ruledef(r.oid) AS definition
+   FROM pg_rewrite r
+   JOIN pg_class c ON c.oid = r.ev_class
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE r.rulename <> '_RETURN'::name;
+}}}
+
+ === pg_settings ===
+  ==== 설명 ====
+  * 이 뷰는 설정에 대한 정보를 가지고 있다.
+  || name || 설정항목 ||
+  || setting || 현재 설정 ||
+  || context || 설정을 변경할 수 있는 권한, 프로세스에 대한 정보 (예: user, postmaster, sighup 등) ||
+  || vartype || 설정의 데이터 타입 ||
+  || source || 현재의 설정이 세팅된 경로 (예: default, configuration file 등) ||
+  || min_val || 값의 최소 범위 ||
+  || max_val || 값의 최대 범위 ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_settings
+      View "pg_catalog.pg_settings"
+ Column  | Type | Modifiers | Description
+---------+------+-----------+-------------
+ name    | text |           |
+ setting | text |           |
+ context | text |           |
+ vartype | text |           |
+ source  | text |           |
+ min_val | text |           |
+ max_val | text |           |
+View definition:
+ SELECT a.name, a.setting, a.context, a.vartype, a.source, a.min_val, a.max_val
+   FROM pg_show_all_settings() a(name text, setting text, context text, vartype text, source text, min_val text, max_val text);
+Rules: pg_settings_u,
+       pg_settings_n
+}}}
+
+ === pg_stat_activity ===
+  * 이 뷰는 현재 상태에 대한 정보를 가지고 있다.
+  || datid || oid ||
+  || datname || DB이름 ||
+  || procpid || 프로세스 PID ||
+  || usesysid || 사용자의 UID (pg_shadow에 명시) ||
+  || usename || 사용자 이름 ||
+  || current_query || 현재 처리중인 쿼리 ||
+  || query_start || 쿼리가 시작된 시간 (일것으로 생각된다.) ||
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_activity
+                 View "pg_catalog.pg_stat_activity"
+    Column     |           Type           | Modifiers | Description
+---------------+--------------------------+-----------+-------------
+ datid         | oid                      |           |
+ datname       | name                     |           |
+ procpid       | integer                  |           |
+ usesysid      | integer                  |           |
+ usename       | name                     |           |
+ current_query | text                     |           |
+ query_start   | timestamp with time zone |           |
+View definition:
+ SELECT d.oid AS datid, d.datname, pg_stat_get_backend_pid(s.backendid) AS procpid, pg_stat_get_backend_userid(s.backendid) AS usesysid,
+   u.usename, pg_stat_get_backend_activity(s.backendid) AS current_query, pg_stat_get_backend_activity_start(s.backendid) AS query_start
+   FROM pg_database d, ( SELECT pg_stat_get_backend_idset() AS backendid) s, pg_shadow u
+  WHERE pg_stat_get_backend_dbid(s.backendid) = d.oid AND pg_stat_get_backend_userid(s.backendid) = u.usesysid;
+}}}
+
+ === pg_stat_all_indexes ===
+  ==== 설명 ====
+  * 이 뷰는 현재 DB의 모든 인덱스에 대한 상태 정보를 가지고 있다.
+  || relid || oid ||
+  || indexrelid || oid ||
+  || schemaname || 스키마 이름 ||
+  || relname || 테이블 이름 ||
+  || indexrelname || 인덱스 이름 ||
+  || idx_scan || ? bigint ||
+  || idx_tup_read || ? bigint ||
+  || idx_tup_fetch || ? bigint ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_all_indexes
+      View "pg_catalog.pg_stat_all_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_scan      | bigint |           |
+ idx_tup_read  | bigint |           |
+ idx_tup_fetch | bigint |           |
+View definition:
+ SELECT c.oid AS relid, i.oid AS indexrelid, n.nspname AS schemaname, c.relname, i.relname AS indexrelname, pg_stat_get_numscans(i.oid) AS idx_scan,
+   pg_stat_get_tuples_returned(i.oid) AS idx_tup_read, pg_stat_get_tuples_fetched(i.oid) AS idx_tup_fetch
+   FROM pg_class c
+   JOIN pg_index x ON c.oid = x.indrelid
+   JOIN pg_class i ON i.oid = x.indexrelid
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char";
+}}}
+
+ === pg_stat_all_tables ===
+  ==== 설명 ====
+  * 이 뷰는 현재 DB의 모든 테이블에 대한 상태 정보를 가지고 있다.
+  || relid || oid ||
+  || schemaname || 스키마 이름 ||
+  || relname || 테이블 이름 ||
+  || seq_scan || ? bigint ||
+  || seq_tup_read || ? bigint ||
+  || idx_scan || ? bigint ||
+  || idx_tup_fetch || ? bigint ||
+  || n_tup_ins || ? bigint ||
+  || n_tup_upd || ? bigint ||
+  || n_tup_del || ? bigint ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_all_tables
+       View "pg_catalog.pg_stat_all_tables"
+    Column     |  Type   | Modifiers | Description
+---------------+---------+-----------+-------------
+ relid         | oid     |           |
+ schemaname    | name    |           |
+ relname       | name    |           |
+ seq_scan      | bigint  |           |
+ seq_tup_read  | bigint  |           |
+ idx_scan      | numeric |           |
+ idx_tup_fetch | numeric |           |
+ n_tup_ins     | bigint  |           |
+ n_tup_upd     | bigint  |           |
+ n_tup_del     | bigint  |           |
+View definition:
+ SELECT c.oid AS relid, n.nspname AS schemaname, c.relname, pg_stat_get_numscans(c.oid) AS seq_scan,
+   pg_stat_get_tuples_returned(c.oid) AS seq_tup_read, sum(pg_stat_get_numscans(i.indexrelid)) AS idx_scan,
+   sum(pg_stat_get_tuples_fetched(i.indexrelid)) AS idx_tup_fetch, pg_stat_get_tuples_inserted(c.oid) AS n_tup_ins,
+   pg_stat_get_tuples_updated(c.oid) AS n_tup_upd, pg_stat_get_tuples_deleted(c.oid) AS n_tup_del
+   FROM pg_class c
+   LEFT JOIN pg_index i ON c.oid = i.indrelid
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char"
+  GROUP BY c.oid, n.nspname, c.relname;
+}}}
+
+ === pg_stat_database ===
+  ==== 설명 ====
+  * 이 뷰는 모든 DB에 대한 상태 정보를 가지고 있다.
+  || datid || oid ||
+  || datname || DB 이름 ||
+  || numbackends || 현재 열린 세션 수 ||
+  || xact_commit || ? bigint ||
+  || xact_rollback || ? bigint ||
+  || blks_read || ? bigint ||
+  || blks_hit || ? bigint ||
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_database
+        View "pg_catalog.pg_stat_database"
+    Column     |  Type   | Modifiers | Description
+---------------+---------+-----------+-------------
+ datid         | oid     |           |
+ datname       | name    |           |
+ numbackends   | integer |           |
+ xact_commit   | bigint  |           |
+ xact_rollback | bigint  |           |
+ blks_read     | bigint  |           |
+ blks_hit      | bigint  |           |
+View definition:
+ SELECT d.oid AS datid, d.datname, pg_stat_get_db_numbackends(d.oid) AS numbackends,
+   pg_stat_get_db_xact_commit(d.oid) AS xact_commit, pg_stat_get_db_xact_rollback(d.oid) AS xact_rollback,
+   pg_stat_get_db_blocks_fetched(d.oid) - pg_stat_get_db_blocks_hit(d.oid) AS blks_read, pg_stat_get_db_blocks_hit(d.oid) AS blks_hit
+   FROM pg_database d;
+}}}
+
+ === pg_stat_sys_indexes ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_sys_indexes
+      View "pg_catalog.pg_stat_sys_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_scan      | bigint |           |
+ idx_tup_read  | bigint |           |
+ idx_tup_fetch | bigint |           |
+View definition:
+ SELECT pg_stat_all_indexes.relid, pg_stat_all_indexes.indexrelid, pg_stat_all_indexes.schemaname, pg_stat_all_indexes.relname,
+   pg_stat_all_indexes.indexrelname, pg_stat_all_indexes.idx_scan, pg_stat_all_indexes.idx_tup_read, pg_stat_all_indexes.idx_tup_fetch
+   FROM pg_stat_all_indexes
+  WHERE pg_stat_all_indexes.schemaname = 'pg_catalog'::name OR pg_stat_all_indexes.schemaname = 'pg_toast'::name;
+}}}
+
+ === pg_stat_sys_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_sys_tables
+       View "pg_catalog.pg_stat_sys_tables"
+    Column     |  Type   | Modifiers | Description
+---------------+---------+-----------+-------------
+ relid         | oid     |           |
+ schemaname    | name    |           |
+ relname       | name    |           |
+ seq_scan      | bigint  |           |
+ seq_tup_read  | bigint  |           |
+ idx_scan      | numeric |           |
+ idx_tup_fetch | numeric |           |
+ n_tup_ins     | bigint  |           |
+ n_tup_upd     | bigint  |           |
+ n_tup_del     | bigint  |           |
+View definition:
+ SELECT pg_stat_all_tables.relid, pg_stat_all_tables.schemaname, pg_stat_all_tables.relname, pg_stat_all_tables.seq_scan,
+   pg_stat_all_tables.seq_tup_read, pg_stat_all_tables.idx_scan, pg_stat_all_tables.idx_tup_fetch, pg_stat_all_tables.n_tup_ins,
+   pg_stat_all_tables.n_tup_upd, pg_stat_all_tables.n_tup_del
+   FROM pg_stat_all_tables
+  WHERE pg_stat_all_tables.schemaname = 'pg_catalog'::name OR pg_stat_all_tables.schemaname = 'pg_toast'::name;
+}}}
+
+ === pg_stat_user_indexes ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_user_indexes
+      View "pg_catalog.pg_stat_user_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_scan      | bigint |           |
+ idx_tup_read  | bigint |           |
+ idx_tup_fetch | bigint |           |
+View definition:
+ SELECT pg_stat_all_indexes.relid, pg_stat_all_indexes.indexrelid, pg_stat_all_indexes.schemaname, pg_stat_all_indexes.relname,
+   pg_stat_all_indexes.indexrelname, pg_stat_all_indexes.idx_scan, pg_stat_all_indexes.idx_tup_read, pg_stat_all_indexes.idx_tup_fetch
+   FROM pg_stat_all_indexes
+  WHERE pg_stat_all_indexes.schemaname <> 'pg_catalog'::name AND pg_stat_all_indexes.schemaname <> 'pg_toast'::name;
+}}}
+
+ === pg_stat_user_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stat_user_tables
+       View "pg_catalog.pg_stat_user_tables"
+    Column     |  Type   | Modifiers | Description
+---------------+---------+-----------+-------------
+ relid         | oid     |           |
+ schemaname    | name    |           |
+ relname       | name    |           |
+ seq_scan      | bigint  |           |
+ seq_tup_read  | bigint  |           |
+ idx_scan      | numeric |           |
+ idx_tup_fetch | numeric |           |
+ n_tup_ins     | bigint  |           |
+ n_tup_upd     | bigint  |           |
+ n_tup_del     | bigint  |           |
+View definition:
+ SELECT pg_stat_all_tables.relid, pg_stat_all_tables.schemaname, pg_stat_all_tables.relname, pg_stat_all_tables.seq_scan,
+   pg_stat_all_tables.seq_tup_read, pg_stat_all_tables.idx_scan, pg_stat_all_tables.idx_tup_fetch, pg_stat_all_tables.n_tup_ins,
+   pg_stat_all_tables.n_tup_upd, pg_stat_all_tables.n_tup_del
+   FROM pg_stat_all_tables
+  WHERE pg_stat_all_tables.schemaname <> 'pg_catalog'::name AND pg_stat_all_tables.schemaname <> 'pg_toast'::name;
+}}}
+
+ === pg_statio_all_indexes ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_all_indexes
+     View "pg_catalog.pg_statio_all_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_blks_read | bigint |           |
+ idx_blks_hit  | bigint |           |
+View definition:
+ SELECT c.oid AS relid, i.oid AS indexrelid, n.nspname AS schemaname, c.relname, i.relname AS indexrelname,
+   pg_stat_get_blocks_fetched(i.oid) - pg_stat_get_blocks_hit(i.oid) AS idx_blks_read, pg_stat_get_blocks_hit(i.oid) AS idx_blks_hit
+   FROM pg_class c
+   JOIN pg_index x ON c.oid = x.indrelid
+   JOIN pg_class i ON i.oid = x.indexrelid
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char";
+}}}
+
+ === pg_statio_all_sequences ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_all_sequences
+   View "pg_catalog.pg_statio_all_sequences"
+   Column   |  Type  | Modifiers | Description
+------------+--------+-----------+-------------
+ relid      | oid    |           |
+ schemaname | name   |           |
+ relname    | name   |           |
+ blks_read  | bigint |           |
+ blks_hit   | bigint |           |
+View definition:
+ SELECT c.oid AS relid, n.nspname AS schemaname, c.relname, pg_stat_get_blocks_fetched(c.oid) - pg_stat_get_blocks_hit(c.oid) AS blks_read,
+   pg_stat_get_blocks_hit(c.oid) AS blks_hit
+   FROM pg_class c
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'S'::"char";
+}}}
+
+ === pg_statio_all_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_all_tables
+       View "pg_catalog.pg_statio_all_tables"
+     Column      |  Type   | Modifiers | Description
+-----------------+---------+-----------+-------------
+ relid           | oid     |           |
+ schemaname      | name    |           |
+ relname         | name    |           |
+ heap_blks_read  | bigint  |           |
+ heap_blks_hit   | bigint  |           |
+ idx_blks_read   | numeric |           |
+ idx_blks_hit    | numeric |           |
+ toast_blks_read | bigint  |           |
+ toast_blks_hit  | bigint  |           |
+ tidx_blks_read  | bigint  |           |
+ tidx_blks_hit   | bigint  |           |
+View definition:
+ SELECT c.oid AS relid, n.nspname AS schemaname, c.relname, pg_stat_get_blocks_fetched(c.oid) - pg_stat_get_blocks_hit(c.oid) AS heap_blks_read,
+   pg_stat_get_blocks_hit(c.oid) AS heap_blks_hit, sum(pg_stat_get_blocks_fetched(i.indexrelid) - pg_stat_get_blocks_hit(i.indexrelid)) AS idx_blks_read,
+   sum(pg_stat_get_blocks_hit(i.indexrelid)) AS idx_blks_hit, pg_stat_get_blocks_fetched(t.oid) - pg_stat_get_blocks_hit(t.oid) AS toast_blks_read,
+   pg_stat_get_blocks_hit(t.oid) AS toast_blks_hit, pg_stat_get_blocks_fetched(x.oid) - pg_stat_get_blocks_hit(x.oid) AS tidx_blks_read,
+   pg_stat_get_blocks_hit(x.oid) AS tidx_blks_hit
+   FROM pg_class c
+   LEFT JOIN pg_index i ON c.oid = i.indrelid
+   LEFT JOIN pg_class t ON c.reltoastrelid = t.oid
+   LEFT JOIN pg_class x ON t.reltoastidxid = x.oid
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char"
+  GROUP BY c.oid, n.nspname, c.relname, t.oid, x.oid;
+}}}
+
+ === pg_statio_sys_indexes ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_sys_indexes
+     View "pg_catalog.pg_statio_sys_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_blks_read | bigint |           |
+ idx_blks_hit  | bigint |           |
+View definition:
+ SELECT pg_statio_all_indexes.relid, pg_statio_all_indexes.indexrelid, pg_statio_all_indexes.schemaname, pg_statio_all_indexes.relname,
+   pg_statio_all_indexes.indexrelname, pg_statio_all_indexes.idx_blks_read, pg_statio_all_indexes.idx_blks_hit
+   FROM pg_statio_all_indexes
+  WHERE pg_statio_all_indexes.schemaname = 'pg_catalog'::name OR pg_statio_all_indexes.schemaname = 'pg_toast'::name;
+}}}
+
+ === pg_statio_sys_sequences ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_sys_sequences
+   View "pg_catalog.pg_statio_sys_sequences"
+   Column   |  Type  | Modifiers | Description
+------------+--------+-----------+-------------
+ relid      | oid    |           |
+ schemaname | name   |           |
+ relname    | name   |           |
+ blks_read  | bigint |           |
+ blks_hit   | bigint |           |
+View definition:
+ SELECT pg_statio_all_sequences.relid, pg_statio_all_sequences.schemaname, pg_statio_all_sequences.relname,
+   pg_statio_all_sequences.blks_read, pg_statio_all_sequences.blks_hit
+   FROM pg_statio_all_sequences
+  WHERE pg_statio_all_sequences.schemaname = 'pg_catalog'::name OR pg_statio_all_sequences.schemaname = 'pg_toast'::name;
+}}}
+
+ === pg_statio_sys_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_sys_tables
+       View "pg_catalog.pg_statio_sys_tables"
+     Column      |  Type   | Modifiers | Description
+-----------------+---------+-----------+-------------
+ relid           | oid     |           |
+ schemaname      | name    |           |
+ relname         | name    |           |
+ heap_blks_read  | bigint  |           |
+ heap_blks_hit   | bigint  |           |
+ idx_blks_read   | numeric |           |
+ idx_blks_hit    | numeric |           |
+ toast_blks_read | bigint  |           |
+ toast_blks_hit  | bigint  |           |
+ tidx_blks_read  | bigint  |           |
+ tidx_blks_hit   | bigint  |           |
+View definition:
+ SELECT pg_statio_all_tables.relid, pg_statio_all_tables.schemaname, pg_statio_all_tables.relname, pg_statio_all_tables.heap_blks_read,
+   pg_statio_all_tables.heap_blks_hit, pg_statio_all_tables.idx_blks_read, pg_statio_all_tables.idx_blks_hit, pg_statio_all_tables.toast_blks_read,
+   pg_statio_all_tables.toast_blks_hit, pg_statio_all_tables.tidx_blks_read, pg_statio_all_tables.tidx_blks_hit
+   FROM pg_statio_all_tables
+  WHERE pg_statio_all_tables.schemaname = 'pg_catalog'::name OR pg_statio_all_tables.schemaname = 'pg_toast'::name;
+}}}
+
+ === pg_statio_user_indexes ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_user_indexes
+     View "pg_catalog.pg_statio_user_indexes"
+    Column     |  Type  | Modifiers | Description
+---------------+--------+-----------+-------------
+ relid         | oid    |           |
+ indexrelid    | oid    |           |
+ schemaname    | name   |           |
+ relname       | name   |           |
+ indexrelname  | name   |           |
+ idx_blks_read | bigint |           |
+ idx_blks_hit  | bigint |           |
+View definition:
+ SELECT pg_statio_all_indexes.relid, pg_statio_all_indexes.indexrelid, pg_statio_all_indexes.schemaname, pg_statio_all_indexes.relname,
+   pg_statio_all_indexes.indexrelname, pg_statio_all_indexes.idx_blks_read, pg_statio_all_indexes.idx_blks_hit
+   FROM pg_statio_all_indexes
+  WHERE pg_statio_all_indexes.schemaname <> 'pg_catalog'::name AND pg_statio_all_indexes.schemaname <> 'pg_toast'::name;
+}}}
+
+ === pg_statio_user_sequences ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_user_sequences
+  View "pg_catalog.pg_statio_user_sequences"
+   Column   |  Type  | Modifiers | Description
+------------+--------+-----------+-------------
+ relid      | oid    |           |
+ schemaname | name   |           |
+ relname    | name   |           |
+ blks_read  | bigint |           |
+ blks_hit   | bigint |           |
+View definition:
+ SELECT pg_statio_all_sequences.relid, pg_statio_all_sequences.schemaname, pg_statio_all_sequences.relname, pg_statio_all_sequences.blks_read,
+   pg_statio_all_sequences.blks_hit
+   FROM pg_statio_all_sequences
+  WHERE pg_statio_all_sequences.schemaname <> 'pg_catalog'::name AND pg_statio_all_sequences.schemaname <> 'pg_toast'::name;
+}}}
+
+ === pg_statio_user_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_statio_user_tables
+       View "pg_catalog.pg_statio_user_tables"
+     Column      |  Type   | Modifiers | Description
+-----------------+---------+-----------+-------------
+ relid           | oid     |           |
+ schemaname      | name    |           |
+ relname         | name    |           |
+ heap_blks_read  | bigint  |           |
+ heap_blks_hit   | bigint  |           |
+ idx_blks_read   | numeric |           |
+ idx_blks_hit    | numeric |           |
+ toast_blks_read | bigint  |           |
+ toast_blks_hit  | bigint  |           |
+ tidx_blks_read  | bigint  |           |
+ tidx_blks_hit   | bigint  |           |
+View definition:
+ SELECT pg_statio_all_tables.relid, pg_statio_all_tables.schemaname, pg_statio_all_tables.relname, pg_statio_all_tables.heap_blks_read,
+   pg_statio_all_tables.heap_blks_hit, pg_statio_all_tables.idx_blks_read, pg_statio_all_tables.idx_blks_hit, pg_statio_all_tables.toast_blks_read,
+   pg_statio_all_tables.toast_blks_hit, pg_statio_all_tables.tidx_blks_read, pg_statio_all_tables.tidx_blks_hit
+   FROM pg_statio_all_tables
+  WHERE pg_statio_all_tables.schemaname <> 'pg_catalog'::name AND pg_statio_all_tables.schemaname <> 'pg_toast'::name;
+}}}
+
+ === pg_stats ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_stats
+               View "pg_catalog.pg_stats"
+      Column       |   Type   | Modifiers | Description
+-------------------+----------+-----------+-------------
+ schemaname        | name     |           |
+ tablename         | name     |           |
+ attname           | name     |           |
+ null_frac         | real     |           |
+ avg_width         | integer  |           |
+ n_distinct        | real     |           |
+ most_common_vals  | anyarray |           |
+ most_common_freqs | real[]   |           |
+ histogram_bounds  | anyarray |           |
+ correlation       | real     |           |
+View definition:
+ SELECT nspname AS schemaname, relname AS tablename, attname, stanullfrac AS null_frac, stawidth AS avg_width, stadistinct AS n_distinct,
+        CASE
+            WHEN 1 = stakind1 THEN stavalues1
+            WHEN 1 = stakind2 THEN stavalues2
+            WHEN 1 = stakind3 THEN stavalues3
+            WHEN 1 = stakind4 THEN stavalues4
+            ELSE NULL::"unknown"
+        END AS most_common_vals,
+        CASE
+            WHEN 1 = stakind1 THEN stanumbers1
+            WHEN 1 = stakind2 THEN stanumbers2
+            WHEN 1 = stakind3 THEN stanumbers3
+            WHEN 1 = stakind4 THEN stanumbers4
+            ELSE NULL::real[]
+        END AS most_common_freqs,
+        CASE
+            WHEN 2 = stakind1 THEN stavalues1
+            WHEN 2 = stakind2 THEN stavalues2
+            WHEN 2 = stakind3 THEN stavalues3
+            WHEN 2 = stakind4 THEN stavalues4
+            ELSE NULL::"unknown"
+        END AS histogram_bounds,
+        CASE
+            WHEN 3 = stakind1 THEN stanumbers1[1]
+            WHEN 3 = stakind2 THEN stanumbers2[1]
+            WHEN 3 = stakind3 THEN stanumbers3[1]
+            WHEN 3 = stakind4 THEN stanumbers4[1]
+            ELSE NULL::real
+        END AS correlation
+   FROM pg_statistic s
+   JOIN pg_class c ON c.oid = s.starelid
+   JOIN pg_attribute a ON c.oid = a.attrelid AND a.attnum = s.staattnum
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE has_table_privilege(c.oid, 'select'::text);
+}}}
+
+ === pg_tables ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_tables
+           View "pg_catalog.pg_tables"
+   Column    |  Type   | Modifiers | Description
+-------------+---------+-----------+-------------
+ schemaname  | name    |           |
+ tablename   | name    |           |
+ tableowner  | name    |           |
+ hasindexes  | boolean |           |
+ hasrules    | boolean |           |
+ hastriggers | boolean |           |
+View definition:
+ SELECT n.nspname AS schemaname, c.relname AS tablename, pg_get_userbyid(c.relowner) AS tableowner, c.relhasindex AS hasindexes,
+   c.relhasrules AS hasrules, c.reltriggers > 0 AS hastriggers
+   FROM pg_class c
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'::"char";
+}}}
+
+ === pg_user ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_user
+            View "pg_catalog.pg_user"
+   Column    |  Type   | Modifiers | Description
+-------------+---------+-----------+-------------
+ usename     | name    |           |
+ usesysid    | integer |           |
+ usecreatedb | boolean |           |
+ usesuper    | boolean |           |
+ usecatupd   | boolean |           |
+ passwd      | text    |           |
+ valuntil    | abstime |           |
+ useconfig   | text[]  |           |
+View definition:
+ SELECT pg_shadow.usename, pg_shadow.usesysid, pg_shadow.usecreatedb, pg_shadow.usesuper,
+   pg_shadow.usecatupd, '********'::text AS passwd, pg_shadow.valuntil, pg_shadow.useconfig
+   FROM pg_shadow;
+}}}
+
+ === pg_views ===
+  ==== 설명 ====
+  ==== DDL ====
+  {{{#!plain
+netitup=# \d+ pg_views
+         View "pg_catalog.pg_views"
+   Column   | Type | Modifiers | Description
+------------+------+-----------+-------------
+ schemaname | name |           |
+ viewname   | name |           |
+ viewowner  | name |           |
+ definition | text |           |
+View definition:
+ SELECT n.nspname AS schemaname, c.relname AS viewname, pg_get_userbyid(c.relowner) AS viewowner, pg_get_viewdef(c.oid) AS definition
+   FROM pg_class c
+   LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'v'::"char";
+}}}

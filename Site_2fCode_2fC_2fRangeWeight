@@ -1,0 +1,60 @@
+#title 비트필드에서 Range Weight 구하기
+
+=== 코드 ===
+{{{#!plain
+#include <stdio.h>
+
+float AndOrValue(int a, int b)
+{
+  int n = 0;
+  int Orflag = 0;
+  int Andflag = 0;
+  for (n = 0; n < 16; n++)
+  {
+    if ( a >> 30 && b >> 30)
+    {
+      Andflag++;
+    }
+    if (((a >> 30) || (b >> 30)))
+    {
+      Orflag++;
+    }
+
+    a = a << 2;
+    b = b << 2;
+  }
+  return (float)Andflag/(float)Orflag;
+}
+int main(int argc, char **argv)
+{
+  printf("%f\n", AndOrValue(1000, 5000));
+}
+}}}
+
+=== 소개 ===
+[wiki:Code/C/BlockNum 비트필드에서 최상위 블럭 얻어오기]의 연장에 있는 코드다. 하나의 문서에서 2개이상의 Term이 발견되었을 경우를 생각해 보자. 이 경우 두개의 텀이 문서의 비슷한 위치에서 연속적으로 발생했을 때, Score를 높여주는 공식을 만들어야 할 것이다. 문제를 푸는 방식은 다양할건데, 다음과 같은 간단한 방식을 생각해 보았다.
+
+  * 두개의 Term 비트필드를 OR 연산해서 참인 필드를 구한다.
+  * 두개의 Term 비트필드를 AND연산해서 참인 필드를 구한다.
+  * AND/OR를 구한다.
+
+즉 Term A와 Term B의 비트필드가 다음과 같을 때.
+{{{#!plain
+00 00 00 00 00 00 00 00 00 00 00 11 11 10 10 00  Term A
+00 00 00 00 00 00 00 00 00 01 00 11 10 00 10 00  Term B
+}}}
+  * Or Field # = 5, And Field # = 3 
+  * 그러므로 Bit Weight 는 3/5 가 된다.
+
+문서 D에서 N개 만큼의 Term이 발생했다면 기본 공식은
+{{{#!plain
+{
+   Term 1 = AndField# / ORField #
+ + Term 2 = AndField# / ORField #
+ + Term 3 = AndField# / ORField #
+ + ....
+ + Term N = AndField# / ORField #
+} * Norm
+}}}
+
+이 공식은 수정해야 할 점이 있다. 함수를 호출하면 호출할 수록 OR Field의 갯수가 늘어나서 뒤로 갈수록 점수가 높아질 수 있다는 점인데, 적당한 값을 곱해줘서 값을 보정해 줘야 할 것이다. (* 1/N) 정도가 가장 편할 거 같다.

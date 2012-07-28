@@ -1,0 +1,38 @@
+#title UTF8 문자열에 대응되는 substr
+출처 : http://kr2.php.net/manual/en/function.substr.php
+=== 소개 ===
+UTF8 형태의 문자열에 대한 '''substr'''연산을 수행합니다.
+{{{#!plain
+
+<?php
+// String intercept By Bleakwind
+// utf-8:$byte=3 | gb2312:$byte=2 | big5:$byte=2
+function utf_substr($string, $start, $len, $byte=3)
+{
+    $str     = "";
+    $count   = 0;
+    $str_len = strlen($string);
+    for ($i=0; $i<$str_len; $i++) {
+        if (($count+1-$start)>$len) {
+            $str  .= "...";
+            break;
+        } elseif ((ord(substr($string,$i,1)) <= 128) && ($count < $start)) {
+            $count++;
+        } elseif ((ord(substr($string,$i,1)) > 128) && ($count < $start)) {
+            $count = $count+2;
+            $i     = $i+$byte-1;
+        } elseif ((ord(substr($string,$i,1)) <= 128) && ($count >= $start)) {
+            $str  .= substr($string,$i,1);
+            $count++;
+        } elseif ((ord(substr($string,$i,1)) > 128) && ($count >= $start)) {
+            $str  .= substr($string,$i,$byte);
+            $count = $count+2;
+            $i     = $i+$byte-1;
+        }
+    }
+    return $str;
+}
+
+$str = "안녕하세요. 만나서 반갑습니다";
+echo utf_substr($str, 0, 8);
+}}}

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for FILE in `ls`
+for FILE in `ls `
 do
 	if [ -f $FILE ]
 	then

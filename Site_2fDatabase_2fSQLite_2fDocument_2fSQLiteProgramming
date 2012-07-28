@@ -1,0 +1,1094 @@
+#title SQLite2 프로그래밍
+
+  * [wiki:Site/SQLite/Document/SQLite SQLite3 프로그래밍]
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>Sqlite 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.76b+
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+></A
+>Sqlite 프로그래밍</H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yundream@join.co.kr<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44256;&#52828; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.9</TD
+><TD
+ALIGN="LEFT"
+>2004년 2월 16일 8시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>참고문헌및 사이트 추가</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44256;&#52840; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2004년 1월 09일 20시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>최초 문서작성</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1. <A
+HREF="#AEN18"
+>소개</A
+></DT
+><DT
+>2. <A
+HREF="#AEN25"
+>Sqlite</A
+></DT
+><DD
+><DL
+><DT
+>2.1. <A
+HREF="#AEN28"
+>Sqlite의 특징</A
+></DT
+><DT
+>2.2. <A
+HREF="#AEN56"
+>설치하기</A
+></DT
+></DL
+></DD
+><DT
+>3. <A
+HREF="#AEN79"
+>Sqlite 간단 운용</A
+></DT
+><DD
+><DL
+><DT
+>3.1. <A
+HREF="#AEN81"
+>DB 생성및 간단한 내부명령어들</A
+></DT
+></DL
+></DD
+><DT
+>4. <A
+HREF="#AEN108"
+>C/C++ Interface</A
+></DT
+><DD
+><DL
+><DT
+>4.1. <A
+HREF="#AEN111"
+>핵심 API</A
+></DT
+><DT
+>4.2. <A
+HREF="#AEN115"
+>DB 열기</A
+></DT
+><DT
+>4.3. <A
+HREF="#AEN120"
+>DB닫기</A
+></DT
+><DT
+>4.4. <A
+HREF="#AEN123"
+>SQL 실행</A
+></DT
+><DT
+>4.5. <A
+HREF="#AEN141"
+>에러 코드</A
+></DT
+><DT
+>4.6. <A
+HREF="#AEN186"
+>예제 프로그램</A
+></DT
+></DL
+></DD
+><DT
+>5. <A
+HREF="#AEN193"
+>콜백함수를 이용하지 않는 데이터 접근</A
+></DT
+><DT
+>6. <A
+HREF="#AEN198"
+>참고문헌</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><H1
+CLASS="SECTION"
+><A
+NAME="AEN18"
+></A
+>1. 소개</H1
+><P
+>        지금까지 Oracle, Mysql, Postgresql 과 같은 큰 규모의 DB프로그래밍을 
+        해왔으며 작은 규모에서 간단하게 사용하기 위한 용도로 gdbm 과 같은 
+        라이브러리를 사용했었다.  
+        이들의 문제는 Oracle, Mysql, Postgresql은 적당한 기능을 지원하기 
+        위해서 지나치게 무겁다는 점이고, gdbm과 같은 경우 매우 가볍고 
+        간단하기는 하지만 기능이 너무 제한적이고 
+        SQL문법을 지원하지 않는다는 점이다. 
+        그러던중 Sqlite를 알게 되었다. 웹프로그래밍도 겸하다보니 좀더 
+        가벼운 DB도구를 찾아 헤메던중 발견했다. 
+        이 문서는 Sqlite의 설치와 프로그래밍 활용방안등에 대한 내용을 담고 있다. 
+    </P
+><P
+>        문서는 Linux OS를 기준으로 작성되었다. Windows환경에서의 SQLite의 설치에 
+        대한 힌트를 얻고 싶다면 <A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/SQLite%20Windows"
+TARGET="_top"
+>SWLite Windows</A
+>를 참고하기 바란다. 
+    </P
+><P
+>        또한 SQLite응용 프로젝트도 있으니 이 글을 읽은후 관심이 생겼다면 
+        한번쯤 찾아주길 바란다. 
+        <A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/project_SQLiteDBMS"
+TARGET="_top"
+>SQLiteDBMS 프로젝트</A
+>로 가기 
+    </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN25"
+></A
+>2. Sqlite</H1
+><P
+>        현재 시점에서 최신 버젼인 sqlite-2.8.9를 기준으로 한다.
+    </P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN28"
+></A
+>2.1. Sqlite의 특징</H2
+><P
+>            <P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>                    SQL92의 대부분을 지원한다. 다음은 지원하지 않는 몇 가지 기능들이다.
+                </P
+></LI
+><LI
+><P
+>                    단일 파일에 데이터베이스의 모든것을 포함한다.
+                </P
+></LI
+><LI
+><P
+>                    ACID(Atomic, Consistent, Isolate, Durable) 보증
+                </P
+></LI
+><LI
+><P
+>                    byte order에 관계없이 데이터 파일의 공유가 가능
+                </P
+></LI
+><LI
+><P
+>                    2테라바이트 (2^41)크기의 데이터 파일 생성지원
+                </P
+></LI
+><LI
+><P
+>                    효율적인 메모리 사용 : 25k라인정도의 C코드로 이루어졌다.
+                </P
+></LI
+><LI
+><P
+>                    많은 일반적인 명령을 실행하는데 PostgreSql과 Mysql보다 최소 
+                    2배이상 명령에 따라서 10-20배 이상 빠르다.
+                </P
+></LI
+><LI
+><P
+>                    하나의 구조체와 3개의 함수만 사용하는 정도로 sqlite를 
+                    사용하는 C/C++ 코드를 만들어 낼 수 있다.
+                </P
+></LI
+><LI
+><P
+>                    TCL, Perl, PHP, .Net, Java, Python, SmallTalk, Ruby등의 다양한 언어지원
+                </P
+></LI
+><LI
+><P
+>                    다른 라이브러리등의 도움없이 작동된다. 
+                    libsqlite.so와 sqlite 2개의 파일이면 작동 환경을 만들 수 있다. 
+                </P
+></LI
+><LI
+><P
+>                    Public Domain 라이센스를 가진다.
+                </P
+></LI
+><LI
+><P
+>                    sqlite는 서버/클라이언트 모델을 지원하는 RDBMS가 아니다. 
+                    로컬에서만 사용가능하며 인터넷응용을 원한다면 별도의 서버 
+                    프로그램을 만들어야 한다. 
+                </P
+></LI
+></OL
+>
+        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN56"
+></A
+>2.2. 설치하기</H2
+><P
+>            <A
+HREF="http://www.hwaci.com/sw/sqlite"
+TARGET="_top"
+>SQLite 홈페이지</A
+>에서 
+            다운로드 받을 수 있다. 현재(2003/1/08) sqlite-2.8.9.tar.gz 버젼이 최신버젼이다.
+            다운로드 받아서 압축까지 풀고 보니 4M정도 되는 작은 크기였다. 
+            oracle은 말할 것도 없고 수십메가의 크기를 가지는 postgresql이나 
+            mysql에 비해서도 매우 작은 크기이다. 
+        </P
+><P
+>            rpm도 준비되어 있기는 한데, 서버 프로그램들은 무조건 컴파일해서 설치해야 하는 
+            성격이라 tarball을 받아서 컴파일 후 설치하기로 했다.
+            다음은 필자가 사용중인 리눅스박스의 사양이다.
+            <DIV
+CLASS="TABLE"
+><A
+NAME="AEN61"
+></A
+><P
+><B
+>&#54364; 1. 시스템 사양</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>OS</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Linux</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Kernel 2.6.0</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>컴파일러</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>gcc</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>2.96</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>cpu</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Intel 800MHZ</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>업그레이드 시키고 싶다.</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+        </P
+><P
+>            설치는 매우 간단하다.
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># wget http://www.hwaci.com/sw/sqlite/sqlite-2.8.9.tar.gz
+# mv sqlite-2.8.9.tar.gz /usr/src
+# tar -xvzf sqlite-2.8.9.tar.gz
+# cd sqlite
+# ./configure
+# make 
+# make install
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            옵션없이 설치했을 경우 /usr/local 밑에 자리잡게 된다. 이걸로 설치 끝이다. 
+        </P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN79"
+></A
+>3. Sqlite 간단 운용</H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN81"
+></A
+>3.1. DB 생성및 간단한 내부명령어들</H2
+><P
+>            sqlite [dbname] 으로 간단하게 생성할 수 있다. 
+            동일한 이름이 존재하면 열고 그렇지 않다면 새로 생성한다. 
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># sqlite test.db
+SQLite version 2.8.9
+Enter ".help" for instructions
+sqlite&#62; 
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            그다음 부터는 알고 있는 <B
+CLASS="EMPHASIS"
+>Sql query</B
+>를 이용해서 
+            필요한 작업을 하면 된다. 
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>sqlite&#62; create table test(name char(80), age int);
+sqlite&#62; insert into test values("yundream", 19);
+sqlite&#62; insert into test values("hello world", 29);
+sqlite&#62; select * from test;
+yundream|19
+hello world|29
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            내부명령어와 관련된 도움말은 '''.help'''를 입력하는 정도로 간단히 참조할 수 있다.
+            <P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>                    .databases : 현재 작업중인 DB파일과 관련된 다른 파일들 목록 출력
+                </P
+></LI
+><LI
+><P
+>                    .echo ON|OFF : 명령어를 반향 할건지 여부
+                </P
+></LI
+><LI
+><P
+>                    .exit : 프로그램 종료
+                </P
+></LI
+><LI
+><P
+>                    .help : 도움말
+                </P
+></LI
+><LI
+><P
+>                    .schema ?TABLE? : 테이블 구조 
+                </P
+></LI
+><LI
+><P
+>                    .show : 현재 프로그램 설정값을 보여준다. 
+                </P
+></LI
+><LI
+><P
+>                    .read FILENAME : FILENAME으로 부터 SQL을 실행한다. 
+                </P
+></LI
+><LI
+><P
+>                    .output FILENAME : 출력을 FILENAME으로 보냄
+                </P
+></LI
+><LI
+><P
+>                    .output stdout : 출려을 화면으로 보냄(기본 값) 
+                </P
+></LI
+><LI
+><P
+>                    .output stdout : 출려을 화면으로 보냄(기본 값) 
+                </P
+></LI
+></OL
+>
+        </P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN108"
+></A
+>4. C/C++ Interface</H1
+><P
+>        sqlite는 매우 쉽게 관련 애플리케이션을 제작할 수 있도록 디자인되어 있다. 
+        여기에서는 sqlite C/C++프로그래밍 방법에 대해서 알아 보겠다. 
+    </P
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN111"
+></A
+>4.1. 핵심 API</H2
+><P
+>            sqlite는 3개의 핵심 함수와 하나의 자료구조를 제공한다. 
+            이외에도 몇가지 리턴값과 상수들을 가지고 있다.  
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct sqlite sqlite;
+#define SQLITE_OK
+
+sqlite *sqlite_open(const char *dbname, int mode, char **errmsg);
+
+void sqlite_close(sqlite *db);
+
+int sqlite_exec
+(
+  sqlite *db,
+  char *sql,
+  int (*xCallback)(void*,int,char**,char**),
+  void *pArg,
+  char **errmsg
+);
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            위의 내용만 숙지하는 정도로 C,C++프로그램을 만들 수 있다.
+        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN115"
+></A
+>4.2. DB 열기</H2
+><P
+>            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>            sqlite *sqlite_open(const char *dbname, int mode, char **errmsg);
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            sqlite_open 함수를 이용해서 SQLite DB를 열거나 새로운 DB를 생성할 수 있다. 
+            첫번째 인자는 DB이름이다. 두번째 인자는 현재 사용하지 않는다. 
+            DB를 여는 중에 에러가 발생한다면 errmsg에 에러메시지를 채우게 된다. 에러가 
+            발생하지 않았다면 NULL을 가리킨다. 
+        </P
+><P
+>        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN120"
+></A
+>4.3. DB닫기</H2
+><P
+>            sqlite_close()함수를 호출하면 된다. 인자로는 sqlite_open()으로 생성된 sqlite 
+            구조체 포인터가 들어간다. sqlite_close()를 호출했을 때 트랜잭션(transaction)이
+            활성화 되어 있는 상태라면 이 트랜잭션은 rolled back 하게 된다. 
+        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN123"
+></A
+>4.4. SQL 실행</H2
+><P
+>            sqlite_exec()를 이용해서 SQL쿼리와 각종 명령을 수행할 수 있다. 이 함수는 5개의 
+            인자를 가진다. 
+            <P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>                        sqlite_open()에 의해서 만들어진 sqlite구조체 포인터다.
+                    </P
+></LI
+><LI
+><P
+>                        sql 쿼리와 sql 명령을 위한 문자열이 들어간다. 이 문자열은 
+                        null로 끝난다. 
+                    </P
+></LI
+><LI
+><P
+>                        콜백함수로써 쿼리의 결과를 처리하기 위해서 호출 된다. NULL
+                        이라면 아무일도 하지 않게 된다.  
+                    </P
+></LI
+><LI
+><P
+>                        콜백함수로 넘겨줄 인자의 처음을 가르키는 포인터다. 
+                    </P
+></LI
+><LI
+><P
+>                        에러메시지를 가르키는 포인터다. 이 포인터는 malloc()등을 이용해서 
+                        할당된 공간에 씌여지며 함수가 종료되면 free() 된다. NULL이라면 
+                        어떤 에러메시지도 보고되지 않을 것이다. 
+                    </P
+></LI
+></OL
+>
+        </P
+><P
+>            콜백(callback)함수는 쿼리의 결과를 받기 위해서 사용된다. 콜백함수는 
+            다음과 같이 선언되어 있다. 
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>int Callback(void *pArg, int argc, char **argv, char **columnNames))
+{
+    return 0;
+}
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            콜백함수의 첫번째 인자는 sqlite_exec()의 네번째 아규먼트의 복사다. 이 인자는 
+            클라이언트 코드로 부터 콜백함수로 임의의 정보를 전달하기 위해서 사용되어 진다. 
+            두번째 인자는 쿼리결과 생성된 컬럼(columns)의 갯수이다. 세번째 아규먼트는 
+            컬럼의 실제 내용을 담고 있으며 하나의 컬럼 내용은 하나의 배열에 대응한다. 
+            네번째 인자는 컬럼의 이름이다. 
+        </P
+><P
+>            콜백함수는 정상적으로 수행되었을 경우 0을 리턴한다. 만약 에러가 발생한다면 
+            0이 아닌 값을 리턴하고 쿼리는 취소된다. 이경우 sqlite_exe()는 
+            <B
+CLASS="EMPHASIS"
+>SQLITE_ABORT</B
+>를 리턴할 것이다.  
+        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN141"
+></A
+>4.5. 에러 코드</H2
+><P
+>            정상적으로 실행되었을 경우 sqlite_exec()함수는 SQLITE_OK를 리턴한다. 
+            그렇지 않을경우 다음과 같은 에러 코드들을 리턴한다. 
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#define SQLITE_OK           0   /* Successful result */
+#define SQLITE_ERROR        1   /* SQL error or missing database */
+#define SQLITE_INTERNAL     2   /* An internal logic error in SQLite */
+#define SQLITE_PERM         3   /* Access permission denied */
+#define SQLITE_ABORT        4   /* Callback routine requested an abort */
+#define SQLITE_BUSY         5   /* The database file is locked */
+#define SQLITE_LOCKED       6   /* A table in the database is locked */
+#define SQLITE_NOMEM        7   /* A malloc() failed */
+#define SQLITE_READONLY     8   /* Attempt to write a readonly database */
+#define SQLITE_INTERRUPT    9   /* Operation terminated by sqlite_interrupt() */
+#define SQLITE_IOERR       10   /* Some kind of disk I/O error occurred */
+#define SQLITE_CORRUPT     11   /* The database disk image is malformed */
+#define SQLITE_NOTFOUND    12   /* (Internal Only) Table or record not found */
+#define SQLITE_FULL        13   /* Insertion failed because database is full */
+#define SQLITE_CANTOPEN    14   /* Unable to open the database file */
+#define SQLITE_PROTOCOL    15   /* Database lock protocol error */
+#define SQLITE_EMPTY       16   /* (Internal Only) Database table is empty */
+#define SQLITE_SCHEMA      17   /* The database schema changed */
+#define SQLITE_TOOBIG      18   /* Too much data for one row of a table */
+#define SQLITE_CONSTRAINT  19   /* Abort due to contraint violation */
+#define SQLITE_MISMATCH    20   /* Data type mismatch */
+#define SQLITE_MISUSE      21   /* Library used incorrectly */
+#define SQLITE_NOLFS       22   /* Uses OS features not supported on host */
+#define SQLITE_AUTH        23   /* Authorization denied */
+#define SQLITE_ROW         100  /* sqlite_step() has another row ready */
+#define SQLITE_DONE        101  /* sqlite_step() has finished executing */
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            다음은 각 에러코드들에 대한 설명이다.
+            <P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>SQLITE_OK</DT
+><DD
+><P
+>                        명령이 정상적으로 수행되었다.
+                    </P
+></DD
+><DT
+>SQLITE_INTERMAL</DT
+><DD
+><P
+>                        SQLite library의 내부적인 문제로 발생하는데, SQLite 라이브러리의 
+                        버그에 의해서만 발생된다고 되어 있다. 만약 이 에러가 발생했다면 
+                        SQLite mailing list에 문제를 보고하기 바란다.  
+                    </P
+></DD
+><DT
+>SQLITE_ERROR</DT
+><DD
+><P
+>                        SQL에 문제가 있을 경우 발생된다.
+                    </P
+></DD
+><DT
+>SQLITE_PERM</DT
+><DD
+><P
+>                        데이터페이스 파일을 열기위한 권한이 없을 경우 발생한다.
+                    </P
+></DD
+><DT
+>SQLITE_ABORT</DT
+><DD
+><P
+>                        콜백함수가 0이 아닌 값을 리턴했을 때 발생한다.
+                    </P
+></DD
+><DT
+>SQLITE_BUSY</DT
+><DD
+><P
+>                        다른 프로그램이나 쓰레드가 데이터베이스를 사용하고 있을 때 
+                        발생한다. SQLite는 하나의 데이터베이스에 동시에 두개나 그 이상의 
+                        쓰레드가 읽는 것을 허용한다. 그러나 쓰기위해서 열었을 경우에는 
+                        단지 하나만의 쓰레드만이 접근이 가능하다.  
+                    </P
+></DD
+><DT
+>SQLITE_NOMEM</DT
+><DD
+><P
+>                        malloc()에 실패했을 때 리턴한다. 
+                    </P
+></DD
+><DT
+>SQLITE_READONLY</DT
+><DD
+><P
+>                        단지 읽기만 가능한 데이터베이스(혹은 읽기 전용으로 연)
+                        파일에 쓰려고 했을 때 발생한다.
+                    </P
+></DD
+><DT
+>SQLITE_FULL</DT
+><DD
+><P
+>                        디스크에 더이상의 공간이 없거나 데어터베이스 파일이 너무나 클경우 
+                        발생한다.  
+                    </P
+></DD
+><DT
+>SQLITE_AUTH</DT
+><DD
+><P
+>                        인증에 실패했다.
+                    </P
+></DD
+></DL
+></DIV
+>
+        </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN186"
+></A
+>4.6. 예제 프로그램</H2
+><P
+>            지금까지의 내용들을 이용해서 sqlite 데이터 베이스에 연결해서 
+            데이터를 가져오는 간단한 프로그램을 만들어 보도록 하겠다.
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>#include &#60;stdio.h&#62;
+#include &#60;sqlite.h&#62;
+
+static int callback(void *NU, int argc, char **argv, char **azColName)
+{
+    int i;
+    for (i = 0; i &#60; argc; i++)
+    {
+        printf ("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
+int main(int argc, char **argv)
+{
+    sqlite *db;
+    char *ErrMsg = 0;
+    int rc;
+
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usge : ./testsql [dbname] [query]\n");
+        exit(0);
+    }
+    db = sqlite_open(argv[1], 0, &#38;ErrMsg);
+    if (db == 0)
+    {
+        fprintf(stderr, "Cant open database ; %s\n", ErrMsg);
+        exit(0);
+    }
+    rc = sqlite_exec(db, argv[2], callback, 0, &#38;ErrMsg);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "SQL error : %d\n", ErrMsg);
+    }
+    sqlite_close(db);
+    return 0;
+}
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            프로그램의 이름은 <B
+CLASS="EMPHASIS"
+>testsql</B
+>로 하겠다. 다음과 같이 
+            컴파일후 테스트 해보기 바란다. 
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># gcc -o testsql testsql.c -L/usr/local/lib -lsqlite
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            다음은 테스트 결과다
+            <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+># ./testsql test.db "select * from test"
+name = yundream
+age = 19
+
+name = hello
+age = 22
+# ./testsql test.db "insert into test values(\"kknd\", 56);"
+# ./testsql test.db "select * from test"
+name = yundream
+age = 19
+
+name = hello
+age = 22
+
+name = kknd
+age = 56
+            </PRE
+></TD
+></TR
+></TABLE
+>
+            고작 38라인 정도로 제대로 작동하는 DB 애플리케이션을 작성했다.
+        </P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN193"
+></A
+>5. 콜백함수를 이용하지 않는 데이터 접근</H1
+><P
+>        sqlite_exec() 함수는 SQLite 데이터베이스로 부터 데이터를 가져오기 위한 단지 한 가지
+        방법만을 제공한다. 방법이 제한되어 있으니 이것 저것 신경스지 않고 간단하게 사용할 수 
+        있겠으나 많은 프로그래머들이 콜백함수를 이용해서 데이터를 가져오는 것에 만족하지 
+        않을 수도 있다. 이런 이유로 SQLite 2.7.7이후 버전에서는 콜백함수가 아닌 다른 방법을 
+        통해서 데이터를 가져올 수 있도록 지원함수를 추가했다.        
+    </P
+><P
+>        3개의 새로운 함수가 추가되었는데, sqlite_exec()의 기능을 3개로 나누어서 
+        좀더 세밀하게 제어할 수 있도록 기능을 분할 했다고 보면 된다.
+        <TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>typedef struct sqlite_vm sqlite_vm;      
+
+int sqlite_compile
+(
+    sqlite *db,          /* 열린 데이터 베이스 */
+    const char *zSql,    /* SQL statement to be compiled */ 
+    const char **pzTail, /* OUT: uncompiled tail of zSql */ 
+    sqlite_vm **ppVm,    /* OUT: the virtual machine to execute zQsql */ 
+    char **pzErrmsg      /* OUT: Error message */
+);
+
+int sqlite_step
+(
+    sqlite_vm *pVm,           /* The virtual machine to exeucte */
+    int *pN,                  /* OUT: Number of columns in result */ 
+    const char ***pazValue,   /* OUT: Column data */ 
+    const char ***pszColName  /* OUT: Column names and datatypes */
+);
+
+int sqlite_finalize
+(
+    sqlite_vm *pVm,        /* The virtual machine to be finalized */
+    char **pzErrMsg        /* OUT: Error message */
+);
+        </PRE
+></TD
+></TR
+></TABLE
+>
+    </P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN198"
+></A
+>6. 참고문헌</H1
+><P
+>        <P
+></P
+><OL
+TYPE="1"
+><LI
+><P
+>            <A
+HREF="http://www.sqlite.org"
+TARGET="_top"
+>sqlite 홈페이지</A
+>        
+        </P
+></LI
+><LI
+><P
+>            <A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/SQLite%20Windows"
+TARGET="_top"
+>SWLite Windows</A
+>        
+        </P
+></LI
+><LI
+><P
+>            <A
+HREF="http://www.joinc.co.kr/modules/moniwiki/wiki.php/project_SQLiteDBMS"
+TARGET="_top"
+>SQLiteDBMS 프로젝트</A
+>
+        </P
+></LI
+></OL
+>
+    </P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}

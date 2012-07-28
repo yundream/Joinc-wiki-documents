@@ -1,0 +1,100 @@
+#title openstack install
+
+[[TableOfContents]]
+== 설치 환경 ==
+ * Ubuntu Linux 12.04
+ * 하드웨어 : Intel(R) Core(TM) i5-2520M 4core (VAIO 노트북)
+ * 하이퍼바이저 : [wiki:man/12/KVM KVM]
+ * Database : Mysql 5.5.24
+
+== 시스템 준비 사항 == 
+=== NTP ===
+{{{#!plain
+# apt-get install ntp
+}}}
+
+=== open-iscsi ===
+볼륨을 attach하기 위한 기본 인터페이스로 [wiki:man/12/iSCSI iSCSI]를 사용한다. iscsi 관련 패키지를 설치한다. 
+{{{#!plain
+# apt-get install open-iscsi
+# apt-get install open-iscsi-utils
+}}}
+iSCSI 관리에 대한 자세한 내용은 [wiki:Site/System_management/iSCSI  리눅스에서 iSCSI 운용]문서를 참고한다.
+
+=== bridge network ===
+오픈스택은 브릿지 네트워크를 구성해서 게스트 VM의 네트워크를 관리한다. OpenVSwitch(OVS)로 구성할 수도 있으나 아직은 실험적인 기술이니, 브릿지 네트워크를 사용하기로 한다.
+{{{#!plain
+# apt-get install bridge-utils
+}}}
+
+=== 가상화 환경 ===
+[wiki:man/12/Site/cloud/Qemu KVM] 하이퍼바이저를 사용한다. kvm과 함께 libvirt 가상화 관리 도구도 설치한다.
+{{{#!plain
+# apt-get install kvm libvirt-bin
+}}}
+
+=== Rabbitmq ===
+오픈스택은 message를 전달하는 방식으로 컴포넌트들을 통합하며, 이때 사용하는 소프트웨어가 rabbitmq다.
+{{{#!plain
+# apt-get install rabbitmq-server memcached python-memcache
+}}}
+
+== Mysql Database 설정 ==
+Nova와 glance를 위한 Database를 설정한다. Mysql 패키지를 설치한다.
+{{{#!plain
+# apt-get install -y mysql-server python-mysqldb
+}}}
+
+glance, nova, keystone를 위한 데이터베이스를 만든다. 간단히 root 권한으로 만들기로 했다. 
+{{{#!plain
+# mysql -u root -p
+mysql > CREEATE DATABASE glance;
+mysql > CREEATE DATABASE nova;
+mysql > CREEATE DATABASE keystone;
+}}}
+
+== keystone 설치 ==
+keystone는 Identity 컴포넌트다.  
+{{{#!plain
+# apt-get install keystone python-keystone python-mysqldb python-keystoneclient
+}}}
+
+/etc/keystone/keystone.conf 파일을 열어서 sql connection 부분을 수정한다.
+{{{#!plain
+[sql]
+connection = mysql://root:password@localhost/keystone
+idle_timeout = 200
+}}}
+
+keyston 서비스를 리스타트 하고, db를 생성한다.
+{{{#!plain
+# service keystone restart
+# keystone-manage db_sync
+}}}
+
+keystone 관련 테이블이 만들어진 걸 확인할 수 있다.
+{{{#!plain
+mysql> use keystone;
+mysql> show tables;
++------------------------+
+| Tables_in_keystone     |
++------------------------+
+| ec2_credential         |
+| endpoint               |
+| metadata               |
+| migrate_version        |
+| role                   |
+| service                |
+| tenant                 |
+| token                  |
+| user                   |
+| user_tenant_membership |
++------------------------+
+}}}
+ec2 테이블이 있는 걸 봐선 AWS와의 연동도 가능한 것으로 보인다. (개발중인 컴포넌트라서 지금 당장 사용할 수 있는지는 알 수 없지만) 
+
+
+== Glacne 설치 ==
+== Nova 설치 ==
+== VM 생성 ==
+== 오픈스택 대쉬보드 ==

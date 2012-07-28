@@ -1,0 +1,142 @@
+#title Lucene을 이용한 색인파일 생성
+
+Lucene를 이용해서 색인파일을 만드는 방법에 대해서 알아볼 생각이다.
+
+색인은 다음의 과정을 거친다.
+  1. 문서를 분석해서 tokenizing 한다. 
+  1. field를 포함한 lucene document를 생성한다. 
+  1. lucene document를 색인한다.
+
+색인파일을 생성하기 위해서 3개의 클래스를 만들 계획이다.
+  1. 파일을 색인하기 위한 클래스
+  1. 파일을 색인가능한 형태로 변환하는 클래스
+  1. 테스트를 위한 검색 클래스
+
+Lucene는 색인파일을 만들기 위해서 '''IndexWriter'''를 제공한다. 
+
+다음은 lucene과 함께 배포되는 예제파일로 특정 디렉토리 밑에 있는 모든 File을 색인한다. 이 색인코드는 path와 content 두개의 필드를 가진다. 아래 코드를 분석한다면, 위에서 계획한 코드를 만드는 것도 문제가 되지 않을 것이다.
+
+필요한 라이브러리는 '''lucene-core-2.4.0.jar'''이다.
+{{{#!plain
+package org.apache.lucene.demo;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.IndexWriter;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Date;
+
+/** 디렉토리 밑에 있는 모든 텍스트파일을 색인한다. */
+public class IndexFiles {
+  
+  private IndexFiles() {}
+
+  static final File INDEX_DIR = new File("index");
+  
+  /** 디렉토리 밑에 있는 모든 텍스트 파일을 색인한다. */
+  public static void main(String[] args) {
+    String usage = "java org.apache.lucene.demo.IndexFiles <root_directory>";
+    if (args.length == 0) {
+      System.err.println("Usage: " + usage);
+      System.exit(1);
+    }
+
+    if (INDEX_DIR.exists()) {
+      System.out.println("Cannot save index to '" +INDEX_DIR+ "' directory, please delete it first");
+      System.exit(1);
+    }
+    
+    final File docDir = new File(args[0]);
+    if (!docDir.exists() || !docDir.canRead()) {
+      System.out.println("Document directory '" +docDir.getAbsolutePath()+ "' does not exist or is not readable, please check the path");
+      System.exit(1);
+    }
+    
+    Date start = new Date();
+    try {
+      /** IndexWriter 를 생성한다. 기본 Analyzer를 사용한다. */
+      IndexWriter writer = new IndexWriter(INDEX_DIR, new StandardAnalyzer(), true, IndexWriter.MaxFieldLength.LIMITED);
+      System.out.println("Indexing to directory '" +INDEX_DIR+ "'...");
+      indexDocs(writer, docDir);
+      System.out.println("Optimizing...");
+      writer.optimize();
+      writer.close();
+
+      Date end = new Date();
+      System.out.println(end.getTime() - start.getTime() + " total milliseconds");
+
+    } catch (IOException e) {
+      System.out.println(" caught a " + e.getClass() +
+       "\n with message: " + e.getMessage());
+    }
+  }
+
+  static void indexDocs(IndexWriter writer, File file)
+    throws IOException {
+    // do not try to index files that cannot be read
+    if (file.canRead()) {
+      if (file.isDirectory()) {
+        String[] files = file.list();
+        // an IO error could occur
+        if (files != null) {
+          for (int i = 0; i < files.length; i++) {
+            indexDocs(writer, new File(file, files[i]));
+          }
+        }
+      } else {
+        System.out.println("adding " + file);
+        try {
+          // 색인을 추가한다.
+          writer.addDocument(FileDocument.Document(file));
+        }
+        catch (FileNotFoundException fnfe) {
+          ;
+        }
+      }
+    }
+  }
+}
+}}}
+ * Class IndexWriter : 색인파일을 생성하고 관리한다. 
+
+아래는 FileDocument.java
+{{{#!plain
+package org.apache.lucene.demo;
+
+import java.io.File;
+import java.io.FileReader;
+
+import org.apache.lucene.document.DateTools;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+
+/** 파일을 lucene문서로 만든다 */
+public class FileDocument {
+
+  public static Document Document(File f)
+       throws java.io.FileNotFoundException {
+	 
+    // 새로운 document를 생성한다.
+    Document doc = new Document();
+
+    // path필드에 파일의 경로를 추가한다. 파일이름은 색인이 되긴 하지만 tokenize 하진 않을 것이다.
+    doc.add(new Field("path", f.getPath(), Field.Store.YES, Field.Index.NOT_ANALYZED));
+
+    // modified필드 에 파일이 수정된 날짜를 저장한다. 역시 tokenize 하진 않는다.
+    doc.add(new Field("modified",
+        DateTools.timeToString(f.lastModified(), DateTools.Resolution.MINUTE),
+        Field.Store.YES, Field.Index.NOT_ANALYZED));
+
+    // contents 필드에 파일의 본문내용을 추가한다. 이때 본문내용은 tokenized 되어서 색인된다.
+    doc.add(new Field("contents", new FileReader(f)));
+
+    // return the document
+    return doc;
+  }
+  private FileDocument() {}
+}
+}}}
+
+관련문서 : http://www.javangelist.de/space/Lucene-Mini-Tutorial

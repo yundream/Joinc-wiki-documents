@@ -1,0 +1,99 @@
+#title Crontab
+
+[[TableOfContents]]
+== Crontab ==
+Cronttab(이하 크론탭)은 작업을 일정한 시간에 주기적으로 실행시키기 위해서 사용하는 task 스케쥴링 프로그램이다. 이와 비슷한 프로그램으로 at(1)와 anacron(1)이 있다. at는 원하는 시간에 명령을 '''한번만'''실행 시키며, crontab과 같이 주기적으로 실행시키는 기능은 가지고 있지 않다. anacron은 이름에서알 수 있듯이 crontab와 거의 동일하게 사용할 수 있다. 다른점은 시스템 다운이나 anacron 프로그램의 다운 등의 이유로 해당시간에 실행되어야할 프로그램이 실행되지 않았다면, 이를 확인해서 다시 실행시켜준다는 점이다.  
+
+다음은 at의 간단한 사용예이다.
+{{{#!plain
+# echo "점심시간" | at "12:00"
+}}}
+
+joinc는 많은 프로그램들이 주기적으로 돌아간다. 대략 다음과 같은 프로그램들이 주기적으로 작동하고 있다. 
+  1. 매 5분간격으로 rrd 통계데이터를 생성한다.  
+  1. 매 5분간격으로 spam 데이터들을 삭제한다. 
+  1. wiki log 파일을 파싱해서 title에 사용할 색인데이터를 생성한다. 
+  1. 매 10분 간격으로 cpu 사용율을 측정해서 rrd에 저장한다.
+  1. 매 시간주기로 teamblog의 category 정보를 갱신한다. 
+
+이러한 프로그램들은 특성상 daemon 프로세스로 개발을 해야 할 것인데, 개발하고 관리하기가 까다롭다. crontab을 사용하면 간단하게 관리할 수 있다. 
+
+crontab는 시스템 프로그램으로 리눅스 배포판에 관계없이 기본적으로 설치가 된다. 크론탭은 내부적으로 자체관리하는 설정파일을 가지고 있는데, 이를 이용해서 크론탭이 사용할 쉘(:12), 에디터 등과 주기적으로 실행할 스크립트를 지정할 수 있다.
+{{{#!plain
+[root@localhost ~]# cat /etc/crontab
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+
+# run-parts
+01 * * * * root run-parts /etc/cron.hourly
+02 4 * * * root run-parts /etc/cron.daily
+22 4 * * 0 root run-parts /etc/cron.weekly
+42 4 1 * * root run-parts /etc/cron.monthly
+[root@localhost ~]#
+}}}
+
+== 환경변수 영역 ==
+첫번째 영역에서는 몇가지 변수를 설정한다.
+
+'''SHELL'''
+   등록된 프로그램을 실행시킬 쉘프로그램을 지정한다. 정의 하지 않을 경우 '''/bin/sh'''이 쉘 프로그램으로 지정된다.
+'''PATH'''
+   cron은 별도로 쉘을 띄우귀 때문에, 쉘에서 프로그램을 찾기 위한 '''PATH'''도 지정해줄 필요가 있다. 왜냐하면 로그인을 해서 shell을 실행시키지 않으므로, 로그인과정에서의 '''PATH'''변수를 사용할 수 없기 때문이다.
+'''MAILTO'''
+   cron이 수행한 작업의 결과를 mail로 보낼 수 있다. 위의 경우 '''root'''유저에게 메일을 전송한다. 만약 MAILTO를 설정하지 않으면 crontab의 실행유저에게 메일이 전송된다.
+'''HOME'''
+   cront의 home 디렉토리(:12)경로를 설정한다. 기본적으로는 crontab의 실행유저의 홈디렉토리로 /etc/passwd에 설정된 경로를 따른다.
+
+== 크론탭 기본 명령 ==
+ * crontab -l : 예약된 작업 목록을 보여준다.
+ * crontab -e : 예약 작업을 수정한다. 
+ * crontab -r : 예약된 작업을 삭제한다. 
+
+== 설정 형식 ==
+crontab -e를 실행하면 예약 작업을 수정할 수 있는데, 그러기 위해서는 설정 형식을 알고 있어야 한다.
+
+크론탭은 총 6개의 필드로 구성되어 있다. 앞의 5개의 필드가 시간 지정을 위한 필드이고, 마지막 필드에 스케쥴링할 명령어를 지정한다. 아래와 같이 사용한다.
+{{{#!plain
+# min             hours        day        month          day      command
+   34               2           *            *             *       sh /root/backup.sh
+}}}
+위의 예는 "sh /root/backup.sh"를 매일 2시 34분에 실행한다.
+
+시간은 아래와 같이 5개의 단위로 분류된다.
+|| 분      || 0-59    ||  ||
+|| 시      || 0-23    ||  ||
+|| 일      || 1-31    ||  ||
+|| 월      || 1-12    ||                      ||
+|| 주/일   || 0-6     || 일요일이 0이다.      ||
+
+== crontab 설정 예 ==
+별표(*)는 all을 의미한다. 
+{{{#!plain
+* * * * *  /bin/bash /usr/local/bin/myprog  # 매분 마다 myprog를 실행
+}}}
+
+시간을 특정할 수 있다.
+{{{#!plain
+30 * * * *  /bin/bash /usr/local/bin/myprog  # 매시 30분에 실행 
+5,10 * * * *  /bin/bash /usr/local/bin/myprog  # 매시 5,10분에 실행 
+5 1 * * 0  /bin/bash /usr/local/bin/myprog  # 매주 일요일 새벽 1시 5분에 실행 
+}}}
+
+/를 이용해서 실행 간격을 조정할 수 있다.
+{{{#!plain
+*/5 * * * *  /bin/bash /usr/local/bin/myprog  # 5분 간격으로 실행 
+*/20 * * * *  /bin/bash /usr/local/bin/myprog  # 20분 간격으로 실행 
+}}}
+
+-를 이용해서 범위를 지정할 수도 있다.
+{{{#!plain
+5-30 * * * *  /bin/bash /usr/local/bin/myprog  # 매시 5-30분에 분간격으로 실행 
+5 4-5 * * *  /bin/bash /usr/local/bin/myprog  # 새벽 4시5분, 5시 5분에 실행 
+}}}
+
+-와 /를 조합할 수도 있다.
+{{{#!plain
+5-30/5 * * * *  /bin/bash /usr/local/bin/myprog  # 매시 5-30분에 5분간격으로 실행 
+}}}

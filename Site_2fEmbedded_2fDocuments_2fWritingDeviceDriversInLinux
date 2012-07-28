@@ -1,6 +1,6 @@
 #title Linux 커널에서의 디바이스 드라이버 작성
 [http://www.freesoftwaremagazine.com/articles/drivers_linux?page=0,0 원문]
-[[UploadFile]]
+
 == 문서를 읽기 위해 필요한 사항 ==
 Linux 디바이스 드라이버의 작성을 위해서는 아래의 주제에 대한 이해를 가지고 있어야 한다.
   * '''C 프로그래밍''', 포인터과 비트를 다루는 작업이 많기 때문에, 중급 수준정도의 C 프로그래밍 능력을 가지고 있어야 한다. 
@@ -19,14 +19,14 @@ Linux 디바이스 드라이버의 작성을 위해서는 아래의 주제에 �
 
 리눅스에서 드바이스 드라이버는 필요할 때 적재 되는 개념으로 모듈형식으로 제공이 된다. 이말은 모듈을 올리거나 내리는 등의 함수들이 필요하다라는 의미가 있다. 이를 위해서 몇개의 유저영역 함수들을 제공하게 되며, 해당 유저영역의 함수를 통해서 요청을 받는 커널영역의 함수가 쌍으로 존재하게 된다. 아래의 테이블은 디바이스 드라이버를 제작하기 위한 함수테이블이다. 아직까지는 배운 것이 없으므로 빈칸으로 남겨지게 되며, 학습을 해가면서 하나하나 채워나가게 될 것이다. 
 
-|| Events		|| 유저 함수		|| 커널 함수		||
-|| Load module	||	||	||
-|| Open device	||	||	||
-|| Close device	||	||	||
-|| Write device	||	||	||
-|| Read device	||	||	||
-|| Close device	||	||	||
-|| Remove module	||	||	||
+|| Events    || 유저 함수    || 커널 함수    ||
+|| Load module  ||  ||  ||
+|| Open device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Write device  ||  ||  ||
+|| Read device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Remove module  ||  ||  ||
 
 == 디바이스 드라이버의 적재와 제거 ==
 === 유저 모드에서의 적재와 제거 ===
@@ -59,14 +59,14 @@ make -C /usr/src/kernel-source-2.6.8 M=`pwd` modules
 }}}
 이제 우리는 모듈과 관련된 내용중 적재와 제거에 관련된 2가지 방법을 배웠다.
 
-|| Events		|| 유저 함수		|| 커널 함수		||
-|| Load module	|| insmod ||	||
-|| Open device	||	||	||
-|| Close device	||	||	||
-|| Write device	||	||	||
-|| Read device	||	||	||
-|| Close device	||	||	||
-|| Remove module	|| rmmod	||	||
+|| Events    || 유저 함수    || 커널 함수    ||
+|| Load module  || insmod ||  ||
+|| Open device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Write device  ||  ||  ||
+|| Read device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Remove module  || rmmod  ||  ||
 
 === 커널 모드에서의 적재와 제거 ===
 그럼 커널모드에서는 어떠한 방법을 통해서 모듈의 적재와 제거가 가능한지 알아보도록 하겠다.
@@ -85,12 +85,12 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int hello_init(void)
 {
-	printk("<1> Hello world!\n");	
-	return 0;
+  printk("<1> Hello world!\n");  
+  return 0;
 }
 static int hello_exit(void)
 {
-	printk("<1> I will be back\n");
+  printk("<1> I will be back\n");
 }
 
 module_init(hello_init);
@@ -105,14 +105,14 @@ module_exit(hello_exit);
 이제 insmod와 rmmod를 이용해서 적재와 해제를 시키도록 하자. 콘솔화면을 통해서는 어떤일이 일어났는지 확인할 수 없겠지만 /var/log/syslog 파일을 보면 커널이 적재되고 해제 되면서, module_init와 module_exit 함수들이 주어진 일을 수행했음을 확인할 수 있을 것이다.     
 
 이렇게 해서 우리는 2가지 커널모드 함수를 추가로 배웠다.
-|| Events		|| 유저 함수		|| 커널 함수		||
-|| Load module	|| insmod || module_init() ||
-|| Open device	||	||	||
-|| Close device	||	||	||
-|| Write device	||	||	||
-|| Read device	||	||	||
-|| Close device	||	||	||
-|| Remove module	|| rmmod	|| module_exit() ||
+|| Events    || 유저 함수    || 커널 함수    ||
+|| Load module  || insmod || module_init() ||
+|| Open device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Write device  ||  ||  ||
+|| Read device  ||  ||  ||
+|| Close device  ||  ||  ||
+|| Remove module  || rmmod  || module_exit() ||
 
 == 좀더 그럴듯한 디바이스 드라이버의 작성 ==
 그럼 생색내기 식의 프로그램이 아닌, 좀더 현실적인 디바이스 드라이버를 작성해 보도록 하자. 이 프로그램은 앞에서 다루었던 프로그램들에 비해서 상당히 많은 수의 include 파일을 포함하고 있다.
@@ -227,14 +227,14 @@ int memory_release(struct inode *inode, struct file *filp) {
 드라이버의 제거는 memory_exit 함수에서 unregister_chrdev 함수를 호출함으로써 이루어진다. kmalloc()는 커널내부에서 사용하는 메모리 할당함수이며, malloc()로 할당한 함수를 free()로 되돌려줘야 하듯이, 반드시 kfree() 함수를 이용해서 되돌려주어야 한다.
 
 이상에서 우리는 장치를 열기/닫기 위한 함수를 추가적으로 배웠다.  
-|| Events				|| 유저 함수		|| 커널 함수							||
-|| Load module	|| insmod 			|| module_init()					||
-|| Open device	|| fopen() 			||	file_operations:open	||
-|| Close device	||	||	||
-|| Write device	||	||	||
-|| Read device	|| fclose()			|| file_operations:release	||
-|| Close device	||	||	||
-|| Remove module	|| rmmod	|| module_exit() ||
+|| Events        || 유저 함수    || 커널 함수              ||
+|| Load module  || insmod       || module_init()          ||
+|| Open device  || fopen()       ||  file_operations:open  ||
+|| Close device  ||  ||  ||
+|| Write device  ||  ||  ||
+|| Read device  || fclose()      || file_operations:release  ||
+|| Close device  ||  ||  ||
+|| Remove module  || rmmod  || module_exit() ||
 유저영역의 함수와 다른 점이라면, 유저영역함수는 이미 정의되어 있는 함수를 호출하면 되지만, 커널영역 함수의 경우, 사용자가 직접정의 해줘야 한다는 점일 것이다.
 
 다음은 읽고 쓰기 위한 memory_read함수와 memory_write함수의 정의다.
@@ -286,9 +286,9 @@ attachment:parll.png
 port = check_region(0x378, 1);
 if (port) 
 { 
-	printk("<1>parlelport: cannot reserve 0x378\n"); 
-	result = port; 
-	goto fail;
+  printk("<1>parlelport: cannot reserve 0x378\n"); 
+  result = port; 
+  goto fail;
 } 
 request_region(0x378, 1, "parlelport");
 }}}
@@ -298,21 +298,21 @@ request_region(0x378, 1, "parlelport");
 {{{#!plain
 if (!port) 
 { 
-	release_region(0x378,1);
+  release_region(0x378,1);
 }
 }}}
 
 === 장치로 부터 읽기 ===
 장치 드라이버의 가장 중요한 역할은 장치로 부터 읽은 데이터를 유저 영역에 되돌려주는 일이다. inb 함수는 해당 주소로 부터 데이터를 읽고 이를 버퍼에 담아두는 일을 한다. 
-|| 이벤트			|| 커널 함수		||
-|| Read data	|| inb					||
-|| Write data	|| 							||
+|| 이벤트      || 커널 함수    ||
+|| Read data  || inb          ||
+|| Write data  ||               ||
 
 === 장치에 쓰기 ===
 장치로 부터 데이터를 읽는 함수를 만들었으니, 이제 장치로 데이터를 쓰는 함수를 만들어야 한다. 이 함수는 유저 영역의 데이터를 읽어서, 장치가 읽을 수 있는 데이터로 변환한 후 쓰는 일을 한다. 함수의 이름은 outb 이며, 두번째 인자로 주어진 주소 영역에, 첫번째 인자로 주어진 데이터를 쓴다. 
-|| 이벤트			|| 커널 함수		||
-|| Read data	|| inb					||
-|| Write data	|| outb					||
+|| 이벤트      || 커널 함수    ||
+|| Read data  || inb          ||
+|| Write data  || outb          ||
 
 === 완전한 'parlelport' 드라이버 ===
 모듈을 초기화 하고, 드라이버로 부터 데이터를 읽고, 드라이버로 데이터를 쓰고, 모듈을 제거하기 위한 코드들에 대해서 알아봤다. 이제 이들 코드를 조합해서 완전하게 작동하는 장치드라이버를 만들어 보도록 하자.

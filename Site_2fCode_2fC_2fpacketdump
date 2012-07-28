@@ -1,0 +1,124 @@
+----
+ 1. packetdump
+ 1. 패킷덤프하는 간단한 코드
+ 1. [멍]
+ 1. Version 0.1
+ 1. 2004/01/28
+----
+
+=== 설명 ===
+수신 또는 전송할 패킷을 덤프하는 간단하는 예제입니다.
+
+네트워크 프로그래밍에서 가장 중요하면서도 기본이 되는게 실제로 패킷이 정상적으로 만들어져서 전송이 됐는지,
+
+반대로 수신받은 패킷이 정상적인지 검증하고 싶을 때 패킷 내용을 직접 봐야하는 경우가 생깁니다.
+
+이럴 때 아주 유용하게 쓸 수 있습니다.
+
+이 코드를 잘 응용하면 파일로 저장된 패킷데이터를 읽어서 출력해볼수 도 있습니다.
+
+아니면 로그 파일로 출력하는 기능을 넣을수도 있습니다.
+
+
+=== 사용방법 ===
+'''packet_dump.c'''
+
+{{{#!plain
+int main(int argc, char *argv)
+{
+	char *buffer = "In the UNIX environment a thread: \n" \
+		"Exists within a process and uses the process resources\n" \
+		"Has its own independent flow of control as long as its parent process exists and the OS supports it\n" \
+		"May share the process resources with other threads that act equally independently (and dependently)\n" \
+		"Dies if the parent process dies - or something similar\n";
+
+	packet_dump(buffer, strlen(buffer), 16);
+}
+}}}
+
+=== 실행결과 ===
+{{{#!plain
+$ ./packet_dump
+[   0] 49 6e 20 74 68 65 20 55-4e 49 58 20 65 6e 76 69   In the UNIX envi
+[   1] 72 6f 6e 6d 65 6e 74 20-61 20 74 68 72 65 61 64   ronment a thread
+[   2] 3a 20 0d 0a 45 78 69 73-74 73 20 77 69 74 68 69   : ..Exists withi
+[   3] 6e 20 61 20 70 72 6f 63-65 73 73 20 61 6e 64 20   n a process and
+[   4] 75 73 65 73 20 74 68 65-20 70 72 6f 63 65 73 73   uses the process
+[   5] 20 72 65 73 6f 75 72 63-65 73 0d 0a 48 61 73 20    resources..Has
+[   6] 69 74 73 20 6f 77 6e 20-69 6e 64 65 70 65 6e 64   its own independ
+[   7] 65 6e 74 20 66 6c 6f 77-20 6f 66 20 63 6f 6e 74   ent flow of cont
+[   8] 72 6f 6c 20 61 73 20 6c-6f 6e 67 20 61 73 20 69   rol as long as i
+[   9] 74 73 20 70 61 72 65 6e-74 20 70 72 6f 63 65 73   ts parent proces
+[  10] 73 20 65 78 69 73 74 73-20 61 6e 64 20 74 68 65   s exists and the
+[  11] 20 4f 53 20 73 75 70 70-6f 72 74 73 20 69 74 0d    OS supports it.
+[  12] 0a 4d 61 79 20 73 68 61-72 65 20 74 68 65 20 70   .May share the p
+[  13] 72 6f 63 65 73 73 20 72-65 73 6f 75 72 63 65 73   rocess resources
+[  14] 20 77 69 74 68 20 6f 74-68 65 72 20 74 68 72 65    with other thre
+[  15] 61 64 73 20 74 68 61 74-20 61 63 74 20 65 71 75   ads that act equ
+[  16] 61 6c 6c 79 20 69 6e 64-65 70 65 6e 64 65 6e 74   ally independent
+[  17] 6c 79 20 28 61 6e 64 20-64 65 70 65 6e 64 65 6e   ly (and dependen
+[  18] 74 6c 79 29 0d 0a 44 69-65 73 20 69 66 20 74 68   tly)..Dies if th
+[  19] 65 20 70 61 72 65 6e 74-20 70 72 6f 63 65 73 73   e parent process
+[  20] 20 64 69 65 73 20 2d 20-6f 72 20 73 6f 6d 65 74    dies - or somet
+[  21] 68 69 6e 67 20 73 69 6d-69 6c 61 72 0d 0a         hing similar..
+$
+}}}
+
+=== 코드 ===
+
+{{{#!plain
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+void packet_dump(char* buf, int size, int unit)
+{
+     char     tmp[150];
+     char     msg[256];
+     int      i, j, lno;
+
+     j = 7;
+     lno = 0;
+     memset((tmp+0), 0x00, 150);
+     
+     for (i = 0; i < size; i++) {
+          if((i%unit) == 0)
+               memset((tmp+0), 0x20, ((unit*3)+unit+1+7+3));
+          if(j == 7)
+               sprintf((tmp+0), "[%4d] ", lno);
+          sprintf((tmp+j), "%02x", (unsigned char)*(buf+i));
+          tmp[j+2] = 0x20;
+          if((unsigned char)*(buf+i) >= (unsigned char)0x20)
+               tmp[(j/3)+(unit*3)+1+6] = *(buf+i);
+          else
+               tmp[(j/3)+(unit*3)+1+6] = '.';
+          j += 3;
+          if((i%unit) == (unit-1)) {
+               printf("%s\n", (tmp+0));
+               j = 7;
+               ++lno;
+          }
+          else if((i%unit) == ((unit/2)-1))
+               tmp[j-1] = '-';
+     }
+     
+     if ((i % unit) != 0) {
+	 printf("%s\n", (tmp+0));
+     }
+}
+}}}
+
+=== packet_dump 함수 인자 설명 ===
+
+    1. buf: 패킷데이터 
+    1. size: 패킷데이터의 전체크기 또는 특정크기
+    1. unit: 한 라인에 몇 문자씩 보여줄지 결정
+
+
+=== 변경사항 ===
+
+==== 2004/01/28 ====
+
+=== 잡담 ===
+오 .. 제가 필요로 하던거.. 잘 쓸께요..

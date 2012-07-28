@@ -1,0 +1,87 @@
+#title Perl : 프로세스 상태정보 얻어오기
+
+=== 코드 ===
+{{{#!plain
+#!/usr/bin/perl
+
+$argnum = $#ARGV+1;
+$PNAME = $ARGV[0];
+$PID=$$;
+
+# 아규먼트로 PID(:12) 번호를 입력받는다.
+# /proc/PID/status 를 이용해서 실행중인 쓰레드 갯수를 얻어온다.
+sub getThreadNum
+{
+  my($PID) = @_;
+  my $PROC = "/proc/$PID/status";
+  my $thread="";
+  my $line;
+  open(LFD, $PROC) || return 0;
+
+  while($line=<LFD>)
+  {
+    if ($line =~ m/^Threads:/)
+    {
+      $line =~ s/\s+$//;
+      @_=split /:[ \t]+/,$line;
+      $thread=$_[1];
+      close(LFD);
+      return atoi($thread);
+    }
+  }
+  close(LFD);
+}
+
+# 문자열을 숫자로 변경한다.
+sub atoi
+{
+    my $num;
+    foreach my $d (split(//, shift()))
+    {
+        $num = $num * 10 + $d;
+    }
+    return $num;
+}
+
+open(FD, "ps aux |") || die "Process Status FAILURE |status=0\n";
+$CpuUsage = 0.0;
+$MemUsage = 0.0;
+$MemSize = 0;
+$Pnum = 0;
+$TNum = 0;
+while($line = <FD>)
+{
+  if ($line =~ m/$PNAME/)
+  {
+    if ($line =~ m/$0/)
+    {
+    }
+    else
+    {
+      @_ = split / +/,$line;
+      $CpuUsage = $CpuUsage + $_[2];
+      $MemUsage += $_[3];
+      $MemSize += $_[4];
+      $TNum += getThreadNum($_[1]);
+      $Pnum++;
+    }
+  }
+}
+if ($Pnum == 0)
+{
+    printf "Process Status OK |status=0\n";
+}
+else
+{
+    printf "Process Status OK |status=1 cpu=%2.2lf mem=%2.2lf num=$Pnum size=%d thread=%d\n", $CpuUsage, $MemUsage, $MemSize, $TNum;
+}
+}}}
+
+=== 사용방법 ===
+{{{#!plain
+# Process_Status apache2
+Process Status OK |status=1 cpu=0.00 mem=0.00 num=5 size=1428536 thread=83
+}}}
+
+=== 관련키워드 ===
+ proc(:12) sms(:12)

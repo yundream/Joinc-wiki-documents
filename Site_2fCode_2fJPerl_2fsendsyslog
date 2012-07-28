@@ -1,0 +1,59 @@
+#title perl 코드 : syslog 전송
+
+=== 분산로깅 ===
+다수의 서버에서 발생하는 어플리케이션 이벤트를 통합관리해야 하는 필요가 생겼다. 여러가지 방법이 있겠으나 역시 syslog(:12)가 가장 편하지 싶어서 syslog 전송 프로그램을 만들기로 했다. 이 syslog 전송 프로그램은 이벤트를 전송할 모든 서버에 설치가 되어야 한다. 그래서 배포가 까다로울 수 있는 C(:12)언어 대신 perl(:12)을 사용하기로 했다. 
+
+=== syslog 설정 ===
+일종의 분산환경으로 원격지의 '''syslog 수집서버'''로 log를 전달해야 하기 때문에, 각각의 '''syslog 전송서버'''에 대해서 다음과 같은 환경을 만들어줘야 했다. 그전에 log 시스템 환경부터
+  * syslog 수집서버 IP : 172.2.0.5 
+  * syslog 전송서버 IP : 172.2.0.10, ~ 172.2.0.15
+syslog 수집서버로 보낼 syslog는 '''local5.*'''에 해당하는 log들이다. 이를 위해서 /etc/syslog.conf 에 다음 줄을 포함시키고 syslog 데몬을 재시작 했다.
+{{{#!plain
+local5.*   @172.2.0.5
+}}}
+
+syslog 수집서버는 syslog 전송서버로 부터 받은 메시지를 /var/log/distevent.log 에 남기도록 작업했다. 마찬가지로 syslog.conf 에 아래의 내용을 추가하고 재시작
+{{{#!plain
+local5.*   /var/log/distevent.log 
+}}}
+
+=== sesndsyslog ===
+{{{#!plain
+#!/usr/bin/perl
+
+use Getopt::Std;
+
+use Sys::Syslog;
+use Sys::Syslog qw(:DEFAULT setlogsock);
+use Sys::Syslog qw(:standard :macros);
+
+%level_map=(
+    1=>"info",
+    2=>"warning",
+    3=>"err",
+    4=>"crit"
+);
+
+%opts=();
+getopts("hm:l:", \%opts);
+
+if ($opts{h})
+{
+    help();
+    exit(0);
+}
+
+$message = $opts{m};
+$level = $level_map{2};
+if($opts{l})
+{
+    $level = $level_map{$opts{l}};
+}
+
+syslog($level|local5", $message);
+
+sub help
+{
+    print "Usage : sendsyslog -h -m event message -l event level [1~4]\n";
+}
+}}}

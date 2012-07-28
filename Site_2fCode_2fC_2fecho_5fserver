@@ -1,0 +1,64 @@
+#title echo server 예제 코드
+
+=== 설명 ===
+간단한 echo server 프로그램. [wiki:Code/C/echo_client echo client]로 테스트 할 수 있다. 
+  1. TCP(:12)
+  1. 연결 지향, 단일 프로세스/단일 쓰레드(:12)
+  1. 동기 / 봉쇄 입출력:::모델(:12)
+
+=== 코드 ===
+{{{#!plain down echo_server.c
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+
+#define MAXBUF  256
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[MAXBUF];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    client_len = sizeof(clientaddr);
+
+    if ((server_sockfd = socket(:2)(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(:3)( atoi(:3)(argv[1]) );
+
+    bind(:2)(server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(:2)(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, MAXBUF);
+        client_sockfd = accept(:2)(server_sockfd, (struct sockaddr *)&clientaddr,
+                            &client_len);
+
+        if ((n = read(client_sockfd, buf, MAXBUF)) <= 0)
+        {
+            close(client_sockfd);
+            continue;
+        }
+        if ( write(client_sockfd, buf, MAXBUF) <=0)
+        {
+            perror("write error : ");
+            close(client_sockfd);
+        }
+        close(client_sockfd);
+    }
+}
+}}}
+
+=== 참고 ===
+  * [wiki:Site/Network_Programing/Documents/socket_beginning BSD 소켓 프로그래밍]
+[[tag(소켓,네트워크 프로그래밍)]]
+[[category(200)]]

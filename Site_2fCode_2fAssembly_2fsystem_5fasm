@@ -1,0 +1,59 @@
+[설명]
+리눅스에서 execve 시스템 콜을 이용해서 /bin/sh -c [사용자 명령어] 를 실행하여 어셈블리어로 system() 함수를 구현한 소스 입니다.
+
+[소스코드]
+# system.S
+
+.type system, @function
+system:
+    push %ebp
+    movl %esp, %ebp
+    movl 0x8(%ebp), %eax
+    movl (%eax), %edi
+    xorl %eax, %eax
+    pushl $0x00000000   # ebp - 0x4
+    pushl $0x00006873   # ebp - 0x8 sh
+    pushl $0x0000632d   # ebp - 0xc -c
+    pushl $0x0068732f   # ebp - 0x10 /sh
+    pushl $0x6e69622f   # ebp - 0x14 /bin ( 0x2f 0x62 0x69 0x6e 0x2f 0x73 0x68 )
+    pushl $0x00000000   # ebp - 0x18 char *[] argvs
+    pushl %edi          # ebp - 0x1c &cmd
+    leal -0xc(%ebp), %edi 
+    pushl %edi          # ebp - 0x20 & sh
+    leal -0x8(%ebp), %edi
+    pushl %edi          # ebp - 0x24
+    xorl %edi, %edi
+    pushl $0x00000000   # ebp - 0x28
+    leal -0x28(%ebp), %edi
+    pushl %edi          # ebp - 0x2c
+    xorl %edi, %edi
+    # argv1
+    leal -0x14(%ebp), %eax
+    movl %eax, %ebx
+    # argv2
+    leal -0x24(%ebp), %eax
+    movl %eax, %ecx
+    # argv3
+    leal -0x2c(%ebp), %eax
+    movl %eax, %edx
+    movl %eax, %edx
+    xorl %eax, %eax
+    movb $0xb, %al
+    int $0x80
+    movl %ebx, %eax
+    leave
+    ret
+
+[ 호출 방법 ]
+movl [명령 문자열이 있는 주소], %eax
+pushl %eax
+leal (%esp), %eax
+pushl %eax
+call system
+addl $0x4, %esp
+
+[ 동작 순서 ]
+"ls -al; uname -a" -> [명령 문자열이 있는 주소] -> [그 주소를 가리키는 주소]
+
+----
+CategoryLanguage

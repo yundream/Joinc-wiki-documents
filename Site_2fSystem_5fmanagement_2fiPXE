@@ -1,0 +1,87 @@
+#title iPXE - Open source boot firmware
+
+[[TableOfcontents]]
+
+== iPXE ==
+iPXE는 오픈소스 기반의 네트워크 부트 펌웨어로 PXE의 모든 기능을 지원한다. 더불어 아래와 같은 추가적인 기능도 가지고 있다.  
+  * HTTP와 같은 웹 서버를 이용한 부팅 
+  * iSCSI SAN을 통한 부팅
+  * wireless network를 통한 부팅
+  * 광대역 네트워크를 통한 부팅.  
+  * 스크립트를 이용한 부트 과정 제어
+
+=== 다운로드 ===
+iPXE는 부팅 가능한 [ISO 이미지 형태로 배포된다. CD-ROM으로 구운다음에 부팅하면 된다. [http://boot.ipxe.org/ipxe.iso iPXE ISO 다운로드하기]
+
+== 테스트 ==
+=== 준비 사항 ===
+iPXE는 다양한 기술들을 필요로 한다. 이 문서를 읽고 자기의 것으로 만들려면 아래의 기반 지식이 필요하다.
+  * [wiki:Site/System_management/PXEBoot PXE-Boot]
+  * [wiki:Site/System_management/dhcp DHCP]
+  * [wiki:Site/cloud/Qemu/Network QEMU(KVM) 네트워크]
+
+=== 테스트 환경 ===
+다음은 테스트 환경이다.
+   1. [wiki:man/12/KVM  KVM] 물리 환경 대신 KVM으로 테스트를 했다. virtualbox나 VMWare로도 테스트 할 수 있다.
+   1. [wiki:Site/System_management/dhcp DHCP 서버] : 자동화를 위해서는 필수
+   1. 운영체제 설치를 위한 웹 서버 : http://ftp.daum.net/centos/6/os/x86_64
+DHCP와 ISO 저장소를 위한 웹 서버 설정은 [wiki:Site/System_management/PXEBoot PXE-Boot] 문서를 참고한다. 설치할 운영체제로는 centos 6.2를 선택했다. ISO를 다운로드 하지 않고 http://ftp.daum.net/centos/6/os/x86_64/ 에서 직접 설치하기로 했다.
+
+=== DHCP 서버 설정 ===
+{{{#!plain
+subnet 192.168.56.0 netmask 255.255.255.0 {
+    option routers 192.168.56.1;
+
+    host ipxe-test {
+            hardware ethernet 08:00:27:C1:84:53;
+            fixed-address 192.168.56.61;
+            filename "http://192.168.56.1/install.ipxe";
+    }
+}}}
+  * 웹서버의 주소는 192.168.56.1
+  * KVM 게스트는 192.168.56.61 IP 주소를 가진다.
+  * TFTP 대신 http 를 이용해서 install.ipxe 스크립트를 읽어서 부팅한다. 
+
+=== iPXE 스크립트 만들기 ===
+iPXE 스크립트를 만든다. 
+{{{#!plain
+#!ipxe
+
+prompt -k 0x197e -t 20000 Press F12 to install CentOS... || exit
+set base http://ftp.daum.net/centos/6/os/x86_64
+kernel ${base}/images/pxeboot/vmlinuz stage2=${base}/images/install.img ksdevice=${netX/mac}
+initrd ${base}/images/pxeboot/initrd.img
+boot
+}}}
+  * prompt : 부팅 프롬프트가 뜬다. -t 시간 동안 입력을 기다린다.
+
+=== KVM으로 iPXE 부팅 ===
+이제 KVM에서 iPXE 부팅을 이용 운영체제를 설치해 보자. openvpn을 이용 tap0 디바이스를 만든다음 네트워크를 설정했다.
+{{{#!plain
+# openvpn --mktun --dev tap0
+# ifconfig tap0 192.168.56.1 netmask 255.255.255.0 up
+}}}
+
+운영체제를 설치할 디스크 이미지를 만든다.
+{{{#!plain
+# kvm-img create -f raw dummy.img 4G 
+}}}
+
+kvm을 실행한다.
+{{{#!plain
+# kvm -m 512 -cdrom ipxe.iso -k en-us -net nic,macaddr=08:00:27:C1:84:53 \
+-net tap,ifname=tap0,script=no -hda dummy.img 
+}}}
+
+https://lh5.googleusercontent.com/-Rx7oJkCx92g/T_aDFobkqeI/AAAAAAAACLc/-p3hU3kWMHU/s640/ipxe01.png
+
+prompt에 설정한 메시지가 뜨는 걸 확인할 수 있다. F12 키를 누르면 다음 줄로 넘어가서 vmlinuz을 로딩하고 설치 과정을 진행한다.
+
+https://lh3.googleusercontent.com/-qOLdbxe5wo4/T_aDyKgwXnI/AAAAAAAACLk/PX98UQncGyE/s640/ipxe02.png
+
+== 활용 ==
+사실 iPXE를 사용한다고 해서 PXE-Boot 보다 관리가 편해질 것인가에 대해서는 생각 해볼 필요가 있다. ipxe iso로 부팅을 해야 하기 때문이다. 물론 IPMI를 이용해서 원격 저장소에서 ipxe iso를 마운트 해서 부팅할 수 있기는 하지만 PXE-Boot에서는 필요 없었던 관리 포인트가 늘어난 것은 분명하다.
+
+내 생각에 iPXE의 장점은 public cloud 환경에서 활용 할 때, 누릴 수 있을 것 같다.
+  * 유저가 자신이 원하는 경로를 통해서 운영체제를 설치.
+물론 ISO를 올려서 설치하는 것도 가능하긴 한데, 크게는 수기가가 되는 ISO 파일을 굳이 클라우드 스토리지에 올려서 운영체제를 설치하는 건 인프라측면이나 고객 모두에게 좋은 방법은 아닌 것 같다. iPXE를 이용하면, VM을 ipxe.iso 로 부팅 한다음에 http를 이용해서 운영체제를 설치할 수 있으니, 클라우드 인프라관리자는 스토리지와 네트워크 비용을 절약할 수 있어서 좋고, 유저는 편하고 빨라서 좋다.

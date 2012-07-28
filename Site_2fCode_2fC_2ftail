@@ -1,0 +1,173 @@
+#title select를 이용한 Multi tail 구현
+
+=== 설명 ===
+tail구현 함수 입니다. 파일에 추가 되는 내용이 있는지 검사해서 줄단위로 읽어들입니다. 로그파일처리를 위한 프로그램등에 유용하게 사용할 수 있을 겁니다. 현재 저는 Apache(:12)의 웹로그를 분석해서 PV, Hits를 통계내는 곳에 사용하고 있습니다. 시간단위로 누적 count 값을 RRD(:12)에 저장해 둔다면, 변화량을 측정할 수 있게됩니다.
+
+ 1. 파일의 끝에 도달하면 select의 의미가 없으므로  <!> 굳이 select를 사용할 필요는 없을 거라고 생각된다. 실제 select부분을 주석처리해도 제대로 작동한다.
+=== 사용방법 ===
+{{{#!plain
+TAIL *opentail(char *fname);
+int readtail(TAIL *LTAIL, char *buf, size_t size, int sec);
+void closetail(TAIL *LTAIL);
+}}}
+ * opentail은 tail(:12)을 적용할 파일을 열기 위해서 사용한다. 실패하면 NULL을 리턴하고 성공하면 TAIL 객체(구조체 포인터)를 리턴한다.   
+ * readtail은 TAIL 객체를 이용해서 파일로 부터 추가된 내용을 줄단위로 읽어 온다. 줄이 추가되면 '''size'''만큼 읽어서 '''buf'''에 복사한다. 추가된 줄이 없을 경우 '''sec'''만큼 기다린다. 
+ * 입력된 줄을 읽어 왔다면 1을 리턴하고 어떤 이유로 실패 했을 경우 -1을 리턴한다.  
+
+{{{#!plain down:test.c
+#include "tail.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <vector>
+using namespace std;
+int main(int argc, char **argv)
+{
+  vector<TAIL *> tflist;
+  TAIL *tf;
+  char *buf;
+  int n, i;
+
+  // 2개 이상의 파일에 대해서 tail 가능하다.
+  for(i = 1; i < argc; i++)
+  {
+    if((tf = opentail(argv[i])) == NULL)
+    {
+      perror("error ");
+      exit(1);
+    }
+    tflist.push_back(tf);
+  }
+
+  buf = (char *)malloc(1024);
+  int issleep = 0;
+  while(1)
+  {
+    issleep = 0;
+    for(i = 0; i < tflist.size(); i++)
+    {
+      n = readtail(tflist[i], buf, 1023, 1);
+      if(n > 0)
+        printf("%d : %s", i, buf);
+      issleep |= n;
+    }
+
+    if (issleep == 0)
+    {
+      sleep(1);
+      printf("Sleep\n");
+      continue;
+    }
+  }
+  //closetail(tf);
+  free(buf);
+}
+}}}
+
+=== 코드 ===
+{{{#!plain adsense
+#include <sys/types.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+/*
+ * tail 관리를 위한 객체
+ */
+typedef struct _TAIL
+{
+    FILE *fp;            // 파일 스트림 
+    char filename[256];  // 오픈한 파일 이름
+    int fd;              // 파일 스트림에 대한 파일 지정자
+    int revsize;         // 최근에 읽었던 파일 크기 
+} TAIL;
+
+/*
+ * tail을 적용할 파일을 연다.  
+ */
+TAIL *opentail(char *fname)
+{
+    TAIL *MTAIL;
+    struct stat fbuf;
+    MTAIL = (TAIL *)malloc(sizeof(TAIL));
+    if ((MTAIL->fp = fopen(fname, "r")) == NULL)
+    {
+        return NULL;
+    }
+
+    if (stat(fname, &fbuf) < 0)
+    {
+        return NULL;
+    }
+
+    strncpy(MTAIL->filename, fname, 255);
+
+    // 열린 파일 스트림의 파일지정자를 얻어온다.
+    MTAIL->fd = fileno(MTAIL->fp);
+    MTAIL->revsize = fbuf.st_size;
+    return MTAIL;
+}
+
+/*
+ * sec시간 간격으로 파일에 추가된 내용을 읽어온다.  
+ * 만약 지금의 파일크기가 이전 파일크기 보다 작다면 
+ * 파일이 truncate() 되었다고 가정하고 첫라인 부터 
+ * 다시 읽어 들인다. 
+ */
+int readtail(TAIL *LTAIL, char *buf, size_t size, int sec)
+{
+    fd_set rfds;
+    struct timeval tv;
+    int n, retval;
+    char *ret;
+    int fd;
+    struct stat fbuf;
+
+    FD_ZERO(&rfds);
+    FD_SET(LTAIL->fd, &rfds);
+    tv.tv_sec  = sec;
+    tv.tv_usec = 0;
+    retval = select(LTAIL->fd+1, &rfds, NULL, NULL, &tv);
+    if (retval)
+    {
+        ret = fgets(buf, size, LTAIL->fp);
+        if (stat(LTAIL->filename, &fbuf) < 0)
+        {
+            return -1;
+        }
+        if (ret == NULL)
+        {
+            // 현재 파일크기가 이전 파일 크기 보다 
+            // 작다면 rewind()시킨다. 
+            if (fbuf.st_size < LTAIL->revsize)
+            {
+                rewind(LTAIL->fp);
+            }
+            LTAIL->revsize = fbuf.st_size;
+            return 0;
+        }
+        LTAIL->revsize = fbuf.st_size;
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+    return 1;
+}
+
+void closetail(TAIL *LTAIL)
+{   
+    fclose(LTAIL->fp);
+    free(LTAIL);
+}
+}}}
+
+=== 참고문서 ===
+ * select(2)
+ * tail(2)
+ * [wiki:Site/Network_Programing/Documents/selectIntro select를 이용한 입출력 다중화]

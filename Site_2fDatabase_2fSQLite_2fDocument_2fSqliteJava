@@ -1,0 +1,80 @@
+#title SQLite Java Wrapper/JDBC 드라이버 테스트
+
+Sqlite의 Java(:12) Wrapper와 JDBC 드라이버가 있어서 소개한다. Wrapper은 JNI를 이용해서 Sqlite의 C(:12) 라이브러리(:12)를 호출하는 방식으로 사용하기가 매우 버거롭기 때문에 설명하지 않고, JDBC 드라이버를 중심으로 테스트 하도록 하겠다. 테스트 환경은 다음과 같다.
+ * Sqlite 3.3.8
+ * JDK 1.5 (문서에는 JDK 1.1 이상을 지원한다고 되어 있음)
+
+javasqlite 패키지및 API문서는 http://www.ch-werner.de/javasqlite 에서 얻을 수 있다.
+
+다음은 테스트를 위한 table 구조다
+{{{#!plain
+sqlite> .schema cache
+CREATE TABLE cache (
+did int primary key,
+score real,
+xmind real,
+prox int);
+}}}
+
+다음은 테스트를 위한 코드다
+{{{#!plain
+import SQLite.JDBCDriver;
+import java.sql.*;
+
+class mytest2
+{
+
+    public static void main(String[] args)
+    {
+        try
+        {
+            Class.forName("SQLite.JDBCDriver");
+            long start, end;
+
+            String url="jdbc:sqlite://home/yundream/Desktop/javasqlite-new/cache.db";
+            start =  System.currentTimeMillis();
+            Connection db = DriverManager.getConnection(url);
+            db.setAutoCommit(false);
+            Statement st = db.createStatement();
+            System.out.println("=====================");
+            /*
+            for (int i = 0; i < 1000; i++)
+            {
+                st.executeUpdate("insert into cache values("+i+",'yundream')");
+            }
+            db.commit();
+            */
+           System.out.println("End   : " + (System.currentTimeMillis() - start));
+
+           System.out.println("=====================");
+            start =  System.currentTimeMillis();
+
+           ResultSet rs = st.executeQuery("select * from cache where id < 200");
+           while (rs.next())
+           {
+                //System.out.println(rs.getInt("id")+":"+rs.getString("name"));
+           }
+           System.out.println("End   : " + (System.currentTimeMillis() - start));
+
+           System.out.println("=====================");
+
+           db.close();
+        }
+        catch (ClassNotFoundException cnfEx)
+        {
+            System.err.println("CLASS Error: "+cnfEx.getMessage());
+        }
+        catch (SQLException sqlEx)
+        {
+            System.err.println("SQL Error: "+sqlEx.getMessage());
+        }
+    }
+}
+}}}
+
+JNI를 통한 응용이기 때문에, 실행을 위해서는 libsqlite의 경로를 지정하거나 환경변수 '''LD_LIBRARY_PATH''' 에 지정해야 한다.
+{{{#!plain
+# java -Djava.library.path=/usr/local/lib mytest2
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+}}}
+ * http://www.sqlite.org/speed.html : Sqlite 속도비교 문서

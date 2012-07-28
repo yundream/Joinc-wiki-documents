@@ -1,0 +1,203 @@
+#title Solr로 로컬 검색서비스 만들기
+
+[[TableOfcontents]]
+== Solr ==
+Solr은 Apache Lucene 프로젝트에 기반을 둔 검색엔진으로 기업용을 대상으로 개발을 했다. [wiki:man/12/lucene Lucene]의 강력한 기능의 대부분을 그대로 사용할 수 있다.  
+   * Full-text search 
+   * hit highlighting 
+   * faceted search
+   * dynamic clustering
+   * database integration
+   * Word, PD와 같은 rich document 색인 지원
+
+Solr은 Java 기반으로 만들어졌으며, Tomcat와 같은 servlet container에 올릴 수 있다.
+
+== Joinc 컨텐츠 검색 서비스 만들기 ==
+지금까지는 구글 custom search(이하 CS)를 사용해 왔다. 쓸만하지만 몇 가지 문제가 있다.
+  1. 색인 갱신 주기를 조절할 수 없다. 컨텐츠를 옮기거나 하는 등으로 URL이 변경되면, 다음번 색인 까지 한참 동안 링크가 깨진다. 
+  1. URL 맵이 엉망으로 만들어진다. 구글 CS는 크롤을 기반으로 한다. 따라서 모든 가능한 링크에 대해서 색인이 만들어 지는데, 그러다 보니 ?action=diff 등과 같은 wiki 액션 페이지들도 색인이 되버린다. memset 페이지 뿐만 아니라 memset??action=diff 와 같은 페이지까지 색인이 되버린다. 그리고 어느게 score가 높을지 예상할 수가 없다. memset??action=diff 같은 URL이 링크걸리면, 재수 없을 경우 아예 컨텐츠를 확인할 수 없는 경우가 비일비재 하다. 
+  1. 텍스트 브라우저로 브라우징 할 수 없다. 주로 [wiki:man/12/w3m w3m]을 이용해서 브라우징을 한다. 구글 CS는 Ajax 호출이기 때문에 w3m에서는 검색결과를 볼 수 없다. 대부분의 사람들에게는 상관없겠지만 나에게는 중요한 문제다. 
+
+문제를 해결하기 위해서는 컨텐츠 기반으로 색인을 하면 되는데, lucene가 거의 유일한 해결책이라 할 수 있겠다. 하지만 lucene는 너무 무겁고, 설치/운용이 귀찮다. 직접 만드는 건 더 귀찮다. 
+
+이래 저래 귀찮아서 그냥 CS를 사용하고 있었는데, [wiki:Site/cloud/automation chef]를 가지고 놀다가 우연찮게 발견했다. chef에서는 메타정보 검색을 위해서 solr을 사용를 사용하는데, 이게 뭔가 하고 살펴봤더니 루신 색인을 그대로 사용하는거 아닌가. 게다가 설치/운용도 간단해 보였다.!!!
+
+그래 Solr을 이용해서 컨텐츠 기반의 검색 서비스를 만들어 보기로 했다.
+
+=== 다운로드 ===
+Joinc 서버는 Ubuntu 리눅스를 사용하고 있는데, 친절하게도 Tomcat까지 포함해서 Solr을 배포한다. 하지만 Tomcat은 너무 무겁다는 생각이 들어서 Tomcat 없이 설치하기로 했다. Joinc 서버는 (가장 저렴한)VM에서 돌아간다. 그래서 Tomcat 올리는게 좀 무섭다. 
+
+http://lucene.apache.org/solr 에서 다운로드 했다. (2012년 7월 현재)4.0버전을 사용할 수 있지만 아직 Beta를 벗어나지 못한 상태라서, 3.6.0을 설치하기로 했다.
+
+압축을 풀면 컨테이너까지 제공을 한다. 해서 Tomcat 대신, 소스 패키지에서 제공하는 컨테이너를 사용하기로 했다. 
+
+=== 색인 준비 ===
+다행히 lucene로 삽질한 경험이 있어서, 별 어려움 없이 사용할 수 있었다. 색인을 위해서 먼저 schema를 설계 한다. 여기에는 필드이름과 필드타입등이 들어간다.
+
+아 schema 수정하기 귀찮다. 그래서 소스코드에 들어있는 schema를 그대로 사용하기로 했다.
+{{{#!plain
+# cat schema.xml
+...
+   <field name="id" type="string" indexed="true" stored="true" required="true" />
+   <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
+   <field name="name" type="text_general" indexed="true" stored="true"/>
+   <field name="alphaNameSort" type="alphaOnlySort" indexed="true" stored="false"/>
+   <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
+   <field name="cat" type="string" indexed="true" stored="true" multiValued="true"/>
+   <field name="features" type="text_general" indexed="true" stored="true" multiValued="true"/>
+...
+}}}
+이 schema는 예제로 제공하는 컨텐츠의 색인을 위한 용도다. 이중 id와 cat 필드를 사용하기로 했다. 두 개만 사용할 거라면 필요없는 것 지우고 name만 바꿔도 되지 않겠느냐 라고 할 수도 있는데, 귀찮다. 그리고 괜히 바꿔서 에러나면 삽질해야 할 것 같아서. 어차피 색인 새로 만드는 시간이라고 해봐야 10분인데, 나중에 정교하게 하면 되겠다. 
+
+  * id : wiki 파일 이름으로 한다. 검색 후에 id 이름으로 페이지 링크를 만들면 된다. 
+  * cat : wiki 본문 내용으로 한다. wiki 내용은 wiki 포맷을 따르기 때문에, 검색 결과를 예쁘게 보여주려면, 정리작업이 필요하다. 하지만 귀찮아서 그냥 wiki 문서 그대로 색인하기로 했다.   
+
+내가 사용하는 moniwiki 파일은 data/text에 plain text형태로 저장 된다.   
+{{{#!plain
+# cat man_2f12_2fmemset
+# title memset
+
+=== memset ===
+memset은 어쩌고 저쩌고 하는 함수다....
+}}}
+
+색인을 하려면 schema에 맞게 작성해야 한다. 
+{{{#!plain
+<add>
+<doc>
+    <field name="id">man_2f12_2fmemset</field>
+    <field name="cat">memset은 어쩌고 저쩌고 하는 함수다....</field>
+</doc>
+</add>
+}}}
+cat field의 경우 CDATA를 써줘야 할 것이다.
+
+python 스크립트 하나 만들어서 모든 wiki 파일을 schema 형식에 맞게 변환해서 doc.xml 이름으로 저장했다. 귀찮아서 대충 돌아가게만 만들었다.
+{{{#!plain
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+import sys
+import os
+import re
+import urllib
+import codecs
+
+output = codecs.open('doc.xml', 'w', 'utf8')
+for file in os.listdir('./text'):
+    if re.match("^Site_2f|^man_2f",file):
+        try:    
+            handle = codecs.open('./text/'+file, 'r', 'utf8')
+            print file  
+        except IOError:
+            print "Open Error"
+        else:   
+            firstline = 1
+            body = ""   
+            for line in handle:
+                if firstline == 1: 
+                    if line.find('#title') != -1:
+                        firstline = 0;          
+                        title = line            
+                        #print u"<field name=\"title\">{0}</field>".format(line)
+                else:           
+                    #output.write(line) 
+                    body = body + line  
+            output.write("<doc>\n")
+            output.write("\t<field name=\"id\">{0}</field>\n".format(file))
+            body = u"\t<field name=\"cat\">\n{0}\n</field>\n\n".format(body)
+            output.write(body)
+            output.write("</doc>\n")
+            handle.close()
+            #print "\t<field name=\"id\">{0}</field>".format(file)
+            #print "</doc>"
+}}}
+python에서 utf8 처리하려다 멘붕 올뻔했다. 약 올리려고 까다롭게 한건가 ? 
+
+Solr 컨테이너 띄우고
+{{{#!plain
+# java -jar start.jar &
+}}}
+8983 포트로 연결하면 관리자 화면이 뜬다. 여기에서 질의 결과를 테스트할 수 있다. 
+
+색인 시작
+{{{#!plain
+# java -jar post.jar doc.xml
+}}}
+했더니 끝이다. wiki 컨텐츠 중에 CDATA를 포함한 문서가 있어서, 수정 작업을 좀 했다. 나중에 wiki 컨텐츠를 깔끔하게 변환하도록 프로그램을 수정해야 겠다.  
+
+8983 포트로 연결해서 테스트 하면 된다.
+=== 테스트 ===
+{{{#!html
+  <form action="http://www.joinc.co.kr/modules/moniwiki/wiki.php/search">
+    <div>
+    <input name="q" type="text" size="10" class=goto value=""/>
+    <input type="submit" name="sa" value="검색" class='submitBtn' />
+    </div>
+  </form>
+}}}
+
+TF * IDF에 기반한 전형적인 Lucene 검색 결과를 보여준다. 형태소분석기 없이 ngram 색인을 돌렸는데, CMS 컨텐츠를 대상으로 본다면 충분히 쓸만한거 같다. 문서가 수백만건인 것도 아닌데, 굳이 형태소분석기를 돌릴 필요는 없는 것 같다. 차라리 데이터 클랜징, title field 추가, token이 일정 갯수 이하일 경우 score를 낮추도록 LengthNorm 알고리즘을 변경하는게 (별다른 노력없이)검색품질을 높일 수 있는 방법이지 싶다. 
+
+=== moniwiki와 통합 ===
+==== 검색 요청 ====
+이제 moniwiki와 통합할 차례다. Solr를 별도의 컨테이너로 띄웠으니, php 함수로 URL을 open 해서 처리할 수 밖에 없겠다. php에서 직접 solr를 처리하는 방법이 있으나, 현재 php solr의 지원버전이 3.2라서 그냥 URL 오픈하기로 했다. 
+{{{#!plain
+// ...
+$xmlUrl = "http://localhost:8983/solr/select/?q=$q&version=2.2&start=$start&rows=10&indent=on";
+$xmlStr = file_get_contents($xmlUrl);
+$xmlObj = simplexml_load_string($xmlStr);
+$arrXml = objectsIntoArray($xmlObj);
+$q = ($arrXml['lst']['lst']['str'][2]);
+$rows = ($arrXml['lst']['lst']['str'][4]);
+// ...
+}}}
+검색 결과는 xml 형식으로 돌려준다. php의 내장 xml 함수를 이용해서 파싱해서 처리했다. 이렇게 해서 지금의 joinc 검색 서비스가 만들어졌다. (아직은 보기에 그닥 좋지 않지만)  
+
+==== 데이터 클랜징 ====
+위키 원문을 그대로 색인하다 보니, 검색 결과에 위키 문법을 포함한 문서가 노출이 된다. 보기에 썩 좋지 않다. 위키 원문을 색인하기 보다는 HTML로 해석된 위키 문서를 HTML strip해서 색인하는게 좋을 것이다. 
+
+느리고 아름다운 방법 대신 스크립트를 이용해서 '''빠르고 지저분한 방식'''으로 데이터를 클랜징하기로 했다.
+  * 색인할 위키 문서의 URL 링크 목록을 만든다.  
+  * [wiki:man/12/w3m w3m]으로 위키 문서를 요청한다. 그러면 위키엔진이 해석한 HTML 문서를 가져올 것이다. 그리고 w3m이 알아서 HTML strip 해준다. 깔끔해진 문서를 별도의 디렉토리에 저장한다.  
+    {{{#!plain
+import getopt, sys
+import os
+import re
+import urllib
+import codecs
+
+for file in os.listdir('./text'):
+    if re.match("^Site_2f|^man_2f",file):
+        uri = file.replace('_', '%')
+        command = "w3m -dump \"http://www.joinc.co.kr/modules/moniwiki/wiki.php/{0}?action=print\" > rawindex/{1}".format(urllib.unquote(uri), file)
+        os.system (command)
+}}}
+  * 이 문서를 색인한다.  
+검색 결과가 훨씬 보기 좋아졌다.
+
+==== 문서 추가/업데이트/삭제시 색인 업데이트 ====
+주기적으로 추가및 업데이트된 문서에 대한 색인을 만드는 방법이 있다. 모니위키는 '''editlog'''파일에 문서 변경내용을 추가한다. 그러하니 주기적으로 editlog 파일을 읽어서 색인을 업데이트 하면 된다.   
+
+문서 변경내용을 실시간에 색인에 적용하기를 원한다면, moniwiki 스크립트를 약간 수정해야 한다. moniwiki는 '''send_page'''라는 함수를 호출해서 문서를 저장하는데, 저장 한 다음 색인 추가 프로그램을 호출하면 된다. 
+  1. wiki에서 파일을 저장하면
+  1. w3m을 이용해서 수정한 웹 페이지를 읽어서 
+  1. xml 데이터로 만든 다음에  
+  1. 색인한다.
+
+=== 앞으로 해야 할 것. ===
+  1. Moniwiki와 연동해야 한다. 
+     * 글을 새로 만들 때, 색인 Add.
+     * 글을 수정 할 때, 색인 Update.
+     * 글 삭제시, 색인 Delete
+  1. 색인 업데이트 삭제등을 wiki 페이지 업데이트 삭제와 연동해야 한다.
+  1. Snippet, hit highlighting 적용
+  1. 색인 컨텐츠 정규화
+  1. field 정리. time field, tag 필드 추가 
+  1. solr을 이용한 분산 검색 아이디어
+  1. solr를 이용한 RDBMS 색인
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-07-19T09:28:44)]]
+
+[[Tag(검색,Lucene,Solr)]]

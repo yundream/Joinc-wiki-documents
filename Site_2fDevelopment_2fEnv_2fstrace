@@ -1,10 +1,11 @@
 #title strace를 이용한 system call tracing
 
+[[TableOfContents]]
 == strace ==
-리눅스상에서 작동하는 C(:12) 코드들은 모두 시스템콜(:12)을 주어진 임무를 수행한다. 그러므로 프로그램의 시스템콜이 호출되는 것을 추적할 수 있다면, 프로그램을 디버깅하거나 제대로 작동되는지에 대한 중요한 정보를 얻을 수 있을 것이다.
+리눅스상에서 작동하는 [wiki:Site/C C] 코드들은 모두 시스템콜(:12)을 주어진 임무를 수행한다. 그러므로 프로그램의 시스템콜이 호출되는 것을 추적할 수 있다면, 프로그램을 디버깅하거나 제대로 작동되는지에 대한 중요한 정보를 얻을 수 있을 것이다.
 
-=== strace란 무엇인가 ? ===
-strace는 프로그램이 실행될동안 호출하는 시스템콜(:12)을 추적할 수 있는 툴 이다. 여기에 더불어 프로세스가 받은 signal(:12)에 대한 정보도 얻을 수 있다. strace를 이용하는 가장 간단한 경우는 strace 다음에 실행시킬 프로그램을 명시하는 것으로, 그러면 프로그램이 종료될때까지의 시스템콜 혹은 시그널 정보를 얻을 수 있게 된다.  
+=== strace에 대해서 ===
+strace는 프로그램이 실행될동안 호출하는 [wiki:man/12/시스템콜 시스템콜]을 추적할 수 있는 툴 이다. 여기에 더불어 [wiki:man/12/프로세스 프로세스]가 받은 [wiki:man/12/signal signal]에 대한 정보도 얻을 수 있다. strace를 이용하는 가장 간단한 경우는 strace 다음에 실행시킬 프로그램을 명시하는 것으로, 그러면 프로그램이 종료될때까지의 시스템콜 혹은 시그널 정보를 얻을 수 있게 된다.  
 
 strace의 사용방법은 다음과 같다.
 {{{#!plain
@@ -17,7 +18,7 @@ usage: strace [-dffhiqrtttTvVxx] [-a column] [-e expr] ... [-o file]
 }}}
 
 === 시스템콜 추적하기 ===
-strace를 테스트하기 위해서 간단한 셈플프로그램을 만들어보도록 하자. 프로그램의 이름은 test.c 로 하겠다.
+strace를 테스트하기 위해서 간단한 셈플프로그램을 만들었다. 프로그램의 이름은 test.c으로 했다.
 {{{#!plain
 #include <stdio.h>
 
@@ -27,7 +28,7 @@ int main(int argc, char **argv)
 }
 }}}
 
-이제 프로그램을 컴파한후, strace를 이용해서 프로그램을 실행시킨다.
+이제 프로그램을 컴파일한후, strace를 이용해서 프로그램을 실행시킨다.
 {{{#!plain
 $ strace ./mytest2 
 execve("./mytest2", ["./mytest2"], [/* 47 vars */]) = 0
@@ -51,14 +52,14 @@ exit_group(0)                           = ?
 Process 22425 detached
 }}}
 
-strace를 실행시키면 가장 먼저, 인자로 주어진 프로그램을 execv 를 이용해서 실행시킨다. 여기에서, 인자는 ./mytest2를 줬고, 47개의 환경변수(:12)를 넘겼음을 확인할 수 있다. 이 환경변수는 strace를 실행시킨, shell(:12)에서 복사된 값들이다.
+strace를 실행시키면 가장 먼저, 매개변수로 주어진 프로그램을 execv 를 이용해서 실행시킨다. 여기에서, 인자는 ./mytest2를 줬고, 47개의 [wiki:man/12/환경변수 환경변수]를 넘겼음을 확인할 수 있다. 이 환경변수는 strace를 실행시킨, [wiki:man/12/shell shell]에서 복사된 것들이다.
 {{{#!plain
 execve("./mytest2", ["./mytest2"], [/* 47 vars */]) = 0
 }}}
-이제 brk(0), close(2), open(2), read(2)와 같은 시스템함수들을 호출하는 것을 확인할 수 있다. 최종적으로 exit_group 를 호출해서 프로세스를 종료시키고, 쉘로 detached 된다.
+이제 brk(0), [wiki:man/2/close close(2)], [wiki:man/2/open open(2)], [wiki:man/2/read read(2)]와 같은 시스템함수들을 호출하는 것을 확인할 수 있다. 최종적으로 exit_group 를 호출해서 프로세스를 종료시키고, 쉘로 detached 된다.
 
 === 시그널 추적및 보고서만들기 ===
-strace를 이용하면 시그널을 추적하고, 이에 대한 보고서를 만들 수도 있다. 다음과 같은 C(:12)코드를 준비하자.
+strace를 이용하면 시그널을 추적하고, 이에 대한 보고서를 만들 수도 있다. 다음과 같은 [wiki:Site/C C]코드를 준비하자.
 {{{#!plain
 #include <stdio.h>
 
@@ -77,7 +78,7 @@ int main()
 {{{#!plain
 $ strace -o trace.txt ./mytest3
 }}}
-이제 적당한 시기에 ctrl+c 를 눌러스 SIGINT signal(:12)을 발생시킨다. strace를 이용한 모든 결과는 trace.txt에 저장되어 있으니 확인해 보도록 하자.
+이제 적당한 시기에 ctrl+c 를 눌러스 SIGINT [wiki:man/12/signal signal]을 발생시킨다. strace를 이용한 모든 결과는 trace.txt에서 확인할 수 있다.
 {{{#!plain
 ...
 ...
@@ -121,7 +122,7 @@ $ cat trace.txt
 {{{#!plain
 # strace -p [pid]
 }}}
-fork(2)와 vfork(2)도 추적하려면 f와 F옵션을 사용하면 된다.
+[wiki:man/12/fork fork]와 [wiki:man/12/vfork vfork(2)]도 추적하려면 f와 F옵션을 사용하면 된다.
 {{{#!plain
 # strace -fF -p [pid]
 }}}
@@ -130,5 +131,22 @@ fork(2)와 vfork(2)도 추적하려면 f와 F옵션을 사용하면 된다.
   1. 데몬이 멈췄다. 어느 지점에서 멈췄는지 확인할 수 있다.
   1. 클라이언트가 연결을 하지 못한다. 클라이언트는 connect(2)함수를 호출했는지, 서버는 accept(2)함수가 제대로 호출 되었는지 확인할 수 있다.
 
+호출한 시스템 콜에 대한 호출빈도, 에러, CPU 타임 정보를 확인할 수도 있다. Ctrl+C를 누르면 레포팅된다.
+{{{#!plain
+$ sudo strace -r -p 12051 -c
+Process 12051 attached - interrupt to quit
+^CProcess 12051 detached
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 98.20    0.016002         182        88           poll
+  0.87    0.000142           0       703           write
+  0.77    0.000125           0       572           futex
+  0.16    0.000026           0      1670       439 read
+  0.00    0.000000           0         1           restart_syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.016295                  3034       439 total
+}}}
 === 마치며 ===
 gdb, ltrace, strace를 함께 사용한다면, 좀더 쉽게 프로그램의 성능과 문제점등을 파악할 수 있을 것이다.
+
+[[Tag(strace,systemcall,gdb,process,signal)]]

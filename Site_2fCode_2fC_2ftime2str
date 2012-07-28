@@ -1,0 +1,93 @@
+#title 조각 코드 : 유닉스 시간을 문자열 형식으로 변환
+
+=== 설명 ===
+유닉스 시간을 문자열로 바꿔주기 위한 표준 함수는 ctime(:3)과 asctim(:3)입니다. 그렇지만 일반 응용 애플리케이션에서 사용하기에는 형식이 매우 제한적일 수 밖에 없습니다. 그래서 별도의 시간변환 함수를 만들어서 사용하는데요. 한번 만들어 보았습니다.
+
+'''time_t''' 타입의 유닉스 시간을 알아보기 쉬운 일반 문자열로 변경하는 함수입니다. 시간의 각 단위를 표현하기 위해 y(년), m(월), d(일), h(시), mi(분),s(초) 를 사용하게 됩니다. php의 date 함수와 비슷하게 사용할 수 있습니다.
+
+현재는 각 자리수가 고정되어 있고 (년 4자리, 월 2자리 등..) 시간 같은 경우도 24시간 표기법만 지원하는데 수정하면 좀더 폭넓은 표현이 가능할겁니다.  
+|| 표기문자  || 출력포맷    || 단위  ||
+|| y    || %04      || 년  ||
+|| m    || %02      || 월  ||
+|| M          || %s                       || 영문 월, 3자리  ||
+|| d    || %02      || 일  ||
+|| D    || %2s      || 영문 요일, 3자리 ||
+|| h    || %02      || 시  ||
+|| mi    || %02      || 분  ||
+|| s    || %02      || 초  ||
+
+=== 사용방법 ===
+{{{#!plain
+int main(int argc, char **argv)
+{
+    char *str;
+    str = time2str(time((time_t *)NULL), "y, M d D h:mi:s");
+    printf("%s\n", str);
+}
+}}}
+
+=== 코드 ===
+{{{#!plain
+char * time2str(time_t org_time, char *format)
+{
+    struct tm *tm_ptr;
+    int index=0;
+    int i;
+    tm_ptr = localtime(&org_time);
+    memset(dday, 0x00, 256);
+    for (i = 0; i < strlen(format); i++)
+    {
+        switch(format[i])
+        {
+            case 'y': // 년  
+                sprintf(dday+index, "%04d", tm_ptr->tm_year+1900);
+                index += 4;
+                break;
+            case 'm': // 월(1-12), 분(0-59)  
+                if (format[i+1] == 'i')
+                {
+                    sprintf(dday+index, "%02d", tm_ptr->tm_min);
+                    index += 2;
+                    i++;
+                    break;
+                }
+                else
+                {
+                    sprintf(dday+index, "%02d", tm_ptr->tm_mon+1);
+                    index += 2;
+                    break;
+                }
+            case 'M':
+               sprintf(dday+index, "%s", montable+((tm_ptr->tm_mon)*4));
+               index += 3;
+               break;
+
+            case 'd': // 일 (1-31) 
+                sprintf(dday+index, "%02d", tm_ptr->tm_mday);
+                index += 2;
+                break;
+            case 'D': // 요일(일 ~ 토) 
+                sprintf(dday+index, "%s", daytable+(tm_ptr->tm_wday * 4));
+                index += 3;
+                break;
+            case 'h': // 시(00-23) 
+                sprintf(dday+index, "%02d", tm_ptr->tm_hour);
+                index += 2;
+                break;
+            case 's': // 초(00-59) 
+                sprintf(dday+index, "%02d", tm_ptr->tm_sec);
+                index += 2;
+                break;
+
+            default:
+                dday[index] = format[i];
+                index++;
+        }
+    }
+    return dday;
+}
+}}}
+
+=== 변경사항 ===
+
+[[Category(200)]]

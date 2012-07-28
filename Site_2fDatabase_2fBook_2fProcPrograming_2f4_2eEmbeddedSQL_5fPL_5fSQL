@@ -5,13 +5,13 @@
 앞에서도 말한바와 같이 Pro*C/C++ 을 사용하는 이유는 C/C++ 프로그램에서 SQL 문장을 사용하기 위해서이다. 실행 가능한 SQL 문장을 삽입하여 DB에 접근하고, 조작하고, 관리 할 수 있다. 사용가능한 문장들에는 어떤것들이 있는지 살펴보자.
 
  * 사용할 수 있는 SQL 문장
-|| SQL	|| Description			||
-|| DML	|| Delete, Insert, Select, Update, Explain Plan, Lock Table ||
-|| DDL	|| Alter, Analyze, Audit, Comment, Create, Drop, Grant, NoAudit,  Rename, Revoke, Truncate ||
-|| Session Control	|| Alter Session, Set Role ||
-|| Transaction Control	|| Commit, Rollback, Savepoint, Set Transaction ||
-|| System Control	|| Alter System		||
-|| PL/SQL Block		|| PL/SQL 문장들	||
+|| SQL  || Description      ||
+|| DML  || Delete, Insert, Select, Update, Explain Plan, Lock Table ||
+|| DDL  || Alter, Analyze, Audit, Comment, Create, Drop, Grant, NoAudit,  Rename, Revoke, Truncate ||
+|| Session Control  || Alter Session, Set Role ||
+|| Transaction Control  || Commit, Rollback, Savepoint, Set Transaction ||
+|| System Control  || Alter System    ||
+|| PL/SQL Block    || PL/SQL 문장들  ||
 
 ==== 데이터베이스에 접속 ====
 먼저 데이터베이스에 어떤 조작을 하려면 접속을 해야만 한다. 접속을 하기 위해선 데이터베이스에 계정을 가지고 있어야 한다. 우리는 오라클에서 테스트용으로 제공하는 SCOTT이라는 계정을 사용한다. 먼저 유의 해야할 사항은 사용자 계정과 패스워드역시 SQL 문장에서 사용될 것이므로 이것을 저장할 변수 역시 호스트 변수로 선언해야 한다는 것이다. 위에서 보았듯이 호스트 프로그램에 SQL 문장을 삽입하기 위해서는 반드시 EXEC SQL을 붙여주어야만 한다.
@@ -19,22 +19,22 @@
 아래에 예제를 보자.
 {{{#!plain
 EXEC SQL BEGIN DECLARE SECTION;
-	varchar username [20];
-	varchar password [20];
-	varchar dbname [20];
+  varchar username [20];
+  varchar password [20];
+  varchar dbname [20];
 EXEC SQL END DECLARE SECTION;
 … … …
 
-	strcpy (username.arr, “SCOTT”);
-	strcpy (password.arr, “TIGER”);
-	strcpy (dbname.arr,   “ORCL” );
-	username.len = strlen (“SCOTT”);
-	password.len = strlen (“TIGER”);
-	dbname.len   = strlen (“ORCL” );
+  strcpy (username.arr, “SCOTT”);
+  strcpy (password.arr, “TIGER”);
+  strcpy (dbname.arr,   “ORCL” );
+  username.len = strlen (“SCOTT”);
+  password.len = strlen (“TIGER”);
+  dbname.len   = strlen (“ORCL” );
 
 … … …
-	
-	EXEC SQL CONNECT :username IDENTIFIED BY :password USING :dbname;
+  
+  EXEC SQL CONNECT :username IDENTIFIED BY :password USING :dbname;
 }}}
 
 사용자의 이름은 SCOTT이고 패스워드는 TIGER이다. 그리고 varchar형식의 변수를 선언했으므로 arr에 문자열을 넣어주고 len에 그 길이를 넣어준다. 주의하여 볼 만한 사항으로 USING :dbname 부분이 있다. 이것은 원격 데이터베이스에 접속할 때 사용하는 것으로 반드시 필요한 구문은 아니다. dbname 변수에 들어가는 것은 원격 데이터베이스를 지정하는 커넥트 스트링을 저장한다. 커넥트 스트링은 tnsnames.ora 파일에 들어있으며 여기에 먼저 선언이 되어 있어야만 사용 할 수 있다. 만약에 로컬 데이터베이스에 접속한다면 Using :dbname 구문은 필요 없다. 
@@ -45,11 +45,11 @@ EXEC SQL END DECLARE SECTION;
 {{{#!plain
 /* 호스트 변수의 선언 시작 */
 EXEC SQL BEGIN DECLARE SECTION;
-	int empno;              /* emp 테이블의 empno를 받을 변수 */
-	char ename[10];         /* emp 테이블의 ename을 받을 변수 */
-	char jog[10];		/* emp 테이블의 job  을 받을 변수 */
-	float sal;              /* emp 테이블의 sal  을 받을 변수 */
-	float comm;             /* emp 테이블의 comm 을 받을 변수 */
+  int empno;              /* emp 테이블의 empno를 받을 변수 */
+  char ename[10];         /* emp 테이블의 ename을 받을 변수 */
+  char jog[10];    /* emp 테이블의 job  을 받을 변수 */
+  float sal;              /* emp 테이블의 sal  을 받을 변수 */
+  float comm;             /* emp 테이블의 comm 을 받을 변수 */
 EXEC SQL EBD DECLARE SECTION;
 /* 호스트 변수의 선언 종료 */
 
@@ -62,8 +62,8 @@ empno = atoi (gets ());
 EXEC SQL
 SELECT ename, job, sal, comm
 INTO :ename, :job, :sal, :comm
-	FROM emp
-	WHERW empno = :empno;
+  FROM emp
+  WHERW empno = :empno;
 
 /*
  * 얻어온 급여와 상여를 수정하여 다시 업데이트 한다.
@@ -71,9 +71,9 @@ INTO :ename, :job, :sal, :comm
 sal  = sal  + 3000;
 comm = comm + 1000;
 EXEC SQL
-	UPDATE emp
-	SET sal = :sal, comm = :comm.
-	WHERE empno = :empno;
+  UPDATE emp
+  SET sal = :sal, comm = :comm.
+  WHERE empno = :empno;
 }}}
 … … …
 위의 문장은 사원정보테이블에서 사원번호가 7788인 사람의 이름, 직책, 급여, 상여를 얻어오는 문장이다. 앞에서 본 바와 같이 SQL문장을 사용하기 위해서 EXEC SQL 절을 붙여주어야 한다. 데이터베이스에서 패치된 칼럼의 내용이 ename, job, sal, comm이라는 호스트 변수 안에 들어가도록 되어있다. 이때 WHERE 절에서 사용된 사원번호 값도 호스트 변수를 이용하여 조건절을 넘긴 것이다.
@@ -84,16 +84,16 @@ EXEC SQL
 
 {{{#!plain
 EXEC SQL BEGIN DECLARE SECTION; /* 호스트 변수의 선언 시작 */
-	int empno;              /* emp 테이블의 empno를 받을 변수 */
-	char ename[10];         /* emp 테이블의 ename을 받을 변수 */
-	char job[10];		/* emp 테이블의 job  을 받을 변수 */
-	float sal;              /* emp 테이블의 sal  을 받을 변수 */
-	float comm;             /* emp 테이블의 comm 을 받을 변수 */
-	short ind_empno;	/* empno변수의 INDICATOR */
-	short ind_ename;	/* ename변수의 INDICATOR */
-	short ind_job;		/* job  변수의 INDICATOR */
-	short ind_sal;		/* sal  변수의 INDICATOR */
-	short ind_comm;		/* comm 변수의 INDICATOR */
+  int empno;              /* emp 테이블의 empno를 받을 변수 */
+  char ename[10];         /* emp 테이블의 ename을 받을 변수 */
+  char job[10];    /* emp 테이블의 job  을 받을 변수 */
+  float sal;              /* emp 테이블의 sal  을 받을 변수 */
+  float comm;             /* emp 테이블의 comm 을 받을 변수 */
+  short ind_empno;  /* empno변수의 INDICATOR */
+  short ind_ename;  /* ename변수의 INDICATOR */
+  short ind_job;    /* job  변수의 INDICATOR */
+  short ind_sal;    /* sal  변수의 INDICATOR */
+  short ind_comm;    /* comm 변수의 INDICATOR */
 EXEC SQL END DECLARE SECTION;   /* 호스트 변수의 선언 종료 */
 
 … … …
@@ -114,9 +114,9 @@ WHERE empno = :empno;
 (ind_sal  == -1) ? sal  = 3000 : sal  = sal  + 3000;
 (ind_comm == -1) ? comm = 1000 : comm = comm + 1000;
 EXEC SQL
-	UPDATE emp
-	SET sal = :sal, comm = :comm.
-	WHERE empno = :empno;
+  UPDATE emp
+  SET sal = :sal, comm = :comm.
+  WHERE empno = :empno;
 }}}
 
 … … …
@@ -127,11 +127,11 @@ EXEC SQL
 아래의 표는 INDICATOR 변수의 값이 가지는 의미를 보여준다. 
 
  * 표6 INDICATOR 값의 의미
-|| 값			|| 의미	||
-|| 0			|| 정상적으로 처리	||
-|| -1			||	SELECT시 NULL이 리턴되거나 INSERT, UPDATE시 NULL이 들어감 ||
-|| -2			|| 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 알 수 없음.			||
-|| >0			|| 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 나타냄.					||
+|| 값      || 의미  ||
+|| 0      || 정상적으로 처리  ||
+|| -1      ||  SELECT시 NULL이 리턴되거나 INSERT, UPDATE시 NULL이 들어감 ||
+|| -2      || 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 알 수 없음.      ||
+|| >0      || 칼럼의 값이 잘려서 전달. 칼럼 값의 길이를 나타냄.          ||
 
 
 위의 예제처럼 SQL문장을 수행한 후에 의심되는 칼럼에 대해서 INDICATOR 값을 검사해 보도록 하라.
@@ -143,9 +143,9 @@ SELECT 구문과 같이 일반적으로 알고있는 FROM, WHERE, INTO 절 이�
 
 {{{#!plain
 EXEC SQL BEGIN DECLARE SECTION;
-	int deptno;
-	char dname[10];
-	char loc[10];
+  int deptno;
+  char dname[10];
+  char loc[10];
 EXEC SQL END DECLARE SECTION;
 
 
@@ -157,13 +157,13 @@ strcpy (dname, “MANAGER”);
 strcpy (loc, “SEOUL”);
 EXEC SQL
 INSERT INTO DEPT 
-	VALUES (:deptno, :dname, :loc);
+  VALUES (:deptno, :dname, :loc);
 }}}
 
 위에서 보는 바와 같이 INSERT 문이라 하여 특별한 것은 없다. 단순히 VALUES 절에 들어가는 실제 데이터들만 호스트 변수 또는 실제 상수값으로 대체시켜 주면 되는 것이다.
 {{{#!plain
 EXEC SQL BEGIN DECLARE SECTION;
-	Int deptno;
+  Int deptno;
 EXEC SQL END DECLARE SECTION;
 
 /*
@@ -171,8 +171,8 @@ EXEC SQL END DECLARE SECTION;
  */
 EXECL SQL 
 UPDATE DEPT
-	SET deptno = 60
-	WHERE deptno = 50;
+  SET deptno = 60
+  WHERE deptno = 50;
 
 … … …
 
@@ -180,8 +180,8 @@ UPDATE DEPT
  * 부서번호가 60인 부서를 삭제한다.
  */
 EXEC SQL
-	DELETE DEPT
-	WHERE deptno = 60;
+  DELETE DEPT
+  WHERE deptno = 60;
 }}}
 
 UPDATE, DELETE도 역시 별반 다를바는 없다. 
@@ -205,9 +205,9 @@ EXEC SQL END DECLARE SECTION;
  */
 EXEC SQL
 DECLARE emp_cursor CURSOR FOR
-	SELECT empno, ename, job, sal, comm
-	FROM emp
-	WHERE deptno = 10;
+  SELECT empno, ename, job, sal, comm
+  FROM emp
+  WHERE deptno = 10;
 
 … … …
 
@@ -227,30 +227,30 @@ WHENEVER NOT FOUND DO break;
 
 While (1)
 {
-	/*
-	 * 커서에서 레코드를 하나씩 패치한다.
-	 */
-	EXEC SQL
+  /*
+   * 커서에서 레코드를 하나씩 패치한다.
+   */
+  EXEC SQL
 FETCH emp_cursor
 INTO :empno, :ename, :job, :sal, :comm.;
 
-	printf (“Fetch Data : %d, %s, %s, %7.2f, %7.2f\n”,
+  printf (“Fetch Data : %d, %s, %s, %7.2f, %7.2f\n”,
 empno, ename, job, sal, comm );
 
-	/*
-	 * 패치한 레코드의 사원 정보에서 급여를 20% 인상한다.
-	 */
-	EXEC SQL 
-		UPDATE emp
-		SET sal = sal * 1.2;
-		WHERE empno = :empno;
+  /*
+   * 패치한 레코드의 사원 정보에서 급여를 20% 인상한다.
+   */
+  EXEC SQL 
+    UPDATE emp
+    SET sal = sal * 1.2;
+    WHERE empno = :empno;
 } 
 
 /*
  * 사용이 끝난 커서를 닫는다.
  */
 EXEC SQL
-	CLOSE emp_cursor;
+  CLOSE emp_cursor;
 }}}
 
 
@@ -263,19 +263,19 @@ EXEC SQL
 
 {{{#!plain
 EXEC SQL
-	COMMIT WORK;
+  COMMIT WORK;
 
 EXECL SQL
-	ROLLBACK WORK;
+  ROLLBACK WORK;
 }}}
 위의 두 문장중 위의 것은 지금까지의 변경사항을 데이터 베이스에 영구적으로 적용하는 문장이고 아래것은 취소하고 이전의 데이터로 되돌리는 문장이다. WORK 구문은 단순히 SQL표준을 따르기 위한 것으로 반드시 붙일 필요는 없다.
 
 {{{#!plain
 EXEC SQL
-	COMMIT WORK RELEASE;
+  COMMIT WORK RELEASE;
 
 EXEC SQL
-	ROLLBACK WORK RELEASE;
+  ROLLBACK WORK RELEASE;
 }}}
 위의 두 문장 중은 아까 봤던 문장과 약간 다른 점이 있다. 바로 RELEASE가 뜻하는 바인데 RELEASE는 컴퓨터에서 ‘놓는다’, ‘푼다’, ‘해재한다’라는 의미로 쓰인다. Pro*C/C++ 에서는 바로 데이터베이스와의 접속을 끊는다는 의미이다. 즉 지금까지의 변경사항을 적용하고 접속을 끊던지 취소하고 접속을 끊는 작업이다. 
 
@@ -294,25 +294,25 @@ int main (void)
 EXEC SQL
 WHENEVER SQLERROR DO sql_error ();
 EXEC SQL
-	DELETE FROM dept
-	WHERE deptno = 10;
+  DELETE FROM dept
+  WHERE deptno = 10;
 EXEC SQL
-		WHENEVER SQLERROR DO CONTINUE;
+    WHENEVER SQLERROR DO CONTINUE;
 
 … … …
 }
 
 void sql_error (void)
 {
-	printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
-	printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
+  printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
+  printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
 
-	EXEC SQL
-		WHENEVER SQLERROR DO CONTINUE;
-	EXEC SQL
-		ROLLBACK WORK RELEASE;
-	
-	EXIT (EXIT_FAILURE);
+  EXEC SQL
+    WHENEVER SQLERROR DO CONTINUE;
+  EXEC SQL
+    ROLLBACK WORK RELEASE;
+  
+  EXIT (EXIT_FAILURE);
 }
 }}}
 위의 예제는 DELETE 문장을 실행하기 전에 먼저 SQL 실행시 에러가 발생하면 sql_error 라는 함수를 실행하도록 만들어 놓고 DELETE를 실행한다. 만약 DELETE 구문을 실행하다가 에러를 만나게 되면 프로그램은 자동으로 sql_error 함수로 분기하게 되고 거기서 SQL 에러코드와 에러메세지를 출력하고 프로그램은 모든 변경사항을 취소하고 데이터베이스와 접속을 끊고 종료한다. 만약 DELETE 구문이 성공하였다면 WHENEVER SQLERROR DO CONTINUE을 수행하여 에러가 발생하여도 계속적으로 프로그램을 진행하도록 다시 변경할 것이다. 
@@ -327,11 +327,11 @@ int main (void)
 … … …
 
 EXEC SQL
-	DELETE FROM dept
-	WHERE deptno = 10;
+  DELETE FROM dept
+  WHERE deptno = 10;
 If (sqlca.sqlcode != 0)
 {
-	printf (“Error Occurred\n”);
+  printf (“Error Occurred\n”);
 sql_error();
 }
 
@@ -342,15 +342,15 @@ exit (EXIT_SUCCESS);
 
 void sql_error (void)
 {
-	printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
-	printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
+  printf (“SQL Error Code : %d\n”, sqlca.sqlcode);
+  printf (“SQL Error Message : %s\n”, sqlca.sqlerrm.sqlerrmc);
 
-	EXEC SQL
-		WHENEVER SQLERROR DO CONTINUE;
-	EXEC SQL
-		ROLLBACK WORK RELEASE;
-	
-	EXIT (EXIT_FAILURE);
+  EXEC SQL
+    WHENEVER SQLERROR DO CONTINUE;
+  EXEC SQL
+    ROLLBACK WORK RELEASE;
+  
+  EXIT (EXIT_FAILURE);
 }
 }}}
 

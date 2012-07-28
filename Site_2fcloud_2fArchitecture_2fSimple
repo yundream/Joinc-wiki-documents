@@ -1,0 +1,133 @@
+#title 간단한 Clooud 구성
+
+[[TableOfContents]]
+== 환경 ==
+ * 소수의(5개 이내의) POD(rack)으로 구성
+ * x86 기반의 cnode(computing node) x 16
+ * Snode(storage node)
+    * VM의 Root volume과 data volume용 snode x 1
+    * Object Storage x 1
+
+== 물리적인 구성 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1iOOzWG6yl7iN9_WaCz73gXAkh_Ge-2Kz71zi8OchAew&amp;w=494&amp;h=403">
+}}}
+
+CNODE가 몇 개인지는 중요하지 않다. CNODE는 최소한 다음의 사양을 충족해야 할 것이다.
+  * AMD-V 혹은 VT-X를 지원하는 multi core cpu
+  * 3개 이상의 NIC. 가능하면 10G NIC 포함
+  * Public Network Traffic 서비스를 위한 L2 Switch 
+  * Volume 서비스 트래픽을 수성하기 위한 L2 Switch.  
+  * Root volume과 Data volume를 서비스하기 위한 Snode 
+
+== 네트워크 ==
+=== POD 네트워크 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1TsSYJrw9Mz3PezjkSQI82LkrNpnYd3OhGPU9PU5FvJw&amp;w=601&amp;h=615">
+}}}
+  1. Public Network 
+     * Guest VM의 Public Traffic을 실어나르는 네트워크
+  1. Storage Network 
+     * Guest VM의 Volume Traffic을 실어나르는 네트워크 
+     * Block storage와 object storage를 분리할지에 대한 계획을 세워야 한다.
+  1. Management Network 
+     * 관리를 위한 네트워크.
+     * Cloud software, Monitering 트래픽이 흐른다.
+
+=== 전체 네트워크 구성 ===
+모든 자원을 클라우드에 통합할 수는 없다. 클라우드 환경에 맞지 않는 자원일 수도 있고, 클라우드 환경에 통합하기 위한 시간/비용이 부족해서 일 수도 있다. 이러한 경우를 예상 해서 네트워크 구성을 만들어 본다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1KjqkjTqH0fN6sufFmfyrssJ1mUMTGjLTNu4ZyzSuJ_M&amp;w=682&amp;h=580">
+}}}
+  1. F/W : 입 출력 트래픽을 필터링 한다.
+  1. Aggregation Switch : 전체 네트워크를 관리하는 스위치로 클라우드와 네트워크와 레거시 네트워크의 퍼블릭 트래픽을 수송한다.
+  1. L4 Switch : [wiki:man/12/NAT NAT], LB등 클라우드의 네트워크를 서비스 한다. 클라우드 소프트웨어가 직접 제어 한다. 
+  1. L2 Switch : 클라우드 네트워크와 레거시 네트워크 사이의 프라이빗 트래픽을 수송한다. 이 네트워크를 통해서 클라우드에 접근할 수 있다.  
+이 물리적 구조는 소프트웨어 구성에 따라 완전히 달라질 수 있다. 네트워크 서비스를 소프트웨어로 구성할 경우, 네트워크 소프트웨어를 cnode 나 POD 단위로 둘 수 있기 때문이다.
+
+가장 중요한 NAT 서비스를 중심으로 네트워크 구성을 살펴보자. 
+
+==== Host Network ====
+각 cnode 마다 네트워크 서비스가 올라간다. 오픈스택의 경우 cnode마다 노바-네트워크가 올라가는 형상이다. Cnode에 있는 게스트 VM은 호스트를 게이트웨이로 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1BbpEX7tGKD8JlWt3qCq1JNyjwELZ5SWzMC9e4DhQGzg&amp;w=692&amp;h=336">
+}}}
+
+클라우드스택은 '''Advanced network mode'''가 이와 비슷한데, 차이가 있다. 오픈스텍은 cnode의 호스트 OS가 직접 기능하는 반면, 클라우드 스택은 네트워크 서비스를 하는 VM이(Rout VM - RVM)을 만든다. 이 RVM은 cnode단위가 아닌, Account 단위로 만들어진다. 
+
+클라우드스택 모델 보다는 오픈스택의 모델이 깔끔하고 효율적인 것 같다.
+
+'''Host Network'''는 프라이빗 네트워크와 퍼블릭 네트워크를 관리한다. 사설 아이피로 향하는 트래픽은 IP Address 변환 없이 전송하고, 공인 아이피로 향하는 트래픽은 NAT 한다. 두 네트워크 모드 L2로 묶는다. 
+
+이 형상의 장 단점은 다음과 같다.
+  * 장점
+    * 네트워크 서비스를 분산할 수 있다.
+    * 서비스가 분산되니, 위험이 분산 된다. 네트워크 서비스가 분산되기 때문에, 특정 네트워크 서비스에 문제가 생기더라도, 관리하는 cnode의 VM으로만 문제가 한정된다. 
+  * 단점
+    * 자원이 분산되면 관리도 분산된다. 네트워크 서비스들에 대한 모니터링, 빌링을 위한 트래픽 카운트 정보가 모두 분산된다. 
+    * 문제의 원인을 파악하기가 쉽지 않다. Cnode의 호스트 OS에서 작업을 하기 때문에, 네트워크 서비스의 품질에 영향을 끼치는 요소들이 많아진다. 따라서 문제가 생겼을 때, 정확한 원인을 찾기가 어려워 질 수 있다.
+    * 게스트 VM의 영향을 받기 때문에 네트워크 트래픽의 품질관리가 쉽지 않다.  
+==== POD Network ====
+네트워크 서비스를 위한 프로세스가 cnode가 아닌 POD 단위다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1qGMjQ2aHQMc4cT_4Q25N_Yb9RF9nv96jyewzZ7uc4gE&amp;w=654&amp;h=334">
+}}}
+
+POD에 네트워크 서비스만을 위한 TOR(Top of rack)호스트를 하나 둔다. 오픈스택이라면 Nova-Network만 POD에 두면 될테니, 구성에 어려움이 없을 것이다. 클라우드스택의 경우에는 RVM을 TOR에 두게 하는 방식으로 비슷하게 구성 할 수 있을 것이다. 다만 아직 RVM을 특정 호스트에 '''dedicate'''하는 기능이 없어서 현재는 POD Network 구성이 힘들다. 올해 클라우드스택 로드맵상에 RVM dedicated 기능이 있기는하다.
+
+  * 장점
+    * 적당한 자원 분산 : Host Network 만큼은 아니지만 적당히 자원이 분산된다. 
+    * 적당한 관리성 : 분산정도가 낮기 때문에 Host Network에 비해서는 관리가 수월하다. 
+    * 적당한 위험 관리 : Network에 생긴 문제는 POD단위로 확산된다. 
+    * 품질관리 용이 : 네트워크 서비스에 최적화 할 수 있다. 
+  * 단점
+    * Host network 보다는 문제의 확산 범위가 넓다.
+    * 장비 구성 비용이 올라간다. : Host Network와는 달리 별도의 장비가 들어간다. HA 구성을 할 경우 비용이 더 늘어난다. 
+==== Zone Network ====
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=17z-qlMkyRZ-KNfgE-fZNDL2_9rPmZyR9eHhWtqWsLkI&amp;w=612&amp;h=401">
+}}}
+
+Zone 전체를 위한 네트워크 서비스를 둔다. 값 비싼 네트워크 장비를 구입한 다음 HA 구성하는 방식이 있을 것이고, 개발 자원이 충분하다면 (덤으로 시간도 있다면) 저렴한 X86과 공개 소프트웨어 개반으로 cluster 환경을 구축하는 방법이 있다.    
+
+네트워크 장비를 박는 것은 장 단점이 명확하다. 클라우드 도입을 목표로 개발된 장비들(Netscaler 같은)의 경우 잘 정의된 API를 이용해서 클라우드에 연동할 수 있다. Cluster한 장비/소프트웨어를 직접 개발하는 방법을 제안한다. 
+  * 장점
+    * Scale-out 하게 만들 수 있다.
+    * 낮은 비용
+    * 관리가 쉽다.
+  * 단점
+    * 개발 비용 
+    * 네트워크 문제가 zone 전체에 영향을 미친다. : Cluster로 구성하면 영향을 줄일 수 있지만 여전히 Host와 POD기반 보다는 넓은 범위에 영향을 미친다.
+
+오픈스택의 경우 Network appliance에 노바네트워크를 올리면 될 것이다. 클라우드스택은 Netscaler와 SRX API를 지원하므로 이들 장비를 zone에 붙이면 된다. 
+
+네트워크 장비를 직접 개발하는 것은 많은 이슈가 있다. 다음 문서를 참고 한다. 
+  * [wiki:Site/cloud/AWS/EIP NAT Cluster 개발]
+  * [wiki:Site/cloud/AWS/ELB LB Cluster 개발]
+
+=== 네트워크 방식의 선택 ===
+하나의 POD으로 유지되는 클라우드 환경이라면 Private Cloud라고 가정할 수 있을 것이다. 이 경우에는 다음의 이유로 Zone network로 가는게 나을 것 같다.  
+   * 문제를 빨리 감지하고 해결. 네트워크 자원이 집중 되므로 문제를 파악하고 해결하기가 쉽다.
+   * 마찬가지 이유로 관리용이.
+
+네트워크 장비 선택은 결국 장비 구입과 개발 둘 중 하나인데, 클라우드 솔류션 개발 업체가 아닌 다음에야 당연히 구입해서 사용하는게 낫다. 나는 클라우드 솔류션 개발자이니 개발하는 것을 선호한다. 전체 솔류션 비용을 낮출 수 있기 때문이다. 프라이빗 클라우드에서는 비용에서의 차이가 그다지 심각하게 다가 오지 않겠지만 퍼블릭클라우드로 간다면 비용이 해결해야 할 중요한 문제가 될테니 말이다.
+
+=== 클라우드 소프트웨어 선택 ===
+클라우드스택이 무난하다. 높은 수준의 완성된 패키지 형태로 제공하기 때문에 쉽게 설치하고 운용할 수 있다. 별도의 개발/인프라 유지 인력을 가지고 있지 않다면, 중/소 규모의 프라이빗 클라우드에서는 그냥 클라우드스택을 이용하는 걸 제안한다. 
+
+== Storage ==
+=== Data Volume Storage ===
+[wiki:man/12/NFS NFS], [wiki:man/man/12/iSCSI iSCSI]인터페이스를 이용해서 볼륨을 제공한다.
+
+클라우드스택은 cluster 단위로 storage를 관리한다. 하나의 LUN을 cluster에 포함된 cnode가 공유하는 형태다. EBS 스타일이 아니라서, POD간 volume migration, POD간 VM HA에 제한이 있다. 유연하지 않은 구조로 퍼블릭 클라우드에는 적당한 방식은 아닌 것 같다. 그러나 프라이빗 클라우드에서라면 관리 범위가 명확해서 오히려 좋은 구조라고 볼 수 있다.  
+
+=== Object Storage ===
+요즘 대세는 Swift인 것 같은데, Object Storage에 대한 수요가 늘어나면서 다른 눈여겨 볼만한 프로젝트들이 생겼다. 가장 눈이 가는 것은 '''GlusterFS'''로 한번쯤 고려해볼 만하다.
+
+GlusterFS는 scale-out한 NAS 파일 시스템으로, GPLv3를 따르는 공개 소프트웨어다. Redhat사가 관심을 가지고 주도하는 프로젝트다. 현재(2012)는 Object storage용도로만 사용하고 있는데, Root및 Data volume 제공 용도로 테스트 중이라고 한다. 인터넷 상에서 Root/Data 볼륨으로 사용하고 있는 사례를 찾아 볼 수 있어서, 조만간 사용가능 한 수준이 될 거 같다. 그렇게 되면, 굳이 Object storage와 Block storge를 물리적으로 분리할 필요가 없을 것이다.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-07-20T09:59:09)]]

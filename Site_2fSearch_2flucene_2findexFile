@@ -1,0 +1,80 @@
+#title 루신 색인 파일 포맷
+
+[[TableOfContents]]
+== 색인 파일 포맷 ==
+이 문서는 루신 3.0.x를 기준으로 색인 파일 형식에 대한 내용을 담고 있습니다.
+
+아파치 루신은 원래 자바 언어로 개발했지만, 다른 여러 언어로 된 루신 응용이 있습니다. 루신의 색인파일은 언어에 독립적이므로 어떤언어로든 개발할 수 있다.
+
+=== 정의 ===
+루신 색인에서 중요한 요소는 Index(색인), document(문서), field(필드) 그리고 term이다. 색인은 연속된 문서의 정보를 가지고 있다.
+   * 문서는 필드로 구성된다.
+   * 필드는 이름을 가지고 있다.
+   * term은 문자열이다.
+하나의 문자열은 두개 이상의 다른 필드에 위치할 수 있다. 웹 문서라면 보통 <Title>과 <Body> 필드를 가질 것이다. 이 웹 문서가 루신을 주제로 한다면, '''루신'''은 Title과 Body에 모두 존재할 수 있다.
+
+그러므로 term은 텀의 이름과 텀의 필드 이름의 쌍으로 구성된다. 위의 예살면 {루신:title}, {루신:body}로 구성될 것이다.
+
+=== Inverted Indexing ===
+루신의 색인은 term 기반으로, 더욱 효과적인 검색을 위해서 배치되어있다. 루신의 색인은 '''Inverted Index'''로 알려진 색인 방식에 따라서 저장되어 있다. 이 색인은 Term의 목록으로 표현되며, 각 Term은 Term이 발견된 문서에 대한 정보를 가지고 있다.
+
+inverted라고 하는 이유에 대해서 알아보자.
+
+문서를 색인할 때, 가장 문저 문서를 term 단위로 분해한다. 그러므로 {문서:Term}의 목록이 만들어질 것이다. 이것을 다시 {Term:{문서목록}}으로 만든다. 이렇게 관계가 역전되므로 Inverted 색인이라고 한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1rP9rD6-qeqja28YQDmfVctXTXVPgGj7Mw8vUOTwFzKk&amp;w=380&amp;h=225">
+}}}
+
+=== 필드 ===
+루신은 문서를 term단위로 tokenizing하는데 이때 term의 필드 정보를 함께 색인한다. 필드는 term이 문서의 어느 영역에서 발생했는지에 대한 정보를 가지고 있다.
+
+=== 세그먼트 (Segments) ===
+루신 색인은 세그먼트라고 불리는 다중의 서브 인덱스로 구성된다. 각각의 세그먼트는 완전히 독립된 색인을 포함한다. 이렇게 세그먼트로 나누는 이유는 다음과 같다.
+   1. 색인주기에 따라서 새로 추가되는 문서는 새로운 새그먼트에 저장한다.
+   1. 나중에 이들 세그먼트를 합해서 새로운 색인을 만들 수 있다.
+검색은 여러 개의 세그먼트들에 대해서 이루어지고 이를 취합할 수 있다.
+
+=== 문서 번호 (Document Numbers) ===
+루신은 내부적으로 문서를 가리키는 interger 타입의 문서 번호를 유지하고 있다. 처음 추가된 문서는 0번을 가지는데, 색인시 문서 이름이 아닌 문서번호가 저장한다. 이렇게 하면 색인을 위한 저장공간을 절약할 수 있다. 
+  * 문서 번호는 각 세그먼트에서 유일하다. 
+  * 문서가 삭제되도, 문서 번호는 그대로 남는다. 일종의 빈공간이 생기는 셈인데, 이런 공간은 성능에 영향을 미친다. 이들은 문서가 merge될때, 문서를 재배치하면서 삭제도니다. 
+
+=== Overview ===
+각각의 세그맨트 색인은 아래의 요소를 포함한다.
+  * 필드 이름 : 색인은 한 개 이상의 필드 이름 셋을 가지고 있다.
+  * 필드값 : 
+  * 단어 사전 : 모든 문서의 색인 필드에 포함된 단어 (Term)을 가지고 있다. 각 Term은 Term이 발견된 문서의 목록을 가지며, 문서에서 얾마나 자주 발생하는지 그리고 어떤 위치에서 발견됐는지에 대한 정보도 가지고 있다. 
+  * Term Frequency data : 각 단어가 모든 문서에서 얼마나 발견됐는지에 대한 정보를 가지고 있다.
+  * Normalization Factors : 
+  * Term Vectors : 여기에는 단어 문자열과 단어의 빈도정보가 있다. 
+  * Deleted documents : 문서가 삭제되면, 여기에 표시를 해서 문서가 삭제되었음을 알려준다.
+
+=== 파일 네이밍 ===
+
+=== 파일 확장자 요약 ===
+|| segments_File   ||  segments.gen, segments_N || 세그먼트 정보를 가지고 있다. ||
+|| Lock File             || write.lock           || 같은 파일에 다중의 IndexerWriter의 접근을 방지하기 위한 잠금 장치 ||
+|| Compound File || .cfs ||       ||
+|| Fields        || .fnm    || 필드에 대한 정보가 저장되어 있다. ||
+|| Field Index || .fdx || 필드 데이터의 포인터  ||
+|| Term Infos   || .tis  || 단어사전      ||
+|| Term Info Index  || .tii   || 단어색인 ||
+|| Frequencies   || .frq      || 단어를 발견한 문서의 목록     ||
+|| Positions   || .prx     || 단어가 발견된 위치      ||
+|| Norms      || .nrm  || 문서와 단어의 boost ||
+|| Term Vector Index  || .tvx  || Stores offset into the document data file ||
+|| Term Vector Documents || .tvd   || Contains information about each document that has term vectors ||
+|| Term Vector Fields || .tvf  || The field level info about term vectors  ||
+|| Deleted Documents || .del   || 삭제한 문서의 정보  ||
+
+=== 기본 데이터 형 ===
+==== Byte ====
+==== UInt32 ====
+==== Uint64 ====
+==== VInt ====
+==== Chars ====
+==== String ====
+==== Ciompound Types ====
+=== Compound Types ===
+

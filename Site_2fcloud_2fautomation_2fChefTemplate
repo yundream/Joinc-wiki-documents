@@ -1,0 +1,158 @@
+#title Chef Template
+
+[[TableOfContents]]
+== Template ==
+템플릿을 특정한 형식을 가지는 설정파일을 찍어내기 위한 틀 역할을 하는 파일이다. Cookbook은 이 템플릿을 틀로해서 다양한 환경에 맞는 설정파일을 만들 수 있다.  
+
+Apache 웹서버 쿡북을 만들었다고 가정해 보자. 아파치 웹서버 설치의 핵심은 환경에 맞는 설정파일을 만드는 것이다. 설정파일 httpd.conf가 있다면, 웹서버에 관계없이 httpd.conf의 기본틀은 동일할 것이다. 다만 여기에서 몇몇 설정의 값들만 변경될 것이다. 템플릿은 변경 값들을 변수로 대체하는 방식으로 하나의 틀에서 다양한 설정파일을 찍어낸다.    
+
+템플릿 파일은 "erb" 형식을 가지며, 해당 쿡북의 template/default 디렉토리에 위치한다. 
+
+== 템플릿 예제 ==
+테스트를 위해서 [wiki:Site/System_management/dhcp dhcp] 서버를 위한 템플릿을 만들어 볼 생각이다. 
+
+=== 테스트 환경 ===
+  * 운영체제 : CentOS 6.2. 특별히 선호한다기 보다는 회사에서 서버 운영체제로 centos를 사용하다보니, centos로 테스트하기로 했다. 
+  * Chef Server와 Chef Client : VirtualBox로 Chef Server와 Chef Client를 만들기로 했다. 
+  * 테스트 예제 : DHCP서버를 chef로 구성한다. data bags을 이용해서 dhcp를 위한 설정 파일을 관리한다.
+
+=== 테스트 시나리오 ===
+Baremetal auto-provisioning을 위한 [wiki:Site/System_management/dhcp DHCP] 서버 구성을 목적으로 한다. 베어메탈 프로비저닝은 [wiki:Site/System_management/PXEBoot PXE-BOOT] 과정과 kicskstart를 거쳐서 운영체제를 설치하는 과정을 거친다. 핵심은 DHCP 서버다. DHCP 서버를 이용해서 베어메탈 호스트에 [wiki:man/12/IP IP]를 할당하고 pxe-boot 과정을 명령할 수 있기 때문이다. 
+
+다음과 같은 방식으로 DHCP 설정이 갱신된다.
+  1. data bag에 host 정보를 입력한다. 
+     * IP 주소
+     * [wiki:man/12/MAC MAC]주소
+     * 호스트 이름
+  1. [wiki:Site/cloud/automation/databag data bag]을 로딩한다.    
+  1. dhcp 서버에서 chef-client를 실행한다. 
+  1. dhcp 레시피를 가져온다.
+     1. 레시피는 data bag의 host 정보를 이용해서, dhcp 설정파일을 만든다. 
+     1. dhcp server를 재시작한다. 
+
+=== dhcp 서버 템플릿 ===
+템플릿 파일 "dhcp.erb"로 부터, dhcp 설정파일 "/etc/dhcp/dhcpd.conf"를 만든다. dhcp.erb는 아래와 같이 만들었다.
+{{{#!plain
+# cat templates/default/dhcp.erb 
+# Made in chef
+ddns-update-style none;
+
+option domain-name "example.org";
+option domain-name-servers <%=@dns01%>, <%=@dns02%>;
+
+default-lease-time 600;
+max-lease-time 7200;
+
+log-facility local7;
+
+subnet <%=@network%> netmask <%=@netmask%> {
+    option routers <%=@gateway%>;
+<% @hosts.each do |name, value| -%>
+    host <%= value['name'] %> {
+        hardware ethernet <%=value['mac'] %>;
+        fixed-address <%=value['ip'] %>;
+    }
+<% end -%>
+}
+}}}
+
+=== databag 파일 ===
+DHCP를 위한 databags 파일을 만든다. 다음과 같은 구성을 가질 것이다.
+{{{#!plain
+# cat mydhcp.json
+{ 
+  "id":"mydhcp",
+  "dns01" : "8.8.8.8",
+  "dns02" : "8.8.6.6", 
+  "gateway" : "192.168.56.1",  
+  "netmask" : "255.255.255.0",
+  "network" : "192.168.56.0",
+  "hosts" : { 
+     "host01" : {
+     "name" : "baremetal01.test.com" ,
+     "mac" : "08:00:27:48:9C:01",
+     "ip" : "192.168.56.101"
+     },
+     "host02" : {
+       "name" : "baremetal02.test.com" ,
+       "mac" : "08:00:27:48:9C:02",
+       "ip" : "192.168.56.102"
+     }
+   }
+} 
+}}}
+
+data bag을 upload 했다. data bag 이름은 mydhcp로 했다.
+{{{#!plain
+# knife data bag create mydhcp
+# knife data bag from file mydhcp mydhcp.json
+}}}
+
+위 data bag으로 만들어진 설정파일의 내용은 대략 다음과 같을 것이다.
+{{{#!plain
+# cat /tmp/dhcp.txt 
+# Made in chef
+ddns-update-style none;
+
+option domain-name "example.org";
+option domain-name-servers 8.8.8.8, 8.8.6.6;
+
+default-lease-time 600;
+max-lease-time 7200;
+
+log-facility local7;
+
+subnet 192.168.56.0 netmask 255.255.255.0 {
+    option routers 192.168.56.1;
+    host baremetal01.test.com {
+        hardware ethernet 08:00:27:48:9C:01;
+        fixed-address 192.168.56.101;
+    }
+    host baremetal02.test.com {
+        hardware ethernet 08:00:27:48:9C:02;
+        fixed-address 192.168.56.102;
+    }
+}
+}}}
+
+=== recipes 만들기 ===
+{{{#!plain
+# cat recipes/default.rb 
+
+info = data_bag_item('mydhcp', 'mydhcp')
+
+template "/etc/dhcp/dhcpd.conf" do
+    source "dhcp.erb"
+    mode 0644
+    owner "root"
+    owner "root"
+    variables ({
+        :dns01 => info['dns01'],
+        :dns02 => info['dns02'],
+        :gateway => info['gateway'],
+        :netmask => info['netmask'],
+        :network => info['network'],
+        :hosts => info['hosts']
+    })
+    action :create
+end
+
+# SELINUX를 적용한다. 실행하지 않으면 퍼미션 오류가 발생한다.
+execute "restorecon" do
+    command "restorecon -v /etc/dhcp/dhcpd.conf"
+    action :run
+end
+
+# dhcpd service를 restart한다.
+service "dhcpd" do
+  action :restart
+end
+}}}
+
+== 참고 ==
+  * http://wiki.opscode.com/display/chef/Templates
+
+== 히스토리 ==
+  * 작성일 : @DATE@
+  * 수정
+    * @DATE@ : 완료

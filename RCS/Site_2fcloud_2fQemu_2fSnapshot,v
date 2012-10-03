@@ -1,0 +1,226 @@
+head	1.5;
+access;
+symbols;
+locks
+	root:1.5; strict;
+comment	@# @;
+
+
+1.5
+date	2012.08.14.02.40.47;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.08.13.06.02.47;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.08.13.02.27.56;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.08.12.04.50.27;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.08.11.10.41.44;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fQemu_2fSnapshot
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@#title QCOW2 Snapshot 테스트
+
+[[TableOfContents]]
+== QCOW2 ==
+KVM은 qcow2라는 이미지형식을 지원한다. '''Q'''emu '''C'''opy '''O'''n '''W'''rite 라는 이름에서 처럼 '''copy on write'''를 지원하는 이미지형식이다. cow는 데이터를 겹쳐쓰지 않는다. 그 대신에 새로운 블록에 데이터가 기록이 되고, 기록정보는 메타데이터에 저장된다. 따라서 어느 시점이후에 기록된 파일 정보를 가져올 수 있다. 증분 스냅샷이 가능하다는 의미다. 
+
+특정 시점이후 변경된 정보만 스냅샷을 뜰 수 있기 때문에 저장공간과 저장시간을 모두 절약할 수 있다.
+
+== 스냅샷 테스트 ==
+두 가지를 테스트 할 계획이다.
+  1. 로컬 하드디스크에 qcow2 이미지 파일을 만들어서 스냅샷기능을 테스트 
+  1. 원격 디스크에 대한 증분 스냅샷 테스트. [wiki:man/12/iSCSI iSCSI]디바이스에 대해서 qcow2 포맷을 적용해서 테스트 한다.
+
+=== 일반 테스트 ===
+KVM으로 테스트 한다. qcow2 포맷으로 두 개의 이미지 파일을 만든다.
+  1. linux.qcow2 : 리눅스 운영체제를 설치할 루트 볼륨 
+  1. data.qcow2 : 스냅샷 테스트에 사용할 데이터 볼륨 
+{{{#!plain
+# kvm-img create -f qcow2 linux.qcow2 4G
+# kvm-img create -f qcow2 data.qcow2 4G
+}}}
+
+우분투 리눅스 12.04 서버 버전을 설치했다. 설치 과정은 생략
+{{{#!plain
+# kvm -cdrom ../ubuntu-12.04-server-amd64.iso -hda linux.qcow2 -boot d
+}}}
+
+설치가 끝나면 준비한 데이터 볼륨과 함께 실행한다. 스냅샷 작업은 QMP와 kvm-img 모두에서 가능하다. kvm-img를 이용하는게 편해서, kvm-img로 테스트하기로 했다.  
+{{{#!plain
+$ kvm -hda linux.qcow2 -hdb data.qcow2 
+}}}
+
+Guest VM에서 추가 디스크(data.qcow2)를 마운트 한 다음, dd를 이용해서 100M 크기의 파일을 만들었다.  
+{{{#!plain
+# mkfs.ext4 /dev/sdb
+# mount /dev/sdb data/
+# dd if=/dev/random of=data1.dat bs=1M count=100 
+}}}
+
+QMP 명령을 이용해서 스냅샷을 뜬다. 스냅샷을 뜰 디바이스 이름을 알아야 하는데 query-block 명령으로 확인할 수 있다.
+{{{#!plain
+{"execute":"query-block"}
+{"return": [
+    {  "io-status": "ok", 
+       "device": "ide0-hd0", 
+       "locked": false, 
+       "removable": false, "inserted": 
+       {
+          "ro": false, 
+          "drv": "qcow2", 
+          "encrypted": false, 
+          "file": "linux.qcow2"
+          # 생략 ....
+    {
+       "io-status": "ok", 
+       "device": "ide0-hd1", 
+       "locked": false, 
+       "removable": false, 
+       "inserted": 
+       {  "ro": false, 
+          "drv": "qcow2", 
+          "encrypted": false, 
+          "file": "data.qcow2"}, 
+          "type": "unknown"}
+          # 생략 ....
+}}}
+data.qcow2의 디바이스 이름이 "ide0-hd1"인 것을 확인했다.
+
+이제 스냅샷을 뜬다.
+{{{#!plain
+{ "execute": "blockdev-snapshot-sync", "arguments": { 
+     "device": "ide0-hd1", 
+     "snapshot-file": "snapshot_test.img", 
+     "format": "qcow2" } }
+}}}
+스냅샷 파일이 만들어진 걸 확인할 수 있다. kvm-img 명령으로 파일 정보를 확인해보자. 
+{{{#!plain
+# kvm-img info snapshot_test.img 
+image: snapshot_test.img
+file format: qcow2
+virtual size: 2.0G (2147483648 bytes)
+disk size: 196K
+cluster_size: 65536
+backing file: data.qcow2 (actual path: data.qcow2)
+}}}
+
+계속 ...
+== 히스토리 ==
+ * 문서작성 : [[Date(2012-08-13T02:27:55)]]
+@
+
+
+1.4
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d40 1
+a40 1
+kvm-img를 이용해서 스냅샷을 떳다. 
+d42 24
+a65 1
+# kvm-img create -f qcow2 -b data.qcow2 snapshot.qcow2
+d67 10
+a76 1
+snapshot.qcow2 파일이 만들어진다. kvm-img를 이용해서 스냅샷 정보를 확인할 수 있다.
+d78 2
+a79 2
+# qemu-img info snapshot.qcow2 
+image: snapshot.qcow2
+d87 1
+a87 2
+... 계속
+
+@
+
+
+1.3
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d28 1
+a28 1
+설치가 끝나면 준비한 데이터 볼륨과 함께 실행한다. 스냅샷 명령을 내리기 위해서 [wiki:Site/cloud/Qemu/QMP QMP] 서버 모드로 실행한다. 
+d30 1
+a30 2
+$ kvm -hda linux.qcow2 -hdb data.qcow2 -qmp tcp:localhost:4444,server
+QEMU waiting for connection on: tcp:127.0.1.1:4444,server
+d37 1
+d40 1
+a40 1
+데이터원본에서의 변화 시점을 기록하는 것이기 때문에, 데이터 원본을 필요로 한다. 해서 현재 /dev/sdb의 원본 스냅샷을 뜨기로 했다. 
+d44 1
+a44 2
+
+이제 디바이스(/dev/sdb)에 대해서 일정 주기로 스냅샷을 만들면 된다. 먼저 디바이스 이름을 가져오자. 
+d46 7
+a52 17
+{"execute": "query-block"}
+{"return": [
+    {"io-status": "ok", 
+     "device": "ide0-hd0", 
+     "locked": false, 
+     "removable": false, 
+     "inserted": 
+         {"ro": false, 
+          "drv": "qcow2", 
+          "encrypted": false, 
+          "file": "linux.qcow2"
+         }, 
+         "type": "unknown"
+    }, 
+    {"io-status": "ok", 
+     "device": "ide0-hd1", 
+      ...
+d55 2
+@
+
+
+1.2
+log
+@14.52.44.238;;yundream;;
+@
+text
+@d40 6
+a45 1
+이제디바이스(/dev/sdb)에 대한 스냅샷을 만들면 된다. 먼저 디바이스 이름을 가져오자. 
+d65 3
+@
+
+
+1.1
+log
+@14.52.44.238;;yundream;;
+@
+text
+@d3 1
+d30 1
+a30 1
+$ kvm -hda linux.qcow2 -hdb data.qcow2
+@

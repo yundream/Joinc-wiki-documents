@@ -1,0 +1,84 @@
+#title Knoppix를 이용한 Live CD 만들기
+
+[[TableOfContents]]
+== Live CD가 필요하다. ==
+[wiki:Site/cloud/automation/PING PING](PartImage is not ghost)을 자동 백업/리스토어 솔류션으로 사용하려고 했으나, ext4와 [wiki:Site/System_management/LVM LVM]을 지원하지 않아서 사용하지 않기로 했다. 그냥 dd 기반으로 솔류션을 만들기로 했다. 관리자가 직접 Live CD를 넣고 작업할 거라면, 돌아다니는 아무 Live CD 선택해서 사용하면 되겠지만, 자동화가 목적이므로 직접 Live CD를 만들어야 했다. 하다 못해 ssh 서버라도 떠 있어야 원격으로 dd 명령을 수행할 수 있으니 말이다.     
+
+== KNOPPIX == 
+다양한 LIVE CD를 찾아 헤맸다. 선택기준은 간단한 remastering이다. 노가다는 싫다. 뭔가 복잡스러워 보이는 라이브 시디는 모두 건너 뛰었다. 오랜 시간을 이것 저것 기웃거리다가 찾아낸게 ''knoppix'''다. 
+
+knoppix는 오픈소스 기반의 Linux live cd로, 리눅스의 모든 것을 live cd로 할 수 있게하자라는 목적으로 만들어졌다. 범용 live cd라고 할 수 있는데, 그래서 그런지 덩치도 크고, KDE, Gnome, Gimp, Libra office, Mozilla, Konqueror, Apache, mysql 등 왠만한 애플리케이션은 몽땅 깔려있다. 우분투 리눅스 기반이기 때문에 관리도 편하다. 
+
+https://lh5.googleusercontent.com/-4gDFtijytec/UDM2Pt6HkBI/AAAAAAAACd4/p7wcR7inkTI/s400/knoppix01.png
+
+https://lh5.googleusercontent.com/-YBCwCQZ13cM/UDM2Uy7qgxI/AAAAAAAACeI/mODxgcy6CZI/s640/knoppix02.png
+
+== Knoppix live cd remastering ==
+밑바닥 부터 시작해서 live cd를 만드는 방법이 있겠다. 밑바닥 부터 시스템 어드민 노가다를 하거나 uck 같은 툴을 이용해서 좀 더 간단하게 하거나. 몇개 시도해 봤는데, 시스템 어드민 노가다는 너무 노가다였고 - 배포판마다 버전마다 약간씩 차이가 나기 때문에, 원하는 정보를 찾기가 너무 힘들다. 그나마 한글 문서는 더 찾기가 힘들다 - uck 같은 툴은 이것 저것 제한이 많았다. 그나마 knoppix 라이브 시디를 리마스터링 하는게 제일 쉬웠다. (정말로 쉽다) 
+
+=== Knoppix Live CD 다운로드 ===
+http://knoppix.net/ 에서 다운로드 할 수 있다. 3G에 육박하는 DVD 대신 700M 정도의 CD를 다운로드 했다. 라이브 시디라면 가능한 덩치를 줄여야할 필요가 있으니, 쓸데없는 애플리케이션이 덕지덕지 붙은 DVD 보다는 CD를 사용할 것을 추천한다. 
+
+=== 테스트 환경 ===
+ * 호스트 운영체제 : Ubuntu 리눅스 12.10
+ * [wiki:Site/cloud/virtualbox Virtualbox] : VM으로 테스트 했다. 
+
+=== Knoppix HD install ===
+Knoppix는 하드디스크에 설치할 수 있다. 설치 할 하드디스크는 16G로 넉넉하게 잡았다. 
+
+Live cd로 부팅한다. 부팅 후, 메뉴에서 "Preferences/KNOPPIX HD Install"(DVD 버전은 "Knoppix/KNOPPIX HD Instal")을 선택한다. 다음 "USE whole hard disk" => Install GRUB Bootloader to MBR" 과정을 거치면, 설치가 끝난다.   
+
+=== 리마스터링 ===
+https://lh5.googleusercontent.com/--Z2IJ9C4hRg/UDM2SEqVo3I/AAAAAAAACeA/PYIRUXylcTw/s640/knoppix03.png
+
+Knoppix에서의 라이브 시디 리마스터링은 현재 설치된 Knoppix 운영체제의 환경을 그대로 Live CD화 하는 편리한 방식이다.  하드디스크로 부팅 한 다음에 패키지 관리툴("dpkg")과 시스템 어드민 능력을 이용해서 원하는 라이브 시디 환경을 만든다.
+
+
+이제 마스터링을 한다. 마스터링을 위해서는 Knoppix 라이브 시디 원본이 있어야 한다. virtualbox의 경우 온라인으로 CD에 ISO 이미지를 삽입할 수 있다. 
+
+마스터링을 위해서는 꽤 큰 디스크 공간이 필요하다. 10G 정도의 디스크 공간을 마련하자. 마스터링인은 /opt 디렉토리에서 이루어지니 참고한다.
+
+마스터링을 위한 스크립트가 있다. 이 스크립트를 루트권한으로 실행하면 된다. 스크립트는 http://www.wp-schulz.de/knoppix/kn-script.html 에서 구할 수 있다. 리마스터링에 사용할 스크립트는 "kn-remaster" 이다.  
+
+kn-remaster를 실행한다. 쉘 스크립트인데, 신경써서 만들었다. 알록달록하다.
+
+https://lh4.googleusercontent.com/-tFnWgtFQFZ8/UDQ-yQ0aIPI/AAAAAAAACe0/X88QhwjbjE8/s640/knoppix04.png 
+
+ISO까지 만드는데, 대략 10분에서 20분 정도의 시간이 걸린다.
+  1. "Prepare enviroment within HD Installation"을 실행한다. 실행하면 자동으로 /opt/knx 디렉토리를 만들고, 여기에 knoppix 라이브 시디의 내용을 복사해준다.
+  1. "Rsync with modification of HD Installation"을 실행한다. HD에서 변경된 내용을 적용한다.  
+  1. "Build new ISO from remastered Knoppix". 라이브 시디를 만든다.
+ISO가 만들어지면 VirtualBox로 테스트 했다. 잘 된다. 
+
+== 백업/복구 솔류션을 위한 시나리오 ==
+=== 백업/복구 솔류션의 선택 ===
+그럴듯 하게 작동하는 백업/복구 솔류션을 만들려면 좀 신경써야 할 것들이 있다. 먼저 백업/복구를 위한 소프트웨어의 선택이다. 무난하게 dd를 사용하는 방법이 있기는 하지만, 파티션 단위로 백업하기가 힘들다는 문제가 있다. LVM을 다룰 수 없기 때문이다. 제대로 하려면, 각 파일시스템에 따른 백업 소프트웨어를 사용해야 할 건데, 귀찮다. 난 그냥 dd를 이용해서 하드디스크를 클론(clone)하기로 했다.
+
+회사 내부에서 베어메탈 프로비저닝을 위해서 사용하는게 목적이므로 dd로도 문제없다고 생각했기 때문이다. 공개 솔류션을 만들려면, 머리 좀 써야 할 거다. 
+
+=== 인프라 ===
+복구 같은 경우에는 완전 자동화가 필요하다. 특히 나 같은 경우 베어메탈 프로비저닝이 목적이기 때문에 더욱 그렇다. [wiki:Site/System_management/PXEBoot PXE]를 이용해서 자동으로 부팅한 다음에, 역시 NFS나 CIFS로 이미지 저장소에 연결해서 복구가 진행되야 한다. 
+
+필요한 인프라 구성요소는 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1qTyikG6mmuKaAX3lbARWzT8uw1C0RS-Nic9iQPXJu5k&amp;w=702&amp;h=311">
+}}}
+  1. IPMI : 라이브 시디를 마운트하고, 베어메탈 호스트의 전원을 올리고 내리기 위해서 사용한다.  
+  1. PXE-Boot 환경
+  1. 이미지 서버 : 백업/복구 이미지가 저장된다.
+
+복구 명령은 ssh를 이용해서 라이브 시디에 원격으로 접속해서 직접 명령을 내리면 될거다. 혹은 라이브 시디에 백업/복구를 위한 웹 서비스를 올려도 될테다. 궁극적으로는 웹서비스를 올려야 할 것 같다. 초기에는 ssh로 작업한다. 
+
+== 남은 일 ==
+  1. Knoppix 라이브 시디로 PXE-Boot : IPMI를 이용해서 ISO를 마운트해서 부팅하는 대신 PXE-Boot 하게 
+  1. PartImage 외에 dd를 대체할 만한 백업 방안을 찾아본다. LVM 백업/리스토어 툴등도 고민해 본다. 
+
+== 하위 문서 ==
+[[subindex]]
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-08-22T02:24:41)]]
+  * 수정
+     * [[Date(2012-08-23T00:21:16)]] : 백업/복구 시나리오 추가 
+[[Tag(Backup,Baremetal,Live cd,LVM,PXE)]]

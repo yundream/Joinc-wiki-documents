@@ -1,0 +1,300 @@
+head	1.8;
+access;
+symbols;
+locks
+	root:1.8; strict;
+comment	@# @;
+
+
+1.8
+date	2012.09.11.04.39.54;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.09.10.09.48.11;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.09.10.08.35.24;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.09.10.08.05.58;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.09.07.09.28.44;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.09.07.02.36.53;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.09.06.05.35.24;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.09.05.16.03.15;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fBigQuery
+@
+
+
+1.8
+log
+@175.253.85.13;;yundream;;
+@
+text
+@#title Bigquery
+
+[[TableOfcontents]]
+== Google Bigquery ==
+엄밀히 Bigquery는 Cloud 영역이라기 보다는 BigData영역이라고 볼 수 있겠다. 하지만 Iaas에서 Paas, Saas로 자연스럽게 이동하다 보니, 자연스럽게 빅데이터 기술에 관심을 가지게 됐다. 이전에 검색서비스를 개발한 경험이 있는데, 그러다 보니 특히 빅데이터 쪽에 관심을 가지게 된 것 같다. 
+
+Gooble bigquery는 구글의 서비스로 '''아주 큰 데이터셋'''으로 부터 '''매우 빠른 시간에''' 원하는 정보를 질의하기 위한 데이터처리 시스템이다. 질의어로 SQL을 사용한다. SQL을 이용해서 질의를 한다는 것만 놓고 보면 RDBMS와의 차이점이라고 할만한건 '''아주 큰 데이터셋'''정도가 될테다. 얼마나 큰 데이터를 아주 큰 데이터셋이라고 할 수 있을까 ? 마찬가지로 '''매우 빠른 시간'''이 얼마나 빠른 시간을 의미하는 걸까. 
+
+구글은 bigquery를 이용하면 수테라바이트의 데이터에서 10초이내에 질의 결과를 얻을 수 있다고 설명하고 있다. 아마도 RDBMS로도 가능할 것이다. 매우 많은 시간과 비용을 투자한다면... Bigquery를 이용하면, 저렴하고 빠르게 데이터를 분석할 수 있다.  
+
+이 문서는 BigQuery 서비스를 소개하려는게 목적이 아니다. 어떻게 클라우드위에 올릴 수 있을지를 나름 고민해서 해답을 찾는 것을 목적으로 한다. BigQuery 서비스에 대한 정보는 [https://developers.google.com/bigquery goolge bigquery 사이트]에서 얻자.  
+
+== 데이터 색인 ==
+데이터는 CSV 형식으로 Cloud Storage에 올린다. Object Storage면 될 테다. CSV의 각 필드는 검색 필드에 대응한다. 데이터 분석자는 schema를 설계해야 하는데, 검색 색인을 위한 스키마 설계와 동일할 것이다. RDBMS 처럼 스키마 설계가 복잡하지 않을 것이다. 필드명, 데이터 타입, 색인 방식만 정의 하면 된다.    
+
+Goolge의 [https://developers.google.com/bigquery/docs/sample-tables 샘플 테이블]중 '''Birth information for the United States from 1969 to 2008'''를 사용할 것이다.  
+
+셈플 예제는 '''필드 이름'''과 '''데이터 타입'''만 명시돼 있는데, 색인 방식도 필요하지 않을까라는 생각이다. 어떤 데이터의 경우에는 ngram 방식의 색인은 필요할 수 있기 때문이다. 예를 들어 로그 분석을 위해서 로그 메시지 필드를 색인할 경우다. integer, boolean 혹은 코드화된 스트링의 경우에는 범위 검색이나 exacting match 로도 충분할 것이다.     
+
+== 구현 ==
+이렇게 색인 할 경우 SQL의 '''SELECT .. FROM ... WHERE'''을 이용한 검색 기능의 제공은 가능하다. 예를 들어서 1990년에 태어난 아이들 중 성이 '''Tom'''인 남아를 검색하고 싶다면, 아래 쿼리로 충분할 것이다. 
+{{{#!plain
+SELECT field.secondname FROM natality WHRE field.year=1990   
+}}}
+이 질의어는 검색 질의어로 문제없이 변경할 수 있다.
+
+그러나 '''Group by'''와 관련된 질의어의 경우 검색 질의어로 변경이 불가능하다. 예컨데 SUM, AVG, COUNT, MAX, MIN, LAST등이다. 1990년부터 2000년까지 년도별 출산률 정보를 얻기 위한 SQL 질의어는 다음과 같을 것이다.
+{{{#!plain
+SELECT field.year, count(field.year) FROM natality WHERE field.year > 1990 and field.year < 2000 Group by year  
+}}}
+
+이러한 통계 기능을 구현하기 위해서는 색인기와 Searcher의 수정이 불가피하다. 주요 SQL 명령별로 어떻게 구현해야 할지 생각해보려 한다. 
+
+=== AVG, SUM, MAX, MIN, COUNT, TOPN ===
+==== 기본안 ====
+연도별로 출산 아이의 평균 체중 증감율을 보고 싶다면, 아래와 같은 SQL이 필요할 것이다. 
+{{{#!plain
+SELECT field.year, AVG(field.weight) FROM natality WHERE field.year > 1990 and field.year < 2000 Group by year  
+}}}
+
+검색엔진은 year에 대한 범위 검색을 할 것이고 그 결과 각 년도에 대한 DocID를 가져올 수 있을 것이다. 하지만 여기에서 필요한 것은 DocID가 아니고 DocID가 가리키는 문서의 weight 필드의 값이다. 이 값을 가져와서 AVG 연산을 해줘야 한다. 색인테이블에는 DocID만 저장하고 있기 때문에 검색엔진 그대로는 위의 쿼리를 지원할 수 없다.    
+
+내가 생각한 해결 방안은 다음과 같다.
+  * Integer나 floot와 같이 수치연산이 가능한 필드의 값은 따로 저장을 한다. 이 파일의 이름은 extra.dat라고 하자. 
+저장하는 것은 문제될게 없다. 문제는 빠르게 읽어올 수 있는 구조여야 한다는 점이다. DocID를 0부터 순차적으로 증가하게 하도록 하면, seek를 이용해서 빠르게 정보를 읽어올 수 있을 것이다. 예를 들어 색인에 3개의 integer 필드가 있다면, DocID가 517, 520인 문서의 정보는 아래와 같이 가져올 수 있을 거다. 의사코드다. 
+{{{#!plain
+fd = open("extra.dat",...);
+curpos = 0;
+fieldsize = sizeof(int)*3
+docs = [517, 520];
+for docid in docs
+{
+  offset = docid x fieldsize;
+  seek(fd, 0, offset);
+  read(fd, buf, sizeof(int)*3);
+}
+}}}
+이 값들은 priority queue에 들어갈 것이다. 정리해 하자면, 아래와 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=15ATq9LGRSfK2xMRVCDcEY8cpyL5YyT6LnIl18jW7Lf0&amp;w=693&amp;h=320">
+}}}
+  1. 색인 테이블에서 Key를 찾는다. Key에 대한 DocID 목록을 얻을 수 있다.
+  1. DocID를 이용해서, 통계 연산에 필요한 값들을 가져올 수 있다.  
+  1. 연산 후 Priority Queue에 들어간다. 검색엔진은 TF * IDF 기반의 weight를 가지고 정렬하는데, 다른 값들(SUM, AVG등의 연산 결과)로 정렬하도록 수정이 필요하다.  
+
+SELECT, GROUP BY, ORDER BY, LIMIT 까지 해결이 됐다. 문제는 속도가 되겠다. 간단히 생각할 수 있는 튜닝요소는 다음과 같다. 
+  1. Density model을 뺀다. 풀 텍스트 검색 서비스가 목적이 아니다. 풀 텍스트 검색의 경우에도 Density model은 지나치게 많은 시간을 잡아먹기 때문에 최적화 포인트가 된다. 하물며 개발할 솔류션은 풀 텍스트 검색을 사용할 필요가 없다. 스트링 메시지를 포함하는 데이터의 경우에, 해당 필드에 제한적으로 풀 텍스트 검색을 수행하도록 할 수 있는데, 이 경우에도 Density model을 적용할 필요는 없을 것이다. 
+  1. Score 연산 수정 : TF * IDF 기반으로 Term에 대한 문서 가중치를 계산할 필요가 없다. 뺀다.    
+  1. Priority Queue : 지정한 Queue 크기를 채워서 데이터가 입력되며, 그때부터 Priority 연산을 한다. 1990 ~ 2000 범위로 group by year 연산을 한다면 Queue 크기는 10밖에 안될 건데, priority 연산은 낭비다. 
+
+연산데이터에 접근하는 속도도 고려해야 한다. 수백만건의 문서로 작업을 한다면, 수백만번의 seek 연산이 발생한다. 모아서 처리하는 것으로 어느정도 속도를 높일 수 있을 것이다. DocID는 정렬돼 있기 때문에, 일정 갯수의 DocID에 대해서 한번에 메모리에 올려서 작업을 하면 어떨까 싶다. 예를 들어 "0, 3, 4, 10, 20"의 문서가 검색됐다면, (레코드 하나의 길이는 sizeof(int)*4로 가정) 21*sizeof(int)*4 만큼을 메모리에 올려서 작업할 수 있을 것이다. SSD를 사용하는 것도 방법이될 수 있을 것이다. 이런 고민이 필요없을 수도 있는데, 테스트해보기전엔 장담할 수가 없다. 
+
+==== 수정안 1 ====
+연산이 숫자 데이터에만 이루어지라는 법은 없다. '''Group by lastname'''을 할 수도 있기 때문이다. 이를테면 1990년에 태어난 lastname별 count 연산 같은 것들이다. 결국 string 데이터도 들어가야 하는데, 다음과 같이 데이터를 링크하면 어떨까 싶다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1M5nnNMRnT3jTTOVNci4mRDdj5mX4ZFRv9oYrkt0uWsQ&amp;w=712&amp;h=561">
+}}}
+
+루신검색엔진도 원본 데이터의 위치 정보를 가지고 있으므로, 굳이 직접 구현할 필요가 없을 수도 있다. 최적화 가능한지를 테스트해볼 필요가 있겠다. 
+
+이제 SELECT field,firstname, count(field.firstname) FROM table GROUP BY field.firstname where year=1999 하면 
+   1. field.year가 1999의 색인 레코드를 찾은 다음
+   1. DocID를 읽어 오고 
+   1. DocID의 데이터 위치를 읽어서, firstname 값을 가져온다.  
+   1. priority queue에 <firstname, count> 을 입력(혹은 갱신)한다. 
+      1. queue에 원소가 충분히 많을 경우 priority 연산을 수행한다. 
+
+=== Query ===
+==== LIMIT ====
+결과가 미리 정렬되어 있지 않다면, 색인 테이블 전체를 검색해야 한다. 따라서 Limit 조건을 걸었다고 해서, 검색이 빨라지지는 않을 것이다.
+
+==== JOIN ====
+JOIN은 처리해야할 테이블의 처리범위와 순서에 따라 (성능 측면에) 매우 큰 영향을 받는다. 구글 Bigquery도 join 연산에 제한을 둔다. 왜, 어떤 제한이 생기는지, 어떤 경우에 join연산을 효율적으로 사용할 수 있는지 확인할 필요가 있다. 
+
+예를 들어 질의어가 "ON A.name = B.name AND A.id = B.id"이고 A와 B 모드 백만레코드를 포함하고 있다면, 100만번의 검색이 이뤄진다. 엄청나게 많은 시간이 걸릴 것이다. 따라서, 효과적인 join 연산을 위해서는 기준이 되는 한쪽 테이블의 크기가 작아야 한다. A가 천만레코드 B가 천레코드라면 B를 기준테이블로 1000번의 연산이 이루어질 거다. 
+
+한쪽 테이블의 크기가 작은 "small join"이 필요하다. small join은 구글 Bigquery의 제한조건이기도 하다. 
+
+색인 테이블이 Small join을 만족한다면, 크기가 작은 색인 테이블의 필드의 값을 가져와서 검색 쿼리를 만들면 된다.
+
+=== 분산 검색 ===
+"분산 검색"은 검색 속도를 높이기 위해서 일반적으로 사용할 수 있는 방법이다. 
+
+분산 검색을 하게 되면, 검색 결과에 약간의 오차가 생길 수 있다. 아래의 경우를 보자.
+{{{#!plain
+A-1 색인 :  100 90 80 70 75 | 74 73 72 71 70 69 50 45  
+A-2 색인 :   85 12 11 10  9 |  8  7  6  5  4  3  2  1
+}}}
+각각의 searcher가 가져올 <DocID, score> 크기를 5로 하자, 그러면 최종 결과는 "100 90 85 80 75 70 12 11 10" 이렇게 될 것이다. 우리가 원하는 값이 아니다. 물론 각각의 searcher에서 가져오는 크기를  늘리는 것으로 오차를 줄일 수는 있겠지만, 완전한 해결책은 아니다.
+
+그래도 웹 문서에 대한 풀 텍스트 검색이라면 검색 품질에 미치는 영향이 작을 것이기 때문에 크게 신경쓸 필요는 없다. 
+  1. score가 서로 독립적이기 때문이고
+  1. 웹 문서에 대한 풀 텍스트 검색은 어차피 "근사 값"을 높이는게 목적이지 100% 원하는 문서를 가져오는게 목적이 아니다. 즉 Pruning을 해도 된다. 
+하지만 BigQuery라면 상황이 좀 달라진다. 각각의 search에서 넘어온 값들이 서로 관계를 가질 수 있다. 따라서 Pruning할 수가 없다. 
+
+분산 검색을 포기하는 방법도 있다. 색인 테이블이 아주 크지 않을 경우 괜찮은 방법인거 같은데, 마음 한 구석이 허전하다. 색인 파일이 테라바이트가 될지 누가 알겠는가. 
+
+분산 검색을 한다. 이를 위해서 MapRedude 엔진을 사용한다. 분산 검색 결과를 mapreduce엔진에 넣고 돌린다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1YnpbsnCS7ROR5SeC3uazCMxsHYlVGQ2KbkYuH491jsA&amp;w=1214&amp;h=346">
+}}}
+  1. 각 Search는 중간파일 형태로 결과를 반환한다. 결과자체가 Key로 정렬된 Map 자료형태다. count(firstname) 이라면, frstname이 key, count 값이 value다. 
+  1. Worker를 이용해서 reduce 작업을 한다. 합병정렬이기 때문에 매우 빠를 것이다. 
+
+=== 색인 ===
+
+=== Multi tenancy ===
+
+=== 테스트 ===
+@
+
+
+1.7
+log
+@183.98.30.10;;yundream;;
+@
+text
+@a115 1
+
+d120 7
+a126 1
+분산 검색한다. 이를 위해서 MapRedude 엔진을 사용한다. 분산 검색 결과를 mapreduce엔진에 넣고 돌린다. 
+a127 1
+계속...
+@
+
+
+1.6
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d106 6
+a111 1
+일반적인 풀 텍스트 검색이라면, 하나의 DocID가 하나의 score에 대해서 "정렬"
+d113 11
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d65 1
+a65 1
+  1. 연산 후 Priority Queue에 들어간다. 검색엔진은 TF * IDF 기반의 weight를 가지고 정열하는데, 다른 값들(SUM, AVG등의 연산 결과)로 정열하도록 수정이 필요하다.  
+d104 3
+a106 1
+색인 테이블을 분산해서 저장하고 질의 한다면,
+@
+
+
+1.4
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d34 1
+a34 1
+=== AVG, SUM, MAX, MIN, COUNT ===
+d90 3
+a92 1
+=== Limit ===
+d94 13
+a106 1
+=== 분산 처리 ===
+a109 2
+=== 색인 생성 ===
+
+@
+
+
+1.3
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d3 1
+d35 1
+d74 1
+a74 1
+==== 수정 1 ====
+d85 1
+a85 1
+   1. DocID를 읽어 온다.
+d89 10
+@
+
+
+1.2
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d72 15
+a86 1
+계속 ....
+@
+
+
+1.1
+log
+@121.135.216.196;;yundream;;
+@
+text
+@d17 1
+a17 1
+셈플 예제는 '''필드 이름'''과 '''데이터 타입'''만 명시돼 있는데, 색인 방식도 필요하지 않을까라는 생각이다. 어떤 데이터의 경우에는 (최소한)ngram 방식의 색인은 필요할 수 있기 때문이다. 예를 들어 로그 분석을 위해서 로그 메시지 필드를 색인할 경우다. integer, boolean 혹은 코드화된 스트링의 경우에는 범위 검색이나 exacting match 로도 충분할 것이다.     
+d33 1
+a33 2
+=== GROUP BY ===
+==== AVG, SUM, MAX, MIN ====
+d56 1
+d58 15
+a72 1
+... 계속
+@

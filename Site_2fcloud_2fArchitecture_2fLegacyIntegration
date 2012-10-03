@@ -1,0 +1,124 @@
+#title 레거시 시스템의 클라우드 통합
+
+[[TableOfcontents]]
+== 레거시 시스템과 클라우드와의 통합 ==
+프라이빗 클라우드를 도입할 경우 문제는 기존의 레거시 시스템을 어떻게 할 것인지 하는 거다. 레거시 시스템과는 별도로 독립적인 클라우드 시스템을 구축하는 방법을 생각해 볼 수도 있겠는데, 그다지 예쁘지 않다. 
+
+새로 개발하는 서비스들은 클라우드위에 올리면 되겠지만, 연동해야하는 데이터는 레거시 시스템에 있을 것이기 때문이다. 또한 어떤 서비스들은 특성상 클라우드가 아닌 베어메탈 호스트에서 돌려야 하는 경우도 고려해야 한다.
+
+따라서 프라이빗 클라우드는 아래의 요소들로 구성이 된다고 가정해야 한다.
+  1. 클라우드 운영체제 : CloudStack, OpenStack 내가 사용해 본 것은 이정도.
+  1. 베어메탈 호스트 : VM으로 올리기는 껄끄러운 서비스들이 있을 테다.   
+  1. 레거시 시스템 : 데이터베이스, NAS, 스토리지등의 서비스들이다.    
+
+네트워크도 고려를 한다. 클라우드 도입전 인터넷 서비스를 하고 있었다면, DMZ 네트워크를 구성해서 WAS와 데이터베이스등의 시스템을 인터넷으로 부터 분리했을 것이다(라고 가정한다).  
+
+=== 클라우드 운영체제 통합 ===
+CloudStack은 Advanced network mode와 Basic network mode 두가지 모드를 가지고 있다. Basic network mode와 Advanced network mode 모두에 대해서 통합 방안을 고민해 보려 한다. 
+
+=== 네트워크&시스템 통합 ===
+네트워크 구성은 다음과 같다고 가정한다.
+ 1. DMZ에는 퍼블릭 네트워크로 연결된다. 웹서버와 같은 웹 애플리케이션이 위치한다.   
+ 1. Security Area는 퍼블릭 네트워크로 부터 보호해야 하는 데이터베이스, WAS, Storage server 등이 위치한다. 
+ 1. Management network가 있다. 관리를 위해서 사용한다. 대략 아래의 트래픽이 흐른다.
+    1. IPMI
+    1. Cloudstack API
+    1. 베어메탈 노드를 프로비저닝하기 위한 프로토콜들 : DHCP, PXE-BOOT...
+시스템은 2개 이상의 NIC을, Storage 트래픽을 분리하기를 원한다면 3개의 NIC을 가지고 있어야 할 것이다. 다음은 위의 구성을 단순화한 그림이다. 아래 그림을 바탕으로 설계를 확장해 나갈 생각이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1PaSHO93ex4W-MEG1f_bC3qA3RCduNxyZXdyKZvlzwxc&amp;w=723&amp;h=429">
+}}}
+
+각 POD는 lack에 대응한다. Lack 대신 POD라고 쓴 이유는 순전히 개인적으로 클라우드 스택의 zone / pod 개념에 익숙하기 때문이다. POD에는 L2 swtich가 있을 것이고, 이 L2 switch는 다시 L3 switch로 연결될 것이다. L3 switch는 하나 이상의 L2 switch와 연결될 수 있는데, L3 switch 밑에 있는 POD과 모든 노드들은 L2 영역으로 묶이게 된다.
+
+POD 스위치를 L3로 하면, L3 네트워크로 구성할 수도 있을테다. 실제로는 L2 네트워크 구간과 와 L3 네트워크 구간이 함께 구성될거다.
+
+==== 매니지먼트 네트워크 ====
+매니지먼트 네트워크를 구성할 때는 염두에 둬야 할 점이 하나 있다. VM을 올리기 위한 CNODE의 경우에는 매니지먼트 네트워크까지 연결해도 상관이 없겠지만, Baremetal NODE(이하 BNODE)의 경우에는 보안문제가 생길 수 있다. 매니지먼트 네트워크는 DMZ와 Security area모두에 연결돼 있으므로 일종의 백도어로 작동할 수 있기 때문이다. 하긴 베에머탈 노드를 매니지먼트 네트워크에 연결하는 경우도 흔치 않기도 하다. 베어메탈 노드 구성은 따로 다루도록 한다.
+
+==== 클라우드스택 매니지먼트 시스템 구성 ====
+클라우드스택 매니지먼트 서버의 위치를 생각해 보자.  
+
+어떤 네트워크모드로 구성하느냐에 따라 달라진다. Basic network 모드로 구성할 거라면, 클라우드스택이 관리하는 POD를 L3 네트워크로 구성해야 할 것이고, Advanced network 모드로 구성할 거라면 L2 네트워크로 구성해야 할 것이다. Basic network 모드 구성은 단순하므로 Advanced network 모드의 tagged vlan 타입으로 구성을 고민해 보려한다. 
+
+위치는 DMZ와 Security area 모두에 클라우드스택 매니지먼트 서버를 두는 방법을 생각할 수 있다. 서로 분리되는 네트워크라는 관점에서 보면 두개의 매니지먼트 서버를 두는게 합리적인 구조로 보일 수 있다. 하지만 관리 포인트가 많아진다는 문제점이 있다. 개발이 가능하다면, 클라우드스택 API를 이용하는 또다른 매니지먼트 서버를 두는 방법도 있다. JCloud, DeltaCloud등의 솔류션을 이용해서 클라우드 소프트웨어 관리 레이어를 하나 더 두는 방법을 생각할 수 있다.
+
+각 area에 독립된 클라우드스택 매니지먼트 서버를 둔다면 다음과 같이 구성할 수 있을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1FKSRfCK4Y7yr4Z-1Epwj58D9nrkf7nGSJXl5HhOu4FI&amp;w=625&amp;h=280">
+}}}
+  * API Management server : Cloudstack을 관리하는 서버다. 매니지먼트 망을 이용, 클라우드스택 API를 호출해서 클라우드를 관리한다.
+  * 매니지먼트 망 : 빨간색선으로 관리 트래픽이 흐른다.  
+  * Zone : 클라우드스택의 zone이다. L3 switch가 하나의 zone이 되며, 스위치에 묶인 POD들은 같은 L2 네트워크로 묶인다. 각 POD에는 L2 switch가 놓인다. zone과 zone 혹은 다른 network area 사이의 통신은 L3 스위치를 거치므로 데이터 통신에 문제는 없다.    
+이렇게 구성하면, DMZ의 클라우드스택 zone에 web service를 두고, Security area에 WAS나 데이터베이스 서버를 두는 구성이 가능할 것이다. 
+
+위의 구성에서 어카운트 VM은 RVM(소프트에어 라우터)을 통해서 퍼블릭 네트워크로 나가게 되는데, RVM을 거치면서 성능누수가 생긴다는 문제가 있다. RVM의 성능누수와 성능 한계는 실 서비스에서는 문제가 될 수 있는 수준이다. 
+
+두 가지 방법으로 문제 해결이 가능하다.
+  1. Basic network 모드로 구성 : Basic network 모드는 L3 네트워크 구성으로 VM이 직접 퍼블릭 네트워크에 연결된다. 따라서 RVM에 의한 성능저하가 없다. 문제는 Basic network 모드의 기능이 충분하지 않고, 검증역시 충분하지 않다는 점이다. 처음부터 advanced network 모드에 주로 개발역량을 집중했기 때문에 발생한 문제다. 클라우드스택3에서는 basic network 모드 개발에도 신경을 쓰는 모양인데, 검증이 필요하다. 
+  1. Multi nic 구성 : 클라우드스택을 이용해서 VM에 multi nic을 할당할 수 있다. 추가한 nic를 network area간 트래픽 통로로 사용하면, 1번과 동일한 효과를 누릴 수 있을 것이다.
+
+=== 베어메탈 호스트와의 통합 ===
+베어메탈 호스트를 클라우드 환경에 포함해야 하는 경우의 수를 생각해 보자. 
+  1. 성능문제로 VM대신 베어메탈 호스트에 서비스를 올리려 한다.  
+  1. 애플리케이션 문제로 베어메탈 호스트에 서비스를 올려야만 한다.  
+웹 서버는 VM으로 올리고 데이터베이스 서버는 베어메탈로 구성해서 연결하는 경우도 있을 테고, 서비스의 모든 구성요소들을 베어메탈로 구성하는 경우도 생각해 볼 수 있다. 
+
+==== 베어메탈 시스템 & 네트워크 구성 ====
+베어메탈 시스템도 POD 구성을 따를 것이다. 이 POD은 베어메탈 호스트만을 위한 POD으로 TOR(Top of rack)스위치와 베어메탈 호스트의 단순한 구성을 가진다.
+
+네트워크 구성은 아래의 두 가지 타입이 있다.
+  1. L2 network로 구성한 다음 NAT을 한다.
+  1. L3 network로 구성한다. 
+
+1 번의 경우 POD의 TOR 스위치로 L2 스위치가 올라간다. 아래의 구성을 가질 것이다. '''BPOD'''는 Baremetal POD이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1TO07JDd-YLWrwd0G82XCshxY_RzYm1qOhb0Ba-L7Gm0&amp;w=676&amp;h=563">
+}}}
+  1. BPOD는 각각 L2 switch를 가진다. 
+  1. BPOD는 L2 집선 switch에 연결된다. 
+     * L2 network 구조에서 '''Baremetal zone'''은 L2 집선 스위치단위로 정의할 수 있다.     
+     * Baremetal zone에 있는 모든 베어메탈 호스트는 하나의 L2 네트워크에 묶인다.
+  1. 베어메탈 호스트들은 사설 IP를 가진다.    
+  1. L4 장비를 이용해서 NAT를 한다. 
+     * L4 장비는 Network area에 대한 LB 서비스 용도로도 사용할 수 있다.   
+
+2번 구성은 L2 집선 스위치 대신 L3 Switch가 사용된다는 걸 제외하면, 1번과 동일한 구성을 가진다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=17q_4EVCI_eMzUaxqiEB6FF8MZOdY2rdaIgn44OHavfg&amp;w=676&amp;h=563">
+}}}
+  1. BPOD는 L2 switch를 가진다. 
+  1. BPOD의 L2 switch는 L3 switch에 연결된다.
+  1. L3 네트워크 이므로 NAT 서비스가 필요없다. L4 장비는 Load Balancer로 사용된다. 
+
+베어메탈 호스트들간의 isolation은 고려하지 않기로 했다. 
+
+==== 베어메탈 프로비저닝 ====
+베어메탈 프로비저닝에 대한 문서는 [wiki:Site/cloud/automation/PING PING]을 살펴보기 바란다. 하지만 PING는 LVM, ext4를 지원하지 않으며 프로젝트도 거의 중단된 상태인것 같다. 그냥 PING과 같은 솔류션을 직접 만드는 걸 추천한다. [wiki:Site/System_management/Knoppix Knoppix] live cd를 이용하면, 프로비저닝 솔류션을 (비교적)쉽게 개발할 수 있을 것이다. 
+
+베어메탈 프로비저닝 방식은 크게 두 가지로 나눌 수 있다.
+  1. kickstart, Windows DS(windows deployment service)를 이용한 방법. 여기에 chef를 올려서 초기 운영체제 설정까지 관리한다.
+  1. 운영체제 Image 복사. 클라우드스택에서 VM image 템플릿을 이용해서 VM을 생성하는 것과 동일한 방식. Image를 베어메탈에 복사한다는게 유일한 차이점이다. Chef가 설치된 운영체제 image를 만들어서, 설정관리까지 할 수 있다.
+
+개인적으로 2번 방식을 선호한다. 리눅스 운영체제만을 프로비저닝 한다면 문제될게 없는데, 윈도우 운영체제까지 프로비저닝 할 경우 구현기술이 복잡해지기 때문이다. Kickstart와 DS를 클라우드환경에 함께 묶을 생각을 하면, 벌써부터 머리가 아프다. 베어메탈 프로비저닝 기능을 포함하는 클라우드 소프트웨어들도 2번 방식을 주로 사용한다.  
+
+베어메탈 프로비저닝에서의 핵심은 DHCP서버의 구성에 있다. DHCP 서버 설정은 chef로 관리하면 되니, 문제될게 없다. 문제는 DHCP가 L2에서 작동하는 프로토콜이라는 점이다.
+
+L2 네트워크 구성의 경우 BPOD 마다 DHCP 서버를 두면 된다. POD 마다 DHCP 서버를 두는게 부담이라면, 모든 BPOD를 하나의 subnet으로 묶고, 첫번째 BPOD에만 DHCP 서버를 두면 된다. 비교적 간단히 구성할 수 있을 것이다.
+
+L3 네트워크라 구성의 경우 L2 집선스위치 대신에 L3 Switch가 놓인다는 점을 고려해야 한다. DHCP는 L3 switch를 넘어갈 수 없기 때문에, 각 BPOD 마다 DHCP 서버를 구성해야만 한다. 이게 싫다면 모든 BPOD을 VLAN trunk로 묶어서 L2 네트워크 처럼 보이게 해야 한다. 이 경우 BPOD 중 하나에 DHCP 서버를 두면 된다. 이 DHCP 서버는 VLAN 개수만큼의 VLAN interface를 가지게 구성하면 된다. 
+
+L3 네트워크에서의 구성은 대략 다음과 같을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1q60VXnnVLD7DG9d9DqU09lRb5PE30dUOzjutFjrIZd8&amp;w=884&amp;h=464">
+}}}
+
+... 계속
+
+== 히스토리 ==
+  1. 2012년 10월 3일 작성

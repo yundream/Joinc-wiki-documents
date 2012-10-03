@@ -1,0 +1,181 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2012.08.24.06.36.28;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.08.24.06.15.22;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fKnoppix_2fPxeBoot
+@
+
+
+1.2
+log
+@183.98.30.10;;yundream;;
+@
+text
+@#title Knoppix LIVE CD로 PXE-BOOT 환경 만들기  
+
+[[TableOfContents]]
+== PXE-Boot를 하려는 이유 ==
+Knoppix를 이용해서 백업/리스토어 솔류션, 더 나아가서 베어메탈 프로비저닝 솔류션을 만들 계획이다. 궁극적으로는 백업, 리스토어, 프로비저닝 모든 과정이 자동화 할 계획이다.
+
+자동화를 하려하면 knoppix 라이브 시디로 [wiki:Site/System_management/PXEBoot PXE-BOOT]가 돼야 한다. 대략 다음의 프로세스다.  
+  1. PXE-BOOT를 한다. 
+  1. Knoppix 라이브 시디 부팅된다. 이 라이브 시디는 백업, 프로비저닝, 리스토어를 위한 애플리케이션을 포함하고 있다. 
+  1. ssh 혹은 웹으로 백업,복구 애플리케이션을 실행한다. 
+
+== Knoppix PXE-Boot 환경 만들기 ==
+PXE-Boot 환경은 모두 설정 된 것으로 가정한다. 구성은 다음과 같다.
+
+  1. VirtualBox : 가상환경에서 테스트 한다. 베어메탈 노드는 [wiki:Site/cloud/virtualbox virtualbox] 게스트로 시뮬레이션 한다. 
+  1. Knoppix 라이브 OS는 /srv/iso/KNOPPIX 에 위치한다. NFS를 이용해서 OS를 실행한다. 
+  1. 테스트에 사용할 라이브 ISO의 이름은 knoppix_yun.iso로, 리마스터링한 라이브 운영체제다.
+  1. Knoppix 6.2.1 버전
+
+=== NFS 서버 구성 === 
+NFS 루트디렉토리는 /srv/iso 이다. 다음과 같이 설정했다.
+{{{#!plain
+# cat /etc/exports
+/srv/iso 192.168.56.*(rw,sync,no_root_squash,no_subtree_check)
+}}}
+
+=== Knoppix 라이브 운영체제 복사 ===
+[wiki:man/12/NFS NFS] 디렉토리로 (리마스터링한)Knoppix 라이브 운영체제를 복사한다.  
+{{{#!plain
+# mount -o loop knoppix_yun.iso /mnt/knoppix 
+# cp -r /mnt/knoppix/KNOPPIX /srv/iso 
+}}}
+복사된 디렉토리의 파일 구성은 다음과 같다.
+{{{#!plain
+# ls /srv/iso/KNOPPIX
+KNOPPIX                         README_Security.txt  index_en.html  knoppix-cheatcodes.txt   sha1sums
+Knoppix67-wallpaper-README.txt  SOURCES.txt          index_es.html  knoppix-logo-medium.png
+Knoppix67-wallpaper.flame       background.jpg       index_fr.html  knoppix-logo-small.png
+LICENSE.txt                     index_de.html        index_it.html  modules
+}}}
+
+=== TFTP boot 설정 ===
+TFTP 루트 디렉토리는 "/srv/tftp"다. knoppix 부트 파일들이 위치할 디렉토리는 "/srv/tftp/images/knoppix" 이다. 
+
+vmlinuz과 initrd 파일을 부트 디렉토리에 복사해야 한다. 대게의 리눅스 운영체제들이 initrd 파일의 이름은 initrd.img로 하는데, knoppix의 이름은 minirt.gz 이다. 
+{{{#!plain
+# ls /srv/tftp/images/knoppix
+minirt.gz  vmlinuz
+}}}
+
+tftp 설정 파일을 변경한다.
+{{{#!plain
+# cat /srv/tftp/pxelinux.cfg/default
+timeout 60
+label knoppix
+  kernel images/knoppix/vmlinuz
+  append nfsdir=192.168.56.1:/srv/iso ramdisk_size=100000 init=/etc/init apm=power-off nomce vga=791 xmodule=fbdev initrd=images/knoppix/minirt.gz BOOT_IMAGE=KNOPPIX
+prompt 60 
+}}}
+
+=== minirt.gz 수정 ===
+이제 VM을 실행하면 PXE boot로 라이브 운영체제가 올라와야 한다. 하지만 modules/net에 있는 모듈들을 올릴 수 없다는 메시지와 함께 라이브 운영체제가 올라오지 않는다. 
+
+모듈정보는 minirt.gz 에 들어간다. 이 파일을 압축을 풀어보면, 실제 리눅스 커널 모듈들이 하나도 들어있지 않음을 알 수 있다. 당연히 실패한다. 제대로 라이브 시디가 올라오려면, 네트워크 모듈, scsi 모듈, nfs 모듈들이 반드시 필요하다. 
+
+해서 어쩔 수 없이 minirt 에 모듈 파일을 복사하는 노가드를 했다. (확장자가 .ko인)커널 모듈들은 실행중인 knoppix 운영체제에서 찾을 수 있으니 복사해서 사용하면 된다. 커널 모듈들은 /lib/modules 디렉토리에 위치한다.
+
+minirt.gz의 압축을 푼다. minirt는 cpio로 묶여있다.
+{{{#!plain
+# mkdir /tmp/knoppix
+# cp minirt.gz /tmp/knoppix 
+# gunzip minirt.gz
+# cpio -ivu --no-absolute-filenames < minirt
+}}}
+압축을 풀면 modules 디렉토리가 보일 것이다. 지금은 텅 비어 있을건데, 여기에 필요한 커널 모듈을 복사한다.
+
+먼저 scsi 관련 커널 모듈이다. modules/scsi 디렉토리에 복사하면 된다. 별 쓸데없는 커널 모듈들도 있겠는데, 필수 커널모듈을 선택하기가 귀찮아서 그냥 되는데로 전부 복사했다.
+{{{#!plain
+# ls modules/scsi
+3w-9xxx.ko       aha152x.ko      eata.ko            initio.ko            osst.ko            sim710.ko
+3w-sas.ko        aha1542.ko      fd_mcs.ko          ipr.ko               pas16.ko           st.ko
+3w-xxxx.ko       aha1740.ko      fdomain.ko         ips.ko               pmcraid.ko         stex.ko
+53c700.ko        aic7xxx.ko      g_NCR5380.ko       iscsi_boot_sysfs.ko  ppa.ko             sym53c416.ko
+BusLogic.ko      aic7xxx_old.ko  g_NCR5380_mmio.ko  iscsi_tcp.ko         qla1280.ko         t128.ko
+NCR53c406a.ko    atp870u.ko      gdth.ko            libiscsi.ko          qlogicfas.ko       tmscsim.ko
+NCR_D700.ko      dc395x.ko       hptiop.ko          libiscsi_tcp.ko      qlogicfas408.ko    u14-34f.ko
+NCR_Q720_mod.ko  dmx3191d.ko     ibmmca.ko          libsrp.ko            scsi_debug.ko      ultrastor.ko
+a100u2w.ko       dpt_i2o.ko      imm.ko             megaraid.ko          scsi_wait_scan.ko  wd7000.ko
+advansys.ko      dtc.ko          in2000.ko          nsp32.ko             ses.ko
+}}}
+
+
+다음 네트워크 모듈이다. nfs 관련 모듈도 함께 올라간다. 역시 선택하기가 귀찮아서 모든 모듈을 복사했다. 원래 nfs는 네트워크 모듈아닌 fs 모듈이므로 직접 복사해줘야 한다.  
+{{{#!plain
+# ls modules/net
+3c501.ko     b44.ko       e1000         ipg.ko         netconsole.ko   r8169.ko        tehuti.ko
+3c503.ko     benet        e1000e        irda           netxen          rionet.ko       tg3.ko
+3c505.ko     bna          e2100.ko      ixgb           nfs.ko          s2io.ko         tlan.ko
+3c507.ko     bnx2.ko      eepro.ko      ixgbe          ni52.ko         sb1000.ko       tokenring
+3c509.ko     bnx2x        eexpress.ko   ixgbevf        ni65.ko         sc92031.ko      tulip
+3c515.ko     bonding      enic          jme.ko         niu.ko          seeq8005.ko     tun.ko
+3c523.ko     bsd_comp.ko  epic100.ko    ks8842.ko      ns83820.ko      sfc             typhoon.ko
+3c527.ko     caif         eql.ko        ks8851_mll.ko  pch_gbe         sis190.ko       usb
+3c59x.ko     can          es3210.ko     ksz884x.ko     pcmcia          sis900.ko       veth.ko
+8139cp.ko    cassini.ko   eth16i.ko     lance.ko       pcnet32.ko      skge.ko         via-rhine.ko
+8139too.ko   chelsio      ethoc.ko      lne390.ko      phy             sky2.ko         via-velocity.ko
+82596.ko     cnic.ko      ewrk3.ko      lp486e.ko      plip.ko         slip.ko         virtio_net.ko
+8390.ko      cs89x0.ko    fealnx.ko     macvlan.ko     ppp_async.ko    smc-mca.ko      vmxnet3
+8390p.ko     cxgb3        forcedeth.ko  macvtap.ko     ppp_deflate.ko  smc-ultra.ko    vxge
+ac3200.ko    cxgb4        hamachi.ko    mdio.ko        ppp_mppe.ko     smc-ultra32.ko  wd.ko
+acenic.ko    cxgb4vf      hamradio      mii.ko         ppp_synctty.ko  smc9194.ko      wimax
+amd8111e.ko  de600.ko     hp-plus.ko    mlx4           pppoe.ko        smsc9420.ko     wireless
+arcnet       de620.ko     hp.ko         myri10ge       pppox.ko        starfire.ko     yellowfin.ko
+at1700.ko    depca.ko     hp100.ko      natsemi.ko     pptp.ko         stmmac          znet.ko
+atl1c        dl2k.ko      ibmlana.ko    ne.ko          qla3xxx.ko      sundance.ko
+atl1e        dnet.ko      ifb.ko        ne2.ko         qlcnic          sungem.ko
+atlx         dummy.ko     igb           ne2k-pci.ko    qlge            sungem_phy.ko
+atp.ko       e100.ko      igbvf         ne3210.ko      r6040.ko        sunhme.ko
+}}}
+
+이제 cpio로 묶어서 사용하면 된다. 
+{{{#!plain
+find . | cpio -oH newc | gzip -9 > /tmp/minirt.gz
+}}}
+
+하면 제대로 올라오는 걸 확인할 수 있을 것이다. 만약 올라오지 않는다면, 십중팔구 필요한 커널 모듈을 포함하지 않아서일 거다. 에러메시지 보면서 확인하는 수 밖에 없다. 
+
+== 히스토리 ==
+  * 작성 : [[Date(2012-08-24T06:36:28)]]
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d3 1
+d5 1
+a5 1
+Knoppix를 이용해서 백업/리스토어 솔류션, 더 나아가서 베어메탈 프로비저닝 솔류션을 만들 계획이다. 궁근적으로는 백업, 리스토어, 프로비저닝 모든 과정이 자동화 할 계획이다.
+d7 1
+a7 1
+자동화를 하려하면 knoppix 라이브 시디로 PXE-BOOT가 돼야 한다. 대략 다음의 프로세스다.  
+d15 1
+a15 1
+  1. VirtualBox : 가상환경에서 테스트 한다. 베어메탈 노드는 virtualbox 게스트로 시뮬레이션 한다. virtualbox에서의 PXE boot는 여기를 참고한다. 
+d28 1
+a28 1
+NFS 디렉토리로 (리마스터링한)Knoppix 라이브 운영체제를 복사한다.  
+d127 3
+@

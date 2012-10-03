@@ -59,6 +59,8 @@ keystone는 Identity 컴포넌트다.
 # apt-get install keystone python-keystone python-mysqldb python-keystoneclient
 }}}
 
+/etc/keystone/keystone.conf 파일을 열어서 addmin_token을 수정한다. "hastexo"를 사용할 것이다. 다른 이름으로 바꾸고 싶을지도 모르는데, 그냥 haxtexo로 한다. 나중에 익숙해지면 바꾸도록 하자. 
+
 /etc/keystone/keystone.conf 파일을 열어서 sql connection 부분을 수정한다.
 {{{#!plain
 [sql]
@@ -71,6 +73,20 @@ keyston 서비스를 리스타트 하고, db를 생성한다.
 # service keystone restart
 # keystone-manage db_sync
 }}}
+
+keystone_data.sh 스크립트를 실행한다. 실행전에 keystone_data.sh파일을 열어서 ADMIN_PASSWORD 변수 값을 수정 한다. 제대로 실행됐다면 0이 반환될 것이다.
+{{{#!plain
+# echo $?
+0
+}}}
+keystone_data.sh는 [http://www.hastexo.com/system/files/user/4/keystone_data.sh__0.txt 여기에서 다운로드]할 수 있다.
+
+마지막으로 endpoints.sh 를 스크립트를 실행한다.
+{{{#!plain
+# ./endpoints.sh -m 10.42.0.6 -u keystonedbadmin -D keystone -p Ue0Ud7ra -K 10.42.0.6 -R RegionOne -E \
+"http://localhost:35357/v2.0" -S 10.42.0.50 -T hastexo
+}}}
+endpoints.sh는 [http://www.hastexo.com/system/files/user/4/endpoints.sh__0.txt 여기에서 다운로드] 할 수 있다.
 
 keystone 관련 테이블이 만들어진 걸 확인할 수 있다.
 {{{#!plain
@@ -93,8 +109,36 @@ mysql> show tables;
 }}}
 ec2 테이블이 있는 걸 봐선 AWS와의 연동도 가능한 것으로 보인다. (개발중인 컴포넌트라서 지금 당장 사용할 수 있는지는 알 수 없지만) 
 
-
 == Glacne 설치 ==
+Glance는 이미지를 서비스하기 위한 컴포넌트다. Glance 관련 패키지를 설치한다.
+{{{#!plain
+# sudo apt-get install glance glance-api glance-client glance-common glance-registry python-glance
+}}}
+
+/etc/glance/glance-api-paste.ini 설정파일을 열어서 수정한다.
+{{{#!plain
+admin_tenant_name = service
+admin_user = glance
+admin_password = 적당한 패스워드 
+}}}
+적당한 값을 입력한다.
+
+/etc/glance/glance-registry.conf를 열어서 db 정보를 수정한다.
+{{{#!plain
+sql_connection = mysql://glance:password@10.21.2.240/glance
+}}}
+sql 호스트의 IP는 실제 외부에 공개된 IP를(127.0.0.1등을 제외한) 사용해야 한다.  
+
+파일 마지막 줄에 아래의 설정을 찾을 수 있을 것이다.
+{{{#!plain
+[paste_deploy]
+flavor = keystone
+}}}
+이 설정과 /etc/glance/glance-api.conf의 설정 값을 같게 한다. 
+
+glance 데이터베이스를 초기화 한다.
+
+
 == Nova 설치 ==
 == VM 생성 ==
 == 오픈스택 대쉬보드 ==

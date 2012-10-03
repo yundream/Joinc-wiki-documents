@@ -1,0 +1,89 @@
+#title QCOW2 Snapshot 테스트
+
+[[TableOfContents]]
+== QCOW2 ==
+KVM은 qcow2라는 이미지형식을 지원한다. '''Q'''emu '''C'''opy '''O'''n '''W'''rite 라는 이름에서 처럼 '''copy on write'''를 지원하는 이미지형식이다. cow는 데이터를 겹쳐쓰지 않는다. 그 대신에 새로운 블록에 데이터가 기록이 되고, 기록정보는 메타데이터에 저장된다. 따라서 어느 시점이후에 기록된 파일 정보를 가져올 수 있다. 증분 스냅샷이 가능하다는 의미다. 
+
+특정 시점이후 변경된 정보만 스냅샷을 뜰 수 있기 때문에 저장공간과 저장시간을 모두 절약할 수 있다.
+
+== 스냅샷 테스트 ==
+두 가지를 테스트 할 계획이다.
+  1. 로컬 하드디스크에 qcow2 이미지 파일을 만들어서 스냅샷기능을 테스트 
+  1. 원격 디스크에 대한 증분 스냅샷 테스트. [wiki:man/12/iSCSI iSCSI]디바이스에 대해서 qcow2 포맷을 적용해서 테스트 한다.
+
+=== 일반 테스트 ===
+KVM으로 테스트 한다. qcow2 포맷으로 두 개의 이미지 파일을 만든다.
+  1. linux.qcow2 : 리눅스 운영체제를 설치할 루트 볼륨 
+  1. data.qcow2 : 스냅샷 테스트에 사용할 데이터 볼륨 
+{{{#!plain
+# kvm-img create -f qcow2 linux.qcow2 4G
+# kvm-img create -f qcow2 data.qcow2 4G
+}}}
+
+우분투 리눅스 12.04 서버 버전을 설치했다. 설치 과정은 생략
+{{{#!plain
+# kvm -cdrom ../ubuntu-12.04-server-amd64.iso -hda linux.qcow2 -boot d
+}}}
+
+설치가 끝나면 준비한 데이터 볼륨과 함께 실행한다. 스냅샷 작업은 QMP와 kvm-img 모두에서 가능하다. kvm-img를 이용하는게 편해서, kvm-img로 테스트하기로 했다.  
+{{{#!plain
+$ kvm -hda linux.qcow2 -hdb data.qcow2 
+}}}
+
+Guest VM에서 추가 디스크(data.qcow2)를 마운트 한 다음, dd를 이용해서 100M 크기의 파일을 만들었다.  
+{{{#!plain
+# mkfs.ext4 /dev/sdb
+# mount /dev/sdb data/
+# dd if=/dev/random of=data1.dat bs=1M count=100 
+}}}
+
+QMP 명령을 이용해서 스냅샷을 뜬다. 스냅샷을 뜰 디바이스 이름을 알아야 하는데 query-block 명령으로 확인할 수 있다.
+{{{#!plain
+{"execute":"query-block"}
+{"return": [
+    {  "io-status": "ok", 
+       "device": "ide0-hd0", 
+       "locked": false, 
+       "removable": false, "inserted": 
+       {
+          "ro": false, 
+          "drv": "qcow2", 
+          "encrypted": false, 
+          "file": "linux.qcow2"
+          # 생략 ....
+    {
+       "io-status": "ok", 
+       "device": "ide0-hd1", 
+       "locked": false, 
+       "removable": false, 
+       "inserted": 
+       {  "ro": false, 
+          "drv": "qcow2", 
+          "encrypted": false, 
+          "file": "data.qcow2"}, 
+          "type": "unknown"}
+          # 생략 ....
+}}}
+data.qcow2의 디바이스 이름이 "ide0-hd1"인 것을 확인했다.
+
+이제 스냅샷을 뜬다.
+{{{#!plain
+{ "execute": "blockdev-snapshot-sync", "arguments": { 
+     "device": "ide0-hd1", 
+     "snapshot-file": "snapshot_test.img", 
+     "format": "qcow2" } }
+}}}
+스냅샷 파일이 만들어진 걸 확인할 수 있다. kvm-img 명령으로 파일 정보를 확인해보자. 
+{{{#!plain
+# kvm-img info snapshot_test.img 
+image: snapshot_test.img
+file format: qcow2
+virtual size: 2.0G (2147483648 bytes)
+disk size: 196K
+cluster_size: 65536
+backing file: data.qcow2 (actual path: data.qcow2)
+}}}
+
+계속 ...
+== 히스토리 ==
+ * 문서작성 : [[Date(2012-08-13T02:27:55)]]

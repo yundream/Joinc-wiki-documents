@@ -1,0 +1,477 @@
+head	1.10;
+access;
+symbols;
+locks
+	root:1.10; strict;
+comment	@# @;
+
+
+1.10
+date	2012.09.05.14.22.54;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2012.09.05.06.44.12;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2012.09.04.06.56.24;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.09.04.06.21.56;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.09.03.15.45.52;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.08.29.09.53.57;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.08.29.01.52.01;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.08.28.15.13.26;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.08.28.10.03.57;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.08.28.09.41.49;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fChefTemplate
+@
+
+
+1.10
+log
+@121.135.216.196;;yundream;;
+@
+text
+@#title Chef Template
+
+[[TableOfContents]]
+== Template ==
+템플릿을 특정한 형식을 가지는 설정파일을 찍어내기 위한 틀 역할을 하는 파일이다. Cookbook은 이 템플릿을 틀로해서 다양한 환경에 맞는 설정파일을 만들 수 있다.  
+
+Apache 웹서버 쿡북을 만들었다고 가정해 보자. 아파치 웹서버 설치의 핵심은 환경에 맞는 설정파일을 만드는 것이다. 설정파일 httpd.conf가 있다면, 웹서버에 관계없이 httpd.conf의 기본틀은 동일할 것이다. 다만 여기에서 몇몇 설정의 값들만 변경될 것이다. 템플릿은 변경 값들을 변수로 대체하는 방식으로 하나의 틀에서 다양한 설정파일을 찍어낸다.    
+
+템플릿 파일은 "erb" 형식을 가지며, 해당 쿡북의 template/default 디렉토리에 위치한다. 
+
+== 템플릿 예제 ==
+테스트를 위해서 [wiki:Site/System_management/dhcp dhcp] 서버를 위한 템플릿을 만들어 볼 생각이다. 
+
+=== 테스트 환경 ===
+  * 운영체제 : CentOS 6.2. 특별히 선호한다기 보다는 회사에서 서버 운영체제로 centos를 사용하다보니, centos로 테스트하기로 했다. 
+  * Chef Server와 Chef Client : VirtualBox로 Chef Server와 Chef Client를 만들기로 했다. 
+  * 테스트 예제 : DHCP서버를 chef로 구성한다. data bags을 이용해서 dhcp를 위한 설정 파일을 관리한다.
+
+=== 테스트 시나리오 ===
+Baremetal auto-provisioning을 위한 [wiki:Site/System_management/dhcp DHCP] 서버 구성을 목적으로 한다. 베어메탈 프로비저닝은 [wiki:Site/System_management/PXEBoot PXE-BOOT] 과정과 kicskstart를 거쳐서 운영체제를 설치하는 과정을 거친다. 핵심은 DHCP 서버다. DHCP 서버를 이용해서 베어메탈 호스트에 [wiki:man/12/IP IP]를 할당하고 pxe-boot 과정을 명령할 수 있기 때문이다. 
+
+다음과 같은 방식으로 DHCP 설정이 갱신된다.
+  1. data bag에 host 정보를 입력한다. 
+     * IP 주소
+     * [wiki:man/12/MAC MAC]주소
+     * 호스트 이름
+  1. [wiki:Site/cloud/automation/databag data bag]을 로딩한다.    
+  1. dhcp 서버에서 chef-client를 실행한다. 
+  1. dhcp 레시피를 가져온다.
+     1. 레시피는 data bag의 host 정보를 이용해서, dhcp 설정파일을 만든다. 
+     1. dhcp server를 재시작한다. 
+
+=== dhcp 서버 템플릿 ===
+템플릿 파일 "dhcp.erb"로 부터, dhcp 설정파일 "/etc/dhcp/dhcpd.conf"를 만든다. dhcp.erb는 아래와 같이 만들었다.
+{{{#!plain
+# cat templates/default/dhcp.erb 
+# Made in chef
+ddns-update-style none;
+
+option domain-name "example.org";
+option domain-name-servers <%=@@dns01%>, <%=@@dns02%>;
+
+default-lease-time 600;
+max-lease-time 7200;
+
+log-facility local7;
+
+subnet <%=@@network%> netmask <%=@@netmask%> {
+    option routers <%=@@gateway%>;
+<% @@hosts.each do |name, value| -%>
+    host <%= value['name'] %> {
+        hardware ethernet <%=value['mac'] %>;
+        fixed-address <%=value['ip'] %>;
+    }
+<% end -%>
+}
+}}}
+
+=== databag 파일 ===
+DHCP를 위한 databags 파일을 만든다. 다음과 같은 구성을 가질 것이다.
+{{{#!plain
+# cat mydhcp.json
+{ 
+  "id":"mydhcp",
+  "dns01" : "8.8.8.8",
+  "dns02" : "8.8.6.6", 
+  "gateway" : "192.168.56.1",  
+  "netmask" : "255.255.255.0",
+  "network" : "192.168.56.0",
+  "hosts" : { 
+     "host01" : {
+     "name" : "baremetal01.test.com" ,
+     "mac" : "08:00:27:48:9C:01",
+     "ip" : "192.168.56.101"
+     },
+     "host02" : {
+       "name" : "baremetal02.test.com" ,
+       "mac" : "08:00:27:48:9C:02",
+       "ip" : "192.168.56.102"
+     }
+   }
+} 
+}}}
+
+data bag을 upload 했다. data bag 이름은 mydhcp로 했다.
+{{{#!plain
+# knife data bag create mydhcp
+# knife data bag from file mydhcp mydhcp.json
+}}}
+
+위 data bag으로 만들어진 설정파일의 내용은 대략 다음과 같을 것이다.
+{{{#!plain
+# cat /tmp/dhcp.txt 
+# Made in chef
+ddns-update-style none;
+
+option domain-name "example.org";
+option domain-name-servers 8.8.8.8, 8.8.6.6;
+
+default-lease-time 600;
+max-lease-time 7200;
+
+log-facility local7;
+
+subnet 192.168.56.0 netmask 255.255.255.0 {
+    option routers 192.168.56.1;
+    host baremetal01.test.com {
+        hardware ethernet 08:00:27:48:9C:01;
+        fixed-address 192.168.56.101;
+    }
+    host baremetal02.test.com {
+        hardware ethernet 08:00:27:48:9C:02;
+        fixed-address 192.168.56.102;
+    }
+}
+}}}
+
+=== recipes 만들기 ===
+{{{#!plain
+# cat recipes/default.rb 
+
+info = data_bag_item('mydhcp', 'mydhcp')
+
+template "/etc/dhcp/dhcpd.conf" do
+    source "dhcp.erb"
+    mode 0644
+    owner "root"
+    owner "root"
+    variables ({
+        :dns01 => info['dns01'],
+        :dns02 => info['dns02'],
+        :gateway => info['gateway'],
+        :netmask => info['netmask'],
+        :network => info['network'],
+        :hosts => info['hosts']
+    })
+    action :create
+end
+
+# SELINUX를 적용한다. 실행하지 않으면 퍼미션 오류가 발생한다.
+execute "restorecon" do
+    command "restorecon -v /etc/dhcp/dhcpd.conf"
+    action :run
+end
+
+# dhcpd service를 restart한다.
+service "dhcpd" do
+  action :restart
+end
+}}}
+
+== 참고 ==
+  * http://wiki.opscode.com/display/chef/Templates
+
+== 히스토리 ==
+  * 작성일 : @@DATE@@
+  * 수정
+    * @@DATE@@ : 완료
+@
+
+
+1.9
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d118 1
+a118 1
+=== recipes 만들기 ===  
+@
+
+
+1.8
+log
+@183.98.30.10;;yundream;;
+@
+text
+@a149 1
+
+@
+
+
+1.7
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d20 1
+a20 1
+Baremetal auto-provisioning을 위한 DHCP 서버 구성을 목적으로 한다. 베어메탈 프로비저닝은 PXE-BOOT 과정과 kicskstart를 거쳐서 운영체제를 설치하는 과정을 거친다. 핵심은 DHCP 서버다. DHCP 서버를 이용해서 베어메탈 호스트에 IP를 할당하고 pxe-boot 과정을 명령할 수 있기 때문이다. 
+d25 1
+a25 1
+     * MAC 주소
+d27 1
+a27 1
+  1. data bag을 로딩한다.    
+d59 1
+a59 1
+=== databag 파일 === 
+@
+
+
+1.6
+log
+@14.52.44.238;;yundream;;
+@
+text
+@d5 1
+a5 1
+템플릿을 특정한 형식을 가지는 설정파일을 찍어내기 위한 틀역할을 하는 파일이다. Cookbook은 이 템플릿을 틀로해서 다양한 환경에 맞는 설정파일을 만들 수 있다.  
+d9 1
+a9 1
+템플릿 파일은 "erb" 형식을 가지며, 해당 쿡북의 template/devault 디렉토리에 위치한다. 
+d13 1
+d22 11
+d34 1
+a34 1
+템플릿 파일 "dhcp.erb"로 부터, dhcp 설정파일 "/etc/dhcp/dhcpdconf"를 만든다. dhcp.erb는 아래와 같이 구성했다. 
+d36 2
+d41 1
+a41 1
+option domain-name-servers 8.8.8.8, 8.8.6.6;
+d48 6
+a53 9
+subnet <%=network %> netmask <%=netmask %> {
+    option routers <%=gateway %>;
+    # 모든 호스트들에 대해서 ip 설정을 만들어 준다. 
+    # MAC을 검사해서 IP를 할당한다.
+<% @@host_groups.each do |host| -%>
+    host <%= host["name"] %> {
+        hardware ethernet <%=host["mac"] %>;
+        fixed-address <%=host["ip"] %>;
+        filename <%=host["filename"] %>;
+d62 19
+a80 19
+{
+  "id":"baremetal",
+  "dns01" : "8.8.8.8",        
+  "dns02" : "8.8.6.6",        
+  "gateway" : "192.168.56.1",        
+  "hosts" : {
+    "host01" : {
+    "name" : "baremetal01.ipc.com" ,
+    "mac" : "08:00:27:48:9C:01",
+    "ip" : "192.168.56.101",
+    "netmask" : "255.255.255.0",
+    "network" : "192.168.56.0"
+   },
+   "host02" : {
+     "name" : "baremetal02.ipc.com" ,
+     "mac" : "08:00:27:48:9C:02",
+     "ip" : "192.168.56.102",
+     "netmask" : "255.255.255.0",
+     "network" : "192.168.56.0"
+d82 7
+a88 1
+}
+d93 2
+a96 1
+# option definitions common to all supported networks...
+d107 3
+a109 5
+
+    host host01 {
+        hardware ethernet 08:00:27:FF:40:5C;
+        fixed-address 192.168.56.150;
+        filename "pxelinux.0";
+d111 3
+a113 4
+    host host02 {
+        hardware ethernet 08:00:27:FF:40:5D;
+        fixed-address 192.168.56.151;
+        filename "pxelinux.0";
+d118 35
+d158 2
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d3 1
+d16 4
+a19 3
+  * 테스트 예제 : DHCP서버를 chef로 구성한다. 2단계로 나눠서 구현할 테다. 
+     1. 첫 단계 : 템플릿의 기능을 테스트하는 단계로, 어트리뷰트를 이용한다.
+     1. 두번째 단계 : 네트워크 인프라 관리를 테스트 한다. data bags를 용한다. dhcp 설정도 더 복잡하다. 
+a21 5
+테스트에 사용할 dhcp 쿡북 레시피로 어트리뷰트 값을 이용해서 dhcp 서버 설정 파일을 생성한다.  
+{{{#!plain
+... 작성 중 
+
+}}}
+d48 2
+a49 1
+쿡북에서 사용할 어트리뷰트를 설정한다. (attributes/default.rb)
+d51 21
+a71 1
+작성 중
+d74 1
+a74 1
+완료된 설정 파일은 대략 다음과 같은 내용을 가질 것이다.
+d90 1
+a90 1
+    host node01 {
+d95 1
+a95 1
+    host node02 {
+@
+
+
+1.4
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d25 1
+a25 3
+템플릿 파일 "dhcp.erb"로 부터, dhcp 설정파일 "/etc/dhcp/dhcpdconf"를 만든다. 
+
+템플릿 파일 "sudoers.erb"는 대략 다음과 같은 내용을 가진다.
+a28 1
+# option definitions common to all supported networks...
+d39 2
+@
+
+
+1.3
+log
+@14.52.44.238;;yundream;;
+@
+text
+@a50 1
+{{{#!plain
+d88 3
+@
+
+
+1.2
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d10 11
+a20 1
+시스템관리를 위해서 sudoers 쿡북을 만든다고 가정해 보자. 이 쿡북의 레시피는 다음과 같을 것이다. 
+d22 2
+a23 9
+template "/etc/sudoers" do
+  source "sudoers.erb"
+  mode 0440
+  owner "root"
+  group "root"
+  variables({
+    :sudoers_groups => node[:authorization][:sudo][:groups],
+    :sudoers_users => node[:authorization][:sudo][:users]
+  })
+d25 1
+a25 1
+템플릿 파일 "sudoers.erb"로 부터, (어트리뷰트와 변수들을 이용해서)설정파일 "/etc/sudoers"을 만든다. 
+d29 10
+d40 8
+a47 21
+#
+# /etc/sudoers
+#
+# Generated by Chef for <%= node[:fqdn] %>
+#
+ 
+Defaults        !lecture,tty_tickets,!fqdn
+ 
+# User privilege specification
+root          ALL=(ALL) ALL
+ 
+<% @@sudoers_users.each do |user| -%>
+<%= user %>   ALL=(ALL) <%= "NOPASSWD:" if @@passwordless %>ALL
+<% end -%>
+ 
+# Members of the sysadmin group may gain root privileges
+%sysadmin     ALL=(ALL) <%= "NOPASSWD:" if @@passwordless %>ALL
+ 
+<% @@sudoers_groups.each do |group| -%>
+# Members of the group '<%= group %>' may gain root privileges
+%<%= group %> ALL=(ALL) <%= "NOPASSWD:" if @@passwordless %>ALL
+d49 7
+d58 28
+d88 1
+a88 1
+  * http://wiki.opscode.com/display/chef/Templates : 이 문서의 많은 부분을 그대로 번역했음.
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d10 1
+a10 1
+시스템관리를 위해서 sudoers 쿡북을 만든다고 가정해 보자. 
+d12 9
+d22 1
+d24 30
+a53 1
+... 계속
+@

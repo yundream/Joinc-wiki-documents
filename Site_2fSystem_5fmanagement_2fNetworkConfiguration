@@ -1,0 +1,110 @@
+#title 네트워크 설정
+
+[[TableOfContents]]
+== 설정 노가다 ==
+운영체제를 설치하면 가장 먼저 하는 일이 네트워크 설정이다. 내가 사용하는 운영체제는 오로지 리눅스이고, 배포판이라고 해봐야 Centos와 Ubuntu이니, 설정을 외우는게 그리 어렵지는 않을 것이다. 그런데 귀찮다. 네트워크 설정을 매일매일 한다면 저절로 외울수 있게지만, 드문드문 하다보니 항상 까먹는다.  그러다 보니 매번 설정 때마다 검색을 해야 한다. 검색할 때 마다 새롭다.  
+
+글로 정리해서 필요 할때 참조해야 겠다는 생각을 한 이유다.
+
+주로 터미널 작업을 하기 때문에 CLI를 기준으로 정리하려 한다. 
+
+== IP 설정 ==
+=== 네트워크 스크립트를 이용한 설정 ===
+네트워크 스크립트를 이용해서 간단하게 IP를 설정할 수 있다. 배포판 별로 약간의 차이가 있다.  
+
+=== Ubuntu 리눅스 ===
+/etc/network/interfaces 파일을 수정한다. 설정파일의 내용은 다음과 같다.
+{{{#!plain
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+  address 192.168.100.99
+  netmask 255.255.255.0
+  gateway 192.168.100.254
+
+iface eth1 inet dhcp
+}}}
+  * auto ![인터페이스 이름!] : 부팅시 네트워크 인터페이스를 자동으로 올린다. 
+     * auto lo : 부팅시 루프백 장치를 올린다.
+     * auto eth0 : 부팅시 eth0 장치를 올린다.
+  * iface ![인터페이스 이름!] inet ![static|dhch!] : '''인터페이스 이름'''의 네트워크 장치를 설정한다. 
+     * static | dhcp : static으로 할건지 [wiki:Site/System_management/dhcp dhcp]로 올릴 것인지 결정한다.
+     * address : [wiki:man/12/IP IP] 주소. dhcp일 경우 필요 없다. 
+     * netmask : netmask. dhcp일 경우 필요 없다.
+     * gateway : default gateway. dhcp일 경우 필요 없다. 
+
+값을 설정한 다음에는 '''ifup'''과 '''ifdown''' 스크립트를 이용해서 인터페이스를 올리거나 내릴 수 있다. 
+{{{#!plain
+# ifup eth0
+# ifdown eth0
+}}}
+
+혹은 networking 스크립트를 이용해서 전체 네트워크 설정을 다시 시작할 수도 있다. 
+{{{#!plain
+# /etc/init.d/networking restart
+}}}
+
+
+=== CentOS 리눅스 ===
+/etc/sysconfig/network 파일에는 도메인 이름, 게이트웨이와 같은 시스템 전역 네트워크 설정 값들이 있다. 
+{{{#!plain
+# cat /etc/sysconfig/network
+NETWORKING=yes
+HOSTNAME=example.com
+GATEWAY=192.168.56.1
+GATEWAYDEV=eth0
+}}}
+
+인터페이스별 설정은 /etc/sysconfig/network-scripts 디렉토리밑에 인터페이스 이름 별로 만들면 된다. 설정파일 이름은 "ifcfg-eth0, ifcfg-eth1"과 같다.
+{{{#!plain
+# cat /ete/sysconfig/network-scripts/ifcfg-eth0
+DEVICE="eth0"
+BOOTPROTO="static"
+HWADDR="08:00:27:FF:40:5C"
+NM_CONTROLLED="yes"
+ONBOOT="yes"
+TYPE="Ethernet"
+NETWORK=192.168.56.0
+NETMASK=255.255.255.0
+IPADDR=192.168.56.2
+}}}
+  * DEVICE : 인터페이스 이름 
+  * BOOTPROTO : static와 dhcp 중 선택
+  * HWADDR : MAC Address. 이 값을 변경한다고 해서 물리적인 인터페이스의 MAC이 변하지는 않는다. 물리적인 인터페이스와 다른 값을 입력할 경우 설정이 적용되지 않는다. 굳이 필요 없는 옵션같다.  
+  * ONBOOT : yes혹은 no. 부팅시 이터페이스를 올릴건지 
+  * NETWORK : 사용할 네트워크.
+  * NETMASK : Netmask
+  * IPADDR : IP 주소 
+역시 ifup, ifdown 스크립트를 이용해서 인터페이스 별로 설정을 적용할 수 있다. 전체 네트워크 설정을 새로 적용하려면 /etc/init.d/network 스크립트를 이용하면 된다. 혹은 service 를 이용해서 네트워크 서비스를 새로 시작할 수도 있다.   
+{{{#!plain
+# ifup eth0
+# ifdown eth0
+# /etc/init.d/network restart
+# service network restart
+}}}
+
+=== 시스템 명령을 이용한 네트워크 인터페이스 조작 ===
+관리스크립트가 아닌 시스템 명령어들을 이용해서 인터페이스를 조작할 수도 있다. ifconfig, route, ip 정도의 명령어만 알고 있으면 된다. 시스템 명령어이기 때문에 배포판에 상관없이 사용할 수 있다는 장점이 있다. (주로 centos와 ubuntu)배포판을 번갈아 가며 테스트해야 하는 경우가 많은데, 그때 주로 사용한다. 
+
+ifconfig의 일반적인 사용방식. ifconfig는 dhcp를 지원하지 않는다.
+{{{#!plain
+# ifconfig eth0 192.168.56.50 netmask 255.255.255.0 broadcast 192.168.56.255 up 
+}}}
+
+게이트웨이 설정에는 route를 이용할 수 있다.
+{{{#!plain
+# route add default gw 192.168.56.1 eth0
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.56.0    0.0.0.0         255.255.255.0   U     0      0        0 eth0
+0.0.0.0         192.168.56.1    0.0.0.0         UG    0      0        0 eth0
+}}}
+
+== 관련글 ==
+  1. [wiki:Site/cloud/NetworkVirtualization/VirtualIP Virtual IP 설정]
+
+== 히스토리 ==
+ * 작성일 : [[Date(2012-08-28T03:25:48)]]

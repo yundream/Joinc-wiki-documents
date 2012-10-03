@@ -1,0 +1,74 @@
+#title Samba(삼바)서버 설정
+
+[[TableOfcontents]]
+== Samba ==
+삼바는 리눅스,유닉스와 윈도우간 상호 데이터 교환이 가능한 표준 파일공유 서비스다. 이 문서는 리눅스에서 삼바서버를 운용하는 방법을 기술한다.
+
+=== 환경 ===
+테스트 환경은 다음과 같다.
+  * 운영체제 : 우분투 리눅스 12.10 
+  * KVM : KVM 게스트 VM으로 삼바 클라이언트를 테스트 한다. 역시 우분투 리눅스 12.10으로 테스트 한다. 
+
+=== 삼바서버 설치와 설정 ===
+samba 패키지를 설치한다.
+{{{#!plain
+# apt-get install samba
+}}}
+
+설정 파일을 수정한다. 파일들은 공유 폴더에 넣기로 했다. 폴더 이름은 public으로 이 폴더는 아이디/패스워드 없이 자유롭게 접근할 수 있게 설정했다. 
+{{{#!plain
+[global]
+ # 윈도우 네트워크 그룹이름
+ workgroup = WORKGROUP
+
+ security = user
+ # 윈도우 탐색기로 검색될 호스트 이름
+ server string = Ubuntu Samba server 
+ guest account = nobody
+
+# 공유폴더 설정 
+[public]
+ path = /srv/img
+ guest ok = yes
+ writable = yes
+ create mask = 0777
+ directory mask = 0777
+ force user = nobody
+ force group = nogroup
+}}}
+
+'''testparm'''명령을 이용해서 설정에 문제가 없는지 확인한다.
+{{{#!plain
+# testparm
+}}}
+
+공유 디렉토리의 퍼미션을 변경한다.
+{{{#!plain
+# chown nobody.nogroup /srv/img
+# chmod 775 /srv/img
+}}}
+
+서버를 재 시작 한다.
+{{{#!plain
+# /etc/init.d/smbd restart
+}}}
+
+=== 삼바클라이언트 테스트 ===
+테스트를 위해서 삼바 클라이언트를 설치한다.
+{{{#!plain
+# apt-get install smbfs
+}}}
+
+마운트 한다.
+{{{#!plain
+# mount -t cifs -ouser="yundream",guest //192.168.56.1/public /mnt/smb
+}}}
+
+이걸로 끝. 10년전 쯤에 삼바 설정했을 때는 고생 좀 했던 것 같은데, 오늘은 쉽게 끝냈다. 자세히 들어가면 할게 많겠지만 오늘([[Date(2012-08-16T14:18:53)]])은 이정도로 만족하련다. 
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-08-16T10:05:12)]]
+  * 수정 
+     * [[Date(2012-08-17T01:30:26)]] : 공유 디렉토리를 위한 권한 수정 
+
+[[Tag(Samba)]]

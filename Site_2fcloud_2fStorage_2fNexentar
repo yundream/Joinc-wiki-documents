@@ -1,46 +1,54 @@
 #title Nexentastor
 
+[[TableOfContents]]
 == Nexentastor ==
-Nexentastor는 opensolaris를 기반으로 스토리지관리를 위한 목적으로 다시 만들어진 어플라이언스 제품입니다. ZFS(:12) 파일 시스템을 기반으로 하고 있으며, iSCSI, NFS, NAS, mirror, snapshot 등의 기능을 지원합니다. 
+Nexentastor는 opensolaris를 기반으로 스토리지관리를 위한 목적으로 다시 만들어진 어플라이언스 제품입니다. [wiki:Site/System_management/ZFS ZFS] 파일 시스템을 기반으로 하고 있다. ZFS는 파일 시스템이지만 볼륨 메니지먼트 기능까지를 모두 포함하고 있다. 따라서 Nexenta도 별도의 기능개발 없이 ZFS의 기능을 활용해서 볼륨을 서비스한다. 
 
-KT uCloud의 클라우드 스토리지에 적용되고 있는 관계로 자연스럽게 Nexentastor을 경험하게 됐습니다. 이 위키는 Nexentastor 경험을 정리하기 위해서 만들었습니다. 
+ZFS는 볼륨생성, [wiki:man/12/iSCSI iSCSI], NFS, 소프트웨어 레이드(RAIDZI,II,III), snapshot, hot spare, cache management, Deduplication, 압축, Encryption, Dynmic striping, clone ... all-in-one 파일 시스템이다. Nexenta는 ZFS의 기능을 쉽게 활용하기 위한 (CLI, GUI)UI와 어플라이언스 관리를 위한 여러 유틸리티(네트워크 설정, 모니터링, HA 구성 같은)를 포함하고 있다. 
 
-== 다룰 nexentastor 버전 ==
-2012년 1월 현재 3.1.x 버전을 사용할 수 있지만, 아마 당분간은 3.0.5를 다루게 될 것 같습니다. 3.1.x는 3.0.5와의 차이점을 설명하는 방향으로 내용을 정리해나가려고 합니다. 
+따라서 ZFS에 대한 경험이 있다면, Nexenta는 경험한거나 마찬가지다. 
+
+== Nexentastor 버전 ==
+2012년 1월 현재 3.1.x 버전을 사용할 수 있지만, 아마 당분간은 3.0.5를 다루게 될 것 같습니다. 3.1.x는 3.0.5와의 차이점을 설명하는 방향으로 내용을 정리해나가려고 한다. 
+
+== 구성 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1J7LuFiEl8iZyMR4oCSURzvNpQpL_XaWfPszBZEim7hk&amp;w=611&amp;h=364">
+}}}
+  * NMC : CLI 기반의 쉘 형식의 프로그램이다. 탭 기반으로 명령어와 인자들을 선택할 수 있으므로, 쉽게 사용할 수 있다. 
+  * NMV : 웹 애플리케이션 서버다. 웹브라우저를 이용해서 nexenta를 제어할 수 있다. NMC의 모든 기능을 좀 더 직관적으로 이용할 수 있다. Nexenta에 익숙해지면 NMV 보다는 NMC를 애용하는 경향이 있다.    
+  * NMS : 관리 서버다 NMC, NMV의 요청을 받아서 처리한다.
+  * SA-API : NMS와의 통신을 위해서 사용하는 API다. 이 API를 이용해서 클라이언트 프로그램을 개발할 수 있다. C/C++, python, ruby, perl을 위한 라이브러리를 제공한다.
 
 == 특징들 ==
-  * 파일 시스템 : 오픈솔라리스기반이니 당연히 ZFS 이겠죠.
+  * 파일 시스템 : ZFS 
   * Block-level 및 file-level replication
   * ZFS의 snapshot 기능을 이용한 replication
   * WORM (Write once Read Many) 지원 
   * 플로그인을 이용한 기능 확장 가능 
     * HA 기능등
   * FTP, NFS, SSH, rsync, WebDAV 
-  * iSCSI targets 
+  * [wiki:man/12/iSCSI iSCSI] targets 
   * iSCSI initiator
   * P-ATA/S-ATA, SCSI, iSCSI, USB, Firewire 지원 
   * Software RAID : 0, 1, 5, JBOD, 5+0, 5+1, 0+1, 1+0 지원. 
-    * ZFS에 내장된 기능으로 별도의 소프트웨어를 사용할 필요가 없습니다.
+    * ZFS에 내장돼 있음. 
   * SNMP 지원 
   * ATA over Ethernet
 
 == 라이센스 ==
-몇 가지 라이센스를 가지고 있습니다. Community Edtion은 자유롭게 이용할 수 있습니다만 아래의 기능 제한이 있습니다. 
+몇 가지 라이센스를 가지고 있다. Community Edtion은 자유롭게 이용할 수 있지만 아래의 제한이 있다.
   * HA
   * Auto Sync and CDP for Data Replication
   * WORM for Data retention
   * Target for virtual LUN mapping
   * 18TB 제한
-간단히 사용하는데는 문제가 없겠지만 18TB 제한이 치명적이네요.
+간단히 사용하는데는 문제가 없겠다.
 
 == 문서들 ==
-  * [wiki:Site/cloud/Storage/NativeZFSOnLinux 리눅스용 Native ZFS] 
-  * [wiki:Site/cloud/Storage/Nexentar/Terminology Nexentastor & ZFS 용어정리]
-  * [wiki:Site/cloud/Storage/Nexentar/Install Nexentastor 설치]
-  * [wiki:Site/cloud/Storage/Nexentar/NmcCommand NMC Command 정리]
-
-== 하위 문서 ==
-[[subindex(Site/cloud/Storage/Nexentar)]]
+[[subindex]]
 
 == 히스토리 ==
-  * 2011년 1월 7일 작성
+  * 2012년 1월 7일 작성
+  * 수정
+     * [[Date(2012-08-08T01:53:17)]] : 소개글 수정, 링크 추가

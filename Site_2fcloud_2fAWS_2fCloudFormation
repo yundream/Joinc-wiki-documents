@@ -23,8 +23,15 @@ AWS의 클라우드포메이션은 비용을 받지 않는다. VM 생성에 따�
 === 필요한 기술들 ===
 퍼블릭 클라우드에서 클라우드포메이션과 같은 서비스를 제공하려고 한다면, 대상 애플리케이션은 공개 소프트웨어야 할 것이다.
   1. 오픈소스에 대한 전반적인 경험과 노하우
-  1. 정돈된 API : 개발자는 API를 이용해서 자신의 템플릿을 만들 수 있어야 한다. 이미지 종류, 매개변수, 
-  1. 정돈된 UI : 유저는 Web UI를 이용해서 템플릿, 클라우드 자원, 애플리케이션 매개변수 등을 설정하는 것으로 간단하게 서비스를 올릴 수 있어야 한다.   
+  1. 정돈된 API : 클라우드가 제공하는 모든 자원에 대해서 접근할 수 있는 API가 필요하다.
+      * 전개할 이미지 선택 : 운영체제 종류, core 및 memory 갯수, disk 크기 
+      * 전개할 zone 선택
+      * 전개할 애플리케이션
+      * EIP 사용 여부 
+      * ELB 사용 여부
+      * Availability zone 사용여부 및 선택 
+      * Object storage 사용 여부 
+  1. 정돈된 web UI : 유저는 Web UI를 이용해서 템플릿, 클라우드 자원, 애플리케이션 매개변수 등을 설정하는 것으로 간단하게 서비스를 올릴 수 있어야 한다.   
   1. 서비스 관리 : 정보를 공유하려는 목적으로 서비스를 전개하려는 유저가 많을 것이다. 이런 유저에게는 저렴한 가격으로 VM을 서비스 할수 있어야 하므로 Micro VM이 사용될 것이다. 하지만 어떤 유저는 다양한 어플리케이셔을 서비스하기를 원할 수도 있다. 예컨데 형상관리, 이슈추적 시스템, CMS, 블로그, Wiki 등을 서비스 하기를 원할 수 있는데 이들 유저를 위해서 자동설치/설정 서비스를 제공하면 좋을 것이다. chef, puppet 등의 자동화 솔류션을 이용해서 인프라를 구축할 필요가 있다. 
 
 === 서비스 할만한 오픈소스들 ===
@@ -58,67 +65,41 @@ CMS 부터 시작하는게 무난해 보인다. 사용자가 많아서 배포와
  * [http://w3techs.com/technologies/segmentation/tld-kr-/content_management Distribution of content management systems among websites that use .kr]
 Wordpress와 XpressEngine(제로보드 XE) 부터시작하는게 무난하겠다. 
 
-== 클라우드 소프트웨어를 위한 Cloudformation ==
-클라우드 소프트웨어들은 Template를 제공한다. 현재 운영중인 VM을 VHD로 만들어서 메타정보와 함께 저장해 두고, 이 VHD로 부터 VM을 생성하는 방식이다. 예컨데 APM을 운영중이라면 이 VM을 APM 템플릿을 만든다음, APM을 운용할 필요가 있다면 APM 템플릿을 이용해서 VM을 생성한다.
+== 자원 전개를 위한 infra 설계 ==
+Cloudformation의 핵심은 자원 전개와 이를 위한 API 개발이다. 자원은 설정파일을 이용해서 제어할 수 있다. AWS는 cloudformation을 위해서 독자적인 agent를 포함하는 운영체제 템플릿을 배포한다. 나는 chef를 이용해서 개발할 것이다. 모든 운영체제 템플릿에 chef-client와 몇개 agent를 개발해서 심을 것이다.
 
-CloudFormation 서비스를 하려면 이걸로는 부족하다. 서비스를 배포하는 게 목적이므로, 운영체제와 애플리케이션 설정이 가능해야 한다. 예컨데, Mysql 이라면 Admin 계정과 패스워드 서비스 포트등을 유저가 설정할 수 있도록 인터페이스를 제공해야 한다.
-
-== 서비스 개발 계획 ==
-  1. Simple is best 
-     * '''설치만을 관리한다.'''  설치 후 패키지 업데이트관리 등은 신경쓰지 않는다. chef, puppet등을 이용해서 설치 후에도 관리할만한 여지가 있으나, 시스템이 복잡해 진다. 이 서비스는 어디까지나 초기 서비스 전개를 빠르게 도와주기 위함이다.   
-     * 마찬가지로 (설정 관리를 하지 않기 때문에)이미 설치된 VM에, 서비스를 전개할 수 있는 기능은 제공하지 않는다. 굳이 이러한 기능을 추가하길 원한다면, chef 등을 이용한 별도의 설정관련 서비스를 만든다.  
-  1. 초기 설정값을 지정할 수 있도록 API를 제공한다.
-     * Port 번호, 도메인 이름, Admin 계정 정보 등 애플리케이션과 관련된 몇가지 값들을 사용자가 정할 수 있도록 (AWS는 JSON 형태의)API를 제공해야 한다. AWS는 CloudFormation을 위해서 Agent를 제공한다. 이 Agent가 JSON 템플릿 설정을 읽어서, 애플리케이션의 설정파일을 변경한다. 
-  1. Amazon API와의 호환성
-     * Amazon과 경쟁을 해야하는 상황이라도, Amazon API와 호환되야 한다. AWS CloudFormation을 분석해야 한다.
-=== 매개변수 적용 ===
-웹 서비스 Template를 만드는 것은 어려울게 없는데, 설정을 변경하는게 문제다. AWS는 JSON 형식의 Template 설정파일을 이용해서 설정을 변경을 가능하게 한다. 웹에서 설정한 매개 변수값으로 JSON 파일이 만들어지고 이 파일을 해석해서 설정파일을 만드는 방식이다.
-
-설정파일을 수정하기 위해서 Agent를 제공한다. Amazon Linux AMI에 Agent가 설치돼 있으므로, 이 AMI를 이용해서 VM 인스턴스를 생성해서 템플릿을 만들면 된다. 
-
-직접 개발한다면, 대략 아래의 구조를 가지지 않을까. 
+기본 구성은 다음과 같다.
 
 {{{#!html
-<img src="https://docs.google.com/drawings/pub?id=1ZT6nqWAW1HhJu8UzDxhtnPAET0WuLJcioCipobULwdo&amp;w=771&amp;h=331">
+<img src="https://docs.google.com/drawings/pub?id=130_0bRLYsIKIawpoXG_4nyTsm7vA_4ovKxEUfYNGPjc&amp;w=860&amp;h=360">
 }}}
-  1. WebUI로 user template 명세서를 작성한다. 
-  1. User Template는 두 부분으로 저장된다. 
-     * Cloud Resource : VM Type, Storage, Network service, 사용할 템플릿
-     * App Config : 설정파일 위치, 설정파일 템플릿. 매개변수 이름과 값 
-  1. Cloud Agent 
-     * Config Generation Server에게 설정정보를 요청한다.
-     * 설정정보를 이용해서 설정파일을 생성한다.
-     * Amazon cloudformation 서비스는 패키지까지 관리한다.
+  1. cookbook을 개발한다.  
+     * resource와 recipes를 개발한다.
+  1. databag을 생성한다. 
+     * 제어할 클라우드 자원의 정보가 들어간다. 
+     * Web UI 정보가 들어간다.
+     * '''databag 대신에 attribute를 수정하는 방법도 있다.'''
+개발해야 하는 것들은 다음과 같다.
+  1. 클라우드 서비스의 접근을 위한 resource 개발 
+     * EIP, ELB, Availability zone, storage 등의 클라우드 서비스등을 사용하기 위한 공통 resource
+  1. cookbook 개발 환경 개발 
+     * cookbook 개발 환경 자체를 개발 해야 한다. cloudformation을 사용하려면 chef의 cookbook 사용법을 배워야 합니다.. 라고 할 수 없는 노릇이다. 
+     * WEB UI 방식으로 제공한다. 클라우드 자원은 select box등으로 선택할 수 있도록 하고, 애플리케이션 설정은 설정 파일의 일부분을 치환하는 인터페이스를 제작할 수 있도록 지원한다. 예를 들어 워드 프레스 라면, service port, DB 계정정보, 워드 프레스 사이트 제목 등을 입력할 수 있는 Web UI를 생성할 수 있어야 한다. ERB 템플릿 엔진을 사용한다.
+     * 이들 정보는 databag 형태로 저장된다.   
 
-=== 서비스 시나리오 ===
-나름대로 정의한 서비스 시나리오
-  1. Cloud Agent가 설치된 VM을 생성한다. 
-  1. 원하는 운영체제 + 애플리케이션 환경을 만든다.
-     * ex) wordpress + mysql
-  1. VM을 shutdown 한다음 shapshot을 만든다. 
-  1. snapshot 으로 Template를 만든다. 
-     * 만든 Template는 S3 같은 Storage에 올려서 누구든지 다운로드 받을 수 있게 한다.
-  1. Template 설정 파일을 만든다. 
-     * 서비스에 사용할 설정 포맷은 미리 정의해야 한다. 
-     * wordpress + mysl 이라면 port, mysql admin password, wordpress admin password를 매개 변수로 받도록 설정파일을 만든다.
+=== 접근 권한 제어 ===
+chef로 개발할 경우 접근 권한을 어떻게 제어할 것인가 하는 문제가 남는다. 공용(public) cookbook 정보라면 상관없겠지만, 유저별 cookbook가 있을 수 있기 때문이다. AWS의 AMI와 같은 클라우드 통합 접근/권한 시스템의 개발이 필요하다.    
 
-CloudFormation 서비스 사용자는 아래의 시나리오를 따른다.
-  1. CloudFormation 서비스를 선택한다.
-  1. 사용할 수 있는 Template 목록을 출력한다.
-  1. Tempalte를 선택하면, Template 설정 파일을 로드해서 매개 변수입력을 위한 submit 폼을 만든다.  
-  1. 매개 변수 입력을 마치고, submit하면 입력 정보를 이용해서, 애플리케이션 설정 파일을 만든다.  
-  1. 유저가 "설치"버튼을 클릭한다.  
-  1. Template로 부터 VM 인스턴스를 만든다.
-  1. VM 인스턴스가 실행되면, CloudAgent가 실행된다.   
-  1. CloudAgent는 서버에 연결해서 설정파일(스크립트를 포함한)을 다운로드 받아서 실행한다. 
-     * 설정파일을 원하는 위치에 복사.
-     * 혹은 스크립트를 이용해서 애플리케이션 환경 설정(ex. mysql admin 패스워드 설정과 같은) 
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1DRY2qolg9IPGP75zn_6UoG9Z1-l5wforihE2l1VqR6g&amp;w=1008&amp;h=500">
+}}}
 
-실제 구현하려면 각 신경써야 할게 많겠지만 큰 틀에서는 대략 위와 같이 정의할 수 있을 것이다.
-== 마치며 ==
-AWS 기반으로 개인적으로 사용하던 웹 기반 애플리케이션들의 템플릿을 만들어서 올려봐야 겠다. Moniwiki 부터 시작하면 되겠지 싶다.
+chef 자원접근 역시 이 접근/권한 시스템을 통해서 이루어지도록 해야 한다. 가장 단순한 방식은 proxy 구현이다. Proxy server를 경유해서 chef server로 요청을 전송하는 방식으로 Proxy server이 접근/권한 시스템에 연동하면 된다. 
+
 
 == 히스토리 ==
   * 첫 작성 : [[Date(2012-07-11T05:37:49)]]
+  * 수정 
+    * [[Date(2012-12-10T14:59:39)]] : chef 기반으로 재 작성 시작
 
 [[Tag(AWS,cloud,cloudformation)]]

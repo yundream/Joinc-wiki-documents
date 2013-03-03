@@ -1,7 +1,8 @@
 #title 루비 파일 입출력
 
+[[TableOfcontents]]
 == 파일 ==
-가장 중요한 건 역시 파일 다루는 것 이겠죠. 여기에서 공부하려는 것은 다음과 같습니다. 
+가장 중요한 건 역시 파일 다루기 이겠다. 여기에서 다룰 내용은 다음과 같다. 
   * 기본 파일 입출력
   * 파일 삭제, 이름 변경, 권한 변경
   * 파일 정보 가져오기 
@@ -10,7 +11,7 @@
   * 디렉토리 
 
 === 표준출력, 표준입력, 표준에러 ===
-표준출력은 puts와 print 메서드를 이용하면 됩니다. 표준입력은 gets를 이용하면 되죠. 
+표준출력은 puts와 print 메서드를, 표준입력은 gets를 이용한다.
 {{{#!plain
 #!/usr/bin/ruby
 
@@ -18,14 +19,14 @@ print "Enter a value : "
 value = gets
 print value
 }}}
-결과는 다음과 같습니다.
+결과는 다음과 같다.
 {{{#!plain
 Enter a value : This is entered value
 This is entered value
 }}}
-putc는 한 바이트씩 출력합니다.
+putc는 한 바이트씩 출력한다.
 
-표준에러는 표준에러를 위한 변수 $stderr를 이용하면 됩니다. 
+표준에러는 표준에러를 위한 변수 $stderr를 이용하면 된다. 
 {{{#!pain
 #!/usr/bin/ruby
 
@@ -34,9 +35,230 @@ $stdout.puts "STD_OUT : MSG"
 }}}
 
 === 파일 열기 닫기 ===
-파일 관련 작업은 File 클래스를 이용하면 됩니다. 사용방법은 다음과 같습니다.
+파일 관련 작업은 File 클래스를 이용하면 됩니다. 사용법은 다음과 같다. 
 {{{#!plain
 aFile = File.new("filename", "mode")
+    # 파일 관련 작업들
 aFile.close
 }}}
 
+==== File.open 메서드 ====
+File.open 메서드를 이용해서 새로운 파일 객체를 만드는 방법동 있다. File.new와 기본적으로 하는 일은 같다. 다른 점이라면 File.open 메서드는 block을 이용한 표현이 가능하다는 점이다. 
+{{{#!plain
+File.open("filename", "mode") do | fobj |
+    # 파일 관련 작업들
+end
+}}}
+'''mode'''에 사용할 수 있는 값들은 다음과 같다.
+|| Mode      || 설명                                                 ||
+|| r         || 읽기 전용으로 연다. 파일의 처음을 가리킨다.          ||
+|| r+        || 읽기/쓰기로 연다. 파일의 처음을 가리킨다.            ||
+|| w         || 쓰기 전용으로 연다. 파일이 존재한다면 덮어쓴다. 파일이 없다면, 새로운 파일을 만든다.  ||
+|| w+        || 읽기/쓰기로 연다. 파일이 존재한다면 덮어쓴다. 파일이 없다면, 새로운 파일을 만든다.    ||
+|| a         || 쓰기 전용으로 연다. 파일이 존재한다면, 파일의 끝을 가리킨다. 추가모드라고 보면 된다. 파일이 없다면 새로운 파일을 만든다.  ||
+|| a+        || 읽기/스기로 연다. 파일이 존재한다면, 파일의 끝을 가리킨다. 추가모드다. 파일이 없다면 새로운 파일을 만든다.                ||
+
+=== 파일 읽기, 쓰기 ===
+==== sysread method ====
+Unix의 [wiki:man/2/read read]함수와 비슷하다. 파일에서 매개변수 크기만큼 내용을 읽는다.  
+{{{#!plain
+aFile = File.new('file.rb', 'r')
+fSize = aFile.stat.size
+if aFile
+    content = aFile.sysread(fSize)
+    puts content
+else
+    puts 'Unable open file'
+end
+}}}
+
+==== syswrite method ====
+{{{#!plain
+aFile = File.new('test.tmp', 'w')
+if aFile
+    puts aFile.syswrite('Hello world!!!')
+else
+    puts 'Unable open file'
+end
+}}}
+
+==== each_byte method ====
+1byte씩 데이터를 읽는다. do 블럭과 함께 사용한다. 
+{{{#!plain
+aFile = File.new('test.tmp', 'r')
+if aFile
+    aFile.each_byte do | ch |
+        putc ch
+        putc '.'
+    end
+else
+    puts 'Unable open file'
+end
+}}}
+
+==== IO.readlines method ====
+File 클래스는 IO 클래스의 서브클래스다. IO 클래스도 파일 입출력 관련 메서드를 제공한다.
+
+readline 메서드는 파일의 내용을 라인단위로 읽는다. 
+{{{#!plain
+lines = IO.readlines('file.rb', 'r')
+
+lines.each do | line |
+    print line
+end
+}}}
+
+==== IO.foreach method ====
+IO.readlines와 마찬가지로 줄 단위로 읽어서 반환한다. readlines와 다른 점이라면 배열을 반환하지 않으며, foreach 블럭을 사용한다는 점이다.  
+{{{#!plain
+IO.foreach('file.rb') do | line |
+    puts line
+end
+}}}
+
+==== 파일 이름 변경과 삭제 ====
+'''rename'''과 '''delete'''를 이용해서 이름을 변경하고 삭제할 수 있다.
+{{{#!plain
+File.rename('test1.txt', 'test2.txt')
+File.delete('test2.txt')
+}}}
+
+==== 파일 권한과 소유자 ====
+'''[wiki:man/2/chmod chmod]'''메서드를 이용해서, 파일의 권한을 변경할 수 있다. 
+{{{#!plain
+file = File.new('test2.txt', 'w')
+file.chmod(0755)
+}}}
+
+==== 파일 정보 확인 ====
+파일이 존재하는지, 일반 파일인지 디렉토리인지, 읽을 수 있는지 혹은 쓸 수 있는지 등 파일과 관련된 다양한 정보를 확인할 수 있는 메서드들을 소개한다.
+
+파일이 존재하는지 확인:
+{{{#!plain
+File.open('test3.txt') if File::exists?('test3.txt')
+}}}
+
+파일의 종류를 확인: 
+{{{#!plain
+puts "Regular File" if File.file?('test2.txt')      # 일반 파일인지
+puts "Regular File" if File.pipe?('test2.txt')      # 파이프 인지
+puts "Regular File" if File.socket?('test2.txt')    # 소켓 인지
+puts "Regular File" if File.symlink?('test2.txt')   # 심볼릭 링크인지
+puts "Directory" if File.directory?('test2.txt')    # 디렉토리 인지
+}}}
+
+읽기/쓰기/실행 권한 확인:
+{{{#!plain
+puts "readable" if File.readable?('test2.txt')
+puts "writeable" if File.writable?('test2.txt')
+puts "executable" if File.executable?('test2.txt')
+}}}
+
+파일크기가 0인지 확인:
+{{{#!plain
+File.zero?('test2.txt')
+}}}
+
+파일의 크기 출력: 
+{{{#!plain
+File.size('test2.txt')
+}}}
+
+파일 종류를 출력 :
+{{{#!plain
+puts File.ftype('test2.txt')    # file
+puts File.ftype('/dev/sdb')     # blockSpecial
+puts File.ftype('/dev/stdout')  # link
+puts File.ftype('/dev/zero')    # characterSpecial
+}}}
+
+==== 심볼릭 링크 읽기 ====
+심볼릭 링크의 원본파일 이름을 가져온다.
+{{{#!plain
+File.readlink(exe_file)
+}}}
+
+=== 디렉토리 ===
+디렉토리는 파일을 포함한다. 루비에서 제공하는 Dir 클래스를 이용해서 디렉토리 관련 작업을 할 수 있다.
+==== 디렉토리 탐험하기 ====
+chdir 메서드를 이용해서 작업 디렉토리를 변경할 수 있다.
+{{{#!plain
+Dir.chdir("/usr/bin")
+}}}
+Dir.pwd로 현재 작업 디렉토리를 알 수 있다.
+{{{#!plain
+puts Dir.pwd   # /usr/bin을 출력한다.
+}}}
+
+Dir.entries로 디렉토리에 있는 파일의 내용을 가져올 수 있다.
+{{{#!plain
+puts Dir.entries("/usr/bin").join("\n")
+}}}
+
+foreach를 이용할 수도 있다.
+{{{#!plain
+Dir.foreach("/usr/bin") do | entry |
+    puts entry
+end
+}}}
+
+==== 디렉토리 만들기, 삭제 ====
+{{{#!plain
+Dir.mkdir('mydir')
+Dir.delete('testdir')
+}}}
+
+==== 임시파일 다루기 ====
+프로그램이 실행되는 동안에만 임시로 사용할 데이터를 저장하기 위해서 임시파일을 생성하기도 한다. 리눅스 운영체제는 이런 임시파일들을 위해서 임시파일 디렉토리 "/tmp"를 제공한다. 임시파일이 필요하다면, "/tmp"디렉토리에 파일을 만들어서 사용하면 된다. 
+
+''Dir.tmpdir''로 운영체제가 제공하는 임시디렉토리를 찾을 수 있다. Dir.tmpdir은 루비가 기본제공하는 메서드가 아니다. 사용하려면 '''tmpdir'''이 필요하다.
+{{{#!plain
+require 'tmpdir'
+
+tmpfilename = File.join(Dir.tmpdir, 'mytemp.dat')
+tempfile = File.new(tempfilename, "w")
+tempfile.puts "This is a temporary file"
+tempfile.close
+File.delete(tempfilename)
+}}}
+/tmp 디렉토리는 임사파일을 만들기 위한 모든 애플리케이션이 공통으로 사용한다. 따라서 중복된 파일이름을 피해야 한다. 루비는 ''Tmpfile''이라는 메서드를 제공하는데, 이 메서드를 이용하면 중복되지 않는 임시파일을 만들 수 있다. 
+{{{#!plain
+require 'tempfile'
+f = Tempfile.new('tingtong')
+f.puts "Hello"
+puts f.path
+f.close
+}}}
+
+=== 파일 상태 ===
+파일의 실행, 읽기, 쓰기 상태를 확인. 크기가 0인 파일을 하나 만들었다. 
+{{{#!plain
+# touch text.txt
+File.readable?("test.txt")   # true
+File.writeable?("test.txt")  # true
+File.executable?("test.txt") # 
+}}}
+
+파일의 크기
+{{{#!plain
+File.size?("text.txt")
+}}}
+
+파일의 종류
+{{{#!plain
+File::ftype("text.txt")
+}}}
+파일의 종류에는 ''file, directory, characterSpecial, blockSpecial, fifo, link, socket, unknown''이 있다. 
+
+파일의 생성,수정,엑세스 시간
+{{{#!plain
+File::ctime( "test.txt" ) # => Fri May 09 10:06:37 -0700 2008
+File::mtime( "text.txt" ) # => Fri May 09 10:44:44 -0700 2008
+File::atime( "text.txt" ) # => Fri May 09 10:45:01 -0700 2008
+}}}
+
+== 히스토리 ==
+  * 작성 : [[Date(2012-11-10T08:46:31)]]
+  * 수정
+    * [[Date(2012-12-01T16:17:45)]] : 심볼릭 링크 읽기 추가
+    * [[Date(2013-02-23T15:14:19)]] : 파일 상태

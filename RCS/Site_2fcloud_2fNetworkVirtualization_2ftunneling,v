@@ -1,0 +1,319 @@
+head	1.8;
+access;
+symbols;
+locks
+	root:1.8; strict;
+comment	@# @;
+
+
+1.8
+date	2013.01.09.05.23.43;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.01.07.08.28.26;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.01.07.07.51.52;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.01.05.16.19.55;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.01.05.11.18.00;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.01.04.08.42.17;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.01.03.15.02.54;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.01.03.09.18.18;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fNetworkVirtualization_2ftunneling
+@
+
+
+1.8
+log
+@183.98.30.10;;yundream;;
+@
+text
+@#title Tunneling
+
+[[TableOfContents]]
+== Tunneling ==
+클라우드 환경에서 네트워크 가상화는 스토리지 가상화와 함께 가장 큰 이슈다. 
+
+네트워크를 가상화 하기 위한, 즉 논리적으로 구성하기 위한 가장 일반적인 방법으로 오랫동안 VLAN을 사용해왔다. 하지만 VLAN은 몇 가지 치명적일 수도 있는 단점을 가지고 있다. 
+  1. '''VLAN 크기가 4029로 제한된다.''' 4029개 이상의 논리적 네트워크를 구성할 수 없음을 의미한다. 4029개를 사용할 수 있다지만, 실제로는 2000~3000 정도밖에 사용할 수 없을 거다. Account 별로 네트워크를 할당할 경우 3000이라는 숫자는 큰 숫자가 아니다.   
+  1. '''스위치를 직접 제어해야 한다'''. 물리적인 스위치장비를 직접 설정해야 한다.
+  1. '''브로드캐스팅 도메인이 커진다 '''. 브로드캐스팅 트래픽이 늘어나서 좋을거 하나 없다.  
+
+Tunneling는 네트워크 가상화를 지원하기 위한 좋은 방법이다. 기본 개념은 패킷을 '''encapusulation'''해서 터널을 유지하는 하는 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1ahhkrsLFlfM3YHNyal0Y9f_PtDAAS7wmF2Z-TCip9vA&amp;w=556&amp;h=553">
+}}}
+
+개념은 간단하다. 예를 들자면
+
+VM-1에서 VM-3으로 패킷을 전송한다. 전송 패킷은 빨간색이다. Openvswitch로 패킷이 전달되면, openvswitch는 VM-3이 있는 CNODE의 ip 주소를 찾아낸다. 그래서 이 패킷을 encapusulation 해서 전달한다. 이 패킷을 받은 CNODE의 openvswitch는 패킷을 까서, VM-3로 전송한다.  
+
+L2 정보를 L3에 넣어서 통신을 하는 모양새이기 때문에, '''L2 over L3'''기술이라고 부르기도 한다.  
+
+== Tunneling protocol ==
+주요 터널링 프로토콜들이다. Openvswitch를 기준으로 살펴본다.
+
+=== 사전지식 ===
+==== TSO - TCP Segmentation Offload ====
+애플리케이션은 데이터를 "write"할 뿐으로 write하는 대상이 파일인지 네트워크인지는 전혀 모른다. 좀 더 정확히 말하자면, 애플리케이션은 파일이든지 네트워크(소켓)이던지 혹은 파이프이던지 간에 모두 "파일"로 보인다. 애플리케이션이 데이터를 소켓에 쓰면 커널이 데이터를 받아서 처리 할 텐데 이때에 비로서 커널의 TCP/IP 스택이 네트워크 통신에 적합하도록 데이터를 가공한다. 이때 커널이 하는 주요한 일은 데이터를 전송하기 적당한 크기로(MTU) 쪼개고, 쪼갠 데이터를 encapsulation 하는 일이다. 이 과정은 다음과 같이 묘사할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1CKsAddiN9qyVdJIjnORopzS8DaRzx5qv8coXnBZtQno&amp;w=669&amp;h=313">
+}}}
+
+네트워크를 타고 흐르는 데이터의 양이 증가함에 따라 운영체제의 부담이 가중이 된다. 그래서 운영체제가 하던 일을 NIC에 맡김으로써 네트워크 데이터를 더 효과적으로 처리하려는 시도를 하게 된다. 운영체제는 TCP를 offload해서 NIC으로 보내며, NIC이 나머지 작업을 하는 방식이다. 대략 아래와 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1obi9VoeqTWV1LDPKEsudEhgVnsbw1RtLSm1jXDCJGSM&amp;w=669&amp;h=313">
+}}}
+
+==== TOE - TCP offload engine ====
+TSO는 운영체제 레벨의 기술이다. 이 기술을 사용하려면 NIC에서 TCP/IP 기능의 일부를 수행할 수 있어야 하는데, NIC에 구현된 이 엔진을 TOE(TCP Offload engine)이라고 한다. TCP/IP의 모든 기능을 NIC에 맡길경우 엔진이 복잡해 질 수 있으므로, 보통은 Partial offloading(부분적 오프로딩)방식을 사용한다. 반대로 TCP/IP의 모든 기능, 그러니까 TCP 연결, 타임아웃, 오류처리, 혼잡제어, 슬라이딩 윈도우 제어등을 포함하는 방식을 full offloading이라고 한다.
+
+TOE구현은 프로세스기반과 칩기반 구현이 있다. 프로세스 기반은 유연하지만 가격이 높고 성능이 낮다는 단점이 있다. 대부분은 offloading를 위한 전용 칩을 이용해서 TOE를 구현한다.
+
+==== Linux와 TSO ====
+리눅스는 커널버전 2.6.x부터 TSO를 지원했다. ethtool을 이용해서 TSO 관련 설정을 확인하거나 변경할 수 있다. 
+{{{#!plain
+# ethtool -k eth0
+Offload parameters for eth0:
+rx-checksumming: on
+tx-checksumming: on
+scatter-gather: on
+tcp-segmentation-offload: on
+udp-fragmentation-offload: off
+generic-segmentation-offload: on
+generic-receive-offload: on
+large-receive-offload: off
+rx-vlan-offload: on
+tx-vlan-offload: on
+ntuple-filters: off
+receive-hashing: off
+}}}
+  * rx-checksumming, tx-checksumming : on이면 TCP 체크섬 계산을 NIC에서 하고 있다는 의미다.
+  * scatter-gather : on이면 메모리상에 흩어져 있는 버퍼를 모아서(gather) 목록을 관리하고, 한번의 system call로 명령을 처리할 수 있게 한다. 시스템 콜이 줄어드는 만큼 성능향상을 기대할 수 있다. 
+  * tcp-segmentation-offload : on이면 TSO를 활성화 한다. tcp 패킷 작업을 NIC에서 수행한다.  
+  * udp-segmentation-offload : on이면 udp에 대한 segmentation offload를 활성화 한다. : udp 패킷 작업을 nic에서 수행한다.
+  * generic-segmentation-offload, generic-receive-offload 
+  * large-receive-offload 
+  * rx-vlan-offload, tx-vlan-offload
+  * ntuple-filters
+  * receive-hashing
+아래와 같이 변경할 수 있다. 
+{{{#!plain
+# ethtool -k eth0 tso on
+# ethtool -k eth0 tso off 
+}}}
+
+=== STT ===
+STT"Stateless Transport Tunneling"는 터널링 프로토콜의 하나로 [http://tools.ietf.org/html/draft-davie-stt-01 stt draft 문서]에서 상세내역을 살펴볼 수 있다. NIC의 TSO를 이용하기 때문에 매우 빠르게 작동한다. OVS에서 지원한다. 아직은 draft 단계이지만 GRE를 대신해서 주요한 터널링 프로토콜로 사용될 것으로 보인다. 
+
+작동방식은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1XZqHdEU9vAJonQZ-8EPwgVAMEQp7HG-L9_80SvkEp6M&amp;w=801&amp;h=422">
+}}}
+
+STT 프로토콜의 구조다.
+
+https://lh5.googleusercontent.com/-coN5xKQ6vsY/UOhNCww1a8I/AAAAAAAACmA/EaAq-ykmmu8/s800/%25EC%258A%25A4%25EB%2583%2585%25EC%2583%25B71.png
+
+  1. Version : 현재 0이다. (Draft라서 그런듯) 
+  1. Flags 
+  1. L4 offset : STT 프레임 헤더의 끝 부분의 위치. 즉 encapsulated된 TCP/UDP 헤더의 위치.
+  1. Reserved field : 사용하지 않는다.
+  1. Max Segment Size : 
+  1. PCP
+  1. V
+  1. VLAN ID
+  1. Context ID
+STT는 물리적인 NIC의 자원을 활용해서 성능을 높이는 것을 목적으로 개발된 프로토콜이기 때문에, NIC이 TSO를 지원해야만 한다. 하드웨어리소스를 활용하기 때문에 더 좋은 성능을 기대할 수 있다. 하드웨어의존적을 단점으로 볼 수도 있겠지만, 1G, 10G NIC는 TSO를 기본지원하기 때문에 문제될 건 없어 보인다. 
+
+http://networkheresy.com/2012/06/08/the-overhead-of-software-tunneling/ 에 터널링 프로토콜별 성능 측정 결과가 있으니 참고하기 바란다.  
+
+=== GRE ===
+'''Generic Routing Encapsulation'''프로토콜로 IP 패킷을 다른 IP 패킷으로 감싸는 방식으로 터널링을 구현한다 . Cisco에서 개발한 프로토콜로 IP(L3)위에서 point-to-point link(L2) 통신을 지원하며 이를 이용해서 클라이언트간 혹은 클라이언트 서버간 VPN을 만들 수 있다. 
+
+https://lh5.googleusercontent.com/-PF7BdJ6g8kI/UOpzQ3PbLBI/AAAAAAAACok/RIu0fsEMZf0/s800/gre.png
+  * C, Checksum Present : Checksum 필드를 사용할경우 1로 설정한다.  
+  * R, Routing Present : Offset 필드를 사용할 경우 1로 설정한다. 
+  * K, Key Present : Key 필드를 사용할 경우 1로 설정한다. 
+  * S, Sequence Number present : Sequence Number를 사용할 경우 1로 설정한다.  
+  * s, Strict Source Route : 모든 라우팅 정보가 strict source routes로 구성될 경우에만 1로 설정한다.  
+  * Recur, Recursion Control : encapsulation이 몇번 허용되는지. 보통 0으로 설정한다.  
+  * Flags 
+  * Version : 버전 보통 0이다.
+  * Protocol : Payload 패킷의 프로토콜 종류를 명시한다. 보통 이더넷 프로토콜 헤더의 Type(2 byte) 필드 값이 들어간다.  
+  * Checksum : GRE 헤더의 payload 패킷의 checksum 정보를 저장하고 있다. Checksum Present가 1일 경우에만 유효하다.   
+  * Offset : Routing 필드의 시작점에서 active source route entry의 첫번째 옥텟까지의 위치(offset)을 표시한다.   
+  * Key : encapsulator가 설정한다. 패킷을 받는 노드가 패킷의 소스를 authenticate 하기 위해서 사용한다. Key present가 1일 경우에만 존재한다.  
+  * Sequence Number : 패킷을 받는 쪽에서 패킷의 순서를 알 수 있게 한다. 
+  * Routing : Routing present가 1일 경우에만 존재한다. 여러개의 source route entries로 구성될 수 있다.  
+
+=== VXLAN ===
+VXLAN이라는 이름에서 알 수 있듯이, VLAN의 확장된 형태다. 다른 터널링 프로토콜과 마찬가지로 encapsulation 프로토콜이다. 다음은 VXLAN 패킷의 구조다. VXLAN ID의 크기가 24bit이다. 따라서 1600만개 이상의 VLAN을 구성할 수 있다. 
+
+http://www.cisco.com/en/US/prod/collateral/switches/ps9441/ps9902/images/white_paper_c11-685115-1.jpg
+
+IP/UDP를 이용해서 encapsulation 하는 매우 단순한 구조다. 이 방식의 장점은 vswitch에서 IP 기반으로 loadbalancing할 수 있다는 점이다. GRE의 경우 GRE자체로 encapsulation하기 때문에 vswitch에서의 부하분산은 불가능 하다.     
+
+=== OVS에서 지원하는 tunneling 프로토콜들 ===
+2013년 1월 현재 아래의 tunneling 프로토콜을 지원한다. 
+  * STT 
+  * Ethernet over GRE
+  * IPsec
+  * GRE over IPsec
+  * VXLAN
+
+
+== 참고문헌 ==
+  * http://www.datacenterworld.com/fall2012/account/Uploader/uploader_files/show/53
+  * https://cwiki.apache.org/CLOUDSTACK/enhancements-to-gre-based-sdn-overlay.html
+  * http://blog.ioshints.info/2012/03/do-we-really-need-stateless-transport.html?m=1
+  * http://networkheresy.com/2012/06/08/the-overhead-of-software-tunneling/
+
+== 히스토리 ==
+  * 작성 : [[Date(2013-01-05T16:19:55)]] 
+@
+
+
+1.7
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d101 3
+a103 1
+STT를 사용하기 위해서는 NIC이 TSO를 지원해야만 한다. 하드웨어적인 제약사항이라고 볼 수도 있겠지만, 1G, 10G NIC는 TSO를 기본지원하기 때문에 문제될 건 없어 보인다. 
+d129 1
+a129 1
+IP/UDP를 이용해서 encapsulation 하는 매우 단순한 구조다. 이 방식의 장점은 vswitch에서 IP 기반으로 loadbalancing할 수 있다는 점이다. GRE의 경우 GRE자체로 encapsulation하기 때문에 vswitch에서의 부하분산이 불가능 하다.     
+d132 1
+d134 3
+a136 1
+  * GRE
+@
+
+
+1.6
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d123 1
+a123 1
+VXLAN이라는 이름에서 알 수 있듯이, VLAN의 확장된 형태다. 다른 터널링 프로토콜과 마찬가지로 encapsulation 프로토콜이다. 다음은 VXLAN 패킷의 구조다.  
+d127 6
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d101 2
+d104 17
+a120 1
+'''Generic Routing Encapsulation'''프로토콜이다. Cisco에서 개발한 프로토콜로 IP(L3)위에서 point-to-point link(L2) 통신을 지원한다.
+a121 1
+계속...
+d123 4
+a126 1
+계속... 
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d47 31
+a77 1
+
+d80 1
+a80 2
+STT는 "Stateless Transport Tunneling"의 줄임말이다.
+
+d82 1
+d84 17
+a100 1
+계속...
+d114 3
+@
+
+
+1.3
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d29 1
+a29 1
+애플리케이션은 데이터를 "write"할 뿐으로 write하는 대상이 파일인지 네트워크인지는 전혀 모른다. 좀 더 정확히 말하자면, 애플리케이션은 파일이든지 네트워크(소켓)이던지 혹은 파이프이던지 간에 모두 "파일"로 보인다. 애플리케이션이 데이터를 소켓에 쓰면 커널이 데이터를 받아서 처리 할 텐데 이때에 비로서 커널의 TCP/IP 스택이 네트워크 통신에 적합하도록 데이터를 가공한다. 이때 커널이 하는 주요한 일은 데이터를 전송하기 적당한 크기로 쪼개고, 쪼갠 데이터를 encapsulation 하는 일이다. 이 과정은 다음과 같이 묘사할 수 있다. 
+d35 1
+a35 1
+애플리케이션 데이터를 TCP 스택에서 처리하기 위해서는 많은 CPU 자원이 소모된다. 아마도 호스트 CPU의 가장 큰 부하일 것이다. 이것을 하드웨어(NIC)에 맡기는 기술이 TSO다.  
+d42 5
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d28 1
+a28 3
+==== TSO ====
+'''TCP Segmentation Offload'''
+
+d35 8
+a42 1
+... 계속...
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d3 1
+d27 18
+d48 1
+d50 1
+a51 1
+=== STT ===
+@

@@ -1,0 +1,513 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2013.02.01.20.25.17;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.02.01.20.22.45;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.12.01.20.03.15;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fGoogle_2fService_2fGoogleMapAPI
+@
+
+
+1.3
+log
+@115.89.24.17;;Anonymous;;
+@
+text
+@#title 구글맵 API를 이용한 Map Service
+[[TableOfContents]]
+[[tag(ajax,google,gwt)]]
+
+== 최근 변경 소식 ==
+=== 2009/3/30 ===
+  1. 구글 맵검색 연동 방법추가.
+=== 2009/3/17 ===
+  1. 지도 서비스가 된다. 지도 서비스를 받기 위해서는 http://maps.google.com  대신 http://maps.google.co.kr 을 이용해야 한다.
+  1. 지도 서비스가 되면서, 길찾기 기능도 추가되었다. 수도권으로만 한정한다면, 매우 정확한 정보를 보여준다.
+  1. Map api 에서도 maps.google.com 대신 maps.google.co.kr 로 API를 요청해야 한다.
+  1. 이 페이지의 모든 예제들의 API 요청주소를 maps.google.co.kr 로 변경했다.
+== 구글의 개발자 포용 정책 ==
+[[Image(maps_results_logo.gif,150,55,left)]]
+구글은 다양한 개발자를 자신의 영역으로 끌어들이기 위한 개방정책을 사용한다. 그래서 대부분의 서비스들이 서비스를 제어할 수 있는 API를 공개적으로 제공하고 있다. 개발자는 이 API를 이용해서 구글이 선보인 서비스를 단순히 둘러보는 정도에 그치지 않고, 다양한 응용을 시도해볼 수 있다. 구글 MAP같은 경우 구글에서 서비스를 만들어내기도 전에, 구글이 제공한 API를 이용해서 자신들만의 독특한 서비스를 만들어낸 사용자들이 있다. http://HousingMaps.com 의 경우 미국 주요도시의 집값 정보를 보여주며, http://ChicagoCrime.org 는 도시내의 범죄와 범행위치를 검색하는 서비스를 제공하고 있다.  
+
+자신의 제품을 사용하거나 테스트해줄 많은 개발자들을 확보하는건 소프트웨어 회사가 성장하기 위한 가장 중요한 동력원임은 말할필요도 없을 것이다. 기존에도 개발자를 자신의 영역으로 끌어들이기 위한 노력을 해왔던건 사실이지만, 많은 제한을 둔 폐쇄적인 형태로 이루어졌었다. 구글은 정보를 완전히 공개하고 있으며, 많은 우호적인 개발자 세력을 만들어냈다. 이들 개발자는 구글매니아로 불리우는 중요 고객이기도 하다. 최근에는 국내 대형포탈들도 이러한 공개 개발자 포용정책을 펴나가는 추세다.
+
+== 구글 Map API ==
+구글 Map은 Ajax(:12)기술을 사용하는 구글의 대표적인 서비스들 중 하나이다. 구글은 단순히 서비스를 제공하는데 그치지 않고 개발자의 참여를 끌어들이기 위해 API를 공개하고 있다. 구글 Map API를 이용하면 자신의 사이트에 구글 Map을 붙이고, 테스트하면서 새로운 응용을 만들 수 있다. Map API를 사용하기 위해서는 '''Map Key'''를 받아야 하는데, http://www.google.com/apis/maps 를 방문해서 Map을 사용할 URL만 명시해주면 바로 Key를 받을 수 있다. 그다음 생성된 코드를 가져다 붙이기만 하면 자신의 사이트에서 바로 구글 Map을 붙일 수 있다. 
+
+attachment:gmap.png
+
+Map Key는 구글 maps 자바스크립트를 불러올때 '''key'''에 명시하면 된다. 
+{{{#!plain
+<script src="http://maps.google.co.kr/maps?file=api&amp;v=2&amp;key=abcdefg" type="text/javascript"></script>
+}}}
+
+== 구글 MAP API 분석 ==
+구글 MAP API는 JavaScript(:12)로 제어된다. 여기에서는 완전한 형태의 HTML 파일을 보여주지는 않을 것이다. 완전한 HTML 페이지를 만드는건 Map Key를 생성할 때 만들어지는 HTML 코드를 이해하는 것만으로 충분할 것이다.   
+
+=== 기본 ===
+구글 Map을 불러오기 위한 가장 기본이 되는코드다. 서울주변을 보여준다. 
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+}}}
+setCenter을 이용해서 보여줄 위치를 지정한다. 첫번째 인자는 좌표를 지정하기 위해서 사용한다. 두번째 인자는 지도의 해상도를 결정하기 위해서 사용한다. 숫자가 클 수록 더 자세한 결과를 보여준다. 
+[http://www.joinc.co.kr/googlemap/simple.html simple.html 예제]
+
+구글 맵은 '''맵''', '''위성''', '''합성'''의 3가지 모드를 제공된다. '''setMapType'''메서드를 이용하면 모드를 변경할 수 있다. 따로 지정하지 않을 경우 '''맵'''모드로 실행된다.
+ * setMapType(G_SATELLITE_TYPE) : 위성모드
+ * setMapType(G_HYBRID_TYPE) : 합성모드
+
+=== Map에서의 이동 ===
+다음은 맵에서 중심을 이동하는 예제다. '''panTo''' 메서드를 이용하면 해당 중심으로 지도를 부드럽게 이동시킨다. 길찾기등의 기능구현에 유용하게 사용할 수 있을 거 같다. 
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+window.setTimeout(function() {
+	map.panTo(new GLatLng(42.615527631349245, 128.353515625));
+}, 2000);
+}}}
+[http://www.joinc.co.kr/googlemap/animate.html animate.html 예제]
+
+=== Control 버튼 추가하기 ===
+맵을 확대기시커나 모드를 바꾸거나 하는등의 제어를 위한 컨트롤 버튼을 추가한다.
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+}}}
+[http://www.joinc.co.kr/googlemap/control.html control.html 예제]
+
+
+=== Event Listener ===
+event listener는 '''GEvent.addListener'''를 호출해서 생성한다. 이것은 맵에서 발생하는 이벤트를 알려준다. 아래의 예제에서 맵을 움직일 경우 변경된 좌표가 출력되는걸 확인할 수 있을 것이다. 
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+GEvent.addListener(map, "moveend", function() {
+  var center = map.getCenter();
+  document.getElementById("message").innerHTML = center.toString();
+});
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+}}}
+[http://www.joinc.co.kr/googlemap/event.html event.html 예제]
+
+=== 정보창 열기 ===
+'''openInfoWindow'''를 이용하면 원하는 지역에 '''DOM'''정보를 출력할 수 있다. 다음은 맵중앙에 '''저는 여기에 살아요'''메시지를 출력하는 코드다.  
+{{{#!plain
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+map.openInfoWindow(map.getCenter(),
+                   document.createTextNode("저는 여기에 살아요"));
+}}}
+[http://www.joinc.co.kr/googlemap/infowindow.html infowindow.html 예제]
+
+=== 맵에 표시하기 ===
+이번 예제는 overlay기능을 이용해서 지도에 랜덤하게 10개의 마크를 표시한다. 마크에 사용되는 이미지는 기본 이미지이며, 사용자 정의 아이콘을 만들 수도 있다. 서울시를 기준으로 작성했다.
+{{{#!plain
+map.setCenter(new GLatLng(35.76873101871279, 139.5413875579834), 12);
+
+var bounds = map.getBounds();
+var southWest = bounds.getSouthWest();
+var northEast = bounds.getNorthEast();
+var lngSpan = northEast.lng() - southWest.lng();
+var latSpan = northEast.lat() - southWest.lat();
+
+// 랜덤 포인트를 만들고 각각의 포인트에 마킹을 한다.
+for (var i = 0; i < 10; i++) {
+  var point = new GLatLng(southWest.lat() + latSpan * Math.random(),
+                          southWest.lng() + lngSpan * Math.random());
+  map.addOverlay(new GMarker(point));
+}
+// 랜덤 포인트를 만들고 이것을 연결한다. 
+var points = [];
+for (var i = 0; i < 5; i++) {
+  points.push(new GLatLng(southWest.lat() + latSpan * Math.random(),
+                          southWest.lng() + lngSpan * Math.random()));
+}
+points.sort(function(p1, p2) {
+  return p1.lng() - p2.lng();
+});
+map.addOverlay(new GPolyline(points));
+}}}
+[http://www.joinc.co.kr/googlemap/overlay.html overlay.html 예제]
+
+=== 클릭 이벤트 제어 ===
+맵에 '''클릭'''을 할경우 이벤트를 받아서 마킹을 하는 예제다. 앞서 배웠던 '''addListenr'''메서드를 이용해서 click 이벤트를 기다리고, 클릭이 발생하면 '''addOverlay'''메서드를 이용해서 마킹을 한다.
+{{{#!plain
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(35.76873101871279, 139.5413875579834), 12);
+GEvent.addListener(map, "click", function(marker, point) 
+{
+  if (marker) 
+  {
+    map.removeOverlay(marker);
+  } else {
+    maㅁp.addOverlay(new GMarker(point));
+  }
+});
+}}}
+[http://www.joinc.co.kr/googlemap/click.html click.html 예제]
+
+=== 마커에 정보 창 출력하기 ===
+10개의 마커를 랜덤하게 표시하고, 마커를 클릭하면 클릭이벤트에 대한 Listener가 작동하도록 해보자. Listener 함수는 '''openInfoWindowHtml'''메서드를 이용해서 정보창을 출력한다. 
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(35.76873101871279, 139.5413875579834), 12);
+function createMarker(point, number) 
+{
+  var marker = new GMarker(point);
+  GEvent.addListener(marker, "click", function() 
+  {
+    marker.openInfoWindowHtml("Marker #<b>" + number + "</b>");
+  });
+  return marker;
+}
+
+var bounds = map.getBounds();
+var southWest = bounds.getSouthWest();
+var northEast = bounds.getNorthEast();
+var lngSpan = northEast.lng() - southWest.lng();
+var latSpan = northEast.lat() - southWest.lat();
+for (var i = 0; i < 10; i++) 
+{
+  var point = new GLatLng(southWest.lat() + latSpan * Math.random(),
+                        southWest.lng() + lngSpan * Math.random());
+  map.addOverlay(createMarker(point, i + 1));
+}
+}}}
+[http://www.joinc.co.kr/googlemap/markerinfo.html markerinfo.html 예제]
+
+=== 탭 사용하기 ===
+'''openInfoWindowsTabs'''메서드 와 '''GInfoWindowTab''' 클래스를 이용하면, 탭을 제어할 수 있다. 다음 예제는 마커를 클릭하면 2개의 tab을 가진 Info Windows를 띄운다.
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(35.76873101871279, 139.5413875579834), 12);
+
+var infoTabs = [
+    new GInfoWindowTab("탭1", "안녕하세요.<br><img src=http://www.joinc.co.kr/images/joinc.png border=0>"),
+    new GInfoWindowTab("탭2", "반갑습니다."),
+];
+
+var marker = new GMarker(map.getCenter());
+GEvent.addListener(marker, "click", function() {
+    marker.openInfoWindowTabsHtml(infoTabs);
+});
+map.addOverlay(marker);
+marker.openInfoWindowTabsHtml(infoTabs);
+}}}
+[http://www.joinc.co.kr/googlemap/tab.html tab.html 예제]
+
+=== 사용자 정의 아이콘 사용하기 ===
+사용자 정의 아이콘을 사용하는 예제다. 아이콘은 구글에서 제공하는 '''mini marker'''이미지들을 사용하기로 했다. 완전한 사용자 정의 아이콘을 만들기 위해서는 원본이미지와 함께 '''그림자 이미지'''가 쌍으로 준비되어야 한다.
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(35.76873101871279, 139.5413875579834), 12);
+
+var icon = new GIcon();
+icon.image = "http://labs.google.com/ridefinder/images/mm_20_red.png";
+icon.shadow = "http://labs.google.com/ridefinder/images/mm_20_shadow.png";
+icon.iconSize = new GSize(12, 20);
+icon.shadowSize = new GSize(22, 20);
+icon.iconAnchor = new GPoint(6, 20);
+icon.infoWindowAnchor = new GPoint(5, 1);
+
+// 10개의 랜덤위치를 찾아서 marking한다.
+var bounds = map.getBounds();
+var southWest = bounds.getSouthWest();
+var northEast = bounds.getNorthEast();
+var lngSpan = northEast.lng() - southWest.lng();
+var latSpan = northEast.lat() - southWest.lat();
+for (var i = 0; i < 10; i++) {
+    var point = new GLatLng(southWest.lat() + latSpan * Math.random(),
+                      southWest.lng() + lngSpan * Math.random());
+map.addOverlay(new GMarker(point, icon));
+}
+}}}
+[http://www.joinc.co.kr/googlemap/icon.html icon.html 예제]
+
+=== 아이콘 클래스 사용하기 ===
+지도서비스를 하게 된다면, 여러개의 아이콘들이 사용될 것이다. '''GIcon'''클래스를 이용하면 아이콘을 쉽게 관리할 수 있다.
+{{{#!plain
+var map = new GMap2(document.getElementById("map"));
+map.addControl(new GSmallMapControl());
+map.addControl(new GMapTypeControl());
+map.setCenter(new GLatLng(37.4419, -122.1419), 13);
+
+// 아이콘에서 사용할 이미지/그림자 이미지, Info Windows등 객체의 
+// 속성을 결정한다.
+var baseIcon = new GIcon();
+baseIcon.shadow = "http://www.google.com/mapfiles/shadow50.png";
+baseIcon.iconSize = new GSize(20, 34);
+baseIcon.shadowSize = new GSize(37, 34);
+baseIcon.iconAnchor = new GPoint(9, 34);
+baseIcon.infoWindowAnchor = new GPoint(9, 2);
+baseIcon.infoShadowAnchor = new GPoint(18, 25);
+
+function createMarker(point, index) {
+  // Create a lettered icon for this point using our icon class
+  var letter = String.fromCharCode("A".charCodeAt(0) + index);
+  var icon = new GIcon(baseIcon);
+  icon.image = "http://www.google.com/mapfiles/marker" + letter + ".png";
+  var marker = new GMarker(point, icon);
+
+  GEvent.addListener(marker, "click", function() {
+    marker.openInfoWindowHtml("지역 <b>" + letter + "</b>");
+  });
+  return marker;
+}
+
+var bounds = map.getBounds();
+var southWest = bounds.getSouthWest();
+var northEast = bounds.getNorthEast();
+var lngSpan = northEast.lng() - southWest.lng();
+var latSpan = northEast.lat() - southWest.lat();
+for (var i = 0; i < 10; i++) {
+  var point = new GLatLng(southWest.lat() + latSpan * Math.random(),
+                          southWest.lng() + lngSpan * Math.random());
+  map.addOverlay(createMarker(point, i));
+}
+}}}
+[http://www.joinc.co.kr/googlemap/iconclass.html iconclass.html 예제]
+=== 마커 드래그 ===
+마커는 클릭, 다른장소로의 드래그 등이 가능한 상호작용하는 객체다. 이 예제는 맵에서 마커를 클릭하고 드래그하는 이벤트를 처리하는 방법을 알려준다. 드래그는 '''click, dragstart, drag, dragend'''의 4가지 타입의 이벤트를 발생한다.
+{{{#!plain
+    var map = new GMap2(document.getElementById("map"));
+    var center = new GLatLng(37.51025350131836, 127.06023216247559);
+    map.setCenter(center, 16);
+    map.setMapType(G_SATELLITE_MAP);
+
+    var marker = new GMarker(center, {draggable: true});
+
+    GEvent.addListener(marker, "dragstart", function() {
+        map.closeInfoWindow();
+    });
+
+    GEvent.addListener(marker, "dragend", function() {
+        map.openInfoWindowHtml("여기를 약속장소로..."); 
+    });
+
+    map.addOverlay(marker);
+}
+}}}
+[http://www.joinc.co.kr/googlemap/drag.html drag.html 예제]
+=== SideBar를 통한 맵 링크 ===
+[http://maps.google.co.kr google map]에서 검색을 해보면 지도 옆에 SideBar를 통해서 맵을 제어하는 걸 볼수 있다. 여기에서는 SideBar를 이용해서 map을 제어하는 방법에 대해서 알아보겠다. 
+
+우선 셈플을 테스트해보도록 한다.
+[http://www.joinc.co.kr/googlemap/sidebar.html sidebar.html 예제]
+
+{{{#!plain
+<script language="JavaScript" type="text/javascript">
+    // 이 변수에 side bar에 이벤트가 발생했을 때 출력할 HTML코드가 저장된다.
+    var side_bar_html = "";
+
+    // side bar에는 여러개의 마커에 대한 HTML요소가 사용되므로
+    // 배열로 정의 한다. 
+    var gmarkers = [];
+    var htmls = [];
+    var i = 0;
+
+    // marker을 만든다. 
+    // 첫번째 인자는 위치, 두번째 인자는 이름, 세번째 인자는 설명이다.
+    function createMarker(point, name, html)
+    {
+        var marker = new GMarker(point);
+        // click 이벤트에 대한 listener 함수 정의
+        GEvent.addListener(marker, "click", function() 
+        {
+            marker.openInfoWindowHtml(html);
+        });
+        gmarkers[i] = marker;
+        htmls[i] = html;
+        side_bar_html += '<a href="javascript:myclick(' + i + ')">' + name + '</a><br>';
+        i++;
+        return marker;
+    }
+
+    function myclick(i)
+    {
+        gmarkers[i].openInfoWindowHtml(htmls[i]);
+    }
+    var map = new GMap2(document.getElementById("map"));
+    // GSmallMapControl대신에 GLargeMapControl을 사용했다.
+    map.addControl(new GLargeMapControl());
+    map.addControl(new GMapTypeControl());
+    map.setCenter(new GLatLng(37.51030456483467, 127.05190658569336),14);
+    map.setMapType(G_SATELLITE_MAP);
+
+    // 테스트에 사용할 marker를 만든다. 
+    var point = new GLatLng(37.508500299402435, 127.06263542175293);
+    var marker = createMarker(point, "반디엔 루인스", "제가 애용하는 서점 입니다");
+    map.addOverlay(marker);
+
+    var point = new GLatLng(37.50209991181568, 127.03652143478394);
+    var marker = createMarker(point, "시티문고", "가끔 강남에 갈일이 있으면 시간을 때우는 장소로..");
+    map.addOverlay(marker);
+
+    var point = new GLatLng(37.517802011991854, 127.0405125617981);
+    var marker = createMarker(point, "로터리 오락실", "드럼메니아 V2때문에 갑니다");
+    map.addOverlay(marker);
+
+    var point = new GLatLng(37.5056235973398, 127.0512306690216);
+    var marker = createMarker(point, "onnet", "제가 다니는 회사지요");
+    map.addOverlay(marker);
+
+    // <div> side_bar에 side_bar_html 문서를 배치한다.
+    document.getElementById("side_bar").innerHTML = side_bar_html;
+</script>
+}}}
+
+== XML과 비동기 HTTP를 이용한 지도 생성 ==
+이번 예제는 경도/위도와 지역정보를 포함한 '''data.xml'''을 다운로드 받아서, 지도에 마커를 표시한다. '''GDownloadUrl'''메서드를 이용해서 파일을 다운로드 받을 수 있다. 다운로드 받은 XML(:12)파일은 '''GXml'''메서드를 이용해서 처리한다. 마커를 클릭하면 지역정보가 표시된다. 
+{{{#!plain
+<script language="JavaScript" type="text/javascript">
+var side_bar_html = "";
+var gmarkers = [];
+var htmls = [];
+var i = 0;
+
+function myclick(i)
+{
+    gmarkers[i].openInfoWindowHtml(htmls[i]);
+}
+function load()
+{
+  var map = new GMap2(document.getElementById("map"));
+  var center = new GLatLng(37.51030456483467, 127.05190658569336);
+
+  map.addControl(new GSmallMapControl());
+  map.addControl(new GMapTypeControl());
+  map.setCenter(center, 14);
+
+  function createMarker(point, name, html)
+  {
+    var marker = new GMarker(point);
+    GEvent.addListener(marker, "click", function()
+    {
+      marker.openInfoWindowHtml("<b>" + name + "</b>");
+    });
+    gmarkers[i]=marker;
+    htmls[i]=html;
+    side_bar_html += '<a href="javascript:myclick(' + i + ')">' + name + '</a><br>';
+    i++;
+    return marker;
+  }
+
+  GDownloadUrl("data.xml", function(data, responseCode)
+  {
+    var xml = GXml.parse(data);
+    var markers = xml.documentElement.getElementsByTagName("marker");
+    for (var i = 0; i < markers.length; i++)
+    {
+      var point = new GLatLng(parseFloat(markers[i].getAttribute("lat")),
+                            parseFloat(markers[i].getAttribute("lng")));
+      map.addOverlay(createMarker(point, markers[i].getAttribute("name"), markers[i].firstChild.nodeValue));
+    }
+    document.getElementById("side_bar").innerHTML = side_bar_html;
+  });
+
+}
+</script>
+  </head>
+  <body onunload="GUnload()">
+    <div id="map" style="width: 600px; height: 340px"></div>
+    <div id="side_bar"></div>
+    <img src=../images/eyes.gif height=0 width=0 onload=javascript:load()>
+  </body>
+</html>
+}}}
+다음은 data.xml의 내용이다. 효율성과는 거리가 멀게 만들어졌다.
+{{{#!plain
+<markers>
+  <marker lat="37.508500299402435" lng="127.06263542175293" name="반디앤 루인스"><![CDATA[<a href=http://www.joinc.co.kr>www.joinc.co.kr</a>]]></marker>
+  <marker lat="37.50209991181568" lng="127.03652143478394" name="시티문고"><![CDATA[<a href=http://teamblog.co.kr>joinc teamblog</a>]]></marker>
+  <marker lat="37.50312128705489" lng="127.05825805664062" name="개미책방"><![CDATA[<a href=http://bbs.joinc.co.kr>joinc bbs</a>]]></marker>
+  <marker lat="37.517802011991854" lng="127.0405125617981" name="로터리오락실"><![CDATA[<a href=http://bbs.joinc.co.kr>joinc bbs</a>]]></marker>
+  <marker lat="37.5056235973398" lng="127.0512306690216" name="울회사"><![CDATA[<a href=http://bbs.joinc.co.kr>joinc bbs</a>]]></marker>
+</markers>
+}}}
+[http://www.joinc.co.kr/googlemap/async.html async.html 예제] 
+
+== Google 검색엔진 연동 ==
+=== GoogleBar를 이용한 검색엔진 활용 ===
+GoogleBar를 이용하면, 구글맵검색결과와 지도를 연동할 수 있다. 이를 위해서는 GGoogleBarOptions 객체를 설정하고 '''GMap2'''생성자의 옵션으로 넘겨주면 된다. 이제 GMap2.enableGoogleBar()를 이용하는 것으로 GoogleBar를 활성화 할 수 있다. GoogleBar의 화면은 google map의 메인화면에서와 비슷한 모습과 느낌을 보여준다. 
+
+다음과 같이 간단하게 google 지도 검색과 연동할 수 있다.
+{{{#!plain
+function initialize() 
+{
+	var map;
+	if (GBrowserIsCompatible()) 
+	{
+		var mapOptions = {
+			googleBarOptions : {
+			style : "new",
+			}
+		}
+		map = new GMap2(document.getElementById("map_canvas"), mapOptions);
+		map.setCenter(new GLatLng(37.51030456483467, 127.05190658569336), 13);
+		map.setUIToDefault();
+		map.enableGoogleBar();
+	}
+}
+}}}
+
+[http://www.joinc.co.kr/googlemap/controll.html 구글 검색엔진 연동 예제] 
+
+== 관련 링크 ==
+ * [wiki:Site/Google/Service/Map_cycling 구글맵으로 달려보는 자전거 산책로]
+ * http://mapki.com/index.php?title=Main_Page
+ * http://www.econym.demon.co.uk/googlemaps
+
+'''문서가 도움이 되었나요?'''
+[[Vote(아주 많이 53, 많이 3, 그럭저럭 5, 별로 3, 전혀 4)]]
+@
+
+
+1.2
+log
+@115.89.24.17;;Anonymous;;
+@
+text
+@d36 1
+a36 1
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 5);
+@
+
+
+1.1
+log
+@210.125.184.70;;Anonymous;;
+@
+text
+@d36 1
+a36 1
+map.setCenter(new GLatLng(36.615527631349245, 127.353515625), 4);
+@

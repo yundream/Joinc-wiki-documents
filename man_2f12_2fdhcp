@@ -1,0 +1,80 @@
+#title DHCP - Dynamic Host Configuration Protocol
+
+[[TableOfContents]]
+== DHCP ==
+Dynamic Host Configuration Protocol(DHCP)는 네트워크상에서 [wiki:man/12/IP IP]통신을 할 수 있도록 네트워크를 (자동으로)설정하기 위해서 사용하는 프로토콜이다. Server/client 모델의 프로토콜이다. 
+
+DHCP server는 네트워크 설정에 필요한 정보를 가지고 있다가 DHCP client가 요청을 하면 네트워크 설정정보를 전송한다. 네트워크 설정 정보를 받은 DHCP client는 네트워크 인터페이스에 대한 네트워크 설정을 적용한다. DHCP server가 가지고 있는 네트워크 정보는 다음과 같다.   
+  * DNS server 주소 
+  * Host name 
+  * IP address 
+  * Netmask
+  * Network
+  * router (gateway)
+
+DHCP는 [wiki:Site/System_management/GNS3Layer2 L2] 프로토콜이다. 즉 DHCP 서버와 DHCP 클라이언트는 반드시 같은 network linke 영역에 있어야 한다. L3 영역의 네트워크 상에서 DHCP 를 사용하려면 DHCp relay와 같은 L3 영역의 기술을 사용해야 한다.  
+
+== 세부 기술 사항 ==
+DHCP는 UDP 67번을 사용하며, '''connectionless'''방식으로 작동한다. DHCP는 4개의 운용단계를 가진다.
+  1. IP discover
+  1. IP lease offer
+  1. IP reuest
+  1. IP acknowledgement
+이 과정을 줄여서 DORA(Discover, Offer, Request, Acknoledgement)라고 부르기도 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1xMs9J9V-_oIlbkE74XNljVbVprjqv2p78tA_AueAAlc&amp;w=453&amp;h=339">
+}}}
+=== IP discovery ===
+DHCP 클라이언트는 자신이 속한 subnet에서 사용가능한 DHCP 서버를 찾기 위한 메시지를 브로드캐스트한다. DHCP discover 패킷은 다음과 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1IRu13dclx0jypyJsM2KiJOAoMbwTB7GoQjo6XES4pjs&amp;w=520&amp;h=944">
+}}}
+
+DHCP 클라이언트가 discover 패킷을 보낼때는 가장 최근 설정된 IP주소를 요청한다.(위 예제 패킷의 경우 192.168.1.100). 만약 request IP가 올바른 것이라면, 서버는 이 요청을 허용한다. 여기에서 "올바르다"라는 것은 서버가 "일치되는 Mac 주소와 request IP 주소"를 확인할 수 있는 상태를 의미한다.
+
+서버가 올바른 request IP를 찾을 수 없다면, 서버는 이 request IP를 무시하고 새로운 네트워크 설정을 내려보낸다. 
+
+=== DHCP offer ===
+DHCP discover 패킷을 받은 DHCP 서버는 네트워크 제안(DHCP offer)를 작성해서 전송한다. 아직 클라이언트의 IP주소를 모르기 때문에, 이 제안서는 브로드캐스팅 된다.   
+
+이 제안서에는 subnet mask, router(gateway), IP lease time (IP 유효 시간), DHCP server IP, DNS 주소등이 포함된다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1jLzAIy6d24HDKn1R3dewKiQKp0qWuxdkAf07vD7zGPA&amp;w=485&amp;h=963">
+}}}
+
+=== DHCP request ===
+DHCP offer(제안)를 받은 클라이언트는 이 offer의 내용을 근거로 DHCP requeust를 전송한다. 클라이언트는 서버의 IP를 알고 있기 때문에 unicast 방식으로 전송한다. 서브넷에는 두 개 이상의 DHCP 서버가 있을 수 있고, 클라이언트는 두 개 이상의 제안서를 받을 수 있다. 이때 클라이언트는 단지 하나의 offer에  대해서만 DHCP request를 전송한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1pcR0sxYtWL8oq2uZBSRIbuusWECI9_VeKSnGwK-NKZs&amp;w=477&amp;h=935">
+}}}
+
+DHCP request에는 request ip와 , dhcp server ip 정보가 들어간다. 
+
+=== DHCP acknowledgement ===
+DHCP request를 받은 DHCP 서버는 DHCP ack 패킷을 전송한다. 여기에 클라이언트의 ip가 (Your IP Address)전송된다. 이것으로 클라이언트 네트워크 설정이 끝난다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10f3WgfU4vhMgFWv7gxcQzanW8MNQRVX63cwIqXzUTSk&amp;w=483&amp;h=1022">
+}}}
+
+IP 주소를 획득한 클라이언트는 [wiki:man/12/ARP ARP]를 전송한다. 이 과정에서 MAC, IP가 충돌하는지를 확인할 수 있다. 
+
+== 관련 경험 ==
+=== 하나의 subnet에 두 개의 dhcp 서버 === 
+많은 테스트를 [wiki:man/12/virtualbox virtualbox]를 이용한 가상화 환경에서 진행하고 있다. 대게는 virtualbox에서 제공하는 DHCP 를 사용하는데, 간혹 ([wiki:Site/System_management/PXEBoot PXEBoot] 테스트등을 위해서)직접 DHCP 서버를 올려야 하는 경우가 있다. 해서 DHCP 서버를 직접 구성해서 테스트를 하는데, 아무리 해도 IP 주소가 제대로 설정이 안되는 거다. 내가 설정을 잘못했나. 가상 디바이스를 잘 못올렸나. 한 시간 정도 삽질을 했는데, virtuabox dhcp 서버를 끄지 않았던것. 쩝. 
+
+== 관련문서 ==
+  * [wiki:Site/System_management/dhcp dhcp 서버 설정하기]
+  * [wiki:Site/System_management/dhcpClient dhcp 클라이언트 설정]
+  * [wiki:Site/System_management/PXEBoot PXEBoot]
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-11-04T02:58:13)]]
+  * 수정
+    * [[Date(2012-11-04T15:20:42)]] : 패킷 구조를 html table에서 이미지로 변경
+
+[[tag(DHCP,subnet,network,BOOTP)]]

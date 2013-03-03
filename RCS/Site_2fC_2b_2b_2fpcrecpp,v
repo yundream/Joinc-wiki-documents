@@ -1,0 +1,205 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.10.05.12.48.43;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fC_2b_2b_2fpcrecpp
+@
+
+
+1.1
+log
+@211.246.71.158;;yundream;;
+@
+text
+@#title PCRECPP : C++용 정규표현 라이브러리 
+
+[[TableOfcontents]]
+== PCRE ==
+perl은 다른 언어에서는 찾아보기 힘든 매우 강력한 정규표현식을 제공한다. 물론 PHP(:12)와 Python도 정규표현식을 제공하긴 하지만, perl에서의 정규표현식이 역사도 오래되었고 거의 표준이다 보니 고무신에 양복을 입힌 느낌이랄까 그런 느낌이 드는 경우가 있다. 그래서 정규표현식을 이용해야 할 경우에는 여전히 Perl을 사용한다.
+
+C/C++은 어떡해야 하나. 주력언어가 C/C++이다 보니, C언에서도 사용할 수 있는 정규표현도구가 있으면 하는게 바램이었다. [wiki:Site/Development/Env/regex regex]가 있긴 하지만, Perl의 강력함에 비하면 사용하기가 여간 불편한게 아니다. 특히 perl의 치환 능력을 생각하면.. 
+
+그러다가 구글신에 물어물어 PCRE라는 [wiki:man/12/정규표현 정규표현] [wiki:man/12/라이브러리 라이브러리]를 찾게 되었다. 무려 '''Perl Compatible Regular Expressions'''이란다. 내가 원하는게 이것 아닐까 라는 생각이 들었다. 알아 봤더니 Apache, PHP, KDE, Postfix, Nmap, Analog등 이미 많은 프로그램에서 사용되는 라이브러리 였다. 나만 모르고 있었군 T.T  
+== PCRECPP ==
+PCRECPP는 PCRE의 C++ wrapper 함수로 구글에서 제공한다. 어느 라이브러리를 사용해도 관계 없겠으나. wrapper인 만큼 치환등 좀 더 광범위한 기능을 지원하고 있어서 PCRECPP를 정규표현/치환 라이브러리로 사용하기로 했다. 
+
+참고로 이 라이브러리는 사용방법을 익히는게 중요한게 아니다. 펄 정규표현을 이해하는게 중요하다. 
+
+=== 설치 ===
+우분투 리눅스에서 패키지 관리자로 간단하게 설치할 수 있다.
+{{{#!plain
+# sudo apt-get install libpcre++0 
+# sudo apt-get install libpcre++-dev
+}}}
+
+=== 인클루드 ===
+{{{#!plain
+#include <pcrecpp.h>
+}}}
+
+=== 컴파일 ===
+{{{#!plain
+# g++ -o pcrecpptest pcrecpptest.cc -lpcrecpp
+}}}
+
+=== 풀 매칭 ===
+'''FullMatch'''는 패턴이 문자열과 정확히 일치하는지를 확인한다. 
+{{{#!plain
+// 완전 일치 하므로 1을 반환한다.
+pcrecpp::RE re("h.*o");
+cout << re.FullMatch("hello") << endl;
+
+// 부분 일치하므로 0을 반환한다.
+pcrecpp::RE re("e");
+cout << re.FullMatch("hello") << endl;
+}}}
+문자열은 const char *와 string 모두 사용할 수 있다.
+
+매칭된 문자열을 따로 저장할 수도 있다. 문자열 "ruby:1234"이 있고, ruby와 1234를 따로 저장하길 원한다면, 다음과 같이 하면 된다. 이걸 regex나 포인터를 이용해서 작업할 것을 생각해보면, 꽤나 끔찍할 것 같다.  
+{{{#!plain
+int i;
+string s;
+pcrecpp::RE re("(\\w+):(\\d+)");
+re.FullMatch("ruby:1234", &s, &i);
+cout << s << " " << i << endl;
+}}}
+
+=== 부분 매칭 ===
+부분일치를 찾기 원한다면 '''PartialMatch'''를 이용하면 된다. 
+{{{#!plain
+cout << pcrecpp::RE("ell").PartialMatch("hello") << endl;
+}}}
+
+처음 일치하는 숫자를 가져오는 예제
+{{{#!plain
+int number;
+pcrecpp::RE re("(\\d+)");
+re.PartialMatch("x * 100 + 20", &number);
+assert(number == 100);
+cout << number << endl;
+}}}
+
+=== 정규표현식 규칙 수정 ===
+Perl 정규표현식을 보면 엔진 규칙을 수정하기 위한 여러가지 규칙들을 제공한다. PCRECPP는 RE_Options을 이용해서 이러한 일들을 할 수 있다. 개인적으로 '''caseless'''를 가장 많이 쓴다. 
+|| modifier             || description          || Perl에 대응하는 옵션      ||
+|| RCRE_CASELESS        || 대소문자 무시        || /i                        ||
+|| PCRE_MULTILINE       || 멀티라인 매칭        || /m                        ||
+|| PCRE_DOTALL          || dot matches newlines || /s                        ||
+|| PCRE_DOLLAR_ENDONLY  || $는  마지막 매치에만 사용됨 ||                    ||
+|| PCRE_UTF8            || UTF8 문자 제어       || 기본 내장                 ||
+|| PCRE_EXTRA           || strict escape parsing ||                          ||
+|| PCRE_EXTENDED        || whitespace 문자 무시  || /x                       ||
+
+다음과 같이 사용할 수 있다.
+{{{#!plain
+RE_options opt;
+opt.set_caseless(true);
+if (RE("HELLO", opt).PartialMatch("hello world")) 
+
+RE(pattern, RE_Options(PCRE_CASELESS|PCRE_MULTILINE)).PartialMatch(str);
+}}}
+
+=== Scanning Text Incrementally ===
+Consume 연산은 문서를 앞으로 읽으면서 반복적으로 패턴매칭을 적용하고자 할때 유용하다. 예를들어 다음과 같은 설정파일을 읽을 때 사용할 수 있다.  
+{{{#!plain
+Key1=value1
+Key2=value2
+Key3=value3
+...
+}}}
+
+응용 예
+{{{#!plain
+string var;
+int value;
+
+string contents="year=1985\nage=25\nbuy=1000\nnation=1022\n";
+pcrecpp::StringPiece input(contents);
+pcrecpp::RE re("(\\w+)=(\\d+)\n");
+
+while(re.Consume(&input, &var, &value))
+{
+    cout << var << " : " << value << endl;
+}
+}}}
+
+=== 문자열 치환 ===
+문자열 치환 기능도 제공한다. 물론 지금까지의 함수들만으로도 가능하긴 하지만, 구현할려면 여간 귀찮지 싶다. 
+{{{#!plain
+string s = "yabba dabba doo";
+cout << "Result " << pcrecpp::RE("b+").Replace("d", &s) << endl;
+cout << s << endl;
+}}}
+간단해서 좋다. Replace는 처음 매칭된 패턴만을 치환한다. 모든 패턴에 대해서 일치할려면 GlobalReplace를 사용해야 한다. perl의 "\g"와 비슷한 일을 한다. 
+
+{{{#!plain
+string s = "yabba dabba doo";
+cout << "Result " << pcrecpp::RE("b+").GlobalReplace("d", &s) << endl;
+cout << s << endl;
+}}}
+
+=== 예제 ===
+HTML 문서에서 joinc.co.kr로 가는 링크를 my.co.kr/redirect/joinc.co.kr로 치환한다. 
+{{{#!plain
+#include <pcrecpp.h>
+#include <string.h>
+#include <stdio.h>
+
+#include <iostream>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+using namespace std;
+#define READ_LINE 32 
+#define MAX_BUF READ_LINE * 2 
+
+int main(int argc, char **argv)
+{
+    int fd=0;
+    char buf[MAX_BUF];
+    string s;
+
+    string redirect = "http://my.co.kr/redirect/";
+    string replace_rule = "\\1=\\2"+redirect+"\\3\\4";
+    pcrecpp::RE_Options opt;
+    opt.set_caseless(true);
+
+    fd = open("test.html", O_RDONLY);
+    memset(buf, 0x00, MAX_BUF);
+    while(read(fd, buf, READ_LINE) > 0)
+    {
+        s = buf;
+        pcrecpp::RE("(src|href|action|xmlns|url)=([\'\"])*http://([a-zA-Z0-9\\-\\_\\.]*)(joinc\\.co\\.kr)",opt).GlobalReplace(replace_rule,&s);
+        cout << s;
+        memset(buf, 0x00, MAX_BUF);
+    }
+}
+}}}
+
+=== 약간의 문제 ===
+패턴을 검색할 때에는 현재 버퍼의 내용만을 검색한다. 위 프로그램을 예로 들자면 다음과 같은 경우 패턴을 일치하지 못한다. 버퍼를 작게 할 경우 하필 운나쁘게 패턴이 일치해야할 부분이 짤리는 바람에, 검색을 못하는 경우가 생길 수 있다. 
+{{{#!plain
+<버퍼>
+....
+<a href=http://www.joinc.co.
+</버퍼>
+}}}
+이를 해결하기 위한 방법은 다음과 같다.
+   * 데이터를 모두 저장해서 패턴매칭을 수행한다. 간단한 방법이긴 한데.. 메모리 크기 때문에 기분이 좀 찝찝하다.
+   * 버퍼에 효과적으로 저장하기. 예컨데, 위에서 처럼 URL Rewrite라면 ">"을 만날 때까지 저장을 해서, 매칭하고자 하는 대상이 중간에 짤리지 않도록 한다. 좀 귀찮지 싶다. 
+
+[[Category(14)]]
+@

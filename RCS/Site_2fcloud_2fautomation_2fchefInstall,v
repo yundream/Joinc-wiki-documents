@@ -1,10 +1,25 @@
-head	1.1;
+head	1.4;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.4; strict;
 comment	@# @;
 
+
+1.4
+date	2012.12.01.06.28.46;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.11.30.07.07.26;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.11.08.09.10.04;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2012.08.27.06.08.38;	author root;	state Exp;
@@ -17,9 +32,9 @@ desc
 @
 
 
-1.1
+1.4
 log
-@183.98.30.10;;yundream;;
+@128.134.217.152;;yundream;;
 @
 text
 @#title chef install
@@ -31,7 +46,7 @@ text
 처음엔 그냥 만들어져 있는 chef 코드만 분석해도 시스템을 이해할 수 있겠거니라고 생각했는데, 역시 프로그램은 직접 설치해서 실행도 해보고 예제 만들어서 테스트도 해봐야 머리속에 정리가 되는 것 같다. 해서 간단하게나마 직접 설치해 보기로 했다. 여기에는 chef 설치와 관련된 최소한의 내용만 포함한다. 
 
 == 인스톨 및 테스트 환경 ==
-chef server, chef client 모두 CentOS Linux(:12) 6.2 server minimal 버전을 선택했다. virtualbox(:12)를 이용해서 설치했다. kvm(:12)이나 vmware로도 테스트 환경을 꾸밀 수 있을 것이다. 
+chef server, chef client 모두 CentOS Linux 6.2 server minimal 버전을 선택했다. [wiki:man/12/virtualbox virtualbox]를 이용해서 설치했다. [wiki:man/12/kvm kvm]이나 vmware로도 테스트 환경을 꾸밀 수 있을 것이다. 
 
 테스트 환경은 다음과 같다. 
 
@@ -49,12 +64,13 @@ opscode.com에 chef server / client install 문서가 있는데, 복잡하다. �
 == chef server 설치 ==
 RBEL repository를 추가 했다.
 {{{#!plain
-# rpm -Uvh http://rbel.frameos.org/rbel6
-http://rbel.frameos.org/rbel6(을)를 복구합니다
+# rpm -Uvh http://rbel.frameos.org/rbel5
+http://rbel.frameos.org/rbel5(을)를 복구합니다
 경고: /var/tmp/rpm-tmp.ygTNpa: Header V4 DSA/SHA1 Signature, key ID f345be74: NOKEY
 준비 중...               ########################################### [100%]
    1:rbel5-release          ########################################### [100%]
 }}}
+centos6에 설치가 필요하다면 rbel6를 사용하면 된다.
 
 chef-server 설치. opscode의 복잡다단한 메뉴얼과는 달리 한번에 설치 끝.
 {{{#!plain
@@ -67,17 +83,21 @@ setup script를 실행한다.
 # setup-chef-server.sh
 }}}
 스크립트를 실행하면, chef server를 운용하기 위한 설정파일이 (/etc/chef 밑에)만들어지고, 서버 프로그램들이 자동으로 실행된다. 서버 프로그램들과 listen port를 정리했다. 
- * Chef Server : 4000 
+ * Chef Restful API Server : 4000 
  * Chef Server 웹 UI : 4040 
  * CouchDB : 5984
  * RabbitMQ : 5672
  * Chef Solr : 8983 
+설치 후 init.d에 등록된다.
+{{{#!plain
+# /etc/init.dchef-server restart|stop|start
+}}}
 
 웹 브라우저로 chef 웹 서버에 접근할 수 있다. http://my.chef.server:4040. 로그인 페이지가 뜨는데, 기본 계정으로 접속한 뒤 패스워드를 변경하면 된다. user:'''admin''' password:'''chef321go'''
 {{{#!html
 <table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/IuGswbkU0zpp9pz8m1r2fNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh5.googleusercontent.com/-kKVg2jgywOk/TzoxV4B35wI/AAAAAAAACA0/KcTjiKwT3ck/s640/chef01.png" height="319" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
 }}}
-
+ * chef server를 설치하면 chef client도 함께 설치된다.
 === chef server 설정 ===
 chef 설정파일들을 살펴보자. chef 설정 파일들은 /etc/chef 밑에 있다. 중요한 것은 server.rb와 chef client 인증을 위해 사용하는 private key 파일들 (.pem)들이다. 먼저 server.rb를 수정.
 {{{#!plain
@@ -122,6 +142,8 @@ umask 0022
 Mixlib::Log::Formatter.show_time = false
 }}}
 
+=== knife 설정 ===
+knife는 chef 자원을 버무려서 chef 코드를 관리하는 만능 도구다. 현실 세계의 요리사가 요리를 만들기 위해서는 knife 뿐만 아니라, 가스렌지 기타등등 여러가지 도구가 필요하지만 chef는 knife로 모든일을 할 수 있다. 
 {{{#!plain
 # mkdir ~/.chef
 # cp /etc/chef/validation.pem /etc/chef/webui.pem ~/.chef/
@@ -138,22 +160,7 @@ Creating initial API user...
 Created client[yundream]
 Configuration file written to /root/.chef/knife.rb
 }}}
-
-chef의 툴들은 환경변수 EDITOR에 등록된 프로그램을 편집기로 사용한다. 편집에 사용할 에디터를 EDITOR에 등록하자.
-{{{#!plain
-# export EDITOR=vim
-}}}
-=== node 등록 ===
-chef client가 chef server에 접속하려면, chef client가 설치된 컴퓨터를 node로 등록해야 한다. 
-{{{#!plain
-# knife node create chef-client.yundream.com
-}}}
-
-hef client가 등록됐는지 확인해 보자. 
-{{{#!plain
-# knife node list 
-chef-client.yundream.com
-}}}
+이제 knife의 command와 sub command를 이용해서 chef 자원을 관리할 수 있다. 
 
 === EDITOR 설정 ===
 chef command line 프로그램을 사용하려면, 사용할 에디터를 지정해줘야 한다. 
@@ -167,6 +174,11 @@ chef client를 설치하기 전에, hostname을 설정한다. hostname -f 결과
 # hostname chef-client.yundream.com 
 # hostname -f
 chef-client.yundream.com
+}}}
+
+/etc/hostname을 수정하는 대신 chef-client를 실행할 때 등록할 host name을 지정하는 방법도 있다. 
+{{{#!plain
+# chef-client -N chef-client.yundream.com 
 }}}
 
 RBEL repository를 추가
@@ -207,8 +219,16 @@ chef cleint가 chef server에 접속하려면 private key를 등록해야 한다
 # scp root@@chef-server.yundream.com:/etc/chef/validation.pem ./ 
 }}}
 이제 chef-client를 실행하면, client.pem이 만들어 진다. 앞으로는 client.pem을 이용해서 인증을 하게 되니, 보안상 validation.pem은 지우도록 한다.
+
+chef-client를 실행하면 chef server node에 등록된다.
 {{{#!plain
 # chef-client
+}}}
+
+chef server에서 knife로 node 정보를 확인해 보자.
+{{{#!plain
+# knife node list
+chef-client.yundream.com 
 }}}
 
 === 첫번째 cookbook 만들기 ===
@@ -310,6 +330,71 @@ chef는 상당히 많은 소프트웨어 패키지의 조합이다. 특히 rabbi
 
 == 문서 히스토리 ==
   1. 2012년 2월 13일 작성 
+  1. 수정
+     * [[Date(2012-11-08T09:10:04)]] : chef client 등록 과정 수정 
 [[tag(chef,cloud)]]
 [[category(50)]]
+@
+
+
+1.3
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d106 2
+d124 1
+a124 5
+
+chef의 툴들은 환경변수 EDITOR에 등록된 프로그램을 편집기로 사용한다. 편집에 사용할 에디터를 EDITOR에 등록하자.
+{{{#!plain
+# export EDITOR=vim
+}}}
+@
+
+
+1.2
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d28 2
+a29 2
+# rpm -Uvh http://rbel.frameos.org/rbel6
+http://rbel.frameos.org/rbel6(을)를 복구합니다
+d34 1
+d61 1
+a61 1
+
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d10 1
+a10 1
+chef server, chef client 모두 CentOS Linux(:12) 6.2 server minimal 버전을 선택했다. virtualbox(:12)를 이용해서 설치했다. kvm(:12)이나 vmware로도 테스트 환경을 꾸밀 수 있을 것이다. 
+d46 1
+a46 1
+ * Chef Server : 4000 
+d51 4
+a125 11
+=== node 등록 ===
+chef client가 chef server에 접속하려면, chef client가 설치된 컴퓨터를 node로 등록해야 한다. 
+{{{#!plain
+# knife node create chef-client.yundream.com
+}}}
+
+hef client가 등록됐는지 확인해 보자. 
+{{{#!plain
+# knife node list 
+chef-client.yundream.com
+}}}
+d141 5
+d184 2
+d190 6
+d295 2
 @

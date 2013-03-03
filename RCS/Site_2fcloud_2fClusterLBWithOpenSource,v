@@ -1,0 +1,250 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2012.11.29.14.55.13;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.11.26.15.02.03;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.11.22.06.02.10;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fClusterLBWithOpenSource
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title haproxy를 이용한 ELB 구성
+
+[[TableOfContents]]
+== 목적 ==
+Cloud에서 고가용성, 고성능, 확장성을 가지는 LB 시스템을 구성한다. L4와 L7 영역을 모두 커버하는게 목적이다. 
+  1. L4는 LVS를 이용해서 구성한다.
+  1. L7은 haproxy를 이용해서 구성하며
+  1. stunnel을 이용해서 ssl offload를 구현한다. 
+이중 2 번을 테스트해볼 생각이다. haproxy의 기능 테스트는 신경쓰지 않는다. ELB를 서비스하기 위한 네트워크를 설계하고, GNS3를 이용해서 테스트를 한다. 즉 haproxy의 기능이 아닌, 네트워크 구성을 테스트하는게 목적이다. haproxy는 거들 뿐이다.
+
+== haproxy ==
+haproxy는 서비스에 고가용성과 로드밸런싱 기능을 제공하는 공개 소프트웨어다. TCP와 HTTP 기반의 애플리케이션에 적용할 수 있으며, proxy 방식으로 즉 L7 영역에서 작동한다.   
+
+=== haproxy 설치/운용 ===
+haproxy 설치와 운용을 해보려 한다. 클라우드에서의 응용이 목적이므로 목적에 맞는 부분만을 중점적으로 살펴본다.
+
+[wiki:man/12/virtualbox virtualbox]를 이용한 가상환경에서 설치와 테스트를 진행한다. 2개의 Guest 운영체제에 apache 웹 서버를 설치하고, 호스트 운영체제에 haproxy를 설치해서 테스트 한다. 테스트는 [wiki:Site/System_management/PerformanceTuning/WebServerPerformance ab]를 이용한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1jWAefagdKLH7MEN6Ec56UWX2psnBFTny4lLN15KGWVo&amp;w=526&amp;h=221">
+}}}
+  * Host OS : Ubuntu 12.04 
+  * Hypervisor : virtualbox
+  * Guest OS : Ubuntu 12.04 server
+
+==== Ubuntu 리눅스에 설치 ====
+호스트 운영체제는 Ubuntu다. apt-get을 이용해서 설치했다. 
+{{{#!plain
+# apt-get install haproxy
+}}}
+
+게스트 운영체제 역시 ubuntu다. 여기에는 haproxy로 테스트할 웹서버를 설치했다. 로드밸런싱을 테스트 해야 했기 때문에 2대의 ubuntu 게스트 운영체제를 만들었다. 아파치 설정은 생략.. 
+
+다음 haproxy 설정을 했다. haproxy 설정파일은 '''/etc/haproxy/haproxy.cfg'''다.
+{{{#!plain
+global
+        log 127.0.0.1   local0
+        log 127.0.0.1   local1 notice
+        #log loghost    local0 info
+        maxconn 4096
+        #chroot /usr/share/haproxy
+        user haproxy
+        group haproxy
+        daemon
+        #debug
+        #quiet
+
+defaults
+        log     global
+        mode    http
+        option  httplog
+        option  dontlognull
+        retries 3
+        option redispatch
+        maxconn 2000
+        contimeout      5000
+        clitimeout      50000
+        srvtimeout      50000
+
+listen  apache-cluster
+        balance roundrobin
+        bind *:8080
+        server  apach01 192.168.56.254:80 maxconn 32
+        server  apach02 192.168.56.253:80 maxconn 32
+
+}}}
+대략 설치는 끝났다. 클라우드환경에 써먹을려면 튜닝이 필요하겠지만, 지금은 가능성을 확인하는게 목적이니 최소 설정으로 끝내려고 한다. bind 주소를 VIP로 바꾸면 되지 싶다.
+
+VIP 설정은 간단하다. 개인 노트북에 설정을 해봤다.
+{{{#!plain
+# ifconfig wlan0:1 172.30.1.5 netmask 255.255.255.0
+# route add -host 172.30.1.5 wlan0:1
+}}}
+이외에 proxy arp를 이용해서 VIP로 활용할 수 있는지 확인해 봐야 겠다.
+==== CentOS에서 설치 ====
+CentOS 6.3에서 설치를 했다. 기본 [wiki:Site/System_management/MakeYumRepository yum] 저장소에는 haproxy가 없고, EPEL(Extra Packages for Enterprise Linux)저장소를 이용해야 한다. 
+{{{#!plain
+# rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-7.noarch.rpm
+# yum install haproxy
+}}}
+이걸로 끝.  
+
+== 구성 ==
+클라우드 환경에서 사용할 수 있는 고가용성, 고확장성의 LB 시스템을 만들려고 한다. 개인적으로 LB Cluster를 만들고 VIP를 이용해서 scale-out을 만족하는 시스템을 생각하고 있다. LVS도 생각해 본적이 있는데, 확실히 효율적으로 작동할 것으로 생각되긴 하지만 L4 레벨에서 작동하기 때문에 SSL offload와 같은 기능을 지원하지 못한다는 문제점이 있다. 
+
+일단은 haproxy를 사용해서 구현해보기로 했다. 기본 구성은 다음과 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1kKR9KMVGvHty_TmtqLXBGdgG3KTwlpl0c_yHKITSEtU&amp;w=762&amp;h=559">
+}}}
+  * LB cluster 
+    고가용성, scale-out 한 LB 서비스를 제공하기 위해서 LB Cluster를 구성할 필요가 있다. 하나의 LB Device에 문제가 생기더라도 옆의 다른 LB Device가 서비스를 계속할 수 있어야 한다. 
+  * LB Device 
+    돈을 주고 H/W 장비를 구입할 것인가 ? 아니면 직접 구현할 것인가 ? 성능과 가격은 어떻게 할 것인가 ? 직접 구현할 경우 얻을 수 있는 잇점은에 대한 고민이 필요하다. 네트워크 가속, SSL 가속, 최적화된 디바이스 드라이버로 무장한 H/W 장비의 성능을 (단기간에)따라잡는 것은 무리다. 남는 것은 가격대 성능비다. 
+    일반적으로 네트워크 장비들은 NAT기능만을 혹은 LB 기능만을 지원하지 않는다. L2 부터 L7까지의 다양한 네트워크 서비스를 all-in-one 형태로 제공하는데, 당연히 가격이 상승할 수 밖에 없다. 퍼블릭 클라우드에서는 전용의 장비를 둘 필요가 있다. [wiki:man/12/NAT NAT] 만을 담당하는 장비, LB만을 담당하는 장비 등이다. 클라우드 특수한 환경이 세분화된 전용 네트워크 장비를 필요로 하는데, 이런 장비는 없다. 만든다고 해도 시장에서 이런 용도의 장비를 얼마나 원하겠는가. 게다가 기능을 특화해서 가격을 내리는 정책도 장비제조사 입장에서는 탐탁치 않을 것이다.    
+    따라서 클라우스 서비스를 하려거든 클라우드 환경에 맞는 네트워크 장비를 직접 개발하는게 맞다고 본다. 가격적인 측면 뿐만 아니라 보안, 과금등의 클리우드 환경에서 고려해야 하는 독특한 문제들이 있는데, 범용 장비로는 유연하게 대처하기가 힘들다는게 내 생각이다. 단 Citrix의 경우 클라우드환경에 맞는 장비 개발에 집중하는 모습을 보이고 있는데, 주시할 필요가 있다. citrix야 [wiki:Site/cloud/cloudstack cloudstack]이라는 클라우드 솔류션이 있고, 이 솔류션에서 사용할 네트워크 디바이스를 자신들의 Netscaler 제품군으로 집어넣을려는 전략을 가지고 있으니 당연한 행보라고 볼 수 있겠다. 실제 나오는 제품라인들도 클라우드를 겨냥하고 있다.  
+    VPX 정보는 [http://www.citrix.com/English/ps2/products/subfeature.asp?contentID=2323073 NetScaler ADC]를 참고한다.
+
+=== LB Cluster를 구성 하기 위한 방안 ===
+문제는 확장성의 확보다. scaling 하는 상황에서 어떻게 유연하게 scaling 할 수 있도록 할 것인지 하는 거다. LB Cluster를 구성하는 각 LB Device는 필요에 따라 트래픽을 분산할 수 있어야 하며, 고가용성 (HA)까지 포함해야 한다. 각각의 경우에 대해서 방안을 마련해보고자 한다. 
+
+=== auto - scaling ===
+하나의 LB Device가 처리할 수 있는 최대 B/W는 정해져 있을 것이다. haproxy는 L7에서 작동하므로 아무래도 L4 로드 밸런서 보다는 cpu 자원을 많이 소모할 것이다. 따라서 scaling을 위한 기준 정보로 트래픽과 cpu를 함께 모니터링할 필요가 있다. 실제 haproxy의 성능이 어떤지는 BMT를 해볼 수 밖에 없을 것 같다.    
+
+만약 LB device에서 더 이상 LB를 위한 자원에 여력이 없다면, 여유가 있는 다른 LB device로 VIP를 분산 해야 한다. 즉 LB - 1 에서 VM - 1과 VM - 2를 로드 밸런싱 하고 있었다면, LB - 2 에 새로운 VIP를 만들어서 VM - 1과 VM - 2를 로드 밸런싱하게 하면 자연 스럽게 scale-out할 수 있을 것이다. 
+
+이 경우 하나의 LB 그룹이 두 개의 VIP를 가지게 될 건데, GSLB로 묶어 주면 된다. LB 그룹은 하나의 VIP를 가지는게 일반적이라서, 두 개 이상의 VIP를 가지는게 이상하게 보일 수도 있는데, scale-out을 고려하면 어쩔 수 없을 것으로 보인다. Amazon의 ELB 서비스도 2개 이상의 VIP를 가질 수 있는데, 역시 scale-out에 대한 고민을 비슷한 방식으로 해결 했기 때문으로 보인다.  
+
+=== 고가용성 ===
+처음 LB 그룹이 만들어 질 때, 아예 두 개 이상의 LB Device에 분산해버릴 수도 있다. 이렇게 구성하면 자연스럽게 고가용성을 만족할 수 있다. 하나의 LB Device가 죽더라도 다른 LB Device가 대신 작동하기 때문이다.
+
+이 구성은 haproxy 프로세스가 더 실행 된다는 부담이 있기는 하지만, 얻을 수 있는 이득에 비하면 감수할 수 만한 부담인 것 같다.
+
+=== 성능 ===
+성능 테스트를 해보기 전에 관련 자료가 있는지 찾아봤다. 원하는 자료가 별로 없었는데, 그나마 찾은게 아래 문서다. 테스트 장비와 커널 버전이 좀 오래된 거라서 다시 테스트해봐야 겠지만 대략적인 성능 확인은 가능 할 테다. 조만간 BMT를 해볼 생각이다. 
+  * http://haproxy.1wt.eu/#perf
+
+haproxy는 L7에서 작동을 하기 때문에, 근본적인 성능 이슈가 있을 수 밖에 없다. 그러므로 LVS와 같은 L4 LB 방식도 고민해볼 필요가 있다. Simple LB를 원하는 고객은 LVS로 서비스 하고, ssl offload를 포함한 LB를 원하는 고객은 L7 LB로 서비스하면 되지 싶다.     
+
+
+== LB Cluster 구성 테스트 ==
+네트워크 환경을 구성해서 LB Cluster를 구성해서 테스트 해보려고 한다. 물리적 네트워크 환경을 구성하면 좋겠지만 그러기엔 장비준비하는게 만만치 않아서 [wiki:man/12/GNS3 gns3]로 시뮬레이션 하기로 했다. 
+
+=== 테스트를 위한 네트워크 구성 ===
+다음은 [wiki:man/12/GNS3 GNS3] 구성이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=16k9sO1fmN90hlJwr83y4QW6BN0o5goGOMHUjirAvrSk&amp;w=960&amp;h=720">
+}}}
+
+라우터와 LB Device의 네트워크 설정은 설명하지 않겠다. 그림에 모든 네트워크 설정이 다 나와 있으니, 운영체제 단위에서의 세부 설정은 직접할 수 있을 것이다.
+
+==== Public router ====
+Public network에 연결한다. LB 서비스를 위한 퍼블릭 네트워크는 14.14.1.0/24로 잡았다. 네트워크 장비로 cisco c3600을 사용했다. 라우터 설정이 부담으로 다가올 수도 있겠지만 ip 주소 정도만 설정하면 되기 때문에, 구성에 어려움은 없을 것이다. [wiki:Site/System_management/GNS3Layer2_02 GNS3로 구성하는 L2 네트워크] 문서의 내용을 이해할 정도면 구성 가능하다.
+
+==== LB Cluster ====
+하나 이상의 LB Device로 구성한다. 여기에서는 LB01과 LB02 두개의 LB Device로 구성했다. 각각의 LB 디바이스가 사용할 수 있는 VIP 범위를 지정한다. LB01은 100에서 199, LB02는 200에서 253까지 쓰기로 했다. 네트워크를 나누거나 subnet을 나누면 좀 더 편리하게 관리할 수 있을 것이다. 
+
+LB Device는 퍼블릭 네트워크와 프라이빗 네트워크를 연결하기 위해서 2개의 인터페이스를 가진다. 
+
+LB Device에는 haproxy를 설치했다. LB 그룹이 추가되면 VIP를 할당하고, haproxy 설정에 LB 정보를 추가한다. LB01의 설정은 다음과 같다. 
+{{{#!plain
+# 앞부분 생략 
+listen lb-cluster01-Acco01
+	balance roundrobin
+	bind 14.14.1.100:8080
+	server apache01 172.16.0.1:80  maxconn 32
+	server apache01 172.16.0.2:80  maxconn 32
+
+listen lb-cluster01-Acco02
+	balance roundrobin
+	bind 14.14.1.101:8080
+	server apache01 172.16.0.3:80  maxconn 32
+	server apache01 172.16.0.4:80  maxconn 32
+}}}
+두 개의 그룹을 추가했다. 각 LB 그룹별 VIP를 만들었다. haproxy 설정을 적용하기 전에 vip를 추가해야 한다. vip 설정은 [wiki:Site/cloud/NetworkVirtualization/VirtualIP Virtual IP 사용]문서를 참고한다.
+
+만약 '''lb-cluster-01-Acco02''' 그룹의 트래픽을 분산하길 원한다면, LB02에 VIP를 만들어서 haproxy에 등록하면 된다. 하나의 LB 그룹이 두 개의 VIP를 가지는데, 이는 GSLB로 묶는 방식으로 해결한다. 
+{{{#!plain
+listen lb-cluster02-Acco02
+	balance roundrobin
+	bind 14.14.1.200:8080
+	server apache01 172.16.0.3:80  maxconn 32
+	server apache01 172.16.0.4:80  maxconn 32
+}}}
+
+==== Private router ====
+프라이빗 네트워크를 관리하기 위한 라우터로 역시 cisco c3600으로 구성했다.
+
+
+==== Web Server ====
+LB 테스트를 위한 Web server다. Group01과 Group02 두 개의 그룹을 만들었다. 
+
+=== 테스트 결과 ===
+구조적으로 문제 없음을 확인했다.
+  1. VIP를 이용해서 서비스 할 수 있다.
+     여기에서는 리눅스의 ip 툴을 이용해서 테스트를 진행했는데, ifconfig로도 동일한 테스트 결과를 얻을 수 있다. 개인적으로 ip 툴을 사용하는게 더 간단한거 같다.
+  1. 하나의 LB 그룹이 2개의 VIP로 작동 할 수 있다. 
+     * Auto-scaling 문제를 해결 할 수 있다. 
+     * VIP가 장비에 분산되 있으므로 하나의 장비에 문제가 생기더라도 서비스의 영향을 최소화 할 수 있다. 
+     * VIP를 묶어주기 위한 GSLB와 같은 서비스가 필요하다.
+  1. haproxy의 성능을 측정할 필요가 있다.
+
+== 히스토리 ==
+  * 수정
+    * [[Date(2012-11-22T06:02:10)]] : 깨진 링크 수정
+    * [[Date(2012-11-29T14:55:13)]] : centos 6.3에서 인스톨 방법 추가 
+[[tag(cloud,haproxy,ELB,Load balancer,GNS3,VIP)]]
+
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d26 1
+d75 7
+d187 1
+@
+
+
+1.1
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d87 2
+a88 2
+    일반적으로 네트워크 장비들은 NAT기능만을 혹은 LB 기능만을 지원하지 않는다. L2 부터 L7까지의 다양한 네트워크 서비스를 all-in-one 형태로 제공하는데, 당연히 가격이 상승할 수 밖에 없다. 퍼블릭 클라우드에서는 전용의 장비를 둘 필요가 있다. NAT(:12) 만을 담당하는 장비, LB(:12)만을 담당하는 장비 등이다. 클라우드 특수한 환경이 세분화된 전용 네트워크 장비를 필요로 하는데, 이런 장비는 없다. 만든다고 해도 시장에서 이런 용도의 장비를 얼마나 원하겠는가. 게다가 기능을 특화해서 가격을 내리는 정책도 장비제조사 입장에서는 탐탁치 않을 것이다.    
+    따라서 클라우스 서비스를 하려거든 클라우드 환경에 맞는 네트워크 장비를 직접 개발하는게 맞다고 본다. 가격적인 측면 뿐만 아니라 보안, 과금등의 클리우드 환경에서 고려해야 하는 독특한 문제들이 있는데, 범용 장비로는 유연하게 대처하기가 힘들다는게 내 생각이다. 단 Citrix의 경우 클라우드환경에 맞는 장비 개발에 집중하는 모습을 보이고 있는데, 주시할 필요가 있다. citrix야 cloudstack(:12)이라는 클라우드 솔류션이 있고, 이 솔류션에서 사용할 네트워크 디바이스를 자신들의 Netscaler 제품군으로 집어넣을려는 전략을 가지고 있으니 당연한 행보라고 볼 수 있겠다. 실제 나오는 제품라인들도 클라우드를 겨냥하고 있다.  
+d114 1
+a114 1
+네트워크 환경을 구성해서 LB Cluster를 구성해서 테스트 해보려고 한다. 물리적 네트워크 환경을 구성하면 좋겠지만 그러기엔 장비준비하는게 만만치 않아서 gns3(:12)로 시뮬레이션 하기로 했다. 
+@

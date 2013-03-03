@@ -1,0 +1,132 @@
+#title Ruby Date and Time
+
+[[Tableofcontents]]
+== 지금 날짜와 시간 가져오기 ==
+지금 날짜와 시간을 가져오는 간단한 예제다.
+{{{#!plain
+#!/usr/bin/ruby
+
+time1 = Time.new
+puts "Current time : " + time1.inspect
+
+# Time.now를 사용할 수도 있다.
+sleep 2
+time2 = Time.new
+puts "Current time : " + time2.inspect
+}}}
+
+실행 결과 :
+{{{#!plain
+$ ./date.rb 
+Current time : 2012-10-27 12:01:02 +0900
+Current time : 2012-10-27 12:01:04 +0900
+}}}
+
+== 날짜와 시간의 구성요소 다루기 ==
+날짜와 시간을 다루기 위해서는 시/분/초 단위로 값을 가져올 수 있어야 한다.
+{{{#!plain
+#!/usr/bin/ruby
+
+time = Time.new
+
+# 시간 구성요소 다루기
+puts "Current Time : " + time.inspect
+puts time.year    # => Year of the date 
+puts time.month   # => Month of the date (1 to 12)
+puts time.day     # => Day of the date (1 to 31 )
+puts time.wday    # => 0: Day of week: 0 is Sunday
+puts time.yday    # => 365: Day of year
+puts time.hour    # => 23: 24-hour clock
+puts time.min     # => 59
+puts time.sec     # => 59
+puts time.usec    # => 999999: microseconds
+puts time.zone    # => "UTC": timezone name
+}}}
+
+실행결과 :
+{{{#!plain
+Current Time : 2012-10-27 12:03:37 +0900
+2012
+10
+27
+6
+301
+12
+3
+37
+913113
+KST
+}}}
+
+== Time.utc, Time.gm, Time.local 함수들 ==
+지역시간과 표준시를 위한 2개의 함수를 사용할 수 있다. utc와 gm(GMT)은 같다. 기술영역에서는 일반적으로 UTC를 사용한다. local 타임을 사용할 경우 UTC 보정 정보를 함께 출력한다. 대한민국은 +0900이다. 
+{{{#!plain
+# 2012년 7월 8일, local time
+puts Time.local(2012, 7, 8)
+# 2012년 7월 8일 9시 10분, local time
+puts Time.local(2012, 7, 8, 9, 10)
+
+# 2012년 7월 8일 9시 10분, GMT 
+puts Time.utc(2012, 7, 8, 9, 10)
+puts Time.gm(2012, 7, 8, 9, 10)
+}}}
+
+실행 결과 :
+{{{#!plain
+2012-07-08 00:00:00 +0900
+2012-07-08 09:10:00 +0900
+2012-07-08 09:10:00 UTC
+2012-07-08 09:10:00 UTC
+}}}
+
+함수의 매개변수로 사용되는 시간요소는 아래와 같은 순서의 배열로 정의돼 있다. 
+{{{#!plain
+[sec,min,hour,day,month,year,wday,yday,isdst,zone]
+}}}
+
+{{{#!plain
+#!/usr/bin/ruby
+
+time = Time.new
+
+values = time.to_a
+puts values
+}}}
+
+실행 결과 : 
+{{{#!plain
+[31, 27, 14, 27, 10, 2012, 6, 301, false, KST]
+}}}
+
+시간 값은 다른 형태로 변환할 수 있다.
+{{{#!plain
+time = Time.now.to_i
+puts time
+puts Time.at(time)
+puts Time.now.to_f
+}}}
+ 
+실행 결과
+{{{#!plain
+1351315887
+2012-10-27 14:31:27 +0900
+1351315887.0634396
+}}}
+
+== Time zone과 일광절약 시간 ==
+Time 객체는 time zone과 일광절약 시간에 대한 모든 정보를 가지고 있다. 
+{{{#!plain
+time = Time.new
+time.zone       # => KST 
+time.utc_offset # => UTC를 기준으로 차이나는 시간(초). 우리나라는 9 * 3600 == 32400 
+time.zone       # => KST 
+time.isdst      # => false: If UTC does not have DST.
+time.utc?       # => true: if t is in UTC time zone
+time.localtime  # Convert to local timezone.
+time.gmtime     # Convert back to UTC.
+time.getlocal   # Return a new Time object in local zone
+time.getutc     # Return a new Time object in UTC
+}}}
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-11-19T05:19:09)]]

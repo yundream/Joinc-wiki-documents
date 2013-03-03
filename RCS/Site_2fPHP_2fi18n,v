@@ -1,0 +1,81 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.01.21.14.37.08;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fPHP_2fi18n
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title 간단한 i18n 예제
+
+참고 : [wiki:Site/PHP/gettext gettext를 이용한 i18n]
+
+우선 다음과 같은 디렉토리를 만들었다.
+{{{#!plain
+ --- locale --+--- kr 
+              |
+              +--- en
+}}}
+'''kr'''에는 '''한국어'''용 메시지들이 들어있고, '''en'''에는 영어용 메시지들이 있다. 
+
+각각의 디렉토리에는 message.php 라는 파일이 있다. 아래는 kr 메시지 파일이다. 
+{{{#!plain
+function msg($s, $arg='')
+{
+	$msg = array(
+		'LOG IN' => '로그인',
+		'LOG OUT' => '로그아웃',
+		'FIND' => '검색',
+		'BOOK' => '책',
+		'LOCAL' => '지역',
+		'HELLO XX' => "안녕하세요. 저는 %s 입니다.",
+		'IMAGE' => '이미지'
+	);
+  return sprintf($msg[$s], $arg);
+}
+}}}
+en 역시 동일한 파일이 있다. 단지 메시지의 내용만 다르다. 
+{{{#!plain
+function msg($s, $arg='')
+{
+	$msg = array(
+		'LOG IN' => 'Log in',
+		'LOG OUT' => 'Log out',
+		'FIND' => 'Search',
+		'BOOK' => 'Book',
+		'LOCAL' => 'local',
+		'HELLO XX' => "Hello. My name is %s.",
+		'IMAGE' => 'image'
+	);
+  return sprintf($msg[$s], $arg);
+}
+}}}
+이들은 파일 이름도 동일하고, 함수이름도 모두 동일 하다. 그러므로 두개를 동시에 include 시켜서 사용할 수 없을 것이다. 이 문제는 factory:::pattern(:12)을 이용해서 해결하기로 했다. 함수의 이름을 다르게하고 (msg_kr, msg_en 하는 식) 모두 include 시키는 방법도 있겠지만, 괜한 자원의 낭비인 것 같아서 꺼려진다. 사용자의 locale 정보와 일치하는 함수만 include 해서 사용하는게 훨씬 나아 보인다. 
+
+이제, 사용자의 locale 정보를 얻어서 일치하는 파일을 include 시키면 된다. 함수의 사용방법은 간단하다.
+{{{#!plain
+// 사용자 locale 이 kr 이라면 
+// locale/kr/message 를 include
+// en 이라면 
+// locale/en/message 를 include
+echo msg('HELLO XX','yundream');
+}}}
+사용 예 : http://wowclub.joinc.co.kr/controll.php/example/locale
+
+@

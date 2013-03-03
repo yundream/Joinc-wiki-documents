@@ -1,0 +1,500 @@
+head	1.8;
+access;
+symbols;
+locks
+	root:1.8; strict;
+comment	@# @;
+
+
+1.8
+date	2012.12.06.14.17.38;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.12.06.06.39.37;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.12.06.03.57.33;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.10.20.05.30.49;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.10.19.14.20.44;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.10.19.14.05.06;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.10.19.13.35.33;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.10.18.14.39.36;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fERB
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title ERB
+
+[[TableOfcontents]]
+== ERB 소개 ==
+ERB는 루비의 내장 템플릿 엔진으로 텍스트의 종류에 상관없이, 루비 코드의 값을 포함하는 문서를 만들 수 있다. 템플릿은 문서내에 변수 뿐만 아니라 흐름제어를 위한 루비코드와 함께 사용함으로써, 다양한 문서 형식에 대응할 수 있다.   
+
+ERB는 주로 웹문서를 만들기 위해서 사용한다. 이외에도 XML 문서, RSS 피드, 소스코드 기타 구조화된 텍스트파일을 만들기 위해서 사용한다. 특히 ERB는 표준 형식을 지니는 반복된 패턴을 포함한 문서를 만들 때 특히 유용하다. 웹문서는 이러한 동일한 패턴을 가지는 대표적인 표준 문서다. 
+
+ERB의 장점이라면 루비나 rake에서 직접 호출 할 수 있는 표준 라이브러리 형태로 제공된다는 점이다. ERB를 사용하기 위해서 다른 어떤 소프트웨어 설치가 필요없다. 
+
+== Template 만들기 ==
+ERB는 문서내의 특정한 위치에 ERB 코드를 넣는 방식으로 작동한다. 혹은 흐름을 제어하는 코드를 호출해서, 반복적인 작업도 가능하다. ERB 코드는 (HTML과 비슷한) 태그 방식으로 문서내에 삽입된다. 루비는 이 태그를 만나면, 코드를 해석한다. 아래는 가장 간단한 형태의 ERB 문서다. 
+{{{#!plain
+Hello, <%= @@name %>.
+Today is <%= Time.now.strftime('%A') %>.
+}}}
+루비 코드는 "<%" 과 "%>"사이에 놓이는데, 이 영역을 '''scriptlet'''라고 한다. Scriptlet 영역에 있는 코드는 루비에 의해서 실행되며, 그 결과는 scriptlet 영역에 그대로 출력된다.  
+
+Scriptlet 영역에는 순환문이나 조건문등을 넣어서 사용하는게 일반적이다.
+{{{#!plain
+<ul>
+  <% for @@item in @@shopping_list %>
+    <li><%= @@item %></li>
+  <% end %>
+</ul>
+}}}
+Scriptlet는 스스로 텍스트를 생산할 수는 없지만, 루프를 돌면서 표현식의 결과를 반복적으로 출력할 수 있다.  
+
+주석을 사용할 수도 있다.
+{{{#!plain
+<%# This is just a comment %>
+}}}
+
+기본적으로 모든 줄 뒤에는 개행 문자가 추가되는데, ERB.new()의 매개변수를 수정해서 개행 문자 추가 정책을 바꿀 수도 있다. 
+
+Rails는 태그를 닫기전에 하이픈 문자(-)을 추가하는 것으로 간단하게 개행문자를 제거할 수 있다.  
+{{{#!plain
+<ul>
+  <% for @@item in @@items -%>
+    <li><%= @@item %></li>
+  <% end -%>
+</ul>
+}}}
+
+== 출력 포맷 변경하기 ==
+ERB는 다양한 포멧으로 데이터를 표현하기 위한 방법을 제공한다.
+{{{#!plain
+This will be HTML escaped: <%= h(this & that) %>
+This will be JSON encoded: <%= j(this & that) %>
+This will be converted to Textile markup: <%= t(this & that) %>
+This will be URL encoded: <%= u(this & that) %>
+}}}
+이 기능을 이용하려면 ERB Util 모듈을 포함(include)해야 한다.
+
+== Template 파일의 이름 규칙 ==
+ERB 템플릿 파일은 어떤 이름을 가져도 상관없다. 하지만 가능하면 ''.erb'' 확장자를 사용하는 걸 권장한다. 레일즈같은 경우에는 파일의 확장자를 이용해서 문서의 타입을 확인한다. 예를 들어 ''layout.html.erb''는 HTML 템플릿 파일로 판단한다. 몇몇 애플리케이션의 경우 HTML 템플릿으로 ''.rhtml''확장자를 사용한다. 
+
+== ERB 라이브러리 이용하기 ==
+간단한 예제를 소개한다.
+{{{#!plain
+require 'erb'
+
+weekday = Time.now.strftime('%A')
+simple_template = "Today is <%= weekday %>."
+
+renderer = ERB.new(simple_template)
+puts output = renderer.result()
+}}}
+ERB는 ''result''를 호출할 때만 template을 처리한다. 이는 렌더링할 때 변수의 값이 결정됨을 의미한다.
+
+위의 코드는 사용방법을 알려주기 위한 아주 간단한 코드로 대부분의 경우에는 binding와 함께 사용한다. ERB 템플릿은 여러개가 준비될 수 있으며, 모든 객체로 부터 호출될 수 있다. 만약 A와 B라는 인스턴스가 템플릿을 사용한다면, 어떤 템플릿을 사용해야 하는지, 어떤 인스턴스의 변수를 사용해야 하는지를 알아야 한다. Binding와 함께 사용하면, 템플릿과 템플릿을 사용할 인스턴스를 간단하게 맵핑할 수 있다.  
+{{{#!plain
+class ShoppingList
+  attr_accessor :items, :template
+
+  def render()
+    renderer.result(binding)
+  end
+end
+}}}
+
+ERB가 여러 분리된 객체로 부터 변수를 이용해서 템플릿을 만들려고 하면, 반드시 binding를 제공할 퍼블릭 메서드를 가지고 있어야 한다. 나중에 이 메서드를 이용해서 바인딩할 수 있다.
+{{{#!plain
+class ShoppingList
+  attr_accessor :items
+
+  def initialize(items)
+    @@items = items
+  end
+
+  # Expose private binding() method.
+  def get_binding
+    binding()
+  end
+
+end
+
+list = ShoppingList.new(items)
+renderer = ERB.new(template)
+puts output = renderer.result(list.get_binding)
+}}}
+
+== Running ERB in a Sandbox ==
+멀티스레드 루비 프로그램을 개발한다면, ERB를 각 스레드로 부터 분리할 수 있어야 한다. ERB의 두번째 매개변수를 이용해서 구분단계를 설정할 수 있다. 매개변수에 값을 주면, 다음 템플릿은 매개변수의 정수와 같은 안전수준을 가진 새 스레드에서 처리된다.   
+
+{{{#!plain
+renderer = ERB.new(template, 3)
+}}}
+무슨 말인지 모르겠다 ...
+
+Safe level 4 provides maximum isolation. At this level, the specified binding must be marked as trusted for ERB to use it.
+
+If you need to set the third or fourth parameters, but do not want ERB to run in a new thread, use 0 as the second parameter.
+
+== 개행문자 변경하기 ==
+ERB에서 객체를 만들 때, 3번째 매개변수의 값을 조정해서 개행문자를 변경할 수 있다. 예를 들어 개행문자 대신에 ">"를 붙이고 싶다면 다음과 같이 객체를 만들면 된다. 
+{{{#!plain
+renderer = ERB.new(template, 3, '>')
+}}}
+
+== 긴 예제 ==
+=== 쇼핑 물건 목록  ===
+온라인 쇼핑몰을 제작하려 한다. 아이템의 목록에 따라서 쇼핑몰 페이지도 다시 디자인 돼야 하는데, ERB로 처리했다.  
+{{{#!plain
+require 'erb'
+
+# 쇼핑 아이템 목록
+def get_items()
+  ['bread', 'milk', 'eggs', 'spam']
+end
+
+# 템플릿 페이지
+def get_template()
+  %{
+        <DOCTYPE html  "-//W3C//DTD  1.0 //EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+    <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+            <title>Shopping List for <%= @@date.strftime('%A, %d %B %Y') %></title>
+        </head>
+        <body>
+                 <h1>Shopping List for <%= @@date.strftime('%A, %d %B %Y') %></h1>
+                <p>You need to buy:</p>
+                <ul>
+                  <% for @@item in @@items %>
+                    <li><%= h(@@item) %></li>
+                  <% end %>
+                </ul>
+        </body>
+        </html>
+  }
+end
+
+class ShoppingList
+  include ERB::Util
+  attr_accessor :items, :template, :date
+
+  def initialize(items, template, date=Time.now)
+    @@date = date
+    @@items = items
+    @@template = template
+  end
+
+  def render()
+    # template를 ERB에 binding 한다.
+    ERB.new(@@template).result(binding)
+  end
+
+  def save(file)
+    File.open(file, "w+") do |f|
+      f.write(render)
+    end
+  end
+
+end
+
+list = ShoppingList.new(get_items, get_template)
+list.save(File.join(ENV['HOME'], 'list.html'))
+}}}
+
+=== dhcp 설정 파일 만들기 ===
+아래의 json 파일은 베어메탈 호스트의 설정 정보다. Subnet 정보와 함께 호스트의 IP, MAC, host name 정보들이 있다. 이 정보를 읽어서 [wiki:man/12/dhcp dhcp] 설정파일을 만드는게 목표다.  
+
+template 파일
+{{{#!plain
+# cat dhcp.erb
+# Network Name : <%=@@shape_json['net']['name']%>
+<% @@shape_json['net']['networks'].each do | network_name, network | %>
+subnet <%=network['subnet']%> netmask <%=network['netmask']%> {
+    option routers <%=network['gateway']%>;
+    option subnet-mask <%=network['netmask']%>;
+<% network['hosts'].each do | hostname, network_info|-%>
+    host <%=network_info['hostname']%> {
+        hostname "<%=network_info['hostname']%>";
+        hardware ethernet "<%=network_info['mac']%>";
+        fixed-address "<%=network_info['ip']%>";
+    }
+<% end-%>
+}
+<% end-%>
+}}}
+
+json 파일
+{{{#!plain
+# cat netinfo.json
+{
+    "id":"netinfo",
+    "net" : {
+        "name" : "myoffice",
+        "networks" : {
+            "net01" : {
+                "type" : "subnet",
+                "subnet" : "10.12.0.0",
+                "gateway" : "10.12.0.1",
+                "netmask" : "255.255.255.0",
+                "hosts" : {
+                    "hello.joinc.com" : {
+                        "hostname" : "hello.yundream.com",
+                        "ip" : "10.12.0.2",
+                        "mac" : "da:ca:ed:bb:87:6e"
+                    },
+                    "hi.yundream.com" : {
+                        "hostname" : "hi.yundream.com",
+                        "ip": "10.12.0.4",
+                        "mac" : "da:ca:ed:bb:90:01"
+                    }
+                }
+            },
+            "net02" : {
+                "type" : "subnet",
+                "subnet" : "10.100.0.0",
+                "gateway" : "10.100.0.1",
+                "netmask" : "255.255.255.0",
+                "hosts" : {
+                    "web.joinc.com" : {
+                        "hostname" : "web.joinc.comm",
+                        "ip" : "10.100.0.2",
+                        "mac" : "da:ca:ed:bb:87:6e"
+                    },
+                    "was.joinc.com" : {
+                        "hostname" : "was.joinc.com",
+                        "ip": "10.100.0.4",
+                        "mac" : "da:ca:ed:bb:90:01"
+                    }
+                }
+            }
+        }
+    }
+}
+}}}
+
+프로그램 파일
+{{{#!plain
+#!/usr/bin/ruby
+require 'json/pure'
+require 'erb'
+
+class MakeDhcpFromTemplate
+    @@shape_json = nil
+    @@template = nil
+    def read_shape template_file
+        af = File.new(template_file, 'r')
+        shape = af.sysread(af.stat.size)
+        @@shape_json = JSON(shape)
+        af.close
+    end
+    def read_template erb_file
+        af = File.new(erb_file, 'r')
+        @@template = af.sysread(af.stat.size)
+        af.close
+    end
+    def render
+        ERB.new(@@template,nil,'%<>-').result(binding)
+    end
+    def print_result
+        puts(render)
+    end
+end
+
+
+template_obj = MakeDhcpFromTemplate.new
+template_obj.read_shape 'netinfo.json'
+template_obj.read_template 'dhcp.erb'
+template_obj.print_result
+}}}
+
+실행 결과
+{{{#!plain
+$ ./erb_test.rb 
+# This dhcp configure is generated from chef
+# Network Name : myoffice
+# This dhcp configure is generated from chef
+# Network Name : myoffice
+
+subnet 10.100.0.0 netmask 255.255.255.0 {
+        option routers 10.100.0.1;
+        option subnet-mask 255.255.255.0;
+        host web.joinc.comm {
+                hostname "web.joinc.comm";
+                hardware ethernet "da:ca:ed:bb:87:6e";
+                fixed-address "10.100.0.2";
+        }
+        host was.joinc.com {
+                hostname "was.joinc.com";
+                hardware ethernet "da:ca:ed:bb:90:01";
+                fixed-address "10.100.0.4";
+        }
+}
+
+subnet 10.12.0.0 netmask 255.255.255.0 {
+        option routers 10.12.0.1;
+        option subnet-mask 255.255.255.0;
+        host hi.yundream.com {
+                hostname "hi.yundream.com";
+                hardware ethernet "da:ca:ed:bb:90:01";
+                fixed-address "10.12.0.4";
+        }
+        host hello.yundream.com {
+                hostname "hello.yundream.com";
+                hardware ethernet "da:ca:ed:bb:87:6e";
+                fixed-address "10.12.0.2";
+        }
+}
+}}}
+
+== 커맨드라인으로 ERB 사용하기 ==
+erb 프로그램을 이용하면 템플릿으로 부터 만들어진 결과물을 [wiki:man/12/표준출력 표준출력]할 수 있다. 표준출력을 다시 파일로 [wiki:man/12/재지향 재지향]하는 방식으로 파일을 만들 수 있다.
+{{{#!plain
+# erb my-template.txt.erb > new-file.txt
+}}}
+== 히스토리 ==
+ * 작성 : [[Date(2012-10-19T13:35:33)]]
+ * 수정
+    * [[Date(2012-12-06T06:39:37)]] : erb dhcp 예제추가
+[[Tag(Ruby,ERB,Template)]]
+@
+
+
+1.7
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d82 1
+a82 1
+ERB가 여러 분리된 객체로 부터 변수를 이용해서 템플릿을 생성하려고 하면, 반드시 binding를 제공할 퍼블릭 메서드를 가지고 있어야 한다. 나중에 이 메서드를 이용해서 바인딩할 수 있다.
+d116 1
+a116 1
+ERB에서 객체를 만들 때, 3번째 매개변수의 값을 조정해서 개행문자를 변경할 수 있다. 예를 들어 개행문자 대신에 ">"를 붙이고 싶다면 다음과 같이 객체를 생성하면 된다. 
+d183 1
+a183 1
+=== dhcp 설정 파일 생성 ===
+@
+
+
+1.6
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d184 143
+a326 1
+아래의 json 파일은 베어메탈 호스트의 설정 정보다. Subnet 정보와 함께 호스트의 IP, MAC, host name 정보들이 있다. 이 정보를 읽어서 dhcp 설정파일을 만드는게 목표다.  
+a327 1
+"미완성 ..."
+d335 2
+@
+
+
+1.5
+log
+@14.39.4.189;;yundream;;
+@
+text
+@d53 1
+a53 1
+이 기능을 이용하려면 ERB::Util 모듈을 포함(include)해야 한다.
+d122 2
+d127 1
+d132 1
+d167 1
+d183 4
+@
+
+
+1.4
+log
+@14.39.4.189;;yundream;;
+@
+text
+@d71 1
+a71 4
+The code shown above will fail almost anywhere other than in a simple script. ERB gets variables from a Binding, an object that provides access to the instance methods and variables that are owned by another object. If you do not specify a Binding, the result() method gets a Binding from the top-level object, which will probably own very little. Fortunately, every Ruby class has a private binding() instance method to provide Bindings that points to itself, so we can easily extend any object to provide ERB with a Binding.
+
+If the ERB object is enclosed in a method, and we want it to use the variables of the host object, we get a Binding for the host like this:
+
+d81 2
+a82 1
+To enable ERB to use the variables from a separate object, we must first ensure that it has a public method to provide a Binding. We can then get a Binding at any later point:
+d104 1
+a104 1
+You may protect your application from ERB by running it in a new thread. If you specify an integer as a second parameter when you create the renderer, then the template will be processed in a new thread which has a safe level equal to the given integer:
+d109 2
+d115 1
+a115 1
+== Suppressing Newlines ==
+d120 1
+@
+
+
+1.3
+log
+@14.39.4.189;;yundream;;
+@
+text
+@d71 34
+d106 8
+@
+
+
+1.2
+log
+@14.39.4.189;;yundream;;
+@
+text
+@d136 1
+a136 1
+erb 프로그램을 이용하면 템플릿으로 부터 만들어진 결과물을 표준출력할 수 있다. 표준출력을 다시 파일로 재지향하는 방식으로 파일의 생성이 가능하다.  
+@
+
+
+1.1
+log
+@110.70.48.215;;yundream;;
+@
+text
+@d3 1
+d17 126
+@

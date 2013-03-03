@@ -1,0 +1,353 @@
+#title Ruby Unit test
+
+[[TableOfContents]]
+== 소개 ==
+비록 [wiki:Site/cloud/automation chef] 때문에 루비를 접했고, 본격적으로 루비 언어를 사용할 생각은 없었으나 이러저러한 이유로 루비기반의 웹 프레임워크를 사용해서 개발하게 됐다. 이렇게 된거 루비개발 환경에서 [wiki:Site/SoftWare_engineering/TDD TDD]도 도입을 하기로 마음먹었다. 
+
+
+그렇다면 일단 Unit test 쪽을 살펴봐야 겠다는 생각이 들어서 이 문서를 만들게 됐다. C++ 기반으로 해본적은 있으니, 개념잡기가 어렵지는 않겠지라고 생각하면서..
+
+== Unit Test ==
+여러 유닛 테스트를 살펴보고 나에게 가장 맞는 것을 선택하기로 했다.
+=== test/unit ===
+루비는 유닛 테스트가 표준라이브러리 형태로 제공된다는 것을 알았다.!! "test/unit"를 이용해서, 아주 쉽게 유닛 테스트 코드를 만들 수 있다. 
+
+Unit test를 위해서 덧셈과 곱셈 연산을 하는 간단한 프로그램을 만들었다. 
+{{{#!plain
+class SimpleNumber
+ 
+  def initialize(num)
+    raise unless num.is_a?(Numeric)
+    @x = num
+  end
+        
+  def add(y)
+    @x + y
+  end
+ 
+  def multiply(y)
+    @x * y
+  end
+ 
+end
+}}}
+
+SimpleNumber 클래스를 테스트하기 위한 코드다.
+{{{#!plain
+require 'simple_number'
+require 'test/unit'
+
+class TestSimpleNumber < Test::Unit::TestCase
+    def test_simple
+    assert_equal(4, SimpleNumber.new(2).add(2) )
+    assert_equal(6, SimpleNumber.new(2).multiply(3) )
+  end
+end
+}}}
+테스트 결과다.
+{{{#!plain
+# ./tc_simple_number.rb 
+Loaded suite ./tc_simple_number
+Started
+.
+Finished in 0.000246 seconds.
+
+1 tests, 2 assertions, 0 failures, 0 errors
+}}}
+Test::Unit::TestCase로 부터 상속된 TestSimpleNumber 클래스를 만들었다. 이 클래스는 test_simple 멤버 함수를 가지고 있다. 이 함수는 덧셈과 곱셈에 대한 간단한 테스트 케이스를 가지고 있다. 각 테스트 케이스는 덧셈과 곱셈에 대해서 예상되는 결과가 나오는지를 테스트하고 있다. 이 코드를 실행하면 하나의 테스트가 진행되었으며 2개의 테스트가 모두 성공했음을 알려준다.   
+
+약간 더 복잡한 예제다.
+{{{#!plain
+require 'simple_number'
+require 'test/unit'
+
+class TestSimpleNumber < Test::Unit::TestCase
+  # 간단한 성공 테스트
+  def test_simple
+    assert_equal(4, SimpleNumber.new(2).add(2) )
+    assert_equal(4, SimpleNumber.new(2).multiply(2) )
+  end
+  # 타입체크 테스트
+  def test_typecheck
+    assert_raise( RuntimeError ) { SimpleNumber.new('a') }
+  end
+  # 실패 테스트
+  def test_failure
+    assert_equal(3, SimpleNumber.new(2).add(2), "Adding doesn't work" )
+  end
+end
+}}}
+{{{#!plain
+Loaded suite ./tc_simple_number
+Started
+F..
+Finished in 0.003596 seconds.
+
+  1) Failure:
+test_failure(TestSimpleNumber) [./tc_simple_number.rb:17]:
+Adding doesn't work.
+<3> expected but was
+<4>.
+
+3 tests, 4 assertions, 1 failures, 0 errors
+}}}
+이 테스트 클래스는 3개의 테스트(하나의 테스트는 하나의 멤버함수에 대응한다)를 가지고 있다. ''test_typecheck''는 예외(exception)을 체크한다. ''test_failure''함수는 실패가 발생하도록 만들었다. 루비는 에러가 발생한 위치를 표시해 주지는 않는다. 대신 어떤 이유로 실패가 발생했는지를 알려준다. 프로그래머는 이 정보를 이용해서 테스트가 실패한 코드를 찾을 수 있다. 위 테스트에서는 실패 원인을 "<3> expected but was <4>"라고 알려주고 있다. 그리고 assert에 메시지를 삽입해서 디버깅 정보로 사용할 수도 있다.
+
+=== 사용할 수 있는 assertions ===
+|| assert(boolean, [message])                     || boolean이 True이면 성공            ||
+|| assert_equal(exepected, actual, [message])     || actual과 exepected가 같으면 성공   ||
+|| assert_not_equal(exepected, actual, [message]) || actual과 exepected가 다르면 성공   ||
+|| assert_match(pattern, string, [message])       || string이 pattern과 일치하면 성공   ||
+|| assert_no_match(pattern, string, [message])       || string이 pattern과 일치하지 않으면 성공   ||
+|| assert_nil(object, [message])                  || object가 nil 이면 성공             ||
+|| assert_not_nil(object, [message])              || object가 nil이 아니면 성공         ||
+|| assert_in_delta(expected_float, actual_float, delta, [message]) || (actual_float - expected_float).abs <= delta 이면 성공                   ||
+|| assert_instance_of(class, object, [message])   || object.class == class 이면 성공    ||
+|| assert_raise(Exception,...) {block}            || 예외가 발생하면 성공               ||
+|| assert_nothing_raise(Exception,...) {block}    || 예외가 발생하지 않으면 성공               ||
+
+간단하게 사용할 수 있지만, 말 그대로 간단하게만 사용할 수 있다. stub, mock이 필요한 좀 더 현실적인 유닛 테스트를 원한다면 다른 유닛 테스트 툴과 함께 사용해야 한다. 
+
+== stub & mock object ==
+이전에 알고 있던 unit test 툴과 다르지 않아서, 사용하는데 문제는 없을 것 같다. 남는건 mock object와 test coverage다. 먼저 mock object 부터 살펴보려한다. 
+
+Mock object는 테스트하기 힘든 자원을 테스트 케이스에 넣기 위해서 사용한다. 예를 들어 어떤 테스트 케이스가 socket 연결을 필요로 한다고 가정해 보자. 이 경우 소켓 클라이언트나 서버를 준비해야 하기 때문에 테스트가 복잡해질 수 있다. 데이터베이스 같은 외부 자원이 테스트 케이스에 포함되는 경우도 마찬가지다.   
+
+이런 경우 진짜 자원이 아닌 가상의 자원을 만들어서 테스트 한다면, 테스트 케이스를 작성하기가 훨씬 쉬워질 것이다. 소켓을 예로 든다면, connect, listen, accept를 가짜로 만드는 것이다.  
+
+== mocha ==
+Mocha는 루비에서 사용할 수 있는 mock과 stub 라이브러리로 JMock와 비슷하게 사용할 수 있다. rack, rspec 등과 함께 사용할 수 있다.
+
+=== 설치 ===
+{{{#!plain
+# gem install mocha
+}}}
+Test::Unit와 함께 사용한다면 require "test/unig" 다음에 require "mocha"를 포함하면 된다.
+{{{#!plain
+require "test/unit"
+require "mocha"
+}}}
+
+=== 예제 ===
+무역회사에서 비용 정산을 위해 사용할 Order 클래스를 만들어 보려 한다. order 클래스에서 비용을 정산하기 위해서 사용하는 정보는 다음과 같다.
+   1. 상품 가격      
+   1. 국내 운송 비용 : km당 4000원, 컨테이너당. 트럭이라서 좀 더 비싸다. 
+   1. 해외 운송 비용 : km당 1000원, 컨테이너당.
+   1. 운송 지연시 발생하는 비용 : 하루단위로 전체 상품가격에서 정해진 %만큼 지연 비용을 물어야 한다.    
+{{{#!plain
+#!/usr/bin/ruby
+
+class GoodsInfo
+    def get_cost (code_num)
+        # DB에서 가져온다.
+        return 10000000
+    end
+    def get_delay_cost
+        # DB에서 가져온다. 
+        return 5
+    end
+end
+
+class Order
+    attr :goods_info
+    def initialize (goods_info)
+        @goods_info = goods_info
+        @delay_cost = 0
+        @goods_cost = 0
+        @trans_cost = 0
+        @container_n = 0
+    end 
+        
+    def print_order
+        print "상품 가격 : ",@goods_cost,"\n"
+        print "지연 비용 : ",@delay_cost,"\n"
+        print "운송 비용 : ",@trans_cost,"\n"
+    end 
+        
+    def trans_cost inner_dist, outter_dist
+        @trans_cost = ((inner_dist * 4000) + (outter_dist * 1000)) * @container_n
+        puts @trans_cost
+    end 
+        
+    def goods_cost (code_num, container_n)
+        cost = goods_info.get_cost(code_num)
+        @container_n = container_n
+        @goods_cost = cost * @container_n
+    end
+
+    def delay_cost (dday)
+        rait = goods_info.get_delay_cost
+        @delay_cost = (rait * dday * @goods_cost) / 100
+        #puts @delay_cost
+    end
+end
+
+order = Order.new(GoodsInfo.new)
+
+# Code가 1440인 물건의 컨테이너 당 값을 가져와서 컨테이너 갯수에 곱한다. 
+# Database에서 가져오는 것으로 한다. 여기에서는 1,5000,000으로 하드코딩 했다.
+# 1 컨테이너당 1,500,000 * 50 컨테이너 
+order.goods_cost 1440, 50
+
+# 국내 운송 80km
+# 해외 운송 1200km
+order.trans_cost 80, 1200
+
+# 하루지연 발생
+order.delay_cost 1
+
+order.print_order
+}}}
+trans_cost 메서드의 경우 메서드안에서 다른 자원을 참조하지 않기 때문에, 간단하게 유닛테스트를 할 수 있다. 그러나 delay_cost와 goods_cost 메서드의 경우 DB 자원을 사용하기 때문에 유닛 테스트가 힘들어진다. 테스트를 하려면 GoodsInfo를 시뮬레이션 해야 하기 때문이다.
+
+이럴때 stub를 사용할 수 있다. stub는 인터페이스를 시뮬레이션 하기 위해서 사용한다. 위의 경우 GoodsInfo 클래스의 get_cost와 get_delay_cost메서드의 인터페이스를 흉내내기 위해서 사용할 수 있을 것이다. 아래는 stub를 이용해서 만든 테스트 케이스다.
+{{{#!plain
+require 'order'
+require 'test/unit'
+require 'rubygems'
+require 'mocha'
+
+class OrderTest < Test::Unit::TestCase
+    def test_delay_cost
+        goods_infos = stub()
+        # get_delay_cost를 호출할 경우 4(%)를 반환한다.
+        goods_infos.stubs(:get_delay_cost).returns(4)
+        # get_cost를 호출할 경우 1500000을 반환한다. 
+        goods_infos.stubs(:get_cost).returns(1500000)
+        myorder = Order.new(goods_infos)
+
+        assert_equal(myorder.goods_cost(1440,50),75000000)
+        assert_equal (myorder.delay_cost(2), 6000000)
+    end
+end
+}}}
+
+== rspec ==
+루비 언어를 위한 테스팅 환경을 제공하는 도구다. 도구의 지향점은 TDD가 아닌 BDD(Behaviour-Driven Development)라고 한다. BDD는 아직은 관심이 없고, TDD 도구로 사용해볼 계획이다. 아래의 기능들을 가지고 있다. 
+
+개인적으로 이게 마음에 든다.
+=== 설치 ===
+{{{#!plain
+# gem install rspec
+}}}
+
+=== Order 클래스 테스트 ===
+위의 Order 클래스 테스트를 위한 rspec 파일을 만들었다.
+{{{#!plain
+require 'order'
+
+describe 'Order App' do
+    def mock_goods
+        @mock_obj = mock(GoodsInfo)
+        @mock_obj.stub(:get_cost) {2000000}
+        @mock_obj.stub(:get_delay_cost) {4}
+        return @mock_obj
+    end 
+    it "Order Database test" do
+        order = Order.new(mock_goods)
+        puts order.goods_cost 1440,50
+        order.goods_cost(1440, 50).should eq(100000000)
+    end
+end 
+}}}
+  1. GoodsInfo에 대한 mock 객체 mock_obj를 만들었다. 
+  1. mock_obj를 이용해서 Order 클래스를 테스트했다. 
+뭔가 복잡한 내용이 많겠지만 일단은 테스트 완료.
+{{{#!plain
+# rspec tc_order.spec 
+}}}
+
+=== sinatra와 rspec를 이용한 Unittest ===
+원래 목적은 TDD 방식으로 sinatra 웹 애플리케이션을 개발하는 것. sinatra에 적용해 봤다. 간단한 sinatra 기반의 웹 애플리케이션을 만들었다. 
+{{{#!plain
+# cat myapp.rb
+require 'rubygems'
+require 'sinatra'
+    
+module Backend
+    class GoodsInfo
+        def get_cost (code_num)
+            return 100000
+        end
+        def get_delay_cost
+            return 5
+        end
+    end
+end     
+        
+helpers Backend
+    
+before do
+    @goods = Backend::GoodsInfo.new
+end
+
+# 상품번호 1004 의 1 컨테이너당 가격을 가져온다.   
+# num은 컨테이너 갯수
+# 사용 : GET /goods/cost/1004?num=50
+get '/goods/cost/:code_num' do
+    cost = @goods.get_cost(params[:code_num])
+    goods_cost= cost * Integer(params[:num]) 
+    "#{goods_cost}"
+end 
+}}}
+아래는 rspec 파일
+{{{#!plain
+require 'myapp'
+require 'rack/test'
+
+describe 'Goods Order' do
+    include Rack::Test::Methods
+    def app
+        Sinatra::Application
+    end     
+    def mock_object
+        @goods_mock = mock("Backend::GoodsInfo")
+        @goods_mock.stub(:get_cost) {1000000}
+        Backend::GoodsInfo.stub(:new).with(any_args()).and_return(@goods_mock)
+    end
+    it " : Order database test" do
+        mock_object
+        get '/goods/cost/1004', :num=>40
+        last_response.body.should eq("40000000")
+    end 
+end
+}}}
+
+== 테스트 케이스들 정리 ==
+다양한 테스트 케이스를 정리하는게 목표다.
+
+=== mock 메서드 매개변수 변경 ===
+mock 메서드의 매개변수를 바꿔가면서 테스트하는 방법.
+{{{#!plain
+require 'myapp'
+require 'rack/test'
+
+describe 'Goods Order' do
+    include Rack::Test::Methods
+    def app
+        Sinatra::Application
+    end
+    def mock_object h
+        if h[:cost] == nil then h[:cost] = 1000000 end
+        @goods_mock = mock("Backend::GoodsInfo")
+        @goods_mock.stub(:get_cost) {h[:cost]}
+        Backend::GoodsInfo.stub(:new).with(any_args()).and_return(@goods_mock)
+    end
+    it " : Order database test, cost is 1000000" do
+        mock_object :cost=>1000000
+        get '/goods/cost/1004', :num=>40
+        last_response.body.should eq("40000000")
+    end
+    it " : Order database test, cost is 500000" do
+        mock_object :cost=>500000
+        get '/goods/cost/1004', :num=>40
+        last_response.body.should eq("20000000")
+    end
+end
+}}}
+
+== 참고 ==
+ * http://en.wikibooks.org/wiki/Ruby_Programming/Unit_testing
+
+== 히스토리 ==
+ * 작성 : [[Date(2012-11-12T14:05:45)]]

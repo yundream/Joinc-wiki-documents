@@ -1,1 +1,95 @@
 #title Heartbeat를 이용한 고가용성 (HA) 시스템 구현 
+
+[[TableOfcontents]]
+== heartbeat을 이용한 HA 시스템 구성 ==
+heartbeat는 linux-hq에서 배포하는 소프트웨어다. linux-hq는 고가용성(high availability) 클러스터 시스템 구축을 위한 인프라를 만드는 것을 목표로 하는데, 가장 중심이 되는 소프트웨어가 heartbeat다. 
+
+== HA 시스템 구성 테스트 ==
+이 문서는 heartbeat 레퍼런스 문서가 아니다. 실제 환경에서 어떤식으로 활용할 수 있는지를 직접 테스트하고 그 결과를 공유할 목적으로 만든 문서다. 
+
+나는 웹 서비스를 만들고 heartbeat를 이용해서 HA 환경을 만들 것이다.  
+
+=== 테스트 환경  ===
+  * VM 가상환경에서 테스트 : virtualbox 
+  * Guest OS : Centos 6.3 x 4
+     * Load balancer server x 2, heartbeat를 포함한다.
+     * Apache web server x 2
+ 
+=== 테스트 네트워크 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1VspUfu7Z_h7U0lOHgYse4MTbL8yAqthnhtLglDuXmLg&amp;w=662&amp;h=293">
+}}}
+  1. Apache Webserver 
+     * 웹 서비스를 담당한다. 2대를 구성했다.  
+  1. LB server 
+     * 웹 서버 앞단에 놓여서, 뒷단에 있는 웹서버를 round robin방식으로 (haproxy를 이용해서)load balancing 한다. 
+     * HA 구성을 위해서 2개로 구성한다.
+     * 각각의 HA 서버에는 [wiki:man/12/haproxy haproxy]가 설치된다.
+나는 LB server를 active & standby 형태로 이중화 할 것이다. LB server는 2개의 네트워크 인터페이스를 가진다. 하나는 퍼블릭 네트워크에 연결하기 위해서, 다른 하나는 heartbeat 네트워크를 구성하기 위해서 사용한다. LB server는 VIP를 이용해서 퍼블릭 네트워크에 연결된다. 
+
+LB server 01과 02의 서비스 네트워크 구성은 다음과 같다.
+  * LB server 01 : 192.168.56.50 
+  * LB server 02 : 192.168.56.51
+  * VIP : 192.168.56.52
+실제 서비스는 VIP를 이용할 것이다. 두 개의 서버 중 Active 서버가 VIP로 서비스를 한다. 만약 Active에 문제가 생기면 대기 중이던 standby 서버가 VIP를 가지고 올라온다. 
+
+LB server 01과 02의 heatbeat 네트워크는 다음과 같이 구성했다. 
+  * 10.0.0.0/24
+    * LB server 01 : 10.0.0.1
+    * LB server 02 : 10.0.0.2
+인터페이스 설정파일은 다음과 같다.
+{{{#!plain
+LB server 01 # cat ifcfg-eth1
+DEVICE="eth1"
+BOOTPROTO="static"
+NM_CONTROLLED="yes"
+ONBOOT="yes"
+IPADDR=10.0.0.1
+NETMASK=255.255.255.0
+NETWORK=10.0.0.0
+TYPE="Ethernet"
+}}}
+
+{{{#!plain
+LB server 02 # cat ifcfg-eth1
+DEVICE="eth1"
+BOOTPROTO="static"
+NM_CONTROLLED="yes"
+ONBOOT="yes"
+IPADDR=10.0.0.2
+NETMASK=255.255.255.0
+NETWORK=10.0.0.0
+TYPE="Ethernet"
+}}}
+
+=== heartbeat install ===
+LB server 01과 LB server 02에 heartbeat 소프트웨어를 설치한다.
+{{{#!plain
+#  wget ftp://mirror.switch.ch/pool/1/mirror/scientificlinux/6rolling/i386/os/Packages/epel-release-6-5.noarch.rpm
+}}}
+
+{{{#!plain
+# rpm -ivUh epel-release-6-5.noarch.rpm 
+경고: epel-release-6-5.noarch.rpm: Header V4 DSA/SHA1 Signature, key ID 192a7d7d: NOKEY
+준비 중...               ########################################### [100%]
+   1:epel-release           ########################################### [100%]
+}}}
+
+{{{#!plain
+# yum --enablerepo=epel install heartbeat
+}}}
+
+=== heartbeat 설정 ===
+  * /etc/ha.d/ha.cf : heartbeat 주요 설정
+  * /etc/ha.d/haresources : heartbeat로 관리할 자원 설정 
+
+=== HA 테스트 시나리오 -1 ===
+HA 테스트 시나리오는 다음과 같다.
+   1. 2개의 LB server는 heatbeat network로 연결된다. 이 네트워크를 통해서 주기적으로 상태를 체크한다. 
+   1. Active server가 VIP를 가지고 올라온다. 
+   1. Active server를 shutdown 한다.
+   1. Standby server는 heatbeat를 통해서 Active server에 문제가 생긴것을 확인하고, VIP를 올려서 Active로 전환한다. 
+
+... 계속
+== 히스토리 ==
+  * 작성일 : [[Date(2012-11-28T10:07:25)]]

@@ -1,0 +1,122 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.12.10.02.02.42;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fchefAutomationStrategy
+@
+
+
+1.1
+log
+@218.39.233.15;;Anonymous;;
+@
+text
+@#title chef를 이용한 cloud 자동화 전략
+
+[[TableOfContents]]
+
+== cloud 자동화 ==
+cloud는 크게 두 부분으로 이루어진다. 네트워크, 호스트, 스토리지와 같은 cloud 인프라와 이 인프라를 관리하기 위한 관리 소프트웨어다. 이 두 부분중 cloud 인프라 자동화에 대해서 고민해 보려 한다.
+
+=== 인프라 자동화 ===
+컴퓨팅 노드와 스토리지 노드, 네트워크 장비등 클라우드 서비스를 위한 물리적 하부 구조의 자동화다. 여기에서는 컴퓨팅 노드와 스토리지 노드만을 다룬다. 네트워크 장비의 경우 chef client를 설치하는데 한계가 있기 때문에 제외한다. 해당 장비에 chef client를 설치하는 대신 별도의 설정 node를 둬서 snmp등을 이용 원격으로 제어하는 방법이 있겠지만, 네트워크의 경우 굳이 이렇게 할 필요가 있나 싶다.  sd
+
+=== 관리 시스템 자동화 ===
+클라우드 소프트웨어와 인프라를 관리하기 위한 모니터링 소프트웨어의 설치와 운용을 자동화 한다. 여기에서는 다루지 않는다.
+
+== 인프라 자동화 == 
+=== 자동화할 인프라의 구성 ===
+cloud 인프라의 최소 단위는 POD으로 한다. 이 POD는 스위치와 cnode, snode로 구성된다. 이 인프라를 자동화 하면 된다.
+
+=== 자동화 범위 ===
+어디서 부터 어디까지를 자동화 하는지를 정의 한다. 당연하지만 물리적인 셋팅, 그러니까 상면을 확보하고 랙을 두고, 랙에 switch, cnode, snode를 배치하는 것은 엔지니어의 손을 거쳐야 한다. 
+
+이 상태에서 cnode의 전원을 올리면, 운영체제가 자동으로 설치된다. 여기에 더해서 cnode의 경우 hypervisor, snode의 경우에는 스토리지를 관리하기 위한 소프트웨어와 설정까지 자동으로 설치된다.   
+
+=== 자동화의 핵심 기술 셋 ===
+자동화는 chef를 이용할 것이다. 이제 남은 문제는 자동화를 위해서 chef로 어떤 정보를 관리할 것인가 하는 거다. 자동화를 위한 key를 찾기 위해서 운영체제 설치 과정을 하나씩 따라가 보겠다. 
+  1. 운영체제는 PXE-Boot를 이용해서 원격 설치를 한다. 
+     CD 들고 뛰어다닐 수는 없는 노릇이다. 중앙 저장소에 운영체제별로 ISO 파일을 저장하고, 원격 부팅을 이용해서 운영체제를 설치하도록 한다. 
+  1. kickstart를 이용 원할한 원격 설치를 지원한다. 
+     운영체제를 설치할 때 마다 일일이 손으로 설정을 집어 넣을 수 없는 노릇이다. kickstart를 이용해서 설정 입력을 자동화 한다.
+  1. node의 전원을 올리면, [wiki:Site/System_management/dhcp dhcp] 서버에 접근해서 '''ip''', 와 '''host name'''을 가져온다. 
+     노드를 클라우드 인프라에 배치하려면 IP 주소가 필요할 것이다. 이제 배치된 노드에 노드의 성격에 맞는 소프트웨어 환경을 만들어야 한다. chef를 사용할 건데, host name을 이용해서 role을 정할 수 있다. 예컨데, mysql.mycloud.com 이라면 mysql role를 적용하는 식이다.
+
+핵신 기술은 결국 PXE-Boot, Kickstart, dhcp로 요약된다. 이중 PXE-Boot와 kickstart는 기술 명세가 단순하니 넘어가고, 이슈가 좀 있는 dhcp에 대해서 살펴보려고 한다. 
+
+'''dhcp를 이용해서 노드에 ip와 hostname을 할당하고, hostname을 이용 적당한 chef role를 적용한다''' 여기까지는 간단하다. 문제는 dhcp 서버의 위치다. dhcp는 L2 프로토콜이기 때문에, 노드와 같은 subnet에 위치를 해야 한다. 이는 Zone (data center)를 구성하는 10개의 pod가 서로 다른 subnet으로 구성돼 있다면, 각 subnet 마다 네트워크 정보를 할당하기 위한 dhcp 서버가 놓여야 함을 의미한다. 
+
+가장 손쉬운 해결 방법은 POD 별로 dhcp 서버를 두는 것이다. 문제는 서버낭비가 있을 수 있다는 점. 하지만 단순한 해결방법이기 때문에, POD 모니터링 솔류션 등을 함께 두는 정도로 해서 타협하는 경우가 있다.  
+
+다른 해결 방법으로 dhcp-relay를 사용하는 방법이 있을 것이다. dhcp-relay를 이용하면 L3 네트워크에서 dhcp 서비스가 가능하다. 
+
+== Chef를 이용한 자동화 ==
+PXE-Boot에서 [wiki:Site/System_management/KickStart KickStart]를 이용해서 운영체제가 설치되는 것 까지는 [wiki:Site/System_management/PXEBoot PXE-Boot] 문서를 참고하기 바란다. 정리하자면 다음과 같다. 이 과정을 chef를 이용해서 자동화 하면 된다. 일단 TFTP 서버와 kickstart 서버가 구성되면, 노드가 추가 됐을 때 수정되야 하는 것은 DHCP 서버다. 그러므로 DHCP 설정 과정이 자동화 되어야 한다.
+  1. Node가 준비되면,
+  1. Node의 Mac address와 호스트 이름을 설정한다. 
+     * Web UI 형태의 개발이 필요하다.
+  1. 설정 값을 넣고 Submit 하면, chef Databag이 갱신된다.  
+  1. DHCP Server chef client를 가동하면 변경된 Databag 내용에 따라서 DHCP 서버 설정이 바뀌고 dhcp 서버를 재 시작 한다.
+  1. 노드의 파워가 올라오면 dhcp로 부터 네트워크 정보와 함께 pxe-boot image를 가져와서 운영체제가 설치된다. 이 후 과정은 모두 자동으로 이루어진다. 
+  1. 운영체제 설치가 모두 끝나면, chef-client를 설치한다.  
+  1. 노드가 설치된 운영체제로 부팅되면, chef-client가 작동을 하고 role에 따라서 애플리케이션 설치와 설정이 완료 된다.
+=== chef databag ===
+chef databag은 대략 다음과 같은 구성을 가질 것이다. 
+{{{#!plain
+{  
+  "id":"my_cloud_com",
+  "repo_server":"172.56.1.3",
+  "external_dns1":"8.8.8.8"
+  "external_dns2":"8.8.6.6"
+  "my.cloud.com":{
+    "zones":{
+      "test-01":{
+        "name":"test-01",
+        "pods":{
+          "pod1":{
+            "name":"pod1",
+            "gateway":"172.56.1.254"
+            "network":"172.56.1.0",
+            "nemask":"255.255.255.0",
+            "nodes": {
+               "cnode01":{
+                 "ip":"172.56.1.1"
+                 "mac":"xx:xx:xx:xx:xx:01"
+                 "os":"centos6.2"
+               },
+               "cnode02":{
+                 "ip":"172.56.1.2"
+                 "mac":"xx:xx:xx:xx:xx:02"
+                 "os":"centos6.2"
+               }
+            }
+            ....
+
+}}}
+DHCP 서버에서 chef-client가 실행되면, 위에 설정된 databag 정보를 가져온 다음에 대략 다음과 같이 dhcp 설정을 만들 것이다. 
+{{{#!plain
+subnet 172.56.1.0 netmask 255.255.255.0 {
+	option routers 172.56.1.254;
+	deny unknown-clients;
+	host cnode01.my-test-01-pod1.cloud.com {     // zone,pod,nodes 이름을 조합해서 호스트 이름을 만든다.  
+		hardware ethernet xx:xx:xx:xx:xx:01  // cnode01의 ip와 mac을 이용해서 네트워크 정보를 설정 한다.  
+		fixed-address 172.56.1.1 
+	}
+	host cnode02.my-test-01-pod1.cloud.com {
+		hardware ethernet xx:xx:xx:xx:xx:02 
+		fixed-address 172.56.1.2 
+	}
+}
+}}}
+@

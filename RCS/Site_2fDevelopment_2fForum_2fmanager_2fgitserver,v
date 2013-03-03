@@ -1,0 +1,90 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.02.01.09.50.43;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fDevelopment_2fForum_2fmanager_2fgitserver
+@
+
+
+1.1
+log
+@106.240.8.228;;yundream;;
+@
+text
+@#title git server 설치
+
+[[TableOfContents]]
+== git server 설치 ==
+chef 개발 환경을 테스트 하기 위한 이유로 git server를 설치하게 생겼다. chef 개발환경 구축 관련 문서는 여기를 참고한다. 이 글은 git server 구축만을 다룬다. 
+
+=== 설치 환경 ===
+설치 환경은 다음과 같다.
+ * 운영체제 : Ubuntu 11.10
+ * git server hostname : my.yundream.com 
+
+== git과 gitosis ==
+gitosis는 git저장소를 공유하기 위한 시스템으로, 이 프로그램을 이용하면 로컬계정없이 SSH를 이용해서 저장소에 접근할 수 있다.  
+
+git과 gitosis를 설치한다.
+{{{#!plain
+# apt-get install git gitosis
+}}}
+gitosis를 설치하면, '''gitosis'''이름의 시스템 계정이 하나 만들어진다. 
+
+gitosis는 SSH public key 인증을 사용한다. admin 계정을 초기화 하기 위해서 ssh public key를 등록 한다. public key는 ssh-keygen으로 만들면 된다. 
+{{{#!plain
+$ sudo -H -u gitosis gitosis-init < .ssh/id_rsa.pub 
+Initialized empty Git repository in /srv/gitosis/repositories/gitosis-admin.git/
+Reinitialized existing Git repository in /srv/gitosis/repositories/gitosis-admin.git/
+}}}
+
+'''gitosis-admin'''프로젝트를 clone 한다. git 관리를 위한 프로젝트다. 
+{{{#!plain
+# git clone gitosis@@127.0.0.1:gitosis-admin.git
+}}}
+
+clone 하고 나면 gitosis-admin 디렉토리가 만들어질 것이다. 이 디렉토리 밑에 gitosis.conf 파일이 있는데, 이 파일을 편집해서 프로젝트와 프로젝트에 접근할 유저 그룹을 설정할 수 있다. 다음과 같이 gitosis.conf를 수정했다. 
+{{{#!plain
+[gitosis]
+
+[group team]
+writable = testproject
+members = yundream@@yundream shawn.yun
+
+[group gitosis-admin]
+members = yundream@@yundream
+writable = gitosis-admin
+
+}}}
+gitosis-admin은 미리 설정된 admin 그룹이다. admin 그룹으로도 git 저장소를 관리할 수 있겠지만, admin과 일반 유저는 분리하는게 좋을 것이다. 그래서 team이라는 새로운 그룹을 만들었다. team 그룹은 yundream@@yundream과 shawn.yun 유저로 구성돼 있으며, testproject를 저장소로 사용한다. 
+
+user를 추가하기 위해서는 public key를 등록해야 한다. 작업할 호스트에서 ssh-keygen으로 public key를 만든 다음, 이걸 복사해와서 gitosis-admin/keydir 밑에 복사한다. 파일 이름은 "user-name.pub"여야 한다. 예를 들어 위 설정의 경우 shawn.yun 유저의 pub 파일 이름은 "shawn.yun.pub"이다. key를 복사한 다음 git 저장소에 추가하면 된다.
+{{{#!plain
+# git add keydir/shanw.yun.pub
+# git commit -a -m "Add user : shawn.yun"
+# git push
+}}}
+
+이제 프로젝트를 만들어 보자. testproject 디렉토리를 만들고 파일을 하나 등록 한다.
+{{{#!plain
+# mkdir testproject
+# cd testproject 
+# git init
+# git remote add origin gitosis@@gitserver:testproject.git
+# git commit -a -m "testproject init"
+# git push origin master
+}}}
+
+이제 남은건 clone, add, commit, push, pull 테스트.. 
+@

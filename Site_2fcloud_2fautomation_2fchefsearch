@@ -1,0 +1,93 @@
+#title chef search
+
+== Search ==
+Chef 서버는 루신 기반의 solr을 내장하고 있으며, 이를 이용한 full text search를 지원한다. 인프라 관리자는 search를 이용해서 하부구조(infrastructure)와 하부구조위에 놓여있는 애플리케이션의 정보들을 검색할 수 있다.  
+
+인프라 관리자는 recipe에서 search 함수를 호출하거나 knife를 이용해서 검색을 할 수 있다. chef server는 data bag과 api client, node, role을 포함한 모든 정보를 자동으로 색인해서 저장한다.
+
+=== Search Index Names ===
+Chef는 4개의 색인 테이블을 관리한다. 
+|| Data type    || Index Name  || Knife 사용 예                        ||
+|| Roles        || role        || knife search role "name:production"  ||
+|| Nodes        || node        || knife search node "name:app"         ||
+|| API Clients  || client      || knife search client "name:c*"        ||
+|| Environments || environment || knife search environment ":"         ||
+
+'''Data bag'''은 data bag name으로 색인 테이블이 만들어진다. 예를들어 data bag 이름이 "bag_o_data"라면 아래와 같이 질의 하면 된다. 
+{{{#!plain
+knife search bag_o_data "arbitrary_key:some_value"
+}}}
+
+=== Query syntax ===
+질의어는 "field:search_pattern" 형식으로 이루어진다. "field"는 검색할 필드 명으로 JSON의 "key"가 field 이름이 된다. 질의어 패턴은 exact, wildcard, range, fuzzy 매칭을 사용할 수 있다. 필드 이름의 경우 와일드카드의 사용에 제한이 있을 수 있다.  
+
+==== 필드명 syntax ====
+필드명은 JSON 데이터의 '''key'''에 해당한다. 
+{{{#!plain
+knife search node "platform_os_type:Linux*"
+}}}
+
+==== 필드명 찾기 ====
+검색을 하려면 필드명을 알아야 한다. 필드명은 JSON의 key를 확인해서 알 수 있다.  
+{{{#!plain
+knife node show yundream.joinc.co.kr -Fj 
+}}}
+
+==== 와일드카드를 이용한 필드명 매칭 ====
+제한적으로 필드명에 와일드카드를 이용할 수 있다. 와일드 카드로 사용할 수 있는 문자는 "*"와 "?"이다. 단 와일드카드는 필드이름의 첫 글자로 사용할 수 없다. 
+{{{#!plain
+knife search node 'platfo*:ubuntu'
+knife search node 'platfor?:ubuntu'
+}}}
+
+=== Exact matches ===
+와일드카드를 사용하지 않을 경우 "exact matching"하는 것을 기본으로 한다. 말그대로 공백문자까지를 포함해서 완전일치하는 정보만 검색한다. 찾고자하는 field와 field 값을 정확히 알고 있을 때, 유용하게 사용할 수 있다.
+
+admin의 id가 "charlie"와 일치하는 결과를 검색한다.
+{{{#!plain
+knife search admins 'id:charlie'
+}}}
+
+결과
+{{{#!plain
+
+1 items found
+_rev:       1-39ff4099f2510f477b4c26bef81f75b9
+chef_type:  data_bag_item
+comment:    Charlie the Unicorn
+data_bag:   admins
+gid:        ops
+id:         charlie
+shell:      /bin/zsh
+uid:        1005
+}}}
+
+comment로 검색하고 싶다면 아래와 같다. 공백문자 하나라도 틀리면 검색이 안된다.
+{{{#!plain
+knife search admins 'comment:"Charlie the Unicorn"'
+}}}
+
+=== Wildcard matches ===
+일부만 일치해도 검색하고 싶다면 "*"를 사용하면 된다. "*"은 0혹은 하나이상의 모든 문자에 매칭된다. "?" 하나의 문자에 일치한다. 예를 들어서 name이 "app1.example.com"인 노드를 찾기를 원한다면, 아래와 같이 질의하면 된다. 
+{{{#!plain
+knife search node 'name:app*'
+knife search node 'name:app1*.example.com'
+knife search node 'name:app?.example.com'
+knife search node 'name:app1.example.???'
+}}}
+
+=== Range Search ===
+
+=== Joining Multiple Query Criteria with Boolean Operators ===
+=== Finding All  ===
+=== Special Characters ===
+
+=== Recipe에서 search 사용하기 ===
+{{{#!plain
+search (:node, "*:*") do |matching_node|
+	puts matching_node.to_s
+end
+}}}
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-12-27T14:44:18)]]

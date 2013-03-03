@@ -1,0 +1,225 @@
+head	1.5;
+access;
+symbols;
+locks
+	root:1.5; strict;
+comment	@# @;
+
+
+1.5
+date	2012.12.03.05.19.59;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.12.03.04.58.51;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.12.01.14.42.40;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.11.30.16.05.24;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.11.20.03.02.50;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fJson
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@#title Ruby JSON 활용
+
+[[TableOfcontents]]
+== JSON ==
+=== 설치 ===
+1.9.2에는 bundle 형태로 루비와 함께 제공된다. 1.8.7 버전의 경우 gem으로 설치해야 한다.
+{{{#!plain
+# gem install json
+}}}
+
+=== JSON 데이터 생성 ===
+hash 자료구조를 그대로 json 포맷으로 만들 수 있다.
+{{{#!plain
+#!/usr/bin/ruby
+require 'rubygems'
+require 'json'
+
+myinfos = {
+    "name"=>"yundream",
+    "age"=>22,
+    "hosts"=>["host1", "host2"]
+}
+
+puts myinfos.to_json
+}}}
+
+다음과 같이 json 형식으로 변환된다.
+{{{#!plain
+{"age":22,"name":"yundream","hosts":["host1","host2"]}
+}}}
+
+
+=== JSON parse ===
+parse 메서드를 이용해서, 해쉬 자료구조로 변환할 수 있다.  
+{{{#!plain
+require 'json'
+require 'pp'
+
+str = '{
+  "CEO": "William Hummel",
+  "CFO": "Carlos Work",
+  
+  "Human Resources": [
+    "Inez Rockwell",
+    "Kay Mcginn",
+    "Larry Conn",
+    "Bessie Wolfe"
+  ],
+
+  "Research and Development": [
+    "Norman Reece",
+    "Betty Prosser",
+    "Jeffrey Barclay"
+  ]
+}'
+
+empl = JSON.parse(str)
+pp empl
+}}}
+
+출력 결과다.
+{{{#!plain
+{"Human Resources"=>
+  ["Inez Rockwell", "Kay Mcginn", "Larry Conn", "Bessie Wolfe"],
+ "CFO"=>"Carlos Work",
+ "CEO"=>"William Hummel",
+ "Research and Development"=>
+  ["Norman Reece", "Betty Prosser", "Jeffrey Barclay"]}
+}}}
+
+=== JSON 형식 검사 ===
+{{{#!plain
+module JSON
+  def self.is_json?(foo)
+    begin
+      return false unless foo.is_a?(String)
+      JSON.parse(foo).all?
+    rescue JSON::ParserError
+      false
+    end 
+  end
+end
+
+puts 'it is json' if JSON.is_json?('{"name":"world"}')
+}}}
+
+== json_pure ==
+순수 ruby로 만든 json 구현이다.
+{{{#!plain
+# gem install json_pure
+}}}
+
+{{{#!plain
+#!/usr/bin/ruby
+require 'rubygems'
+require 'json/pure'
+require 'pp'
+
+puts JSON.generate([1, 2, {"a"=>3.141}, false, true, nil, 4..10])
+puts JSON 'test' => 23
+a = JSON.parse('{"hello":"23"}')
+pp a
+}}}
+
+실행 결과 :
+{{{#!plain
+# ./test.rb 
+[1,2,{"a":3.141},false,true,null,"4..10"]
+{"test":23}
+{"hello"=>"23"}
+}}}
+
+pretty_generate를 이용하면 깔끔한 결과물을 얻을 수 있다.
+{{{#!plain
+puts JSON.generate([1, 2, {"a"=>3.141}, false, true, nil, 4..10])
+}}}
+{{{#!plain
+[
+  1,
+  2,
+  {
+    "a": 3.141
+  },
+  false,
+  true,
+  null,
+  "4..10"
+]
+}}}
+
+== json과 json/pure ==
+json gem은 json과 json_pure 두개의 버전이 있다. gem install json을 실행할 경우 C 확장 버전이 설치가 된다. 따라서 C 컴파일러가 필요하다.   
+
+gem install json_pure를 실행하면 ruby로 작성된 josn 구현이 설치된다. 순수 ruby로 구현됐기 때문에, 플랫폼에 상관없이 사용할 수 있다. 대신 C 구현보다는 좀 더 느리다.
+
+성능이 중요하지 않다면 json_pure를 사용하는 걸 권장한다. json을 사용할 경우 운영체제에 따라서 문제가 생길 수 있다. centos 5.4에서 json을 설치했더니, "uninitialized constant JSON (NameError)" 에러가 발생했다. 다른 ubuntu 리눅스에서는 잘 돌아간다. 버전은 1.8.7로 동일했다. 결국 ruby_pure를 설치해서 문제를 해결했다.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-11-20T03:02:50)]]
+  * 수정 
+    * [[Date(2012-12-03T04:58:51)]] : json_pure 설명 추가 
+@
+
+
+1.4
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d87 45
+a131 1
+=== json과 json/pure ===
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d87 7
+d96 2
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d14 1
+@

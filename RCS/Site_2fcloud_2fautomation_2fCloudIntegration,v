@@ -1,0 +1,96 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2012.12.17.14.44.46;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.12.16.15.18.40;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fCloudIntegration
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title chef를 이용한 cloud 통합
+
+[[TableOfContents]]
+== Cloud 통합 ==
+클라우드 통합을 위한 생각을 정리하기 위한 위키페이지다.
+
+여기에서 클라우드는 cloudstack, openstack과 같은 소프트웨어로 흔히 CloudOS라고 부른다. 앞으로 CloudOS라고 부르기로 한다. 
+
+== CloudStack 통합 ==
+openstack은 경험이 없으므로 cloudstack를 기준으로 생각하려 한다.
+
+=== 통합 대상 ===
+Cloudstack으로 provisioning되는 모든 자원이 통합/자동화 대상이다.
+
+  1. Cloudstack에서 관리하는 zone, pod, cluster 구성, primary storage와 secondary storage, template, offering 그리고 네트워크 설정들을 통합 관리한다.  
+  1. VM provisioning, network provisioning 기타 network service와 storage 서비스들.
+  1. VM의 설정관리. VM에 chef-client를 설치 해서, 운영체제와 애플리케이션 설정을 통합한다. AWS의 cloudformation과 비슷한 목적이다. 
+  1. Storage provisioning : iSCSI, NFS 서비스를 자동으로 프로비저닝 하고 관리한다. 스토리지 자원은 cloudstack에 통합된다.   
+  1. Network provisioning : 네트워크 어플라이언스에 chef-client를 설치할 수는 없는 노릇이니, API를 호출하는 식으로 통합한다. L4 장비를 대상으로 한다. L3나 L2 네트워크 장비를 통합하기 위해서는 좀 더 고민이 필요하다. 
+
+== Infra 통합 ==
+=== CNODE ===
+Cnode는 computing node로 hypervisor이 올라간다. 모든 cnode는 리눅스 운영체제를 기반으로 한다. 하이퍼바이저는 kvm이나 xenserver를 선택할 수 있겠다. 
+
+PXEBoot와 kickstart를 기반으로 운영체제를 설치한 다음 chef-client까지 설치한다. chef-client으로 하이퍼바이저를 제어하지는 않을 거다. 하이퍼바이저의 제어는 cloudstack에 맡긴다. 
+
+=== SNODE ===
+개인적으로 ZFS가 마음에 든다. 파일 시스템 하나로 모든게 끝나기 때문이다. 하지만 opensolaris 기반이라는게 마음에 걸린다.   
+
+Linux native ZFS도 있기는 한데, 안정성이 검증되지 않았으며 역시 라이센스가 거슬린다.
+
+좀 귀찮더라도 LVM과 software raid (RAID-5) 기반으로 해야 할 것 같다. cloudstack의 경우 POD 단위로 block storage가 배치되는데, 이 block storage를 위한 snode(storage node)를 chef로 관리할 수 있을 것이다. Snode는 EBS 스타일로 구성을 해서, zone내에서 자유롭게 사용할 수 있도록 구성한다.   
+
+Snode 상에서 chef는 다음과 같은 일을 할 것이다.
+  1. Software raid volume 구성.
+  1. LVM 구성
+  1. iSCSI target 구성 
+
+== cloud 통합 ==
+
+== vm 통합 ==
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-12-16T15:18:40)]]
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d23 3
+a25 1
+모든 인프라 시스템은 리눅스 운영체제를 기반으로 한다. PXEBoot와 kickstart를 기반으로 운영체제를 설치한 다음 chef-client까지 설치한다. 
+d28 1
+a28 1
+개인적으로 ZFS가 마음에 든다. 파일 시스템 하나로 모든게 끝나기 때문이다. 하지만 포지션이 애매모호한 opensolaris 기반이라는게 마음에 걸린다.   
+d32 1
+a32 1
+좀 귀찮더라도 LVM과 software raid (RAID-5) 기반으로 해야 할 것 같다. cloudstack의 경우 POD 단위로 block storage가 배치되는데, 이 block storage를 위한 snode를 chef로 관리할 수 있을 것이다. 
+d34 1
+a34 1
+chef는 다음과 같은 일을 할 것이다.
+a40 1
+
+@

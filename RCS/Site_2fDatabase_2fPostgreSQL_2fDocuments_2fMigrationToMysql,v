@@ -1,0 +1,546 @@
+head	1.13;
+access;
+symbols;
+locks
+	root:1.13; strict;
+comment	@# @;
+
+
+1.13
+date	2013.03.02.15.47.19;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2013.03.01.16.48.34;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2013.02.27.12.10.56;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2013.02.21.09.18.46;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.02.21.02.33.57;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2013.02.21.01.36.46;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.02.20.14.04.07;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.02.20.13.17.15;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.02.19.15.24.06;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.02.19.09.36.27;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.02.18.15.05.24;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.02.18.10.00.03;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.02.18.01.42.11;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fDatabase_2fPostgreSQL_2fDocuments_2fMigrationToMysql
+@
+
+
+1.13
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title Postgresql 데이터베이스를 Mysql 데이터베이스로 마이그레이션
+
+[[TableOfContents]]
+== 소개 ==
+어쩌다 보니 Postgresql(pgsql) 데이터베이스를 Mysql 데이터베이스로 마이그레이션 해야 한다. 마이그레이션하면서 신경써야 할 것들과 마이그레이션 방법들에 대해서 정리한다.  
+
+== 현재 상황 ==
+현재 상황은 다음과 같다.
+  1. 운영 중에 있는 서비스다. 서비스의 데이터는 pgsql로 관리하고 있다. 
+  1. pgsql을 mysql로 마이그레이션 해야 한다. 
+  1. 마이그레이션 범위는 다음과 같다.
+     1. 데이터베이스 스키마는 그대로 유지한다.
+     1. 기존 데이터도 마이그레이션 대상이다.  
+     1. 다운 타임을 최소화 해야 한다.
+
+== 마이그레이션시 고려해야 할 사항 ==
+=== 마이그레이션 대상 데이터베이스 크기 확인 ===
+Postgresql 데이터베이스 크기 확인
+{{{#!plain
+postgres=# SELECT pg_database_size ('db_name');
+ pg_database_size 
+------------------
+        102194978
+(1 row)
+}}}
+
+참고로 mysql 데이터베이스 크기 확인
+{{{#!plain
+mysql> SELECT table_schema "Database Name", SUM(data_length + index_length) / 1024 / 1024 "Size(MB)" FROM information_schema.TABLES GROUP BY table_schema;
++--------------------+-------------+
+| Database Name      | Size(MB)    |
++--------------------+-------------+
+| information_schema |  0.00781250 |
+| mysql              |  0.62274456 |
+| phpbb              | 52.52191901 |
++--------------------+-------------+
+3 rows in set (0.09 sec)
+}}}
+
+=== index length 크기 제한 ===
+Mysql의 한 row가 가질 수 있는 index 최대 크기는 (InnoDB 에서)767 byte다. 반면 Pgsql은 8191로 text 데이터 타입을 index하기에 충분한 크기다. 만약 마이그레이션 하려는 pgsql 데이터베이스의 text 데이터 타입이 index가 걸려있다면, index 최대 크기를 넘기는 경우를 고민해야 한다. 
+
+가장 좋은 방법은 mysql의 index prefix 기능이지 싶다.
+
+테스트를 위해서 idxtest 테이블을 만든 다음 prefix index를 추가했다. index length는 32로 했다.
+{{{#!plain
+mysql> create table idxtest (str text, age int);
+mysql> ALTER TABLE test ADD UNIQUE INDEX stridx (str(32));
+}}}
+인덱스 정보를 확인해 봤다.
+{{{#!plain
+mysql> show index from idxtest\G
+*************************** 1. row ***************************
+        Table: idxtest
+   Non_unique: 0
+     Key_name: stridx
+ Seq_in_index: 1
+  Column_name: str
+    Collation: A
+  Cardinality: 1
+     Sub_part: 32
+       Packed: NULL
+         Null: YES
+   Index_type: BTREE
+      Comment: 
+Index_comment: 
+1 row in set (0.00 sec)
+}}}
+
+==== UTF8에서의 Index 크기 ====
+앞서 mysql에서 하나의 row가 가질 수 있는 최대 index 길이는 767 byte라고 했다. 이건 1byte언어에서의 경우이고, charater set으로 UTF8을 쓴다면, index의 길이는 더 줄어든다. UTF8의 경우 문자 하나는 3byte를 차지하므로 prefix index의 길이는 255로 줄어든다. 원칙적으로 UTF8의 경우 영문자와 숫자는 1byte로 처리하고 나머지를 3byte로 처리하지만, prefix index는 무조건 x3을 해버린다.   
+{{{#!plain
+mysql> create table mytest (str text, id int) DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+mysql> ALTER TABLE mytest ADD UNIQUE INDEX (str(500));
+ERROR 1709 (HY000): Index column size too large. The maximum column size is 767 bytes.
+}}}
+prefix의 크기를 500으로 했지만 500 * 3 == 1500 해서 767을 초과해 버리는 거다.
+
+이 경우 '''innodb_large_prefix''' 옵션을 사용하면 된다. 이 옵션을 '''ON'''하면, 3072 byte까지 사용할 수 있다. large prefix를 하기 위해서는 몇가지 설정 변경이 필요하다. '''my.cnf'''를 수정하기로 했다. 
+{{{#!plain
+# cat /etc/mysql/my.cnf
+....
+....
+[mysqld]
+default-storage-engine = INNODB
+innodb_file_per_table
+innodb_file_format=Barracuda
+innodb_large_prefix
+....
+}}}
+mysql server를 재시작 한 후, 설정값들이 제대로 적용됐는지 확인해 보자.
+{{{#!plain
+mysql> select  @@@@global.innodb_file_format;
++-----------------------------+
+| @@@@global.innodb_file_format |
++-----------------------------+
+| Barracuda                   |
++-----------------------------+
+1 row in set (0.00 sec)
+
+mysql> select  @@@@global.innodb_large_prefix;
++------------------------------+
+| @@@@global.innodb_large_prefix |
++------------------------------+
+|                            1 |
++------------------------------+
+1 row in set (0.00 sec)
+
+select  @@@@global.innodb_file_per_table;
++--------------------------------+
+| @@@@global.innodb_file_per_table |
++--------------------------------+
+|                              1 |
++--------------------------------+
+1 row in set (0.00 sec)
+}}}
+
+테이블을 만들 때도 설정이 필요하다. ROW_MORMAT=DYNAMIC로 해준다.
+{{{#!plain
+mysql> create table mytest (str text, id int) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin ROW_FORMAT=DYNAMIC;
+mysql> ALTER TABLE mytest ADD UNIQUE INDEX (str(500));
+Query OK, 0 rows affected (0.03 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+}}}
+오케이 성공이다.
+
+궁금해서 실제 가능한 index length 크기 확인
+{{{#!plain
+mysql> ALTER TABLE mytest ADD UNIQUE INDEX (str(1000));
+Query OK, 0 rows affected (0.03 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+....
+mysql> ALTER TABLE mytest ADD UNIQUE INDEX (str(1200));
+ERROR 1071 (42000): Specified key was too long; max key length is 3072 bytes
+}}}
+
+=== index 필드의 case-sensitive ===
+pgsql의 index는 case-sensitive하다. 하지만 mysql의 index는 case-insensitive, 대소문자를 구분하지 않는다. 예를 들어 pgsql에서 'aAa'와 'AAa'는 서로 다른 값으로 index에 문제가 없지만 mysql에서는 '''Duplicate''' 에러가 발생한다.
+{{{#!plain
+mysql> insert into idxtest values ('yundream', 19);
+mysql> insert into idxtest values ('Yundream', 19);
+ERROR 1062 (23000): Duplicate entry 'Yundream' for key 'stridx'
+}}}
+
+다음과 같이 필드에 '''COLLATE''' 설정을 적용하는 것으로 해결할 수 있다.
+{{{#!plain
+mysql> DROP TABLE idxtest;
+mysql> CREATE TABLE idxtest ( str text COLLATE latin1_general_cs, age int);
+mysql> ALTER TABLE idxtest ADD UNIQUE INDEX stridx (str(32));
+mysql> insert into idxtest values ('Yundream', 29);
+Query OK, 1 row affected (0.00 sec)
+
+mysql> insert into idxtest values ('yundream', 29);
+Query OK, 1 row affected (0.01 sec)
+
+mysql> insert into idxtest values ('yundream', 29);
+ERROR 1062 (23000): Duplicate entry 'yundream' for key 'stridx'
+}}}
+'''_cs'''는 case-sensitive, '''_ci'''는 case-insensitive를 의미한다.
+
+Collation은 데이터베이스에 저장된 값을 검색하거나 정렬하는 작업을 할때, 문자열들 간의 비교 규칙을 정의하기 위해서 사용한다. 따라서 CHAR, VARCHAR, TEXT 같은 데이터 타입에 대해서 사용할 수 있다. 
+
+만약 다루는 문자열이 UTF8이라면 문제가 좀 복잡해 진다. '''COLLATE utf8_general_cs'''을 사용하면 될 것 같지만, 현재(2012년 2월) 버전에서는 에러가 출력된다. 지금은 '''_ci''' 만 허용한다. 이 경우 '''utf8_bin'''을 사용하면 된다.  
+
+=== Timestamp ===
+Postgresql과 mysql 모두 timestamp를 지원한다. 거의 동일하게 사용할 수 있는데, Postgresql은 필드 단위로 '''time zone'''을 지정할 수 있다. Mysql은 필드 단위로는 지정할 수 없고, 데이터베이스 단위로의 지정만 가능하다.   
+
+Postgresql은 timestamp 타입에 '''timestamp without time zone'''과 '''timestamp with time zone'''이 있다. '''timestamp'''로만 지정할 경우 '''timestamp without time zone'''으로 설정된다. '''timestamp with time zone'''으로 설정하면, 시간뒤에 UTC 시간 편차를 출력한다. 
+
+timestamp 필드를 마이그레이션 하는데는 문제 없지만 mysql의 time zone을 맞춰주는게 좋다.
+{{{#!plain
+mysql> SET GLOBAL time_zone='+09:00'
+mysql> SET time_zone='+09:00'
+}}}
+'''GLOBAL'''은 시스템 전역으로 지정하기 위해서 사용한다. GLOBAL을 사용하지 않으면, 클라이언트 세션에 대해서만 time zone을 지정한다. 
+
+위의 입력 결과를 확인해 보자.
+{{{#!plain
+mysql> select @@@@global.time_zone, @@@@session.time_zone;
++--------------------+---------------------+
+| @@@@global.time_zone | @@@@session.time_zone |
++--------------------+---------------------+
+| SYSTEM             | +09:00              |
++--------------------+---------------------+
+}}}
+
+Mysql에서 두개의 timestamp를 사용할 경우 조심해야 한다. 아래의 경우를 보자.
+{{{#!plan
+mysql > create table mytest03 (ts timestamp NOT NULL, ts2 timestamp NOT NULL, str text);
+mysql > insert into mytest03(str) values('hello world');
+mysql> select * from mytest03;
++---------------------+---------------------+-------------+
+| ts                  | ts2                 | str         |
++---------------------+---------------------+-------------+
+| 2013-02-19 23:28:15 | 0000-00-00 00:00:00 | hello world |
++---------------------+---------------------+-------------+
+1 row in set (0.00 sec)
+}}}
+처음 timestamp field만 '''CURRENT_TIMESTAMP'''로 채워졌다. 그러면 ts2에 DEFAULT CURRENT_TIMESTAMP를 주면 될 거라고 생각할 수도 있지만, mysql은 '''하나의 row에 하나의 DEFAULT CURRENT_TIMESTAMP'''만 가능하다.  
+{{{#!plain
+mysql> create table mytest04 (ts timestamp NOT NULL, ts2 timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, str text);
+ERROR 1293 (HY000): Incorrect table definition; there can be only one TIMESTAMP column with CURRENT_TIMESTAMP in DEFAULT or ON UPDATE clause
+}}}
+Mysql 데이터베이스가 처리해 주지 않기 때문에 소프트웨어 영역에서 신경써서 처리해 줘야 한다. 
+
+=== Foreign key ===
+=== Auto increment ===
+Mysql과 Postgresql모두 auto increment field를 지원하지만 방식에 차이가 있다. 
+
+postgresql 방식 : table_name 테이블의 column_name 칼럼에 auto increment를 적용한다.
+{{{#!plain
+ALTER TABLE table_name ALTER COLUMN cloumn_name SET DEFAULT nextval('seqname'::regclass);
+}}}
+
+mysql 방식 :  table_name 테이블의 column_name 칼럼에 auto increment를 적용한다.
+{{{#!plain
+ALTER TABLE table_name MODIFY id int AUTO_INCREMENT;
+}}}
+
+따라서 nextval을 grep 해서 mysql 방식으로 변경해야 한다. 대략 아래와 같은 Perl 코드로 변경할 수 있다.  
+{{{#!plain
+$line =~ s/^ALTER TABLE ([a-zA-Z0-9_]+) ALTER COLUMN ([a-zA-Z0-9]+) .+/ALTER TABLE \1 MODIFY \2 int AUTO_INCREMENT/;
+}}}
+
+=== Migration tool ===
+먼저 postgresql에서 mysql로 변환해주는 (공개)툴을 찾아봤다. 완벽한 툴은 없는 것 같다. 위의 제약들 때문에 완벽하게 마이그레이션 해주는 툴을 찾는 것은 쉽지 않을 거 같다. 필드변환도 해줘야 하고, 데이터베이스 옵션도 변경해야 하고. 
+
+그래서 선택한 툴이 '''pg2mysql'''이다. php로 작성된 건데, postgresql 구문을 mysql 구문으로 변환해 준다. 하지만 완벽하지 않으며, 그럭저럭 괜찮은 변환물을 얻을려면 소스코드를 수정해야 한다. 그리고 2차 변환툴도 만들어야 제대로된 마이그레이션 툴을 가질 수 있을거다.  2차 변환툴은 perl로 개발했다. 
+
+== 데이터 확인 ==
+== 트러블 슈팅 ==
+==  Query LOG 분석 ==
+=== Mysql Log ===
+마이그레이션 후 DB 애플리케이션이 제대로 작동하는지 확인하려면, Mysql log를 확인해야 한다. 두 가지 방법이 있다. 
+
+my.cnf를 수정하는 방법
+{{{#!plain
+[mysqld]
+...
+general_log_file        = /var/log/mysql/mysql.log
+general_log             = 1
+...
+}}}
+tail로 쿼리 내용을 실시간으로 확인할 수 있다.
+{{{#!plain
+yundream@@yundream:~$ tail -f /var/log/mysql/mysql.log 
+                   34 Query     select @@@@version_comment limit 1
+                   34 Query     select count(*) into @@discard from `mysql`.`time_zone_transition_type`
+                   34 Quit
+                   35 Connect   debian-sys-maint@@localhost on 
+                   35 Query     select @@@@version_comment limit 1
+                   35 Query     select count(*) into @@discard from `mysql`.`user`
+                   35 Quit
+130302  0:57:06    36 Connect   root@@localhost on 
+                   36 Query     select @@@@version_comment limit 1
+130302  0:57:11    36 Query     create database mydb
+130302  0:57:38    36 Query     SELECT DATABASE()
+                   36 Init DB   mydb
+                   36 Query     show databases
+                   36 Query     show tables
+130302  0:58:05    36 Query     create table test01 (id int, name varchar(32))
+130302  0:58:13    36 Query     insert into test01 (1, 'test')
+130302  0:58:23    36 Quit
+}}}
+이 방법은 편하고 확실하긴 하지만 mysql 서버에 대한 권한을 가지고 있어야 한다는 제약이 있다.
+
+Mysql 서버에 대한 권한을 가지고 있지 않다면, tcpdump를 이용해서 패킷을 분석하는 방법도 있다.
+{{{#!plain
+# tcpdump -i eth0 -s 0 -l -w - dst port 3306 -n | strings
+tcpdump: listening on vboxnet1, link-type EN10MB (Ethernet), capture size 65535 bytes
+show tables
+select * from test01
+}}}
+예제에서 사용한 tcpdump 옵션들에 대해서 알아보고 넘어가자.
+  * -i : 패킷 덤프할 network interface를 설정한다.
+  * -s : tcpdump는 모든 입력된 패킷의 모든 내용을 분석하지는 않는다. 처리하는 패킷의 크기가 커지면 그만큼 많은 cpu 자원이 소모되기 때문이다. 예컨데 ip 정보만을 보고 싶다면 패킷의 처음 68 byte 정도만 분석하면 될테다. -s 를 이용해서 이 길이를 조절할 수 있다. 이 경우 패킷의 유저 데이터 부분을 읽어야 하기 때문에 -s 를 크게 할 필요가 있다. 0을 설정하면 65536으로 잡는다.
+ * -l : 표준 출력을 line buffering 한다. fflush라고 보면 된다. 
+ * -w : 캡춰한 패킷을 분석하지 않고 그대로 출력한다 "-"면 표준출력이다. 
+=== Postgresql LOG ===
+
+== 무중단 마이그레이션 ==
+마이그레이션을 하는 가장 간단한 방법은 다음과 같다.
+  1. 서비스를 내린다.
+  1. 마이그레이션을 한다.
+  1. 서비스를 올린다.
+간단하고 안전하기는 한데, 마이그레이션 시간이 길어질 수 있다는게 문제다. 짧게는 몇시간 길게는 하루를 꼬박 넘길 수 있는데, 그 시간 동안 서비스 중단 공지사항을 보여주는 건 좀 문제다.  
+
+가능하면 서비스를 중지하지 않고 마이그레이션을 하면 좋겠으니, 방법을 생각해 보자. 내가 생각한 방법은 다음과 같다.
+  1. 서비스를 내린다. 
+  1. 데이터베이스를 덤프 받는다.
+  1. DML query를 남기도록 dbms 설정을 변경한다.
+  1. 서비스를 올린다. 이제 서비스 중에 발생한 query 정보는 로그에 저장된다. 
+  1. 뒷단에서 열심히 데이터베이스를 마이그레이션 한다. 
+  1. 마이그레이션이 다 끝낫다면,
+  1. 서비스를 내린다. 
+  1. 그동안 쌓인 DML 정보를 토대로 운영중 변경된 데이터베이스 내용을 마저 적용한다.
+  1. 서비스를 올린다.
+무중단이라고 할 수는 없지만, 서비스에 영향을 최소화 하면서 안정적으로 마이그레이션 할 수 있다. 
+
+말 그대로의 무중단 마이그레이션을 계획할 수 있겠는데, 지금 처럼 다른 dbms로의 마이그레이션에서 무중단을 고려하는 것은 좀 너무 오바스럽지 싶다. 
+== 참고 ==
+ * http://dev.mysql.com/doc/refman/5.5/en/innodb-parameters.html
+ * [http://blog.naver.com/PostView.nhn?blogId=seuis398&logNo=70094098699 Innodb의 새로운 파일 포멧] 
+ * [http://blog.naver.com/PostView.nhn?blogId=orion_203&logNo=130036311589&redirect=Dlog&widgetTypeCall=true postgresql 통계 정보]
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-02-18T15:05:24)]]
+  * 수정
+     * [[Date(2013-03-02T15:47:19)]] : 무중단 마이그레이션 
+@
+
+
+1.12
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d281 18
+a298 1
+=== Mysql Global 및 session 설정 ===
+d300 1
+a300 1
+== 무중단 마이그레이션 ==
+d308 2
+a309 1
+
+@
+
+
+1.11
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d230 1
+d232 3
+d236 44
+a279 1
+=== Mysql LOG ===
+d283 1
+@
+
+
+1.10
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d207 17
+d230 6
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d206 7
+d216 1
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d17 24
+a40 1
+=== index length 크기 ===
+d127 10
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d48 1
+a48 1
+앞서 mysql에서 하나의 row가 가질 수 있는 최대 index 길이는 767 byte라고 했다. 이건 1byte언어에서의 경우이고, charater set으로 UTF8을 쓴다면, index의 길이는 더 줄어든다. UTF8의 경우 문자 하나는 3byte를 차지하므로 prefix index의 길이는 255로 줄어든다. 원칙적으로 UTF8의 경우 영문자와 숫자는 1byte로 처리하고 나머지를 3byte로 처리하지만, prefix index는 무조건 x3을 해버린다.  
+d175 1
+a175 1
+ * 
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d47 57
+d173 3
+d179 1
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d114 2
+a115 1
+Mysql 데이터베이스가 처리해 주지 않기 때문에 소프트웨어 영역에서 신경써서 처리해 줘야 한다.
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d97 19
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d73 2
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d17 30
+a46 1
+=== index 필드의 크기 ===
+d48 25
+d74 20
+a93 1
+=== 마이그레이션 툴 ===
+d95 2
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+a3 1
+... 작성 중
+d17 3
+a19 6
+=== Pgsql과 mysql의 size에서의 차이점 ===
+가장 먼저 크기(size)에 대한 차이점을 고려해야 한다. 테이블,필드,rows,인덱스 개수,인덱스 크기 등을 살펴봐야 한다. 예를 들어 DB-A는 최대 인덱스 크기가 1024K라고 가정을 해보자. 인덱스의 크기가 충분히 크기 때문에 관리자는 text 데이터 타입의 field를 인덱스를 걸었다. 그런데, 마이그레이션 하려는 DB-B의 최대 인덱스의 크기는 900 byte다. 이럴 경우 인덱스최대 크기를 초과하기 때문에 (아마도) 마이그레이션 실패할 것이다. 관리자는 어떻게 해서든 이문제를 해결해야 할 것이다.
+
+  * 색인의 최대 크기
+=== Pgsql과 mysql의 sql 기능상에서의 차이점 ===
+
+@

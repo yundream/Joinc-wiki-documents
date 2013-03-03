@@ -1,0 +1,78 @@
+#title GNS3로 DMZ 구성
+
+[[TableOfContents]]
+== DMZ 구성 ==
+[wiki:man12/dmz DMZ]에 대한 개략적인 내용은 [wiki:man/12/dmz DMZ]문서를 참고하기 바란다. 나는 GNS3를 이용 DMZ를 구성하려고 한다. 구성시나리오는 다음과 같다.  
+  1. L2 switch를 포함하는 하나의 lack이 있다. 
+  1. 이 lack에 WEB, WAS, DB 서버가 모두 구성돼 있다. 
+  1. 이 lack에서 DMZ zone을 구성하려고 한다. 
+DMZ는 L3 상에서 구현하는게 일반적이겠는데, 굳이 L2 상에서 구현하려는 이유는 lack이 독립적인 하나의 솔류션으로 들어간다고 가정하고 있기 때문이다. 어차피 L2 상에서 구현/테스트 할 수 있다면, L3 상에서의 구현/테스트도 문제될게 없을 것이다. 오히려 L2 에서의 테스트가 더 복잡할 수 있다.
+
+DMZ의 논리적인 구성은 다음과 같다. 이 구성을 네트워크 환경을 달리하면서 테스트 하려하다. 
+
+{{{#!html
+<img src=https://docs.google.com/drawings/pub?id=1Zyns_Ay5LWG2bg7OmQa2eTORnEJm1Ax9pj0HeYlzYSw&w=591&h=388>
+}}}
+
+== 하나의 L2 switch 로 구성 ==
+Lack이 하나의 L2 switch 만을 가지고 있다고 가정해 보자. 
+
+DMZ의 논리적인 구성을 보면, 최소 두개의 스위치가 필요하다. 그런데 이 경우 물리적인 스위치가 하나이므로 VLAN을 이용해서 논리적으로 나눠야 한다. 해서 Untagged VLAN으로 3개의 VLAN을 만들었다. 구성은 다음과 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Y_-MlYKOFeZXRiYgki7HH2Sg0s1NS0o1jQV7JatOFSE&amp;w=549&amp;h=315">
+}}}
+
+== GNS3로 구성 ==
+먼저 테스트를 위해서 3개의 [wiki:man/12/virtualbox virtualbox] VM을 만들었다. 그 다음 GNS3를 이용해서 네트워크를 구성했다. 구성도는 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1BFVs0gTIjBqtpDVno0AAzR8d55B0JhxBxoNzcCLnTwY&amp;w=433&amp;h=407">
+}}}
+  1. SW1 : L2 switch. GNS3는 아주 단순한 형태의 L2 switch를 제공한다. 거의 hub나 마찬가지이지만, VLAN 설정 정도는 가능해서, 그럭저럭 테스트 용도로 사용할 수는 있다. 
+  1. Web server : '''DMZ''' 영역으로 퍼블릭 네트워크에서 접근가능하다. 퍼블릭 네트워크로 연결하기 위한 인터페이스와 내부 네트워크로 연결하기 위한 인터페이스를 가지고 있다. 
+     * 퍼블릭 인터페이스의 IP 주소: 192.168.10.2 
+     * 내부 인터페이스의 IP 주소: 192.168.100.2 
+  1. F/W : WAS와 Web server사이의 트래픽을 제어하기 위한 F/W다.   
+     * DMZ 인터페이스의 IP 주소 : 192.168.100.3
+     * 내부 WAS가 위치하는 security 인터페이스의 IP 주소 : 192.168.200.2
+  1. WAS : Security 영역에 위치한다. 인터페이스의 IP 주소는 192.168.200.3이다. WAS는 두개의 안전장치를 가진다. 
+     1. 외부로 분리된 네트워크 : 바깥에서는 WAS의 네트워크 정보를 전혀 알 수 없다. IP spoofing와 같이 네트워크 정보를 이용한 공격을 할 수 없다.   
+     1. 방화벽 : 방화벽은 필수 조건은 아니다. 보안을 더 강화하고자 할때 사용할 수 있는 옵션이다.
+
+=== VLAN으로 나누지 않았을 경우 ===
+WAS 서버에 들어가서 tcpdump로 네트워크의 패킷 흐름을 살펴봤다. 
+{{{#!plain
+# tcpdump -i eth1
+18:29:27.249962 ARP, Request who-has 192.168.100.3 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.249966 ARP, Request who-has 192.168.200.2 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.249968 IP6 fe80::a00:27ff:fe19:8adf > ff02::2: ICMP6, router solicitation, length 16
+18:29:27.250014 IP6 :: > ff02::1:ff5a:aafc: ICMP6, neighbor solicitation, who has fe80::a00:27ff:fe5a:aafc, length 24
+18:29:27.250025 ARP, Request who-has 192.168.100.3 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.250028 ARP, Request who-has 192.168.200.2 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.250029 ARP, Request who-has 192.168.100.3 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.250031 IP6 fe80::a00:27ff:fe5a:aafc > ff02::2: ICMP6, router solicitation, length 16
+18:29:27.250035 IP6 fe80::a00:27ff:fe19:8adf > ff02::16: HBH ICMP6, multicast listener report v2, 1 group record(s), length 28
+18:29:27.250038 ARP, Request who-has 192.168.200.2 (Broadcast) tell 0.0.0.0, length 46
+18:29:27.250041 ARP, Request who-has 192.168.100.3 (Broadcast) tell 0.0.0.0, length 46
+}}}
+모든 호스트가 같은 브로드캐스트 도메인에 묶여있는 걸 확인할 수 있다.
+
+=== VLAN으로 나눌 경우 ===
+스위치의 MAC 주소 테이블을 네트워크 인터페이스와 맵핑해서 정리했다. VLAN 까지 적용했다.
+|| MAC Address    || Port   || Type || NIC    || IP             ||  용도          || VLAN   ||
+|| 0800.2781.c050 || 1      ||  Web || eth1   || 192.168.10.2   || Public network ||  1     ||
+|| 0800.2700.8c02 || 2      ||  web || eth2   || 192.168.100.2  ||                ||  5     ||
+|| 0800.2719.8adf || 3      ||  F/W || eth1   || 192.168.100.3  ||                ||  5     ||
+|| 0800.275a.aafc || 4      ||  F/W || eth2   || 192.168.200.2  ||                ||  10    ||
+|| 0800.276f.72f5 || 5      ||  WAS || eth1   || 192.168.200.3  ||                ||  10    ||
+스위치는 아래와 같이 설정했다.
+
+https://lh5.googleusercontent.com/-XpKn2CVrp6k/UJ0VvZ8WCpI/AAAAAAAACj4/rGFQOPLkYp8/s640/gns04.png
+
+이제 같은 VLAN에서만 브로드캐스팅 패킷이 전달되는 걸 확인할 수 있다.
+
+이렇게 테스트를 끝냈다. L3 switch를 이용해서 DMZ를 구성하는 것도 테스트해 봄직한데, 어차피 그게 그거라서 (사실은 귀찮아서)패스한다. 
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-11-09T15:45:21)]]

@@ -1,0 +1,279 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.02.14.05.12.34;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.02.14.04.59.24;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fdatabag
+@
+
+
+1.2
+log
+@106.240.8.227;;yundream;;
+@
+text
+@#title chef data bag
+
+[[tableofcontents]]
+== data bag ==
+data bags를 이용하면 전역적으로 사용할 값을 JSON 형태로 저장할 수 있다. 
+
+값을 저장해 놓고 사용한다는 점에서 Role이나 [wiki:Site/cloud/automation/chefAttribute attributes]와 비슷하다고 생각할 수 있지만, 이들과 연관성이 없다. chef server는 데이터 백 정보를 색인해 놓고 필요할 때 검색해서 사용한다.
+
+=== data bag 구성 ===
+데이터백은 '''BAG''' NAME과 ITEM으로 구성되며, 디렉토리 구성은 다음과 같다.
+{{{#!plain
+-- data_bags -+-- BAG -+-- ITEM 
+}}}
+
+실제 구성 예.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/7wJr_5kTewD9cXZjpPHBAtMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-KrevxMrtJY4/T0j8MkZkN3I/AAAAAAAACCM/q8Wc6l14Kow/s800/databag.png" height="137" width="308" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+
+=== data bag 생성 ===
+data bag을 만든 다음, 파일로 부터 읽어와서 채우면 된다.
+{{{#!plain
+# knife data bag create system_users
+# knife data bag from file system_users users.json
+}}}
+
+=== data bag 로딩 ===
+recpie DSL의 data_bag(BAG) 메서드와 data_bag_item(BAG, ITEM)메서드로 데이터백을 로딩할 수 있다. 전자는 데이터백의 모든 아이템을 후자는 데이터백의 특정 아이템을 로드한다.
+{{{#!plain
+data_bag('ntp')
+data_bag_item('ntp', 'default_server')
+}}}
+
+=== data bag 만들기 ===
+데이터 백은 chef-repo/data_bags 디렉토리 밑에 BAG Name을 이름으로 하는 서브 디렉토리를 만들고, 이 디렉토리 밑에 json 형태의 파일을 만들어서 관리한다. 
+
+knife로 데이터 백을 만든다. ntp를 위한 데이터 백을 만든다고 가정한다.
+{{{#!plain
+# knife data bag create ntp
+}}}
+
+data_bags 디렉토리에 ntp 디렉토리를 만들고 데이터 백 파일을 만든다.
+{{{#!plain
+# cd chef-repo
+# mkdir -p data_bags/ntp
+# vi data_bags/ntp/default_server.json
+{
+    "id" : "default_server",
+    "value" : "us.pool.ntp.org"
+}
+}}}
+id는 '''ITEM'''이름과 일치해야 한다. 
+
+knife로 데이터백 정보를 확인할 수 있다.
+{{{#!plain
+# knife data bag list
+  ntp
+  zone
+# knife data bag show ntp default_server
+id:     default_server
+value:  us.pool.ntp.org
+}}}
+
+=== recipes에 data bag 사용하기 ===
+recpies에 데이터 백을 적용시켜보자. [wiki:Site/cloud/automation/chefInstall chef install]에서 만들었던 HelloWorld recipes로 테스트 한다.
+
+{{{#!plain
+# cat cookbook/HelloWorld/recipes/default.rb
+mydata = data_bag_item('ntp','default_server')
+template "/tmp/HelloWorld.txt" do
+        source "HelloWorld.txt.erb"
+        variables ({
+                :message => node['message'],
+                :mydata => mydata['value']
+        })
+        action :create
+end
+}}}
+
+테스트를 위해서 템플릿을 약간 수정했다.
+{{{#!plain
+# cat cookbook/HelloWorld/template/default/HelloWorld.txt.erb
+My Message is : <%= @@message %>
+My Value is : <%= @@mydata %>
+}}}
+
+== 복잡한 예제 ==
+좀 복잡한 데이터백 예제를 만들었다. 데이터백의 이름은 system_users, 아이템이름은 users로 node의 유저를 관리하기 위한 정보를 가지고 있다.
+{{{#!plain
+# cat data_bags/system_users/users.json
+{
+  "id":"users",
+  "user": {
+    "www":{     
+      "name":"www",     
+      "password":"$6$ADoEDZUP1bkJmEy1cQ8R5sBacu/.qS2F/"
+      "home":"/home/www",
+      "shell":"/usr/bin/bash",
+      "gid":"100",      
+      "comment":"apache web server user", 
+      "sudo":"false"    
+    },          
+    "collectd":{
+      "name":"collectd",
+      "password":"$6$ADoEDZUP1bkJmEy1cQ8R5sBacu/.qS2F/",
+      "home":"/home/collectd",
+      "shell":"/usr/bin/bash",
+      "gid":"100",      
+      "comment":"System infomation collecte for zabbix monitering",
+      "sudo":"false"
+    },                  
+    "admin":{   
+      "name":"admin",
+      "password":"$6$ADoEDZUP1bkJmEy1cQ8R5sBacu/.qS2F/"
+      "home":"/home/admin",
+      "shell":"/usr/bin/bash",
+      "gid":"100",      
+      "comment":"System admin",
+      "sudo":"true"     
+    }                   
+  }             
+}       
+}}}
+
+이제 데이터백을 등록한다.
+{{{#!plain
+# knife data bag create system_users
+# knife data bag from file system_users users.json
+}}}
+
+recipes를 만든다. '''HelloWorld''' recipes를 수정하기로 했다.
+{{{#!plain
+# 아이템을 읽어온다.
+map = data_bag_item('system_users', 'users')
+
+users = map['user']
+puts map['user']['www']['name']
+users.each_key do |uinfo |
+    name = map['user'][uinfo]['name']
+    user name do
+        gid        map['user'][uinfo]['gid']
+        shell      map['user'][uinfo]['shell']
+        home       map['user'][uinfo]['home']
+        comment    map['user'][uinfo]['comment']
+        password   map['user'][uinfo]['password']
+    end 
+end
+}}}
+
+chef clinet node에서 chef-client를 실행하면, 유저 정보가 추가된 걸 확인할 수 있다.
+{{{#!plain
+# cat /etc/passwd  
+www:x:1001:100:apache web server user:/home/www:/usr/bin/bash
+admin:x:1002:100:System admin:/home/admin:/usr/bin/bash
+collectd:x:1003:100:System infomation collecte for zabbix monitering:/home/collectd:/usr/bin/bash
+
+# cat /etc/shadow
+}}}
+
+=== recipes 에서 데이터백 관리 ===
+때때로 recipes에서 직접 데이터백을 관리(생성/삭제/추가/수정)를 할 수 있다. 단 주의해야 할 점이 있다. 
+
+Databag은 시스템 전역적인 자원으로 관리자(admin)만 접근할 수 있도록 하는게 일반적이다. 따라서 chef-client가 레시피를 '''실행하는 동안'''에 데이터백을 생성하는 것은 그리 바람직하지 않다. 보통은 [wiki:Site/cloud/automation/chefAttribute attribute]를  이용해서 관리하는걸 권장한다.
+
+하지만 이러저러한 이유로 데이터백을 생성해야 한다면, 먼저 아래의 사항을 점검해야 한다.  
+  * 레시피를 수행하는 node client가 관리자 권한을 가지고 있어야 한다. 
+node를 등록하면 node의 등록이름으로 client가 생성된다. 예를 들어 my.joinc.co.kr 이라는 노드를 등록했다면 아래와 같을 것이다.
+{{{#!plain
+# knife client list
+  my.joinc.co.kr
+  chef-validator
+  chef-webui
+  chef-admin 
+}}}
+my.joinc.co.kr clinet의 정보를 살펴보자.
+{{{#!plain
+# knife client show aws-mgmt.joinc.co.kr
+_rev:        1-46d999389ade094b072d9fad64c3fbab
+admin:       false
+chef_type:   client
+json_class:  Chef::ApiClient
+name:        my.joinc.co.kr
+public_key:  -----BEGIN RSA PUBLIC KEY-----
+             .............
+             .............
+             .............
+             -----END RSA PUBLIC KEY-----
+}}}
+'''admin''' 값이 '''false'''로 돼 있는데, 이 상태로는 databag에 대한 제어가 불가능하다. knife를 이용해서 client의 admin 값을 true로 수정한다.
+{{{#!plain
+# knife client edit my.joinc.co.kr
+{
+  "chef_type": "client",
+  "_rev": "1-46d999389ade094b072d9fad64c3fbab",
+  "json_class": "Chef::ApiClient",
+  "name": "my.joinc.co.kr",
+  "admin": true,
+  "public_key": "-----BEGIN RSA PUBLIC KEY-----\n ..... ...."
+}}}
+이제 databag을 수정할 수 있다.
+
+먼저 데이터백의 생성
+{{{#!plain
+users = Chef::DataBag.new
+users.name("users")
+users.save
+}}}
+
+데이터벡 추가
+{{{#!plain
+sam = {
+  "id" => "sam",
+  "Full Name" => "Sammy",
+  "shell" => "/bin/zsh"
+}
+databag_item = Chef::DataBagItem.new
+databag_item.data_bag("users")
+databag_item.raw_data = sam 
+databag_item.save
+}}}
+
+== 팁 ==
+data bag을 만들다 보면, 잘못된 json 파일 형식이라는 파싱 오류 메시지를 자주 볼 수 있다. 그런데 knife는 어디에서 문제가 발생했는지를 알려주지 않아서 디버깅 하기가 까다롭다. 간단하게 사용할 수 있는 json 검사 방법을 소개한다.
+{{{#!plain
+# cat service.yundream.com.json | python -mjson.tool
+}}}
+어디에서 에러가 발생했는지, 줄과 컬럼까지 친절하게 알려준다.
+
+== 히스토리 ==
+  * 작성 : 2012년 2월 24일 
+  * 수정
+    * [[Date(2013-02-14T04:59:23)]] : recipes에서 databag 관리 
+
+[[tag(cloud,automatic,chef)]]
+@
+
+
+1.1
+log
+@106.240.8.227;;yundream;;
+@
+text
+@d7 1
+a7 1
+값을 저장해 놓고 사용한다는 점에서 Role이나 attributes와 비슷하다고 생각할 수 있지만, 이들과 연관성이 없다. chef server는 데이터 백 정보를 색인해 놓고 필요할 때 검색해서 사용한다.
+d164 1
+a164 1
+Databag은 시스템 전역적인 자원으로 관리자(admin)만 접근할 수 있도록 하는게 일반적이다. 따라서 chef-client가 레시피를 '''실행하는 동안'''에 데이터백을 생성하는 것은 그리 바람직하지 않다. 보통은 attribute를  이용해서 관리하는걸 권장한다.
+@

@@ -1,6 +1,7 @@
 #title chef roles
 
 [[tableofcontents]]
+... 작성 중..
 == Roles ==
 Roles을 이용하면 비슷한 성격을 가지는 노드들을 하나의 그룹으로 묶어서 설정을 관리할 수 있다. 서비스를 위한 웹서버를 운용한다고 가정해 보자. 이들 웹 서버는 apache 웹서버, php, mysql이 올라간다. 그렇다면 앞으로 추가되는 웹 서버들도 모드 동일한 애플리케이션과 설정을 가질 것이다. 그렇다면 webserver role을 만들어서 여기에 APM에 대한 정보를 넣어 넣고, 웹서버 node가 추가될 때마다 webserver role을 추가하면 간단하게 자동화 할 수 있을 것이다. 
 
@@ -13,6 +14,9 @@ role을 이용해서 복잡한 자동화 관리를 간단히 만들어 보자.
 === role 구성 ===
  * role은 attribute와 run list로 구성된다. 
  * node는 하나 이상의 role를 적용할 수 있다. 
+ * chef client가 실행되면, 자신에게 할당된 role의 run list와 자신의 attributes를 조합해서 설정을 관리한다. 
+
+예를 들어 우분투 서버에 웹 서버를 설치하려고 한다면, 이 노드는 'ubuntu'와 'web_server' 두개의 role을 적용할 수 있다. 각 role은 우분투 리눅스 설정과 웹 서버 설정에 필요한 로직과 데이터를 가지고 있다. 
 
 === role 관리 ===
 role은 4가지 방식으로 관리할 수 있다.
@@ -35,53 +39,62 @@ Chef server management console (웹 콘솔)을 이용할 경우
 
 가능하면 role 파일을 이용해서 작업하는 걸 권장한다. 
 
-=== 주요 role 필드들 ===
-JSON을 기준으로 설명한다.
-==== name ====
-각 role은 유일한 '''name'''을 가져야 한다.
+== Ruby DSL을 이용한 role 관리 ==
+Role는 JSON 파일을 컴파일하고 이 결과를 chef server에 업로드하는 방식으로 만든다. 
+
+다음은 간단한 웹 서버 role의 모습이다.
 {{{#!plain
-"name": "base"
+name "webserver"
+description "Simple Web App"
+run_list (
+  "recipe[apache2]"
+)
+}}}
+name, run_list, description과 같은 몇 가지 구성요소를 확인할 수 있을 것이다. 이들 구성요소의 정보를 채워넣어서 role을 만든다. 아래에 구성요소들을 설명하겠다.
+
+=== name ===
+Role은 유일한 이름을 가지고 있어야 한다. ![a-zA-Z0-9_-!]를 이름으로 사용할 수 있다. 스페이스 문자를 사용할 수는 없다.
+{{{#!plain
+name 'webserver'
+}}}
+=== description ===
+Role에 대한 설명
+{{{#!plain
+description "The base role for systems that server HTTP traffic"
 }}}
 
-==== description ====
-role이 하는 일에 대한 간단한 설명.
+=== run_list ===
+run_list에는 node에 적용할 recipes의 목록을 명시한다.
 {{{#!plain
-"description": "The webserver role for APM service"
+run_list "recipe[apache2]", "recipe[apache2::mode_ssl]", "role[monitor]"
+}}}
+이 노드에는 apache2, apache2::mode_ssl 레시피와 monitor role이 적용될 것이다.
+
+=== env_run_lists ===
+<!> env_run_lists는 Chef 10.0이상에서 사용할 수 있다. 
+
+Env에 대한 용어 정리를 하고 넘어가자. Env는 설정이 적용되는 환경을 의미한다. 예컨데 제대로된 프로세스를 밟는 제품이라면 개발 환경과 스테이지 환경, 상용 환경이 구분될 것이다. 개발 환경에서 개발을 끝낸 다음 스테이징 환경에서 테스트를 끝내고, 마지막에 상용 환경에 적용해서 실제 서비스를 하는 식이다. 이 경우 동일한 설정이라도 환경에 따라 달라질 수 있을 것이다. 
+
+env_run_lists를 이용하면 환경별로 chef 코드를 적용할 수 있다. 
+{{{#!plain
+env_run_lists "prod" => ["recipe[apache2]"], "staging" => ["recipe[apache2::staging]"], "_default" => []
 }}}
 
-==== run_list ====
-node에 적용할 recipes의 목록으로 하나 이상의 recipes로 구성할 수 있다.
+=== default_attributes ===
+chef 코드 개발자는 role에 포함된 모든 node에 적용될 attribute를 정의할 수 있다. 
 {{{#!plain
-"run_list": [
-	"recipe[apache]",
-	"recipe[mysql]",
-	"recipe[php]",
-	"recipe[sqlite]"
-]
+default_attributes "apache2" => {"listen_ports" => ["80","443"]}
+}}}
+만약 동일한 이름의 attribute가 존재할 경우에는 원하지 않는 결과가 생길 수 있다. 예를 들어 cook book의 attribute에 "listen_ports"가 있고 값이 배열이라면, "listen_ports"에 원소가 추가가 된다. 
+
+=== override_attributes ===
+role을 가진 모든 node의 attribute를 override 한다.
+{{{#!plain
+override_attributes "apache2" => {"listen_ports" => ["80","443"]}
 }}}
 
-==== env_run_list ====
-chef 0.10.x에 추가된 기능으로, 환경에 따라 다른 run list를 적용할 수 있다. 
-
-==== default_attributes ====
-{{{#!plain
-"default_attributes" {
-	"port": "80",
-	"max client": "100",
-	"max thread": "50"
-}
-}}}
-
-==== override_attributs ====
-{{{#!plain
-"override_attributes" {
-	"port": "80",
-	"max client": "100",
-	"max thread": "50"
-}
-}}}
-
-==== role 예제 ====
+== JSON을 이용한 role 관리 ==
+위에 소개한 루비 DSL로 개발한 attribute는 아래와 같이 JSON 형태로 작성할 수 있다. 
 {{{#!plain
 {
   "name": "webserver",
@@ -102,6 +115,7 @@ chef 0.10.x에 추가된 기능으로, 환경에 따라 다른 run list를 적�
     "role[montior]"
   ],
   "env_run_lists" : {
+    "_default" : [],
     "production" : [],
     "preprod" : [],
     "dev": [
@@ -121,8 +135,78 @@ chef 0.10.x에 추가된 기능으로, 환경에 따라 다른 run list를 적�
   }
 }
 }}}
+Json일 경우 몇 가지 요소가 더 필요하다.
+=== json_class ===
+'''Chef::Role'''만 사용된다.
 
-=== role 다루기 예 ===
+=== chef_type ===
+'''role'''만 사용된다.
+
+== knife로 role 관리하기 ==
+=== Node에 role 추가하기 ===
+run_list 명령으로 role를 추가할 수 있다.
+{{{#!plain
+knife node run_list add NODE "role[ROLE NAME]"
+}}}
+하나 이상의 role을 추가할 수 있다.
+{{{#!plain
+knife node run_list add NODE "role[ROLE NAME 1],role[ROLE NAME 2],role[ROLE NAME 3]"
+}}}
+
+=== role 만들기 ===
+role을 만들 때 사용할 에디터를 지정해야 한다. 환경변수를 이용해서 지정할 수 있다. 
+{{{#!plain
+export EDITOR=vi
+}}}
+
+새로운 role을 만든다.
+{{{#!plain
+knife role create footbar
+}}}
+
+EDITOR에 등록한 에디터로 role을 편집한다.
+{{{#!plain
+{
+    "name": "foobar",
+    "default_attributes": {
+    },
+    "json_class": "Chef::Role",
+    "run_list": [
+ 
+    ],
+    "description": "",
+    "chef_type": "role",
+    "override_attributes": {
+    }
+}
+}}}
+
+에디터를 종료하면 chef server에 저장이 된다. 
+
+=== role 편집 ===
+{{{#!plain
+knife role edit foobar
+}}}
+등록된 에디터로 role을 편집하고 저장하면 된다.
+
+=== role 보기 ===
+{{{#!plain
+knife role show foobar
+}}}
+
+=== role 삭제 ===
+{{{#!plain
+knife role delete foobar
+}}}
+
+=== 파일에서 role 만들기 ===
+JSON 파일로 부터 role을 만들 수도 있다.
+{{{#!plain
+knife role from file FILE
+}}}
+
+
+== role 다루기 예 ==
 knife로 role을 만들어 보자. role이 실제 동작하는 환경을 만들어야 이해가 쉬울 것 같다서, 다음과 같은 테스트 환경을 만들었다. 
   * chef client 운영체제 : Centos 6.2. virtualbox(:12)를 이용해서 생성.
   * chef client 도메인 이름 : web01.yundream.com

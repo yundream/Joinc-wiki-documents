@@ -1,0 +1,82 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.02.18.02.15.45;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fDatabase_2fPostgreSQL_2fDocuments_2fPostgresqlInstallForUbuntu
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title 우분투리눅스에 Pgsql 설치하기
+
+.. 작성 중
+== 설치 환경 ==
+  * 우분투 리눅스 12.04
+  * Postgresql 9.1.6
+
+== 설치 ==
+
+설치
+{{{#!plain
+# apt-get install postgresql
+}}}
+
+패스워드 설정
+{{{#!plain
+# sudo -u postgres psql postgres
+psql (9.1.6)
+Type "help" for help.
+postgres=# \password postgres
+Enter new password: 
+Enter it again: 
+}}}
+
+유저 생성. posgtres는 슈퍼권한을 가진 유저다. 개발/운영을 위해서 새로운 유저를 하나 만들었다. 
+{{{#!plain
+# sudo -u postgres createuser -P 'yundream'
+Enter password for new role: 
+Enter it again: 
+Shall the new role be a superuser? (y/n) 
+}}}
+
+이제 "yundream" 유저로 데이터베이스를 만들어 본다.
+{{{#!plain
+# createdb mydb -U yundream -W
+Password: 
+createdb: could not connect to database postgres: FATAL:  Peer authentication failed for user "yundream"
+}}}
+실패했다. 물론 postgres 권한으로 실행하면 성공하겠지만, 일반 유저는 일반권한으로 실행하도록 설정해야 한다. 
+
+해서 설정을 수정했다.
+{{{#!plain
+# cat /etc/postgresql/9.1/main/pg_hba.conf
+# ...
+# 로그인 방식을 설정하는 곳을 찾는다.
+# peer를 md5로 바꾼다.
+# 이제 local에서 접근하는 유저에 대해서는 시스템 계정이 아닌 데이터베이스에 설정한 계정으로 로그인 할 수 있다. 
+# "local" is for Unix domain socket connections only
+#local   all             all                                     peer
+local   all             all                                     md5
+# /etc/init.d/postgresql restart
+}}}
+
+이제 "yundream" 계정으로 데이터베이스를 관리할 수 있다.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-02-18T02:15:45)]]
+@

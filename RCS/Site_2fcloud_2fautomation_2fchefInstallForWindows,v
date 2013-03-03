@@ -1,0 +1,249 @@
+head	1.8;
+access;
+symbols;
+locks
+	root:1.8; strict;
+comment	@# @;
+
+
+1.8
+date	2012.11.26.06.55.36;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.11.23.01.54.09;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.11.23.01.40.56;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.11.23.01.36.38;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.11.23.01.34.35;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.11.23.01.28.40;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.11.22.07.59.32;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.11.22.07.37.40;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fchefInstallForWindows
+@
+
+
+1.8
+log
+@168.248.255.1;;yundream;;
+@
+text
+@#title Windows 서버를 위한 chef-client 설치
+
+[[TableOfContents]]
+
+== Windows 서버를 chef server로 사용하기 ==
+관심 없다. 그냥 리눅스 운영체제를 chef server로 사용할 테다.
+
+== Windows 서버에 chef-client 설치하기 ==
+설정관리가 필요한 모든 운영체제가 리눅스 였으면 좋겠다. 하지만 세상일이 내맘 같지 않아서 관리 시스템내에 윈도우즈가 있다는 거다. 윈도우즈를 버리고 리눅스로 통일하면 좋겠으나, 어디까지나 나만의 생각.
+
+다행히 윈도우즈 서버용 chef-client가 있다. 예전에는 한참의 삽질을 해야 윈도우즈에 chef-client를 설치할 수 있었던 것 같은데, 지금은 한번에 설치가능하다고 한다.
+
+이 문서는 [wiki:Site/cloud/automation/chefInstall 리눅스 환경에서 Chef install]의 윈도우즈 운영체제 버전이다.
+=== 테스트 환경 ===
+  * [wiki:man/12/virtualbox virtualbox]로 vm을 만들어서 테스트 했다.
+  * 윈도우즈 운영체제 버전 : windows 2003 x64. windows 2008 x64
+  * 리눅스 운영체제 버전 : centos 6. chef server가 설치돼 있다. 
+
+=== 빠른 설치 ===
+http://wiki.opscode.com/display/chef/Installing+Chef+Client+on+Windows 를 방문, chef-client-latest.msi를 다운로드해서 설치하면 된다. Ruby에서 부터 chef-client까지 필요한 모든 것을 한번에 설치해 준다.
+
+https://lh5.googleusercontent.com/-OGb4Pd1MX9U/UK7RjqYM6ZI/AAAAAAAACk8/Zmyk36QoPKs/s640/windows_chef_client01.png
+
+https://lh6.googleusercontent.com/-14sBZIqWk3U/UK7Rjr71J_I/AAAAAAAACk4/q-RYJ6IQjVI/s640/windows_chef_client02.png
+
+chef 관련 프로그램들은 c:/opscode 디렉토리 밑에 설치된다. 프로그램들이 제대로 설치가 됐는지 테스트 해보자.
+{{{#!plain
+c:\>tar --version 
+bsdtar 2.8.3 - libarchive 2.8.3
+c:\>ruby --version
+ruby 1.9.2p290 (2011-07-09) [i386-mingw32]
+c:\>chef-client --version
+Chef: 10.16.2
+}}}
+mingw를 기반으로 배포하나 보다.
+
+=== 설정 ===
+Chef client 기본 설정  디렉토리는 "\chef" 다. Knife로 설정파일을 만든다. 
+{{{#!plain
+c:\chef>knife configure client ./
+WARNING: No knife configuration file found
+Creating client configuration
+Writing client.rb
+Writing validation.pem
+}}}
+WinSCP 등을 이용해서 Chef server로 부터 validation.pem 파일을 복사해 온다. 이제 client.rb를 수정한다. 
+{{{#!plain
+c:\chef>cat client.rb
+log_level               :info
+log_location            STDOUT
+chef_server_url         'http://my.chefserver.com:4000'
+validation_client_name  'chef-validator'
+}}}
+
+chef-client를 실행한다. 
+{{{#!plain
+C:\chef>chef-client
+[2012-11-22T15:30:28+09:00] INFO: *** Chef 10.16.2 ***
+[2012-11-22T15:30:36+09:00] INFO: Client key C:\chef\client.pem is not present -
+ registering
+[2012-11-22T15:30:39+09:00] INFO: HTTP Request Returned 404 Not Found: Cannot lo
+ad node yun-windows
+[2012-11-22T15:30:39+09:00] INFO: Run List is []
+[2012-11-22T15:30:39+09:00] INFO: Run List expands to []
+....
+}}}
+
+Node가 성공적으로 등록됐는지 chef server에서 확인한다.
+{{{#!plain
+# knife node list
+windows2003.test.com
+...
+}}}
+
+=== cookbook 테스트 === 
+[wiki:Site/cloud/automation/chefInstall chef install]에 있는 HelloWorld 쿡북 예제를 윈도우 버전으로 수정했다. HelloWorld/recipes/default.rb만 약간 수정했다. 
+{{{#!plain
+template "c:/chef/HelloWorld.txt" do
+        source "HelloWorld.txt.erb"
+        variables :message => node['message']
+        action :create
+end
+}}}
+경로에 역슬래쉬(\)가 아닌 슬래쉬(/)를 사용하는 것에 주의하자.
+
+== 지원 resource ==
+남은건 리소스 지원 여부다. 아래의 리소스를 아직 지원하지 않는다고 한다.
+  * Cron
+  * Deploy
+  * Erlang call
+  * Git
+  * Http request
+  * Ifconfig
+  * Link
+  * Mdadm
+  * Package (but gem_package - for ruby gems, does work)
+  * Route
+  * SCM
+  * Script
+  * Subversion
+지원하지 않는 리소스가 있기는 하지만, PowserShell script 리소스가 있어서 (약간 귀찮은 걸 제외하면)문제될 것 같지는 않다. 
+
+== 히스토리 ==
+  * 작성 : [[Date(2012-11-22T07:37:40)]]
+  * 수정 
+     * [[Date(2012-11-23T01:34:35)]] : 이미지링크 수정
+     * [[Date(2012-11-26T06:55:36)]] : windows 2008 테스트 
+
+[[tag(chef,windows,cloud,ruby)]]
+@
+
+
+1.7
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d4 4
+d16 1
+a16 1
+  * 윈도우즈 운영체제 버전 : windows 2003 x64
+d107 1
+@
+
+
+1.6
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d80 1
+d104 1
+a104 1
+[[tag(chef,windows,cloud)]]
+@
+
+
+1.5
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d102 2
+@
+
+
+1.4
+log
+@168.248.255.1;;yundream;;
+@
+text
+@a17 1
+{{{#!html
+a18 1
+}}}
+a19 1
+{{{#!html
+a20 1
+}}}
+@
+
+
+1.3
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d18 8
+d104 2
+@
+
+
+1.2
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d9 1
+d14 1
+@
+
+
+1.1
+log
+@168.248.255.1;;yundream;;
+@
+text
+@d3 1
+d75 17
+@

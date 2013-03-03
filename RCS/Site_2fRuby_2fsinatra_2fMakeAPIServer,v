@@ -1,0 +1,337 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2013.02.26.15.19.24;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.02.26.15.00.52;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.02.26.14.47.05;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.02.25.03.04.10;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.02.24.15.26.08;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.02.24.05.13.57;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fsinatra_2fMakeAPIServer
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title sinatra로 API 서버 만들기 
+
+[[TableOfcontents]]
+== Sinatra로 만드는 Resful API server ==
+Sinatra는 경량 웹 프레임워크다. Ruby on Rails와 같은 '''MVC'''패턴은 제한적으로 지원하기 때문에 큰 규모의 웹 애플리케이션 개발에는 적합하지 않을 수 있다. 하지만 그리 크지 않은 규모의 웹 애플리케이션은 매우 빠르게 개발할 수 있다. 
+
+예컨데, Restful API 만을 제공하는 애플리케이션을 개발할 경우 좋은 선택이 될 수 있다. 여기에서 간단한 restful api server를 만들어 보려한다.
+
+더불어 운영체제의 설치에서 부터, 웹 서비스의 등록까지의 과정을 담아보려 한다.
+
+== 웹 애플리케이션 서버 개발 ==
+=== 기능 - Todo 관리 ===
+Todo 목록 관리를 위한 API 서버를 만들려고 한다. 이 서버는 최소한 아래의 API들을 제공해야 할 것이다.
+  1. '''POST /todo : Todo를 추가한다.'''
+  1. DELETE /todo/1234 : Todo를 삭제한다. 
+  1. PUT /todo/1234 : Todo의 내용을 업데이트 한다.
+  1. '''GET /todo/1234 : Todo 내용을 가져온다.''' 
+  1. '''GET /todo : Todo 목록을 가져온다.'''
+하지만 귀찮은 관계로 굵게 표시한 API만 개발할 생각이다.
+
+=== 운영체제 환경 ===
+VirtualBox에 Ubuntu 12.10 운영체제를 설치했다. Ubuntu 리눅스를 설치한 이유는 centos에 비해서 애플리케이션 설치/설정이 편하기 때문이다. 왠지 centos는 ubuntu 보다는 최신 패키지에 대한 패키징이 좀 늦어서, 최신 버전의 소프트웨어들을 설치할 때 간혹 애로사항이 꽃피고는 한다. 
+
+=== Sinatra + Thin 설치 ===
+Sinatra를 기동하기 위해서 먼저 ruby를 설치해야 한다. 특별히 버전을 명시하지 않을 경우 ruby 1.8.7 버전이 설치될건데, 최신 버전인 1.9를 설치했다. 
+{{{#!plain
+# apt-get install ruby1.9.1
+# apt-get install ruby1.9.1-dev
+# apt-get install rubygems
+# apt-get install g++
+}}}
+
+Sinata를 원할히 운영하기 위해서 필요한 몇 가지 ruby gem들을 설치했다.
+{{{#!plain
+# gem install haml
+# gem install sequel
+}}}
+
+Sinatra를 설치한다.
+{{{#!plain
+# gem install sinatra
+}}}
+
+[wiki:Site/Ruby/sinatra/UbuntuInstall Thin] 웹 서버를 설치한다.
+{{{#!plain
+# gem install thin
+}}}
+
+Monk를 이용해서 sinatra 웹 애플리케이션 뼈대를 만들었다. 웹 애플리케이션 디렉토리는 /opt/myapp 으로 했다. 
+{{{#!plain
+# gem install monk
+# mkdir /opt/myapp
+# cd /opt/myapp
+# monk add riblits git://github.com/Phrogz/riblits.git
+# monk init -s riblits
+}}}
+
+=== Thin + Sinatra 실행 환경 ===
+  * 서비스 포트 : 8080
+  * 서비스 프로토콜 : HTTP
+  * Log 디렉토리 : /opt/myapp/log 기본 디렉토리다. '''-l''' 옵션으로 로그 디렉토리 경로를 변경할 수 있다.
+
+아래와 같이 실행하면 된다.
+{{{#!plain
+# thin -p 8080 -R config.ru start -d  
+}}}
+
+=== API 개발 === 
+==== Model 개발 ====
+sqlite3 데이터베이스를 사용하기로 했다.ruby에서 sqlite3를 사용하기 위해서 관련 패키지를 설치했다.
+{{{#!plain
+# apt-get install sqlite3
+# apt-get install libsqlite3-dev
+# gem install sqlite3-ruby
+}}}
+
+데이터 베이스 설정
+{{{#!plain
+# cat models/init.rb
+require 'sequel'
+DB = Sequel.sqlite('todo.db')
+
+# 4개의 필드를 가진 아주 간단한 테이블이다.
+DB.create_table? :todos do
+    primary_key :id
+    String :title          # todo 제목
+    String :desc           # todo에 대한 상세 설명
+    DateTime :createdate   # todo 생성일
+    DateTime :duedate      # todo 만료일
+end
+
+require_relative 'todo'
+}}}
+
+모델을 만들자.
+{{{#!plain
+# cat models/todo.rb
+class Todo < Sequel::Model
+end
+}}}
+
+==== API 코드 ====
+순식간에 애플리케이션 하나 만들었다.
+{{{#!plain
+# cat routes/main.rb
+# encoding: utf-8
+require 'json'
+class MyApp < Sinatra::Application
+    before do
+        time = Time.new
+        @@currenttime = time.strftime("%Y%m%d%H%M%S")
+    end
+
+    # todo 목록을 추가한다. 
+    # todo 목록을 JSON 포멧으로 전송한다.
+    post "/todo" do
+        items = JSON.parse request.body.read
+        items["createdate"] = @@currenttime
+        Todo.create(items)
+    end
+
+    # id를 명시하지 않으면, todo 리스트를 출력한다.
+    # erb는 대충 만들자.
+    get "/todo" do
+        @@items=Todo
+        erb :todolist
+    end
+
+    # id를 명시하면 id에 해당하는 todo를 가져온다. 
+    # erb는 대충 만들자.
+    get "/todo/*" do |id|
+        @@todo=Todo[id]
+        if @@todo == nil
+            status 404
+            erb :eror
+        else
+            erb :todo
+        end
+    end
+end
+}}}
+
+==== API 테스트 ====
+get 테스트야 웹브라우저로 간단하게 진행할 수 있으니 문제될게 없고, post 테스트가 문제다. post를 위한 view를 만들면 되겠지만 귀찮다. 그래서 curl로 대신 테스트 했다. 
+
+테스트에 사용한 json 파일이다.
+{{{#!plain
+# cat item.json
+{
+    "title":"쓸만한 AWS Ruby library 찾기",
+    "desc":"Rython boto와 같은 ruby aws library가 있는지 찾아보자.",
+    "duedate":"20130228193000"
+}
+}}}
+
+curl로 item.json을 POST 방식으로 전송했다.
+{{{#!plain
+# curl -X POST http://192.168.57.15:8080/todo -d @@item.json -H "Content-Type: application/json" 
+}}}
+
+=== 배포 및 실행 ===
+==== init.d script ====
+Service 형태로 관리하는게 편할 것 같다. '''/etc/init.d''' 밑에 서비스 파일을 하나 만들었다. 서비스파일의 이름은 apiserver로 했다. 
+{{{#!plain
+#!/bin/sh
+THIN_BIN="/usr/local/bin/thin"
+APP_DIR="/opt/apiserver"
+PID_FILE="$APP_DIR/tmp/pids/thin.pid"
+
+if [ ! -x $THIN_BIN ]
+then
+    echo "ERROR : $THIN_BIN not installed"
+    exit 1
+fi
+
+if [ ! -e $APP_DIR ]
+then
+    echo "ERROR : $APP_DIR not found"
+    exit 1
+fi
+
+case "$1" in
+    start)
+        cd $APP_DIR
+        $THIN_BIN -p 8080 -R config.ru start -d 2> /dev/null
+        if [ $? -ne 0 ]
+        then
+            echo "ERROR : Starting... Thin ERROR ($?)"
+            exit 1;
+        fi
+        echo "Starting Thin server success!!"
+        exit 0
+        ;;
+    stop)
+        cd $APP_DIR
+        $THIN_BIN stop
+        ;;
+    restart)
+        $THIN_BIN restart
+        exit 0
+        ;;
+esac
+}}}
+Thin은 stop, start, restart 옵션을 제공한다. 개발자가 pid 파일을 검사할 필요 없이, thin이 알아서 pid 파일을 검사한다. 편하다.
+
+== 참고 ==
+ * [wiki:Site/Ruby/sinatra/ReadMe Sinatra readme 문서 - 한글]
+ * [wiki:Site/Ruby/sinatra/UbuntuInstall Sinatra + Thin 설치]
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-02-25T03:04:09)]]
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d44 1
+a44 1
+Thin 웹 서버를 설치한다.
+d206 4
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d103 1
+d105 54
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a3 1
+... 작성 중
+d13 2
+a14 2
+Todo 목록 관리를 위한 API 서버를 만들려고 한다. 이 서버는 아래의 API들을 제공한다.  
+  1. POST /todo/1234 : Todo를 추가한다.
+d17 3
+a19 2
+  1. GET /todo/1234 : Todo 내용을 가져온다. 
+목록을 가져온다든지, 남은 시간을 검사하는 등의 부가적인 기능을 넣지 않을 테다. 
+d21 2
+a22 2
+=== 운영체제 올리기 ===
+AWS에 운영체제를 올리려고 한다. AWS에 계정이 없다면, virtualbox 등을 이용해도 상관 없다. Ubuntu 12.10 서버 운영체제를 선택했다. AWS는 기본 AMI 형태로 지원한다. Ubuntu 리눅스를 이용한 이유는 sinatra 설치가 (centos 등에 비해서)매우 간단하기 때문이다.  
+d61 1
+a61 1
+  * Log 디렉토리 : /opt/myapp/log. 기본 디렉토리다. '''-l''' 옵션으로 로그 디렉토리 경로를 변경할 수 있다.
+d76 25
+a100 1
+... 계속
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 2
+d125 4
+a128 1
+Thin은 stop, start, restart 옵션을 제공한다. 개발자가 pid 파일을 검사할 필요 없이, thin이 알아서 pid 파일을 검사해서 lifecycle 명령을 관리한다.  
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d26 1
+d37 5
+d68 7
+a74 1
+sqlite3 데이터베이스를 사용하기로 했다.
+d76 48
+@

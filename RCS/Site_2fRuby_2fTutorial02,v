@@ -1,0 +1,459 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.10.20.05.50.19;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fTutorial02
+@
+
+
+1.1
+log
+@14.39.4.189;;Anonymous;;
+@
+text
+@#title ruby tutorial2 - Class
+
+[[TableOfContents]]
+== class ==
+클래스와 객체지향(:12)에 대한 내용은 링크를 참고하시고요. 언어를 막론하고 클래스의 사양은 크게 다르지 않으므로, 다른 객제 지향언어를 다룬 적이 있다면 쉽게 이해할 수 있을 겁니다. 특히 Java(:12)에 익숙하다면 더 쉽게 활용할 수 있을 겁니다.
+
+== 클래스 정의 ==
+루비 클래스 블럭은 class와 end 키워드 사이에 위치합니다. 특이한 점은 클래스 이름의 첫글자는 반드시 대문자여야 한다는 겁니다. 소문자면 에러가 발생합니다. 클래스는 보통 다음의 구서요소를 가집니다. 
+  1. method 
+  1. class variable
+  1. instance variable
+
+가장 간단한 클래스의 형식입니다.
+{{{#!plain
+class MyClass
+  def some_method
+  end
+end
+}}}
+=== Instance Variables ===
+인스턴스 변수는 클래스의 인스턴스에서 사용하는 변수입니다. 객체 변수 혹은 멤버 변수라고 부릅니다. 일반적으로 멤버 변수로 사용해 왔는데, Ruby는 인스턴스 변수란 용어를 선호하는 것 같습니다. 여기에서는 인스턴스 변수라고 부를 작정입니다.
+
+인스턴스 변수는 변수 이름 앞에 '''@@'''를 붙입니다. 
+{{{#!plain
+#!/usr/bin/ruby
+
+class MyClass
+  @@one = 1
+  def do_something
+    @@one = 2
+  end
+  def output
+    puts @@one
+  end
+end
+
+instance = MyClass.new
+instance.output
+instance.do_something
+}}}
+
+실행결과는 다음과 같습니다.
+{{{#!plain
+nil
+2
+}}}
+네 output 값이 nil이 나옵니다. 왜 1이 아니지라고 생각할 수 있겠는데요. 인스턴스 변수는 인스턴스에서만 사용할 수 있습니다. 다른 언어는 클래스에서 변수를 사용할 수 없도록 막고 있습니다. 아래 C++ 코드를 보죠  
+{{{#!plain
+#include <iostream>
+
+class MyInfo
+{
+    public:
+        int a = 1;
+        int b = 2;
+};
+
+int main()
+{
+    MyInfo m;
+    cout << m.a << endl;
+}
+}}}
+이 코드는 컴파일시 에러를 발생합니다.
+{{{#!plain
+instance.cpp:6:17: error: ISO C++ forbids initialization of member ‘a’
+instance.cpp:6:17: error: making ‘a’ static
+instance.cpp:6:17: error: ISO C++ forbids in-class initialization of non-const static member ‘a’
+instance.cpp:7:17: error: ISO C++ forbids initialization of member ‘b’
+instance.cpp:7:17: error: making ‘b’ static
+instance.cpp:7:17: error: ISO C++ forbids in-class initialization of non-const static member ‘b’
+}}}
+
+Ruby는 에러를 발생하지는 않는데요. 대신 기본 값으로 초기화 됩니다. 그래서 기본 값인 nil이 출력된거죠. 
+
+== Accessor Methods ==
+인스턴스 변수는 바깥에서 직접 접근할 수 없습니다. 메서드를 이용해서 접근해야 한다. 만약 바깥에서 직접 접근하고 싶다면 Accessor Methods를 만들어서 사용해야 합니다. 
+{{{#!plain
+#!/usr/bin/ruby
+
+class MyClass
+  def initialize
+    @@foo=28
+  end 
+  def foo 
+    return @@foo
+  end 
+end
+
+instance = MyClass.new
+puts instance.foo
+}}}
+foo를 읽을 수 있습니다. 하지만 읽을 수만 있습니다. 만약 값을 쓰려고 하면 에러가 발생할겁니다.
+{{{#!plain
+instance = MyClass.new
+puts instance.foo
+instance.foo = 496
+}}}
+foo에 496을 저장하려고 하면 다음과 같은 에러 메시지가 출력됩니다.
+{{{#!plain
+./class.rb:18: undefined method `foo=' for #<MyClass:0xb76f98b8 @@foo=28> (NoMethodError)
+}}}
+
+이 문제를 해결하는 방법은 두 가지 인데요. 하나는 쓰기 접근이 가능한 Accessor Methods를 만드는 겁니다.   
+{{{#!plain
+class MyClass
+  def initialize
+    @@foo=28
+  end
+  def foo
+    return @@foo
+  end
+
+  def foo=(value)
+    @@foo = value
+  end
+end
+}}}
+이 방식은 간단하긴 합니다만 인스턴스 변수가 추가될 때마다 접근을 위한 메서드 코드를 만들어줘야 한다는 단점이 있습니다. 번거롭죠. 그래서 attr_accessor을 이용해서 접근자 메서드를 정의하는 일을 자동으로 할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+class MyClass
+  attr_accessor :foo
+  def initialize
+    @@foo=28
+  end
+end
+
+instance = MyClass.new
+puts instance.foo
+instance.foo = 496
+puts instance.foo
+}}}
+훨씬 간단해 졌군요.
+
+하지만 Accessor 메서드를 사용할 경우 얻을 수 있는 장점이 있습니다. 메서드이기 때문에 얻을 수 있는 장점인데요. 필요한 연산을 할 수 있습니다. 입력 값을 반올림 해서 저장하는 코드입니다. 
+{{{#!plain
+class MyClass
+  def initialize
+    @@foo=28
+  end
+
+  def foo
+    return @@foo
+  end
+
+  def foo=(value)
+    @@foo = value.round
+  end
+end
+
+instance = MyClass.new
+puts instance.foo
+instance.foo = 496.6
+puts instance.foo
+}}}
+
+=== 클래스 변수 ===
+클래스 변수는 이름앞에 '''@@@@'''연산자를 붙여서 만듭니다. 이 변수는 모든 클래스 인스턴스에서 함께 사용하는데요. C++이나 Java의 '''static 변수'''와 비슷하다고 보시면 됩니다. 
+{{{#!plain
+#!/usr/bin/ruby
+
+class MyClass
+  @@@@value =1
+  def add_one
+    @@@@value = @@@@value +1
+  end
+
+  def value
+    @@@@value
+  end
+end
+
+instanceOne = MyClass.new
+instanceTwo = MyClass.new
+puts instanceOne.value
+
+instanceOne.add_one
+puts instanceOne.value
+puts instanceTwo.value
+}}}
+출력 값입니다.
+{{{#!plain
+1
+2
+2
+}}}
+
+=== Class instance Variables ===
+이건 좀 살펴봐야 할 것 같습니다. 알듯 알듯 하면서 명확하지가 않아서요.
+
+=== 클래스 메서드 ===
+클래스 메서드와 일반적인 메서드와 동일한 방법으로 선언합니다. '''self'''가 붙는 것으로 이 둘을 구분합니다. 클래스 메서드는 클래스 인스턴스를 만들지 않고도 사용할 수 있습니다. c++의 static 메서드와 비슷합니다. static 메서드와 마찬가지로 클래스 변수를 사용할 수 없습니다. 
+{{{#!plain
+class MyClass
+  def self.some_method
+    puts 'something'
+  end
+end
+MyClass.some_method
+}}}
+
+=== 인스턴스 ===
+인스턴스는 클래스로 부터 만드는 객체로, 인스턴스가 만들어지는 과정을 ''instantiation'''이라고 합니다. 루비는 아래와 같이 인스턴스를 만듭니다.
+
+
+{{{#!plain
+anObject = MyClass.new(parameters)
+}}}
+
+클래스는 인스턴스를 생성할 때 자동으로 실행될 함수를 정의할 수 있는데요, 이 함수의 이름이 initialize입니다. C++의 생성자와 비슷하죠. 생성자와 마찬가지로 매개 변수를 가질 수 있습니다.
+{{{#!plain
+class MyClass
+  def initialize(parameters)
+  end
+end
+}}}
+
+== Declaring Visibility ==
+루비 메서드들은 C++, Java와 같은 언어와 마찬가지로 public, private, protected 3개의 visibility 모드를 가지고 있습니다. hidden 방식이라고 보면 될 것 같은데요. hidden은 객체지향의 대표적인 특징이죠. hidden 속성을 조절함으로서, 객체는 속성과 메서드를 안전하게 운용할 수 있습니다. 
+
+=== Private ===
+private는 메서드와 변수에 hidden 속성을 부여한다고 보시면 됩니다. 외부에서 접근할 수 없습니다. private로 선언된 변수는 메서드를 통해서만 간접적으로 제어가 가능합니다. 
+
+자동차라는 객체가 있다고 가정해 봅시다. 자동차는 '''속도'''라는 속성을 가지고 있을 건데요. 이걸 외부에서 직접 접근하도록 하면 안되겠죠. 논리적으로도 맞지 않습니다. 속도는 엑셀레이터와 브레이크를 통해서만 접근해야 겠죠. 클래스라면 엑셀 메서드와 브레이드 메서드를 이용해서 접근하도록 해야 하죠. 속도는 private로 숨겨야 하는 속성인 거죠.
+
+루비에서의 private도 같은 목적으로 사용합니다. 메서드와 변수를 숨기기 위해서 사용합니다. private로 선언하는 방법은 다음과 같습니다.
+{{{#!plain
+  class Example
+    def methodA
+    end
+ 
+    private # 아래의 모든 메서드들은 private 입니다. 
+ 
+    def methodP
+    end
+  end
+}}}
+private 키워드를 단독으로 사용할 경우 아래의 모든 메서드들은 private가 됩니다. 선택적으로 적용하고 싶다면 아래와 같이 하면 됩니다.
+{{{#!plain
+  class Example
+    def methodA
+    end
+ 
+    def methodP
+    end
+ 
+    private :methodP
+  end
+}}}
+methodP를 private 속성으로 선언했습니다.
+
+클래스 메서드의 경우에는 '''private_class_method'''를 사용할 수도 있습니다. 특이한 것은 new 메서드도 private로 선언할 수 있다는 건데요. 주로 singleton(:12) 클래스를 만들기 위해서 사용합니다. new를 사용하는 대신 사용자 정의 메서드를 사용하도록 강제하는 식이죠. new가 숨겨지므로 오류를 줄일 수 있습니다.
+
+{{{#!plain
+#!/usr/bin/ruby
+
+class SingletonLike
+  private_class_method :new
+  @@num 
+  @@@@inst = nil 
+  def initialize
+    @@num = 0 
+  end 
+  def SingletonLike.create
+    @@@@inst = new unless @@@@inst
+    return @@@@inst
+  end 
+  def add_one
+    @@num = @@num+1
+    return @@num;
+  end 
+end
+
+args = "1" 
+block = nil 
+mySingle1 = SingletonLike
+mySingle2 = SingletonLike
+puts mySingle1.create.add_one
+puts mySingle2.create.add_one
+}}}
+
+=== public ===
+public는 기본 hidden 속성입니다. 자유롭게 접근할 수 있습니다.  
+
+
+=== protected ===
+C++이나 Java의 protected와 다르지 않습니다. 자신과 서브클래스들이 접근할 수 있으며, 외부에서는 접근할 수 없습니다. 이건 좀 자료를 더 찾아보고 정리해야 할듯
+
+== 상속 ==
+클래스는 슈퍼 클래스 (부모 클래스 혹은 베이스 클래스라고도 한다.)로부터 메서드와 변수를 상속받을 수 있습니다. 루비는 다중 상속을 지원하지 않습니다. 단지 하나의 슈퍼 클래스만 가질 수 있습니다. 
+{{{#!plain
+#!/usr/bin/ruby
+
+class Car
+  def transport_class
+    puts 'Car'
+  end
+end
+
+class Bus < Car
+  def sub_class
+    puts 'Bus'
+  end
+end
+
+myCar = Bus.new
+myCar.transport_class
+myCar.sub_class
+}}}
+출력 :
+{{{#!plain
+Car
+Bus
+}}}
+
+private 속성의 변수와 메서드가 아니라면 슈퍼 클래스로부터 자식 클래스로 상속 가능합니다.
+
+부모 클래스의 메서드는 오버라이드(:12)할 수 있는데요. super 키워드를 이용해서 여전시 부모클 클래스의 메서드를 사용할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+class Car
+  def iniitialize
+  end
+  def transport_class
+    puts 'Car'
+  end
+end
+
+class Bus < Car
+  def sub_class
+    puts 'Bus'
+  end
+  def transport_class
+    super
+    puts "This is My Car Class"
+  end
+end
+
+Bus.new.transport_class
+}}}
+출력 
+{{{#!plain
+Car
+This is My Car Class
+}}}
+
+부모 클래스의 메서드에 대해서 alias를 줄 수 있는데, 이 기능을 이용하면 상속 메서드를 좀 더 자유롭게 사용할 수 있습니다.
+{{{#!plain
+#!/usr/bin/ruby
+
+class Car
+  def iniitialize
+  end
+  def transport_class
+    "Car"
+  end
+end
+
+class Bus < Car
+  alias xCar transport_class
+  def sub_class
+    puts 'Bus'
+  end
+  def transport_class
+    print xCar, " : This is My Bus\n"
+  end
+end
+
+Bus.new.transport_class
+}}}
+출력
+{{{#!plain
+Car : This is My Bus
+}}}
+
+=== 모듈 사용하기 ===
+모듈은 클래스와 마찬가지로 메서드, 다른 모듈, 클래스를 포함할 수 있습니다. 하지만 클래스는 아닙니다. 따라서 인스턴스를 만들거나 할 수는 없습니다. C++의 [wiki:Site/C++/Documents/namespace namespace]와 비슷하다고 보면 될 것 같은데요. 
+  1. namespace : 새로 정의한 메서드 이름이 다른 곳에서 정의한 메서드와 충돌하지 않게 한다.
+  1. 클래스 사이에 기능 공유 : 클래스와 모듈을 함께 (Mix in)사용하면, 마치 클래스에서 정의한 것 처럼 모듈의 메서드를 사용할 수 있습니다. 상속을 하지 않고도 모듈의 기능을 공유할 수 있습니다.
+
+{{{#!plain
+module A
+  def a1
+    puts 'a1 is called'
+  end
+end
+ 
+module B
+  def b1
+    puts 'b1 is called'
+  end
+end
+ 
+module C
+  def c1
+    puts 'c1 is called'
+  end
+end
+ 
+class Test
+  include A
+  include B
+  include C
+ 
+  def display
+    puts 'Modules are included'
+  end
+end
+ 
+object=Test.new
+object.display
+object.a1
+object.b1
+object.c1
+}}}
+출력
+{{{#!plain
+Modules are include
+a1 called
+b1 called
+c1 called
+}}}
+
+=== Ruby Class Meta-Model ===
+
+{{{#!comment
+작성일 : 2011년 8월 5일 쯤.
+}}}
+
+[[Category(420)]]
+[[tag(ruby,객체지향,클래스)]]
+@

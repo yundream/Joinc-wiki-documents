@@ -1,0 +1,76 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.01.11.08.00.02;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fXen
+@
+
+
+1.1
+log
+@163.180.117.221;;Anonymous;;
+@
+text
+@#title Xen
+
+[[TableOfcontents]]
+== Xen ==
+Xen은 하나의 컴퓨터 하드웨어에서 다수의 운영체제를 동시에 운용할 수 있도록 만들어주는 소프트웨어다. GPLv2하에서 배포되고 있으며, IA-32, x86-64, ARM을 지원한다.
+
+== 구조 ==
+Xen은 native(bare-metal) 하이퍼바이저로, 다른 소프트웨어 보다 더 높은 CPU 권한을 가지고 실행된다.
+
+하이퍼바이저는 모든 가상머신(Xen에서는 "domains"라고 부른다)의 메모리 관리와 CPU 스케쥴링을 책임진다. 하이퍼바이저가 관리하는 가상머신 중 가장 권한을 가지는 특수한 가상머신인 "dom0"가 있다. 오직 dom0만이 하드웨어에 직접 접근할 수 있다. 다른 가상머신(domU라고 부른다.)들은 dom0의 관리를 받으며, dom0를 통해서 하드웨어 자원에 접근할 수 있다. 
+
+dom0 도메인은 [wiki:man/12/Linux 리눅스]나 NetBSD Solaris을 수정해서 만든 운영체제에서 만들어진다. DomU 도메인은 커널을 수정하지 않은 오픈소스 운영체제나 윈도우 같은 운영체제(Intel VT-x와 AMD-V 같은 하드웨어 가상화 기술이 적용돼 있어야 한다) 혹은 일부 커널 수정이 이루어진 ''para-virtualized''운영체제가 사용된다.
+
+Linux Dom0 기반의 x86 xen은 Pentium II이상의 프로세서에서 작동한다. 
+
+== Xen 역사 ==
+  * 1.0 : 2003-10-02
+  * 2.0 : 2004-11-05
+  * 3.0 : 2005-12-05
+     * Hvm 게스트를 위한 Intel VT 기술 지원
+     * Intel IA64 지원
+     * AMD SVM virtualization 지원
+     * PowerPC 지원
+     * Paravirtualised 게스트를 위한 그래픽 framebuffer 지원
+  * 3.1 : 2007-5-18
+     * Hvm을 위한 Liv migration 지원
+  * 3.2 : 2008-01-17
+     * PCI passthrough와 ACPI S3 standby 모드 지원 
+  * 3.3 : 2008-08-24
+     * PCI passthrough 와 power management 지원 강화
+  * 3.4 : 2009-05-18 
+     * Xen Client Initiative 포함
+  * 4.0 : 2010-04-07
+  * 4.1 : 2011-03-25  
+     * 255개 이상의 프로세서 지원. 2.6.37 버전부터 정식 리눅스 커널에 포함 
+
+== Xen 기술 ==
+=== 가상화 타입 ===
+==== Para virtualization - 게스트 수정 필요 ====
+Xen은 paravirtualization이라고 알려진 가상화를 개척했다. 이 가상화 타입에서 게스트 운영체제로 작동하기 위해서는 '''hypercall API'''를 사용하도록 수정된 커널이 필요하다. 
+
+Paravirtualized 모드에서는 CPU 가상화의 도움 없이도 게스트 VM(PV guest)을 올릴 수 있다. 32bit x86 상에서 Xen host 커널은 Ring 0에서, 호스트 도메인은 ring 1에서, 애플리케이션은 Ring 3에서 작동한다.   
+
+==== Hardware-Assisted virtualization - 게스트 수정 필요없음 ====
+대부분의 최신 CPU들은 가상화를 지원한다. 이들 프로세서를 이용하면 게스트운영체제를 수정할 필요 없이 가상화 기술을 적용할 수 있다. 이 기술은 HVM(hardware-assisted virtualization)이라고 부른다.
+
+HVM은 "root mode" 라고 부르는 추가된 실행 모드를 제공한다. 게스트 운영체제는 non-root 모드에서 동일한 방식(커널은 Ring-0, 응용 애플리케이션은 Ring-3)에서 작동한다. 오로지 root mode에서 작동하는 하이퍼바이저만이 실제 하드웨어에 접근할 수 있다. 하이퍼바이저를 위한 별도의 모드를 하드웨어에서 지원하기 때문에 과부하 원인인 '''binary translation'''과정이 필요가 없다. 
+
+Intel과 AMD는 하드웨어 가상화를 위해서 각각 Intel VT-x와 AMD-V를 지원한다. HVM은 I/O 성능을 높이기 위해서 게스트 운영체제를 위한 paravirtualized driver를 제공하기도 한다. HVM 게스트가 PV 드라이버를 이용해서 성능을 높이는 방식은 PV-on-HVM으로 부른다.  
+
+Xen HVM은 QEMU를 기반으로 한다. 
+@

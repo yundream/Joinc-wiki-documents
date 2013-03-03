@@ -4,7 +4,7 @@
 == data bag ==
 data bags를 이용하면 전역적으로 사용할 값을 JSON 형태로 저장할 수 있다. 
 
-값을 저장해 놓고 사용한다는 점에서 Role이나 attributes와 비슷하다고 생각할 수 있지만, 이들과 연관성이 없다. chef server는 데이터 백 정보를 색인해 놓고 필요할 때 검색해서 사용한다.
+값을 저장해 놓고 사용한다는 점에서 Role이나 [wiki:Site/cloud/automation/chefAttribute attributes]와 비슷하다고 생각할 수 있지만, 이들과 연관성이 없다. chef server는 데이터 백 정보를 색인해 놓고 필요할 때 검색해서 사용한다.
 
 === data bag 구성 ===
 데이터백은 '''BAG''' NAME과 ITEM으로 구성되며, 디렉토리 구성은 다음과 같다.
@@ -158,6 +158,68 @@ collectd:x:1003:100:System infomation collecte for zabbix monitering:/home/colle
 # cat /etc/shadow
 }}}
 
+=== recipes 에서 데이터백 관리 ===
+때때로 recipes에서 직접 데이터백을 관리(생성/삭제/추가/수정)를 할 수 있다. 단 주의해야 할 점이 있다. 
+
+Databag은 시스템 전역적인 자원으로 관리자(admin)만 접근할 수 있도록 하는게 일반적이다. 따라서 chef-client가 레시피를 '''실행하는 동안'''에 데이터백을 생성하는 것은 그리 바람직하지 않다. 보통은 [wiki:Site/cloud/automation/chefAttribute attribute]를  이용해서 관리하는걸 권장한다.
+
+하지만 이러저러한 이유로 데이터백을 생성해야 한다면, 먼저 아래의 사항을 점검해야 한다.  
+  * 레시피를 수행하는 node client가 관리자 권한을 가지고 있어야 한다. 
+node를 등록하면 node의 등록이름으로 client가 생성된다. 예를 들어 my.joinc.co.kr 이라는 노드를 등록했다면 아래와 같을 것이다.
+{{{#!plain
+# knife client list
+  my.joinc.co.kr
+  chef-validator
+  chef-webui
+  chef-admin 
+}}}
+my.joinc.co.kr clinet의 정보를 살펴보자.
+{{{#!plain
+# knife client show aws-mgmt.joinc.co.kr
+_rev:        1-46d999389ade094b072d9fad64c3fbab
+admin:       false
+chef_type:   client
+json_class:  Chef::ApiClient
+name:        my.joinc.co.kr
+public_key:  -----BEGIN RSA PUBLIC KEY-----
+             .............
+             .............
+             .............
+             -----END RSA PUBLIC KEY-----
+}}}
+'''admin''' 값이 '''false'''로 돼 있는데, 이 상태로는 databag에 대한 제어가 불가능하다. knife를 이용해서 client의 admin 값을 true로 수정한다.
+{{{#!plain
+# knife client edit my.joinc.co.kr
+{
+  "chef_type": "client",
+  "_rev": "1-46d999389ade094b072d9fad64c3fbab",
+  "json_class": "Chef::ApiClient",
+  "name": "my.joinc.co.kr",
+  "admin": true,
+  "public_key": "-----BEGIN RSA PUBLIC KEY-----\n ..... ...."
+}}}
+이제 databag을 수정할 수 있다.
+
+먼저 데이터백의 생성
+{{{#!plain
+users = Chef::DataBag.new
+users.name("users")
+users.save
+}}}
+
+데이터벡 추가
+{{{#!plain
+sam = {
+  "id" => "sam",
+  "Full Name" => "Sammy",
+  "shell" => "/bin/zsh"
+}
+databag_item = Chef::DataBagItem.new
+databag_item.data_bag("users")
+databag_item.raw_data = sam 
+databag_item.save
+}}}
+
 == 팁 ==
 data bag을 만들다 보면, 잘못된 json 파일 형식이라는 파싱 오류 메시지를 자주 볼 수 있다. 그런데 knife는 어디에서 문제가 발생했는지를 알려주지 않아서 디버깅 하기가 까다롭다. 간단하게 사용할 수 있는 json 검사 방법을 소개한다.
 {{{#!plain
@@ -167,5 +229,7 @@ data bag을 만들다 보면, 잘못된 json 파일 형식이라는 파싱 오�
 
 == 히스토리 ==
   * 작성 : 2012년 2월 24일 
+  * 수정
+    * [[Date(2013-02-14T04:59:23)]] : recipes에서 databag 관리 
 
 [[tag(cloud,automatic,chef)]]

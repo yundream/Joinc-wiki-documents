@@ -1,0 +1,161 @@
+#title gettext를 이용한 i18n 적용 
+
+[[TableofContents]]
+== I18n ==
+국제화 혹은 I18N이라고 부르기도 한다. I18N의 의미는 I와 N사이에 18개의 글자가 들어가 있다는 의미다. 자본의 국제화에 따라 상품은 물론이고 소프트웨어와 인터넷에 기반한 서비스들도 국제적으로 거래되기 시작했다. 
+
+특히 웹 서비스의 경우에는 그 경계가 없는데, 따라서 국제적으로 사용할 수 있도록 서비스를 개발해야 한다. 이때 가장 중요한 요소는 '''서비스 메시지의 국제화'''다. 간단히 생각하면 각 언어의 개수만큼 웹 페이지를 만들면 된다. 하지만 유지/보수에 엄청난 어려움이 예상된다.   
+
+혹은 i18n과 같은 효과를 내기 위해서 [wiki:Site/PHP/i18n msgid의 배열]을 만드는 방법도 있다. 하지만 가장 좋은 방법은 gettext를 이용하는 거다. 개발 언어에 상관없이 표준적으로 사용할 수 있으며, 문서에서 메시지를 추출하고, 컴파일하고, 병합하는 툴도 제공한다.
+
+== gettext ==
+gettext는 웹서비스를 비롯한 응용 소프트웨어에 사용되는 메시지들을 쉽게 다국어에 적용할 수 있도록 도와주는 툴이다. 이 툴을 이용하면, 개발자는 응용 프로그램으로 부터 번역할 메시지를 뽑아내서 "사전"을 만들 수 있다. 이 사전은 "메시지아이디"와 "번역된 스트링"으로 구성이 돼 있다. 개발자는 언어별 사전을 만들어서 국제화에 대비할 수 있다. 예를 들자면 아래와 같다. 
+  * "Hello" 라는 메시지 아이디를 추출한다. 
+  * 언어가 영어(en)일 경우. "Hello my friend"를 출력하도록 하고, 한글일 경우 "안녕 친구"를 출력하도록 사전을 만들어서 등록한다. 
+
+=== 파일 구조 ===
+딕셔너리의 구조는 다음과 같다.
+{{{#!plain
+ +---- locale ----+--- en ---+--- LC_MESSAGES 
+                  |
+                  +--- kr ---+--- LC_MESSAGES ---+--- messages.mo
+                                                 |
+                                                 +--- messages.po
+}}}
+en과 kr는 각 언어별 딕셔너리가 위치하는 디렉토리다. 딕셔너리 파일은 LC_MESSAGES밑에 위치하는데, 실제 응용에서 사용하는 딕셔너리는 확장자가 .mo인 파일이다.
+
+'''.po''' 파일은 원본 딕셔너리 파일이다. 이것은 응용 프로그램에서 추출한 메시지와 번역을 포함하고 있는데, 이 파일을 컴파일 하면 .mo 파일이 만들어진다. .mo 파일은 바이너리 파일로 메시지를 효율적으로 뽑아낼 수 있다. 
+
+=== php에서 gettext 지원 ===
+2013년 1월 현재 php는 gettext를 정식으로 지원한다.
+
+먼저 gettext를 설치한다. 
+{{{#!plain
+# apt-get install gettext
+}}}
+
+apache+php를 설치한다. 우분투 리눅스 12.04에 설치했다. 
+{{{#!plain
+# apt-get install apache2
+# apt-get install php5
+}}}
+우분투의 php5 패키지는 gettext가 enable된 상태로 배포된다. 패키지 설치하면 그걸로 끝이다. 따로 설정을 변경할 필요도 없다. 
+
+phpinfo함수로 gettext가 enable인지 확인해보자.
+
+https://lh3.googleusercontent.com/-Aif76cbLi6w/UPl0yL1ds5I/AAAAAAAACrY/b62W9WMZeQQ/s800/%25EC%258A%25A4%25EB%2583%2585%25EC%2583%25B73.png
+
+=== 시스템 locale 확인 ===
+시스템 locale를 확인한다. 리눅스 배포판에 따라서 시스템 locale에 언어가 등록돼있지 않으면 딕셔너리를 찾지 못하는 수도 있다. locale 명령으로 등록된 언어를 확인할 수 있다. 
+{{{#!plain
+# local -a
+// 생략
+C
+C.UTF-8
+en_ZA.utf8
+en_ZM
+en_ZM.utf8
+ko_KR.utf8
+// 생략
+}}}
+
+=== po 파일 만들기 ===
+'''xgettext'''을 이용해서 소스코드로 부터 메시지를 가져올 수 있다. xgettext는 소스코드를 읽어서 gettext함수를 추출해서 po파일을 만든다.
+
+테스트를 위해서 아래와 같은 php 파일을 만들었다.
+{{{#!plain
+# cat test.php3
+<?
+$language = 'en_IN';
+
+putenv("LANG=$language");
+setlocale(LC_MESSAGES, $language);
+$domain = 'messages';
+bindtextdomain($domain, './locale');
+bind_textdomain_codeset($domain, 'utf8');
+$str = textdomain($domain);
+echo $domain,"<br> $language <br>";
+
+echo gettext("Hello");
+echo "<BR>";
+echo gettext("What");
+?>
+}}}
+
+po파일을 만든다.
+{{{#!plain
+# xgettext -n test.php3
+}}}
+
+만들어진 po파일의 내용이다.
+{{{#!plain
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-01-18 22:35+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: utf-8\n"
+
+#: test.php3:10
+msgid "Hello"
+msgstr "HELLO World"
+
+#: test.php3:12
+msgid "What"
+msgstr "What's your name?"
+}}}
+msgid가 '''메시지 아이디'''이고 msgstr이 '''번역된 문자열'''이다. 물론 msgstr은 프로그래머(혹은 번역자)가 직접 입력해야 한다.  
+
+이제 po파일을 컴파일 한다.
+{{{#!plain
+# msgfmt messages.po 
+}}}
+컴파일 하고 나면 messages.mo 파일이 만들어진다. php 파일은 이 mo 파일을 읽어서 메시지를 처리한다. messages.po파일을 locale/en_IN/LC_MESSAGES 밑에 복사한다.
+
+=== 한글문서 테스트 ===
+msgid "Hello"와 "What"를 한글 메시지로 번역한다면 다음과 같이 po파일을 만들면 딘다.
+{{{#!plain
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-01-18 22:35+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: utf-8\n"
+
+#: test.php3:10
+msgid "Hello"
+msgstr "안녕하세요."
+
+#: test.php3:12
+msgid "What"
+msgstr "당신의 이름은 무엇입니까"
+}}}
+
+=== po 파일 관리 ===
+완전한 po파일을 만들었다고 가정해보자. 이 po 파일로 부터 mo 파일을 만드는 건 문제될게 없다. 그런데 새로 번역해야할 메시지가 추가됐다면 문제다. msgfmt를 사용하면 기존 po가 모두 삭제돼 버리기 때문이다. 이 경우에는 msgmerge로 문제를 해결할 수 있다.  
+  1. 기존 po 파일의 백업 파일을 만든다.
+    {{{#!plain
+# mv messages.po messages_old.po
+}}}
+  1. 새로운 po 파일을 만든다. 
+    {{{#!plain
+# xgettext -n *.php 
+}}}
+  1. msgmerge를 이용해서 이전 po 파일과 새로만든 po 파일을 병합(merge) 한다. 
+    {{{#!plain
+# msgmerge message_old.po message.po --output-file=message_new.po
+}}}
+  1. message_new.po 파일을 번역한다.
+  1. msgfmt로 mo 파일을 만든다.

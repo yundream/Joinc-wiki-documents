@@ -1,0 +1,120 @@
+#title rspec-core
+
+== rspec-core ==
+rspec-core는 실행 가능한 테스트코드를 만들기 위한 구조와 rspec 명령들을 제공한다.  
+
+=== 환경 ===
+내 리눅스 환경에서 테스트 했다.
+  * Ubuntn 리눅스 12.04
+  * Ruby 1.8.7  
+  * gem 1.8.24
+  * rspec 2.11.1
+
+=== 설치 ===
+{{{#!plain
+# gem install rspec       # rspec-core, rspec-expenctations, rspec-mocks 설치
+# gem install rspec-core  # rspec-core만 설치
+}}}
+
+=== 기본 구조 ===
+RSpec는 테스트를 정의하기 위해서 "describe"와 "it"을 사용한다. 다른 테스트 이름만 명시할 수 있는 다른 테스트 툴과 달리 "설명"을 이용해서 직관적인 테스트 케이스를 만들 수 있다는 장점이 있다. 예컨데 아래와 같다. 
+{{{#!plain
+"Describe an order."
+"It sums the prices of its line items."
+}}}
+
+이것을 rspec 코드로 표현하면 다음과 같다.
+{{{#!plain
+describe Order do
+  it "sums the prices of its line items" do
+    order = Order.new
+    order.add_entry(LineItem.new(:item => Item.new(
+      :price => Money.new(1.11, :USD)
+    )))
+    order.add_entry(LineItem.new(:item => Item.new(
+      :price => Money.new(2.22, :USD),
+      :quantity => 2
+    )))
+    order.total.should eq(Money.new(5.55, :USD))
+  end
+end
+}}}
+describe 메서드는 테스트 그룹을 정의한다. 이 블럭에 다양한 테스트 케이스를 작성한다. 
+
+=== nested groups ===
+또한 그룹안에 중첩된 그룹을 만들 수 있다. describe로 큰 범주에서의 테스트를 정의하고 nested group로 작은 범주의 테스트 그룹을 정의할 수 있다. 예컨데, 성공 테스트 케이스 그룹, 실패 테스트 케이스 그룹으로 묶어서 관리할 수 있다. nested group은 "context"로 만들 수 있다. 
+{{{#!plain
+describe Order do
+  context "with no items" do
+    it "behaves one way" do
+      # ...
+    end
+  end
+
+  context "with one item" do
+    it "behaves another way" do
+      # ...
+    end
+  end
+end
+}}}
+
+=== aliases ===
+=== shared examples ===
+shared_examples를 이용해서 공유 테스트 그룹을 선언할 수 있다. 공유 테스트 그룹은 다른 테스트 그룹에서 include해서 사용할 수 있다. 
+{{{#!plain
+shared_examples "collections" do |collection_class|
+  it "is empty when first created" do
+    collection_class.new.should be_empty
+  end
+end
+
+describe Array do
+  include_examples "collections", Array
+end
+
+describe Hash do
+  include_examples "collections", Hash
+end
+}}}
+
+=== metadata ===
+=== rspec 명령 ===
+rspec-core를 설치하면, 실행가능한 rspec 명령도 함께 설치된다. rspec --help 로 옵션을 살펴볼 수 있다.
+
+=== autotest integration ===
+
+=== rcov integration ===
+
+=== 간단 예제 ===
+간단한 예제를 만들어 보자. 계산기 클래스를 만들려고 한다. TDD는 코드를 만들기 전에 테스트를 만든다. 따라서 테스트를 위한 rspec 파일을 먼저 만든다. 
+{{{#!plain
+# in spec/calculator_spec.rb
+describe Calculator do
+  it "add(x,y) returns the sum of its arguments" do
+    Calculator.new.add(1, 2).should eq(3)
+  end
+end
+}}}
+
+테스트를 만들었다면, 코드를 만든다.
+{{{#!plain
+# in lib/calculator.rb
+class Calculator
+  def add(a,b)
+    a + b
+  end
+end
+}}}
+
+rspec 명령을 이용해서 테스트를 진행한다. 테스트 결과는 html 형식으로 레포팅했다. 
+{{{#!plain
+$ rspec spec/calculator_spec.rb --format doc
+Calculator add
+  returns the sum of its arguments
+
+Finished in 0.000379 seconds
+1 example, 0 failures
+}}}
+
+

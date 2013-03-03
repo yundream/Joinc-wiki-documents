@@ -1,0 +1,86 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.10.10.02.02.15;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fQOS_2fMonitering_5fTool_2fzabbix
+@
+
+
+1.1
+log
+@203.255.104.38;;Anonymous;;
+@
+text
+@#title 공개 시스템 모니터링 툴 zabbix
+
+=== 목적 ===
+  1. 공개 시스템 모니터링 툴은 '''zabbix'''를 설치하고 운용한다.
+  1. 장점과 단점을 확인한다.
+  1. 개선시킬 여지가 있는지 확인한다. 
+  1. QOS 시스템에 zabbix의 전부, 혹은 일부를 사용할 수 있을 것인가.
+
+=== 설치 ===
+소스를 컴파일(:12) 해서 설치하기로 했다.
+ * 다운로드 : http://www.zabbix.org/
+ * 버전 : zabbix-1.4.1
+ * OS : Ubuntu 7, Kernel(:12) 2.6.20
+ * DB : Sqlite(:12)
+
+zabbix는 snmp(:12)를 지원하며, 동시에 독립적인 '''Agent'''도 가지고 있다. 이 Agent를 이용하면, SNMP로는 얻기 힘든 자세한 시스템 정보들을 얻어낼 수 있다. 다음과 같은 방식으로 컴파일 했다. '''agent'''방식을 사용하며, DB(:12)로 mysql(:12)를 지원하도록 컴파일했다. 
+{{{#!plain
+# ./configure --enable-server --enable-agent --with-sqlite3 --with-mysql
+# make
+# sudo make install
+}}}
+
+=== APM 환경 설정 ===
+zabbix는 APM(:12) 환경을 필요로 한다. 또한 PHP(:12)의 경우 다음과 같은 기능을 지원해야 한다. 
+  * mysql, oracle(:12), postgresql(:12) 중 하나 
+  * gdlib
+  * BC math support
+yundream은 다음과 같은 옵션으로 php를 컴파일 했다. 
+{{{#!plain
+./configure --prefix=/usr/local/php  --with-config-file-path=/usr/local/apache/conf \
+--with-apxs2=/usr/local/apache/bin/apxs --with-charset=utf8 --with-language=korean --enable-sqlite-utf8 \
+--with-png-dir --with-jpeg-dir --enable-bcmath --with-gd --with-mysql
+}}}
+
+이외에 zabbix는 다음과 같은 php환경설정을 필요로 한다. php.int를 변경하도록 하자.
+{{{#!plain
+max_execution_time = 300
+date.timezone = ROK 
+}}}
+
+=== DB 설정 ===
+zabbix-1.4.1/create/schema 디렉토리에 zabbix가 사용할 데이터베이스의 schema 가 정의되어 있다. 다음과 같이 mysql를 위한 데이터베이스(:12)와 테이블을 생성했다. 
+{{{#!plain
+# mysql -u root 
+mysql> create database zabbix;
+mysql> grant all on zabbix.* to zabbix@@localhost identified by '<some password for zabbix>';
+mysql> flush privileges;
+mysql> quit
+
+# mysql -u root -p zabbix < mysql.sql
+}}}
+
+=== 웹 Frontends 복사 ===
+zabbix 디렉토리의 frontends/php 에 웹 인터페이스를 위한 php/html 파일들이 있다. 웹서버가 엑세스할 수 있는 디렉토리로 카피하도록 한다.
+
+=== setup ===
+APM 환경이 잘 구축되어 있고, php.ini가 제대로 설정되어 있다면, setup에 문제는 발생하지 않을 것이다. 웹서버를 가동시킨뒤에, 페이지에 접근하면 '''setup'''과정이 시작된다. 
+
+=== Login ===
+setup이 끝났다면, 웹 인터페이스를 통해서 로그인 할 수 있다. 초기 아이디는 '''Admin'''이며 패스워드는 설정되어 있지 않다.
+aaaaaaaa
+@

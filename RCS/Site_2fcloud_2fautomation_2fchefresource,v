@@ -1,0 +1,675 @@
+head	1.13;
+access;
+symbols;
+locks
+	root:1.13; strict;
+comment	@# @;
+
+
+1.13
+date	2013.02.05.04.50.02;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2012.12.24.14.50.20;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2012.12.22.15.52.35;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2012.12.18.16.20.44;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2012.12.18.14.53.13;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2012.12.17.15.24.08;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.12.15.14.36.47;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.12.14.09.53.00;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.12.14.09.03.06;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.12.13.09.45.21;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.12.13.06.19.34;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.12.13.01.57.25;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.12.12.14.24.42;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fchefresource
+@
+
+
+1.13
+log
+@106.240.8.227;;yundream;;
+@
+text
+@#title chef resouce
+
+[[TableOfContents]]
+== resource ==
+요리책(cookbook)과 조리법(recipe)가 준비됐다면, 각종 요리재료를 이용해서 요리를 만들어야 할 게다. 예컨데 resource는 요리를 만들기 위한 '''요리재료'''라 할 수 있다.
+
+요리에서 요리재료라면 후추, 고추, 마늘, 간장등이 되겠고, chef에서 요리재료라면 '''computer resource'''를 의미한다. 이를테면 파일, 디렉토리, service, file system, package, cron, user(계정), ruby code 등이 resource다. 좀더 간단히 (C/C++ 같은 프로그래밍 언어에서의) 미리 준비된 라이브러리라고 생각하면 된다. 
+
+resource의 구성요소는 다음과 같다.
+  * Resource name : File, Directory, Ifconfig, User등 리소스의 이름이다. 리소스 이름으로 이 리소스가 어떤 컴퓨팅 자원을 제어하는지를 유추할 수 있다. 
+  * Action : 리소스에 대한 '''생성''', '''삭제''', '''수정''' 등을 명시한다.
+  * Providers : 이 리소스를 적용할 수 있는 플랫폼을 알 수 있다. 어떤 리소스는 특정 운영체제에서만 사용할 수 있는 것들도 있다. 
+  * Attributes : 리소스의 제어가능한 속성들이다. 리소스에 따라서 다르다. 파일이나 디렉토리라면, path, mode, 권한 등의 속성이 attribute가 될 것이다. 
+
+=== Cookbook File ===
+=== Cron ===
+유닉스의 cron을 관리할 수 있다. cron이 설치돼 있어야 한다. 
+==== Actions ====
+|| '''Action'''       || '''설명'''                               || '''default'''      ||
+|| create             || crontab에 entry를 추가한다.              || yes                ||
+|| del                || crontab에서 entry를 삭제한다.            || yes                ||
+
+==== Attributes ====
+|| Attribute          || 설명                                       || 기본 값      ||
+|| minute             || 실행 시간. '''분'''(0-59)                  || *            ||
+|| hour               || 실행 시간. '''시간'''(0-23)                || *            ||
+|| day                || 실행 시간. '''일'''(1-31)                  || *            ||
+|| month              || 실행 시간. '''월'''(1-12)                  || *            ||
+|| weekday            || 실행 시간. '''일/주'''(0-6) (0 = 일요일)   || *            ||
+|| command            || 실행 명령                                  ||              ||
+|| user               || 실행 유저                                  || root         ||
+|| mailto             || MAILTO 환경변수 설정                       ||              ||
+|| path               || PATH  환경변수 설정                        ||              ||
+|| home               || HOME  환경변수 설정                        ||              ||
+|| shell              || SHELL 환경변수 설정                        ||              ||
+
+==== Providers ====
+|| Provider                   || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::Cron       ||                     || All                   ||
+
+==== 예제 ====
+매일 5시 마다 /bin/true 프로그램을 실행
+{{{#!plain
+cron "noop" do
+    hour "5"
+    minute "0"
+    command "/bin/true"
+end
+}}}
+
+
+=== Deploy ===
+=== Directory ===
+디렉토리를 관리할 수 있다. 단지 create와 delete를 할 수 있다. 
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                               || '''default'''      ||
+|| create             || 디렉토리를 만든다.                       || yes          ||
+|| delete             || 디렉토리를 지운다.                       ||              ||
+
+==== Attributes ====
+|| Attribute          || 설명                                       || 기본 값      ||
+|| group              || 디렉토리의 소유 그룹                       ||              ||
+|| mode               || 디렉토리의 모드 ('0755')                   ||              ||
+|| owner              || 디렉토리의 모드 ('0755')                   ||              ||
+|| inherits           || 윈도우즈에서만                             ||              ||
+|| right              || 윈도우즈에서만                             ||              ||
+|| path               || 디렉토리 경로                              ||              ||
+|| recursive          || 디렉토리를 지우거나 삭제할 때, recursively 하게 실행된다.  ||              ||
+
+==== Providers ====
+|| Provider                   || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::Directory  ||                     || All                   ||
+
+=== Env ===
+윈도우즈에서 사용할 수 있는 리소스라고 한다. 윈도우즈 환경을 잘 몰라서 우선 패스.
+
+=== Erlang Call ===
+Erlan call도 패스한다. 나중에 쓸일이 있으면 그때 살펴보련다.  
+
+=== Execute ===
+=== File ===
+Node의 파일을 제어하기 위한 리소스다. 간단하게 사용할 수 있겠지만 읽기를 할 수 없어서 자주 쓸일은 없을 것 같다. 차라리 루비의 File, IO 클래스를 이용하는게 나은거 같다.  
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                           || '''default'''      ||
+|| create             || 파일을 만든다.                       || yes          ||
+|| create_if_missing  || 파일이 업을 때만 만든다.             ||              ||
+|| delete             || 파일을 지운다.                       ||              ||
+|| touch              || 파일의 mtime과 atime을 update 한다.  ||              ||
+
+==== Attributes ====
+|| Attribute          || 설명              || 기본 값      ||
+|| pah                || 파일 경로                              || name         ||
+|| group              || 파일의 소유 그룹                       ||              ||
+|| mode               || 파일의 모드 (0755)                     ||            ||
+|| rights             || user permission - 윈도우즈에서만       ||            ||
+|| inherits           || 윈도우즈에서만                         ||            ||
+|| owner              || 파일의 소유 유저                       ||            ||
+|| content            || 파일에 쓸 내용. 이전 파일내용을 덮어쓴다 || nil(빈파일)      ||
+mode의 경우 "644"와 같이 string를 넣을 수 있다. 만약 string으로 입력할게 아니라면 00755와 같이 5자리의 숫자로 입력해야 한다.
+
+==== Providers ====
+|| Provider              || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::File  ||                     || All                   ||
+
+==== Examples ====
+파일을 읽거나 상태를 체크하는 기능이 없어서, 사용하기가 좀 애매할 수 있다. File을 제대로 다룰 거라면ruby_block를 사용하는게 나을거 같다. 
+
+파일 만들기
+{{{#!plain
+file "/tmp/something" do
+    owner "root"
+    group "root"
+    mode "755"      # 혹은 mode 00755
+    action :create
+end
+}}}
+
+파일 지우기
+{{{#!plain
+file "/tmp/something" do
+    action :delete
+end
+}}}
+
+=== Group ===
+운영체제의 그룹을 관리한다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                           || '''default'''      ||
+|| create             || 그룹을 만든다.                       || yes                ||
+|| remove             || 그룹을 제거한다.                     ||                    ||
+|| modify             || 그룹을 수정한다. 그룹이 없으면 예외를 발생한다.  ||        ||
+|| manage             ||                                      ||       ||
+
+==== Attributes ====
+|| Attribute          || 설명              || 기본 값      ||
+|| group_name         || 그룹 이름         || name         ||
+|| gid                || 그룹 id           || nil          ||
+|| members            || 그룹에 포함할 user id || nil      ||
+|| append             || 그룹에 유저를 추가한다. || false  ||
+|| system             || 시스템 그룹을 만든다.  || nil     ||
+
+==== Providers ====
+|| Provider                        || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::Group           ||                     ||                       ||
+|| Chef::Provider::Group::Dscl     ||                     || Mac OS X              ||
+|| Chef::Provider::Group::Gpasswd  ||                     || All                   ||
+|| Chef::Provider::Group::Pw       ||                     || FreeBSD               ||
+|| Chef::Provider::Group::Usermod  ||                     || Solaris               ||
+|| Chef::Provider::Group::Windows  ||                     || Windows               ||
+
+==== 예제 ====
+유저 생성
+{{{#!plain
+group "admin" do
+  gid 999
+  members ['paco', 'vicente']
+end
+}}}
+
+존재하는 그룹에 유저 추가
+{{{#!plain
+group "www-data" do
+  action :modify
+  members "maintenance"
+  append true
+end
+}}}
+
+=== HTTP Request ===
+HTTP 요청을 보내고 응답을 처리할 수 있다.
+==== Actions ====
+|| '''Action'''       || '''설명'''                                                                || '''default'''      ||
+|| get                || get 요청을 보낸다.                                                        || yes                ||
+|| put                || put 요청을 보낸다.                                                        ||                    ||
+|| post               || post 요청을 보낸다.                                                       ||                    ||
+|| delete             || delete 요청을 보낸다.                                                     ||                    ||
+|| head               || head 요청을 보낸다.                                                       ||                    ||
+|| options            || options 요청을 보낸다.                                                    ||                    ||
+
+==== Attributes ====
+|| Attribute          || 설명                                                       || 기본 값      ||
+|| url                || 요청을 보낼 URL                                            || nil          ||
+|| message            || URL에 보낼 데이                                            || name         ||
+|| headers            || 해쉬 형태의 사용자 헤더                                    ||              ||
+
+==== Providers ====
+|| Provider                    || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::HttpRequest ||                     || All                   ||
+
+요청을 보낼 수는 있지만 응답데이터를 처리할 수는 없는 것 같다. 그냥 ruby의 '''net/http'''를 사용하는게 나을것 같다.
+
+
+=== Ifconfig ===
+네트워크 인터페이스를 관리한다. 리눅스의 ifconfig 명령을 이용해서 할 수 있는 것들이다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                                                                                 || '''default'''      ||
+|| add                || 네트워크 인터페이스 추가. 운영체제에 따라서 network 설정 파일을 만들기도 한다.             || Yes                ||
+|| delete             || 네트워크 인터페이스를 down 한다. 운영체제에 따라서 network 설정파일을 삭제하기도 한다.     ||                    ||
+|| enable             || 네트워크 인터페이스를 활성화 한다.                                                         ||                    ||
+|| disable            || 네트워크 인터페이스를 비 활성화 한다.                                                      ||                    ||
+
+==== Attributes ====
+|| Attribute          || 설명                                                       || 기본 값      ||
+|| target             || 네트워크 인터페이스에 할당할 네트워크 주소                 || name         ||
+|| device             || 설정할 네트워크 인터페이스 이름                            || nil          ||
+|| hwaddr             ||                                                            || nil          ||
+|| inet_addr          ||                                                            || nil          ||
+|| bcast              || 브로드캐스트 주소                                          || nil          ||
+|| mask               || netmask                                                    || nil          ||
+|| mtu                || Maximum Transmission Unit                                  || nil          ||
+|| metric             || 인터페이스를 위한 routing metric                           || nil          ||
+|| onboot             || "yes"면 운영체제 부팅시 인터페이스가 올라온다.             || nil          ||
+|| network            || 네트워크 주소                                              || nil          ||
+|| bootproto          || "dhcp"와 같은 부트 프로토콜                                || nil          ||
+|| onparent           ||                                                            || nil          ||
+
+==== Providers ====
+|| Provider                   || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::Ifconfig   ||                     || All                   ||
+
+==== 예제 ====
+추가 네트워크 구성. 네트워크 설정파일을 만들고 활성화 한다.
+{{{#!plain
+ifconfig "10.0.0.2" do
+   device "eth1"
+   mask "255.255.255.0"
+   onboot "yes"
+   action [:add, :enable]
+end
+}}}
+
+=== Link ===
+=== Log ===
+Recipes에 로그를 추가할 수 있다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                           || '''default'''      ||
+|| write              || 로그를 쓴다.                         || Yes                ||
+
+==== Attributes ====
+|| Attribute          || 설명                                         || 기본 값      ||
+|| level              || :info, :warn, :debug, :error, or :fatal      || :info        ||
+
+
+=== Mdadm ===
+
+=== Mount ===
+파일 시스템 마운트를 관리한다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                                      || '''default'''      ||
+|| mount              || 디바이스를 마운트한다.                          || Yes                ||
+|| unmount            || 디바이스를 언마운트한다.                        ||                    ||
+|| remount            || 디바이스를 다시 마운트한다.                     ||                    ||
+|| enable             || fstab에 등록한다.                               ||                    ||
+|| disable            || fstab에서 삭제한다.                             ||                    ||
+
+Action은 순서가 정해져 있다. 예를 들어 enable에 앞서 mount가 와야 한다. ![:mount, :enable!]
+
+==== Attributes ==== 
+|| Attribute          || 설명                             || 기본 값                       ||
+|| mount_point        || 마운트할 디렉토리  이름          || name                          ||
+|| devie              || 마운트할 디바이스  이름          || nil                           ||
+|| devie_type         || 마운트할 디바이스  타입          || :device                       ||
+|| fstype             || 마운트할 디바이스의 파일 시스템  || nil                           ||
+|| options            || 마운트에 사용할 옵션             || defaults                      ||
+|| dump               ||                                  || 2                             ||
+|| pass               ||                                  || 2                             ||
+|| supports           ||                                  || {:remount => false}           ||
+
+==== Providers ====
+|| Provider                            || Shortcut Resource   || Default for platforms               ||
+|| Chef::Provider::Mount               ||                     || 윈도우즈를 제외한 모든 운영체제     ||
+|| Chef::Provider::Mount::Windows      ||                     || 윈도우즈                            ||
+
+==== 예제 ====
+NFS 파일시스템 마운트. 파일 시스템을 마운트 한다음 /etc/fstab에 입력한다. 
+{{{#!plain
+mount "/export/www" do
+  device "nfs.joinc.co.kr:/export/web_sites"
+  fstype "nfs"
+  options "rw"
+  action [:mount, :enable]
+end
+}}}
+
+=== Ohai ===
+=== Package ===
+=== PowerShell Script ===
+=== Remote Directory ===
+=== Remote File ===
+
+=== Route ===
+시스템 라우팅 테이블을 변경한다. 리눅스 운영체제에서 '''route'''를 가지고 하는 일들을 할 수 있다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                           || '''default'''      ||
+|| add                || route 추가                           || Yes                ||
+|| delete             || route 삭제                           ||                    ||
+
+==== Attributes ====
+|| Attribute          || 설명                             || 기본 값      ||
+|| target             || 타겟 주소                        || name         ||
+|| netmask            || network mask (ex, 255.255.255.0) ||              ||
+|| gateway            || 게이트웨이                       ||              ||
+|| devcie             || 패킷이 들어갈 네트워크 인터페이스   ||           ||
+
+==== Providers ====
+|| Provider                   || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::Route      ||                     || All                   ||
+
+==== 예제 ====
+{{{#!plain
+route "10.0.1.0/24" do
+  gateway "10.0.0.20"
+  device "eth1"
+end
+}}}
+
+=== Ruby block ===
+ruby_block 리소스를 이용하면 chef code에 실행가능한 ruby code를 넣을 수 있다. 하지만 cookbook내에서 ruby code를 실행할 수 있는데, 굳이 ruby_block을 사용할 필요가 있는지 모르겠다. ruby_block의 코드는 완전히 다른 자원으로 평가하기 때문에, 지역 변수등을 공유할 수 없다. 
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                           || '''default'''      ||
+|| create             || Ruby block을 만든다.                 || yes          ||
+
+==== Attributes ====
+|| Attribute          || 설명              || 기본 값      ||
+|| block              || Ruby code 블럭    || nil          ||
+
+==== Providers ====
+|| Provider                   || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::RubyBlock  ||                     || All                   ||
+
+==== 예제 ====
+Mysql 자동 replication.
+{{{#!plain
+# Recipe snippet applied to master DB node
+# Show master status의 값은 다음과 같다.
+# +---------------+----------+--------------+------------------+
+# | File          | Position | Binlog_Do_DB | Binlog_Ignore_DB |
+# +---------------+----------+--------------+------------------+
+# | mysql-bin.003 | 73       | test         | manual,mysql     |
+# +---------------+----------+--------------+------------------+
+ruby_block "master-log" do
+  block do
+    logs = %x[mysql -u root -e "show master status;" | grep mysql].strip.split
+    node[:mysql][:server][:log_file] = logs[0]
+    node[:mysql][:server][:log_pos] = logs[1]
+  end
+  action :create
+end
+# logs[0]은 bin 파일 이름
+# logs[1]은 위치다.
+
+# Make sure that we create replication users for each slave machine known
+# by chef-server.
+
+slaves = search(:node, 'mysql_server_role:slave')
+
+ruby_block "create-replication-users" do
+  block do
+    slaves.each do |slave|
+      # slave_ip = <favorite mechanism to get IP address from hostname>
+      %x[mysql -u root -e "GRANT REPLICATION SLAVE ON *.* TO 'replication'@@'#{slave_ip}' IDENTIFIED BY 'password';]
+    end
+  end
+  action :create
+end
+
+# Recipe snippet applied to slave DB nodes
+masters = search(:node, 'mysql_server_role:master')
+
+# Let's assume we only have one master for now
+ruby_block "import-master-log" do
+  block do
+    # master_ip = <favorite mechanism to figure out an IP address \
+                   from a hostname>
+    master_log_file = masters[0][:mysql][:server][:log_file]
+    master_log_pos = masters[0][:mysql][:server][:log_pos]
+    %x[mysql -u root -e "CHANGE MASTER TO master_host='#{master_ip}', master_port=3306, master_user='replication', master_password='password', master_log_file='#{master_log_file}', master_log_pos=#{master_log_pos};"]
+    %x[mysql -u root -e "START SLAVE;"]
+  end
+  action :create
+end
+}}}
+
+=== SCM ===
+=== Script ===
+=== Service ===
+=== Subversion ===
+=== Template ===
+
+=== User ===
+운영체제의 유저를 생성한다.
+
+==== Actions ====
+|| '''Action'''       || '''설명'''                                      || '''default'''      ||
+|| create             || 유저를 생성한다.                                || yes                ||
+|| remove             || 유저를 삭제한다.                                ||                    ||
+|| modify             || 유저를 수정한다. 유저가 없으면 예외를 발생한다. ||                    ||
+|| lock               ||                                                 ||                    ||
+
+==== Attributes ====
+|| Attribute          || 설명                                       || 기본 값      ||
+|| username           || 유저 이름                                  || name         ||
+|| comment            || 설명                                       || nil          ||
+|| uid                || User id                                    || nil          ||
+|| gid                || group id                                   || nil          ||
+|| home               || 홈 디렉토리                                || nil          ||
+|| shell              || 로그인 쉘                                  || nil          ||
+|| password           || 패스워드                                   || nil          ||
+|| system             || 시스템 유저 여부                           || nil          ||
+|| supports           ||                                            ||              ||
+
+system이 ''true'''이면 시스템 유저를 생성한다. --system 옵션으로 adduser 한 것과 동일한 결과를 보여준다. 
+
+==== Providers ====
+|| Provider                            || Shortcut Resource   || Default for platforms ||
+|| Chef::Provider::User                ||                     ||                       ||
+|| Chef::Provider::User::Useradd       ||                     || All                   ||
+|| Chef::Provider::User::Pw            ||                     || FreeBSD               ||
+|| Chef::Provider::User::Dscl          ||                     || Mac OS X              ||
+|| Chef::Provider::User::Windows       ||                     || Windows               ||
+
+==== 패스워드 생성 ====
+makepassword로 만들 수 있다.
+{{{#!plain
+# echo "password" | makepasswd --clearfrom=- --crypt-md5
+password     $1$pquf0fgS$bsU5hqyec3KRvnQuceC2X/
+}}}
+==== 예제 ====
+users 그룹으로 mytest 유저를 만들었다.
+{{{#!plain
+user "mytest" do
+   comment "Test user"
+   gid "users"
+   home "/home/mytest"
+   shell "/bin/sh"
+   password "$1$pquf0fgS$bsU5hqyec3KRvnQuceC2X/"
+   action :create
+end
+}}}
+
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-12-13T01:57:25)]]
+  * 수정
+    * [[Date(2012-12-13T09:45:21)]] : route 추가
+@
+
+
+1.12
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d406 1
+a406 1
+|| lock               || 유저 패스워드를 
+@
+
+
+1.11
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d250 1
+d252 39
+@
+
+
+1.10
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d171 1
+d173 22
+d238 11
+@
+
+
+1.9
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d172 1
+d174 39
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d283 1
+d285 50
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d79 1
+d128 43
+@
+
+
+1.6
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d13 1
+a13 1
+  * Attributes : 리소스의 제어가능한 속성들이다.
+d17 35
+d76 2
+d79 1
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d9 6
+d19 21
+d44 1
+a44 1
+Node의 파일을 제어하기 위한 리소스다. 
+@
+
+
+1.4
+log
+@175.253.74.194;;yundream;;
+@
+text
+@d102 1
+a102 1
+ruby_block 리소스를 이용하면 chef code에 실행가능한 ruby code를 넣을 수 있다. 예컨데, ruby가 가지고 있는 범용 프로그래밍언어의 강력함을 그대로 이용할 수 있다.
+@
+
+
+1.3
+log
+@175.253.74.194;;yundream;;
+@
+text
+@a66 1
+
+a67 1
+
+d73 1
+d75 25
+d178 2
+@
+
+
+1.2
+log
+@175.253.74.194;;yundream;;
+@
+text
+@d67 1
+d69 1
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+d9 7
+d61 14
+d142 10
+@

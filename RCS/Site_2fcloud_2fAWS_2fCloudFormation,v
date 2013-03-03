@@ -1,0 +1,130 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.12.10.14.59.39;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fAWS_2fCloudFormation
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title AWS CloudFormation
+
+[[TableOfContents]]
+== 소개 ==
+이 문서는 아마존의 클라우드포메이션의 가이드 문서가 아니다. 어떻게 클라우드포메이션같은 서비스를 구현할 수 있을지에 대한 아이디어를 만드는 것을 목적으로 한다.
+
+== CloudFormation에 대하여 ==
+클라우드포메이션은 웹 서비스를 빠르게 전개하기 위해서 제공하는 서비스다. 아주 간단히 생각하면, 자주 사용하는 웹 서비스에 대한 템플릿을 만들어서, 이 템플릿을 이용하면 VM 설치와 동시에 웹 서비스까지 가능하게 하는 서비스다.
+
+예컨데, 설치와 설정까지 모두 끝난 moniwiki VM에 대한 템플릿을 두면 사용자는 이 템플릿을 사용하는 것만으로 moniwiki를 즉시 사용할 수 있게 된다. 사용자는 자신만의 템플릿을 운용하거나 혹은 공개할 수도 있다.
+
+=== 서비스 목적 ===
+AWS의 클라우드포메이션은 비용을 받지 않는다. VM 생성에 따른 일반적인 리소스 사용비용만 받는다.
+
+유저 입장에서 퍼블릭 클라우드 서비스를 이용하는 이유는 서비스를 쉽게 전개하기 위함이다. 클라우드포메이션으로 서비스를 쉽게 전개할 수 있게 도와 줌으로써, 유저를 AWS 생태계에 끌어들일 수 있다. 제로보드 XE기반의 커뮤니케이션을 만든다고 가정해 보자. VM을 올리기만 하면, XE를 운영할 수 있도록 서비스를 제공하는 클라우드 제공 회사가 있다면, 당연히 이 회사의 서비스를 받으려 할 것이다. SaaS의 한 형태라 할만 하다.
+
+  1. 자신의 클라우드 서비스로 유도 : 자사의 클라우드 서비스를 사용하도록 유도할 수 있다. 들어 wordpress 템플릿을 제공한다고 가정해 보자. 기본 데이터베이스는 VM에 함께 설치된 MySQL이지만 좀 더 안정적인 서비스를 원할 경우 자사의 DB 서비스를 이용하도록 선택옵션을 준다거나, Availability zone 선택 옵션을 두는 식으로 유저를 클라우드 생태계 안으로 끌어들일 수 있다. 
+  1. 공개 소프트웨어 생태계 지원 : 다양한 종류의 웹 기반 공개 소프트웨어 들이 등장하고 있다. 최근에는 SNS 애플리케이션들도 찾아볼 수 있다. 소프트웨어 개발자는 템플릿을 만들어서 배포할 수 있고, 사용자는 간단하게 이들 애플리케이션을 전개해서 테스트/사용해 볼 수 있다. 
+  1. 기업유저 유도 : 개발한 소프트웨어를 배포하기 위해서, 혹은 마케팅 용도로 템플릿을 사용하려는 기업유저를 끌어들일 수 있다. 
+
+"유저 <->개발자 <-> 기업" 간의 클라우드 생태계를 만들 수 있다.
+
+=== 필요한 기술들 ===
+퍼블릭 클라우드에서 클라우드포메이션과 같은 서비스를 제공하려고 한다면, 대상 애플리케이션은 공개 소프트웨어야 할 것이다.
+  1. 오픈소스에 대한 전반적인 경험과 노하우
+  1. 정돈된 API : 클라우드가 제공하는 모든 자원에 대해서 접근할 수 있는 API가 필요하다.
+      * 전개할 이미지 선택 : 운영체제 종류, core 및 memory 갯수, disk 크기 
+      * 전개할 zone 선택
+      * 전개할 애플리케이션
+      * EIP 사용 여부 
+      * ELB 사용 여부
+      * Availability zone 사용여부 및 선택 
+      * Object storage 사용 여부 
+  1. 정돈된 web UI : 유저는 Web UI를 이용해서 템플릿, 클라우드 자원, 애플리케이션 매개변수 등을 설정하는 것으로 간단하게 서비스를 올릴 수 있어야 한다.   
+  1. 서비스 관리 : 정보를 공유하려는 목적으로 서비스를 전개하려는 유저가 많을 것이다. 이런 유저에게는 저렴한 가격으로 VM을 서비스 할수 있어야 하므로 Micro VM이 사용될 것이다. 하지만 어떤 유저는 다양한 어플리케이셔을 서비스하기를 원할 수도 있다. 예컨데 형상관리, 이슈추적 시스템, CMS, 블로그, Wiki 등을 서비스 하기를 원할 수 있는데 이들 유저를 위해서 자동설치/설정 서비스를 제공하면 좋을 것이다. chef, puppet 등의 자동화 솔류션을 이용해서 인프라를 구축할 필요가 있다. 
+
+=== 서비스 할만한 오픈소스들 ===
+ * WordPress 
+   * 각종 플러그인
+ * 제로보드  : XpressEngine
+ * Drupal
+   * Durpal + [wiki:Site/Database/Mysql MySQL]
+   * Durpal + RDBAS  
+ * Joomla
+ * PHPNuke
+ * Redmine
+ * 태터툴즈
+ * Moniwiki 
+ * Mediawiki 
+ * APM
+ * Git
+ * SVN
+ * Bugzilla
+ * Trac (+Git, +SVN)
+ * Mentis
+ * FreeNAS
+ * Chef
+ * Puppet
+ * Ruby on Rails
+ * PHP-Nuke
+ * Memcache
+
+CMS 부터 시작하는게 무난해 보인다. 사용자가 많아서 배포와 피드백이 용이하기 때문이다.
+ * [wki:http://w3techs.com/technologies/overview/content_management/all  Usage of content management systems for websites]
+ * [http://w3techs.com/technologies/segmentation/tld-kr-/content_management Distribution of content management systems among websites that use .kr]
+Wordpress와 XpressEngine(제로보드 XE) 부터시작하는게 무난하겠다. 
+
+== 자원 전개를 위한 infra 설계 ==
+Cloudformation의 핵심은 자원 전개와 이를 위한 API 개발이다. 자원은 설정파일을 이용해서 제어할 수 있다. AWS는 cloudformation을 위해서 독자적인 agent를 포함하는 운영체제 템플릿을 배포한다. 나는 chef를 이용해서 개발할 것이다. 모든 운영체제 템플릿에 chef-client와 몇개 agent를 개발해서 심을 것이다.
+
+기본 구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=130_0bRLYsIKIawpoXG_4nyTsm7vA_4ovKxEUfYNGPjc&amp;w=860&amp;h=360">
+}}}
+  1. cookbook을 개발한다.  
+     * resource와 recipes를 개발한다.
+  1. databag을 생성한다. 
+     * 제어할 클라우드 자원의 정보가 들어간다. 
+     * Web UI 정보가 들어간다.
+     * '''databag 대신에 attribute를 수정하는 방법도 있다.'''
+개발해야 하는 것들은 다음과 같다.
+  1. 클라우드 서비스의 접근을 위한 resource 개발 
+     * EIP, ELB, Availability zone, storage 등의 클라우드 서비스등을 사용하기 위한 공통 resource
+  1. cookbook 개발 환경 개발 
+     * cookbook 개발 환경 자체를 개발 해야 한다. cloudformation을 사용하려면 chef의 cookbook 사용법을 배워야 합니다.. 라고 할 수 없는 노릇이다. 
+     * WEB UI 방식으로 제공한다. 클라우드 자원은 select box등으로 선택할 수 있도록 하고, 애플리케이션 설정은 설정 파일의 일부분을 치환하는 인터페이스를 제작할 수 있도록 지원한다. 예를 들어 워드 프레스 라면, service port, DB 계정정보, 워드 프레스 사이트 제목 등을 입력할 수 있는 Web UI를 생성할 수 있어야 한다. ERB 템플릿 엔진을 사용한다.
+     * 이들 정보는 databag 형태로 저장된다.   
+
+=== 접근 권한 제어 ===
+chef로 개발할 경우 접근 권한을 어떻게 제어할 것인가 하는 문제가 남는다. 공용(public) cookbook 정보라면 상관없겠지만, 유저별 cookbook가 있을 수 있기 때문이다. AWS의 AMI와 같은 클라우드 통합 접근/권한 시스템의 개발이 필요하다.    
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1DRY2qolg9IPGP75zn_6UoG9Z1-l5wforihE2l1VqR6g&amp;w=1008&amp;h=500">
+}}}
+
+chef 자원접근 역시 이 접근/권한 시스템을 통해서 이루어지도록 해야 한다. 가장 단순한 방식은 proxy 구현이다. Proxy server를 경유해서 chef server로 요청을 전송하는 방식으로 Proxy server이 접근/권한 시스템에 연동하면 된다. 
+
+
+== 히스토리 ==
+  * 첫 작성 : [[Date(2012-07-11T05:37:49)]]
+  * 수정 
+    * [[Date(2012-12-10T14:59:39)]] : chef 기반으로 재 작성 시작
+
+[[Tag(AWS,cloud,cloudformation)]]
+@

@@ -1,0 +1,105 @@
+#title Anatomy of a chef run 
+
+[[TableOfContents]]
+== Anatomy of a Chef Run ==
+chef는 활용 측면에서만 접근을 시도했기 때문에 어떤 구조를 가지고 있는지, 어떻게 실행되는지 그런건 별로 신경쓰지 않았다. "시키는 일만 잘 하면 되겠지"라는 마인드로 사용했다. 
+
+탑다운방식의 접근이라고 볼 수 있겠는데, 굳이 머리아픈 바닥까지 내려가고 싶진 않았고 그냥 탑에서 적당히 유용하게 써먹으면서 놀고 싶었다.  
+
+그런데 역시나 쓰다보니 바닥을 살펴봐야 하는 그때가 오고야 말았다.
+
+=== 리소스 블럭문이 나중에 실행되네 ?  ===
+mount [wiki:Site/cloud/automation/chefresource resource]를 이용해서 [wiki:man/12/NFS NFS] 설정을 관리하는 레시피를 만들었다.
+{{{#!plain
+mount "/export/www" do
+  device "nfs.joinc.co.kr:/export/web_sites"
+  fstype "nfs"
+  options "rw"
+  action [:mount, :enable]
+end
+}}}
+나는 mount 결과를 http를 이용해서 전송받기를 원했다. 예컨데 언제, 어느 노드에서, mount를 수행했는데, 성공(혹은 실패)했다는 정보를 전송하는 거다.     
+
+그래서 코드를 약간 수정했다.
+{{{#!plain
+require 'net/http'
+mount "/export/www" do
+  device "nfs.joinc.co.kr:/export/web_sites"
+  fstype "nfs"
+  options "rw"
+  action [:mount, :enable]
+end
+# 마운트가 성공적으로 수행됐는지 검사.
+# http request 코드들. get 메서드로 에러메시지를 전송한다. 
+....
+....
+}}}
+내 계획은 "resource 블럭인 mount 블럭이 먼저 실행될테니, mount 블럭뒤에 mount 여부를 검사하는 코드를 넣던지 혹은 resource의 실행 결과를 가져와서 http request를 날리면 되겠지"였다. 그런데 http request 코드가 먼저 실행이 되는거다. 아 뭐지 ? 그래서 나름 머리를 굴려서 생각한 원인이 "블록문은 스레드로 돌아간다"였다. 그래서 sleep을 사용해서 테스트를 했는데도, 여전히 블럭문이 나중에 실행되는 거다. 
+
+해서 이리저리 문서를 찾아다녔는데, 답은 opscode 홈페이지에 있었다. 역시 문제가 생기면 먼저 메뉴얼을 읽어야 하는 거다.
+
+=== Chef anatomy ===
+Chef anatomy문서를 보면, 레시피 코드를 해석하는 순서가 나와 있다.
+
+http://wiki.opscode.com/download/attachments/1179915/Anatomy-of-Chef-Run-0.10.png?version=1&modificationDate=1307055769000
+
+단계별로 알아보자.
+==== Build, Register, Authenticate the Node ====
+===== Build the Node =====
+Chef client나 Chef solo에 의해서 노드가 구축된다. 이때 Ohai가 실행되면서, 노드 정보를 긁어오고 긁어온 정보를 토대로 node default attribute가 만들어진다.   
+
+===== Registering with the chef server =====
+노드가 구축되고 나면, chef client는 자신의 프라이빗키 파일(보통 /etc/chef/client.pem)을 찾는다. 만약 프라이빗 키가 존재하지 않는다면, 자신을 chef server에 등록하기 위한 과정을 수행한다. 우선 임시로 chef client는 자신의 이름을 ''chef-validator''로 가정한다. chef-validator는 새로운 클라이언트를 등록하기 위해서 사용하는 임시 클라이언트 이름이다. ''chef-validator''를 위한 키는 /etc/chef/validation.pem을 참조한다. validation.pem은 chef server로 부터 복사해서 사용해야 한다. chef client는 chef-validator 이름으로 chef server의 인증을 받는데, 인증이 완료되면 /etc/chef/client.pem 파일이 만들어진다. 앞으로는 client.pem을 이용해서 인증을 하게 된다. 
+
+==== Synchronize cookbooks ====
+Chef client는 chef server에 모든 쿡북과 쿡북에 포함된 libraries, attributes, definitions, recipes를 가져와서 로컬 캐쉬에 저장한다.
+
+=== Compile - Resource Collection ===
+이제 쿡북으로 부터 모든 정보를 읽어와서, 노드가 필요로 하는 resource를 수집한다. 
+
+  * Load libraries : 먼저 쿡북에 있는 모든 라이브러리를 로드한다.
+  * Load attributes :  모든 attribute 파일을 로드한다. 레시피와 노드 어드티뷰트를 업데이트 한다. 
+  * Load Definitions 
+  * Load Recipes : 이 시점에서 레시피를 평가한다. 이 시점에서 resource를 위한 액션을 취할 수 없다. 리소스는 리소스 collection에 수집된다. '''"이 부분이 문제였다. resource는 recipes의 해석이 모두 끝난 다음에 수행된다."'''  
+     * 기본적으로 리소스들은 배열에 들어간다   
+     * 순수 루비코드들은 리소스 밖에서 해석된다. 
+     * 만약 루비코드를 다른 리소스와 함께 수행하기를 원한다면, Ruby Block 리소스를 이용해야 한다. 
+     * 필요하다면 컴파일 시간에 리소스를 수행할 수도 있다. 
+
+== Execute - Configure Node ==
+이제 chef는 시스템 설정을 변경할 준비를 마쳤다.
+  * Coverage : 융합 단계다. 리소스 컬랙션에 들어있던 리소스는 실제 실행되기 위해서 provider과 결합되고, 구성된다. 
+  * Save Node : Coverage 후에 chef는 노드 데이터 지속하고 검색할 수 있도록 노드의 상태를 저장한다.
+  * Run Notification : 마지막으로 notification handler이 실행된다. 
+ 
+== 문제 해결 == 
+리소스가 나중에 실행되는 것은 레시피와 순수 루비코드가 먼저 평가되고, 리소스는 나중에 실행되는 chef의 구조 때문이었다. 리소스를 컴파일시간에 수행할 수 있는 방법이 있으니, 문제 해결.    
+
+참고로 이것은 최선의 방법은 아니다. 내가 하려고 한 건 리소스가 성공적으로 수행했는지 여부인데, resource class의 updated_by_last_action? 으로 확인할 수 있다. 해당 리소스가 성공적으로 수행됐다면 true 그렇지 않다면 false를 반환한다.    
+
+== Evaluate and Run Resources at Compile Time ==
+Chef 레시피는 '''Compile'''과 '''Execute'''의 두 가지 단계가 있다.
+  1. '''Complie'''단계에서 레시피는 로비코드를 실행한다. Resource는 실행하지 않고, Resource collection에 넣는다. 
+  1. '''Execute''' 단계어서, Chef는 resource를 실행한다.
+이것은 chef의 일반적인 실행방법이지만, 원한다면 실행 단계를 변경할 수도 있다.
+
+=== 예제 - mount ===
+Mount resource를 이용해서 간단한 예제를 하나 만들어 봤다.
+{{{#!plain
+e = mount "/export/www" do
+  device "nfs.joinc.co.kr:/export/web_sites"
+  fstype "nfs"
+  options "rw"
+  action [:nothing]
+end
+
+e.run_action(:mount)
+
+if e.updated_by_last_action?
+  # 에러처리를 위한 코드삽입
+end
+}}}
+이제 mount resource 블럭은 compile 시간에 즉 다른 루비코드와 함께 순차적으로 실행된다. 이제 resource의 '''updatd_by_last_action'''을 이용해서 resource가 제대로 실행됐는지 확인하고 에러처리 코드를 삽입할 수 있다. 
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-01-07T09:10:45)]]

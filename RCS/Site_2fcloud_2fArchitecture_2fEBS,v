@@ -1,0 +1,339 @@
+head	1.12;
+access;
+symbols;
+locks
+	root:1.12; strict;
+comment	@# @;
+
+
+1.12
+date	2013.01.02.01.42.59;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2013.01.01.13.31.55;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2013.01.01.13.31.02;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2012.12.31.15.59.41;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2012.12.31.15.59.20;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2012.12.31.13.48.36;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2012.12.31.06.01.06;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2012.12.31.02.30.20;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2012.12.30.15.03.42;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2012.12.30.14.17.46;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.12.30.14.11.53;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.12.30.14.05.25;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fArchitecture_2fEBS
+@
+
+
+1.12
+log
+@183.98.30.10;;yundream;;
+@
+text
+@#title Cloud architecture - EBS 기준으로 
+
+[[TableOfContents]]
+== Simple architecture에서의 snode 구성에 대하여 ==
+이전에 다루었던 [wiki:Site/cloud/Architecture/Simple simple cloud 구조]는 POD에 snode를 두고 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1iOOzWG6yl7iN9_WaCz73gXAkh_Ge-2Kz71zi8OchAew&amp;w=493&amp;h=504">
+}}}
+
+이렇게 구성한 이유는 아래와 같다.
+
+ * 익숙한 아키텍쳐다.
+   내가 처음 사용한 cloud os는 클라우드스택이고, 하이퍼바이저로 '''xenserver'''를 사용했다. Xenserver는 기본적으로 cluster 단위로 자원을 관리한다. Cluster은 두 개이상의 xenserver로 구성된 pool인데, cluster로 묶인 xenserver들은 cpu, memory, storage를 공동자원으로 관리한다. 이 cluster의 자원은 다른 cluster 자원으로 부터 독립된다.   
+   이렇게 구성을 하다보니, cluster단위로 storage를 관리하는 위의 simple cloud 형상이 만들어진거다.  
+ * 구성이 단순하다.
+    cluster 단위로 storage가 강하게 연결되는 구조이기 때문에 구성이 단순하고, 구성후 결과를 예측하기가 쉽다. 말그대로 간단한 설계가 가능하다. 소프트웨어든 하드웨어든지 간에 "유연하게 연결"될 수록 복잡도가 증가하기 마련이다.   
+
+이 구성은 다음과 같은 문제를 가지고 있다.
+
+  * 비효율적인 자원 관리
+    Simple 구성에서 자원관리 단위는 POD으로 cpu, memory, disk, network를 공유관리한다. 여기에서 주목할 점은 Data center 단위가 아니라는 점이다. 따라서 자원의 낭비가 발생할 수 있다. 
+
+이런 경우다.
+  1. POD의 cpu와 memory자원은 아직 충분하다. 그런데, 이미 storage가 꽉차버려서 더 이상 자원을 할당할 수가 없다. '''CPU와 memory 낭비가 발생한다.''' 
+  1. Storage의 용량은 충분하다. 반면 사용 가능한 cpu, memory 자원이 없다. '''Storage 낭비가 발생한다.'''
+
+자원을 효율적으로 관리하기 위해서는 자원 관리단위를 좀더 크게 잡을 필요가 있다. 여기에서는 storage를 기준으로 고민 해볼 생각이다. 
+
+Storage에 대한 고민이 끝나면 cpu, memory, network등 다른 자원에 대한 고민도 해봐야 겠다.cpu는 충분한데 memory가 부족하거나 다른 모든 자원이 충분한데 network 가용자원이 모자라는 등의 문제들 역시 해결해야 하기 때문이다.
+
+== EBS ==
+효율적 자원의 관리를 위해서는 자원을 elastic(유연한)하게 프로비저닝하고 접근할 수 있어야 한다는 결론에 도달한다. 따지고 보면 인터넷에서 정보자원이 효율적으로 활용되는 이유도 인터넷에 연결돼 있기만 하면 어디에서든지 유연하게 접근할 수 있기 때문아니겠는가.  
+
+위치에 상관없이 유연하게 접근할 수 있는 block storage를 EBS(Elastic block store)라고 한다. 아마존에서 대중화한 용어인데, 지금은 일반적으로 사용하고 있다.
+
+EBS를 위한 구성요건은 결국 '''접근성'''이다. 가능한 넓은 영역을 커버할 수 있어야 한다. 커버하는 영역이 넓을 수록 자원을 효과적으로 활용할 수 있을 것이다. 물론 무작정 넓은 영역을 커버할 수는 없는 노릇이니 머리좀 굴려야 할 것이다. 
+
+=== 구성 ===
+기본 구성은 아래와 같다. POD 마다 독립적으로 위치했던, SNODE를 제거하고 '''SPOD'''(Storage POD)에 몰아 넣었다. POD의 cnode들과 snode는 L3 기반으로 통신이 가능하게 구성하는 것으로 접근성을 확보한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1uFdlOTdcmz-dxNEHIbGxkvhTYQfNLERPpCituoEf5xc&amp;w=737&amp;h=365">
+}}}
+
+==== CNODE 구성 ====
+Cnode의 vm들은 자유롭게 자원을 선택할 수 있어야 한다. 따라서 xenserver와 같이 한단계 추상화한 하이퍼바이저보다는 kvm과 같은 낮은 추상화 단계를 가지는 하이퍼바이저가 더 유리할 수 있다. 나는 kvm을 선택했다. KVM은 호스트운영체제가 dom0의 역할을 하기 때문에, 자유롭게 호스트운 영체제를 구성할 수 있다는 장점이 있다.  
+
+하드웨어 구성은 다음과 같다.
+  * 2개의 10G 인터페이스 카드 : 하나는 퍼블릭 네트워크 트래픽을 위해서, 다른 하나는 스토리지 트래픽을 전송하기 위해서 사용한다. 
+  * 1개의 1G 인터페이스 카드 : 관리 트래픽을 위해서 사용한다. 관리자는 이 인터페이스를 이용해서 호스트운영체제에 접근할 수 있다.   
+
+==== SNODE 구성 ====
+Volume 서비스는 iSCSI를 이용한다. 비용대비 효과를 따져보면 iSCSI 말고는 딱히 대안이 없는 것 같다. 클라우드 시스템의 경우 많은 수의 vm이 스토리지를 사용하기 때문에 충분한 대역폭을 확보해야 한다.
+
+10Gb 네트워크 인터페이스를 기본으로 하는데, 하나의 10Gb 인터페이로 대역폭이 충분치 않을 수 있다.(대역폭은 언제 계산을 해봐야 겠다.) 따라서 iSCSI multipath나 LACP의 사용을 고려해야 한다.  
+
+===== LACP =====
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1ban8j58zOx_HBFzChM2RzlJP5G8F2Pdxd9Ky6Asqngs&amp;w=226&amp;h=356">
+}}}
+
+Link Aggregation Control Protocol은 Link 레이어에서 이더넷 채널을 묶어주기 위해서 사용하는 프로토콜이다. LACP를 이용 네트워크 인터페이스를 하나 처럼 묶어서 대역폭과 redundancy를 확보할 수 있다. 간단하게 대역폭을 확보할 수 있기는 한데, 스위치에 대한 설정도 필요하다는 단점이 있다. LACP는 아래의 제한 조건을 가지고 있다.  
+  * 두 개 이상의 네트워크 인터페이스가 필요하다. 
+  * 이들 네트워크 인터페이스는 반드시 같은 스위치에 연결돼 있어야한다. 
+  * 이 스위치는 LACP를 지원해야 한다.
+  * 운영체제도 LACP를 지원해야 한다.
+  * 운영체제와 스위치 모두에서 설정이 필요하다.
+10G 인터페이스 두개를 묶으면 20G로 대역폭을 확대할 수 있다. 또한 인터페이스 하나에 문제가 생기더라도 다른 인터페이스를 이용해서 계속 서비스가 가능하다. 
+
+===== iSCSI Multipath Active&Active =====
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1EHpqtYbDbNaQHghjyHoA2de9cmmaPL0CWxXP04Brytk&amp;w=220&amp;h=308">
+}}}
+
+iSCSI Multipath Active&standby 구성은 HA 구성을 위한 것으므로 여기에서는 논의하지 않는다.
+
+iSCSI multipath를 Active&Active로 구성하는 방법이 있다. SCSI command를 두 개 이상의 네트워크 인터페이스로 전송할 수 있다. LACP와 마찬가지로 대역폭과 redundancy를 확보할 수 있다. 
+
+=== 제안  ===
+==== CNODE와 SNODE 구성 ====
+LACP로 구성한다. 스위치까지 설정해야 한다는 번거로움이 있기는 하지만, Link 레이어에서 작동하기 때문에 구성이 단순하고 문제가 생길 여지가 적다는 장점이 있다. 구성은 아래와 같을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1RAvBrettmUKhzyfESHx8AKdbXXWYWnr2qtadvZQhQvY&amp;w=550&amp;h=419">
+}}}
+
+VM이 필요로 하는 모든 volume에 대해서 iSCSI target를 만들어서 서비스 한다.
+
+==== 대역폭 확보를 위한 네트워크 구성 ====
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Eb2l4nhdux9QzMexpksqiP0aVgr1y-mh1EacrgNOu00&amp;w=603&amp;h=248">
+}}}
+
+어디까지나 대략적인 구성이다. 여러가지 요소들에 따라서 구성이 달라질 수 있다. 
+  1. SNODE에서 관리하는 전체 볼륨의 크기. 볼륨크기에 따라서 10G 하나로 할건지 혹은 LACP를 이용할 건지를 결정한다. 
+  1. CNODE에서 만들어지는 vm의 개수. 1G로 충분한지 혹은 LACP를 이용해서 대역폭을 늘려야 할지, 10G를 이용해야하는지 등을 결정해야 한다.
+  1. VM의 활동 패턴. VM이 대역폭을 항상 100%로 사용하는 것은 아니다. 대부분 sleep상태일 것이다. 이를 고려해서 대역폭을 설계해야 한다. 
+  1. 서비스 종류. Public cloud인지 private cloud인지. cpu자원을 많이 사용하는 서비스인지, memory를 주로 사용하는 서비스인지.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-12-31T15:59:20)]]
+@
+
+
+1.11
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d13 5
+a17 9
+"익숙한 아키텍쳐다." 
+
+내가 처음 사용한 cloud os는 클라우드스택이고, 하이퍼바이저로 '''xenserver'''를 사용했다. Xenserver는 기본적으로 cluster 단위로 자원을 관리한다. Cluster은 두 개이상의 xenserver로 구성된 pool인데, cluster로 묶인 xenserver들은 cpu, memory, storage를 공동자원으로 관리한다. 이 cluster의 자원은 다른 cluster 자원으로 부터 독립된다.   
+
+이렇게 구성을 하다보니, cluster단위로 storage를 관리하는 위의 simple cloud 형상이 만들어진거다.  
+
+"구성이 단순하다."
+
+cluster 단위로 storage가 강하게 연결되는 구조이기 때문에 구성이 단순하고, 구성후 결과를 예측하기가 쉽다. 말그대로 간단한 설계가 가능하다. 소프트웨어든 하드웨어든지 간에 "유연하게 연결"될 수록 복잡도가 증가하기 마련이다.   
+d21 2
+a22 3
+"비효율적인 자원 관리"
+
+Simple 구성에서 자원관리 단위는 POD으로 cpu, memory, disk, network를 공유관리한다. 여기에서 주목할 점은 Data center 단위가 아니라는 점이다. 따라서 자원의 낭비가 발생할 수 있다. 
+@
+
+
+1.10
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d85 2
+a86 2
+==== 제안  ====
+===== CNODE와 SNODE 구성 =====
+d95 1
+a95 1
+===== 대역폭 확보를 위한 네트워크 구성 =====
+@
+
+
+1.9
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d85 2
+a86 1
+===== 최종 구성 =====
+d90 1
+d93 13
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d76 1
+a76 1
+===== iSCSI Multipath Active&Active ====
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a3 1
+
+d51 1
+a51 1
+==== CNODE 구현 ====
+d58 4
+a61 2
+==== SNODE 구현 ====
+Volume 서비스는 iSCSI를 이용한다. L3 영역에서 iSCSI 말고는 딱히 대안이 없는 것 같다. 
+d63 4
+d68 22
+d91 2
+@
+
+
+1.6
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d52 7
+d60 3
+a63 2
+==== CNODE 구현 ====
+Cnode의 vm들은 자유롭게 자원을 선택할 수 있어야 한다. 따라서 xenserver와 같이 한단계 추상화한 하이퍼바이저보다는 kvm과 같은 낮은 추상화 단계를 가지는 하이퍼바이저가 더 유리할 수 있다.  
+@
+
+
+1.5
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d14 1
+a14 1
+"처음 접한 아키텍쳐다." 
+d44 1
+d46 10
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 3
+a5 1
+== Simple architecture에서의 snode 구성 ==
+d33 4
+a36 1
+자원을 효율적으로 관리하기 위해서는 자원 관리단위를 좀더 늘릴 필요가 있다. 여기에서는 storage를 기준으로 고민을 해 볼건데, storage 뿐만 아니라 cpu, memory, network등 모든 자원에도 동일한 문제가 발생할 수 있다. 예컨데, cpu는 충분한데 memory가 부족하거나 다른 모든 자원이 충분한데 network 가용자원이 모자라는 등의 문제들이다.  
+d39 6
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d10 23
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 1
+a9 3
+{{{#!google
+}}}
+
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 4
+a9 1
+https://docs.google.com/drawings/pub?id=1iOOzWG6yl7iN9_WaCz73gXAkh_Ge-2Kz71zi8OchAew&w=493&h=504
+@

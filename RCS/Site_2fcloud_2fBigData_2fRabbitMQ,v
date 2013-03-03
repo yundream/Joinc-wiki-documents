@@ -1,0 +1,149 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2013.01.14.14.35.30;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2012.12.29.15.10.30;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2012.12.28.05.54.16;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fBigData_2fRabbitMQ
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title RabbitMQ
+
+[[TableOfcontents]]
+== RabbitMQ에 대하여 ==
+MQ(Message Queue)가 새로운 건 아니다. 소프트웨어를 개발하다 보면 스레드간 혹은 프로세스간 데이터 통신을 해야 하는 경우가 있다. 주로 Job을 자식 쓰레드(혹은 프로세스)에 분산해서 처리하는 소프트웨어가 돼겠다. 보통은 IPC로 충분한데, 처리해야하는 데이터의 양이 많아지면, queue를 고민하게 된다. 
+
+예전에 보안 로그 분석 시스템을 만든적이 있다. IPS, IDS, F/W 기타 등등의 보안 장비가 보내오는 로그를 수집하고 분석해서 실시간으로 보한 위협을 탐지하는 그런 시스템이다. 문제는 로그의 양이 엄청나다는 것. 평소에는 괜찮지만 로그가 몰리게 될경우 IPC에서 병목이 발생하고, 로그를 놓치는 문제가 생길 수 있다. 결국 로그가 몰릴 경우 queue에 쌓아 두었다가 한산할때 분산해서 처리하는 방식으로 해결 했다. 메시지 브로커를 만든 셈이다. 
+
+RabbitMQ는 표준 [wiki:man/12/AMQP AMQP(Advanced Message Queueing Protocol)]을 이용한 메시지 브로커다. 예전에 노가다로 만들었는데, 이제는 표준 프로토콜을 이용해서 잘 만들어진 소프트웨어를 이용해서 메시지를 처리할 수 있다.!! RabbitMQ를 이용하면 대량의 메시지를 처맇기 위한 소프트웨어를 쉽게 개발할 수 있다. (Queue를 만드는 노가다를 없앨 수 있는 것만도 어딘가.)
+
+=== RabbitMQ구성 요소 ===
+새로운 툴은 개념을 잡기가 어려운 경우가 많다. 이런 툴들은 새로운 기술과 뛰어난 기술들을 전면에 내세우기 마련인데, 이들 기능 목록을 보고있자면 일단 그 용어의 화려함에(다른말로 이해하기 어려움) 머리가 혼란스러워지기 때문이다. 하지만 좀 멀리서 보면, 이미 알고 있었던 익숙한 기술의 다른 얼굴인 경우가 많다. RabbitMQ도 그렇다. 간단하다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=12jTk2_VBotXljVOHEkdqWjd8lVFC-FsQMkc1M_SdBZ8&amp;w=613&amp;h=109">
+}}}
+  1. '''P''' : Producing. 메시지를 발행한다. 
+  1. '''Queue''' : Producing된 메시지가 저장되는 큐 
+  1. '''C'' : Consuming. 메시지를 받는 측.
+
+모든 통신 프로토콜과 응용 소프트웨어들은 고대에 "우편"이 개발한 뒤로 변한게 전혀 없다. RabbitMQ역시 "우편 시스템"에서 벗어나지 않는다. '''P'''는 메시지를 만드는 사람, '''Q'''는 우체국, '''C'''는 메시지를 받는 사람이다. '''P'''가 보낸 메시지는 Queue에 저장되고, 순서대로 '''C'''로 보낸다.
+
+이 기본 구성에서 두 개 이상의 '''C'''와 '''Queue'''를 두거나 RPC 처럼 응답을 받는 식의 응용이 가능하다. 
+
+=== RabbitMQ 설치 ===
+==== Rabbitmq server 설치 ====
+처음엔 CentOS 6.3으로 하려했으나 yum 패키지가 없더라. 귀찮아서 Ubuntu server 12.10으로 갈아탔다. Ubuntu는 왠만한 패키지는 apt-get만으로 설치할 수 있어서 좋다. 
+{{{#!plain
+# apt-get install rabbitmq-server
+}}}
+==== Rabbitmq client 설치 ====
+Rabbitmq 사이트에는 python과 java clien를 배포하고 있으나, 최근 개인적으로 ruby에 관심을 두고 있는 터라 ruby client를 설치하기로 했다.
+  * 운영체제 : Ubuntu server 12.10
+  * Ruby 버전 : 1.9.1
+  * 기타 필요한 패키지 : make, g++
+amqp gem을 설치한다.
+{{{#!plain
+# gem install amqp
+}}}
+
+제대로 설치 됐는지 확인해보자.
+{{{#!plain
+# irb -rubygems
+irb(main):001:0> require "amqp"
+=> true
+irb(main):002:0> AMQP::VERSION
+=> "0.9.8"
+}}}
+
+== 예제 ==
+=== One to one publish / subscribe ===
+{{{#!plain
+# cat consumer.rb 
+#!/usr/bin/ruby
+require "rubygems"
+require "amqp"
+
+EventMachine.run do
+    connection = AMQP.connect(:host => '192.168.57.3')
+    puts "Connected to AMQP broker. Running #{AMQP::VERSION} version of the gem..."
+    channel  = AMQP::Channel.new(connection)
+    queue = channel.queue("amqpgem.example.helloworld", :auto_delete => true)
+    exchange = channel.direct("")
+
+    queue.subscribe do |payload|
+        puts "Received a message : #{payload}. Disconnecting..."
+        connection.close {EventMachine.stop}
+    end
+end
+}}}
+
+
+{{{#!plain
+# cat publisher.rb
+#!/usr/bin/ruby
+require "rubygems"
+require "amqp"
+
+EventMachine.run do
+    AMQP.connect(:host => '192.168.57.3') do |connection|
+        channel = AMQP::Channel.new(connection)
+        channel.direct("").publish "Hello, world!", :routing_key => "amqpgem.example.helloworld"
+    end
+end
+}}}
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-12-28T05:54:16)]]
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d26 14
+a39 1
+음 설치부터 해볼까..
+d41 45
+a85 1
+... 계속
+@
+
+
+1.1
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d3 1
+d9 1
+a9 1
+RabbitMQ는 표준 AMQP(Advanced Message Queueing Protocol)을 이용한 메시지 브로커다. 예전에 노가다로 만들었는데, 이제는 표준 프로토콜을 이용해서 잘 만들어진 소프트웨어를 이용해서 메시지를 처리할 수 있다.!! RabbitMQ를 이용하면 대량의 메시지를 처맇기 위한 소프트웨어를 쉽게 개발할 수 있다. (Queue를 만드는 노가다를 없앨 수 있는 것만도 어딘가.)
+@

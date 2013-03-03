@@ -6,7 +6,7 @@ iSCSI는 Internet Small Computer Interface의 줄임말입니다. SCSI는 많이
 
 SCSI는 PC와 하드디스크, CD-ROM, 프린터, 스캐너등과 같은 주변 장치와 통신하기 위한 인터페이스라고 합니다. 
 
-그럼 iSCSI가 무엇일지에 대해서는 대충 감이 오죠. 인터넷을 건너 뛰어서 장치와 통신하기 위한 인터페이스 입니다. SCSI를 인터넷(:12)으로 확장한 겁니다.  
+그럼 iSCSI가 무엇일지에 대해서는 대충 감이 오죠. 인터넷을 건너 뛰어서 장치와 통신하기 위한 인터페이스 입니다. SCSI를 [wiki:man/12/internet 인터넷]으로 확장한 겁니다.  
 
 SCSI는 TCP/IP 프로토콜을 사용합니다. 포트번호는 860과 3260을 이용하고요. TCP/IP로 연결한다음 SCSI 커멘드를 이용해서 스토리지를 사용합니다. iSCSI를 사용하는 이유는 아래와 같습니다.
    * 저장소 통합
@@ -22,7 +22,7 @@ iSCSI는 서버 클라이언트 모델을 따르니다.
   * Initiator : iSCSI 클라이언트 입니다. Target에 연결한다음 SCSI 명령을 이용해서 입출력 작업을 합니다. 
 
 == Linux iSCSI 사용 ==
-리눅스에서 iSCSI를 구성해 보려합니다. 공부를 목적으로 구성하는 거라서 루프백으로 충분하겠지만, 인터넷 프로토콜을 이용하는 만큼 네트워크를 이용해서 구성하려고 합니다. 안타깝게도 테스트에 사용할 수 있는 장비가 제가 사용하는 리눅스 노트북 하나라서, VirtualBox(:12)를 이용 LAN 환경을 구축해서 테스트 하기로 햇습니다. Target, Initiator 모두 리눅스가 되겠군요.
+리눅스에서 iSCSI를 구성해 보려합니다. 공부를 목적으로 구성하는 거라서 루프백으로 충분하겠지만, 인터넷 프로토콜을 이용하는 만큼 네트워크를 이용해서 구성하려고 합니다. 안타깝게도 테스트에 사용할 수 있는 장비가 제가 사용하는 리눅스 노트북 하나라서, [wiki:man/12/virtualbox virtualBox]를 이용 LAN 환경을 구축해서 테스트 하기로 햇습니다. Target, Initiator 모두 리눅스가 되겠군요.
 
 Target 서버는 이미 구축이 돼 있는데요. [wiki:Site/System_management/LVM LVM 구축]에서 사용했던 Linux Guest VM을 Target 서버로 사용할 겁니다. LVM으로 구성된 장치를 iSCSI로 연결해서 사용하는 거죠. LVM 구성은 따라하시면 되구요. LVM 구성이 귀찮으면, Guest VM에 장치 직접 붙여서 테스트해도 되겠습니다. 
 
@@ -148,7 +148,7 @@ $ tgtadm --lld iscsi --op bind --mode target --tid 1 -I ALL
 }}}
 ACL(접근설정)은 -I 옵션으로 정할 수 있습니다. 귀찮아서 ALL로 했습니다. 
 
-제대로 bind(:12)됐는지 netstat(:12)로 확인해 봤습니다.
+제대로 [wiki:man/2/bind bind]됐는지 [wiki:Site/system_programing/proc/NetState netstat]로 확인해 봤습니다.
 {{{#!plain
 # netstat -nap | grep tgtd
 tcp        0      0 0.0.0.0:3260            0.0.0.0:*               LISTEN      943/tgtd        
@@ -239,6 +239,22 @@ none                  1.5G     0  1.5G   0% /var/lock
 /dev/sdb              1.5G   35M  1.4G   3% /mnt/iscsi0
 }}}
 
+=== 자동 마운트 ===
+매번 부팅할 때마다 '''iscsiadm'''명령을 이용해서, 마운트 할수는 없는 노릇이다. target을 성공적으로 붙이고 파일시스템까지 만들었다면, 이후에는 부팅시 자동으로 마운트하면 될테다.
+
+운영체제 마운트 정보는 /etc/fstab에 들어간다. 리눅스 운영체제는 fstab의 정보를 읽어서 마운트를 시도 한다. 마운트까지 성공했다면 /etc/fstab에 아래의 내용을 추가한다. 
+{{{#!plain
+# cat /etc/fstab
+......
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+/dev/VolGroup00/LogVol01 swap                    swap    defaults        0 0
+192.168.57.32:/srv/nfs /mnt/test nfs rw 0 2
+/dev/sdb1 /mnt/iscsi ext3 _netdev 0 0
+}}}
+
+iscsiadm은 attach에 성공한 target 정보를 저장해 두고, mount시 활용한다. 이제 리부팅 해도 마운트 되는 걸 확인할 수 있을 것이다. 
+
 == Cloud를 위한 LVM + iSCSI ==
 이 문서는 iSCSI over LVM 구성입니다. 클라우드는 Storage를 통합해야 하고, 원격으로 Storage Volume을 제공할 수 있어야 합니다. 이런 점에서 LVM과 iSCSI는 좋은 조합이라고 할 수 있겠습니다.
 
@@ -250,5 +266,7 @@ none                  1.5G     0  1.5G   0% /var/lock
 
 == history ==
   1. 최초작성일 : 2011년 9월 8일
+  1. 수정
+     * [[Date(2012-12-13T10:48:05)]] : iscsi target 자동 마운트 추가
 
 [[Category(15)]]

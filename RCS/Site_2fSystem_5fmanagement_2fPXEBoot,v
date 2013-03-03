@@ -1,0 +1,304 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2012.11.29.09.31.18;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fPXEBoot
+@
+
+
+1.1
+log
+@168.248.255.1;;yundream;;
+@
+text
+@#title PXE-boot
+
+[[tableofcontents]]
+== PXE ==
+PXE(Preboot Execution Environment)은 네트워크 인터페이스를 이용해서 컴퓨터를 부팅할 수 있게 만들어주는 환경으로, 하드디스크나 CD-ROM 같은 데이터 저장소에 구애 받지 않고 [wiki:man/12/운영체제 운영체제]를 설치할 수 있습니다. 1999년에 소개된 오래된 기술인데, 다음과 같은 기술들을 이용해서 구현합니다.
+  1. [wiki:man/12/dhcp DHCP] : Dynamic Host Configuration Protocol  
+  1. TFTP : Trival File Transfer Protocol 
+  1. [wiki:man/12/IP IP] : Internet Protocol
+  1. [wiki:man/12/UDP UDP] : User Datagram Protocol 
+  1. GUID
+  1. UUID
+
+PXE Boot는 시스템 관리 이슈로 프로그래머는 굳이 깊이 신경 쓸 필요없는 기술이라고 생각됩니다만, 클라우드를 한다면 반드시 알아야 하는 기술이기도 합니다. 자동화의 가장 첫 단계가 PXE를 이용한 운영체제의 설치이기 때문입니다. PXE Boot를 하면 '''kickstart'''도 자연스럽게 따라옵니다. 
+
+== 구축 환경 ==
+PXE Boot 환경을 구축하기 위해서는 PXE 서버와 PXE 클라이언트 최소 2대의 노드가 필요합니다. 
+  * PXE 서버
+    PXE 클라이언트에게 원격 부팅 및 운영체제 인스톨 환경을 제공하는 컴퓨터 노드입니다. 
+  * PXE 클라이언트 
+    운영체제를 설치하고자 하는 모든 컴퓨터입니다. 메인보드가 PXE를 지원하면 되는데, 요즘은 거의 모든 메인보드가 PXE를 지원하니 걱정할 것 없습니다. 
+
+저는 두 개의 물리적 노드대신에 VM을 이용해서 테스트 환경을 구축하기로 했습니다. Host VM을 '''PXE 서버'''로 Guest VM을 '''PXE 클라이언트'''로 구성했습니다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1rVAkVGP7rqIR2rggWPr3cKVzSdVDSxIkdoxsTGV3aXY&amp;w=384&amp;h=332">
+}}}
+  1. PXE Server 
+    제 ubuntu 리눅스 데스탑입니다.
+  1. Gest VM 
+    PXE Boot할 VM들입니다. 
+  1. KVM
+    Guest VM을 실행할 hypervisor 
+
+[wiki:Site/cloud/Qemu KVM]은 HVM방식의 하이퍼 바이저로 qemu로 하드웨어를 애뮬레이션 합니다. 따라서 qemu가 PXE를 지원하도록 해야 하는데, 아래의 패키지를 설치하면 됩니다. 
+{{{#!plain
+# apt-get install kvm-pxe
+}}}
+
+== 운영체제 설치 파일 저장소 준비 ==
+Guest VM에 설치할 iso 파일을 다운로드 합니다. 저는 '''CentOS-6.2-x86_64-bin-DVD1.iso''', '''CentOS-6.2-x86_64-bin-DVD1.iso''' 를 준비했습니다.
+
+Guest VM은 http 혹은 NFS(:12)를 이용해서 원격에 있는 운영체제 패키지를 다운로드해서 설치할 수 있습니다. 저는 apache(:12) 웹 서버를 이용했습니다. apache 서버 설치와 설정은 생략합니다. DocumentRoot를 /var/www로 했습니다. 
+
+HTTP로 인스톨 할경우 iso를 직접 인스톨할 수 없습니다. 그래서 아래와 같이 마운트 해서 구축했습니다. 실제 운영할 때는 mount보다는 파일을 직접 복사하는걸 권장 합니다. 
+{{{#!plain
+# mkdir /var/www/iso/centos/x86_64/{6.2,5.7}
+# mount -o CentOS-6.2-x86_64-bin-DBD1.iso  /var/www/iso/centos/x86_64/6.2
+}}}
+
+== TFTP 서버 설정 ==
+PXE 클라이언트는 TFTP를 이용해서 부트로더를 다운로드 합니다. 그러므로 PXE 서버는 TFTP 서버를 운영해야 합니다. 
+
+tftp를 설치합니다. xinetd(;12) 기반으로 실행할 겁니다.
+{{{#!plain
+# sudo apt-get install tftp tftpd
+}}}
+
+설정파일을 수정합니다.
+{{{#!plain
+# cat /etc/xinetd.d
+service tftp 
+{ 
+        disable = no 
+        socket_type             = dgram 
+        protocol                = udp 
+        wait                    = yes 
+        user                    = root 
+        server                  = /usr/sbin/in.tftpd 
+        server_args             = -s /srv/tftpboot 
+        per_source              = 11 
+        cps                     = 100 2 
+        flags                   = IPv4 
+} 
+}}}
+tftp의 루트 디렉토리는 /srv/tftpboot로 했습니다. 여기에 원격 부팅을 위한 파일들을 카피하면 됩니다.
+
+==== syslinux bootloader 설치 ====
+이제 PXE Client가 로드할 부트로더를 설치 합니다. 저는 syslinux를 부트로더로 사용하기로 했습니다. syslinux는 공개 소프트웨어로 FAT filesystem과 network booting (PXEBoot)를 위한 가벼운 부트로더 소프트웨어입니다.
+{{{#!plain
+# apt-get install syslinux syslinux-common
+}}}
+
+부트 이미지를 /srv/tftpboot로 복사합니다. 
+{{{#!plain
+# cd /srv/tftpboot
+# cp /usr/lib/syslinux{pxelinux.0,menu.c32} ./ 
+}}}
+
+==== pxelinux 설정 ====
+pxelinux.cfg/default 파일을 편집합니다.
+{{{#!plain
+# cd /srv/tftpboot
+# mkdir pxelinux.cfg
+# cd pxelinux.cfg
+# vi default
+timeout 60 
+default centos6.2
+label centos6.2
+  kernel images/centos/x86_64/6.2/vmlinuz 
+  append initrd=images/centos/x86_64/6.2/initrd.img ramdisk_size=100000 ks=http://192.168.56.1/ks.cfg 
+prompt 1
+}}}
+ * label : 부팅 메뉴입니다. 전 centos6.2 하나의 메뉴만 준비했습니다.
+ * kernel : centos6.2의 부투이미지 입니다.  
+
+centos6.2리눅스의 이미지는 iso를 마운트해서 복사하면 됩니다. 먼저 이미지를 복사할 디렉토리를 만들어야 겠죠.
+{{{#!plain
+# mkdir /srv/tftpboot/images/centos/x86_64/6.2
+}}}
+
+centos iso를 마운트 해서, 이미지를 복사합니다.
+{{{#!plain
+# mount -o loop CentOS-6.2-x86_64-binDVD1.iso /mnt/centos
+# cp /mnt/centos/images/pxeboot/{initrd.img,vmlinuz}  /srv/tftpboot/images/centos/x86_64/6.2
+# umount /mnt/centos
+}}}
+
+tftp 서버를 재 시작 합니다.
+{{{#!plain
+# /etc/init.d/xinetd restart
+}}}
+
+tftp 서버가 잘 떴는지 확인합니다.
+{{{#!plain
+# nmap localhost -sU
+Starting Nmap 5.21 ( http://nmap.org ) at 2012-02-19 14:19 KST
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.0000050s latency).
+Not shown: 996 closed ports
+PORT     STATE         SERVICE
+69/udp   open|filtered tftp
+111/udp  open          rpcbind
+2049/udp open          nfs
+}}}
+
+== DHCP 설정 == 
+DHCP 설정은 [wiki:Site/System_management/dhcp dhcp 서버 설치]문서를 참고하시기 바랍니다. 설정파일만 pxeboot에 맞게 약간 수정했습니다. 
+{{{#!plain
+# cat /etc/dhcp/dhcpd.conf
+....
+subnet 192.168.56.0 netmask 255.255.255.0 {
+        option routers 192.168.56.1;
+        host pxe-bootos {
+                hardware ethernet 08:00:27:C1:84:53;
+                fixed-address 192.168.56.61;
+                #next-server 192.168.56.1
+                filename "pxelinux.0";
+        }
+}
+}}}
+MAC 주소가 '''08:00:27:C1:84:53'''인 192.168.56.61의 IP 주소를 할당하고, PXEBOOT를 위해서 pxelinux.0를 사용하라는 정보를 '''PXE Client'''클라이언트에게 알려줍니다. 
+
+== PXE 클라이언트 테스트 == 
+KVM으로 테스트했습니다. KVM에 대한 자세한 내용은 [wiki:Site/cloud/Qemu Qemu]문서를 참고하시기 바랍니다.  
+
+KVM 대신, VMware나 VirtualBox(:12)로도 테스트가 가능할 겁니다. 다른 하이퍼바이저로 테스트는 직접 해보시기 바랍니다. 개인적으로 VirtualBox로 시도해본 적이 있는데, 자꾸만 VirtualBox에서 제공하는 dhcp 데몬이 뜨는 바람에 제대로 테스트할 수 없었습니다.  VirtualBox의 dhcp 설정을 바꾸는 옵션이 있을거라고 생각하지만 찾기 귀찮아서 kvm으로 테스트를 대신했습니다. 
+
+먼저 kvm image를 만듭니다. 
+{{{#!plain
+# qemu-img create pxe-boot.raw -f raw 10G
+}}}
+
+kvm과 통신할 tap 디바이스를 만들었습니다.
+{{{#!plain
+# openvpn --mktun --dev tap0
+# ifconfig tap0 192.168.56.1 netmask 255.255.255.0 up
+}}}
+
+이제 vm을 실행합니다.
+{{{#!plain
+# qemu-system-x86_64 -m 512 -k en-us -hda pxe-boot.raw -boot n -option-rom \
+/usr/share/kvm/pxe-rtl8139.bin -net nic,macaddr=08:00:27:C1:84:53 \
+-net tap,ifname=tap0,script=no -net socket,listen=localhost:1200
+}}}
+ * -option-rom으로 pxe-rtl8139.bin 롬을 로딩
+ * MAC address를 dhcp에 설정한 값으로 지정
+
+BIOS가 뜨면서, 네트워크 부팅을 할 것인지 묻습니다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/wyw6GiidmlYXYu5rzxzCI9MTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-zQZwEr3KeP8/T0CbMJMTAZI/AAAAAAAACBE/eYeL_Er1XXA/s640/pxeboot01.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+네트워크 부팅을 선택하면 DCHP서버에서 IP와 네트워크 부트에 사용할 부트로더 정보를 받아오는 걸 확인할 수 있습니다. 
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/zqUSPgh43DEiY5ZiO2RLEdMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-HhCrp6sY95k/T0CbOPZbCiI/AAAAAAAACBM/csKaeZY9huQ/s640/pxeboot02.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+설치화면 뜨네요.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/x-lFpU5nIT4YdWz1U4QRkdMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh5.googleusercontent.com/-65errdfa0lY/T0CbPhfakyI/AAAAAAAACBU/ryecGPDjGs4/s640/pxeboot03.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+그 다음 설치 이미지 URL을 명시해주면 됩니다.  
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/47w2W6821a3V-QqcU3Z5ldMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-CtBK_3KwHa8/T0CbRnPhe-I/AAAAAAAACBc/SCuSeDn93jI/s640/pxeboot04.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+이제 images/install.img를 로딩하고 패키지들을 설치합니다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/FvOm6R0Ok-5BTUdtKRfLM9MTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-LqVnjt4cXNM/T0CbTZ3OKrI/AAAAAAAACBk/XXujmqUmzbM/s640/pxeboot05.png" height="356" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+== kickstart ==
+PXEBoot 설정을 했으나 약간 꺼림직합니다. 운영체제 설치까지 자동으로 해주진 않기 때문에, 결국 모니터를 붙여서 작업을 해야 하기 때문인데 자동화라고 하기엔 부족하죠. IPMI를 이용하면 원격에서 설치가 가능하겠으나 역시 만족스럽지 않습니다. 설치까지 모두 자동화 해야 하지 싶습니다. 
+
+{{{#!html
+<iframe width="420" height="315" src="http://www.youtube.com/embed/Ae0LZUIaTbU" frameborder="0" allowfullscreen></iframe>
+}}}
+
+CentOS는 '''kickstart'''를 이용해서 설치하는 과정을 자동화 할 수 있습니다.. 설치시 필요한 정보를 저장한 파일을 읽어서 자동화 하는 방식입니다.
+
+CentOS를 설치하고 나면 '''/root'''디렉토리에 anaconda-ks.cfg파일이 만들어집니다. 이 파일은 설치 정보를 가지고 있는데, 이 파일을 편집해서 사용하면 됩니다. 
+
+kickstart 파일은 HTTP로 접근할 수 있습니다. 그래서 PXEBoot의 웹 서버에 파일을 복사 했습니다.
+{{{#!plain
+# scp root@@mycentos:/root/anaconda-ks.cfg /vaw/www/ks.cfg 
+}}}
+
+파일을 복사한 다음 다음과 같이 수정했다. 
+{{{#!plain
+# Kickstart file automatically generated by anaconda.
+
+#version=DEVEL
+install
+
+# centos 패키지가 들어있는 디렉토리
+url --url=http://192.168.56.1/iso/centos/x86_64/6.2
+
+# centos는 GUI 설치를 기본으로 합니다. CUI 방식으로 설치하도록 설정했습니다.  
+text
+# 언어 설정
+lang en_US.UTF-8
+# 키보드 설정
+keyboard us
+
+# 네트워크 설정. dhcp로 설정했습니다.
+network --onboot yes --device eth0 --bootproto dhcp --noipv6
+# 루트패스워드입니다.
+rootpw  --iscrypted $6$5.1adfefgxaaaaaEDuWuvvfgG3v/UOGerd6112fgBhxFg9v/12ddi/Px112fSd/
+firewall --service=ssh
+authconfig --enableshadow --passalgo=sha512
+selinux --enforcing
+timezone --utc Asia/Seoul
+bootloader --location=mbr --driveorder=sda --append=" rhgb crashkernel=auto quiet"
+# The following is the partition information you requested
+# Note that any partitions you deleted are not expressed
+# here so unless you clear all partitions first, this is
+# not guaranteed to work
+
+# 모든 파티션을 초기화 
+clearpart --linux --drives=sda
+# 9G 크기의 pv pv.01을 만듭니다. 
+part pv.01 --size 9000
+# pv.01을 포함하는 볼륨그룹을 만듭니다.
+volgroup VolGroup pv.01
+# 루트 파일 시스템을 만듭니다.
+logvol / --fstype=ext4 --name=lv_root --vgname=VolGroup --grow --size=1024 --maxsize=51200
+# swap 파일 시스템을 만듭니다.
+logvol swap --name=lv_swap --vgname=VolGroup --grow --size=496 --maxsize=992
+# boot 파일 시스템을 만듭니다.
+part /boot --fstype=ext4 --size=500
+
+repo --name="CentOS"  --baseurl=http://192.168.56.1/iso/centos/x86_64/6.2m --cost=100
+
+# 설치할 패키지를 선택합니다. 저는 core 패키지만 설치했습니다.
+%packages --nobase
+@@core
+%end
+
+# 설치를 끝낸후 리부팅
+reboot
+}}}
+
+== 앞으로 할일 ==
+  * [wiki:Site/System_management/iPXE PXELinux를 iPXE로 대체해 봐야 겠다]
+== 히스토리 ==
+ 1. 2012년 2월 19일 작성
+
+[[tag(PXE,DHCP,TFTP)]]
+@

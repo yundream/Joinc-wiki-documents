@@ -1,0 +1,619 @@
+#title chef knife
+
+[[TableOfcontents]]
+== Knife ==
+Knife는 chef를 제어하기 위한 CLI기반의 툴이다. 관리자는 knife를 이용해서 node, cookbook, roles, databags, envirionments 등 chef의 모든 것을 관리할 수 있다.
+
+Knife도 chef client와 마찬가지로 chef server에서 제공하는 REST API를 이용해서 작업을 한다. chef server와 상호작용하기 위한 CLI 버전이라고 볼 수 있다. 
+
+=== 테스트 환경 ===
+Virtualbox로 두 대의 centos6.3 운영체제를 올려서 chef-server와 chef-client를 설치했다.
+
+=== 도움말 시스템 ===
+{{{#!plain
+# knife --help
+Usage: knife sub-command (options)
+    -s, --server-url URL             Chef Server URL
+    -k, --key KEY                    API Client Key
+        --color                      Use colored output
+    -c, --config CONFIG              The configuration file to use
+        --defaults                   Accept default values for all questions
+    -e, --editor EDITOR              Set the editor to use for interactive commands
+    -E, --environment ENVIRONMENT    Set the Chef environment
+    -F, --format FORMAT              Which format to use for output
+        --no-color                   Don't use colors in the output
+    -n, --no-editor                  Do not open EDITOR, just accept the data as is
+    -u, --user USER                  API Client Username
+...
+}}}
+
+knife는 하위 명령에 대한 help도 제공한다.
+{{{#!plain
+# knife ssh --help
+knife ssh QUERY COMMAND (options)
+    -a, --attribute ATTR             The attribute to use for opening the connection - default is fqdn
+    -s, --server-url URL             Chef Server URL
+    -k, --key KEY                    API Client Key
+        --color                      Use colored output
+    -C, --concurrency NUM            The number of concurrent connections
+    -c, --config CONFIG              The configuration file to use
+        --defaults                   Accept default values for all questions
+    -e, --editor EDITOR              Set the editor to use for interactive commands
+    -E, --environment ENVIRONMENT    Set the Chef environment
+    -F, --format FORMAT              Which format to use for output
+    -i IDENTITY_FILE                 The SSH identity file used for authentication
+        --identity-file
+    -m, --manual-list                QUERY is a space separated list of servers
+        --no-color                   Don't use colors in the output
+    -n, --no-editor                  Do not open EDITOR, just accept the data as is
+        --no-host-key-verify         Disable host key verification
+    -u, --user USER                  API Client Username
+        --print-after                Show the data after a destructive operation
+    -P, --ssh-password PASSWORD      The ssh password
+    -p, --ssh-port PORT              The ssh port
+    -x, --ssh-user USERNAME          The ssh username
+...
+}}}
+
+knife help list로 하위 명령어들을 확인할 수 있다.
+{{{#!plain
+# knife help list
+Available help topics are: 
+  bootstrap
+  client
+  configure
+  cookbook
+  cookbook-site
+  data-bag
+  environment
+  exec
+  index
+  knife
+  node
+...
+}}}
+
+=== knife 설정 ===
+knife는 chef client와 같은 레벨에서 작동한다. 따라서 chef server API에 접근하기 위한 설정들이 필요하다. knife 설정파일이름은 ''~/.chef/knife.rb'' 이다. 
+
+설정 매개변수들은 다음과 같다.
+  * node_name : chef-server 연결과 인증을 위한 client 이름 
+  * client_key : chef-server 인증에 사용할 Private key 파일   
+  * chef_server_url : chef server의 URL.  
+  * chache_type : 기본은 'BasicFile'다. BasicFile, Berkeley, Couch, DataMapper, LMC, Memcache, Memory, MongoDB, Redis, Rufus, S3, SDBM, Tyrant, Xattr, YAML을 지원한다. 
+  * cache_option : cache 옵션으로 cache_type에 따라서 달라진다.
+  * validation_client_name
+  * validation_client_key
+  * cookbook_path 
+  * cookbook_copyright, cookbook_email, cookbook_license
+
+knife를 사용하려면 knife client 인증 절차가 필요하다.
+{{{#!plain
+# mkdir ~/.chef
+}}}
+
+먼저 chef server에서 인증에 사용할 key를 가져온다.
+{{{#!plain
+# scp root@192.168.57.2:/etc/chef/validation.pem ./
+root@192.168.57.2's password: 
+validation.pem                                                          100% 1679     1.6KB/s   00:00    
+[root@localhost .chef]# scp root@192.168.57.2:/etc/chef/webui.pem ./
+root@192.168.57.2's password: 
+webui.pem                                                               100% 1675     1.6KB/s   00:00    
+}}}
+
+knife를 이용해서 설정한다.
+{{{#!plain
+# knife configure -i
+WARNING: No knife configuration file found
+Where should I put the config file? [~/.chef/knife.rb] 
+Please enter the chef server URL: [http://localhost:4000] http://192.168.57.2:4000
+Please enter a clientname for the new client: [root] joinc
+Please enter the existing admin clientname: [chef-webui] 
+Please enter the location of the existing admin client's private key: [/etc/chef/webui.pem] webui.pem
+Please enter the validation clientname: [chef-validator] 
+Please enter the location of the validation key: [/etc/chef/validation.pem] validation.pem
+Please enter the path to a chef repository (or leave blank): 
+Creating initial API user...
+Created client[joinc]
+Configuration file written to /root/.chef/knife.rb
+}}}
+
+테스트..
+{{{#!plain
+# knife status
+53 minutes ago, client01.yundream.com, localhost, 192.168.57.3, centos 6.3.
+}}}
+
+=== EDITOR 환경 변수 설정 === 
+knife 편집에 사용할 편집기를 등록할 수 있다.
+{{{#!plain
+# export EDITOR=vim
+}}}
+
+== knife sub commands ==
+kinfe에 내장된 서브 명령어들을 정리한다.
+=== bootstrap ===
+
+=== client ===
+
+=== configure ===
+'''configure'''를 이용하면 간단하게 knife.rb와 client.rb 설정파일을 만들 수 있다.
+  * --client DIRECTORY : chef 클라이언트 설정파일을 만들 수 있다.
+  * -i, --initial : API 클라이언트를 초기화 한다. 일반적으로 chef server를 처음 인스톨하고, 이를 관리하기 위한 administrator 클라이언트를 초기화하기 위해서 사용한다.  
+  * -r REPO, --repository REPO : chef 저장소 경로
+knife 설정파일을 만든다.
+{{{#!plain
+client.chef.com # knife configure
+WARNING: No knife configuration file found
+Where should I put the config file? [~/.chef/knife.rb] 
+..
+}}}
+실행하면 knife.rb 파일이 만들어진다. 내용은 다음과 같다. 
+{{{#!plain
+client.chef.com # cat knife.rb
+log_level                :info
+log_location             STDOUT
+node_name                'yundream'
+client_key               '/root/.chef/yundream.pem'
+validation_client_name   'chef-validator'
+validation_key           '/etc/chef/validation.pem'
+chef_server_url          'http://server.chef.com:4000'
+cache_type               'BasicFile'
+cache_options( :path => '/root/.chef/checksums' )
+}}}
+kinfe는 chef server의 자원을 말그대로 칼질하는 관리도구다. 따라서 권한 인증을 위한 private key 파일이 필요하다(여기에서는 yundream.pem). 이제 knife를 이용해서 chef 자원을 요리(읽기/쓰기)할 수 있다.
+
+chef 클라이언트 설정파일을 만든다.
+{{{#!plain
+client.chef.com # knife configure client '/directory'
+}}}
+실행하면 /directory 밑에 chef.rb 파일이 만들어진다. 
+{{{#!plain
+# cat client.rb
+log_level        :info
+log_location     STDOUT
+chef_server_url  'http://server.chef.com:4000'
+validation_client_name 'chef-validator'
+}}}
+chef client는 chef server로부터 설정정보를 단지 읽기만 한다. 읽기권한을 획득하기 위해서 역시 chef server의 private key(일반적으로 validation.pem)가 필요하다.  
+
+=== cookbook ===
+cookbook은 chef에서 배포하고 관리하는 기본설정 단위다. cookbook에는 애플리케이션과 운영체제를 설정하기 위한 모든 정보를 가진다. 
+
+cookbook sub command의 사용방법은 다음과 같다.
+{{{#!plain
+# knife cookbook [ARGUMENT] (options)
+}}}
+==== create ====
+create를 이용해서 새로운 cookbook을 만들 수 있다. cookbook을 생성하면 로컬 디렉토리에 cookbook을 위한 디렉토리가 만들어진다. 이 디렉토리에는 다음과 같은 파일들이 놓인다.
+  * cookbook/attributes
+  * cookbook/definitions
+  * cookbook/files/default
+  * cookbook/libraries
+  * cookbook/metadata.rb
+  * cookbook/providers
+  * cookbook/readme.md
+  * cookbook/recipes/default.rb
+  * cookbook/resources
+  * cookbook/templates/default
+create로 만든 cookbook은 '''knife upload'''로 chef server에 업로드할 수 있다.
+{{{#!plain
+# knife cookbook create COOKBOOK_NAME (options)
+}}}
+
+HelloWorld 쿡북을 만들어봤다.
+{{{#!plain
+# knife cookbook create HelloWorld
+** Creating cookbook HelloWorld
+** Creating README for cookbook: HelloWorld
+** Creating metadata for cookbook: HelloWorld
+}}}
+
+cookbook 기본 디렉토리는 /var/chef/cookbooks다.
+{{{#!plain
+# tree
+.
+└── HelloWorld
+    ├── README.md
+    ├── attributes
+    ├── definitions
+    ├── files
+    │   └── default
+    ├── libraries
+    ├── metadata.rb
+    ├── providers
+    ├── recipes
+    │   └── default.rb
+    ├── resources
+    └── templates
+        └── default
+}}}
+
+사용할 수 있는 옵션들을 정리했다.
+  * -C, --copylight : 카피라이트 정보를 입력 
+  * -I LICENSE, --license LICENSE : 배포에 사용할 라이센스 정책을 입력한다.
+  * -m EMAIL, --email EMAIL : 쿡북 관리자의 email
+  * -r FORMAT, --readme-format : 옵션 정보를 저장할 문서 형식. md와 rdoc이 있다. 
+
+사용 예)
+{{{#!plain
+# knife cookbook create mydhcp -C 'joinc.co.kr' -I 'GPLv2' -m 'yundream@gmail.com' -r rdoc
+}}} 
+옵션 정보들은 cookbook 디렉토리 밑에 metadata 에 저장된다. 
+{{{#!plain
+# cat metadata.rb 
+maintainer       "joinc.co.kr"
+maintainer_email "yundream@gmail.com"
+license          ""
+description      "Installs/Configures mydhcp"
+long_description IO.read(File.join(File.dirname(__FILE__), 'README.rdoc'))
+version          "0.0.1"
+}}}
+
+==== upload ====
+create로만든 cookbook는 로컬 저장소에만 저장돼있는 상태다. 이 쿡북을 사용하기 위해서는 chef 서버에 upload 해야 한다. 
+{{{#!plain
+# knife cookbook upload HelloWorld
+Uploading HelloWorld             [0.0.1]
+upload complete
+# knife cookbook upload mydhcp
+Uploading mydhcp             [0.0.1]
+upload complete
+}}}
+
+==== delete ====
+쿡북을 지운다.
+{{{#!plain
+knife cookbook delete COOKBOOK_NAME [COOKBOOK_VERSION] (options)
+}}}
+
+==== download ====
+쿡북을 로컬로 다운로드 한다. 버전을 명시하지 않을 경우 최신 버전을 다운로드 한다.
+{{{#!plain
+knife cookbook download cookbook [version]__ _(options)_
+}}}
+
+예제 : list로 쿡북 목록 확인한 다음, download를 이용 로컬로 복사했다.
+{{{#!plain
+# knife cookbook list
+HelloWorld   0.0.1
+# knife cookbook download HelloWorld 
+Downloading HelloWorld cookbook version 0.0.1
+Downloading resources
+Downloading providers
+Downloading recipes
+Downloading definitions
+Downloading libraries
+Downloading attributes
+Downloading files
+Downloading templates
+Downloading root_files
+Cookbook downloaded to /root/HelloWorld-0.0.1
+}}}
+
+==== list ====
+Chef 서버로 부터 사용할 수 있는 쿡북 목록을 보여준다. 
+{{{#!plain
+# knife cookbook list
+  HelloWorld   0.0.1
+  mydhcp       0.0.1
+}}}
+
+
+==== show ====
+쿡북의 구성요소(attributes, definitions, files, libraries, providers, recipes, resource, template..)에 대한 상세정보를 보여준다. 
+{{{#!plain
+knife cookbook show COOKBOOK_NAME [COOKBOOK_VERSION] [PART...] [FILE_NAME] (options)
+}}}
+옵션들은 다음과 같다.
+  * COOKBOOK_VERSION : 쿡북은 버전을 가지고 있다. 쿡북의 정보를 보려면 버전 중 하나를 선택해야 한다.
+  * PART : attributes, definitions, files, libraries, providers, recipes, resources, template 등 보고자 하는 쿡북 구성요소 
+
+{{{#!plain
+# knife cookbook show HelloWorld
+HelloWorld   0.0.1
+
+# knife cookbook show HelloWorld 0.0.1 attributes
+  checksum:     9c3bb0326fad6197d2a1d79a2bb36fba
+  name:         HelloWorld.rb
+  path:         attributes/HelloWorld.rb
+  specificity:  default
+  url:          http://localhost:4000/cookbooks/HelloWorld/0.0.1/files/9c3bb0326fad6197d2a1d79a2bb36fba
+}}}
+
+
+==== test ====
+쿡북에 있는 모든 .rb와 .erb 파일의 문법 오류를 검사한다. 
+{{{#!plain
+# knife cookbook test COOKBOOK_NAME (options)
+}}}
+
+{{{#!plain
+# knife cookbook test HelloWorld
+checking HelloWorld
+Running syntax check on HelloWorld
+Validating ruby files
+Validating templates
+Validating ruby files
+Validating templates
+}}}
+
+
+=== node ===
+Node는 chef-client가 설치된 모든 서버로 물리적인 서버와 (클라우드 기반의)가상화 서버까지 포함하나. chef는 물리 노드와 가상화 노드의 조합으로 이루어진다. chef-client는 각 노드에서 실행되며, Ohai를 이용해서 클라이언트 시스템에 대한 정보를 수집한다.
+
+Chef server는 node의 sub command를 이용해서 노드들을 관리한다.
+{{{#!plain
+knife node [ARGUMENT] (options)
+}}}
+
+
+==== create ====
+chef 서버에 노드를 추가한다. 추가된 노드 정보는 chef server에 JSON 형테로 저장된다. knife로 node를 편집하기 위해서는 환경변수 EDITOR에 편집기를 등록해야 한다.
+{{{#!plain
+# export EDITOR=vi
+# knife node create NODE_NAME
+}}}
+
+{{{#!plain
+# knife node create node1.yundream.com
+}}}
+명령을 실행하면 환경변수 "EDITOR"에 정의된 에디터로 아래와 같은 편집화면이 뜬다. 
+{{{#!plain
+{
+  "json_class": "Chef::Node",
+  "default": {
+  },
+  "run_list": [
+
+  ],
+  "chef_type": "node",
+  "automatic": {
+  },
+  "name": "node1.yundream.com",
+  "override": {
+  },
+  "normal": {
+  },
+  "chef_environment": "_default"
+}
+}}}
+저장하고 에디터를 종료하면, chef server에 업로드된다.
+
+파일에서 만들 수도 있다.
+{{{#!plain
+knife node from file FILE
+}}}
+
+
+==== delete ====
+노드를 삭제한다.
+{{{#!plain
+knife node delete NODE_NAME
+}}}
+
+{{{#!plain
+# knife node delete node1.yundream.com
+Do you really want to delete node1.yundream.com? (Y/N) y
+Deleted node[node1.yundream.com]
+}}}
+
+==== list ====
+chef server에 등록된 노드 목록을 보여준다.
+{{{#!plain
+knife node list (options)
+}}}
+
+{{{#!plain
+# knife node list
+  dhcp.yundream.com
+  test.yundream.com
+}}}
+
+==== run_list add ====
+node에 role이나 recipes를 추가한다.
+{{{#!plain
+knife node run_list add NODE_NAME RUN_LIST_ITEM (options)
+}}}
+
+{{{#!plain
+# knife node run_list add test.yundream.com 'recipe[HelloWorld]'
+# knife node run_list add dhcp.yundream.com 'recipe[ZoneDHCP]'
+# knife node run_list add dhcp.yundream.com 'role[dhcp]'
+}}}
+
+하나 이상의 recipe와 role을 추가할 수도 있다.
+{{{#!plain
+# knife node run_list add test.yundream.com 'recipe[HelloWorld],recipe[ZoneDHCP] role[dhcp]'
+}}}
+
+==== run_list remove ====
+node에서 role이나 recipes를 제거한다.
+{{{#!plain
+knife node run_list remove NODE_NAME RUN_LIST_ITEM
+}}}
+
+{{{#!plain
+# knife  node run_list remove dhcp.yundream.com 'recipe[ZoneDHCP]'
+}}}
+
+==== show ====
+node의 상세정보를 보여준다. 
+{{{#!plain
+knife node show NODE_NAME (options)
+}}}
+
+{{{#!plain
+# knife  node show dhcp.yundream.com
+Node Name:   dhcp.yundream.com
+Environment: _default
+FQDN:        localhost.localdomain
+IP:          192.168.57.120
+Run List:    role[dhcp]
+Roles:       dhcp
+Recipes:     ZoneDHCP
+Platform:    centos 5.4
+}}}
+  * -l, --long : 모든 정보를 보여준다.
+  * -m, --medium : 상세 정보를 보여주지만 모든 정보를 보여주진 않는다. 옵션이 없을 경우 -m 이 기본이다. 
+  * -r, --run-list : run-list만 보여준다.
+'''-l''' 옵션을 사용할 경우 '''ohai'''를 이용해서 노드의 시스템과 네트워크에 대한 구체적인 정보를 보여준다. 이 내용만을 가지고도 시스템 구성정보를 보여줄 수 있을 것이다.  
+  * block device 정보
+    * 모델
+    * 크기
+    * 상태
+  * network interface 정보
+    * rx, tx : byte, packet
+  * cpu
+  * bios 상세 정보
+  * group및 user정보
+  * filesystem 정보
+  * network 정보 
+    * gateway
+    * interface의 MAC, IP, status, mtu
+  * os 정보
+ohai를 모니터링 도구로까지 확장할 수 있을 것 같은데... 고민해봐야 겠다.
+
+-F 옵션으로 출력 결과를 JSON으로 변환할 수 있다.
+{{{#!plain
+# knife cookbook show HelloWorld -l -F json
+}}}
+=== cookbook-site ===
+=== data-bag ===
+databag에는 chef로 관리할 시스템의 공용 정보가 들어있다. 일종의 전역 값으로 생각하면 된다.
+==== data bag create ====
+data bag을 만든다. 
+{{{#!knife
+# knife data bag create mydatabag
+}}}
+
+==== data bag list ====
+data bag 목록을 확인한다.
+{{{#!plain
+# knife data bag list
+mydatabag
+}}}
+
+==== data bag 업로드 ====
+data bag을 chef server에 업로드 한다. data bag은 json 형식으로 반드시 "id"를 포함해야 한다.
+{{{#!plain
+# cat mydatabag.json
+{
+  "id": "test",
+  "host" : "test.joinc.co.kr",
+  "ip" : "111.111.111.111"
+}
+}}}
+
+{{{#!plain
+# knife data bag from file mydatabag mydatabag.json 
+Updated data_bag_item[mydatabag::test]
+}}}
+
+==== data bag show ====
+data bag 내용을 확인할 수 있다.
+{{{#!plain
+# knife data bag show mydatabag test
+host:  test.joinc.co.kr
+id:    test
+ip:    111.111.111.111
+}}}
+
+==== data bag 삭제 ====
+data bag 전체를 삭제하거나, 특정 ID를 삭제할 수 있다.
+
+특정 ID 삭제
+{{{#!plain
+# knife data bag delete mydatabag test
+Do you really want to delete test? (Y/N) y
+Deleted data_bag_item[test]
+}}}
+
+전체 삭제
+{{{#!plain
+# knife data bag delete mydatabag 
+Do you really want to delete mydatabag? (Y/N) y
+Deleted data_bag[mydatabag]
+}}}
+
+
+ * [wiki:Site/cloud/automation/databag chef databag] 참고
+=== environment ===
+=== exec ===
+=== role ===
+chef role은 [wiki:Site/cloud/automation/chefRoles 여기에서] 정리한다. 나중에 문서위치를 변경해야 겠다.
+
+=== search ===
+chef는 apache solr 기반의 풀 텍스트 검색엔진을 가지고 있다. chef 개발자는 solr 검색엔진이 제공하는 강력한 검색 기능을 활용할 수 있다. 
+
+chef는 databags, API clients, nodes, roles의 모든 데이터를 색인한다. 
+==== Search 색인 테이블 이름 ====
+chef는 아래의 색인 테이블 이름을 가지고 있다.
+|| Data type    || 색인 테이블 이름  || 검색 예제                                ||
+|| Roles        || role              || knife search role "name:production*"     ||
+|| Nodes        || node              || knife search node "name:app*"            ||
+|| API Clients  || client            || knife search client "name:c*"            ||
+|| Environments || environment       || knife search environment ":"             ||
+데이터 백은 데이터 백의 이름으로 색인테이블이 만들어진다. 예를 들어 데이터 백 이름이 'bag_o_data'라면, 질의어는 대략 아래와 같다.  
+{{{#!plain
+# knife search bag_o_data "arbitrary_key:some_value"
+}}}
+... 계속
+
+=== shef ===
+=== ssh ===
+chef에 등록된 노드들에 대해서 ssh로 명령을 수행할 수 있다. 개인적으로 설정이 변경된 노드의 chef-client를 재시작하기 위해서 주로사용한다. 사용법은 아래와 같다.
+{{{#!plain
+# knife ssh SEARCH_QUERY SSH_COMMAND (options)
+}}}
+옵션 들
+  * -a, --attribute '''SSH_ATTR''' : SSH 연결에 사용 할 attribute를 지정한다. 기본값으로 FQDN이 사용되며, ipaddress와 hostname을 사용할 수 있다. chef client를 등록할때, 호스트의 fqdn 이름을 이용하지 않고 chef-client -N 옵션으로 등록할 수도 있다. 이 경우 fqdn을 이용하면 제대로 접속이 안되므로 -a 옵션을 사용해야 한다.
+  * -P, --ssh-password '''PASSWORD''' : SSH 패스워드 
+  * -x, --ssh-user '''USERNAME''' : SSH 유저이름
+  * -i, --identity-file '''IDENTITY_FILE''' : 인증에 사용할 ssh key 파일
+  * -p, --ssh-port '''PORT''' : SSH Port 이름
+  * -C, --concurrency '''NUM''' : 동시 연결 수. 질의어에 따라서 여러 개의(심지어는 수백개) 노드가 검색될 수 있다. 이 옵션으로 동시 접속 가능한 ssh 수를 제한할 수 있다. 
+  * SSH_COMMAND : 실행할 ssh 명령
+
+모든 node의 chef-client를 작동한다. 
+{{{#!plain
+# knife ssh 'name:*' 'sudo chef-client'
+}}}
+
+web role을 가지는 모든 node의 uptime을 가져온다. yundream/12345를 이용하며, ip 주소로 접근한다. 
+{{{#!plain
+# knife ssh "role:web" "uptime" -x yundream -P 12345 -a ipaddress
+192.168.57.3  23:51:38 up 22 min,  2 users,  load average: 0.00, 0.00, 0.00
+}}}
+
+=== status ===
+노드상태를 확인할 수 있다.
+{{{#!plain
+# knife status
+20 hours ago, dev-vm.chisamore.com, ubuntu 10.04, dev-vm.chisamore.com, 10.66.44.126
+3 hours ago, i-225f954f, ubuntu 10.04, ec2-67-202-63-102.compute-1.amazonaws.com, 67.202.63.102
+3 hours ago, i-a45298c9, ubuntu 10.04, ec2-174-129-127-206.compute-1.amazonaws.com, 174.129.127.206
+3 hours ago, i-5272a43f, ubuntu 10.04, ec2-184-73-9-250.compute-1.amazonaws.com, 184.73.9.250
+3 hours ago, i-226ca64f, ubuntu 10.04, ec2-75-101-240-230.compute-1.amazonaws.com, 75.101.240.230
+3 hours ago, i-f65c969b, ubuntu 10.04, ec2-184-73-60-141.compute-1.amazonaws.com, 184.73.60.141
+}}}
+
+노드상태와 함께 적용된 run-list도 확인할 수 있다.
+{{{#!plain
+knife status --run-list
+20 hours ago, dev-vm.chisamore.com, ubuntu 10.04, dev-vm.chisamore.com, 10.66.44.126, role[lb].
+3 hours ago, i-225f954f, ubuntu 10.04, ec2-67-202-63-102.compute-1.amazonaws.com, 67.202.63.102, role[web].
+3 hours ago, i-a45298c9, ubuntu 10.04, ec2-174-129-127-206.compute-1.amazonaws.com, 174.129.127.206, role[web].
+3 hours ago, i-5272a43f, ubuntu 10.04, ec2-184-73-9-250.compute-1.amazonaws.com, 184.73.9.250, role[web].
+3 hours ago, i-226ca64f, ubuntu 10.04, ec2-75-101-240-230.compute-1.amazonaws.com, 75.101.240.230, role[web].
+3 hours ago, i-f65c969b, ubuntu 10.04, ec2-184-73-60-141.compute-1.amazonaws.com, 184.73.60.141, role[web].
+}}}
+
+=== tag ===
+
+== 히스토리 ==
+  * 작성 : [[Date(2012-12-01T13:59:48)]]
+  * 수정
+    * [[Date(2012-12-05T04:18:22)]] : status 추가
+    * [[Date(2012-12-09T14:53:54)]] : ssh 추가

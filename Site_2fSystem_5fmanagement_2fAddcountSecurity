@@ -1,0 +1,92 @@
+#title 리눅스 유저 보안
+
+== 기본 원칙 ==
+리눅스 유저 보안을 위한 기본 원칙이다. 아래의 원칙을 만족하는 최적의 솔루션을 찾는게 목적이다. 
+  1. '''root 권한은 한번에 얻을 수 없다'''
+  1. '''특정 유저만 su를 수행할 수 있다'''
+  1. '''일반 유저는 특수한 목적에 한해 제한된 방식으로 root 권한을 획득할 수 있어야 한다'''
+  1. '''패스워드는 유추하기 힘들어야 한다'''
+
+=== 테스트 환경 ===
+  1. centos6.3 : ubuntu도 비슷하게 응용할 수 있을 것이다.
+  1. ssh : 요즘에 telnet 접근을 허용하는 경우는 없을 것이다.
+=== root 권한은 한번에 얻을 수 없다 ===
+원격 유저의 경우 한번의 경로로 root 권한을 획득할 수 없도록 한다. 예컨데, 일반유저로 접근을 한 다음 su를 통해서 루트권한을 획득할 수 있다. 
+
+ssh 설정을 변경한다.
+{{{#!plain
+# cat /etc/ssh/sshd_config
+PermitRootLogin no
+}}}
+
+=== 특정 유저만 su를 수행할 수 있다 === 
+sysadmin 그룹에 속한 유저만 su 를 수행할 수 있도록 변경했다. 
+
+sysadmin 그룹을 만든다.
+{{{#!plain
+# addgroup sysadmin
+}}}
+
+yundream 유저를 sysadmin 그룹에 포함한다.
+{{{#!plain
+# usermod -G sysadmin yundream
+# cat /etc/group
+sysadmin:x:1201:yundream
+}}}
+
+su 명령을 sysadmin 그룹에 허용한다.
+
+/bin/su는 root user 에 대해서 '''+s'''퍼미션이 붙어 있다. su를 실행하는 유저는 root 유저 권한으로 su를 실행한다. 
+{{{#!plain
+# ls -al su
+-rwsr-xr-x 1 root root 36832  9월 13  2012 su
+}}}
+other 유저에게서 실행권한을 뺏고, sysadmin에게 그룹 권한을 주면 된다.
+{{{#!plain
+# chmod o-x su
+# chgrp sysadmin su
+# chmod g-s su
+}}}
+sysadmin 그룹에 포함되지 않은 일반유저는 su를 실행할 수 없다.
+{{{#!plain
+[guest01@localhost ~]$ su -
+-bash: /bin/su: 허가 거부
+}}}
+
+이제 root 권한을 획득하려면
+  1. ssh를 이용해서 yundream 계정으로 접근 한 다음 
+  1. root로 switch user 해야 한다. 
+
+=== 특수한 경우에 한해 root 권한 획득 ===
+현재 시스템에는 3개 계층의 유저가 있다.
+  1. root : 뭐든지 다 할 수 있다. 
+  1. yundream : sysadmin 그룹에 포함돼 있으며, 필요에 따라 root로 switch user할 수 있다. 일단 root 권한을 획득하면 root와 동등한 권한을 가진다. 
+  1. 일반유저 : 제한된 권한만을 가진다. 
+3개 계층으로 하기에는 다양한 목적의 유저를 수용할 수 없다.
+
+서버 애플리케이션 중에는 루트권한을 필요로 하는 것들이 많다. 현재 계정 정책에서는 yundream으로 접근한다음 su 해야 하는데, 보안상 좋지 않다. 애플리케이션을 실행할 별도의 계정을 만들어야 한다. 이 계정은 일반유저 보다는 더 큰 권한을 가져야 하지만, yundream 보다는 제한된 권한을 가저야 한다. 
+
+가장 좋은 방법은 '''특정 명령만''' 선별적으로 root 권한으로 실행하도록 허용하면 될테다. 리눅스의 sudo를 이용해서 명령단위로 권한을 조정할 수 있다.
+
+sudo의 설정파일은 '''/etc/sudoers'''다.  
+{{{#!plain
+# appadmin 유저는 /mnt/dir에 대해서 mount, umount 명령을 수행할 수 있다. 
+appadmin ALL=/sbin/mount /mnt/dir, /sbin/umount /mnt/dir
+
+# guest01 유저는 /et/test (루트권한을 가지고)파일을 삭제할 수 있다.
+guest01 ALL=/bin/rm /etc/test
+
+# musician 그룹에 포함된 유저는 cdrom을 mount, unmount 할 수 있다. 
+%musician  ALL=/sbin/mount /mnt/cdrom, /sbin/umount /mnt/cdrom
+}}}
+
+=== 패스워드는 유추하기 힘들어야 한다 ===
+패스워드는 유추하기 힘들어야 한다는 말은 하나마나한 말이다. 유추하기 힘들다는 말은 곧 기억하기 힘들다는 말이고, 이 경우 사용자는 포스트잇을 사용하거나 pc에 파일형태로 저장을 한다. 개인적으로 유추하기 힘든 패스워드를 외어서 사용한 적은 한번도 없다. 
+
+따라서 패스워드를 유추하기 힘들게 만드는 걸로는 보안 강도를 높이기가 힘들다. 
+
+차라리 ssh 인증키를 이용하는게 낫지 싶다. 물론 key를 사용하려면, key를 로컬시스템에 복사해 두고 사용해야 하기 때문에 누출될 가능성이 있기는 하다. 하지만 패스워드 역시 누출될 가능성은 충분하다. 패스워드 방식의 또다른 문제는 Brute force 방식에 취약하다는 점이다. - 패스워드를 16자 이상으로 설정할 수는 없는 노릇이라서 그렇다 - 
+
+그러니 그냥 pem 파일 사용하자.
+
+... 계속

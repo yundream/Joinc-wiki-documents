@@ -1,0 +1,71 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.03.20.05.17.32;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fLDAP
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title LDAP - Lightweight Directory Access Protocol
+
+== LDAP ==
+서버/클라이언트 모델위에서 작동하는 디렉토리 서비스다. 정보를 관리하는 가장 일반적인 방법은 디렉토리를 구성하는 것이다. LDAP은 디렉토리구조로 정보를 관리를 하며, 정보요청시 빠르게 정보를 찾아서 반환한다. 데이터를 저장하고 질의에 응답한다는 점에서 데이터베이스관리 시스템이라고 볼 수 있다.  
+
+== 소개 ==
+나는 여러 지역에 분산된 네트워크 시스템을 관리해야 한다. 이들 시스템들은 VPN으로 통합을 했다. 네트워크가 통합됐으니, 다른 자원들도 통합해야 할 것이다. 가장 먼저 '''도메인이름'''을 통합했다. 네트워크에 흩어져있는 각 노드들은 내부에 구축된 private dns 서버를 이용해서 도메인 이름을 찾을 수 있다. 간단한 dns 서버인 dnsmasq로 구축했다. 
+
+이제 계정을 통합해야 한다. 여기 저기 흩어져 있는 시스템의 아이디, 패스워드를 시스템 관리자가 (엑셀 쉬트 보면서) 호스트에 접근해서 작업을 하는 그런 삽질을 할 수 없는 노릇이다. 계정관리 시스템을 통합하면, 유저 접근 로그를 중앙에서 관리할 수 있다는 것도 큰 장점 중 하나다. 
+
+주변에 물어본 결과 계정 통합하려면 LDAP이 딱이라는 이야기를 듣고, LDAP 환경을 구축하기로 했다. 이글에 LDAP 서버와 클라이언트 환경을 구축하고 응용하기 위한 방법을 정리할 것이다. 글의 말미에는 계정을 관리하기 위한 (LDAP 이외의)다른 방법들이 있는지 살펴볼 것이다.  
+
+
+== OpenLdap server ==
+=== 주요특징 ===
+  * LDAP은 data entries가 디렉토리로 구성되는 계층적(hierarchical)구조를 가진다. 이것을 DIT(Directory Information Tree)라고 부른다. 
+  * Entry는 (속성)attributes으로 구성된다. 
+  * attribute는 하나 이상의 값(value)로 구성된다. 
+  * 모든 attribute는 하나 이상의 '''objectClass'''로부터 정의된다.  
+  * Attribute와 objectclasses는 schema로 정의된다. 
+  * 각각의 entry는 유일한 식별자를 가지고 있다. 이것을 '''Distinguished Name'''(줄여서 DN 혹은 dn)이라고 한다. 계층적 구조에서 DN은 부모 entry를 가질 수 있는데, RDN으로 이러한 관계를 표시할 수 있다. 
+
+{{{#!plain
+dn: cn=John Doe,dc=example,dc=com
+cn: John Doe
+givenName: John
+sn: Doe
+telephoneNumber: +1 888 555 6789
+telephoneNumber: +1 888 555 1232
+mail: john@@example.com
+manager: cn=Larry Smith,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+}}}
+위의 정보는 LDIF(LDAP Data interchange Format)형식으로 작성된 entry의 모습이다. 위 entry의 DN은 "cn=John Doe,dc=example,dc=com"이며, RDN은 "dc=example,dc=com"이다. dc는 suffix(naming context)라고 하는데, 일반적으로 '''도메인 이름'''을 사용한다. 즉 위의 DN은 example.com 도메인에 소속된 John유저에 대한 정보를 담고 있고 해석할 수 있다.
+
+=== 환경 ===
+설치 및 테스트 환경이다.
+  * Virtualbox : VM으로 테스트하기로 했다. 서버와 클라이언트 모두 VM에서 설치하고 테스트할 계획이다.
+  * Ubuntu 12.10 : 서버 클라이언트 모두 Ubuntu 12.10이다.
+    * LDAP server 호스트 이름 : 이하 LDAP server의 이름은 LDAPS 라고 부른다.  
+    * LDAP client 호스트 이름 : 이하 LDAP server의 이름은 LDAPC 라고 부른다.  
+
+=== 설치 ===
+@

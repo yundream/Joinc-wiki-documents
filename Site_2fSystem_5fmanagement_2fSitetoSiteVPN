@@ -1,0 +1,297 @@
+#title OpvenVPN으로 구축하는 Site-to-Site VPN
+
+[[TableOfContents]]
+== 소개 ==
+예전에 uCloud 환경에서 VPN의 성능을 측정하기 위해서 OpenVPN으로 '''site-to-site VPN'''를 구축한적이 있었다. IPSec과 SSL VPN중 어느게 더 성능이 뛰어난지, 더 범용적으로 사용할 수 있을지에 대한 정보를 얻는게 목적이었다. SSL VPN 솔류션으로는 OpenVPN을 IPSec 솔류션으로는 Openswan을 사용했었는데, 결국 OpenVPN쪽으로 기울었다.
+
+아뭏든 그렇게 잊고 지냈는데, 다시 OpenVPN기반으로 site-to-site VPN 환경을 구축해야 할 일이 생겼다. 노가다였다. 기존에 테스트 했던 문서를 저장하지 않아서 바닥부터 다시 시작했기 때문이다. 
+
+Site-to-Site는 기 구축된 [wiki:Site/Network_Programing/Documents/SubNetWorking subnet]에 openvpn 호스트를 구축하고 VPN 트래픽일 경우 openvpn 호스트를 경유해서 나가도록 라우팅 설정까지 해야 하기 때문에, (예상외로)구축하는게 쉽지 않다. 자동화하지 않고 수작업을 한다면, 경험있는 엔지니어가 해도 하루는 걸리지 싶다.
+
+이번에도 사소한 실수들 때문에 하루가까이 삽질을 했다. 나중에 삽질하지 않도록 기록으로 남긴다.
+
+참 host-to-site vpn은 이전에 정리해 둔게 있다. [wiki:Site/System_management/VPN/OpenVPN 여기]를 참고하자.
+
+== Site-to-Site VPN 구축하기 == 
+AWS [wiki:Site/cloud/VPC VPC] 환경에 구축할건데, VPC든 다른 네트워크든 구성은 동일하기 때문에 쉽게 응용할 수 있을 거다. 다만 라우팅 구성이 간단한 VPC에 비해서, 다른 네트워크 환경에서는 라우터 설정이 좀 까다로울 수는 있다.
+
+=== 구성 ===
+구성을 그림으로 그리고 구성위에서 패킷이 어떻게 이동하는지를 표현했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1nTuEz9D7ho_7ZPdClQJM3OiGg762K9vp1zrnUJRBDYQ/pub?w=566&amp;h=233">
+}}}
+  * 두개의 VPC 네트워크를 하나의 네트워크로 묶을 거다. 
+  * 각 VPC 네트워크에는 '''VPN gateway''' 역할을 하는 호스트가 있다. 이 호스트는 EC2 instance로 openvpn 소프트웨어가 설치돼 있다. VPN-02를 VPN server 설정하고 VPN-01은 VPN client로 설정한다.   
+  * '''Router'''는 VPC에서 제공하는 것을 그대로 사용한다. 
+  * '''Internet gateway'''는 패킷을 인터넷으로 보내기 위한 관문이다. Internet gateway위에는 NAT server가 있겠지만 이 구조에서는 신경쓰지 않을거다. 
+  * 독립된 2개의 네트워크를 하나의 네트워크로 연결하기 위해서 가상의 '''VPN subnet'''을 하나 만든다. Subnet 주소는 192.168.100.0/24로 하겠다. VPN Gateway는 이 가상의 네트워크를 통해서 서로 연결이 된다. VPN Gateway느 VPN subnet에 연결하기 위한 IP(192.168.100/24 대역의)를 할당 받는다. VPN-02는 192.168.100.2, VPN-01은 192.168.100.5를 할당하겠다. 
+  * VPN gateway는 인터넷으로 패킷을 보내기 위해서 EIP를 attach 한다.
+
+VPC-01과 VPC-02를 VPN으로 연결했다. VPC-01의 호스트 10.2.51.2에서 VPC-02의 호스트 10.1.51.2로 패킷이 전송되는 과정을 살펴볼 것이다. 
+
+패킷흐름은 다음과 같다.
+  1. VPC-01.Host 에서 VPC0-2.Host로 패킷을 전송한다.
+  1. VPC-01.Host는 '''destip 10.1.5.2'''로 패킷을 보낸다. 
+  1. 패킷은 '''라우터'''로 이동한다. 
+  1. 패킷을 받은 라우터는 '''VPN gateway''' 패킷을 보낸다. 
+     * 이를 위해서 routing table 설정을 해야 한다.
+  1. 패킷을 받은 VPN gateway는 패킷을 캡슐화(encapsulation) 한다. 새로 만들어진 패킷의 정보는 다음과 같다.
+     * Source IP : 54.23.56.7  
+     * Source Port : 1194 (Openvpn의 기본 port)
+     * Dest IP : 54.23.100.50
+     * Dest Port : 1194
+  1. 패킷은 인터넷을 경유해서 VPN gateway까지 전송된다.   
+  1. VPN gateway는 패킷을 decapsulation한다.
+  1. Decapsulation한 패킷을 전송한다. Decapsulation한 패킷의 정보는 다음과 같다.
+     * Dest ip 10.1.5.2
+     * Source ip : 10.2.51.2
+  1. 패킷은 VPC-02.Host에 도착한다.
+  1. VPC-02.Host는 응답 패킷을 만든다. 이 응답 패킷의 정보는 다음과 같다. 
+     * Dest ip : 10.2.51.2 
+     * Source ip : 10.1.51.2 
+  1. 응답패킷은 VPN gateway로 향한다. 물론 이렇게 하기 위해서는 Router에 라우팅룰을 추가해줘야 한다.  
+
+OpenVPN을 이용해서 site-to-site를 구성하려면 결국 
+  1. 라우팅 경로 수정
+  1. OpenVPN 서버/클라이언트 설치
+의 두가지 과정이 필요하다.
+
+라우팅 경로수정은 VPC에서 제공하므로 어렵지 않게 설정할 수 있을 것이다. 이 부분은 다루지 않고, OpenVPN 서버/클라이언트 설치만 다루도록 하겠다.   
+
+== OpenVPN 설치 ==
+=== 설치 운영체제 ===
+Ubuntu 리눅스 12.10 서버 버전을 사용한다.
+=== OpenVPN Server 설치 및 설정 ===
+서버측 즉 VPC-02의 VPN gateway의 설치 및 설정 정보다.
+Openvpn을 설치한다.
+{{{#!plain
+# apt-get install openvpn
+}}}
+
+밑바닥 부터 openvpn 설정을 하는 것은 좋은 방법이 아니다. Openvpn패키지를 설치하면, 설정을 도와주기 위한 스크립트들과 셈플 설정파일과 문서들을 제공하니 이들을 참고한다. 이들 파일은 /usr/share/doc/openvpn/examples 밑에 위치한다. 
+
+==== Public Key Infrastructure ====
+VPN은 서로 다른 네트워크를 연결하기 위한 솔류션이다. 당연히 허용한 네트워크의 연결만 허용해야 한다. Openvpn은 이를 위한 X509 PKI(public key infrastructure)를 제공한다. PKI외에 (좀더 단순한)static key를 이용하는 방법도 있다. 나는 PKI를 이용할 거다. examples/esay-rsa 디렉토리 밑에 있는 몇 개의 스크립트들을 이용해서 public key를 관리할 수 있다. 
+
+easy-rsa밑에는 1.0과 2.0 이름의 디렉토리가 있다. ([[Date(2013-03-09T17:43:54)]])현재 openvpn버전은 2.2.1로 2.0 디렉토리 밑에 있는 스크립트를 사용하면 된다. 1.0은 이전 버전과의 호환을 위해서 사용할 수 있다.
+ 
+PKI를 위한 환경변수를 설정한다. 환경변수를 저장하고 있는 파일의 이름은 vars로 했다. 아래 부분을 수정하면 된다.
+{{{#!plain
+# cat vars
+...
+export KEY_SIZE=2048   # Key 크기를 2048로 늘렸다. 기본은 1024
+export KEY_COUNTRY=KR
+export KEY_CITY=SEOUL
+export KEY_ORG=Joinc
+export KEY_EMAIL=yundream@gmail.com
+...
+}}}
+환경변수를 적용한다. 
+{{{#!plain
+# source ./vars 혹은
+# . ./vars
+}}}
+이제 CA(Certificate Authority)를 만든다. 
+{{{#!plain
+# ./clean-all
+# ./build-ca
+Generating a 1024 bit RSA private key
+...................++++++
+.++++++
+writing new private key to 'ca.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [KR]:
+}}}
+OpenSSL은 vars파일에 있는 환경변수의 내용을 가지고 기본 설정값을 만든다.  build-ca를 실행하고 나면 keys 디렉토리 밑에 '''ca.crt'''와 '''ca.key'''가 만들어진다. 
+
+CA를 만들었다면 build-key-server를 이용해서 server key를 만든다. 
+{{{#!plain
+# ./build-key-server server
+}}}
+실행하고 나면 keys 디렉토리에 server.crt, server.csr, server.key 파일이 만들어진다. 
+
+이제 클라이언트를 위한 client key를 만든다. 클라이언트 이름은 client01로 하겠다. 
+{{{#!plain
+# ./build-key client01 
+}}}
+역시 keys 디렉토리 밑에 client01.crt, client01.csr, client01.key 파일이 만들어진다.
+
+==== Openvpn 서버 설정 ====
+Openvpn 구축의 60%는 서버측 설정에 달려있다. 나머지 30%는 네트워크 설정, 나머지 10%는 클라이언트측 설정이다. Openvpn 서버는 모든 클라이언트와 통신을 할 수 있다. 만약 클라이언트들 끼리 통신이 가능하게 하고 싶다면 '''client-to-client'''설정을 하면 된다. 이렇게 되면, 서버와 클라이언트가 하나의 네트워크에 묶는 구성이 가능해 진다. 
+제일먼저 Openvpn의 설정 디렉토리를 만들어야 한다. 이 디렉토리에 앞서 만든 key 파일들을 복사하고 openvpn의 설정파일을 만든다. Openvpn의 기본 설정 디렉토리는 '''/etc/openvpn''' 이다. 이 디렉토리 밑에 '''certs'''와 '''keys''' 디렉토리를 만든다. 
+{{{#!plain
+# mkdir /etc/openvpn
+# mkdir /etc/openvpn/certs /etc/openvpn/keys
+}}}
+그리고 '''server.crt'''와 '''ca.crt'''를 /etc/openvpn/certs 에 복사한다. server.key는 /etc/openvpn/keys에 복사한다. 보안상의 이유로 server.key는 반드시 600 권한을 가져야 한다. 
+{{{#!plain
+# chmod -R 600 /etc/openvpn/keys
+}}}
+다음 대칭키 교환을 위한 Diffie-Hellman 매개변수를 만들어서 /etc/openvpn에 복사한다.
+{{{#!plain
+# openssl dhparam -out dh2048.pem 2048
+}}}
+
+Openvpn의 장점은 각 클라이언트 별로 설정파일을 관리하고, 이 설정 파일의 내용을 push할 수 있다는 점이다. 예컨데 클라이언트가 접근하면 서버는 클라이언트에게 라우팅 정보와 vpn subnet 정보들을 알려줘서, 자동으로 vpn 네트워크에 참여하도록 설정가능 하다. 
+
+클라이언트 별 설정파일이 위치할 디렉토리 ccd(client-config-directory)를 만들고, 여기에 클라이언트 설정정보를 저장하는 파일을 두면된다. 파일의 이름은 클라이언트 이름과 동일하게 만들어야 한다. 그러므로 client01에 대한 설정파일 이름은 client01이어야 한ㄷ.
+{{{#!plain
+# mkdir /etc/openvpn/ccd
+# touch /etc/openvpn/ccd/client0
+}}}
+
+cleint0 파일을 열어서 설정 내용을 편집한다. 
+{{{#!plain
+iroute 192.168.100.0 255.255.255.0
+push "route 10.1.0.0 255.255.0.0" 
+}}}
+iroute는 클라이언트의 서브넷 정보를 알려주기 위해서 사용한다. push는 클라이언트측에 서버측으로의 라우팅 정보를 밀어주기 위해서 사용한다.  
+
+지금까지의 정보를 openvpn 설정파일에 넣어주면 된다. openvpn 설정파일의 기본 이름은 openvpn.conf로 내용은 아래와 같다. 설정파일의 상세 설명은 주석으로 대신한다.
+{{{#!plain
+# cat /etc/openvpn/openvpn.conf
+# Openvpn 서버의 bind 포트 정보. 기본 포트는 1194다. 
+port 1194
+# 사용할 프로토콜. 보통 udp를 사용한다.
+proto udp
+# vpn subnet을 위한 가상 인터페이스 타입. TUN을 사용했다.
+dev tun
+
+keepalive 10 120
+persist-key
+persist-tun
+
+# 위에서 만든 ca와 server key들의 위치
+ca certs/ca.crt
+cert certs/server.crt
+key keys/server.key 
+dh dh2048.pem
+
+# vpn subnet의 정보
+server 192.168.100.0 255.255.255.0
+
+# 암호화 방식을 선택한다.
+cipher BF-CBC      # Blowfish (기본)
+
+# 압축을 지원할 건지.
+# 서버가 압축 설정을 했다면, 반드시 클라이언트도 압축설정을 해야 한다.
+comp-lzo
+
+# client to client 통신을 지원할 경우 주석을 푼다.
+# client-to-client
+ifconfig-pool-persist ipp.txt
+
+# 로그를 남긴다. 
+# 일반적인 실행 환경이라면 verb 3 정도로 충분하다. 
+# 디버깅을 위해서 verb 단계를 11로 높였다.
+verb 11
+log         openvpn.log
+status openvpn-status.log
+
+# ccd 디렉토리.
+# ccd 디렉토리 밑에 클라이언트 설정을 둔다.
+client-config-dir  ccd
+route 10.2.0.0 255.255.255.0
+}}}
+
+client0에 대한 설정 파일이다.
+{{{#!plain
+# cat ccd/client01
+# vpn subnet 정보
+iroute 10.2.0.0 255.255.0.0
+# vpn gateway의 서브넷 정보를 밀어준다.
+push "route 10.1.0.0 255.255.0.0" 
+}}}
+
+openvpn 서비스를 올린다음 네트워크 정보를 확인해 봤다.
+{{{#!plain
+root@kic-mgmt-vpn-gateway:~# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         10.1.0.1     0.0.0.0         UG    0      0        0 eth0
+10.2.0.0        192.168.100.2   255.255.0.0     UG    0      0        0 tun0
+10.1.0.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+192.168.100.0   192.168.100.2   255.255.255.0   UG    0      0        0 tun0
+192.168.100.2   0.0.0.0         255.255.255.255 UH    0      0        0 tun0
+}}}
+  1. 디폴트 게이트웨이 : 10.1.0.1
+  1. VPC-01(10.2.0.0)으로 향하는 패킷은 tun0 디바이스로 보낸다. 디바이스로 향한 패킷은 openvpn이 받아서 encapsulation 한다음 54.23.56.7 로 전송한다. 
+
+==== Openvpn 클라이언트 설정 ====
+openvpn은 서버와 클라이언트 프로그램이 따로있지 않다. 설정에 의해서 결정된다. 먼저 openvpn을 설치한다.  
+{{{#!plain
+# apt-get install openvpn
+}}}
+
+VPC-01에 있는 VPN gateway는 클라이언트로 VPC-01의 VPN gateway에 접근한다. 접근하기 위해서는 먼저 "내가 접근할 권한을 가지고 있다"는 것을 서버에 증명해야 한다. 나는 PKI를 사용해서 인증하기로 했으므로, 앞서 서버측에서 생성한 '''client01'''을 증명하기 위한 인증서와 key를 획득해야 한다. 
+
+VPC-01로 부터 아래의 파일들을 복사한다.
+   * ca.crt 
+   * client01.crt 
+   * client01.key
+
+아래는 클라이언트 설정파일이다.
+{{{#!plain
+client
+dev tun
+
+# VPN 서버측의 IP(EIP) 
+remote 54.23.100.50 
+
+# 연결권한을 얻기 위한 인증서와 키들 
+ca /etc/openvpn/certs/ca.crt
+cert /etc/openvpn/certs/client01.crt
+key /etc/openvpn/keys/client01.key
+
+# 서버와 같은 암호화 알고리즘을 사용해야 한다. 
+cipher BF-CBC
+
+# 프로토콜과 포트로 서버와 같아야 한다.
+proto udp
+port 1194
+
+# 로그를 남기고 싶은가 ?  그럼 남기자.
+log-append /var/log/openvpn.log
+verb 4
+
+# openvpn을 루트권한으로 실행하는게 불안하다면, 실행 유저를 등록하자. 
+;user nobody
+;group nobody
+;daemon
+
+# Use a persistent key and tunnel interface.
+persist-tun
+persist-key
+}}}
+서버측에서 클라이언트 정보를 알고 있기 때문에 클라이언트측 설정은 단순하다. 클라이언트 openvpn을 실행하면, 서버로 부터 정보를 가져와서 네트워크를 설정한다.  
+
+VPN 클라이언트의 네트워크 설정을 살펴보자.
+{{{#!plain
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         10.2.0.1        0.0.0.0         UG    0      0        0 eth0
+10.2.0.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+10.1.0.0        192.168.100.5   255.255.0.0     UG    0      0        0 tun0
+192.168.100.1   192.168.100.5   255.255.255.255 UGH   0      0        0 tun0
+192.168.100.5   0.0.0.0         255.255.255.255 UH    0      0        0 tun0
+}}}
+  1. 디폴트 게이트웨이: 10.2.0.1
+  1. 10.1.0.0/16으로 향하는 패킷은 VPN gateway 주소인 192.168.100.5으로 향한다. 패킷은 openvpn이 만든 가상 디바이스인 tun0으로 향하고 openvpn 소프트웨어가 처리한다. Opnvpn은 패킷을 encapsulation하고, 이 패킷을 54.23.100.50로 전송한다. 
+
+== 참고 ==
+ * [http://www.smallnetbuilder.com/security/security-howto/30353-how-to-set-up-a-site-to-site-vpn-with-openvpn?start=2 Site to site vpn with openvpn]
+ * [http://en.wikipedia.org/wiki/Certificate_authority Certificate authority]
+ * [http://www.terms.co.kr/PKI.htm PKI]
+ * [http://system.kcu.ac/opendept/crypto/sub/sub06.htm Diffie-Hellman 키 교환]
+
+== 히스토리 ==
+ * 작성일 : [[Date(2013-03-10T09:53:13)]]

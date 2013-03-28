@@ -1,0 +1,109 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.03.18.16.08.54;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.03.17.15.55.59;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fDnsmasq
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title dnsmasq를 이용한 로컬 네트워크 dns 서버 구축
+
+[[TableOfcontents]]
+== private dns 서버 구축 ==
+지역 네트워크를 운영하려하면 private dns 서버를 구축해야 하는 경우가 생긴다. 관리 네트워크의 규모가 좀 커지면, 몇 개의 지역네트워크를 통합관리할 수 있는 dns 서버가 필요할 수도 있다.  
+
+최근 나는 여러 region에 있는 vpc 네트워크를 통합하는 일을 하게 됐다. Region간 vpc 네트워크의 통합은 vpn 터널을 뚫는 것으로 해결 했고, 남은건 계정관리와 도메인 이름 관리였다. 계정은 LDAP으로 통합하면 될테고 도메인 이름관리는 뭐로 해야 할지가 고민이었다. 
+
+원하는 구성은 아래와 같다.
+
+{{{#!plain
+<img src="https://docs.google.com/drawings/d/1ebHgAV2Wv5WSWyw7yOTStYvK9CgH7c7tPaE30uy4U5g/pub?w=711&amp;h=321">
+}}}
+
+bind를 이용해서 dns서버를 구성할 수도 있겠는데, 배보다 배꼽이 더 큰 느낌이다. 내가 원하는 건, 그다지 크지 않은 규모의 도메인 이름(대략 1000~2000)을 아주 간단하게 유지/관리할 수 있는 솔류션으로 '''/etc/hosts'''를 중앙 관리할 수 있는 수준이면 된다. 
+
+== dnsmasq ==
+구글님에게 신탁을 받기 위해서 검색어를 선택했다. 선택한 검색어는 '''linux simple dns server'''. 그랬더니 [wiki:http://en.wikipedia.org/wiki/Comparison_of_DNS_server_software comparison of dns server software comparison]이 걸려올라왔다. 그중 제일 위에 소개된 BIND는 제외, 두번째 소개된 Microsoft DNS는 (내가 윈도우를 사용하지 않는 다는 이유로)제하고 세번째 소개된 dnsmasq를 (몇 번의 테스트 후)선택하게 됐다. 밑에 있는 다른 녀석들은 ? 귀찮아서 넘어갔다. 내가 원하는 일만 잘 해내면 된다. 굳이 다른 것들까지 살펴볼 생각은 없다.  
+
+요녀석이 마음에 드는 이유는 아래와 같다.
+  1. /etc/hosts를 그대로 서비스할 수 있다 : /etc/hosts를 중앙에서 관리하는 효과를 누릴 수 있다.
+  1. Dns 중계 : /etc/hosts 에서 이름을 찾지 못했다면, 자동으로 (미리 설정한) public dns에서 이름을 찾아서 되돌려 준다.   
+딱 내가 원하는 기능이다.
+
+== 설치 및 관리 ==
+게다가 마음에 드는 건 설치와 관리가 엄청 쉽다는 것. dnsmasq는 dns외에 dhcp와 tftp 관리 기능도 제공하는데, 이것들을 신경쓰지 않는다면 설치후 설정 없이 바로 사용할 수 있다.
+
+테스트를 위해서 virtualbox를 이용해서 환경을 꾸몄다.
+  1. 192.168.57.1 : 호스트 리눅스로 여기에 dnsmasq를 설치한다. 우분투리눅스 12.10이다. 
+  1. 192.168.57.101 : 게스트 리눅스로 여기에서 호스트 리눅스로 dns query를 날린다. 우분투리눅스 12.10이다. 
+
+그냥 apt-get으로 설치
+{{{#!plain
+# apt-get install dnsmasq
+}}}
+
+호스트 운영체제의 /etc/hosts에 이름을 추가했다. 
+{{{#!plain
+# cat /etc/hosts
+120.56.1.2      test1.myjoinc.com 
+120.56.1.3      test2.myjoinc.com 
+120.56.1.4      test3.myjoinc.com 
+}}}
+
+게스트 운영체제의 /etc/resolv.conf를 수정했다.
+{{{#!plain
+# cat /etc/resolv.conf
+nameserver 192.168.57.1
+}}}
+
+테스트
+{{{#!plain
+$ nslookup test1.myjoinc.com
+Server:         192.168.57.1
+Address:        192.168.57.1#53
+
+Name:   test1.myjoinc.com
+Address: 120.56.1.2
+}}}
+성공..
+
+== 네트워크 지연 ==
+이 구성이 가지는 문제는 네트워크 지연이 발생할 수도 있다는 점이다. 이 문제는 각 로컬 호스트에 '''nscd'''를 설치해서 dns 이름을 캐쉬하는 것으로 어느정도 해결할 수 있을 것이다. 각 지역마다 dns 서버를 두는 방법도 있을텐데, 굳이 이렇게까지 할 필요가 있나 싶고 결정적으로 귀찮아서 패스.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-03-18T16:08:54)]]
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+d7 7
+a13 1
+최근 나는 여러 region에 있는 vpc 네트워크를 통합하는 일을 하게 됐다. Region간 vpc 네트워크의 통합은 vpn 터널을 뚫는 것으로 해결 했고, 남은건 계정관리와 도메인 이름 관리였다. 계정은 LDAP으로 통합하면 될테고 도메인 이름관리는 뭐로 해야 하나가 고민이었다. 
+d61 6
+@

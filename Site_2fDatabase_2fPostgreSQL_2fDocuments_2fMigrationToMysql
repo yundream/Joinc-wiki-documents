@@ -227,8 +227,99 @@ $line =~ s/^ALTER TABLE ([a-zA-Z0-9_]+) ALTER COLUMN ([a-zA-Z0-9]+) .+/ALTER TAB
 
 그래서 선택한 툴이 '''pg2mysql'''이다. php로 작성된 건데, postgresql 구문을 mysql 구문으로 변환해 준다. 하지만 완벽하지 않으며, 그럭저럭 괜찮은 변환물을 얻을려면 소스코드를 수정해야 한다. 그리고 2차 변환툴도 만들어야 제대로된 마이그레이션 툴을 가질 수 있을거다.  2차 변환툴은 perl로 개발했다. 
 
-== 데이터 확인 ==
-== 트러블 슈팅 ==
+== 마이그레이션 정합성 확인 절차 ==
+다른 데이터베이스로의 마이그레이션이라서 신경쓸것들이 좀 있다.
+  1. 모든 데이터베이스와 모든 테이블이 만들어져야 한다. 
+  1. Index, Auto incremet, Foreign key, char set, filed data type 등을 일치시켜야 한다. 일치하지 않을 경우 동일한 효과를 가질 수 있도록 수정해줘야 한다. 
+  1. 모든 테이블에 모든 값이 insert 돼야 한다.
+  1. 입력된 모든 값을 확인한다. 
+
+=== 모든 테이블에 대한 row 값 확인 ===
+테이블에 있는 row 값을 저장하고 diff로 확인한다. 이것으로 데이터베이스와 테이블이 제대로 만들어졌는지, 그리고 데이터가 제대로 입력됐는지를 확인할 수 있다. 
+
+Postgresql 용 스크립트
+{{{#!plain
+#!/bin/bash
+database=database_name
+user=user_name
+PGCOMMAND=" psql -U $user -d $database -At -c \"
+            SELECT   table_name
+            FROM     information_schema.tables
+            WHERE    table_type='BASE TABLE'
+            AND      table_schema='public'
+            \""
+
+TABLENAMES=$(export PGPASSWORD=test; eval "$PGCOMMAND")
+
+for TABLENAME in $TABLENAMES; do
+    midfile="/tmp/postgres.$database.$TABLENAME.mid"
+    dstfile="/tmp/postgres.$database.$TABLENAME.csv"
+    PGCOMMAND=" psql -U $user -d $database -At -c \"
+        copy(select * from $TABLENAME order by id) to '$midfile' DELIMITER ',' CSV HEADER;
+                \""
+    eval "$PGCOMMAND"
+    cat $midfile | sed -e "s/\"//g" > $dstfile
+done
+}}}
+
+Mysql용 스크립트
+{{{#!plain
+#!/bin/bash
+database=database_name
+for name in `mysql -u root -ppassword $database -B -e "show tables"`;
+do
+   mysql -B --vertical -u root -ppassword $database -e "select count(*) as $name from $name" | grep -v '^\*' | replace ": " "|"
+done
+}}}
+
+=== 입력데이터 확인 ===
+일단 테이블에 모든 값이 들어갔다는 것은 확인했다. 이제 값이 제대로 들어갔는지를 확인할 차례다. Postgresql, Mysql 모두 데이터를 csv로 export 한 다음에 diff로 확인하는 방법을 사용하기로 했다.
+
+Postgresql용 스크립트
+{{{#!plain
+database=database_name
+user=user_name
+PGCOMMAND=" psql -U $user -d $database -At -c \"
+            SELECT   table_name
+            FROM     information_schema.tables
+            WHERE    table_type='BASE TABLE'
+            AND      table_schema='public'
+            \""
+
+TABLENAMES=$(export PGPASSWORD=test; eval "$PGCOMMAND")
+
+for TABLENAME in $TABLENAMES; do
+    midfile="/tmp/postgres.$database.$TABLENAME.mid"
+    dstfile="/tmp/postgres.$database.$TABLENAME.csv"
+    PGCOMMAND=" psql -U $user -d $database -At -c \"
+        copy(select * from $TABLENAME order by id) to '$midfile' DELIMITER ',' CSV HEADER;
+                \""
+    eval "$PGCOMMAND"
+    cat $midfile | sed -e "s/\"//g" > $dstfile
+done
+}}}
+
+Mysql용 스크립트
+{{{#!plain
+#!/bin/sh
+
+database=database_name
+for name in `mysql -u root -ppassword $database -B -e "show tables"`;
+do
+   midfile="/tmp/mysql.$database.$name.mid"
+   dstfile="/tmp/mysql.$database.$name.csv"
+   mysql -u root -ppassword $database -e "SELECT * INTO OUTFILE '$midfile'
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY ''
+LINES TERMINATED BY '\n'
+FROM $name;"
+    if [ $? -eq 0 ]
+    then
+        cat $midfile | sed -e "s/[\"']//g" -e "s/\\N//g" -e "s/\\\\//g" > $dstfile
+    fi
+done
+}}}
+출력형식에 약간의 차이가 있는데, sed로 보정했다. 이제 diff로 csv 파일을 비교하면 된다.
+
 ==  Query LOG 분석 ==
 === Mysql Log ===
 마이그레이션 후 DB 애플리케이션이 제대로 작동하는지 확인하려면, Mysql log를 확인해야 한다. 두 가지 방법이 있다. 
@@ -298,6 +389,19 @@ select * from test01
 무중단이라고 할 수는 없지만, 서비스에 영향을 최소화 하면서 안정적으로 마이그레이션 할 수 있다. 
 
 말 그대로의 무중단 마이그레이션을 계획할 수 있겠는데, 지금 처럼 다른 dbms로의 마이그레이션에서 무중단을 고려하는 것은 좀 너무 오바스럽지 싶다. 
+
+== 마이그레이션 성능이슈 ==
+=== update ===
+무중단 마이그레이션을 위해서 DML로그를 이용하기로 했다. 실행하는건 문제될게 없는데 DML 로그가 많을 경우 실행시간이 문제가 될 수 있다. Update 성능을 높여야 겠다. 
+
+Restore가 목적이니 bin log를 남길 필요는 없겠다.
+{{{#!plain
+SET SQL_LOG_BIN=0; 
+}}}
+
+Update하기 전에 key 필드에 대한 색인 작업은 걸어둬야 겠지 ?
+
+
 == 참고 ==
  * http://dev.mysql.com/doc/refman/5.5/en/innodb-parameters.html
  * [http://blog.naver.com/PostView.nhn?blogId=seuis398&logNo=70094098699 Innodb의 새로운 파일 포멧] 

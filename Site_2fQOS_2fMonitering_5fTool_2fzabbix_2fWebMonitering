@@ -1,0 +1,59 @@
+#title 웹 서비스 모니터링
+
+[[TableOfContents]]
+== 웹 서비스 모니터링 ==
+AWS [wiki:Site/cloud/AWS/VPC VPC]에 웹 서비스를 올릴 계획이다. [wiki:Site/cloud/AWS/ELB ELB]를 이용해서 로드 분산 및 고가용성 환경을 만들었다. 대략적인 구성은 다음과 같다.   
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1MmwT8FqzMbefUBSxj_MMnX-PkvAkDWGu-oe2zXgK3w4/pub?w=577&amp;h=269">
+}}}
+
+모니터링은 크게 두 부분에서 이루어질거다.
+  * 웹 서버 모니터링
+  * 웹 서비스 모니터링
+
+위 그림은 대략적인 그림이다. ELB를 통한 웹 서비스 모니터링은 문제 없지만, VPC 안에 있는 Web server 인스턴스에 대한 모니터링을 위해서는 별도의 접근 경로가 필요하기 때문에 VPC 구성이 달라져야 한다. 이건 따로 문서를 만들어 볼 생각이다.
+
+웹 서버 모니터링은 운영체제 수준에서의 모니터링이다. 호스트 운영체제에 zabbix agent를 설치해서 운영체제의 정보들을 수집하고 분석한다. 수집 분석대상은 다음과 같다.  
+  1. CPU 사용율
+  1. Memory 사용율 
+  1. Disk 사용율
+  1. Netstate 정보
+  1. 웹 서버 프로세스 정보 : 전체 프로세스 개수, 프로세스의 CPU 및 메모리 점유율 
+  1. ICMP
+
+다음은 웹 서비스 모니터링이다. 이건 유저 접점에 있는 ELB를 대상으로 모니터링을 한다. 호스트 레벨에서는 문제가 없지만 (ELB를 통한)인터넷 서비스가 안되거나, 반대로 호스트 레벨에서는 문제가 있지만 인터넷 서비스는 가능할 수 있기 때문에, 웹 서비스 모니터링과 웹 서버 모니터링은 서로 분리돼야 한다. 웹 서비스 모니터링에서는 순수하고 HTTP 기반의 정보만 모니터링 한다. 
+  1. HTTP 응답 시간  
+  1. HTTP 응답 코드
+  1. 응답 데이터 크기
+
+== Zabbix 설정 ==
+=== Host 등록 ===
+먼저 Host를 등록한다. Web 모니터링 Zabbix에 내장된 기능이므로 Zabbix server가 Host가 된다. 단 등록하더라도 Host 자체를 모니터링 하지는 않을 거다. 인터넷 너머에 있는 ELB에 대해서만 모니터링을 할 것이다. 따라서 등록되는 Host는 Web 모니터링을 위한 가상의 Host라고 볼 수 있다.  
+
+결국 Zabbix server에서 모니터링 하고자하는 웹 서버에 연결해서 정보를 수집하는 방식이다. 정확히 하려면 (HTTP 모니터링 에이전트가 설치된)모니터링 전용 서버에 요청을 하는게 올바른 방법이겠으나 일단은 zabbix server에서 모니터링하기로 했다.
+
+"Configuration" > "Hosts" 에서 Host를 등록한다. Host group의 이름은 Web service로 하고, Host의 이름은 web monitering으로 했다. 이제 "configuration"에서 Web serivce와 web_monitering를 선택하고 "Create scenario"를 클릭하면 된다. 
+
+=== 시나리오 등록 ===
+웹 모니터링을 위한 시나리오를 준비하고, 시나리오를 위한 Step을 정의하는 방식으로 모니터링이 이루어진다. 하나의 시나리오는 여러개의 step을 가질 수 있다. 예를 들어 "file upload" 시나이오라면 
+  1. Front page
+  1. Login 
+  1. file upload 
+  1. Logout 
+의 4개의 step을 가질 수 있을 것이다. 
+
+https://lh3.googleusercontent.com/-kggRYQAJxTQ/UWuUBxqg1bI/AAAAAAAAC-Q/EDWKBbsm0FE/s640/zabbix_web01.png
+
+Step은 Steps 탭을 클릭해서 추가하면 된다. 
+  1. Name : Step의 이름
+  1. URL : 호출할 URL 
+  1. Post : POST 데이터가 있다면, 여기에 명시한다.
+  1. Required string : HTTP 응답 데이터에 포함된 특정 문자열을 확인한다. 예컨데 "Success"등의 문자열일 거다. 문자열이 발견되지 않는다면 이벤트를 발생한다.
+  1. Required code : 기대되는 HTTP 코드. 기대하지 않은 코드라면 역시 이벤트를 발생한다.   
+
+https://lh4.googleusercontent.com/-W2N3OBN64Iw/UWuUB5GNiuI/AAAAAAAAC-E/XFnTwc5Tkbc/s400/zabbix_web02.png
+
+이제 save하면 모니터링이 진행된다. 결과는 "Monitoring > Web"에서 확인할 수 있다. 
+
+https://lh5.googleusercontent.com/-BloXzdmlbCE/UWuUCJNJM6I/AAAAAAAAC-M/JD3XVJRXuSg/s640/zabbix_web03.png

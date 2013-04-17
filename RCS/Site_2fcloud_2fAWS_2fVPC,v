@@ -1,0 +1,192 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2013.04.02.16.25.49;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.04.02.16.24.29;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.04.02.16.07.25;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.04.02.16.02.34;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.03.30.16.07.21;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.03.28.15.18.24;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fAWS_2fVPC
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title AWS VPC 구성
+
+[[TableOfContents]]
+== 개요 ==
+AWS VPC를 이용하면, AWS region에 private network를 만들 수 있다. AWS는 16비트 크기의 충분한 네트워크를 제공한다. 여기에 라우터를 이용해서 다층 구조의 네트워크를 구성할 수 있다.
+
+VPC를 이용해서 다층 네트워크를 만들어 보려한다.
+== VPC 구성 ==
+=== 단일 네트워크 구성 ===
+하나의 네트워크로 구성한다. 간단하게 구성할 수 있지만, 모든 자원이 같은 브로드케스트 도메인에 놓이기 때문에 보안성이 떨어진다는 단점이 있다. 
+
+=== 다층 네트워크 구성 ===
+나는 다층 네트워크 구성을 만들 것이다. 즉 2개 이상의 subnet을 가지는 네트워크를 만든다. 나는 총 5개의 subnet으로 이루어진 VPC 네트워크를 설계할 것이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1IVLUQRImTJXLyR3zwQwDBqUDAYrtLcxUaMhvVjU0TVw/pub?w=475&amp;h=390">
+}}}
+
+=== Private subnet와 public subnet ===
+VPC를 만들면 16bit 크기의 서브넷을 할당 받는다. 이 서브넷을 VPC subnet이라고 하겠다. 유저는 VPC subnet에 다시 여러 개의 subnet을 만들 수 있다. 이 subnet은 크게 private subnet과 public subnet으로 나눌 수 있다. 
+
+Private subnet과 pubic subnet은 단지 라우팅테이블에 igw(internet gateway)로 향하는 라우팅룰이 있는지 없는 지로 결정한다. 만약 해당 서브넷의 라우팅테이블이 igw로 향한다면, 이 서브넷에 있는 인스턴스들은 [wiki:Site/cloud/AWS/EIP EIP]를 붙이는 것으로 인터넷으로 패킷을 직접 보낼 수 있다. igw로 향하는 룰이 없는 private subnet은 당연히 인터넷으로 패킷을 보낼 수가 없다. AWS는 Private subnet의 인스턴스에 EIP를 붙이는 것을 허용하긴 하지만, 붙여봤자 외부에서 접근할 수 없다. 
+
+결국 public subnet은 인터넷에 직접 연결해야 하는 인스턴스를, private subnet에는 인터넷으로 부터 숨겨야 하는 인스턴스를 배치할 수 있다.
+
+=== 가용성 존 구성 ===
+간단한 다층 네트워크 구성은 하나의 public subnet과 하나의 private subnet으로 구성할 수 있다. 하지만 다른 목적으로 좀 더 많은 subnet 구성이 가능하다. 나는 가용성존(Availability zone)을 구성하기 위해서 2개씩의 public subnet과 private subnet을 만들었다.
+
+이렇게 구성하면 하나의 zone에 문제가 생기더라도 다른 zone을 이용해서 서비스를 할 수 있다. AWS에서 하나의 zone에 문제가 생기는 경우는 드물지 않으므로 가용성이 필요한 서비스는 반드시 가용성존 구성을 해줘야 한다. 
+
+=== NAT subnet 구성 ===
+Private subnet에 있는 인스턴스들이 인터넷으로 패킷을 보내야할 경우가 있을 수 있다. 패킷 업데이트 혹은 외부로 로그/데이터 전송, 외부로 부터의 인증 등의 경우다. Private subnet의 인스턴스는 EIP를 가질 수 없으므로, public subnet에 별도의 NAT 인스턴스를 만들어야 한다.
+
+NAT 인스턴스는 마스커레이딩([wiki:Site/System_management/NAT SNAT])을 할 수 있는 리눅스 인스턴스를 만들어서 EIP를 붙여주면 된다. NAT 인스턴스는 public subnet 어디에 있어도 상관은 없지만, 다른 인스턴스와는 특성이 좀 다르므로 따로 subnet을 만들기로 했다. 
+
+트래픽 흐름은 대략 아래와 같을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1UK4fzlbF3ITSiqHI-OMNmbVkmk8VBzCWqenQVmfng3Q/pub?w=448&amp;h=407">
+}}}
+  1. VPC routing 테이블에 0.0.0.0/0으로 향하는 패킷을 NAT instance로 향하도록 룰을 추가한다.   
+  1. Private subnet 인스턴스에서 0.0.0.0/0으로 향하는 패킷은 라우터에 의해서 NAT instance로 향한다. 
+  1. NAT instance는 SNAT 한 후 igw로 패킷을 보낸다.
+  1. igw로 향한 패킷은 EIP로 다시한번 SNAT 한후 인터넷으로 향한다.  
+
+=== 라우팅 테이블 ===
+라우팅 테이블을 구성해보자 대략 다음과 같을 것이다.
+
+Public subnet의 routing 테이블
+|| 10.10.0.0/16 || local  || VPC 내부로 향하는 트래픽    ||
+|| 0.0.0.0/0    || igw    || Internet으로 향하는 트래픽  ||
+'''10.10.10.0/24 와  10.10.15.0/24 subnet이 이 routing 테이블의 멤버가 된다.'''
+
+NAT subnet의 routing 테이블
+|| 10.10.0.0/16  || local         || VPC 내부로 향하는 트래픽   ||
+|| 0.0.0.0/0     || igw           || Internet으로 향하는 트래픽 ||
+'''10.10.100.0/24 subnet이 이 routing 테이블의 멤버가 된다.'''.   
+
+Private subnet의 rougint 테이블
+|| 10.10.0.0/16 || local          || VPC 내부로 향하는 트래픽   ||
+|| 0.0.0.0/0    || NAT instance   || 인터넷으로 향하는 트래픽은 NAT instance로 보낸다. ||
+'''10.10.20.0/24와 10.10.25.0/24 subnet이 이 routing 테이블의 멤버가 된다.'''
+
+== 또 다른 구성 ==
+=== DMZ trust 구성 ===
+VPC가 비록 public subnet와 private subnet을 구성하도록 하고 있기는 하지만 igw가 있느냐 없느냐의 차이일 뿐 별다른 의미를 가지지는 못한다. 따라서 다층 네트워크 구조를 만들었다고 하더라도 우리가 알고 있는 그런 DMZ trust 구성은 아니다. Security group을 이용한 트래픽 필터링이 가능하기는 하지만, 이건 호스트 레벨의 필터링일 뿐으로 제대로 구성하려면 router와 router 사이에 방화벽을 둬야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1PgP6xmMrGZ1HHgUgOAqQQBDOK2sAj2_rwNSjaq3mMdU/pub?w=468&amp;h=412">
+}}}
+
+대략 이런 구조다. 방화벽은 리눅스 인스턴스로 구성하면 된다. 단 VPC 환경안에서 굳이 이런 복잡한 구성이 필요한지에 대한 의문은 있다. 내 생각에 이건 (구성하는 재미는 있겠지만) 배보다 배꼽이 더 큰 구성인 것 같다. 그냥 Security group으로 충분하지 싶다.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-04-02T16:07:25)]]
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d22 1
+a22 1
+Private subnet과 pubic subnet은 단지 라우팅테이블에 igw(internet gateway)로 향하는 라우팅룰이 있는지 없는 지로 결정한다. 만약 해당 서브넷의 라우팅테이블이 igw로 향한다면, 이 서브넷에 있는 인스턴스들은 EIP를 붙이는 것으로 인터넷으로 패킷을 직접 보낼 수 있다. igw로 향하는 룰이 없는 private subnet은 당연히 인터넷으로 패킷을 보낼 수가 없다. AWS는 Private subnet의 인스턴스에 EIP를 붙이는 것을 허용하긴 하지만, 붙여봤자 외부에서 접근할 수 없다. 
+d34 1
+a34 1
+NAT 인스턴스는 마스커레이딩(SNAT)을 할 수 있는 리눅스 인스턴스를 만들어서 EIP를 붙여주면 된다. NAT 인스턴스는 public subnet 어디에 있어도 상관은 없지만, 다른 인스턴스와는 특성이 좀 다르므로 따로 subnet을 만들기로 했다. 
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d64 10
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+d52 1
+a52 1
+  * 10.10.10.0/24 와  10.10.15.0/24 subnet이 이 routing 테이블의 멤버가 된다.
+d56 2
+a57 2
+|| 0.0.0.0/0     || NAT instalnce || Internet으로 향하는 트래픽 ||
+  * 10.10.20.0/24 와 10.10.25.0/24 subnet이 이 routing 테이블의 멤버가 된다.
+d59 7
+a65 1
+... 계속
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d15 1
+a15 1
+<img src="https://docs.google.com/drawings/d/1IVLUQRImTJXLyR3zwQwDBqUDAYrtLcxUaMhvVjU0TVw/pub?w=960&amp;h=874">
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d7 3
+a10 1
+== VPC 구성 ==
+d14 45
+a58 1
+... 미완성 ...
+@

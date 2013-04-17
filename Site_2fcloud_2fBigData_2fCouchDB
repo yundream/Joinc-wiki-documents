@@ -1,11 +1,11 @@
 #title couchdb
 
 [[TableOfContents]]
-.. API 목록 작성 중
+
 == 왜 CouchDB 를 ==
 Moniwiki를 사용한지 어언 10년째다. 한번 만들어볼까라는 생각이 든다. 생각만하다가 포기할 확률이 99%쯤되긴 하는데, 어쨋든 wiki를 만들면 어떤 도구를 이용해야 하나 라는 생각부터 하기 시작했다. 대략 내린 결론은 다음과 같다.
   * [wiki:Site/Ruby/sinatra Sinatra]로 개발하자. 왜 sinatra냐면, 그냥 최근 사용하고 있는 웹 프레임워크가 sinatra이기 때문이다.
-  * '''CouchDB'''. [wiki:Site/cloud/automation Chef]하다가 접한 놈이다. '''문서 지향 데이터베이스'''라는데 혹했다. wiki도 문서관리 시스템이니 뭔가 죽이 잘 맞지 않을까라는 생각에서. 언뜻 couchdb를 살펴보니 '''문서 버전 관리'''기능을 가지고 있다. 이거야 말로 내가 원하는 건데, 잘됐다 싶었다. Moniwiki는 '''RCS'''로 문서 버전을 관리하는데, 깔끔하지 않은 느낌이다.   
+  * '''CouchDB'''. [wiki:Site/cloud/automation Chef]하다가 접한 놈이다. '''문서 지향 데이터베이스'''라는데 혹했다. wiki도 문서관리 시스템이니 뭔가 죽이 잘 맞지 않을까라는 생각에서. 대략 couchdb를 살펴보니 '''문서 버전 관리'''기능을 가지고 있다. 이거야 말로 내가 원하는 건데, 잘됐다 싶었다. Moniwiki는 '''RCS'''로 문서 버전을 관리하는데, 깔끔하지 않은 느낌이다.   
 
 == CouchDB ==
 '''Cludster of Unreliable Commodity Hardware'''의 줄임말이다. 2005년 개발이 시작되고, 2008년초 아파치 인큐베이팅 프로젝트에 등록된 '''문서 기반''' 데이터베이스다. 다음과 같은 특징을 가지고 있다. 
@@ -18,9 +18,29 @@ Moniwiki를 사용한지 어언 10년째다. 한번 만들어볼까라는 생각
     CouchDB는 '''eventual consistency'''를 보증한다.
   * Javascript로 데이터를 쿼리한다.
   * Erlang로 구현돼 있다. 때문에 Concurrency를 강조한다. 
-  * MapReduce를 이용한 퀄지 지원  
+  * MapReduce 지원
   * 양방향 복제지원
-  * CouchDB는 relational database가 아니다. 테이블에 있는 모든 정보는 그 자체로 독립적이며, 서로 relation 하지 않는다.   
+  * CouchDB는 relational database가 아니다. 테이블에 있는 모든 정보는 그 자체로 독립적이며, 서로 relation 하지 않는다. 
+
+정리하자면 이 놈은 문서를 좀 특이하게 관리한다. Couchdb는 "수정"이라는 개념이 없다. 원본 문서의 내용을 바꿔서 저장하면, 원본 문서의 내용을 덮어쓰는게 아니고 (새로운 버전 번호를 가지는) 새로운 문서가 하나 만들어진다. 문서의 모든 내용이 저장되기 대문에 ACID의 구성이 단순하며, 읽거나 쓸때 잠금을 걸 필요가 없다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/10tOz4wpap5UlztHmuX0S2nDiZhjeIIgzujNDGO2Tb3A/pub?w=420&amp;h=297">
+}}}
+
+2명의 유저가 문서 1-xxx를 읽었다고 가정해 보자. 그리고 나서 각자 문서를 수정하고 update를 한다. 일반적인 문서 관리 시스템에서는 "충돌"이 발생 할 테지만 - wiki를 생각해 보라 - couchdb는 그냥 새로운 문서 두개를 저장해 버린다. 애플리케이션 단에서 문서충돌을 해결하기 위한 어떤 장치를 마련해야 하긴 하지만, 문서를 저장하기 위한 아주 간단한 모델임은 분명하다.  
+
+대신 이 모델은 데이터의 양이 좀 더 커진다는 단점이 있다. 하지만 저장공간의 비용이 점점 저렴해지는 추세라서 그다지 큰 문제가 될 것 같지는 않다. 
+
+=== Document oriented 와 relational database와의 차이 ===
+문서지향 데이터베이스는 문서를 데이터베이스화 하는 시스템이다. 문서안에 모든 데이터가 있다는 의미인데, 레코드와 레코드를 이루는 필드에 데이터가 있는 관계형 데이터베이스와는 차이가 있다. 
+
+문서로 이루어져 있다는 것과 필드와 레코드의 조합으로 이루어져있다는 것의 차이가 뭘까. 
+
+관계형 데이터베이스는 데이터를 원자화 한다. 데이터를 분류가능한 최소단위로 쪼갠다음, 각 단위에 성질을 부여하고 이들간의 관계를 설정함으로서 데이터를 구조화 한다. 반면 문서지향 데이터베이스는 문서 그자체를 데이터베이스로 다룬다. 문서지향 데이터베이스의 가장 대표적인 예는 (HTML로 만들어진) 웹 문서다. 매우 타이트하게 짜여져 있는 관계형 데이터베이스와는 다르게 문서지향 데이터베이스는 각 데이터 요소가 (HTML 문서를 보라)느슨하게 얽혀 있다. 
+
+문서지향 데이터베이스는 데이터 요소가 느슨하게 얽혀있는 구조를 가지기 때문에, 엄격한 '''schema'''를 가질 필요가 없다. 따라서 schema를 유지관리하기 위해서 정력을 솓을 필요가 있다. 큰 규모의 관계형 데이터베이스를 다루어 본적이 있다면, schema 변경이 얼마나 큰 공사인지 잘 알고 있을 것이다.  
+
 === CouchDB 테스트 환경 ===
   * Ubuntu 12.10 server 운영체제 
   * VirtualBox : VM을 만든다음에 Couchdb를 설치했다. couchdb 서버의 IP 주소는 192.168.57.3이다.
@@ -28,7 +48,7 @@ Moniwiki를 사용한지 어언 10년째다. 한번 만들어볼까라는 생각
 === CouchDB 설치 ===
 한번에 설치 가능하다. 이래서 리눅스를 좋아한다.
 {{{#!plain
-apt-get install couchdb
+# apt-get install couchdb
 }}}
 
 === Futon ===
@@ -65,9 +85,8 @@ https://lh6.googleusercontent.com/-YPWTyzT1YT8/UQ58Jnsx-GI/AAAAAAAACxc/xcJGRQ1x9
 
 데이터베이스 관리에 대한 접근제어가 필요하다면 '''Fix this'''를 클릭해서, 아이디와 패스워드를 입력할 수 있다. 이렇게 하면 anonymous에 대한 접근을 막을 수는 있다. 하지만 유저단위의 권한 관리는 설정할 수 없다. 
 
-
 === 문서 만들기 ===
-이제 문서를 만들어봐야 겠다. 우선 웹 UI로 만들어봐야 겠다. http://192.168.57.3:5984/_utils/ 로 접근해서 "Create Database"로 만들었다. 데이터베이스의 이름은 mywiki로 했다.   
+이제 문서를 만들어봐야 겠다. 우선 웹 UI로 만들어보기로 했다. http://192.168.57.3:5984/_utils/ 로 접근해서 "Create Database"로 만들었다. 데이터베이스의 이름은 mywiki로 했다.   
 
 https://lh3.googleusercontent.com/-MFUQTqJAmbU/UQ-1uFObxwI/AAAAAAAACzo/iwz8pi7kTko/s640/%25EC%258A%25A4%25EB%2583%2585%25EC%2583%25B78.png
 
@@ -75,6 +94,8 @@ https://lh3.googleusercontent.com/-MFUQTqJAmbU/UQ-1uFObxwI/AAAAAAAACzo/iwz8pi7kT
 
 === 문서 업데이트 ===
 CouchDB는 append only 데이터베이스다. 업데이트를 할 경우 예전 문서를 덮었는게 아니고, 새로운 문서가 추가된다. 새로 업데이트되는 문서는 동일한 '''id'''에 다른 '''_rev'''를 가진다. 다른 버전의 문서는 '''Previous Version'''과 '''Next version'''으로 볼 수 있다.
+
+문서를 업데이트 하기 위해서는 업데이트 문서의 "id"와 업데이트할 문서의 버전번호 "_rev"를 명시해야 한다.
 
 === curl로 테스트 ===
 curl로 couchdb를 제어해보자. 테스트를 위해서 새로운 문서를 만들었다.
@@ -198,6 +219,7 @@ CouchDB를 선택한 이유는 순전히 문서 버전관리의 간편함 때문
 Mapreduce는 저자, 카테고리, 태그, 작성일 별로 문서를 필터링 하거나 관련문서를 추천하는 등의 서비스를 만들 수 있을테다. 특히 관련문서추천 쪽에 관심이 간다. 분산저장은 대량의 문서를 관리해야 한다 하면 고려대상이 될 수 있겠는데, 우선은 고려만 해야 겠다. 
 
 == Ruby 예제 ==
+=== 간단한 CRUD 예제 ===
 {{{#!plain
 #!/usr/bin/ruby
 require 'net/http'
@@ -261,6 +283,32 @@ jsonval = JSON res.body
 pp jsonval
 }}}
 
+=== Map function 호출 ===
+Ruby sinatra를 이용해서 wiki 시스템을 개발 중이다. 위키문서는 파일 시스템의 디렉토리/파일 구조로 저장하려고 한다. 이 구조에서 위키 문서 이름은 디렉토리/파일에 대응한다. 따라서 위키 문서의 이름이 유일하다고 하더라도 couchdb의 '''id'''로 할 수는 없다. 디렉토리/파일이름이 변경될 수 있기 때문이다. 
+
+이런 이유로 couchdb id는 32자리로 랜덤하게 생성하고, 따로 '''name''' 필드를 둬서 문서 이름을 관리하기로 했다. 이제 '''name''' 필드로 원하는 문서를 찾는 별도의 함수를 만들어야 한다.
+
+나는 couchdb에서 제공하는 map view를 이용해서 만들기로 했다. name으로 문서를 검색하는 map function은 다음과 같다.  
+{{{#!plain
+function(doc) { 
+	if (doc.name == 'linux/sysadmin') { 
+		emit(null, doc); 
+	}
+}
+}}}
+Couch db는 javascript를 수행 기능을 내장하고 있다. 개발자는 필요한 map 기능을 javascript 함수로 만든 다음 POST 방식으로 요청하기만 하면 된다. 나는 다음과 같은 sinatra(ruby) 코드를 만들었다.  
+{{{#!plain
+get "/wiki/:name" do | name |
+    view = <<END
+{"language":"javascript","map":"function(doc) { if (doc.name == '#{name}') { emit(null, doc); }}"}
+END
+    @data = nil
+}}}
+이 문서를 POST 방식으로 넘기면 된다. POST URL은 다음과 같다.
+{{{#!plain
+POST http://couchdbserver:5984/mywiki/_temp_view
+}}}
+
 == CouchDB API ==
 === Naming/Addressing ===
 CouchDB에서 저장하는 모든 문서는 고유한 '''DocID'''를 가진다. DocID는 대/소문자를 구분하며, 데이터베이스 내에서 유일하다. DocID를 키로 문서를 관리할 수 있다. 
@@ -303,6 +351,7 @@ CouchDB는 "_"로 시작하는 몇 개의 특수 필드를 가지고 있다.
 ... 계속...
 
 
+== 참고 ==
+  * http://www.linux-mag.com/id/7597/
 == 히스토리 ==
   * 작성일 : [[Date(2013-02-03T15:02:38)]]
-

@@ -237,7 +237,32 @@ $line =~ s/^ALTER TABLE ([a-zA-Z0-9_]+) ALTER COLUMN ([a-zA-Z0-9]+) .+/ALTER TAB
 === 모든 테이블에 대한 row 값 확인 ===
 테이블에 있는 row 값을 저장하고 diff로 확인한다. 이것으로 데이터베이스와 테이블이 제대로 만들어졌는지, 그리고 데이터가 제대로 입력됐는지를 확인할 수 있다. 
 
-Postgresql 용 스크립트
+데이터베이스의 모든 Table의 count
+{{{#!plain
+#!/bin/bash
+database=database_name
+user=postgres
+echo "Database : $database"
+PGCOMMAND=" psql -U $user -d $database -At -c \"
+            SELECT   table_name
+            FROM     information_schema.tables
+            WHERE    table_type='BASE TABLE'
+            AND      table_schema='public'
+            \""
+
+TABLENAMES=$(export PGPASSWORD=test; eval "$PGCOMMAND")
+
+for TABLENAME in $TABLENAMES; do
+    PGCOMMAND=" psql -U $user -d $database -At -c \"  
+                SELECT   '$TABLENAME',  
+                         count(*)   
+                FROM     $TABLENAME  
+                \""
+    eval "$PGCOMMAND"
+done
+}}}
+
+데이터베이스의 모든 테이블을 덤프 받는다.
 {{{#!plain
 #!/bin/bash
 database=database_name

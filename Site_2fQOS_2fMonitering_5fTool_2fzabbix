@@ -1,61 +1,93 @@
 #title 공개 시스템 모니터링 툴 zabbix
 
-=== 목적 ===
-  1. 공개 시스템 모니터링 툴은 '''zabbix'''를 설치하고 운용한다.
-  1. 장점과 단점을 확인한다.
-  1. 개선시킬 여지가 있는지 확인한다. 
-  1. QOS 시스템에 zabbix의 전부, 혹은 일부를 사용할 수 있을 것인가.
+[[TableOfContents]]
+== Zabbix ==
+오픈마루에서는 zenoss를 사용해서 서비스를 모니터링했다. 그러다가 zabbix에 관심을 가지게 됐다. 이유는 '''지금 회사에서 사용하고 있기 때문'''이다. 익숙한 zenoss를 두고 zabbix를 사용하려고 하니 귀찮음으 폭풍처럼 몰려오지만 어쩌겠는가. 
 
-=== 설치 ===
-소스를 컴파일(:12) 해서 설치하기로 했다.
- * 다운로드 : http://www.zabbix.org/
- * 버전 : zabbix-1.4.1
- * OS : Ubuntu 7, Kernel(:12) 2.6.20
- * DB : Sqlite(:12)
+사실 zabbix가 처음은 아니긴 하다. 2006년 쯤인가 오픈마루에서 서비스들이 하나 둘 런칭될 때, 인프라와 서비스들을 모니터링해야 할 필요가 생겼고 이때 zenoss와 zabbix 중 어느걸 선택할지를 고민을 했었다. 결국 다음의 이유로 zenoss를 선택했다.    
+  * Zenoss는 모니터링 소프트웨어가 아닌 자원관리 소프트웨어를 표방했다. IT의 자원을 체계적으로 관리하는게 주요 목적이고, 모니터링은 목적을 효과적으로 달성하기 위한 주요 컴포넌트들 중 하나였다. 반면 zabbix는 모니터링을 전문으로 하는 소프트웨어였다. 나는 장기적으로 전체 IT 자원을 효율적으로 관리하기 위한 시스템을 구축하는게 목적이었기 때문에 zenoss에 더 마음이 갔다. 디바이스 등록에서 부터, 모니터링, 이벤트 발생과 관리 등등을 아우르는 구조도 마음에 들었다. 
+  * Zenoss를 이용해서 컨설팅을 하고 있었는데, 이를 위해서 완성도를 높일 필요가 있었던듯 싶다. 이때 이미 zenoss는 기업에서 써도 될만큼의 사용 편의성과 UI를 가지고 있었다.  
+  * 당시 모기업도 zenoss를 사용하고 있었다. 경험을 가진 조직으로 부터 정보를 공유할 수 있다는게 큰 장점이었다.  
+이런 이유로 zabbix는 설치해서 구경하는 정도로 끝내고 zenoss를 기반으로 자원관리 시스템을 구축했다. 모니터링이 아닌 자원관리 시스템이었다. 자원의 입고부터 출고까지의 라이프사이클 관리, 애플리케이션 배포, 모니터링, 이벤트 정책 수립, 이벤트 라이프사이클 관리..  
 
-zabbix는 snmp(:12)를 지원하며, 동시에 독립적인 '''Agent'''도 가지고 있다. 이 Agent를 이용하면, SNMP로는 얻기 힘든 자세한 시스템 정보들을 얻어낼 수 있다. 다음과 같은 방식으로 컴파일 했다. '''agent'''방식을 사용하며, DB(:12)로 mysql(:12)를 지원하도록 컴파일했다. 
+=== 준비 할 것들 ===
+  * 데이터베이스 : zabbix는 postgresql, mysql, sqlite3를 지원한다. 나는 그냥 익숙한 mysql을 사용하기로 했다. 
+  * Apache + php5 : zabbix server는 아파치+php5 기반의 프론트엔드를 제공한다. 미리 설치해 둬야 한다.
+  * 즉 '''APM''' 환경을 구축하면 된다.
+여기에서는 APM환경 구축은 다루지 않는다.
+=== Zabbix 설치 ===
+Ubuntu 12.04에 설치하기로 했다. 2006년쯤인가 설치할 때는 이것 저것 대여섯개의 소스파일을 컴파일해야 간신히 설치가 가능했는데(zabbix를 쓰지 않은 이유이기도 하다. 당시에도 zenoss는 설치 패키지를 제공했다.) 지금은 패키지관리자를 이용해서 편하게 설치할 수 있다. 
+
+zabbix server 설치
 {{{#!plain
-# ./configure --enable-server --enable-agent --with-sqlite3 --with-mysql
-# make
-# sudo make install
+# apt-get install zabbix-server-mysql
 }}}
 
-=== APM 환경 설정 ===
-zabbix는 APM(:12) 환경을 필요로 한다. 또한 PHP(:12)의 경우 다음과 같은 기능을 지원해야 한다. 
-  * mysql, oracle(:12), postgresql(:12) 중 하나 
-  * gdlib
-  * BC math support
-yundream은 다음과 같은 옵션으로 php를 컴파일 했다. 
+zabbix php 프론트엔드 설치. 세상 편하네..
 {{{#!plain
-./configure --prefix=/usr/local/php  --with-config-file-path=/usr/local/apache/conf \
---with-apxs2=/usr/local/apache/bin/apxs --with-charset=utf8 --with-language=korean --enable-sqlite-utf8 \
---with-png-dir --with-jpeg-dir --enable-bcmath --with-gd --with-mysql
+# apt-get install zabbix-frontend-php
 }}}
 
-이외에 zabbix는 다음과 같은 php환경설정을 필요로 한다. php.int를 변경하도록 하자.
+zabbix agent도 설치한다.
 {{{#!plain
-max_execution_time = 300
-date.timezone = ROK 
+# apt-get install zabbix-agent
 }}}
 
-=== DB 설정 ===
-zabbix-1.4.1/create/schema 디렉토리에 zabbix가 사용할 데이터베이스의 schema 가 정의되어 있다. 다음과 같이 mysql를 위한 데이터베이스(:12)와 테이블을 생성했다. 
+=== 웹서버 설정 ===
+zabbix 웹 프론트엔드 문서의 위치는 /usr/share/zabbix다. Apache의 root directory를 /usr/share/zabbix 로 설정한 다음 apache 서버를 제시작 한다. 
 {{{#!plain
-# mysql -u root 
-mysql> create database zabbix;
-mysql> grant all on zabbix.* to zabbix@localhost identified by '<some password for zabbix>';
-mysql> flush privileges;
-mysql> quit
+<VirtualHost *:80>
+        ServerAdmin webmaster@localhost
 
-# mysql -u root -p zabbix < mysql.sql
+        DocumentRoot /usr/share/zabbix
+        <Directory />
+                Options FollowSymLinks
+                AllowOverride None
+        </Directory>
+......
 }}}
 
-=== 웹 Frontends 복사 ===
-zabbix 디렉토리의 frontends/php 에 웹 인터페이스를 위한 php/html 파일들이 있다. 웹서버가 엑세스할 수 있는 디렉토리로 카피하도록 한다.
+=== 데이터베이스 설정 ===
+mysql을 기준으로 설명한다. zabbix 데이터베이스를 만든다음 schema와 images, data를 입력해야 한다. 데이터베이스 생성 스크립트는 /usr/share/zabbix-server-mysql 디렉토리 밑에 있다.
 
-=== setup ===
-APM 환경이 잘 구축되어 있고, php.ini가 제대로 설정되어 있다면, setup에 문제는 발생하지 않을 것이다. 웹서버를 가동시킨뒤에, 페이지에 접근하면 '''setup'''과정이 시작된다. 
+{{{#!plain
+# mysql -u root -p < schema.sql
+# mysql -u root -p < images.sql 
+# mysql -u root -p < data.sql 
+}}}
 
-=== Login ===
-setup이 끝났다면, 웹 인터페이스를 통해서 로그인 할 수 있다. 초기 아이디는 '''Admin'''이며 패스워드는 설정되어 있지 않다.
-aaaaaaaa
+=== 초기 설정 ===
+웹 서버를 재시작하고 서버에 접근하면, 초기 설정 화면이 뜬다. 2. Check of pre-requissites에서 php측 설정이 제대로 돼 있는지를 검사한다. 요구사항(Required)에 맞도록 php.ini 파일을 수정하자.
+
+https://lh5.googleusercontent.com/-DfAiUlInkHI/UWro2j2QvDI/AAAAAAAAC9s/hKCqduvJ11k/s640/zabbix7.jpg
+
+다음 데이터베이스 설정부분이다.
+
+https://lh5.googleusercontent.com/-hXqTR6tslOA/UWro2q90NcI/AAAAAAAAC9w/XQOE8vWybUk/s640/zabbix8.jpg
+
+이걸로 끝
+=== 로그인 ===
+이제 웹 서버에 접근하면 로그인 페이지가 뜬다. 기본 계정은 admin/zabbix다. 로그인하면 대쉬보드가 뜬다.
+
+https://lh4.googleusercontent.com/-kelSCL6n7Jw/UWmNSKpPpeI/AAAAAAAAC7M/rt5H_jQ3vso/s616/zabbix2.png
+
+
+=== Brute froce attack 방지 정책 ===
+Brute force 공격을 막기 위해서 연속해서 5번 로그인에 실패하면, 30초동안 로그인이 금지된다. 
+
+=== 유저관리 ===
+Zabbix가 설치되고 나면, "Admin" 유저와 "guest"유저 단지 2개의 유저만있다. Admin 유저는 사이트에 대한 모든 권한을 가지는 슈퍼유저고, guest 유저는 읽기 권한만을 가진 유저다. 
+
+"Administration" > "User" 에서 "Create user" 명령으로 새로운 유저를 만들 수 있다. 아래 예제에서 "yundream"이라는 이름을 가지는 유저를 만들었다. 이 유저의 타입은 Zabbix User로 Network administrators의 그룹에 속한다. 유저는 기본적으로 어떤 media(notification 방법) 도 가지지 않는다. Media를 클릭해서 어떤 정보를 통지(notification) 할지를 정할 수 있다. 
+
+https://lh3.googleusercontent.com/-BKuDsNEXn2M/UWmUAg4PszI/AAAAAAAAC80/yvo9iuGwVfU/s640/zabbix4.jpg
+
+Media를 클릭하면 팝업창이 뜨는데, 여기에서 통지방법과 받을 사람, 통지할 이벤트의 레벨을 정의할 수 있다.   
+
+https://lh5.googleusercontent.com/-CEd6jIU4sJI/UWmUAUC-LyI/AAAAAAAAC7o/Yvf_mpGV3uw/s800/zabbix5.png
+
+=== Email 설정 ===
+"Menu" > "Administration" > "Media Type"에서 이메일설정을 할 수 있다. Media type에는 "Email, Jabber, SMS, Script"의 미리 정해진 타입이 있다. 
+
+== 하위 문서들 ==
+[[subindex]]

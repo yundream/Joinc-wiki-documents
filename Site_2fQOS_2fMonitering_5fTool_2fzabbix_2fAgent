@@ -1,0 +1,75 @@
+#title Zabbix Agent 설정
+
+[[TableOfContents]]
+== Zabbix agent ==
+호스트를 모니터링하기 위한 방법으로 SNMP를 이용하는 것과 Zabbix agent를 이용하는게 있다. 이중 Zabbix agent를 이용해서 모니터링하는 방법을 살펴보려고 한다. 
+
+=== 모니터링 대상 ===
+모니터링 대상은 www.joinc.co.kr로 network interface in/out 트래픽이다. 시스템 정보는 다음과 같다. 운영체제는 Ubuntu 리눅스다.
+
+=== Zabbix agent 설치 ===
+apt-get으로 설치한다.
+{{{#!plain
+# apt-get install zabbix-agent
+}}}
+
+Zabbix agent가 지원하는 모니터링 목록을 확인해 보자. 이것 저것 쓸데없는 것들은 생략했다.
+{{{#!plain
+agent.ping                                    [u|1]
+agent.version                                 [s|1.8.1]
+system.localtime                              [u|1366025551]
+system.run[echo test]                         [m|ZBX_NOTSUPPORTED]
+web.page.get[localhost,,80]                   [t|EOF]
+web.page.perf[localhost,,80]                  [d|0.000000]
+...
+vfs.file.cksum[/etc/passwd]                   [u|1404938668]
+vfs.file.md5sum[/etc/passwd]                  [s|46fee21e2b6e53700239c87a573a1ef6]
+net.tcp.dns[,localhost]                       [u|1]
+logrt[logfile]                                [m|Accessible only as active check!]
+...
+eventlog[system]                              [m|Accessible only as active check!]
+net.if.in[lo,bytes]                           [u|4923532003]
+net.if.out[lo,bytes]                          [u|4923532003]
+}}}
+'''ZBX_NOTSUPPORTED'''는 지원하지 않는 모니터링 요소다. 모니터링 요소의 표시형식은 다음과 같다.
+{{{#!plain
+key[parmaters,mode]
+}}}
+예를들어 eth0 인터페이스에 대한 네트워크 입력 트래픽 모니터링 요소는 "net.if.in[eth0,bytes]"로 표시할 수 있다. 각 모니터링 요소별 mode는 [https://www.zabbix.com/documentation/1.8/manual/config/items zabbix items]에서 확인한다.
+
+모니터링 요소의 값을 제대로 가져오는지 테스트 해보자.
+{{{#!plain
+# zabbix_agentd -t net.if.in[eth0,bytes]
+net.if.in[eth0,bytes]                         [u|20943559812]
+}}}
+
+=== Zabbix host 등록 === 
+https://lh4.googleusercontent.com/-2qiQ1dGGiys/UW65SymiSpI/AAAAAAAAC-g/w8YZgt1rDk8/s640/zabbix9.png
+
+모니터링할 호스트를 등록한다. "Configuration > Hosts > Create host" 명령으로 호스트를 등록할 수 있다. 
+
+Create host를 누르면 다음과 같이 host 정보를 입력하는 창이 만들어진다. 입력 값들에 대해서 대략 정리한다.
+
+https://lh3.googleusercontent.com/-bPlXrjwMr30/UW6_LLqsMjI/AAAAAAAAC-o/SQS5hXykzXo/s640/zabbix10.png
+
+  * Host name : 호스트 이름 
+  * Visible name : 화면에 출력할 이름
+  * Group : 등록될 호스트 그룹.
+  * New host group : 마땅한 호스트 그룹이 없다면, 새로운 호스트 그룹을 만들어서 등록한다.
+  * Agent interfaces : Zabbix Agent를 설치할 경우에 값을 넣는다. Zabbix Agent가 사용하는 기본 포트는 10050이다.  
+  * SNMP interfaces : SNMP를 사용한다면 여기에 추가한다.
+  * JMX interfaces : Zabbix 2.0에 추가된 인터페이스다. 자바 기반의 모니터링 솔류션이라고 하는데, 써보지 않아서 모르겠다.
+  * IPMI interface : IPMI는 하드웨어 수준에서 서버를 관리하기 위한 프로토콜이다. 하드웨어 수준이기 때문에 운영체제가 설치돼 있지 않거나 혹은 운영체제에 문제가 생겨서 원격 접속이 안되는 상황에서도 시스템을 관리할 수 있다. 나는 baremetal 호스트의 auto provisioning을 위해서 IPMI를 사용했다. 모니터링 용도로 사용할 수 있을지에 대해서는 고민해본 바가 없다.     
+  * Monitored by proxy : 분산 모니터링 환경을 구성하기 위한 목적으로 zabbix proxy를 둘 수 있다. 모니터링해야 할 대상이 여러 지역에 거쳐서 VPN(혹은 VPC)환경에 있다면, zabbix proxy를 구성을 고려할 수 있다. 
+
+Template에는 모니터링 환경에 맞게 미리 정의된 수집목록의 집합이 있다. 일종의 상속이다. 템플릿으로 부터 모니터링 item을 만든 다음에, 추가하거나 빼는 것으로 간단하게 설정할 수 있다. 필요하다면 새로운 템플릿을 만들 수도 있다.  
+
+=== Application, Items === 
+www.joinc.co.kr를 호스트로 등록했다. joinc는 리눅스 운영체제위에서 운영되고 있으니, Linux server template을 선택했다.     
+
+https://lh5.googleusercontent.com/-vLgIevntPF8/UW7Ey0Uvq_I/AAAAAAAAC-w/hHRQ749NIvM/s640/zabbix11.png
+
+Template에 미리 정의된 데로 Application, Items, Triggers, Graphs, Discovery의 내용이 모두 채워져 있는 걸 확인할 수 있다. 그 중 application과 Items를 살펴보려고 한다.
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-04-17T15:57:02)]]

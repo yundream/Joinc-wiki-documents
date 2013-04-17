@@ -1,10 +1,25 @@
-head	1.16;
+head	1.19;
 access;
 symbols;
 locks
-	root:1.16; strict;
+	root:1.19; strict;
 comment	@# @;
 
+
+1.19
+date	2013.04.11.14.52.27;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2013.04.11.14.16.39;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2013.04.09.16.21.15;	author root;	state Exp;
+branches;
+next	1.16;
 
 1.16
 date	2012.12.26.02.03.26;	author root;	state Exp;
@@ -92,9 +107,9 @@ desc
 @
 
 
-1.16
+1.19
 log
-@183.98.30.10;;yundream;;
+@128.134.217.152;;yundream;;
 @
 text
 @#title chef knife
@@ -235,6 +250,77 @@ kinfe에 내장된 서브 명령어들을 정리한다.
 === bootstrap ===
 
 === client ===
+chef API를 사용하기 위해서는 chef cleint로 등록을 해야 한다.
+
+하지만 노드가 처음 만들어진 상태에서 chef-client를 실행하면, 아직 API client 권한을 가지고 있지 않기 때문에 chef server에 요청을 할 수가 없다. 요청을 하기 위해서는 client key 파일을 가지고 있어야 한다. chef 관리자는 knife를 이용해서 client를 등록하고, 이때 만들어진 client key 파일을 배포할 수 있다. 이 key 파일을 이용해서 등록하면 된다.      
+client를 등록하는 또 다른 (일반적인)방법은 '''chef-validator'''으로 등록하는 방법이다. 처음 chef-client가 실행되면 clinet는 먼저 client key 파일을 찾는다. 만약 client key 파일이 없다면 validation.pem 파일을 이용해서 등록을 시도한다. validation.pem 파일은 chef-server의 /etc/chef 디렉토리에 있다. validation.pem 파일을 이용해서 등록된 client는 일반 (none-admin) client로 등록된다.    
+
+==== client 타입 ====
+Client는 아래의 두 가지 타입이 있다.
+  * Admin API client : 관리자 권한을 가지는 client다. 읽기와 쓰기권한 모두를 가지고 있다. cookbook을 수정하고, node와 client를 등록하고, data bag을 편집할 수 있다.  
+  * 일반 client : cookbook에 대한  읽기 권한만을 가지는 client다. validation.pem을 이용해서 등록된 client들은 일반 cleint 권한을 가진다. cookbook을 다운로드 받아서 실행할 수 있다. 
+
+==== create ====
+새로운 API client를 등록할 수 있다. 등록하고 나면 API client를 위한 RSA key pair가 만들어진다. Public key는 chef server에 저장되고 Private key는 화면에 출력되거나 파일로 저장할 수 있는데, 이 private key를 client에 배포하면 된다. 
+  * chef-client(일반 client)를 위한 private key 파일은 /etc/chef/client.pem으로 복사한다.
+  * Knife(Admin API client)를 위한 private key 파일은 (보통) ~/.chef/client_name.pem 파일로 복사한다.
+
+===== 사용법 =====
+사용법은 다음과 같다.
+{{{#!plain
+# knife client create CLIENT_NAME (options) 
+}}}
+사용할 수 있는 옵션들이다.
+  * -a, --admin : Admin API client를 만든다. 모든 chef 자원에 접근할 수 있다. -a 옵션이 없을 경우 일반 client를 만든다.   
+
+mgmtclient 라는 이름의 admin API client를 만든다.  
+{{{#!plain
+# knife client create mgmtclient -a -f mgmtclient.pem 
+}}}
+
+testclient 라는 이름의 일반 client를 만든다.
+{{{#!plain
+# knife client create testclient  -f testclient.pem 
+}}}
+
+==== delete ====
+클라이언트를 삭제한다.
+{{{#!plain
+# knife client delete CLIENT_NAME
+}}}
+
+==== list ====
+클라이언트 목록을 출력한다.
+{{{#!plain
+# knife client list
+}}}
+
+==== reregister ====
+새로운 RSA key pair를 생성한다.
+{{{#!plain
+# knife client regenerate testclient -f rsa_key
+}}}
+
+==== show ====
+API client의 상세정보를 보여준다.
+{{{#!plain
+# knife client show CLEINT_NAME (options)
+}}}
+
+사용 예
+{{{#!plain
+# knife client show node1.joinc.co.kr
+_rev:        1-8669ff3d09ccd85292e92165fc065ca1
+admin:       false
+chef_type:   client
+json_class:  Chef::ApiClient
+name:        node1.joinc.co.kr
+public_key:  -----BEGIN RSA PUBLIC KEY-----
+             xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+             yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy 
+             ......
+             -----END RSA PUBLIC KEY-----
+}}}
 
 === configure ===
 '''configure'''를 이용하면 간단하게 knife.rb와 client.rb 설정파일을 만들 수 있다.
@@ -482,9 +568,8 @@ chef 서버에 노드를 추가한다. 추가된 노드 정보는 chef server에
 
 파일에서 만들 수도 있다.
 {{{#!plain
-knife node from file FILE
+# knife node from file node.json 
 }}}
-
 
 ==== delete ====
 노드를 삭제한다.
@@ -686,6 +771,8 @@ web role을 가지는 모든 node의 uptime을 가져온다. yundream/12345를 �
 192.168.57.3  23:51:38 up 22 min,  2 users,  load average: 0.00, 0.00, 0.00
 }}}
 
+Role이 변경됐을 때, 원격 node의 chef-client를 실행하기 위한 유일한 방법이다. 물론 corn에 등록하거나 chef-client '''-i'''옵션등을 이용해서 주기적으로 실행하는 방법이 있긴 하지만, 그다지 권할만한 방법은 아닌 것 같다. chef를 이용해서 시스템을 자동화할 경우 unix 계정도 함께 관리할 텐데, 이때 ssh-key를 함께 관리하도록 하자. 그러면 knife ssh와 ssh key를 이용해서, 원하는 시점에 chef-cliet를 실행할 수 있다. 
+
 === status ===
 노드상태를 확인할 수 있다.
 {{{#!plain
@@ -716,6 +803,37 @@ knife status --run-list
   * 수정
     * [[Date(2012-12-05T04:18:22)]] : status 추가
     * [[Date(2012-12-09T14:53:54)]] : ssh 추가
+@
+
+
+1.18
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d139 71
+@
+
+
+1.17
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d386 1
+a386 1
+knife node from file FILE
+a388 1
+
+@
+
+
+1.16
+log
+@183.98.30.10;;yundream;;
+@
+text
+@d590 2
 @
 
 

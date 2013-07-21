@@ -1,0 +1,170 @@
+head	1.4;
+access;
+symbols;
+locks
+	root:1.4; strict;
+comment	@# @;
+
+
+1.4
+date	2013.07.08.03.40.05;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.07.07.16.10.43;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.07.07.05.03.32;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.07.06.16.52.06;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fNetwork_5fPrograming_2fDocuments_2fSMTP
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title SMTP - Simple Mail Transfer Protocol 
+
+[[TableOfContents]]
+== SMTP ==
+SMTP는 거의 모든 email 소프트웨어 들이 사용하는 프로토콜로, [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]와 함께 지금의 인터넷이 있게한 일등공신이라 할 만하다. SMTP가 나온게 1981년 경이니, (2013년 현재)30년이 훌쩍넘은 프로토콜이다. SMTP가 국내에서 상업적으로 가장 주목받았던 시기는 1990년대 초반쯤으로 이때 한참 웹메일 솔류션들이 시장이 나올 때였다. 
+
+지금은 (google를 포함한)포털에서 제공하는 웹 메일 서비스들을 너무나 일상적으로 사용하고 있어서, 마치 공기를 인식하지 못하듯이 그렇게 사용하고 있다.  
+
+이번에는 SMTP 프로토콜을 분석해보려고 한다. RFC[[FootNote(Request for comments : 비평을 기다리는 문서라는 의미. 컴퓨터 공학에서 인터넷 기술에 적용 가능한 새로운 연구, 혁신, 기법등을 아우르는 텍스트를 의미한다)]] 수준에서 분석하는 그런건 아니고, SMTP를 이용한 응용 애플리케이션 개발에 촛점을 맞추려고 한다. SMTP의 사양은 응용을 개발하는데 필요한 정도를 다룬다.
+
+=== 메일 처리 방식 ===
+SMTP를 이용한 메일 처리 방식은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/10sYiBOK-foJzgEBgeVGoYdn-MzyaDBE02vrbb0q_5C8/pub?w=566&amp;h=336">
+}}}
+
+메일 시스템은 "송신자 -> 매체(전달자) -> 수신자"읠 일반적인 메시지 전송 과정을 따른다. 송신자는 '''MUA (Mail User Agent)'''를 이용해서 메일을 만들어서 보낸다. 메일 클라이언트 프로그램이라고 볼 수 있다. MUA는 TCP 587 번 포트번호를 이용해서 메일을 전송한다.    
+
+메일 서비스 제공자는 587번 포트를 제공하는데, 기존 방식과의 호환을 위해서 25번 포트도 함께 제공한다. MSA(Mail Submission agent)는 587번 포트를 사용하고 MTA(Mail transfer agent)는 25번 포트를 사용한다. MSA와 MTA 모두 SMTP를 이용한다. 차이점은 MSA는 인증을 제공하고, MTA는 인증을 제공하지 않는다는 점이다. 많은 SMTP 서버 프로그램들이 MSA와 MTA 기능을 모두 가지고 있다.  
+
+이메일 주소는 "username@@도메인이름" 형식으로 구성된다. 따라서 이메일을 받은 MTA는 도메인 이름을 찾아야 하는데, DNS서버로 부터 MX(Mail exchanger)레코드값을 이용해서 메일을 전송해야 하는 호스트를 찾을 수 있다.
+
+이제 메일이 수신지로 전달이 됐다. 수신지는 일종의 메일함 역할을 하며, 여러 유저의 메일가 저장된다. 따라서 도착한 메일을 분류해서 사용자 메일박스에 저장하는 등의 작업을 해야 하는데, 이일을 하는 프로그램이 '''MDA(Mail delivery agent)'''다.  
+
+=== SMTP 통신 예제 === 
+(HTTP 처럼)SMTP는 printable한 ASCII 문자로 통신하기 때문에, 비교적 쉽게 분석이 가능하다. SMTP의 통신 과정은 다음과 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/19WPrD2QkVT8C_TNKSoU_JXfp4-VfGuiC5MpEu_vQAS8/pub?w=669&amp;h=630">
+}}}
+
+예를 들어 설명해 보자. Aliece가 theboss에게 메일을 보내는 과정이다. "S"는 서버 메시지, "C"는 클라이언트 메시지를 의미한다.
+{{{#!plain
+S: 220 smtp.example.com ESMTP Postfix
+C: HELO relay.example.org
+S: 250 Hello relay.example.org, I am glad to meet you
+C: MAIL FROM:<bob@@example.org>
+S: 250 Ok
+C: RCPT TO:<alice@@example.com>
+S: 250 Ok
+C: RCPT TO:<theboss@@example.com>
+S: 250 Ok
+C: DATA
+S: 354 End data with <CR><LF>.<CR><LF>
+C: From: "Bob Example" <bob@@example.org>
+C: To: "Alice Example" <alice@@example.com>
+C: Cc: theboss@@example.com
+C: Date: Tue, 15 January 2008 16:02:43 -0500
+C: Subject: Test message
+C:
+C: Hello Alice.
+C: This is a test message with 5 header fields and 4 lines in the message body.
+C: Your friend,
+C: Bob
+C: .
+S: 250 Ok: queued as 12345
+C: QUIT
+S: 221 Bye
+{서버와의 연결을 종료한다.}
+}}}
+
+== SMTP 응용 프로그램 개발 ==
+리눅스에서 ruby를 이용해서 개발할 생각이다. SMTP는 오래된 프로토콜이기 때문에, 어떤 언어를 사용하더라도 훌륭한 SMTP 라이브러리를 이용할 수 있을 테다.  
+
+=== GServer ===
+GServer를 이용해서 빠르게 개발한다.
+
+GServer는 루비에서 사용할 수 있는 TCP 네트워크 서버 프로그램 개발을 위한 "표준 라이브러리"다. Thread pool 관리, 로깅, 디버깅, 멀티-서버 관리등을 간단하게 할 수 있다. 자세한 내용은 [wiki:Site/Ruby/GServer ruby GServer 활용] 문서를 살펴보자.
+
+=== SMTP 서버 프로그램 개발 ===
+나가 만들려는 프로그램의 사양은 다음과 같다. 
+  1. Gmail등에서 수신한 메일을 읽는다.
+  1. 메일의 수신자, 송신자, 제목, Body를 분석한다. 
+  1. Body는 다시 분석한다. Body의 문서 타입을 확인하고, 첨부파일과 본문을 분리해서 따로 저장한다. 
+... 계속
+=== SMTP 클라이언트 프로그램 개발 ===
+... 계속
+
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d14 1
+a14 1
+{{{#!
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d26 2
+a27 2
+=== 통신과정 === 
+SMTP 클라이언트와 SMTP 서버와의 통신 과정을 살펴보려한다. 
+d29 33
+d69 1
+a69 1
+GServer는 루비에서 사용할 수 있는 TCP 네트워크 서버 프로그램 개발을 위한 "표준 라이브러리"다. Thread pool 관리, 로깅, 디버깅, 멀티-서버 관리등을 간단하게 할 수 있다. 자세한 내용은 [wiki:Site/Ruby/GServer  ruby GServer 소개] 문서를 살펴보자.
+d76 1
+a76 1
+
+d78 1
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+d5 1
+a5 1
+SMTP는 거의 모든 email 소프트웨어 들이 사용하는 프로토콜로, HTTP와 함께 지금의 인터넷이 있게한 일등공신이라 할 만하다. SMTP가 나온게 1981년 경이니, (2013년 현재)30년이 훌쩍넘은 프로토콜이다. SMTP가 국내에서 상업적으로 가장 주목받았던 시기는 1990년대 초반쯤으로 이때 한참 웹메일 솔류션들이 시장이 나올 때였다. 
+d9 1
+a9 1
+이번에는 SMTP 프로토콜을 분석해보려고 한다. RFC 문서를 읽어내리는 그런 수준은 아니고, SMTP를 이용한 애플리케이션 개발에 촛점을 맞추려고 한다.
+d26 3
+a28 1
+...계속
+d33 5
+d39 5
+@

@@ -1,0 +1,26 @@
+#title VPC에서 DNS 구성 방안
+
+[[TableOfContents]]
+== Dnsmasq를 이용한 VPC에서의 private dns 구성 방안  ==
+[wiki:Site/cloud/AWS/VPC VPC]에 있는 [wiki:Site/cloud/AWS/EC2 EC2] 호스트 자원은 [wiki:Site/cloud/automation chef]를 이용해서 중앙에서 관리하고 있다. 중앙에서 관리하려면 chef node의 도메인 이름을 관리할 필요가 있어서, dnsmasq로 private dns server를 구성했다. 
+
+=== dnsmasq를 선택한 이유 ===
+AWS에서 private dns는 아래의 기능을 가지고 있어야 한다. 
+  1. Private dns는 dns 요청을 중계할 수 있어야 한다. : 만약 private dns server로 질의 요청한 도메인 이름이 private dns에서 관리하는 도메인 이름이 아니라면, (미리 설정된) 다른 dns server로 요청을 보내고 그 결과를 클라이언트에게 보내줘야 한다. 보통은 AWS에서 제공하는 dns server를 중계 서버로 하면 된다.  
+  1. 분산 구성할 수 있어야 한다. : VPC가 여러 region에 흩어져 있을 경우, 각 VPC에 dns server를 둬서 '''single point of failure'''를 막을 수 있어야 한다.
+  1. 구성과 관리가 쉬워야 한다. 
+[wiki:Site/System_management/Dnsmasq Dnsmasq]는 아래의 조건을 만족한다.
+  1. 요청을 중계할 수 있고
+  1. /etc/hosts에 추가하는 정도로 간단하게 네임서비스를 할 수 있다.
+  1. 구성요소가 간단하기 때문에 분산 환경을 만들기도 쉽다. /etc/hosts만 잘 동기화 해주면 된다.   
+
+=== 구성 ===
+Dnsmasq를 이용한 private dns 환경 구성도다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1URNIps6IUvL7P5SGPICJsGXBdcGUJThllcavXLio_e0/pub?w=480&amp;h=385">
+}}}
+
+도메인 이름 정보는 chef server가 가지고 있다. 이 cook book의 이름을 DNS Cookbook 이라고 하자. DNS Cookbook은 ip와 도메인 이름의 정보를 가지고 있으며, 이 정보를 이용해서 /etc/hosts 파일을 만든다. /etc/hosts 파일을 갱신 한 후에는 dnsmasq 서버를 재 시작하면 된다. DNS server 측에서는 chef client를 한번 실행하는 것으로 dns 서버 정보를 동기화 할 수 있다. 
+
+EC2 instance가 private 도메인 이름을 요청하면 DNS server는 /etc/hosts를 읽어서 응답할 것이다. 만약 /etc/hosts에 등록 돼 있지 않은 도메인 이름이라면 AWS에서 제공하는 도메인 서버에 요청해서 응답한다.  

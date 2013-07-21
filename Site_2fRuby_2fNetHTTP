@@ -1,0 +1,135 @@
+#title NET::HTTP를 이용한 웹 클라이언트 개발
+
+[[TableOfContents]]
+== NET::HTTP ==
+[wiki:Site/Ruby/sinatra Sinatra]를 이용해서 웹 애플리케이션을 개발하던 중, 클라이언트의 요청을 다른 웹서버로 보내야 하는 API를 만들게 됐다. 그냥 GET 호출만 할게 아니고, JSON 형태의 값을 POST로 넘기고, 거기에 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] header까지 제어해야 했다. 해서 꽤 많은 일을 할 수 있는 HTTP client api를 찾아야 했다. 
+
+그렇게 찾은게 NET::HTTP다. 몇개 더 있는 것 같기는한데, 대략 내가 원하는 일들은 다 할 수 있을 것 같아서 그냥 선택하기로 했다.
+
+=== URI ===
+HTTP 요청은 꽤 많은 구성요소를 가진다. "프로토콜://Domain:port/PATH?uriquery#fragment"의 구성요소를 가지는데, 이것을 다루는 것도 꽤나 귀찮은 일이다. ruby에서 제공하는 '''uri''' 모듈을 사용하기로 하자. 
+{{{#!plain
+require 'uri'
+
+uri = URI("http://www.joinc.co.kr/wiki.php/test?action=edit#sect1")
+
+puts uri.scheme    # http 
+puts uri.host      # www.joinc.co.kr
+puts uri.port      # 80
+puts uri.path      # wiki.php/test
+puts uri.query     # action=edit
+puts uri.fragment  # sect1
+puts uri.to_s      # http://www.joinc.co.kr/wiki.php/test?action=edit#sect1
+}}}
+
+=== 테스트를 위한 PHP 코드 ===
+curl 요청이 제대로 가는지 테스트하기 위해서, 요청을 할 웹 서버쪽에 간단한 웹 페이지를 하나 만들었다. 
+{{{#!plain
+# cat test.php
+<?
+print_r($_SERVER);
+print_r(apache_request_headers());
+echo $HTTP_RAW_POST_DATA;
+?>
+}}}
+  * apache_request_headers : 요청 헤더 정보를 출력한다.  
+  * $HTTP_RAW_POST_DATA : POST를 데이터 그대로 출력한다.
+
+=== GET 요청 작성 ===
+{{{#!plain
+require 'net/http'
+# -*- coding: utf-8 -*-
+require 'uri'
+require 'net/http'
+
+url = URI.parse("http://www.joinc.co.kr/test.php?name=yundream&key=value")
+http = Net::HTTP.new(url.host, url.port)
+req = Net::HTTP::Get.new(url.request_uri)
+req.add_field("MY-Header", "1234567890")
+
+response = http.request(req)
+
+puts response.body
+puts response.code
+}}}
+
+실행 결과. '''$_SERVER'''의 내용은 편집했다. 
+{{{#!plain
+Array
+(
+    [SERVER_ADDR] => xx.xx.xxx.xx 
+    [SERVER_PORT] => 80
+    [REMOTE_ADDR] => xx.xxx.xxx.xx 
+    [REMOTE_PORT] => 54486
+    [GATEWAY_INTERFACE] => CGI/1.1
+    [SERVER_PROTOCOL] => HTTP/1.1
+    [REQUEST_METHOD] => GET
+    [QUERY_STRING] => name=yundream&key=value
+    [REQUEST_URI] => /test.php?name=yundream&key=value
+)
+Array
+(
+    [Accept] => */*
+    [User-Agent] => Ruby
+    [My-Header] => 1234567890
+    [Connection] => close
+    [Host] => www.joinc.co.kr
+)
+200
+}}}
+=== POST 요청 작성 ===
+POST 요청을 위한 일반적인 코드. 
+{{{#!plain
+#!/usr/bin/ruby
+# -*- coding: utf-8 -*-
+require 'uri'
+require 'net/http'
+
+url = URI.parse("http://www.joinc.co.kr/test.php")
+http = Net::HTTP.new(url.host, url.port)
+req = Net::HTTP::Post.new(url.request_uri)
+req.add_field("MY-Header", "1234567890")
+req.add_field("Content-type", "application/json")
+
+req.body = "hello world"
+
+response = http.request(req)
+
+puts response.body
+puts response.code
+}}}
+
+실행 결과. '''$_SERVER'''의 내용은 편집했다. 
+{{{#!plain
+Array
+(
+    [SERVER_ADDR] => xx.xxx.xx.xx 
+    [SERVER_PORT] => 80
+    [REMOTE_ADDR] => xx.xxx.xx.xx 
+    [REMOTE_PORT] => 54477
+
+    [GATEWAY_INTERFACE] => CGI/1.1
+    [SERVER_PROTOCOL] => HTTP/1.1
+    [REQUEST_METHOD] => POST
+    [REQUEST_URI] => /test.php
+)
+
+Array
+(
+    [Accept] => */*
+    [User-Agent] => Ruby
+    [My-Header] => 1234567890
+    [Content-Type] => application/json
+    [Connection] => close
+    [Host] => www.joinc.co.kr
+    [Content-Length] => 11
+)
+hello world
+200
+}}}
+
+== HTTPS 연결 ==
+{{{#!html
+https = Net::HTTP.new(url.host, url.port)
+https.use_ssl = true
+}}}

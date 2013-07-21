@@ -1,0 +1,83 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.05.27.08.06.14;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fautomation_2fChefRestAPI
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title Chef REST API
+
+== Chef REST API ==
+chef server가 설치돼 있고, admin 모드의 knife 클라이언트 설정이 돼 있다고 가정하겠다. 즉 다음과 같은 구성이다.
+{{{#!plain
++--------------+              +--------------+
+| Chef server  |<------------>| API server   |
+|              |              |              |
++--------------+              +--------------+
+}}}
+나는 chef server를 관리하는 API server 애플리케이션을 개발하려고 한다.
+
+관리자는 chef knife를 이용해서, 모든 chef 자원을 제어할 수 있다. 하지만 애플리케이션 관리자라면, 예컨데 chef를 이용한 관리시스템을 만드는 개발자라면 API를 이용해서 애플리케이션을 개발해야 할 필요가 있다. 
+
+Chef는 REST API를 제공하는데, knife로 할 수 있는 모든 일을 할 수 있다.  Chef rest api는 Chef::REST 라이브러리를 이용해서 제어할 수 있다.
+
+입력과 출력 데이터는 JSON 포멧을 사용한다.
+
+아래는 REST API의 기본적인 사용방법을 보여준다.  
+{{{#!plain
+#!/usr/bin/ruby
+require 'chef'
+
+# knife.rb 파일에서 설정 정보를 읽어온다.
+Chef::Config.from_file("/etc/chef/knife.rb")
+
+# 설정파일의 chef server url을 이용해서 REST 객체를 만든다.  
+rest = Chef::REST.new(Chef::Config[:registration_url])
+
+# node 목록을 가져온다. 
+nodes = rest.get_rest("/nodes")
+
+# node의 상세 정보를 가져온다.
+nodes.each do |key, value|
+	node = rest.get_rest("/nodes/#{key}")
+	puts node['hostname']
+	puts node['fqdn']
+	puts node['ipaddress']
+end
+}}}
+
+node를 create 하길 원한다면 post_rest 메서드를 이용하면 된다. 
+{{{#!plain
+#!/usr/bin/ruby
+require 'chef'
+
+Chef::Config.from_file("/etc/chef/knife.rb")
+rest = Chef::REST.new(Chef::Config[:registration_url])
+
+# node 정보를 저장하고 있는 json 파일을 읽는다.
+f = File.new('node.json')
+str = f.sysread(f.stat.size)
+json = JSON.parse(str)
+rest.post_rest('nodes', json)
+}}}
+
+== 참고 ==
+ * [http://rubydoc.info/gems/chef/0.10.4/Chef/REST Chef REST API]
+@

@@ -1,0 +1,93 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.07.10.07.53.33;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fCode_2fC_2fecho_5fclient
+@
+
+
+1.1
+log
+@112.158.59.123;;Anonymous;;
+@
+text
+@#title echo client 프로그램
+
+=== 설명 ===
+[wiki:Code/C/echo_server echo server]를 테스트하기 위한 클라이언트 프로그램입니다.
+
+=== 사용방법 ===
+
+=== 코드 ===
+{{{#!gcode c
+plain down:echo_client.c
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define MAXBUF	1024
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in serveraddr;
+    int server_sockfd;
+    int client_len;
+    char buf[MAXBUF];
+    char rbuf[MAXBUF];
+
+
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("error :");
+        exit(0);
+    }
+
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = inet_addr("218.234.19.87");
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(serveraddr);
+
+    if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len) < 0)
+    {
+        perror("connect error :");
+        exit(0);
+    }
+
+    memset(buf, 0x00, MAXBUF);
+    read(0, buf, MAXBUF);
+    if (write(server_sockfd, buf, MAXBUF) <= 0)
+    {
+        perror("write error : ");
+        exit(0);
+    }
+    memset(buf, 0x00, MAXBUF);
+    if (read(server_sockfd, buf, MAXBUF) <= 0)
+    {
+        perror("read error : ");
+        exit(0);
+    }
+    close(server_sockfd);
+    printf("read : %s", buf);
+}
+}}}
+
+=== 변경사항 ===
+ * [wiki:/Site/Network_Programing/Documents/socket_beginning  BSD 소켓 프로그래밍]
+[[Category(200)]]
+@

@@ -1,0 +1,399 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.05.20.07.42.51;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fsystem_5fprograming_2fIPC_2fmemory_5fmap
+@
+
+
+1.1
+log
+@163.152.126.86;;Anonymous;;
+@
+text
+@#title 메모리맵
+
+[[TableOfContents]]
+
+=== 교정 과정 ===
+ 1. mmap 예제 추가 - 2004/4/21 
+
+=== mmap란? ===
+mmap(2)는 메모리의 내용을 파일이나 디바이스에 대응(mapping)하기 위해서 사용하는 시스템 호출이다. 여기에서는 mmap시스템 호출의 활용방안에 대해서 알아보도록 한다.  
+
+==== 메모리관리와 mmap ====
+각각의 프로세스는 프로세스마다 다른 프로세스와 중복되지 않는 주소공간을 가지게 된다. 주소 공간은 최초 논리적인 3개의 세그먼트로 분할된다. 
+
+텍스트, 데이터와 스택이 그것이다. 텍스트 세그먼트는 읽기전용으로 프로그램의 명령을 포함하고 있다. 데이터와 스택 세크먼트는 읽기,쓰기가 모두 가능한 영역이다. 차이점이라면 데이터 세그먼트에는 초기화 된 데이터와 그렇지 않은 데이터가 함께 있는데 반해, 스택 세그먼트는 실행시간에 초기화된 값들을 보관한다는 것이다. 대부분의 시스템에서는 프로세스의 실행과 함께 커널에 의해서 스택 세그먼트가 자동으로 확장된다. 데이터 세그먼트의 경우는 malloc()계열의 시스템콜을 이용해서 확장하는 것이 가능하다. 텍스트 세그먼트의 경우 디버깅과 같은 제한된 환경에서 크기의 변경이 가능하다.   
+
+어쨌든 간에 프로세스 메모리는 기본적으로 다른 프로세스 메모리와 공유되지 않는다. 이것은 프로세스의 데이터를 보호하기 위해서 반드시 필요한 기능이긴 하지만 다른 프로세스와 특정 데이터를 공유하기 위해서는 귀찮은 기능이 되기도 한다. 이때문에 IPC를 사용하게 된다. mmap은 메모리의 특정영역을 파일로 대응시킬 수 있도록 도와준다. 파일은 시스템 전역적인 객체이므로 다른 프로세스에서 접근가능하도록 할 수 있으며, 이러한 mmap의 특징때문에 IPC용도로 사용가능하다. - mmap이 IPC용도로 사용가능하지만 IPC설비는 아니다. - 
+
+mmap는 프로세스의 주소공간을 파일에 대응시킨다. 파일은 운영체제 전역적인 자원이므로 당연히 어렵잖게 다른 프로세스와 공유해서 사용할 수 있을 것이다.    
+
+==== mmap의 활용용도 ====
+메모리의 내용을 파일에 대응시켜서 얻을 수 있는 이익을 생각해 보자. 그러면 mmap의 활용 용도를 결정할 수 있을 것이다. 
+ 1. 메모리의 내용을 파일에 대응시킬 수 있다면 프로세스간 데이터의 교환을 위한 용도로 사용가능 할 것이다. 프로세스간 공유하고자 하는 데이터를 파일에 대응시키고 이것을 읽고 쓰면 된다. 물론 접근제어를 해줘야 하겠지만 말이다.   
+ 1. 메모리의 내용을 파일에 직접 대응시킨 다면 성능향상을 생각할 수 있을 것이다. 고전적인 방법은 파일지정자를 얻어서 직접 입출력하는 방식으로 '''open''', '''read''', '''write''', '''lseek'''와 같은 함수를 이용한다. 이러한 함수의 사용은 당연하지만 상당한 비용을 지불해야 하는데, mmap를 이용하면 비용을 줄일 수 있다. 자세한 내용은 뒤에 따로 다루도록 하겠다.  
+
+==== mmap설명 ====
+mmap는 다음과 같이 선언되어 있다.  
+{{{#!plain
+#include <sys/mman.h>
+
+#ifdef _POSIX_MAPPED_FILES
+void * mmap(void *start, size_t length, int prot , 
+          int flags, int fd, off_t offset);
+
+int munmap(void *start, size_t length);
+#endif
+}}}
+mmap함수는 '''start'''부터 '''length'''까지의 메모리 영역을 열린파일 '''fd'''에 대응한다. 대응 할때 파일의 위치를 지정할 수 있는데 이것은 '''offset'''을 통해서 이루어진다.  
+
+'''prot'''는 파일에 대응되는 메모리 영역의 보호특성을 결정하기 위해서 사용된다. 메모리영역과 파일이 서로 대응되기 때문에 파일에 대한 어떠한 작업이 메모리영역에 직접적인 영향을 미칠 수 있기 때문이다. prot는 다음과 같은 플레그(flag)를 제공한다.
+ 1. '''PROT_EXEC''' 페이지(page)는 실행될 수 있다. 
+ 1. '''PROT_READ''' 페이지는 읽혀질 수 있다.
+ 1. '''PROT_WRITE''' 페이지는 쓸수 있다.
+ 1. '''PROT_NONE''' 페이지를 접근할 수 없다. 
+
+'''flags'''는 대응되는 객체의 형식(type)를 지정하기 위해서 사용한다. 이 flag에 어떤 값을 사용하느냐에 따라서 대응된 페이지를 다른 프로세스와 공유하거나 단지 생성한 프로세스만 사용할 수 있도록 지정할 수 있다.  
+ 1. '''MAP_FIXED'''
+ 1. '''MAP_SHARED''' 대응되는 객체를 다른 프로세스도 공유할 수 있게 만들어준다. 프로세스들은 객체에 대해서 동등한 권한을 가지게 된다. 그렇다면 객체 접근에 대한 동기화를 시켜줄 필요가 있는데, 이를 위해서 '''msync(2)'''와 '''munmap(2)'''가 사용된다. 이들 함수를 이용한 동기화는 따로 다룰 것이다. 
+ 1. '''MAP_PRIVATE''' 
+mmap를 사용할 때 반드시 '''MAP_PRIVATE'''와 '''MAP_SHARED'''둘중 하나를 사용해야 한다. 
+
+위의 '''flag'''는 POSIX.1b에 정의된 표준적인 것들인데, 리눅스는 몇 가지 표준적이지 않은 flag를 제공한다. 이들 플레그는 man페이지를 참고하기 바란다.  
+
+mmap가 성공적으로 호출되면 메모리 대응된 장소에 대한 주소를 리턴 받는다. 우리는 이 값을 이용해서 메모리관련 작업을 하게 된다.    
+
+=== 예제 1 ===
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main(int argc, char **argv)
+{
+    int fd;
+    char *file = NULL;
+    struct stat sb;
+    char buf[80] ={0x00,};
+    int flag = PROT_WRITE | PROT_READ;
+
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: input\n");
+        exit(1);
+    }
+
+    if ((fd = open(argv[1], O_RDWR|O_CREAT)) < 0)
+    {
+        perror("File Open Error");
+        exit(1);
+    }
+
+    if (fstat(fd, &sb) < 0)
+    {
+        perror("fstat error");
+        exit(1);
+    }
+
+    file = (char *)malloc(40);
+
+    // mmap를 이용해서 열린 파일을 메모리에 대응시킨다.
+    // file은 대응된 주소를 가리키고, file을 이용해서 필요한 작업을 
+    // 하면 된다. 
+    if ((file =
+        (char *) mmap(0, 40, flag, MAP_SHARED, fd, 0)) == -1)
+    {
+        perror("mmap error");
+        exit(1);
+    }
+    printf("%s\n", file);
+    memset(file, 0x00, 40);
+    close(fd);
+}
+}}}
+일단 test.nmap 이란 파일을 만들고 내용은 "hello world\n"정도로 채운다. 그 다음 위 코드를 컴파일 한후 테스트를 해보도록 하자. 파일의 내용이 메모리에 대응되는 것을 확인 할 수 있을 것이다. 코드의 마지막 부분에서 memset()을 호출했는데, 실제 파일에 대응되어서 파일 내용이 '''0x00'''으로 채워졌는지 확인해 보도록 하자. 
+
+=== mmap을 이용한 프로세스간 데이터 공유 ===
+mmap()은 파일 I/O에서의 우월한 성능과 메모리의 공유 가능하다는 장점을 가지므로 ''''파일 I/O 대체''' 와 '''IPC 용'''으로의 사용이 가능할 것이다. 이중 IPC용으로의 사용에 대해서 알아보도록 하겠다.  
+
+여기에서는 배열로 만들어진 환형큐를 구현해 보도록 하겠다. 환형큐에 대한 내용은 [wiki:article_큐_자료추상 큐 자료추상]를 참고하기 바란다. 큐에는 int형의 데이터가 들어가며 큐의 크기는 10으로 할 것이다.  
+
+여기에는 2개의 프로그램이 만들어진다. 첫번째 프로그램은 큐에 데이터를 쓰고 두번째 프로그램은 큐에 쓰여진 데이터를 읽어서 제곱을 한다. 환형큐의 특성상 현재 큐에 읽을 데이터가 있는지를 알 수 있어야 하므로 맨 앞 2byte는 현재 큐에 저장된 원소의 갯수를 저장하기 위한 용도로 사용된다. 대략 다음과 같은 메모리 구조를 유지하게 될 것이다. 첫번째 프로그램의 이름은 a1, 두번째 프로그램의 이름은 b2로 하겠다. 
+{{{#!plain
++---+---+---+---+---+    +---+
+|num|값0|값1|값2|값3|    |값9|
++---+---+---+---+---+....+---+
+}}}
+
+a1은 값을 입력하고 값을 입력한 후에는 num++를 하게 된다. a2는 num을 읽어서 0보다 크다면 값을 읽어오고 num--를 하게 된다. num에 대해서는 동기화가 필요하다. a1이 queue에 새로운 값을 집어 넣고 num을 증가시키는 동안에는 a2가 접근하지 못하게 하고, 마찬가지로 a2가 queue에서 값을 가져오고 num을 감소시키는 동안에는 a1이 접근하지 못하도록 해야 한다. 이러한 동기화는 fcntl()을 응용한 레코드잠금을 이용할 것이다. 레코드 잠금에 대한 내용은 [wiki:article_fcntl을_이용한_파일_레코드잠금 fcntl을 이용한 파일잠금]을 참고하기 바란다.       
+
+==== 예제 ====
+아직 완성되지 않았음
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/sem.h>
+#include <sys/ipc.h>
+
+#define VSIZE		5
+#define MODE		S_IRUSR|S_IWUSR
+#define FLAG		O_RDWR|O_CREAT|O_EXCL
+
+typedef struct __M_que 
+{
+	int number;
+	int idx;
+	int value[VSIZE];
+} M_que;
+
+static int semid;
+static struct sembuf mysem_open = {0, -1, SEM_UNDO};
+static struct sembuf mysem_close = {0, 1, SEM_UNDO};
+
+int main(int argc, char **argv)
+{
+    int fd, i = 0;
+    char *file = NULL;
+    struct stat sb;
+    char buf[80] ={0x00,};
+    int flag = PROT_WRITE | PROT_READ;
+	M_que *lque;
+	int sem_num = 1;
+
+
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: input\n");
+        exit(1);
+    }
+
+    if ((fd = open(argv[1], FLAG, MODE)) < 0)
+    {
+        perror("File Open Error");
+        exit(1);
+    }
+
+	semid = semget((key_t)234, sem_num, 0660|IPC_CREAT);
+	if (semid == -1)
+	{
+		perror("semget error");
+		exit(0);
+	}
+
+	lque = (void *)malloc(sizeof(M_que));
+	memset((void *)lque, 0x00, sizeof(M_que));
+	write(fd, (void *)lque, sizeof(M_que));
+
+    // mmap를 이용해서 열린 파일을 메모리에 대응시킨다.
+    // file은 대응된 주소를 가리키고, file을 이용해서 필요한 작업을
+    // 하면 된다.
+    if (((void *)lque = 
+		mmap(0, sizeof(&lque), flag, MAP_SHARED, fd, 0)) == MAP_FAILED)
+    {
+        perror("mmap error");
+        exit(1);
+    }
+
+	while(1)
+	{
+		record_lock(fd);
+		input_value(lque, i, fd);
+		record_unlock(fd);
+		sleep(1);
+		i++;
+	}
+	munmap((void *)lque, sizeof(lque));
+    close(fd);
+}
+
+int input_value(M_que *lque, int value, int fd)
+{
+	if (lque->number == VSIZE)
+	{
+		printf("buffer overflower\n");
+		record_unlock(fd);	
+		if (semop(semid, &mysem_open, 1) == -1)
+		{
+			perror("semop error");
+			return -1;
+		}
+		printf("close wait\n");
+		semop(semid, &mysem_close, 1);
+		record_lock(fd);
+	}
+
+
+	printf("%d : %d\n", lque->idx, value);
+	lque->value[lque->idx] = value;
+	lque->number ++;
+	lque->idx = (lque->idx ++) % VSIZE;
+	record_unlock(fd);
+	return 1;
+}
+
+int record_lock(int fd)
+{
+	struct flock lock; 
+	lock.l_type = F_WRLCK;
+	lock.l_start = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len = 1;
+	return fcntl(fd, F_SETLKW, &lock);
+}
+
+int record_unlock(int fd)
+{
+	struct flock lock; 
+	lock.l_type = F_UNLCK;
+	lock.l_start = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len = 1;
+	return fcntl(fd, F_SETLK, &lock);
+}
+}}}
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/sem.h>
+#include <sys/ipc.h>
+
+#define VSIZE	10
+#define MODE	S_IRUSR
+#define FLAG	O_RDONLY
+
+typedef struct __M_que
+{
+	int number;
+	int idx;
+	int value[VSIZE];
+} M_que; 
+
+static int semid;
+static struct sembuf mysem_open = {0, -1, SEM_UNDO};
+static struct sembuf mysem_close = {0, 1, SEM_UNDO};
+
+int main(int argc, char ** argv)
+{
+	int fd;
+	char *file = NULL;
+	int flag = PROT_READ;
+	int sem_num = 0;
+
+	M_que *lque;
+	int value;
+
+
+	if (argc < 2)
+	{
+		fprintf(stderr, "Usage: ./a2 [mmap_file]\n");
+		exit(1);
+	}
+
+	if ((fd = open(argv[1], FLAG, MODE)) < 0)
+	{
+		perror("FILE Open Error");
+		exit(0);
+	}
+
+	semid = semget((key_t)234, sem_num, 0660);
+	if (semid == -1)
+	{
+		perror("semget error");
+		exit(0);
+	}
+
+	lque = (void *)malloc(sizeof(M_que));
+	if (((void *)lque = 
+		mmap(0, sizeof(&lque), flag, MAP_SHARED, fd, 0)) == MAP_FAILED)
+	{
+		perror("mmap error");
+		exit(1);
+	}
+	else
+	{
+		printf("Success\n");
+	}
+	while(1)
+	{
+		record_lock(fd);
+		printf("%d : %d\n", lque->number, lque->idx);
+		if (lque->number == 5)
+		{
+			printf("Wait\n");
+			if(semop(semid, &mysem_open, 1) == -1)
+			{
+        		perror("semop error ");
+				exit(0);
+			}
+			printf("OK\n");
+			semop(semid, &mysem_close, 1);
+		}
+		record_unlock(fd);
+		getchar();
+	}
+}
+
+
+int record_lock(int fd)
+{
+	struct flock lock; 
+	lock.l_type = F_WRLCK;
+	lock.l_start = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len = 1;
+	return fcntl(fd, F_SETLKW, &lock);
+}
+
+int record_unlock(int fd)
+{
+	struct flock lock; 
+	lock.l_type = F_UNLCK;
+	lock.l_start = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len = 1;
+	return fcntl(fd, F_SETLK, &lock);
+}
+
+}}}
+
+=== mmap와 파일 I/O와의 성능 비교 ===
+
+=== 참고문헌 ===
+ 1. [http://developers.sun.com/solaris/articles/read_mmap.html A Performance Comparison of "read" and "mmap"] 
+ 1. [wiki:Site/system_programing/Book_LSP/ch08_IPC 리눅스 시스템 프로그래밍 8장 IPC]
+ 1. mmap(2) man page
+@

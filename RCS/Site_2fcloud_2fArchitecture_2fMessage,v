@@ -1,0 +1,101 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.07.20.16.48.34;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.07.18.16.07.07;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fArchitecture_2fMessage
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title 간단한 Message platform을 만들어 보자.
+
+<!> 미완성
+== 소개 ==
+Twitter와 같은 메시지 플렛폼을 만들어보려고 한다. 클라우드관련 업무를 하다보니, 메시지 플렛폼의 필요성을 체감한다. 급하게 SQS 같은 플렛폼을 사용할 수 있긴 하겠는데, 제대로 사용하려면 플렛폼을 한번 그려봐야지 싶다. 언젠가는 메세지 플렛폼이 필요할 것 같은 느낌도 강하게 들고 
+
+== 기능 ==
+우선은 메시지를 주고 받는 최소한의 기능만을 가진 간단한 platform을 만든다음, 이를 확장하기 위한 구성을 그려보려고 한다. 파일을 저장 그런거 없다.
+
+== 개발 환경 ==
+=== virtualbox ===
+AWS에서 구성하고 싶지만, 돈 들어간다. 신규고객에 한하여 [http://aws.amazon.com/ko/free/ free tier]서비스를 제공하긴 하지만, 가입일로 부터 12개월 동안만 제공되는 거라서 역시 기분이 썩 좋지 않다. 그냥 [wiki:Site/cloud/virtualbox virtualbox]로 구성하기로 했다.  
+
+=== rabbitmq ===
+다양한 종류의 message queue가 있겠는데, 간단하게라도 사용해본 rabbitmq를 선택했다.
+
+=== Sinatra ===
+Message API를 제공할 프레임워크로는 경량 웹 프레임워크인 ruby [wiki:Site/Ruby/sinatra sinatra]를 사용하기로 했다. 웹서버로 thin을 붙이고, monk로 프레임워크 스택을 만들었다. 
+
+=== Mysql ===
+유저에게 전송된 메시지를 저장할 메시지 박스가 있어야 겠는데, Mysql로 구현하기로 했다. 
+
+== 구성도 ==
+대략 구성은 이렇다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1QIdDlCGj9jnnKKGLHT67qkYHdXKvKsXWBP5OR2hZ4io/pub?w=972&amp;h=156">
+}}}
+  1. 유저는 Send API를 이용해서 메시지를 보낸다. 
+  1. 메시지는 message queue에 쌓인다. 
+  1. Message router는 message queue로 부터 메시지를 꺼낸 다음, 유저의 '''message box'''에 쌓는다. 
+  1. 마침내 유저는 Read API를 이용해서 자신에게 전달된 메시지를 읽는다. 
+유저는 POST 방식으로 JSON 형식의 메시지를 보낸다. 이 메시지에는 보낸 사람과 받을 사람 그리고 text를 포함한다. 대략 아래와 같은 형식이다. 
+{{{#!plain
+{
+  "From":"user-01",
+  "To":"user-02",
+  "Text":"Hello world!"
+}
+}}}
+
+=== 시스템 구성 ===
+VirtualBox로 시스템을 구성한다. 모두 우분투 리눅스 13.04를 기반으로 한다.
+  * API Server 
+    * Sinatra를 올린다. Send API와 Read API함께 올린다. Read API는 유저의 요청을 받으면 Mysql 데이터베이스로 부터 최근 메시지를 읽어온다.  
+  * Message queue server : RabbitMq를 올린다. 
+  * Message router : RabbitMq에서 메시지를 읽은 다음, Mysql 데이터베이스에 쓴다. 즉 Message box 역할 까지 한다. 
+대략 이러하다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1L7WJcnePo76UkgVXGZB_vZjBUDfJ0UF5c-xY3KKzP5g/pub?w=620&amp;h=335">
+}}}
+
+=== Message Box ===
+
+=== REST API === 
+==== Send API ====
+==== Read API ==== 
+
+=== Router ===
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d20 3
+d42 17
+d60 1
+@

@@ -1,0 +1,274 @@
+#title Ruby 자료구조
+
+[[TableOfContents]]
+== Array ==
+변수는 프로그래밍에 필수 요소이지만, 변수만으로는 실제 사용할만한 프로그램을 개발하기가 쉽지 않다. 그래서 현대적인 (모든) 프로그래밍 언어는 데이터를 구조화 하고, 추상화 하기 위한 여러가지 방법들을 제공한다. 
+
+배열(Array)는 가장 널리 알려진, 그리고 가장 오래된 간단한 자료구조로 Shell에서 부터 C, Java, python, scala까지 모든 언어에서 제공하는 기본적인 자료구조다.     
+
+최근에는 Array와 비슷하지만 좀 더 다루기 쉽고 강력한 [wiki:man/12/hash hash]를 제공하는 프로그래밍 언어들이 많다. 인덱스를 기반으로 데이터 아이템의 모음을 제공한다는 측면에서 배열과 비슷하지만, integer외에 다른 객체들을 인덱스로 할 수 있다는 점에서 차이가 있다.   
+
+awefawefawef
+=== Array의 사용 ===
+루비의 배열도 다른 언어의 배열과 마찬가지로 interger 값으로 원소에 접근할 수 있으며 (C언어등과 마찬가지로) 0부터 시작한다. 
+
+루비의 배열은 동적이다. 크기 지정없이 배열을 만들 수 있으며, 만든 후에 크기를 지정할 수 있다. 또한 크기를 알아서 늘려주기 때문에 배열공간을 관리하기 위한 고민도 필요 없다. 배열자체가 객체로 스스로 배열의 길이와 이터레이터등을 관리해준다. 사용하기 편하다는 이야기다. 게다가 배열에 다양한 데이터 유형을 저장할 수 있다.
+
+==== 배열 생성과 초기화 ====
+특수 클래스 메서드인 ![!]로 배열을 만들 수 있다. 배열의 값들은 버켓안에 표현된다. 다음은 배열을 만드는 다양한 방법들을 보여준다.
+{{{#!plain
+a = Array.[](1,2,3,4)
+b = Array[1,2,3,4]
+c = [1,2,3,4]
+}}}
+
+배열도 클래스인 만큼 new 메서드로 배열을 만들 수도 있다. 하나 이상의 매개변수를 사용할 수 있는데, 첫번째 매개 변수는 배열의 크기이고, 두번째 매개변수는 배열의 내용을 초기화할 값이다. 
+{{{#!plain
+d = Array.new           # 빈 배열을 만든다.
+e = Array.new(3)        # [nil, nil, nil]
+f = Array.new(3, 'abc') # ["abc", "abc", "abc"]
+}}}
+
+==== 배열에 접근하기 ====
+클래스 메서드인 ![!]로 배열의 값을 읽을 수 있으며, ![!]= 로 배열에 값을 저장할 수 있다. 인덱스는 보통 0부터 시작한다. 가장 앞쪽에 있는 값이 0으로 1씩 증가한다. 기타 범위 접근을 이용해서, 일정 범위의 값을 읽어오고나 치환하는 등의 작업을 할 수 있다. 
+
+인덱스에 음의정수를 사용할 수 있는데, 뒤에서 부터 시작한다. -1은 배열의 가장 뒤를 가리킨다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1dXqVukPhqYpBFdngWsTOsWlK8GykjiS74cXWQZH4pM8/pub?w=331&amp;h=158">
+}}}
+
+{{{#!plain
+a = [1, 2, 3, 4, 5, 6]
+b = a[0]          # 1
+c = a.at(0)       # 1
+d = a[-2]         # 5
+e = a.at(-2)      # 5
+f = a[9]          # nil
+g = a.at(9)       # nil
+h = a[3,3]        # [4, 5, 6]
+i = a[2..4]       # [3, 4, 5]
+j = a[2...4]      # [3, 4]
+
+a[1] = 8                 # [1, 8, 3, 4, 5, 6]
+a[1,3] = [10, 20, 30]    # [1, 10, 20, 30, 5, 6]
+a[0..3] = [2, 4, 6, 8]   # [2, 4, 6, 8, 5, 6]
+a[-1] = 12               # [2, 4, 6, 8, 5, 12]
+}}}
+
+현재 배열의 크기보다 더 큰 위치에 값을 삽입할 수도 있는데, 이 경우 배열의 크기는 자동으로 조정된다. 값이 지정되지 않은 인덱스에는 자동으로 '''nil'''이 삽입된다. 
+{{{#!plain
+a = [1, 2, 3, 4, 5, 6]
+a[8] = 8    # [1, 2, 3, 4, 5, 6, nil, nil, 8]
+}}}
+
+".."를 이용해서 배열의 중간에 값을 추가할 경우에도 배열의 크기가 자동으로 절된다.
+{{{#!plain
+a = [1, 2, 3, 4]
+a[1..2] = [5, 6, 7] # [1, 5, 6, 7, 4]
+}}}
+
+'''slice'''[[FootNote(slice는 베다라는 의미이니, 배열의 특정 범위를 베어서 값을 가져온다라고 설명하는게 쉬울 것 같기는 하다. 아니면 메서드 이름을 바꾸던지. 좀 헛갈린다.)]] 메서드를 이용해서, 인덱스가 가리키는 범위의 값에 접근할 수도 있다.
+{{{#1plain
+x = [0, 2, 4, 6, 8, 10, 12]
+a = x.slice(2)        # 4
+b = x.slice(2,4)       # [4, 6, 8, 10]
+c = x.slice(2..4)      # [4, 6, 8]
+}}}
+
+=== 배열 크기 ===
+length와 size 메서드로 배열의 크기를 알아낼 수 있다. 
+{{{#!plain
+x = ["a", "b", "c", "d"]
+a = x.length        # 4
+b = x.size         # 4
+}}}
+
+=== 배열 비교 ===
+배열의 비교는 문자열 비교나 숫자 비교와 달리 예상하기가 좀 힘들기 때문에, 사용에 주의를 기울여야 한다.
+
+우선 배열은 "elementwise" 방식으로 비교한다. 즉 동일하지 않은 첫번째 배열 요소의 비교 결과가 전체 배열의 비교 결과를 결정한다. 아래의 예제를 보자.
+{{{#!plain
+a = [1, 2, 3, 9, 9]
+b = [1, 2, 4, 1, 1]
+c = a <=> b    # -1
+}}}
+배열 a와 b에서 동일하지 않는 값은 3,4 이고 3은 4보다 작다. 이 비교가 배열 비교의 결과를 결정한다. 즉 뒤의 값들과는 상관없이 배열 a는 배열 b 보다 작다.
+
+비교하는 배열의 모든 원소가 같으면 두 배열은 같은 것으로 결정된다. 
+{{{#!plain
+d = [1, 2, 3]
+e = [1, 2, 3, 4]
+f = [1, 2, 3]
+if d == f
+ puts "d equals f"  # Prints "d equals f"
+end
+}}}
+
+=== 배열 정렬 ===
+배열을 정렬하는 가장 간단한 방법은 내장된 '''sort''' 메서드를 사용하는 거다.
+{{{#!plain
+words = %w(the quick brown fox)
+list = words.sort # ["brown", "fox", "quick", "the"]
+# Or sort in place:
+words.sort!    # ["brown", "fox", "quick", "the"]
+}}}
+
+이 메서드는 배열의 모든 요소가 동일한 자료형일 거라고 가장한다. 예컨데 ![1,2,"three",4!] 같은 mixed 배열에 [wiki:Site/Database/algorithm sort]를 적용하면 '''type error'''가 발생한다.
+
+이런 경우에는 block를 이용해서 배열의 요소들을 동일한 자료형으로 변환해서 비교해야 한다. 예를 들어 integer와 string으로 구성된 배열이라면, integer를 string으로 변환한뒤 비교해야 한다. 데이터 타입이 따라 다르겠지만 썩 믿음직 스럽지는 않은 방법이다. 
+{{{#!plain
+a = [1, 2, "three", "four", 5, 6]
+b = a.sort {|x,y| x.to_s <=> y.to_s}
+# b is now [1, 2, 5, 6, "four", "three"]
+}}}
+
+block을 이용한 방법은 다른 응용이 가능하다. 예를 들어 다음과 같이 역으로 정렬할 수 있다. C++의 [wiki:Site/C++/STL STL]을 다뤄봤다면 꽤나 익숙한 코드일테다.
+{{{#!plain
+x = [1, 4, 3, 5, 2]
+y = x.sort {|a,b| b <=> a}  # [5, 4, 3, 2, 1]
+}}}
+
+아래는 block를 이용한 복잡스러운 예제다. 영화 제목을 정렬하는 코드인데, A와 the 같은 관사를 정렬에서 제외하고, 대소문자 구분을 하지 않고 정렬하는 코드다. 
+{{{#!plain
+titles = ["Starship Troopers", 
+    "A Star is Born", 
+    "Star Wars",    
+    "Star 69", 
+    "The Starr Report"]
+sorted = titles.sort do |x,y|
+    # Delete leading articles
+    a = x.sub(/^(a |an |the )/i, "")
+    b = y.sub(/^(a |an |the )/i, "")
+    # Delete spaces and punctuation
+    a.delete!(" .,-?!")
+    b.delete!(" .,-?!")
+    # Convert to uppercase
+    a.upcase!
+    b.upcase!
+    # Compare a and b
+    a <=> b
+end
+# 결과
+# ["Star 69", "A Star is Born", "The Starr Report",
+#  "Starship Troopers", "Star Wars"]
+}}}
+
+=== 조건에 의한 배열에서의 선택 ===
+때때로 sql에서 처럼, 배열에서 조건에 맞는 값을 찾기를 원할 때도 있다. C 같은 언어였다면, 배열을 순환하면서 조건에 맞는지 검사해서 리턴하는 함수를 만들었을 거다. 루비는 좀더 깔끔한 방법을 지원한다.      
+{{{#!plain
+x = [5, 8, 12, 9, 4, 30]
+# Find the first multiple of 6
+x.detect {|e| e % 6 == 0 }     # 12
+# Find the first multiple of 7
+x.detect {|e| e % 7 == 0 }     # nil
+}}}
+배열이 다양한 데이터타입을 포함하고 있다면, 블럭문이 복잡해질 것이다. 
+
+find 메서드는 detect와 같은 일을 한다. find_all 은 일치하는 모든 값을 배열로 반환한다. find_all과 같은일을 하는 메서드로 select가 있다.  
+{{{#!plain
+x.find {|e| e % 2 == 0}      # 8
+x.find_all {|e| e % 2 == 0}    # [8, 12, 4, 30]
+x.select {|e| e % 2 == 0}     # [8, 12, 4, 30]
+}}}
+
+grep 메서드는 패턴을 이용해서 각 요소가 일치하는지를 검사한다. 
+{{{#!plain
+a = %w[bus a01 b01 a01d world]
+a.grep(/[a-z][0-9]+$/)   # ["a01, "b01"]
+b = [1, 20, 5, 7, 13, 33, 15, 28]
+b.grep(12..24)   # [20, 13, 15]
+}}}
+일치하는 요소들에 대해서는 block 문을 이용해서 연산을 적용할 수도 있다.
+{{{#!plain
+a = %w[bus a01 b0567841 a01d world]
+b = [1, 20, 5, 7, 13, 33, 15, 28]
+a.grep(/[a-z][0-9]+$/) do | m |
+    puts "Type : #{m[0]}"    # a, b 
+    puts "Serial Number : #{m[1..-1]}" # 01, 0567841
+end
+b.grep(12..24) {|n| n*n}     # {400, 169, 225}
+}}}
+
+'''regect''' 메서드는 '''select'''와 반대의 일을 한다. 즉 조건과 일치하는 값을 제외하는 일을 한다. 조건과 일치하면 false, 다르면 true를 반환한다.
+{{{#!plain
+c = [5, 8, 12, 9, 4, 30]
+d = c.reject {|e| e % 2 == 0}  # [5, 9]
+c.reject! {|e| e % 3 == 0}
+}}}
+
+'''min''', '''max''' 메서드를 이용해서 배열의 최소값과 최대값을 찾을 수 있다. 물론 블럭문을 이용해서 min, max를 재정의해서 사용할 수 있다. 
+{{{#!plain
+a = %w[Elrond Galadriel Aragorn Saruman Legolas]
+b = a.min                 # "Aragorn"
+c = a.max                 # "Saruman"
+d = a.min {|x,y| x.reverse <=> y.reverse} # "Elrond"
+e = a.max {|x,y| x.reverse <=> y.reverse} # "Legolas"
+}}}
+
+'''index'''로 찾은 메서드의 인덱스 위치를 알 수도 있다.
+{{{#!plain
+a = %w[Elrond Galadriel Aragorn Saruman Legolas]
+i = a.index a.min   # 2
+j = a.index a.max   # 3
+}}}
+
+=== Using Specialized Indexing Functions === 
+루비는 내부적으로 인덱스 함수를 호출해서 배열의 인덱스를 처리한다. 따라서 이들 메서드들을 override 해서, 자신이 원하는 방식으로 처리할 수 있다. 
+
+{{{#!plain
+class Array2 < Array
+    def [](index)
+        if index > 0
+            super(index - 1)
+        else
+            raise IndexError
+        end
+    end
+
+    def []=(index,obj)
+        if index > 0
+            super(index-1,obj)
+        else
+            raise IndexError
+        end
+    end
+end
+
+x = Array2.new
+x[1] = 5
+x[2] = 3
+x[0] = 1 # error
+x[-1] = 1 # error
+}}}
+Array의 인덱스 메서드를 수정했다. 인덱스 번호를 1번부터 시작하게 했으며, 1보다 작은 수를 인덱스 번호로 사용할 수 없게 했다. 
+
+=== 배열간의 set 연산 ===
+
+=== 배열값을 랜덤하게 섞기 ===
+
+=== 다차원 배열 ===
+
+=== 배열값 변환 ===
+
+=== 배열에서 nil 제거하기 ===
+
+=== 배열에 배열 붙이기  ===
+
+=== 배열로 Stack Queue 구현 ===
+
+=== 배열 순환 ===
+
+=== 배열의 값을 하나의 문자열로 합치기 ===
+
+=== 배열의 값을 뒤집기 ===
+
+=== 중복값 제거 ===
+
+=== Synchronized Sorting of Multiple Arrays ===
+
+=== Establishing a Default Value for New Array Elements ===
+
+== 참고 ==
+ * http://www.informit.com/articles/article.aspx?p=26943
+ * http://ruby-doc.org/core-2.0/Array.html

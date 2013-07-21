@@ -1,16 +1,34 @@
 #title Sequel - 루비언어를 위한 데이터베이스 툴킷 
 
-== sequel ==
-데이터 베이스 애플리케이션 개발은 C나 PHP에서 직접 mysql, postgresql API를 호출하는 방식으로 해왔기 때문에, ORM(Object-relational mapping)은 나에게 생소하다. 예컨데 나는 PHP나 C에서 persistence layer를 처리하는 Model 1 방식만을 경험한 셈이다. ORM은 데이터베이스 Model 3로 iBatis, Hibernat와 같은 persistence 담당하는 프레임워크를 이용해서 데이터 베이스를 처리하는 방식이다. 객체지향적인 프로그래밍이 가능하다라는 장점이 있는 반면, 프레임워크를 배워야 한다는 단점이 있다.
+[[TableOfContents]]
+== sequel에 대하여 ==
+데이터 베이스 애플리케이션 개발은 C나 PHP에서 직접 mysql, postgresql API를 호출하는 방식으로 해왔기 때문에, ORM(Object-relational mapping)은 나에게 생소하다. 예컨데 나는 PHP나 C에서 persistence layer를 처리하는 Model-1 방식만을 경험한 셈이다. ORM은 데이터베이스 Model-3로 iBatis, Hibernat와 같은 persistence 담당하는 프레임워크를 이용해서 데이터 베이스를 처리하는 방식이다. 
 
-sequel은 루비언어를 위한 데이터베이스 툴킷으로 ORM 레이어를 포함하고 있다. 전공분야는 아니지만 이왕 sinatra를 하게 된거, 배워두면 쓸모가 있겠다 싶어서 간단히 살펴보기로 했다.     
+sequel은 루비언어를 위한 데이터베이스 툴킷으로 ORM 레이어를 포함하고 있다. 전공분야는 아니지만 이왕 sinatra를 하게 된거, 배워두면 쓸모가 있겠다 싶어서 간단히 살펴보기로 했다.
+
+=== Sequel의 기능들 ===
+  * Sequel은 thread safe 하며, connection pooling과 SQL 쿼리, 테이블 스키마를 위한 간결한 '''DSL'''을 제공한다. 
+  * Sequel은 루비 객체에 레코드를 맵핑하고, 관련 레코드를 처리하기 위한 완전한 ORM 레이어를 가지고 있다.   
+  * Sequel은 prepared statement, bound variables, stored procedures, 트랜잭션 isolation, savepoint, slave/master 설정, 데이터베이스 sharding과 같은 진보된 데이터베이스 기능을 지원한다. 
+  * Sequel은 ADO, Amalgalite, CUBRID, DataObjects, DB2, DBI, Firebird, IBM_DB, Infomix, JDBC, MySQL, Mysql2, ODBC, OpenBase, Oracle, postgrSQL, SQLite3, Swift[[FootNote(Object storage의 그 swift인가? 한번 확인해 봐야 겠다.), TinyTDS를 지원한다.    
+=== ORM의 장점과 단점 ===
+장점
+  * 생산성 향상 : 반복적인 (그리고 익숙하지 않은)sql문을 사용할 필요가 없다. 
+  * 개발시간 단축 
+  * 특정 DBMS 벤더에 종속되지 않는다. 일반적으로 ORM은 DBMS 벤더에 종속적이지 않다. 
+단점
+  * ORM을 새로 배워야 한다.
+  * 실제 코드가 하는 일이 무언지 이해하지 못할 수 있다. 개발자는 SQL을 사용할 때 보다, 프로그램 코드에 대한 제어권을 잃어 버리게 된다.
+  * ORM은 느린 경향이 있다. 
 
 === 지원 데이터베이스 ===
-ADO, Amalgalite, CUBRID, DataObjects, DB2, DBI, Firebird, IBM_DB, Informix, JDBC, MySQL, Mysql2, ODBC, OpenBase, Oracle, PostgreSQL, SQLite, Swift, TinyTDS 많이도 지원한다. 이중에서 다뤄본 DB는 MySQL, Oracle, SQLite, PostgreSQL 정도.  
+ADO, Amalgalite, CUBRID, DataObjects, DB2, DBI, Firebird, IBM_DB, Informix, JDBC, MySQL, Mysql2, ODBC, OpenBase, Oracle, PostgreSQL, SQLite, Swift, TinyTDS 많이도 지원한다. 이중에서 다뤄본 DB는 MySQL, Oracle, SQLite, PostgreSQL 정도. 
 
 === 설치 ===
 {{{#!plain
 # gem install sequel
+# gem install ruby-mysql
+# gem install sqlite3
 }}}
 
 === 예제 - 1 ===
@@ -40,19 +58,231 @@ puts "Item count: #{items.count}"
 puts "The average price is: #{items.avg(:price)}"
 }}}
 
-=== sinatra 에서 사용 ===
-  * Sinatra 웹 프레임워크에서 사용해 보려한다. 주소록이나 만들어 볼 생각이다. 
+== sequel 사용 ==
+=== Cheat sheet ===
+기본적인 사용법 위주로 살펴본다. 테스트를 위해서 mysql과 sqlite3를 사용했다. 테스트를 위해서 mysql과 sqlite gem을 설치하자.
+{{{#!plain
+# gem install ruby-mysql  
+# gem install sqlite3
+# gem install pg
+}}}
 
-== 문서 정리 ==
-음 공부해야할 문서들이 많군. 쩝.
-  * Databases
-    * Connection a Database 
-    * Database Transactions
-    * Schema Modification
-    * Master/Slave Databases and Sharding
-  * Dataset
-  * Models
-    * Reflection
-    * Thread Safety
-    * Testing With Sequel
-  * Migrations
+==== 데이터베이스 열기 ====
+{{{#!plin
+require 'sequel'
+
+# sqlite에 연결
+DB = Sequel.sqlite('test.db')
+
+# mysql db에 연결
+DB = Sequel.connect('mysql://user:password@127.0.0.1/test') 
+
+# postgres db에 연결
+DB = Sequel.connect('postgres://postgres:password@localhost/test')
+
+# 이렇게 연결할 수도 있다.
+DB = Sequel.postgres('test', :user=>'postgres', :password=>'password', :host => 'localhost')
+}}}
+
+==== SQLite 인 메모리 데이터베이스 ====
+SQLite는 메모리에 데이터베이스를 올릴 수 있다. 빠르긴 하지만 persistency하지 않다. 연결을 끊으면, 메모리의 데이터도 날아가 버린다. 매개변수없이 만들면, 메모리에 데이터베이스를 올릴 수 있다. 
+{{{#!plain
+DB = Sequel.sqlite
+}}}
+
+==== RAW SQL 구문 사용 ====
+{{{#!plain
+DB = Sequel.connect('mysql://root:password@127.0.0.1/test')
+DB.run "CREATE TABLE users (name VARCHAR(255) NOT NULL, age INT NOT NULL)
+DB.run "INSERT INTO users VALUES ('yundream', '30')"
+}}}
+
+==== Insert rows ====
+{{{#!plain
+DB = Sequel.connect('mysql://root:password@127.0.0.1/test')
+
+dataset = DB[:users]
+dataset.insert(:name => 'abcdef', :age => 39)
+}}}
+
+==== Retrieve rows ====
+{{{#!plain
+dataset = DB[:users]
+dataset.each do | r |
+    puts r
+end
+dataset.all # => [{...}, {...}, ...]
+dataset.first # => {...}
+}}}
+
+==== Filtering ====
+===== 같은 값 찾기 =====
+{{{#!plain
+dataset = DB[:users]
+# SELECT * FROM users WHERE name = 'yundream'
+dataset.where(:name => 'yundream').each do |row|
+    puts "#{row[:name]}: #{row[:age]}"
+end
+}}}
+===== 크거나 작은 값 찾기 =====
+{{{#!plain
+dataset.where{age > 35}.each do | row |
+    puts "#{row[:name]}: #{row[:age]}"
+end
+}}}
+
+===== 포함하는 값 찾기 =====
+{{{#!plain
+# SELECT * FROM users WHERE age >= 35 and age <= 40 
+dataset.where(:age => 35..40).each do | row |
+    puts "#{row[:name]}: #{row[:age]}"
+end
+
+# SELECT * FROM users WHERE age = 45 or age = 43
+dataset.where(:age => [45, 43]).each do | row |
+    puts "#{row[:name]}: #{row[:age]}"
+end
+
+dataset.where(:id=>other_dataset.select(:other_id))
+}}}
+
+==== Ordering ====
+{{{#!plain
+# SELECT * FROM users ORDER BY name  
+dataset.order(:name).each do | row |
+    puts row[:name]
+end
+
+# SELECT * FROM users ORDER BY name DESC 
+dataset.reverse_order(:name).each do | row |
+    puts row[:name]
+end
+}}}
+
+==== Limit / Offset ====
+{{{#!plain
+# SELECT * FROM users WHERE age >= 35 and age <= 40 limit 10
+dataset.where(:age => 35..40).limit(10).each do | row |
+    puts "#{row[:name]}: #{row[:age]}"
+end
+
+# SELECT * FROM users WHERE age >= 35 and age <= 40 limit 10,5
+dataset.where(:age => 35..40).limit(10,5).each do | row |
+    puts "#{row[:name]}: #{row[:age]}"
+end
+}}}
+
+==== Join ====
+Join 예제를 위해 2개의 테이블을 만들었다.
+
+{{{#!html
+<table><tr valign=top><td>
+}}}
+|||| Employee 테이블         ||
+|| LastName  || DepartmentID ||
+|| Rafferty  || 31           ||
+|| Jones     || 33           ||
+|| Steinberg || 33           ||
+|| Robinson  || 34           ||
+|| Smith     || 34           ||
+|| John      || NULL         ||
+{{{#!html
+</td><td>
+}}}
+|||| Department 테이블      ||
+|| 31             || 영업부 ||
+|| 33             || 기술부 ||
+|| 34             || 사무부 ||
+|| 35             || 마케팅 ||
+{{{#!html
+</td></tr></table>
+}}}
+
+INNER Join을 수행했다.
+{{{#!plain
+DB = Sequel.connect('mysql://root:password@127.0.0.1/test')
+
+# SELECT * FROM `employee` INNER JOIN `department` 
+#    ON (`department`.`DepartmentID` = `employee`.`DepartmentID`);
+dataset = DB[:employee].join(:department, :DepartmentID => :DepartmentID)
+dataset.each do | row |
+    puts "#{row[:LastName]} : #{row[:DepartmentName]}"
+end
+# 결과
+# afferty : 영업부
+# Jones : 기술부
+# Steinberg : 기술부
+# Robinson : 사무부
+# Smith : 사무부
+}}}
+==== Aggregate functions methods ====
+{{{#!plain
+dataset = DB[:users]
+puts dataset.max(:age)
+puts dataset.min(:age)
+puts dataset.avg(:age)
+puts dataset.sum(:age)
+}}}
+
+==== Update/Delete ====
+{{{#!plain
+# UPDATE users SET age = age + 1;
+dataset = DB[:users]
+dataset.update(:age => :age + 1)
+
+# DELETE FROM users WHERE name = 'yundream'
+dataset.where(:name => 'yundream').delete
+}}}
+
+==== Schema Manipulation ====
+{{{#!plain
+DB.create_table :categories do
+  primary_key :id
+  String :name
+end
+
+DB.create_table :mytest do
+  primary_key :id
+  String :name, :unique => true, :null => false
+  TrueClass :active, :default => true
+  foreign_key :category_id, :categories
+  DateTime :created_at
+  index :created_at
+end
+
+DB.drop_table mytest
+
+DB.create_table :address do
+  String :zipcode
+  enum :system, :elements => ['mac', 'linux', 'windows']
+end
+}}}
+
+==== Aliasing ====
+{{{#!plain
+# SELECT name AS user_name FROM users
+dataset.select(Sequel.as(:name, :user_name)).each do |row|
+    pp row
+end
+}}}
+
+==== Transactions ====
+{{{#!plain
+DB.transaction do
+    dataset.insert(:name => 'sang.yun', :age => 35)
+    dataset.insert(:name => 'kong.kim', :age => 34)
+end
+# 두개 모두 insert되거나 두개 모두 실패하한다. (All or nothing) 
+}}}
+
+{{{#!plain
+DB.transaction do
+  raise "some error occurred"
+end # 에러가 발생하면 롤백 
+}}}
+
+== 참고 ==
+ * http://sequel.rubyforge.org/rdoc/files/doc/cheat_sheet_rdoc.html
+ * [wiki:Site/Ruby/sinatra/MakeAPIServer Sinatra로 API server 만들기]
+ * http://bloodyguy.tistory.com/category/Develop/ORM
+ * http://stackoverflow.com/questions/4667906/the-advantages-and-disadvantages-of-using-orm

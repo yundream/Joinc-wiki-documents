@@ -1,0 +1,75 @@
+#title Ruby iconv 변환
+
+== iconv ==
+테스트 환경
+  * Ubuntu 13.04
+  * Ruby 1.9.3 
+
+=== iconv gem 설치 ===
+{{{#!plain
+# gem install iconv
+}}}
+ruby-dev 패키지가 설치돼 있지 않다면, gem install 중 아래와 같은 에러가 발생한다. 
+{{{#!plain
+# gem install iconv
+Building native extensions.  This could take a while...
+ERROR:  Error installing iconv:
+        ERROR: Failed to build gem native extension.
+
+        /usr/bin/ruby1.9.1 extconf.rb
+/usr/lib/ruby/1.9.1/rubygems/custom_require.rb:36:in `require': cannot load such file -- mkmf (LoadError)
+        from /usr/lib/ruby/1.9.1/rubygems/custom_require.rb:36:in `require'
+        from extconf.rb:1:in `<main>'
+
+
+Gem files will remain installed in /var/lib/gems/1.9.1/gems/iconv-1.0.3 for inspection.
+}}}
+
+ruby-dev를 설치하면 된다.
+{{{#!plain
+# apt-get install ruby-dev
+}}}
+
+== iconv 사용 ==
+iconv의 사용방법이다.
+{{{#!plain
+Iconv.iconv("dst_encoding", "src_encoding", string)
+}}}
+아래는 EUC-KR문자열을 UTF-8로 변환 예제다.
+{{{#!plain
+Iconv.iconv("UTF-8", "EUC-KR", mystring)
+}}}
+
+== string.encode 의 사용 == 
+문자셋 변환을 위해 간단한 코드를 만들어서 테스트를 돌렸다.
+{{{#!plain
+# -*- coding: utf-8 -*
+require 'iconv'
+
+conv1 = Iconv.new('EUC-KR', 'UTF-8')
+conv2 = Iconv.new('UTF-8', 'EUC-KR')
+
+str = conv1.iconv("안녕")
+puts conv2.iconv(str)
+}}}
+UTF-8을 EUC-KR로 변환하고, 다시 UTF-8로 변환하는 방식으로 테스트했다. (당연히)변환은 문제 없이 잘된다. 그런데 스크립트를 실행하자 다음과 같은 경고메시지를 출력했다. 
+{{{#!plain
+$ ./iconv.rb 
+/usr/lib/ruby/1.9.1/rubygems/custom_require.rb:36:in `require': iconv will be deprecated in the future, use String#encode instead.
+안녕
+}}}
+iconv 대신에 String.encode를 사용하란 말씀이다. ruby는 1.9.x 버전부터 사용와서 잘 모르는데, 아마도 1.9.x가 되면서 String 클래스에서 문자셋 변환 메서드를 기본으로 포함하는 것 같다.   
+
+String.encode를 사용하도록 코드를 수정했다.
+{{{#!plain
+# -*- coding: utf-8 -*
+
+str= "안녕".encode('EUC-KR', 'UTF-8')
+puts str.encode('UTF-8', 'EUC-KR')
+}}}
+잘 된다. 
+
+앞으로는 그냥 String.encode를 사용해야 겠다. 
+
+== 히스토리 ==
+  * 작성일 : [[Date(2013-07-10T07:43:20)]]

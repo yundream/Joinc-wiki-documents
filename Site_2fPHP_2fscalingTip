@@ -1,0 +1,43 @@
+#title 5 Rockin' Tips For Scaling PHP To 30,000 Concurrent Users Per Server
+
+ * 번역해야지
+ * [http://http://www.linuxjournal.com/content/speed-your-web-site-varnish Varnish] 살펴봐야겠다.
+=== 동접 30,000 유저를 처리하기 위한 PHP 서버 구성 팀 ===
+[[Date(2013-07-10T02:51:34)]]
+
+RockThePost.com의 CTO는 AWS EC2 환경에서 대량의 동접 유저를 효율적으로 처리하기 위한 경험을 공유했다.
+
+그들의 서비스는 아래의 구조를 가지고 있다. 
+ * PHP's Zend Framework 2
+ * 웹 서버를 위한 (단지)두개의 m1.medium 
+ * 로드를 분산하기 위한 ELB
+ * MySQL 데이터베이스는 master/slave로 구성
+ * Siege for load testing
+
+30,000명의 동접 유저를 처리하기 위한 합리적인 팁 :
+ * '''PHP의 APC 기능 사용'''. APC는 opcode(PHP의 바이트코드)를 캐쉬하는 기능이다. 웹 사이트 성능을 올리기 위해서 가장 먼저 해야 하는 작업. 
+ * '''PHP 파일이 아닌 파일은 CDN에 넣는다'''. 웹 서버에 정적파일을 두지말라. 정적파일은 모두 S3에 넣은 다음 CloudFront로 서비스 한다. 
+ * '''Don't make connections to other servers in your PHP code.''' Making connections to other servers blocks the server and slows down processing. Use the APC key/value store for data storage and Varnish for caching full pages.
+ * '''Varnish cache를 사용하라.'''
+ * '''c1.xlarge 를 사용하라.''' c1.xlarge는 8개의 CPU로 로드를 분산할 수 있다. m1.medium은 단지 하나의 CPU만을 가지고 있다. 
+ * '''Pretty straightforward, yet good advice.''' The original article has many more details and is well worth reading.  
+
+=== PHP APC ===
+APC(Alternative PHP Cache)는 오픈소스 PHP 캐시 프레임워크다. PHP로 작성된 코드는 PHP가 해석할 수 있는 bytecode로 번역한 다음 실행을 한다. 이 과정은 PHP 코드를 호출할 때 마다 일어나는데, 상당히 많은 컴퓨팅 자원을 소모한다. 더 많은 시간을 소비하는건 파일로 된 PHP 코드를 디스크에서 읽는 작업이다. 
+APC는 바이트코드를 공유메모리에 저장하는 방식으로 PHP 코드가 효율적으로 작동하게 한다. 결과적으로 다음과 같은 이드을 얻는다.
+  1. 디스크에서 PHP 코드 파일을 읽는 시간을 줄이고, 
+  1. 바이트코드로 해석하는 과정을 제거한다.
+어느 정도의 성능향상이 있는지 언제 한번 테스트를 진행해봐야 겠다.
+
+=== Varnish ===
+Varnish는 웹 애플리케이션 성능을 높이기 위해서 사용하는 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] reverse proxy 형태의 캐싱(caching) 서버 소프트웨어다. 기존의 웹 서버와는 독립적으로 작동하기 때문에, 코드의 수정 없이 웹서버 앞단에 varnish를 놓는 것으로 웹 서비스의 성능을 개선할 수 있다.     
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/15TJctowgrYswU6Fqm2Vgxd9Zf893wtp3fxlHTHtanjQ/pub?w=811&amp;h=293">
+}}}
+=== 참고 ===
+  * [http://php.net/manual/en/book.apc.php Alternative PHP Cache] 
+  * [https://www.varnish-cache.org/ Varnish web application accelerator]
+  * [http://highscalability.com/blog/2013/7/3/5-rockin-tips-for-scaling-php-to-30000-concurrent-users-per.html 원문]
+  * [http://www.linuxjournal.com/content/speed-your-web-site-varnish Speed Up Your Web site with Varnish]
+  * [http://helloworld.naver.com/helloworld/352076 Varnish 이야기]

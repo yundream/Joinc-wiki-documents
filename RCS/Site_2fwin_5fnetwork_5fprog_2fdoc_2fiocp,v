@@ -1,0 +1,207 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.06.20.01.57.04;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fwin_5fnetwork_5fprog_2fdoc_2fiocp
+@
+
+
+1.1
+log
+@61.75.62.97;;Anonymous;;
+@
+text
+@#title IOCP - Input/Output Completion Port
+
+== IOCP에 대하여 ==
+IOCP는 Input/Ouptput Completion Port의 약자다. 입력과 출력의 완료를 담당할 포트를 지정해서 처리하겠다는 의미다. 입력과 출력의 완료시점에서의 통지는 overlapped(중첩 입출력)에서 처리가 되므로, 이 기술은 윈도의 중첩 입출력 기술을 확장시킨 것으로 볼 수 있다. 
+
+포트는 작업 혹은 서비스를 전담하기 위해서 만들어지는 객체다. 소켓의 포트가 특정 서비스로 데이터 입출력을 전달하기 위한 객체임을 상기하면 이해가 쉬울 것이다. 이러한 포트의 특징을 이해하면, 입출력 완료 시점에서 이에 대한 통지를 전담할 포트를 만들어서 데이터를 처리하는 방식도 충분히 생각해 볼 수 있을 것이다.
+
+{{{#!html
+<img src="http://docs.google.com/drawings/pub?id=1ed5_AbjMQ1vP4et5Qu7s0iNqizNvcNa1cUob7cNb520&w=484&h=497">
+}}}
+
+입출력 장치 (여기에서는 소켓으로 한정한다.)로 부터 입출력이 완료되면, 이 완료보고는 '''입출력 완료 대기열'''에 쌓인다. 그러면 스레드를 깨우게 되고, 스레드는 대기열에 있는 완료보고를 읽어서 데이터를 처리하는 식이다. 
+
+이 방식의 장점은 클라이언트가 연결 할 때 마다 스레드를 만드는 멀티 스레드 방식과 달리, 미리 스레드를 만들어서 입출력 완료 보고를 기다리도록 할 수 있다는 점이다. 이렇게 적당한 개수의 워커 스레드를 만들어 두면, 운영체제가 쉬고 있는 워커 스레드를 깨울 수 있다. 이 방식은 스레드 혹은 프로세스 풀과 비슷해 보이기도 하지만 차이가 있다. 일반적으로 스레드 풀 방식에서는 쉬고 있는 스레드에 작업을 할당하기가 수월하지 않다. 이렇게 하려면 몇 가지 까다로운 기법을 사용해야 하는데, IOCP는 개발자가 신경 쓸 필요 없이 운영체제(:12)가 알아서 스레드를 선택해서 깨운다.
+
+중첩 소켓 특징을 사용하므로, 가능하면 WSA 계열의 윈속(:12) 확장 함수로 데이터를 처리하는 것을 권장 한다.
+
+== IOCP 프로그래밍 ==
+IOCP 프로그램은 다음과 같은 과정을 거친다. 입력을 기준으로 설명한다.
+  1. 워커 스레드 생성 : 적당한 개수의 워커 스레드를 만든다.ㄴㅁㅇㄹㄴㅇ
+     1. 워커 스레드는 완료 보고 통지를 기다린다.
+  1. 소켓 생성 
+  1. accept 함수 호출 
+  1. 연결 되면, 소켓을 CP (Completion Port)에 할당한다.
+  1. WSARecv(:4100)함수를 호출한다. 소켓은 비동기, 중첩 소켓이다. 
+
+=== 워커 스레드 ===
+워커 스레드는 GetQueuedCompletionStatus(:4200)로 완료 통보를 기다린다. 이 함수는 OVERLAPPED(:12) 구조체를 되돌려 주는데, 이 구조체에서 정보를 토대로 데이터를 처리하면 된다.  
+
+=== 소켓을 CP에 할당하기 ===
+파일 관리 함수인 CreateIoCompletionPort(:4200)함수로 소켓을 CP에 할당할 수 있다. 이제 해당 소켓에 입출력 완료가 이루어지면 '''입출력 완료 대기열'''에 완료보고가 쌓이고, 워커 스레드들 중 하나가 깨어나서 작업을 처리한다.
+
+CreateCompletionPort 함수는 HANDLE을 등록시키는 함수이므로, 소켓의 경우 HANDLE로 형 변환 해서 사용해야 한다.
+
+=== 비동기 입출력 수행 ===
+WSA 계열 함수를 이용해서 (중첩)비동기 입출력을 수행한다. 이 내용은 [wiki:Site/win_network_prog/doc/overlapped 중첩 입출력 모델]문서를 참고하기 바란다. 
+
+
+== 예제 프로그램 ==
+클라이언트 연결 당 스레드를 만드는 방식이 아닌, 입력당 처리 스레드를 스케쥴링 하는 방식으로 매우 효율적으로 작동한다. 일반적으로 모든 운영체제를 통틀어 가장 효율적인 입출력 모델 중 하나로 인정하고 있다. 
+
+기본적인 흐름은 매우 단순하다. 실제, 프로그램 구성과 흐름만을 놓고 보면 WSAEventSelect(:4100), WSAAsyncSelect(:4100) 모델보다 더 간단하다. 때때로 작동방식을 이해하기 힘들다는 평가가 있기도 하지만 중첩 소켓의 특징을 이해한다면 크게 어렵다고 생각되지 않는다.
+
+워커 스레드를 먼저 만들어 놓고, 작업을 할당하는 것은 스레드 풀 등의 기술로 이미 응용 구현되어 있기도 하다. 스레드 풀에 대한 내용은 [wiki:Site/Thread/Advanced/ThreadPool 쓰레드 풀]문서를 참고하기 바란다. 참고 문서는 입력당 쓰레드 할당이 아닌, 연결당 쓰레드 할당으로 IOCP의 그것과는 약간의 차이가 있지만 원리를 이해하는 데에는 문제 없으리라 생각된다. IOCP 처럼 입력당 쓰레드 할당으로 하려면 약간의 수정이 있어야 한다.
+
+{{{#!plain
+#include <stdio.h>
+#include <winsock2.h>
+
+#define MAXLINE 1024
+
+// 소켓 정보 구조체 OVERLAPPED로 캐스팅 되어서 넘어간다.
+struct SocketInfo
+{
+	OVERLAPPED overlapped;
+	SOCKET fd;
+	char buf[MAXLINE];
+	int readn;
+	int writen;
+	WSABUF wsabuf;
+
+};
+
+HANDLE g_hIocp;
+
+// 워커 스레드 함수
+unsigned int WINAPI Thread_func(LPVOID parm)
+{
+	int readn;
+	int coKey;
+	int flags = 0;
+	OVERLAPPED *overlapped;
+	struct SocketInfo *sInfo;
+	while(1)
+	{   
+		// IOCP로부터 완료된 입출력 보고가 있는지 확인한다. 
+		GetQueuedCompletionStatus(g_hIocp, &readn, &coKey, (LPOVERLAPPED *)&overlapped, INFINITE);
+		sInfo = (struct SocketInfo *)coKey;
+		if(readn == 0)
+		{
+			printf("close socket %d\n", sInfo->fd);
+			closesocket(sInfo->fd);
+			free(sInfo);
+			continue;
+		}
+		memset(&(sInfo->overlapped), 0x00, sizeof(OVERLAPPED));
+		send(sInfo->fd, sInfo->wsabuf.buf, sInfo->wsabuf.len, 0);
+		WSARecv(sInfo->fd, &sInfo->wsabuf, 1, &readn, &flags, &sInfo->overlapped, NULL);
+	}
+}
+
+
+int main(int argc, char **argv)
+{
+	WSADATA wsaData;
+	struct sockaddr_in addr;
+	struct SocketInfo *sInfo;
+	SOCKET listen_fd, client_fd;
+	HANDLE hThread[10];
+	DWORD  ThreadArray[10];
+	int flags;
+	int readn, addrlen, i;
+
+	if (argc != 2)
+	{
+		printf("Usage : %s [port num]\n", argv[0]);
+		return 1;
+	}
+
+	if(WSAStartup(MAKEWORD(1,1), &wsaData) != 0)
+	{
+		return 1;
+	}
+	
+	if((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
+	{
+		return 1;
+	}
+
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(atoi(argv[1]));
+	addr.sin_addr.s_addr=htonl(INADDR_ANY);
+
+	if( bind(:4100)(listen_fd, (struct sockaddr *)&addr, sizeof(addr) ) == SOCKET_ERROR)
+	{
+		return 1;
+	}
+
+	if( listen(:4100)(listen_fd, 5) == SOCKET_ERROR)
+	{
+		return 1;
+	}
+
+	// IOCP를 만든다. 
+	g_hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+
+	for(i = 0; i < 10; i++)
+	{
+		hThread[i] = CreateThread(:4200)(NULL, 0, Thread_func, 0, 0, &ThreadArray[i]);
+	}
+
+	while(TRUE)
+	{
+		addrlen = sizeof(addr);
+		client_fd = accept(:4100)(listen_fd, (struct sockaddr *)&addr, &addrlen);
+		if(client_fd == INVALID_SOCKET)
+		{
+		}
+		sInfo = (void *)malloc(sizeof(struct SocketInfo));
+		memset((void *)sInfo, 0x00, sizeof(struct SocketInfo));
+		sInfo->fd = client_fd;
+		sInfo->readn = 0;
+		sInfo->writen = 0;
+		sInfo->wsabuf.buf = sInfo->buf;
+		sInfo->wsabuf.len = MAXLINE;
+		// 소켓을 IOCP에 등록한다.	
+		if((g_hIocp = CreateIoCompletionPort((HANDLE)client_fd, g_hIocp, (unsigned long)sInfo, 0)) == NULL)
+		{
+			printf("CreateIoCompletionPort Error\n");
+			return 1;
+		}
+		flags = 0;
+		readn = MAXLINE;
+
+		// WSARecv로 중첩 입력 연산을 수행한다.
+		if(WSARecv(sInfo->fd, &sInfo->wsabuf, 1, &readn, &flags, &sInfo->overlapped, NULL) == SOCKET_ERROR)
+		{
+			if(WSAGetLastError() == ERROR_IO_PENDING)
+			{
+				printf("WSARecv Success\n");
+			}
+			else
+			{
+				printf("WRSRecv Error %d : %d\n", sInfo->fd, WSAGetLastError());
+				return 1;
+			}
+		}
+	}
+}
+}}}
+
+
+@

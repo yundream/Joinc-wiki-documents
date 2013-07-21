@@ -1,0 +1,57 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.04.23.02.26.34;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fQOS_2fMonitering_5fTool_2fzabbix_2fMysql
+@
+
+
+1.1
+log
+@106.240.8.228;;Anonymous;;
+@
+text
+@#title Mysql 모니터링
+
+== 모니터링 전용 계정 만들기 ==
+보안을 위해서 모니터링만 가능한 계정을 만든다. '''show status''' 
+
+== Show status ==
+Mysql의 show status에서 보여주는 값들 중 아래의 것들을 모니터링 한다. mysqladmin의 extended-status 옵션으로 가져올 수 있다. 혹은 show status 질의어로도 확인할 수 있다. 
+
+중요하다고 생각하는 것들만 나열했다.
+|| Aborted_connects     || INT || Count  || Connection이 자주 끊어진다면 문제가 있다. ||
+|| Connections          || INT || Count  || 지금 까지의 연결시도                      ||
+|| Innodb_data_read     || INT || Count  || 읽은 데이터 크기                          ||
+|| Innodb_data_written  || INT || Count  || 쓰 데이터 크기                            ||
+|| Innodb_row_lock_time || INT || Count  || row 잠금을 얻기위해 사용한 총 시간        ||
+|| Innodb_row_lock_waits || INT || Count || row 잠금을 얻기위해 기다린 횟수           ||
+|| Queries              || INT  || Count || 서버에서 실행된 쿼리의 총 개수            ||
+|| Threads_created      || INT || Count  || 연결을 다루기 위해서 만들어진 스레드 개수 ||
+|| Threads_running      || INT || GAUGE  || Running 상태의 스레드                     ||
+|| Uptime               || INT || Count  || 서버 시작 후 흐른 시간                    || 
+
+
+
+== 모니터링 스크립트 ==
+Mysql 상태를 모니터링 하는 간단한 스크립트를 만들었다. 대략 이러하다.
+{{{#!plain
+# mysqladmin -umonitor -pagent_password extended-status | grep -i "Uptime " | cut -d '|' -f3 | tr -d ' '
+}}}
+매개변수를 참조하도록 예쁘게 다듬었다. 
+
+
+== 참고 ==
+  * http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
+@

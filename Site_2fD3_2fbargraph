@@ -1,0 +1,911 @@
+#title D3.js를 이용한 bar 그래프 그리기
+
+[[TableOfContents]]
+== Bar 그래프 그리기 ==
+D3.js를 이용해서 bar 그래프를 그릴 것이다. 이 그래프는 [wiki:Site/D3/AddElement D3 엘리먼트 다루기]에 소개된 div를 이용한 bar 그래프의 svg 버전이다.
+
+== 모니터링 데이터를 시각화 ==
+Zabbix 모니터링 솔류션으로 수집된 모니터링 정보를 직관적으로 보여주는게 목적이다. Zabbix는 모니터링 정보 수집과 분석에 특화된 툴이다. 그래프 기능이 있긴 한데, 써먹을 만한 수준이 아니다. 제대로 시각화해주지 못한다는 것은 시스템/네트워크 관리자에게는 심각한 문제다. 
+
+그래서 d3.js를 이용해서 그래프를 그리기로 했다. 
+  * zabbix는 history 테이블에 모니터링 정보를 제공하며, 이 정보는 [https://www.zabbix.com/documentation/1.8/api zabbix api]를 이용해서 가져올 수 있다. 이 정보로 그래프를 그린다.   
+  * History에는 원본 데이터가 들어가는데, 그 크기가 매우 커질 수 있다. 따라서 History에는 지정한 기간 만큼만 데이터를 유지하고, 기간을 초과한 데이터는 삭제한다. 대신 trend 데이터를 유지한다. Trend 데이터는 history의 원본 데이터를 한시간 간격으로 통계(min, max, average)를 낸 정보를 저장한다.          
+  * 결국 2일 이내의 데이터는 원본 데이터를 이용해서 보여주고, 1주일, 1달, 1년과 같은 긴간격의 그래프는 trend 데이터를 이용해서 보여주기로 했다. 
+SVG는 DOM 엘리먼트로 이미지를 표현한다. 따라서 다수의 SVG 엘리먼트를 한번에 뿌려주게 되면, 클라이언트(웹 브라우저)에 엄청난 부하를 줄 수 있다. 대량의 정보를 그래프로 처리하는 것에 대해서는 [http://blog.iamdenny.com/2013/04/blog-post.html 대용량 스캐터 차트 개발 공유]문서를 참고하기 바란다. SVG기반의 툴은 대량의 데이터를 시각화 하기에는 문제가 있다는 건데, 대량의 데이터를 다룰 일은 없으니 나에게는 상관없는 문제다.   
+
+== 간단하게 그려보자 ==
+먼저 SVG 엘리먼트를 만들어야 한다. 챠트를 위한 사각형, 선, 원 등은 모두 SVG 엘리먼트 위에 표현된다. 예컨데 그림판을 만드는 셈이다.   
+{{{#!plain
+var svg = d3.select("body").append("svg");
+}}}
+'''body'''를 찾은 다음 svg 엘리먼트를 추가한다. 나는 SVG 엘리먼트를 배치하기 위한 div 엘리먼트 '''chart_01'''를 만들었다. 
+{{{#!plain
+<div id="chart_01"></div>
+<script type="text/javascript">
+var svg = d3.select("#chart_01").append("svg")
+    .attr('width', 400)
+    .attr('height', 200)
+</script>
+}}}
+
+Bar chart를 위한 데이터를 준비하고, 이 데이터를 이용해서 간단한 bar chart를 그렸다. Bar는 '''rect'''로 표현했다.
+{{{#!html
+<div id="chart_01"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var svg = d3.select("#chart_01")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', 0)
+   .attr('y', 40)
+   .attr('width', 10)
+   .attr('height', 50)
+   .attr('fill', 'blue');
+</script>
+}}}
+
+코드는 다음과 같다.
+{{{#!plain
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var svg = d3.select("#chart_01")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', 0)
+   .attr('y', 40)
+   .attr('width', 10)
+   .attr('height', 50)
+   .attr('fill', 'blue');
+}}}
+   1. x, y : 사각형의 x축 y축
+   1. width : 사각형의 넓이 
+   1. height : 사각형의 높이 
+   1. fill : 사각형을 채울 색으로 기본은 black
+
+위 예제는 dataset을 이용하지 않고 있다. dataset을 이용해서 그래프를 그린다.
+{{{#!html
+<div id="chart_02"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var svg = d3.select("#chart_02")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 20;
+    })
+   .attr('y', 0)
+   .attr('width', 20) 
+   .attr('height', function (d) {
+      return d;
+    })
+   .attr('fill', 'blue');
+</script>
+}}}
+
+예제에 사용한 코드
+{{{#!plain
+<div id="chart_02"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var svg = d3.select("#chart_02")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 20;
+    })
+   .attr('y', 0)
+   .attr('width', 20) 
+   .attr('height', function (d) {
+      return d;
+    })
+   .attr('fill', 'blue');
+</script>
+}}}
+
+그래프가 좀 이상하다. 기준점이 왼쪽 상단인데다가 스케일도 맞지 않기 때문이다. 기준점과 스케일을 수정했다.
+
+{{{#!html
+<div id="chart_03"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=450;
+var h=100;
+var svg = d3.select("#chart_03")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 20;
+    })
+   .attr('y', function(d) {
+     return h-(d*4);
+   })
+   .attr('width', 20)
+   .attr('height', function (d) {
+      return h+(d*4); 
+    })
+   .attr('fill', 'blue');
+</script>
+}}}
+
+훨씬 보기 좋아졌다.
+{{{#!plain
+<div id="chart_03"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=450;
+var h=100;
+var svg = d3.select("#chart_03")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 20;
+    })
+   .attr('y', function(d) {
+     return h-(d*4);
+   })
+   .attr('width', 20)
+   .attr('height', function (d) {
+      return h+(d*4); 
+    })
+   .attr('fill', 'blue');
+</script>
+}}}
+
+많이 좋아지긴 했는데, 그래프가 너무 답답한 느낌이 든다. 그래프와 그래프사이에 간격을 넣었다.   
+
+{{{#!html
+<div id="chart_04"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=450;
+var h=100;
+var svg = d3.select("#chart_04")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 21;
+    })
+   .attr('y', function(d) {
+     return h-(d*4);
+   })
+   .attr('width', 20)
+   .attr('height', function (d) {
+      return h+(d*4); 
+    })
+   .attr('fill', 'blue');
+</script>
+}}}
+
+각 bar에 값을 출력하면, 그래프를 보기가 더 쉬울거라는 생각에 text를 추가했다.
+
+{{{#!html
+<div id="chart_05"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=450;
+var h=100;
+var svg = d3.select("#chart_05")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return i * 21;
+    })
+   .attr('y', function(d) {
+     return h-(d*4);
+   })
+   .attr('width', 20)
+   .attr('height', function (d) {
+      return h+(d*4); 
+    })
+   .attr('fill', 'blue');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return (i * 21)+2;
+   })
+   .attr('y', function(d) {
+     return h-(d*4)+11;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+</script>
+}}}
+
+중복되는 코드는 생략했다.
+{{{#!plain
+var w=450;
+var h=100;
+var svg = d3.select("#chart_04")
+    .append("svg")
+    .attr('width', 450)
+    .attr('height', 100);
+
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return (i * 21)+2;
+   })
+   .attr('y', function(d) {
+     return h-(d*4)+11;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+}}}
+Text의 위치를 정하는 건 산수문제 이므로 굳이 설명이 필요 없겠다.
+
+== 복잡하게 그려보자 ==
+앞선 예제는 잘 돌아가긴 하지만 본격적인 그래프라고 하기엔 부족한 점이 있다.   
+  1. 스케일 : 스케일은 그래프의 x(폭)축과 y(높이)축 모두에 필요하다.
+     * X축의 경우 데이터의 크기에 맞게 폭(width)를 정할 수 있어야 한다. 간단하게 data.length / width 하면 되겠다. 
+     * y축은 x축보다는 복잡하다. 스케일을 적용하기 위해서는 data.min과 data.max 그리고 canvas의 height를 알면된다. Canvas의 height를 알면 data.min과 data.max가 Canvas.height 영역(domain)에 위치하게 계산하면 된다.  
+  1. Axis : X축선과 y축선을 그려야 한다. X축선과 y축선은 스케일에 따라 동적으로 적용할 수 있어야 하므로 데이터 종류에 따라서 꽤 복잡한 연산이 필요할 수 있다. 물론 d3.js가 알아서 해주기 대문에 걱정할 필요는 없다. 
+  1. 다양한 표현 : 지금은 bar chart만 그렸는데, line, area, scatterplot, stack bar, stack line, stack area... 등등의 다양한 모습의 chart로 표현할 수 있어야 한다. 여기에서는 bar chart만 다루겠다. 나머지 chart는 다른 문서에서... 
+  1. 변환 : 데이터를 동적으로 보여줄수 - 예컨데, 실시간으로 그래프의 변화를 보여준다든지 하는 - 있어야 한다. 
+여기에서는 '''스케일, Axis, 변환'''에 대해서 살펴볼 것이다.
+
+=== Scale ===
+Canvas의 크기에 따라서 chart의 크기도 그에 맞게 변환하기 위해서 사용한다. 산수계산 좀 하면 되겠지만 d3.js가 알아서 해준다는데, 마다할 필요가 없다. 예컨데 Canvas의 높이가 100이고, 데이터가 0에서 100까지의 범위를 가진다면 1:1로 매핑이 된다. 이경우 값이 50인 데이터의 높이는 50일 거다. 그러나 Canvas의 높이가 50이라면 25로 보정을 해줘야 한다.  
+
+==== Domain 과 Range  ====
+Scale은 '''Domain'''과 '''Range'''로 결정한다.
+  * '''Domain''' : 입력 값의 구간
+  * '''Range''' : 출력 값의 범위
+지금껏 예제로 사용했던 dataset을 이용해서 scale을 결정해보자.
+{{{#!plain
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var h = 450;
+var w = 100;
+}}}
+입력 값의 범위는 5 에서 25이고 출력 값의 범위는 450이다. 따라서 y축에 대한 domain, range 는 다음과 같다.
+  * Domain : 0 ~ 25
+  * Range : 0 ~ 450 으로 하면 된다.  
+이를 코드로 나타내면
+{{{#!plain
+var w=400;
+var h=100;
+var padding=10;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+}}}
+쯤 되겠다. padding은 y축 상단에 여백을 주기 위해서 추가했다.   
+
+x축은 y축에 비해서 단순하다.
+{{{#!html
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+}}}
+이렇게 scale를 적용해서 만든 차트다.
+{{{#!html
+<div id="chart_06"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=800;
+var h=200;
+var padding=10;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+
+var svg = d3.select("#chart_06")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d)+padding;
+   })
+   .attr('width', function (d,i) {
+     return x(1)-1;
+   })
+   .attr('height', function (d) {
+      return h-(y(d)+padding); 
+    })
+   .attr('fill', 'black');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return x(i)+(x(1)/2)-11;
+   })
+   .attr('y', function(d) {
+     return y(d)+12+padding;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+</script>
+}}}
+
+테스트에 사용한 코드다.
+{{{#!plain
+<div id="chart_06"></div>
+<script type="text/javascript">
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var w=800;
+var h=200;
+var padding=10;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+
+var svg = d3.select("#chart_06")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d)+padding;
+   })
+   .attr('width', function (d,i) {
+     return x(1)-1;
+   })
+   .attr('height', function (d) {
+      return h-(y(d)+padding); 
+    })
+   .attr('fill', 'black');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return x(i)+(x(1)/2)-11;
+   })
+   .attr('y', function(d) {
+     return y(d)+12+padding;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+</script>
+}}}
+
+=== Axis ===
+지금까지 그래프에 X축, Y축을 추가해보자. 이 정도면 그래프를 그리기 위한 기본요소는 대략 다루었다고 볼 수 있지싶다.
+
+==== Axis 설정 ====
+d3.svg.axis()로 axis를 만들 수 있다.
+{{{#!plain
+var xAxis = d3.svg.axis();
+}}}
+
+Axis는 다른 그래프 요소들과 마찬가지로 scale의 영향을 받는다. X축에 대해서 스케일을 적용한 axis를 만들었다.
+{{{#!plain
+var y = d3.scale.linear()
+        ...
+var x = d3.scale.linear()
+        ...
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom')
+}}}
+이렇게 만든 axis를 svg에 추가한다.
+{{{#!plain
+svg.append("g")
+   .call(xAxis);
+}}}
+
+{{{#!html
+<div id="chart_10"></div>
+<script type="text/javascript">
+var width=800;
+var height=200;
+var svg=null;
+
+function chart(w, h)
+{
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var padding=10;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+
+svg = d3.select("#chart_10")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d)+padding;
+   })
+   .attr('width', function (d,i) {
+     return x(1)-1;
+   })
+   .attr('height', function (d) {
+      return h-y(d); 
+    })
+   .attr('fill', 'blue');
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return parseInt(x(i)) + 1;
+   })
+   .attr('y', function(d) {
+     return y(d)+12+padding;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+
+svg.append('g')
+   .call(xAxis);
+}
+chart(500, 200)
+</script>
+}}}
+추가는 됐는데 그림이 좀 이상하게 나왔다. CSS를 이용해서 좀 깔끔하게 만들어 보자.
+{{{#!plain
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+}}}
+
+Axis에 css를 적용한다.
+{{{#!plain
+svg.append('g')
+   .attr('class', 'axis')
+   .call(xAxis);
+}}}
+
+CSS를 적용한 후의 모습.
+
+{{{#!html
+<style>
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+</style>
+<div id="chart_11"></div>
+<script type="text/javascript">
+var width=800;
+var height=200;
+var svg=null;
+
+function chart(w, h)
+{
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var padding=10;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+
+svg = d3.select("#chart_11")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d)+padding;
+   })
+   .attr('width', function (d,i) {
+     return x(1)-1;
+   })
+   .attr('height', function (d) {
+      return h-y(d); 
+    })
+   .attr('fill', 'blue');
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return parseInt(x(i)) + 1;
+   })
+   .attr('y', function(d) {
+     return y(d)+12+padding;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+
+svg.append('g')
+   .attr('class', 'axis')
+   .call(xAxis);
+}
+chart(500, 200)
+</script>
+}}}
+
+xAxis의 위치를 아래로 내려야 겠다. SVG의 transform 어트리뷰트를 이용해서 2D 변환(transform)을 할 수 있다.
+{{{#!plain
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate(0,"+ (h-padding)+")")
+   .call(xAxis);
+}}}
+
+{{{#!html
+<div id="chart_12"></div>
+<script type="text/javascript">
+var width=800;
+var height=200;
+var svg=null;
+
+function chart(w, h)
+{
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var padding=20;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([0, w])
+
+svg = d3.select("#chart_12")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d);
+   })
+   .attr('width', function (d,i) {
+     return x(1)-1;
+   })
+   .attr('height', function (d) {
+      return h-y(d)-padding;
+    })
+   .attr('fill', 'blue');
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return parseInt(x(i)) + 1;
+   })
+   .attr('y', function(d) {
+     return y(d)+10;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate(0,"+ (h-padding)+")")
+   .call(xAxis);
+}
+chart(500, 200)
+</script>
+}}}
+
+이제 y축을 그려보자. 
+{{{#!plain
+var yAxis = d3.svg.axis();
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate("+padding+",0)")
+   .call(yAxis);
+}}}
+
+X축과 Y축까지 포함한 완전한 형태의 그래프다. Padding 처리하는 부분에서 처음의 예제와는 약간의 차이가 있다.
+
+{{{#!html
+<div id="chart_20"></div>
+<script type="text/javascript">
+var width=800;
+var height=200;
+var svg=null;
+
+function chart(w, h)
+{
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var padding=20;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([padding, w])
+
+svg = d3.select("#chart_20")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d);
+   })
+   .attr('width', function (d,i) {
+     return parseInt(( w-padding )/ dataset.length) - 1;
+   })
+   .attr('height', function (d) {
+      return h-y(d)-padding;
+    })
+   .attr('fill', 'blue');
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom');
+var yAxis = d3.svg.axis()
+              .scale(y)
+              .ticks(5)
+              .orient('left');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return parseInt(x(i)) + 1;
+   })
+   .attr('y', function(d) {
+     return y(d)+10;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate(0,"+ (h-padding)+")")
+   .call(xAxis);
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate("+padding+",0)")
+   .call(yAxis);
+}
+chart(500, 200)
+</script>
+}}}
+{{{#!plain
+<div id="chart_20"></div>
+<script type="text/javascript">
+var width=800;
+var height=200;
+var svg=null;
+
+function chart(w, h)
+{
+var dataset = [ 5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                11, 12, 15, 20, 18, 17, 16, 18, 23, 25 ];
+var padding=20;
+
+var y = d3.scale.linear()
+          .domain([0, d3.max(dataset)])
+          .range([h-padding,0])
+var x = d3.scale.linear()
+          .domain([0, dataset.length])
+          .range([padding, w])
+
+svg = d3.select("#chart_20")
+    .append("svg")
+    .attr('width', w)
+    .attr('height', h);
+
+svg.selectAll('rect')
+   .data(dataset)
+   .enter()
+   .append('rect')
+   .attr('x', function (d, i) {
+     return x(i);
+    })
+   .attr('y', function(d) {
+     return y(d);
+   })
+   .attr('width', function (d,i) {
+     return parseInt(( w-padding )/ dataset.length) - 1;
+   })
+   .attr('height', function (d) {
+      return h-y(d)-padding;
+    })
+   .attr('fill', 'blue');
+
+var xAxis = d3.svg.axis()
+              .scale(x)
+              .orient('bottom');
+var yAxis = d3.svg.axis()
+              .scale(y)
+              .ticks(5)
+              .orient('left');
+svg.selectAll('text')
+   .data(dataset)
+   .enter()
+   .append('text')
+   .text(function(d) {
+     return d;
+   })
+   .attr('x', function(d, i) {
+     return parseInt(x(i)) + 1;
+   })
+   .attr('y', function(d) {
+     return y(d)+10;
+   })
+   .attr('font-size','10px')
+   .attr('fill', 'white')
+
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate(0,"+ (h-padding)+")")
+   .call(xAxis);
+svg.append('g')
+   .attr('class', 'axis')
+   .attr('transform', "translate("+padding+",0)")
+   .call(yAxis);
+}
+chart(500, 200)
+</script>
+}}}
+== 참고 ==
+  * http://mbostock.github.io/d3/tutorial/bar-2.html
+  * http://bost.ocks.org/mike/path/  

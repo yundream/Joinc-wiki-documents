@@ -20,8 +20,7 @@ Ubuntu 12.04에 설치하기로 했다. 2006년쯤인가 설치할 때는 이것
 
 zabbix server 설치
 {{{#!plain
-# apt-get install zabbix-server-mysql
-}}}
+# apt-get install zabbix-server}}}
 
 zabbix php 프론트엔드 설치. 세상 편하네..
 {{{#!plain
@@ -86,8 +85,46 @@ Media를 클릭하면 팝업창이 뜨는데, 여기에서 통지방법과 받�
 
 https://lh5.googleusercontent.com/-CEd6jIU4sJI/UWmUAUC-LyI/AAAAAAAAC7o/Yvf_mpGV3uw/s800/zabbix5.png
 
-=== Email 설정 ===
-"Menu" > "Administration" > "Media Type"에서 이메일설정을 할 수 있다. Media type에는 "Email, Jabber, SMS, Script"의 미리 정해진 타입이 있다. 
+=== Media Type 설정 ===
+'''Media Type'''을 이용해서 유저에게 (이벤트 등을)통지할 매체를 정할 수 있다. "Menu" > "Administration" > "Media Type"에서 일설정을 할 수 있다. Media type에는 "Email, Jabber, SMS, Script"등이 있다. Email은 통상적인 이메일, Jabber는 메시징 프로토콜이다. SMS는 serial GSM 모뎀을 이용한 통지 방법이라고 하는데, 어디에 쓰는 물건인지 모르겠다. 나는 주로 script를 직접 만들어서 사용한다.     
+
+Script는 /etc/zabbix/alert.d 밑에 두고 사용하면 된다. 보통 이벤트 메시지는 "메일"과 SMS(단문 메시지) 서비스를 이용해서 보낸다. 메일은 그냥 mail 프로그램을 이용해서 보내면 되고, 단문메시지는 서비스 업체에서 제공하는 API를 이용한다. 아래는 간단한 mail 전송 스크립트다.
+{{{#!plain
+#!/usr/bin/bash
+recipient=$1
+subject=$2
+message=$3
+
+echo $message | mail -s "$subject" "$recipient"
+}}}
+Zabbix에서는 특정 조건을 만족하는 이벤트를 어떤 media type을 통해서 보낼 지를 지정할 수 있다. 만약 Script를 지정해싿면, script 프로그램을 '''recipient''', '''subject''', '''message''' 3개의 매개변수로 실행한다.  
+
+내가 script를 선호하는 이유는 이벤트를 다양한 방식으로 처리할 수 있기 때문이다. 이메일과 sms는 물론이고, bugzilla API 나 Jira API를 이용해서 이벤트 ticket을 만들어서 체계적으로 관리할 수 있다. 혹은 직접 이벤트 관리 소프트웨어를 만들어서 관리할 수도 있다. 개인적으로 moniwiki를 이용해서 이벤트 처리 시스템을 만드는 걸 선호한다. 요즘 moniwiki는 그다지 사용하지 않는 추세인데, 플러그인을 개발하기가 굉장히 쉬워서 사용하고 있다.   
+
+== 호스트 관리 == 
+이제 모니터링할 호스트를 등록하면 된다. 
+=== Host group ===
+호스트들은 하나이상의 그룹에 포함되기 마련이며, 보통은 계층적 구조를 가진다. AWS에서 region 별로 분산되서 운용되는 웹 서비스가 있다고 가정해보자. 먼저 '''Linux server'''그룹으로 나눌 수 있을 것이다. 그리고 다시 '''web server''' 그룹과 '''database server''' 그룹으로 나눌 수 있을 것이고, 지역에 따라서 Tokyo-region, NVirgina-region, Ireland-region 등으로 관리할 수 있을 것이다. 유럽에서 서비스하는 리눅스 웹서버라면 '''Linux server > web server > Ireland''' 식의 계층화가 가능하다.  
+
+호스트들을 효율적으로 관리할 수 있으며 특히 이벤트가 발생할 때, 이벤트가 영향을 주는 위치를 빠르게 판단할 수 있다.
+
+예컨데, host group을 이용해서 전체 시스템의 형상을 설계할 수 있다. 따라서 모니터링 초기에 신경을 써서 host group을 만들어야 한다. 
+
+앞서 설명한 대로 호스트는 계층적 구조를 가지며, 따라서 host group도 계층적 표현이 가능해야 할 것 같지만 zabbix의 host group은 계층 구조를 지원하지 않는다. 대신 하나의 호스트가 여러 host group에 속하게 하는 것으로 계층 구조를 지원한다.  
+
+=== 호스트 등록 ===
+'''Configuration > Hosts > Create Host'''로 호스트를 등록 할 수 있다.
+
+https://lh5.googleusercontent.com/-vGyINfGWTtk/UY0gHLRfmnI/AAAAAAAADC4/s3eiNBwoh5E/s640/zabbix12.jpg
+  * Host name : 호스트 이름 
+  * visible name : 디스플레이 이름. 특정하지 않으면 host name이 사용된다.
+  * Groups : 호스트가 포함될 그룹을 선택한다. 하나 이상의 그룹에 속할 수 있다.
+  * New host group : 새로운 호스트 그룹을 만들수도 있다.
+  * Agent interface : zabbix agent로 요청할 ip 주소다. zabbix agent의 기본 포트는 10050 이다.  
+  * SNMP interface : SNMP로 수집하기를 원한다면..
+  * JMX interface : JMX로 수집하기를 원한다면..
+  * IMPI interface : IPMI로 관리하기를 원한다면.. 
+  * Monitored by proxy : Zabbix - Proxy를 거쳐서 수집하기를 원한다면
 
 == 하위 문서들 ==
 [[subindex]]

@@ -1,0 +1,259 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.07.29.09.48.35;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fsystem_5fprograming_2fFile_2fselect
+@
+
+
+1.1
+log
+@210.94.41.89;;Anonymous;;
+@
+text
+@#title select를 이용한 입출력 다중화
+
+[[TableOfContents]]
+=== 입출력 다중화 ===
+==== 입출력 다중화 모델 ====
+입출력과 관련된 함수들은 기본적으로 봉쇄/동기적 으로 작동한다. 봉쇄형은 데이터를 처리하는 직관적인 방식이긴 하지만, 두 개 이상의 파일을 처리할 때 문제가 된다. 하나의 파일에서 봉쇄가 되어 버리면 다른 파일의 데이터는 영원히 읽지 못할 수도 있기 때문이다. 비 봉쇄 방식으로 처리하는 방법도 있으나 일반적으로 비봉쇄 방식은 봉쇄 방식에 비해서 까다로운 프로그래밍 기술을 요구한다. 
+
+봉쇄/동기성을 유지하면서 두 개 이상의 파일을 처리하는 일반 적인 방법은 멀티:::프로세스(:12)와 멀티:::쓰레드(:12)를 이용한 방식이다. 이들 프로그래밍 기술은 파일당 하나의 프로세스(혹은 쓰레드)를 할당해서 동시에 두개 이상의 파일을 처리한다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/iuxl4iTSn3G3W6V6VPqkcw?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uP0ZWjpkI/AAAAAAAABP4/V-7ZTMAUc9I/s800/sJEEZxZ6KusYRuWs8i_8i_Q.png" /></a>
+}}}
+
+이 방식은 단순해 보이지만, 단일 프로세스/단일 쓰레드 방식의 프로그램에 비해서 다음과 같은 복잡한 프로그래밍 이슈를 가지고 있다. 
+   1. 프로세스, 쓰레드간 통신 : 프로세스간 통신을 위해서 IPC(:12)를 사용해야 한다. IPC(:12)는 다루기 까다로운 도구다.
+   1. 프로세스 동기화, 쓰레드 동기화를 위해서 IPC(:12) 혹은 mutex(:12)와 같은 다루기 힘든 기술을 사용해야 한다.
+   1. 프로세스와 쓰레드의 생성에는 많은 비용이 소모된다.
+
+입출력 다중화는 단일 프로세스에서 여러 개의 파일을 제어할 수 있도록 한다. 입출력 다중화는 "비 동기 / 봉쇄 입출력 모델"의 응용이다. 입출력:::모델(:12) 문서 보기.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/7FiVopLBBKZI7ErkOPwitA?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uP0OK-33I/AAAAAAAABPw/0UPDG2MyVKQ/s800/s8BTKOXaRr00RX70Upyi_mA.png" /></a>
+}}}
+
+입출력 다중화는 여러 개의 파일을 다루기 위해서, '''파일 기술자'''를 배열 (그룹)으로 관리한다. 데이터 변경을 감시할 파일 기술자를 배열에 포함시키고, 배열에 포함된 파일 기술자에 (읽기, 쓰기, 에러와 같은)데이터 변경이 발생하면 파일 기술자에 대응되는 배열에 '''표시'''하는 방식이다. 개발자는 파일 기술자 배열의 값을 검사하는 것으로 여러 개의 파일을 처리할 수 있게 된다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/wzVJ0iQR25_dGoalu6ilxQ?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uP0ZOr25I/AAAAAAAABP0/JY8cIURlWKY/s800/sEq0JgGRcmpiX34Aa8uj81g.png" /></a>
+}}}
+
+2, 4, 8번 파일 기술자에 데이터 변화가 있음을 알 수 있다.
+
+이 모델은 모델 특유의 제한을 가지고 있다. 
+   1. 파일 기술자 테이블의 크기 
+      처리할 수 있는 파일의 최대 크기는 "프로세스가 열 수 있는 파일의 최대 개수"와 별도로 "파일 기술자 테이블의 크기"의 영향을 받는다. 일반적으로 파일 기술자 테이블의 크기는 1024인데, ulimit(1) 등으로 변경할 수 없다. 
+   1. 배열로서 가지는 성능 문제 
+      이벤트 기반이 아니기 때문에, 배열에 있는 모든 값을 전부 검사해야 한다. 1000개의 클라이언트가 연결되어 있고 이중 어느 하나에 데이터 변경이 이루어졌다면, 최악의 경우 1000개의 필드를 모두 검사해야 한다. 
+   1. 병렬 처리가 아니다. 
+      이 모델은 멀티 쓰레드와 같은 병렬 처리가 아니다. "데이터를 읽어서 처리하고 응답하는"시간 동안 다른 파일은 대기 해야 한다. 그러므로 데이터 처리 과정이 긴 서비스에 적용하기에는 적당한 모델이 아니다. 데이터 처리 과정이 짧은 메시지 전달 서비스에 적합한 모델이다.
+
+이러한 단점이 있지만 매우 견고한 모델이며, 프로그래밍 기술이 단순하기 때문에 널리 사용되고 있다.
+
+=== select함수로 입출력 다중화 ===
+입출력 다중화는 여러 개의 파일에서 발생하는 입출력을 함께 관리하는 기술이다. 원리는 간단하다. 입출력을 관리하고자 하는 파일의 그룹을 fd_set이라는 파일 비트 배열에 집어 넣고, 비트 배열의 값이 변했는지를 확인하는 방식이다.
+
+리눅스는 BSD select함수로 입출력 다중화를 달성한다.
+dd
+{{{#!plain
+int select (int nfds, fd_set *readfds, fd_set *writefds, 
+    fd_set *exceptfds, struct timeval *timeout);
+}}}
+다음은 select함수의 매개 변수다.
+  1. nfds : 관리하는 파일의 개수를 등록한다. 파일의 개수는 '''최대 파일 지정 번호 + 1'''로 지정하면 된다.
+  1. fd_set : 관리하는 파일의 지정번호가 등록되어 있는 비트 배열 구조체
+     * readfds : 읽을 데이터가 있는지 검사하기 위한 파일 목록 
+     * writefds : 쓰여진 데이터가 있는지 검사하기 위한 파일 목록
+     * exceptfds  : 파일에 예외 사항들이 있는지 검사하기 위한 파일 목록
+  1. timeout : select함수는 fd_set에 등록된 파일들에 데이터 변경이 있는지를 timeout동안 기다린다. 만약 timeout시간동안 변경이 없다면 0을 반환 한다. timeout을 NULL로 하면, 데이터가 있을 때까지 무한정 기다리고, 멤버 값이 모두 0이면 즉시 반환한다.
+
+fd_set 구조체는 은 1024크기를 가지는 비트 배열을 포함하고 있는데, 파일 지정 번호는 각 비트 배열 첨자에 대응되는 구조를 가지고 있다. 예를 들어 파일 지정번호가 3이라면 4번째 비트배열에 대응된다. (배열은 0부터 시작하기 때문)  
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/I16mmT7jpnI2EvelenNLUg?feat=embedwebsite"><img src="http://lh3.ggpht.com/_Os5qf5urx_A/S6uP0v2VfLI/AAAAAAAABP8/mpSDzYLsp-g/s800/st85FB58YcWHRaU4pJmNDhg.png" /></a>
+}}}
+
+만약 변경된 데이터가 있다면 해당 비트값이 1로 설정이 되고, 프로그램은 이 비트 값을 검사함으로써 어떤 파일 지정 번호에 변경된 데이터가 있는지 확인해서 읽기/쓰기를 하면 된다.
+
+select 함수는 '''데이터가 변경된 파일의 개수 즉 fd_set에서 비트 값이 1인 필드의 개수를 반환'''한다. 데이터가 변경된 파일의 목록을 반환하지 않는다는 것에 주의해야 한다. 그러므로 만약 최대 파일 지정 번호가 1000 이고 select가 1을 반환 했다면, 0번 부터 루프를 순환하면서 어떤 파일이 변경되었는지를 검사해야 한다. 최악의 경우 1000번 루프를 돌아야 한다. select의 작동방식에 따른 근본적인 문제인데, 연결 파일의 목록을 별도의 배열에 유지 하는 것으로 어느 정도 문제를 해결할 수 있기는 하다. (완전한 방법은 아니다. 연결된 파일이 하나고 이 파일의 지정 번호가 1000이라면, 1번만 비교할 수 있지만, 연결된 파일이 1000이라면 여전히 1000번의 루프를 돌아야 할 수 있다.) 
+
+==== fd_set 관리 ====
+select함수의 핵심은 fd_set구조체에 있다. fd_set구조체는 다음과 같이 관리요소가 필요하다.
+   1. fd_set구조체를 0으로 초기화 한다.
+   1. fd_set에 관리할 파일을 등록한다. 
+   1. select함수가 반환 했을 때, 어떤 파일에 변경이 일어났는지 확인하기 위해서 fd_set의 각 필드의 값을 검사한다. 
+   1. fd_set에서 파일을 제거한다.
+
+fd_set을 관리하기 위해서 다음의 매크로 함수를 제공한다.
+   1. FD_ZERO(fd_set *fds) : fds의 비트필드를 0으로 초기화 한다.
+   1. FD_SET(fd, *fds) : fds 비트 필드에 fd를 추가한다. 대응되는 필드의 값이 1로 변경된다.
+   1. FD_ISSET(fd, *fds) : fd에 변경이 있는지를 검사한다. 필드의 값이 1이면 TRUE를 반환한다. 
+   1. FD_CLR(fd, *fds); : fd를 fds 비트(:12) 필드에서 제거한다.
+
+fd_set은 단일 비트 필드 테이블 이라는 것에 주목해야 한다. 즉 fd_set은 이전 상태를 기억하지 못한다. 아래의 그림을 보자.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/V2l_-ooYhsqtfV-3Var74g?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uP0_f3iXI/AAAAAAAABQA/WY2aGlhSI7k/s800/sV_XKYvCz3bwfs0uH3PuUxQ.png" /></a>
+}}}
+
+  1. FD_ZERO로 readfds를 초기화 한다.
+  1. 파일 지정 번호 2, 4, 8을 readfds에 추가한다. 대응되는 필드의 값을 1로 설정한다. 
+  1. 4번파일에 읽을 데이터가 있다면, 4번을 1로 채운다음 반환한다. 
+fd_set이 이전 상태를 기억하지 못한다는 의미를 이해했을 것이다. 그러므로 select함수를 호출하기 전에 이전 fd_set의 값을 저장해 두어야 한다. 매번 fd_set 정보를 복사해야 한다는게 select함수의 또 다른 단점이다.
+
+==== 예제 1 ====
+그럼 간단한 예제 프로그램을 하나 만들도록 하자. 이 예제 프로그램은 /tmp/testfile 과 /tmp/testfile2 두개의 파일을 읽어서 파일에 내용이 추가될 때마다 화면에 뿌려주는 일을 한다.
+
+예제 : select.c
+{{{#!plain down:select.c
+#include <sys/time.h> 
+#include <sys/types.h> 
+#include <unistd.h> 
+#include <fcntl.h> 
+#include <stdlib.h> 
+#include <string.h> 
+#include <stdio.h> 
+
+int main()
+{
+    int fd[2];
+    int i;
+    int n;
+    int state;
+
+    char buf[255];
+
+    struct timeval tv;
+
+    fd_set readfds, writefds;
+
+    if ((fd[0] = open("/tmp/testfile", O_RDONLY)) == -1)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+    if ((fd[1] = open("/tmp/testfile2", O_RDONLY)) == -1)
+    {
+        perror("file open error : ");
+        exit(0);
+    }
+
+    memset (buf, 0x00, 255);
+
+
+    for(;;)
+    {
+        FD_ZERO(&readfds);
+        FD_SET(fd[0], &readfds);
+        FD_SET(fd[1], &readfds);
+
+        state = select(fd[1]+1, &readfds, NULL, NULL, NULL);
+        switch(state)
+        {
+            case -1:
+                perror("select error : ");
+                exit(0);
+                break;
+
+            default :
+                for (i = 0; i < 2; i++)
+                {
+                    if (FD_ISSET(fd[i], &readfds))
+                    {
+                        while ((n = read(fd[i], buf, 255)) > 0)
+                            printf("(%d) [%d] %s", state, i, buf);
+                    }
+                }
+                memset (buf, 0x00, 255);
+                break;
+        }
+        usleep(1000);
+    }
+}
+}}}
+위의 프로그램은 초기에 "/tmp/testfile" 와 "/tmp/testfil2" 2개의 파일을 열어서 출력을 하고 파일 끝까지 가더라도 프로그램을 종료하지 않고, select 를 이용해서 파일에 새로운 내용이 입력되는지 기다리는지를 조사해서 새로운 내용이 입력되면 화면에 출력하도록 한다.
+
+우리는 fd[0]과 fd[1] 의 2개의 파일에 대해서 읽을수 있는 데이타가 있는지에 관심을 가지고 있음으로, FD_SET 을 이용 readfds 의 비트배열에 fd 값을 할당한다. (값을 할당한다라기 보다는 비트배열의 인덱스값이 fd 를 가르킨다 라는게 좀더 적당한 표현일듯 하다) 그다음 select 를 이용해서 readfds 의 비트값을 가져오고, FD_ISSET 을 이용해서 각 비트값을 검사하게 된다.
+
+이코드에서는 for 루프를 돌때 usleep 를 이용해서 약간의 시간지연을 두었는데, 이는 CPU 점유율을 무한대(남는 만큼 다)로 점유하는걸 막기 위해서 이다. 남는만큼의 CPU를 점유하고, 다른응용프로그램이 필요로 하면 돌려주기는 하지만 기분이 찜찜해서..
+
+timeval 구조체를 이용해서 시간 제한을 두지 않는 이유는 정규파일을 select 했을경우 파일 끝을 만나더라도, readfds 비트의 설정을 제대로 하지 못하기 때문이다.
+
+==== 예제 2 ====
+이번에는 timeval 구조체를 이용해서, 제한시간내에 입력이 있는지 없는지 검사하는 프로그램을 만들어보도록 하자.
+
+예제 : select_time.c
+{{{#!plain down:select_time.c
+#include <sys/time.h> 
+#include <sys/types.h> 
+#include <unistd.h> 
+#include <fcntl.h> 
+#include <stdlib.h> 
+#include <string.h> 
+#include <stdio.h> 
+
+int main()
+{
+    int        fd;
+    char    buf[255];
+    int        state; 
+
+    struct    timeval tv; 
+    fd_set    readfds, writefds;
+    fd = fileno(stdin);
+    FD_ZERO(&readfds);
+
+    for (;;)
+    {
+        FD_SET(fd, &readfds);
+
+        tv.tv_sec = 10;
+        tv.tv_usec = 0;
+
+        state = select(fd + 1, &readfds, (fd_set *)0, (fd_set *)0, &tv);
+        switch(state)
+        {
+            case -1:
+                perror("select error : ");
+                exit(0);
+                break;    
+            case 0:
+                printf("Time over\n");            
+                close(fd);
+                exit(0);
+                break;
+            default:
+                fgets(buf, 255, stdin);
+                printf("%s", buf);
+                break;
+        }
+    }    
+
+}
+}}}
+매우 간단한 프로그램이다. 저 위에서 언급한 select.c 를 약간 수정만 했을 따름 이다. timeval 구조체의 세팅을 10초로 했다는 정도만 눈여겨 보면 될것이다. select 를 이용해서 10초 동안 블럭이 되는데, 그 10초 안에 fd 에 어떠한 입력이 발생하지 않는다면 select 는 시간이 0 을 넘겨주고, 여기에 대해 적절한 조치를 취해주기만 하면 된다. 이것은 간단한 예제로 alarm(2)을 통해서 구현할수도 있을것이다.
+
+이상 select 에 관한 기본적인 내용에 대해서 알아보았다. 사실 select 가 진정으로 힘을 발휘하는 곳은 정규파일 관련 작업이라기 보다는 다중의 클라이언트를 받아들이는 네트웍서버의 제작에 있을것이다. 이러한 네트웍서버의 제작은 다른 문서를 통해서 빠른시간내에? 제공하도록 하겠다.
+
+=== 관련 글 ===
+ * [wiki:Site/Network_Programing/Documents/Sockettimeout 소켓 타임아웃]
+ * [wiki:Site/Network_Programing/Documents/select select를 이용한 다중연결처리 서버 제작]
+ * [wiki:Site/Network_Programing/AdvancedComm/epoll24 epoll - 이벤트 기반 파일 처리]
+
+[[tag(select,네트워크프로그래밍,입출력다중화,epoll)]]
+[[category(4)]]
+@

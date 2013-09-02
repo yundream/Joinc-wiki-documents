@@ -1,5 +1,6 @@
 #title SMTP - Simple Mail Transfer Protocol 
 
+<!> 미완성
 [[TableOfContents]]
 == SMTP ==
 SMTP는 거의 모든 email 소프트웨어 들이 사용하는 프로토콜로, [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]와 함께 지금의 인터넷이 있게한 일등공신이라 할 만하다. SMTP가 나온게 1981년 경이니, (2013년 현재)30년이 훌쩍넘은 프로토콜이다. SMTP가 국내에서 상업적으로 가장 주목받았던 시기는 1990년대 초반쯤으로 이때 한참 웹메일 솔류션들이 시장이 나올 때였다. 
@@ -60,8 +61,118 @@ S: 221 Bye
 {서버와의 연결을 종료한다.}
 }}}
 
+=== 멀티미디어 컨텐츠 처리 === 
+애초에 SMTP는 텍스트 메시지를 전송하는 걸 목표로 만들어졌다. 하지만 얼마되지 않아, 바이너리 데이터(이미지, 동영상, PPT, DOC 문서)를 함께 처리해야 하는 요구가 생겨났다. 
+
+바이너리 데이터를 포함한 메일은 대략 다음과 같은 형식이 될 거다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1iocqrrmnaYlW08PRl9yyyPFb9yne0vdJZKpjaAhWIpc/pub?w=516&amp;h=461">
+}}}
+
+메일 구조가 복잡해 지면서, 아래의 문제를 해결해야 했다.
+  1. '''각 데이터들을 분리할 수 있어야 한다.''' : SMTP는 각 데이터사이를 '''boundary 문자열'''을 이용해서 분리한다. 아주 단순하지만 가장 확실한 방법이기도 하다. 
+  1. '''각 데이터의 타입을 알 수 있어야 한다.''' : 데이터가 plain/text인지 바이너리 데이터인지, 바이너리 데이터라면 이름은 무언지등이다. SMTP는 각 데이터의 앞부분에 데이터의 부가정보를 담은 '''header'''를 두는 것으로 문제를 해결했다. header에는 이 데이터의 애플리케이션 타입 정보도 들어가는데, 이 정보를 이용해서 데이터를 처리할 애플리케이션을 실행할 수 있다.  
+  1. '''Base64 encode''' : SMTP는 printable한 텍스트 데이터를 처리하는 것을 목적으로 만들어졌다. 이때문에 바이너리 데이터를 텍스트로 변환할 필요가 있었는데, 이를 위해서 base64 encoding 기법을 사용한다. Base64라는 이름에서 알 수 있듯이, 데이터를 '''알파벳 대소문자 52'''개와 숫자 10개 그리고 추가적인 두개의 기호 "+","/"를 더한 64개의 텍스트로 변환을 한다. 변환과정에서 대략 4/3 정도 크기가 늘어난다. 데이터를 받은측은 Base64 decode 과정을 거쳐서 원래의 데이터로 복원한다. 
+
+그래서 아래와 같은 구조가 만들어졌다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1rtWsSd7xDtwlrm6WOWHKwvOaNcwol6ThIihUlWI-GVQ/pub?w=324&amp;h=522">
+}}}
+
+=== 문자셋 ===
+SMTP의 Header에는 문서의 메타정보만 있는게 아니고, "Subject", "To", "From"와 같은 메일의 데이터까지 함께 들어있다. 그리고 이들 정보의 인코딩방식이나 문자셋을 알려주는 별도의 필드가 없다. 그러다 보니, 각 필드에서 사용한 문자셋과 인코딩 방식을 전부 표기해야 한다. 
+
+아래는 gmail에서 전송한 메일의 헤더 부분이다. 어떤식으로 인코딩 정보를 표현하는지 확인할 수 있다.
+{{{#!plain
+Subject: =?EUC-KR?B?vsiz58fPvLy/5C4=?=
+From: "yundream@gmail.com" <yundream@gmail.com>
+To: yundream@joinc.co.kr
+Content-Type: multipart/alternative; boundary=047d7b6d908a020e4004e2ceb1a8
+}}}
+
+=?'''문자셋'''?'''인코딩타입'''?'''데이터'''?= 이런식의 표현이다. 지저분하다는 생각이 든다. 그냥 Charset 필드하나 둬서 해결하면 안되나라는 생각도 들고.  
+
+위 gmail에서 Subject의 데이터의 문자셋은 '''EUC-KR'''이고, '''Base64'''방식으로 인코딩 됐다는 정보를 얻을 수 있다. 
+
+간단한 코드를 만들어서 테스트를 했다.
+{{{#!plain
+#!/usr/bin/ruby
+# -*- coding: utf-8 -*
+require 'base64'
+
+str="Subject: =?EUC-KR?B?vsiz58fPvLy/5C4=?="
+
+if str =~ /=\?([a-zA-Z0-9\-]+)\?([a-zA-Z]+)\?(.+)\?=/
+    puts "Charset : #{$1}"
+    puts "Encode : #{$2}"
+    puts "Text #{$3}"
+    puts "=============="
+    puts Base64.decode64($3).encode('UTF-8', 'EUC-KR')
+end
+}}}
+
+결과
+{{{#!plain
+Charset : EUC-KR
+Encode : B
+Text vsiz58fPvLy/5C4=
+==============
+안녕하세요.
+}}}
+
+대략 처리방법은 알아낸 셈이다.
+=== multipart 컨텐츠 처리 ===
+메일이 두 개 이상의 컨텐츠로 구성돼 있을 경우, multipart 메시지로 처리한다. multipart는 2가지 타입이 있다.  
+ * multipart/mixed
+   * 다른 종류의 컨텐츠로 구성돼 있을 경우다. gmail로 파일을 하나 이상 첨부해서 보내는 경우다.
+ * multipart/alternative 
+   * 하나의 컨텐츠를 서로 다른 타입으로 보낼 경우다. 예를 들어 gmail의 경우 메일의 본문을 '''text/plain'''과 '''text/html''' 두 가지 타입으로 전송을 한다. 
+
+그냥 결과를 보고 분석해 보자. Gmail에서 이미지 파일을 포함한 메일을 이용해서 테스트를 했다. 메일내용의 일부분이다.
+{{{#!plain
+Message-ID: <CAHCh+-omsMR0QjJrS8hN7z7Adx+LyeW-j+H5V+k04EVGs+Dvkw@mail.gmail.com>
+Subject: =?EUC-KR?B?wMy5zMH2IMbEwM/AuyDG98fUx9W0z7TZLg==?=
+From: "yundream@gmail.com" <yundream@gmail.com>
+To: yundream@joinc.co.kr
+Content-Type: multipart/mixed; boundary=bcaec54306def2158404e2e44fba
+
+--bcaec54306def2158404e2e44fba
+Content-Type: multipart/alternative; boundary=bcaec54306def2157f04e2e44fb8
+
+--bcaec54306def2157f04e2e44fb8
+Content-Type: text/plain; charset=EUC-KR
+Content-Transfer-Encoding: base64
+
+vsiz58fPvLy/5C4gxde9usauwNS0z7TZLg0K
+--bcaec54306def2157f04e2e44fb8
+Content-Type: text/html; charset=EUC-KR
+Content-Transfer-Encoding: base64
+
+PGRpdiBkaXI9Imx0ciI+vsiz58fPvLy/5C4gxde9usauwNS0z7TZLjwvZGl2Pg0K
+--bcaec54306def2157f04e2e44fb8--
+--bcaec54306def2158404e2e44fba
+Content-Type: image/jpeg; name="49852_1182039246_2988_q.jpg"
+Content-Disposition: attachment; filename="test.jpg"
+Content-Transfer-Encoding: base64
+X-Attachment-Id: f_hju3v09z0
+
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg
+SlBFRyB2NjIpLCBxdWFsaXR5ID0gOTUK/9sAQwACAQEBAQECAQEBAgICAgIEAwICAgIFBAQDBAYF
+......
+......
+
+--bcaec54306def2158404e2e44fba--
+.
+QUIT
+}}}
+
+이 메일은 '''test.jpg'''라는 이름의 첨부파일을 가지고 있다. 이미지와 text의 서로 다른 컨텐츠로 구성돼 있으므로 '''multipart/mixed'''다. 분문은 "text/plain"과 "text/html"의 서로 다른 형식으로 보내고 있다. 따라서 이 부분은 '''multipart/alternative'''가 된다.         
+
+컨텐츠간의 구분은 "Boundary 문자열"을 이용하고 있다. Boundary 문자열은 본문 헤더의 "boundary="에 명시한다.
 == SMTP 응용 프로그램 개발 ==
-리눅스에서 ruby를 이용해서 개발할 생각이다. SMTP는 오래된 프로토콜이기 때문에, 어떤 언어를 사용하더라도 훌륭한 SMTP 라이브러리를 이용할 수 있을 테다.  
+리눅스에서 ruby를 이용해서 개발하기로 했다. SMTP는 텍스트를 기반으로 하고 있으니, 문자열만 잘 다룰 수 있으면 된다. '''Net::SNMP'''같은 툴을 사용할 수 있겠는데, 이건 클라이언트 개발 할 때나 필요한 거라서, 서버 개발 할 때는 그냥 문자열 처리하는 수 밖에 없다. (SMTP 데이터를 처리하기 위한 라이브러리도 있을 법 한데, 그냥 날 코딩 하기로 했다. 
 
 === GServer ===
 GServer를 이용해서 빠르게 개발한다.
@@ -69,11 +180,12 @@ GServer를 이용해서 빠르게 개발한다.
 GServer는 루비에서 사용할 수 있는 TCP 네트워크 서버 프로그램 개발을 위한 "표준 라이브러리"다. Thread pool 관리, 로깅, 디버깅, 멀티-서버 관리등을 간단하게 할 수 있다. 자세한 내용은 [wiki:Site/Ruby/GServer ruby GServer 활용] 문서를 살펴보자.
 
 === SMTP 서버 프로그램 개발 ===
-나가 만들려는 프로그램의 사양은 다음과 같다. 
+내가 만들려는 프로그램의 사양은 다음과 같다. 
   1. Gmail등에서 수신한 메일을 읽는다.
   1. 메일의 수신자, 송신자, 제목, Body를 분석한다. 
   1. Body는 다시 분석한다. Body의 문서 타입을 확인하고, 첨부파일과 본문을 분리해서 따로 저장한다. 
-... 계속
+
+
 === SMTP 클라이언트 프로그램 개발 ===
-... 계속
+만들기 귀찮아서 인터넷상에 널려있는 걸 참고해서 개발하기로 했다. [https://github.com/aarongough/mini-smtp-server mini smtp server]를 참고하자. 개발에 필요한 것들은 대략 정리한 것 같으니 이걸로 끝
 

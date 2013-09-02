@@ -1,0 +1,28 @@
+#title AWS Simple Queue Service
+
+[[TableOfContents]]
+== SQS ==
+SQS(Simple Queue Service)는 컴포넌트간 메시지를 주고받기 위한 메시지대기열을 제공하는 서비스다.
+
+=== SQS의 특징 ===
+==== HTTP 기반 ====
+AMQP기반이 아닌 HTTP 기반이다. 따라서 성능을 기대하기는 힘들 것 같다. EC2에서의 메시지 요청시 약 20ms이내에서의 응답속도를 보여준다고 한다. 즉 1초에 대략 50번의 API를 호출할 수 있다는 것. 그다지 좋은 성능은 아닌 것 같은데, 대신 스레드를 늘리는 것으로 처리량을 늘릴 수 있다고 한다. AWS 왈 초당 수천건의 메시지를 처리하는 고객도 있다고 한다. 
+
+==== Long Polling 지원 ====
+다행히도 언제부턴가 Long polling 기능이 추가됐다고 한다. 이 글을 쓸때만해도 long polling이 없는 걸로 알고 있었는데. 
+
+아뭏든 Long polling 기능이 생겨서, 무한폴링을 할 필요가 없어졌다.
+
+==== Batch 처리 ====
+64KB 혹은 10개의 메시지를 일괄처리가 가능하다고 한다. 
+
+=== SQS와 RabbitMQ ===
+==== 어떤 서비스를 이용해야 할까 ? ====
+SQS의 경우 꽤나 심각해보이는 단점이 있는데도 불구하고, 만지작거릴 수 밖에 없는 이유가 있다. 바로 '''AWS에서 제공하는 인프라 자원'''이라는 거다. 개발 할 필요도 없고, 관리 할 필요도 없다. 메시지가 유실되거나 손상되지 않도록 중복저장하는 방식으로 가용성도 보장해 준다. 
+
+RabbitMQ(다른 MQ도 마찬가지)로 구축한다고 생각해보면 머리가 아프다.
+   1. AWS의 zone의 가용성은 100%가 아니다. 실제 심심찮게 문제가 보고된다. 따라서 Multi-AZ 환경으로 메시지 큐 환경을 만들고 관리해야 한다. 모니터링도 해줘야 겠지. 전문엔지니어가 있는가 ? 그렇다면 RabbitMQ로 삽질해도 된다.  
+
+== 참고 ==
+ 1. [http://aws.typepad.com/aws/2012/07/scaling-with-amazon-sqs.html Amazon web services Blog]
+ 1. [http://www.nsono.net/blog/?p=3 SQS vs RabbitMQ)

@@ -1,8 +1,8 @@
 #title 간단한 Message platform을 만들어 보자.
 
-<!> 미완성
+[[TableOfContents]]
 == 소개 ==
-Twitter와 같은 메시지 플렛폼을 만들어보려고 한다. 클라우드관련 업무를 하다보니, 메시지 플렛폼의 필요성을 체감한다. 급하게 SQS 같은 플렛폼을 사용할 수 있긴 하겠는데, 제대로 사용하려면 플렛폼을 한번 그려봐야지 싶다. 언젠가는 메세지 플렛폼이 필요할 것 같은 느낌도 강하게 들고 
+Twitter와 같은 메시지 플렛폼을 만들어보려고 한다. 클라우드관련 업무를 하다보니, 메시지 플렛폼의 필요성을 체감한다. 급하게 [wiki:Site/cloud/AWS/SQS SQS] 같은 플렛폼을 사용할 수 있긴 하겠는데, 제대로 사용하려면 플렛폼을 한번 그려봐야지 싶다. 언젠가는 메세지 플렛폼이 필요할 것 같은 느낌도 강하게 들고 
 
 == 기능 ==
 우선은 메시지를 주고 받는 최소한의 기능만을 가진 간단한 platform을 만든다음, 이를 확장하기 위한 구성을 그려보려고 한다. 파일을 저장 그런거 없다.
@@ -30,7 +30,7 @@ Message API를 제공할 프레임워크로는 경량 웹 프레임워크인 rub
   1. 메시지는 message queue에 쌓인다. 
   1. Message router는 message queue로 부터 메시지를 꺼낸 다음, 유저의 '''message box'''에 쌓는다. 
   1. 마침내 유저는 Read API를 이용해서 자신에게 전달된 메시지를 읽는다. 
-유저는 POST 방식으로 JSON 형식의 메시지를 보낸다. 이 메시지에는 보낸 사람과 받을 사람 그리고 text를 포함한다. 대략 아래와 같은 형식이다. 
+유저는 POST 방식으로 [wiki:Site/Ruby/Json JSON] 형식의 메시지를 보낸다. 이 메시지에는 보낸 사람과 받을 사람 그리고 text를 포함한다. 대략 아래와 같은 형식이다. 
 {{{#!plain
 {
   "From":"user-01",
@@ -52,9 +52,82 @@ VirtualBox로 시스템을 구성한다. 모두 우분투 리눅스 13.04를 기
 }}}
 
 === Message Box ===
+Mysql 데이터베이스로 구현한다. '''누가, 누구에게, 어떤 메시지'''를 보냈는지를 저장한다. 
+|| 필드        || 데이터 타입       || 설명                         ||
+|| id          || int               || 메시지의 일련 번호           ||
+|| from        || char(32)          || 메시지를 보낸 유저의 아이디  ||
+|| to          || char(32)          || 메시지를 받을 유저의 아이디  ||
+|| message     || varchar(255)      || 메시지 내용                  ||
+|| createddate || datetime          || 메시지를 만든 시간           ||
+|| readtime    || datetime          || 메시지를 읽은 시간           ||
+
+=== Read 데이터에 접근하는 방법 ===
+이제 message box에 있는 메시지를 읽는 방법에 대해서 고민을 해야 한다. 두 가지 방법이 있을 수 있다.
+
+메시지 프론트엔드가 웹 기반일 경우 고민해야 할 내용이다. 이대로 나가다가는'''Comet'''까지 정리 해야 할 것 같은데, 여기에서는 그냥 아이디어만 정리한다. 
+
+==== 주기적으로 polling ====
+주기적으로 message box에 새로 쌓인 메시지가 있는지 확인하는 방식이다. 호출한 시기에 새로 발생한 메시지를 돌려준다. 읽은 메시지에 대해서는 '''읽음'''으로 상태만 변경한다.   
+
+장점은 단순하다는 것. REST 기반으로 read api만 설계하면 된다.
+
+단점은 '''폴링 주기에 따른 메시지 지연'''이 있을 수 있다는 점. 폴링 주기를 짧게 하면, 빠른 메시지 전달이 가능하겠으나 서버에 부하가 걸릴 거다. 풀링 주기를 길게 하면, 서버는 널널하겠지만 메시지 지연을 감수해야 한다. 
+
+==== Push ====
+일정 시간 연결을 유지하고 있다가, 새로운 메시지가 들어오면 웹 브라우저에 밀어(Push)넣는다. Socket 클라이언트 프로그램을 만드는 방법도 있으나 접근성에서 좋지 않다. 가능한 HTTP 기반으로 데이터를 밀어 넣을 수 있어야 한다.
+
+약간 어색하긴 하지만 HTTP 기반의 Push 서버를 만드는 방법이 있다. 메시지를 스트리밍 하는 방식으로 볼 수 있겠다. HTTP의 content-type중에 '''multipart/x-mixed-replace'''를 이용해서 구현할 수 있다. 
+
+x-mixed-replace의 헤더 형식은 대략 다음과 같다.
+{{{#!plain
+Content-type: multipart/x-mixed-replace;boundary="rn9012"
+}}}
+HTTP를 이용해서 메시지를 보낼 경우 메시지와 메시지의 경계를 구분할 수 있어야 한다. x-mixed-replace은 "boundary"문자열을 이용해서 메시지를 구분한다. 대략 다음과 같다. php로 표혀했다. 
+
+{{{#!plain
+header('Content-type: multipart/x-mixed-replace;boundary="rn9012"');
+for(;;)
+{
+  $message = get_message();   # 새로운 메시지가 들어올 때까지 block
+  print "--rn9012\n";
+  print "Content-type: plan/text\n\n";
+  print "{$message}<br>\n";
+  print "--rn9012\n";
+  flush();
+}
+}}}
+
+==== Long polling ====
+기본 개념은 풀링방식과 비슷하다. 차이점이 있다면, 일반 풀링방식의 경우 메시지가 없더라도 바로 반환하는데, 롱 풀링방식은 메시지가 입력될때까지 기다린다는 점이다. 메시지가 입력되면, (HTTP)연결을 끊고 다시 연결을 시도한다. 폴링 방식과 푸쉬방식의 장점을 섞은 모델이라고 볼 수 있다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Xdg5TVO56rtrlkXh0d1TUeTbyVt8J6gzTIMyBJgXoKY/pub?w=1025&amp;h=210">
+}}}
+ 1. Sender가 MQ에서 메시지를 읽어온다. 
+ 1. Sender는 message box에 메시지를 보내기 전에, 유저가 long polling 서버에 붙어있는지 확인한다. 만약 붙어 있다면, 메시지를 long polling 서버와 메일박스 양쪽 모두로 보낸다. 
+ 1. Long polling 서버는 메시지를 가져와서 유저에게 전송한다. 
+ 1. 메시지를 받은 유저는 long polling 서버와의 연결을 끊고, 새로 연결해서 메시지를 요청한다.
+
+그림그려놓고 생각해 보니, 이 방식이 괜찮은 것 같다.
 
 === REST API === 
+메시지를 쓰고 읽는 두 개의 API만 제공한다.  
 ==== Send API ====
+  * '''POST /message'''
+메시지를 보낸다. 메시지는 JSON 포멧을 따른다. 다음과 같은 형태로 전송한다.
+{{{#!plain
+{
+  "from":"메시지를 전송하는 유저의 아이디",
+  "to": "메시지를 받을 유저의 아이디",
+  "createddate":"메시지를 만든 시간",
+  "message":"메시지 내용"
+}
+}}}
+
 ==== Read API ==== 
+  * '''GET /message?num=N''' : Message box에서 (최신)메시지 N개를 가져온다. 
+  * '''GET /message''' : Long polling을 위해서 사용한다. 연결 후 새로 전송된 메시지를 요청한다.  
+  * '''GET /message/id''' : 번호가 id인 메시지를 가져온다. 
 
 === Router ===
+

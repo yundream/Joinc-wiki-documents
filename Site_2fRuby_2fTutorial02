@@ -2,25 +2,257 @@
 
 [[TableOfContents]]
 == class ==
-클래스와 객체지향(:12)에 대한 내용은 링크를 참고하시고요. 언어를 막론하고 클래스의 사양은 크게 다르지 않으므로, 다른 객제 지향언어를 다룬 적이 있다면 쉽게 이해할 수 있을 겁니다. 특히 Java(:12)에 익숙하다면 더 쉽게 활용할 수 있을 겁니다.
+클래스와 객체지향에 대한 내용은 링크를 참고한다. 언어를 막론하고 클래스의 개념은 크게 다르지 않으므로, 다른 객제 지향언어를 다룬 적이 있다면 쉽게 이해할 수 있을거다. java, python, c++ 경험이 있다면 금상첨화. 
+
 
 == 클래스 정의 ==
-루비 클래스 블럭은 class와 end 키워드 사이에 위치합니다. 특이한 점은 클래스 이름의 첫글자는 반드시 대문자여야 한다는 겁니다. 소문자면 에러가 발생합니다. 클래스는 보통 다음의 구서요소를 가집니다. 
-  1. method 
-  1. class variable
-  1. instance variable
+=== 모든 것은 객체다. ===
+객체는 클래스로부터 만들어지는 구현물이다. 클래스는 사물의 "특성"과 "행동방식"을 정의해 놓은 일종의 명세서 같은걸로 보면 되겠다. 이 명세서대로 작동하는 구현물을 만들면 그게 객체가 된다.
 
-가장 간단한 클래스의 형식입니다.
+=== 루비 클래스 ===
+루비 클래스 블럭은 class와 end 키워드 사이에 위치한다. 특이한 점은 클래스 이름의 첫 글자는 반드시 대문자여야 한다는 것으로, 소문자로 시작하면 에러부터  발생한다.. 클래스는 다음의 구성요소를 가진다. 각각의 요소에 대해서는 따로 자세히 다루도록 한다. 
+  1. Class variable : 클래스가 가지는 변수. 클래스 영역의 변수이기 때문에, 클래스로 부터 만들어진 모든 인스턴스가 공유한다.  
+  1. Instance variable : 인스턴스 마다 가지는 변수. 인스턴스에 독립적인 값이다.
+  1. Method : 외부로 부터 값을 입력받아서, 내부에 저장/연산 하고 연산한 결과를 출력하는 등의 "데이터를 조작"하는 일을 한다.   
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1TRvr2NSWrsEyu9sGDX-uYBYCipRFgQWbU1BRWCa1mJg/pub?w=295&amp;h=369">
+}}}
+
+아래는 하나의 데이터와 하나의 메서드로 이루어진, 가장 단순한 형태의 클래스다. 
 {{{#!plain
-class MyClass
-  def some_method
-  end
+class Myclass
+    @name = nil
+    def setname name
+        @name = name
+    end
+    def output
+        puts @name
+    end
 end
 }}}
-=== Instance Variables ===
-인스턴스 변수는 클래스의 인스턴스에서 사용하는 변수입니다. 객체 변수 혹은 멤버 변수라고 부릅니다. 일반적으로 멤버 변수로 사용해 왔는데, Ruby는 인스턴스 변수란 용어를 선호하는 것 같습니다. 여기에서는 인스턴스 변수라고 부를 작정입니다.
 
-인스턴스 변수는 변수 이름 앞에 '''@'''를 붙입니다. 
+=== Object-specific classes ===
+루비는 특정 객체로 부터 클래스를 만드는 것을 허용한다. 아래예제에는 두개의 String 객체들이 있다. 이 중 a 객체로부터 anonymous class를 만들었다.   
+{{{#!plain
+#!/usr/bin/ruby
+a="hello"
+b=a.dup
+
+class << a
+    def to_s
+        "The value is #{self}"
+    end
+    def twoTimes
+        self+self
+    end
+end
+
+puts a.to_s
+puts a.twoTimes
+puts b.to_s
+}}}
+"class << obj"는 객체 '''obj'''로 부터 새로운 클래스를 만들어라는 의미다. 
+
+아래와 같은 방법으로도 만들 수 있다.
+{{{#!plain
+a = "hello"
+b = a.dup
+def a.to_s
+  "The value is '#{self}'"
+end
+def a.twoTimes
+  self + self
+end
+a.to_s	        # "The value is 'hello'"
+a.twoTimes	# "hellohello"
+b.to_s          # "hello"
+}}}
+
+
+=== Mixin Modules === 
+클래스는 모듈을 포함할 수 있다. 클래스는 모듈에 있는 메서드를 "인스턴스 메서드"처럼 사용할 수 있다. 슈퍼클래스의 메서드를 그대로 사용할 수 있는 것과 동일한 효과를 얻을 수 있다.
+{{{#!plain
+module SillyModule
+  def hello
+    "Hello."
+  end
+end
+class SillyClass
+  include SillyModule
+end
+s = SillyClass.new
+s.hello       # "Hello."
+}}}
+
+다른 예
+{{{#!plain
+# cat support.rb
+module Week
+   FIRST_DAY = "Sunday"
+   def Week.weeks_in_month
+      puts "You have four weeks in a month"
+   end
+   def Week.weeks_in_year
+      puts "You have 52 weeks in a year"
+   end
+end
+}}}
+
+{{{#!plain
+#!/usr/bin/ruby
+require_relative "support"
+   
+class Decade
+include Week
+   no_of_yrs=10
+   def no_of_months
+      puts Week::FIRST_DAY
+      number=10*12
+      puts number
+   end
+end
+d1=Decade.new
+puts Week::FIRST_DAY
+Week.weeks_in_month
+Week.weeks_in_year
+d1.no_of_months
+}}}
+
+실행 결과
+{{{#!plain
+Sunday
+You have four weeks in a month
+You have 52 weeks in a year
+Sunday
+120
+}}}
+
+루비에서 module를 mixin 하는 아주 전형적인 예제
+{{{#!plain
+#!/usr/bin/ruby
+module A
+   def a1
+        puts "a1"
+   end
+   def a2
+        puts "a2"
+   end
+end
+module B
+   def b1
+        puts "b1"
+   end
+   def b2
+        puts "b2"
+   end
+end
+
+class Sample
+include A
+include B
+   def s1
+        puts "s1"
+   end
+end
+
+samp=Sample.new
+samp.a1
+samp.a2
+samp.b1
+samp.b2
+samp.s1
+}}}
+
+=== Extending Objects ===
+"Object#extend"를 이용해서 객체에 다른 모듈을 끼워넣는 방식으로 확장할 수 있다.
+{{{#!plain
+module Humor
+  def tickle
+    "hee, hee!"
+  end
+end
+a = "Grouchy"    # String 객체 a를 만들었다.
+a.extend Humor   # 객체 a에 Humor 모듈을 가져다 붙였다.
+a.tickle         # Humor의 tickle를 인스턴스 메서드처럼 사용할 수 있다.
+}}}
+
+'''extend'''는 클래스안에서도 사용할 수 있다.  
+{{{#!plain
+
+module Humor
+  def tickle
+    "hee, hee!"
+  end
+end
+class Grouchy
+  include Humor
+  extend  Humor
+end
+Grouchy.tickle	 # "hee, hee!"
+a = Grouchy.new
+a.tickle	 # "hee, hee!"
+}}}
+클래스안에서 extend는 self.extend와 동일하며, 모듈의 메서드를 클래스 메서드처럼 사용할 수 있다.
+
+=== 객체지향적인 코드 ? ===
+객체지향적인 코드란 어떤 코드를 의미하는가. 
+
+아래는 영문/숫자를 제외한 문자를 제거하는 함수다.
+{{{#!plain
+def to_alphanumerics(s)
+	s.gsub /[^\w\s]/, ''
+end
+}}}
+우리는 이 코드가 "객체지향 적이지 않다"는 것을 알고 있다. 데이터와 메서드가 서로 분리돼 있기 때문이다.
+
+위의 코드를 "객체지향적"으로 변경했다.
+{{{#!plain
+class String
+    def to_alphanumeric
+        gsub /[^\w\s]/, ''
+    end
+end
+}}}
+이 코드를 이용하면, 문자열은 메서드를 이용해서 스스로를 조작할 수 있다. 데이터와 메서드의 융합. 예컨데, 대상이 아니라 스스로가 객체로서 목적이 되는 셈이다.  
+{{{#!plain
+"abcd1234!@()".to_alphanumeric
+}}}
+
+=== 코드안에서의 클래스 정의 ===
+루비는 클래스와 코드사이에 어떠한 차이도 없다. 따라서 코드 중간에 클래스를 정의할 수도 있다. 아래의 코드를 보자. 
+{{{#!plain
+3.times to
+	class C
+		puts "Hello"
+	end
+end
+}}}
+
+코드어디에서나 정의할 수 있는 특성으로, 메서드가 서로 다른 "같은 이름의 클래스"를 선언해서 사용하는 것도 가능하다.
+{{{#!plain
+class D
+    def x
+        'x'
+    end
+end
+
+class D
+    def y
+        'y'
+    end
+end
+
+obj = D.new
+puts obj.x
+puts obj.y
+}}}
+
+이런류의 코드에 어디에 쓸모있느냐 하겠는데, 메타 프로그래밍에서 유용하게 응용할 수 있다. 
+
+=== Instance Variables ===
+인스턴스 변수는 클래스의 인스턴스에서 사용하는 변수다. 객체 변수 혹은 멤버 변수라고 부릅니다. 다른 언어에서는 일반적으로 멤버 변수등의 이름으로 사용하는데, Ruby는 인스턴스 변수란 용어를 선호하는 것 같다. 여기에서는 인스턴스 변수라고 부른다. 
+
+인스턴스 변수는 변수 이름 앞에 '''@'''를 붙인다.
 {{{#!plain
 #!/usr/bin/ruby
 
@@ -44,37 +276,10 @@ instance.do_something
 nil
 2
 }}}
-네 output 값이 nil이 나옵니다. 왜 1이 아니지라고 생각할 수 있겠는데요. 인스턴스 변수는 인스턴스에서만 사용할 수 있습니다. 다른 언어는 클래스에서 변수를 사용할 수 없도록 막고 있습니다. 아래 C++ 코드를 보죠  
-{{{#!plain
-#include <iostream>
-
-class MyInfo
-{
-    public:
-        int a = 1;
-        int b = 2;
-};
-
-int main()
-{
-    MyInfo m;
-    cout << m.a << endl;
-}
-}}}
-이 코드는 컴파일시 에러를 발생합니다.
-{{{#!plain
-instance.cpp:6:17: error: ISO C++ forbids initialization of member ‘a’
-instance.cpp:6:17: error: making ‘a’ static
-instance.cpp:6:17: error: ISO C++ forbids in-class initialization of non-const static member ‘a’
-instance.cpp:7:17: error: ISO C++ forbids initialization of member ‘b’
-instance.cpp:7:17: error: making ‘b’ static
-instance.cpp:7:17: error: ISO C++ forbids in-class initialization of non-const static member ‘b’
-}}}
-
-Ruby는 에러를 발생하지는 않는데요. 대신 기본 값으로 초기화 됩니다. 그래서 기본 값인 nil이 출력된거죠. 
+output 값이 nil이 나온다. 왜 1이 아니지라고 생각할 수 있겠다. 인스턴스 변수는 인스턴스에서만 사용할 수 있다. 루비에서 인스턴스 변수는 '''nil'''로 초기화 된다.  
 
 == Accessor Methods ==
-인스턴스 변수는 바깥에서 직접 접근할 수 없습니다. 메서드를 이용해서 접근해야 한다. 만약 바깥에서 직접 접근하고 싶다면 Accessor Methods를 만들어서 사용해야 합니다. 
+인스턴스 변수는 바깥에서 직접 접근할 수 없고, 메서드를 이용해서 접근해야 한다. 만약 바깥에서 직접 접근하고 싶다면 Accessor Methods를 만들어서 사용해야 합니다. 
 {{{#!plain
 #!/usr/bin/ruby
 
@@ -90,18 +295,18 @@ end
 instance = MyClass.new
 puts instance.foo
 }}}
-foo를 읽을 수 있습니다. 하지만 읽을 수만 있습니다. 만약 값을 쓰려고 하면 에러가 발생할겁니다.
+foo를 읽을 수 있다. 하지만 읽을 수만 있으며, 값을 쓰려고 하면 에러가 발생한다.
 {{{#!plain
 instance = MyClass.new
 puts instance.foo
 instance.foo = 496
 }}}
-foo에 496을 저장하려고 하면 다음과 같은 에러 메시지가 출력됩니다.
+foo에 496을 저장하려고 하면 다음과 같은 에러 메시지가 출력된다. 
 {{{#!plain
 ./class.rb:18: undefined method `foo=' for #<MyClass:0xb76f98b8 @foo=28> (NoMethodError)
 }}}
 
-이 문제를 해결하는 방법은 두 가지 인데요. 하나는 쓰기 접근이 가능한 Accessor Methods를 만드는 겁니다.   
+이 문제를 해결하는 방법은 두 가지가 있다. 하나는 쓰기 접근이 가능한 Accessor Methods를 만드는 거다. 
 {{{#!plain
 class MyClass
   def initialize
@@ -116,7 +321,7 @@ class MyClass
   end
 end
 }}}
-이 방식은 간단하긴 합니다만 인스턴스 변수가 추가될 때마다 접근을 위한 메서드 코드를 만들어줘야 한다는 단점이 있습니다. 번거롭죠. 그래서 attr_accessor을 이용해서 접근자 메서드를 정의하는 일을 자동으로 할 수 있습니다.
+간단한 방법이긴 하지만, 인스턴스 변수가 추가될 때마다 접근을 위한 메서드 코드를 만들어줘야 한다는 단점이 있다. 번거롭다. 이 경우 '''attr_accessor'''을 이용해서 접근자 메서드를 정의할 수 있다. 
 {{{#!plain
 #!/usr/bin/ruby
 
@@ -132,9 +337,8 @@ puts instance.foo
 instance.foo = 496
 puts instance.foo
 }}}
-훨씬 간단해 졌군요.
 
-하지만 Accessor 메서드를 사용할 경우 얻을 수 있는 장점이 있습니다. 메서드이기 때문에 얻을 수 있는 장점인데요. 필요한 연산을 할 수 있습니다. 입력 값을 반올림 해서 저장하는 코드입니다. 
+하지만 Accessor 메서드를 사용할 경우 얻을 수 있는 장점이 있다. 메서드이기 때문에 연산을 위한 코드를 삽입할 수 있다. 입력 값을 반올림 해서 저장하는 코드다.
 {{{#!plain
 class MyClass
   def initialize
@@ -157,7 +361,7 @@ puts instance.foo
 }}}
 
 === 클래스 변수 ===
-클래스 변수는 이름앞에 '''@@'''연산자를 붙여서 만듭니다. 이 변수는 모든 클래스 인스턴스에서 함께 사용하는데요. C++이나 Java의 '''static 변수'''와 비슷하다고 보시면 됩니다. 
+클래스 변수는 이름앞에 '''@@'''연산자를 붙여서 만든다. 이 변수는 모든 클래스 인스턴스에서 함께 사용하는 변수다. C++이나 Java의 '''static 변수'''와 비슷하다고 볼 수 있겠다. 
 {{{#!plain
 #!/usr/bin/ruby
 
@@ -188,7 +392,6 @@ puts instanceTwo.value
 }}}
 
 === Class instance Variables ===
-이건 좀 살펴봐야 할 것 같습니다. 알듯 알듯 하면서 명확하지가 않아서요.
 
 === 클래스 메서드 ===
 클래스 메서드와 일반적인 메서드와 동일한 방법으로 선언합니다. '''self'''가 붙는 것으로 이 둘을 구분합니다. 클래스 메서드는 클래스 인스턴스를 만들지 않고도 사용할 수 있습니다. c++의 static 메서드와 비슷합니다. static 메서드와 마찬가지로 클래스 변수를 사용할 수 없습니다. 
@@ -424,11 +627,6 @@ b1 called
 c1 called
 }}}
 
-=== Ruby Class Meta-Model ===
-
-{{{#!comment
-작성일 : 2011년 8월 5일 쯤.
-}}}
 
 [[Category(420)]]
 [[tag(ruby,객체지향,클래스)]]

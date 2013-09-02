@@ -1,0 +1,108 @@
+#title AWS-VPC 관리 전략
+
+[[TableOfContents]]
+== 소개 ==
+VPC(Virtual Private Cloud)는 public cloud상에서 private cloud의 구성을 가능하게 한다. 이 서비스를 이용하면 공개된 퍼블릭 클라우드 영역에 비공개적인 프라이빗 클라우드영역을 만들 수 있다. 운영관점에서 보자면, 퍼블릭 크라우드의 장점인 '''탄력적인 자원 전개''', '''탄력적인 인프라 설계''', '''탄력적인 자원 접근'''을 누리면서, 외부와 분리된 자원운용도 함께 누릴 수 있다.  
+
+예를 들어, 퍼블릭 클라우드에서의 접근이 필요한 웹 서버는 퍼블릭 서브넷에 만들고 퍼블릭 접근이 필요 없는 데이터베이스나 애플리케이션 서버등은 프라이빗 서브넷에 두는 식의 운용이 가능하다. 
+
+VPC는 여러 서브넷을 만들수 있게 허용할 뿐만 아니라 각 서브넷을 위한 보안정책과 네트워크 라우팅 정책을 적용함으로써 체계적인 자원관리를 가능하게 한다. 또한 [wiki:[wiki:Site/System_management/VPN VPN]을 이용해서, 기업의 데이터를 클라우드와 확장할 수도 있다.    
+
+VPC는 AWS의 대부분의 서비스 - EIP, ELB, S3, RDS, Availability zone, SQS, IAM, Route 53 .... -과 연동할 수 있다. VPC와 이들 자원을 연동함으로써, 자신의 상황에 맞는 다양한 구성을 할 수 있다. 다양한 구성을 할 수 있다는 말은 제대로 사용하려면 상당한 지식이 필요하다는 걸 의미한다. AWS 서비스를 대상으로 한 클라우드 아키텍처링 서비스가 있는 이유일 것이다.  
+
+나는 AWS APV에 대한 기술적인 명도 함께 검토할 생각이다. 물론 AWS엔지니어가 아니니 정확한 검토를 할 수는 없을 것이다. 그냥 나름대로 상상의 나래를 펼 것이다. 
+== 구성 모델 ==
+VPC는 라우터, 인터넷 게이트웨이, 시큐리티그룹, 서브넷 구성을 위한 도구를 지원한다. 네트워크를 만들기 위한 필요한 대부분의 자원을 제공한다는 이야기인데, 운영자 입장에서는 좋은 소식일 수도 있고 나쁜 소식일 수도 있다. 
+
+좋은 소식은 운영자의 능력에 따라서 다양한 네트워크 모델을 만들 수 있다는 것이고, 나쁜 소식은 그 만큼의 능력이 필요하다는 것이다. 완전한 하나의 네트워크를 설계하고 구성하는게 쉬울리는 없지 않은가.  
+
+그렇다고 걱정할 필요는 없는게, AWS는 자주 사용되는 4가지 정도의 자주사용하는 VPC 모델을 템플릿 형태로 제공하고 있다. 유저는 위자드 방식의 web ui를 이용해서 간단하게 VPC 네트워크를 구성할 수 있다.
+
+나는 AWS가 제공하는 VPC 모델 중에서 다층 네트워크 모델을 응용한 모델을 설계할 것이다. 여기에서 더 나아가 VPC를 관리하기 위한 확장된 모델을 만들어볼 계획이다. 
+
+=== 설계 요소들 ===
+설계에 영향을 주는 요소들을 정리한다. 아래의 요소들을 만족하는 네트워크 구조를 가지도록 설계할 것이다.
+  1. '''Web server, WAS, Database''' 로 구성되는 서비스를 전개한다.
+  1. '''Public network와 private network의 분리'''
+     * Public network : 퍼블릭 인터넷에서 접근할 수 이는 네트워크 영역으로 Web server가 위치한다.  
+     * Private network : 퍼블릭 영역으로 부터 숨겨지는 네트워크 영역으로 WAS와 Database가 위치한다. 
+  1. '''Availability zone'''
+     * Public network와 Private network 모두 availability zone을 가진다. 예를 들어 public network에 웹 서버는 서로 다른 av zone에 위치하게 할 것이며, 마찬가지로 private network의 was도 서로 다른 av zone에 위치하게 할 것이다.
+  1. '''관리를 위한 연동'''
+     * VPC 네트워크는 관리를 위해 연동되야 한다. 
+=== 구성 ===
+구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Jat88pR_0Bhn_B0v_H32PO9I6XrnHI-6HYmxdI4bTz8/pub?w=370&amp;h=344">
+}}}
+
+=== Subnet 구성 ===
+VPC를 만들면 유저는 10.0.0.0/16의 B 클래스 서브넷을 할당받는다. 이 서브넷을 24bit 서브넷으로 나눠서 관리하면 된다. 나는 4개의 subnet으로 나눴다. 먼저 퍼블릭 서브넷과 프라이빗 서브넷으로 나누고 각각의 서브넷을 다시 2개의 AV zone 서브넷으로 나눴다. 
+
+퍼블릭 서브넷에는 인터넷에서 직접 접근할 수 있는 자원인 웹서버를 둘 것이고, 프라이빗 스브넷에는 데이터베이스와 was를 둘 것이다. 
+
+=== NAT server ===
+퍼블릭 네트워크에는 (Source NAT)[wiki:Site/System_management/NAT NAT] 서버가 놓인다. NAT 서버는 VPC에서 인터넷자원을 쉽게 접근하기 위한 목적으로 사용한다. 예컨데, 패키지 업데이트, 운영체제 패치등을 편하게 하기 위한 목적이다.
+
+VPC를 만들면 AWS에서 NAT 인스턴스를 하나 만들어 주는데, 나는 직접 만들기로 했다. 내가 선호하는 운영체제를 선택하기 위해서다. 나중에 NAT 인스턴스에 VPN을 설치해서 관리 네트워크를 구축할 거다.
+
+=== ELB === 
+ELB는 private ELB와 public ELB가 있다. 웹 서버의 경우 퍼블릭 네트워크에 직접 연결되므로 public ELB를 사용했다. Private 네트워크에 있는 자원을 로드밸런싱하길 원한다면 private ELB를 만들면 된다. 
+
+ELB는 EIP를 가질 수 없는 대신에 AWS에서 제공하는 퍼블릭 dns 서비스를 받을 수 있다. ELB사용자는 DNS의 CNAME을 설정해서 자신이 원하는 도메인이름으로 서비스할 수 있다. 
+
+ELB에 EIP를 주면, 사용자가 좀 더 편하게 ELB를 관리할 수 있으므로 ELB에 EIP를 붙일 수 없는 것은 합리적이지 않아 보일 수 있다. EIP를 붙일 수 없는 이유는 기술적인 문제로 보인다. ELB는 탄력적으로 scale-in/scale-out 할 수 있어야 하는데, 이 때문에 EIP를 할당해서 관리하기가 힘들다. EIP pool을 관리할 수는 없는 노릇이기 때문이다. DNS 기반으로 하는게 깔끔하다. 
+
+ELB에 대한 기술적인 내용은 [wiki:Site/cloud/AWS/ELB ELB 분석]문서를 참고하자.
+
+=== Internet Gateway ===
+VPC에 있는 자원들이 인터넷으로 가기 위한 관문역할을 한다. 트래픽을 인터넷으로 보내기 위해서는 Internet Gateway를 통과해야만 한다. Internet Gateway는 Gateway로서의 역할만 한다. 즉 NAT나 LB 서비스등을 제공하지는 않는다. 
+
+=== NAT Gateway ===
+아마도 stateless nat 기반의 clusterd nat 형태로 구축돼 있을 것이다. 여기에서 EIP 서비스를 위한 NAT 변환을 한다. NAT에 대한 기술적인 내용은 [wiki:Site/cloud/AWS/EIP AWS EIP]문서를 참고한다.
+
+=== Avalibility zone ===
+AV zone은 서브넷을 서로 다른 av zone에 만드는 걸로 구성할 수 있다. 이제 instance를 서로 다른 av zone에 배치하는 것으로 서비스에 대한 가용성을 높일 수 있다. 여기에서는 webserver와 database를 av zone에 분산해서 구성했다.   
+
+=== 보안을 위한 구성 ===
+Public network와 private network를 분리할 수 있기는 하지만 DMZ trust zone 수준을 생각하면 안된다. DMZ를 구성하려면 두개의 네트워크사이에 트래픽을 필터링하기 위한 방화벽이 있어야 하지만 VPC에서 제공하는 라우터는 subnet 구성이 가능하게 해줄 뿐 방화벽을 제공하지는 않는다. 
+
+Security group을 이용한 호스트 차원에서의 장치를 사용할 수 있을 뿐이다. 
+
+마음만 먹는다면, 아래와 같은 구성을 만들 수있을거다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1he0qnxZeQ5RQTyWjCYYJUc2ahCbg010vBCez-PDfqCc/pub?w=457&amp;h=580" width="350">
+}}}
+
+Public subnet과 private subnet사이에 방화벽을 위한 subnet을 두고 트래픽을 필터링하는 구조다. 기타 여러방식으로 구성할 수 있겠다. F/W룰에는 Database관리를 위해서 22번 포트도 열어둘 건데, 아예 22번 포트를 닫아버리는 방법도 있다. private subnet으로의 연결은 별도의 VPN을 이용하도록 구성하면 된다.    
+
+이렇게까지 구성해야 할지는 고민 해볼 필요는 있다. 일단 VPC로 구성하면 외부에 공개되는 IP라고는 ELB의 public ip가 유일하기 때문에 VPC 구성만으로도 보안성을 높일 수 있다. 또한 subnet으로 나누면, L2 영역에서의 공격을 무력화 할 수 있다. 특별한 이유가 있지 않다면, 여기에서 보안을 더 강화할 필요는 없다고 본다. 흔히 보안은 강력할 수록 좋다고 하지만 "강력함"을 얻기 위해서는 "비용"과 "편함"을 희생해야 한다. "비용"과 "편함"은 혁신의 한 요소로 지나치게 강력한 보안은(쓸데없이 강력한 보안)은 혁신을 가로막는 역할을 하게 된다. 상황에 맞는 보안 수준을 확보하는게 중요하다.  
+
+== VPC 자원 관리 ==
+VPC에 있는 자원은 외부로 격리되므로 관리하기가 까다로워질 수 있다. 만약 몇개 region에 VPC가 구축돼 있을 경우 이를 통합관리하는 것도 고려해야 한다. 
+
+여기에서는 VPC자원을 통합관리하기 위한 구성에 대해서 고민해 보려 한다.
+
+=== 관리 요소 ===
+VPC 자원 관리요소는 다음과 같다.
+  1. 모니터링 : VPC의 자원을 모니터링 해야 한다. Cloudwatch와 다른 모니터링 솔류션을 이용해서 구축한다. 이들 모니터링 자원은 어딘가에 수집돼야 한다.
+  1. 프로비저닝 : AWS 서비스를 사용할 경우 자동화는 필수다. 자동화는 AWS SDK와 CloudFormation, OpsWorks, [wiki:chef Site/cloud/automation]등의 조합으로 이루어질 것이다. 이를 위해서 관리 트래픽이 흐를 공간이 필요하다.
+  1. 기타 중앙 자원 : 멀티 region의 vpc가 공통자원에 접근해야할 경우도 있다. 패키지/소스 레포지토리라든지 데이터베이스 등이 그것이다.
+=== OpenVPN을 이용한 Management VPC 구성 ===
+곽역 네트워크에 흩어져 있는 subnet을 연결하는 가장 좋은 방법 중 하나는 [wiki:Site/System_management/VPN VPN]을 구성하는 것이다. AWS도 VPC를 위한 (하드웨어 기반의)VPN 서비스를 제공하는데, 나는 openvpn 기반으로 구성할 것이다. 
+
+구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1MsFGsOkscZb8m0nxRj-T9UrZkYFuXfSwabxYI421Tdw/pub?w=645&amp;h=511">
+}}}
+
+각 region에는 NAT 인스턴스가 있는데, NAT 인스턴스를 VPN Gateway로 사용한다. 이제 Region과 사무실을 Openvpn을 이용해서 [wiki:Site/System_management/SitetoSiteVPN site-to-site vpn]으로 연결하는 것으로 멀티 region의 VPC를 하나로 통합할 수 있다. 
+
+== 관련문서 ==
+ * [http://aws.amazon.com/ko/vpc Amazon VPC]
+ * [http://bcho.tistory.com/779 Amazon VPC 소개 - 조대협의 블로그] 
+== 히스토리 ==
+  * 작성일 : [[Date(2013-03-03T04:12:13)]]

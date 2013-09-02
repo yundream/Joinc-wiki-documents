@@ -1,0 +1,160 @@
+head	1.5;
+access;
+symbols;
+locks
+	root:1.5; strict;
+comment	@# @;
+
+
+1.5
+date	2013.08.26.16.12.42;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.08.26.16.04.35;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.08.26.16.03.38;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.08.26.15.53.47;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.08.26.11.40.32;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fAWS_2fNetworkLatency
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title AWS tokyo와 대한민국간 네트워크 레이턴시 측정
+
+[[TableOfContents]]
+== 소개 ==
+빠른 개발, 적당한 수준의 품질, 안정성, 글로벌 대응 등을 이유로 AWS를 이용해서 서비스를 구축하기로 했다. 문제는 korea region이 없다는 것. 물리적으로 가장 가까운 tokyo region을 사용해야 하는데, 물리적으로는 그다지 먼 거리는 아닌데, 어떤 이유인지 네트워크 지연이 꽤 된다는 보고가 있었다.  
+
+해서 이번기회에 어느 정도의 네트워크 지연(network latency)이 있는지를 테스트 해보기로 했다. 웹 기반 서비스이기 때문에, HTTP로 테스트를 진행했다.
+
+== 테스트 방법 ==
+AWS tokyo에 [wiki:man/12/Nginx nginx] 서버를 설치해서 정적페이지를 요청하고, 이때 걸리는 시간을 측정하기로 했다. 비교대상이 있어야 하는데, 국내 테스트는 ucloud를 이용하기로 했다. 
+
+테스트는 '''ab'''를 이용하기로 했다. 네트워크 대역폭을 어느 정도 사용하느냐는 중요하지 않기 때문에, 동접 하나로 테스트를 진행했다. ab 테스트는 joinc 사이트에서 진행했다. 중요하지 않은 정보들은 제거했다. 
+
+=== AWS ===
+{{{#!plain
+# ab -n 10 -c 1 http://aws.test.com/index.html  
+Server Software:        nginx/1.2.6
+Server Port:            80
+
+Document Path:          /index.html
+Document Length:        612 bytes
+
+Concurrency Level:      1
+Time taken for tests:   0.944 seconds
+Complete requests:      10
+Failed requests:        0
+Write errors:           0
+Total transferred:      8310 bytes
+HTML transferred:       6120 bytes
+Requests per second:    10.59 [#/sec] (mean)
+Time per request:       94.392 [ms] (mean)
+Time per request:       94.392 [ms] (mean, across all concurrent requests)
+Transfer rate:          8.60 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:       37   47   5.8     48      53
+Processing:    37   47   8.3     50      60
+Waiting:       37   47   8.3     50      60
+Total:         78   94  13.2     99     113
+
+Percentage of the requests served within a certain time (ms)
+  50%     99
+  66%    103
+  75%    105
+  80%    106
+  90%    113
+  95%    113
+  98%    113
+  99%    113
+ 100%    113 (longest request)
+}}}
+평균 94ms 정도의 시간이 나왔다. 
+
+=== uCloud ===
+미완성. 약 9ms 가 나왔다. 자세한 결과는 캡춰해서 정리.. 
+
+
+=== 테스트 결과에 대한 정리 ===
+AWS는 인스턴스 타입에 상관없이 평균 100ms 정도의 지연을 보여줬다. 100ms가 서비스에 적당한 수준이냐 하는 것은 서비스 종류에 따라 달라진다.  
+ * 빠른 상호작용이 필요한 게임에서 100ms는 너무 긴 지연이다. 이러한 류의 애플리케이션를 한국에서 서비스할 경우 AWS는 좋은 선택이 아니다. 
+ * 웹 기반 서비스를 계획하고 있다면 (그리 마음이 편하지는 않지만) 그럭 저럭 봐줄만한 정도의 지연이다. AWS의 ELB는 사용량이 늘어나면 늘어난만큼 대역폭을 확보해 준다. 거기에 auto scaling 기능까지 활용한다면, 안정적인 대역폭 확보와 일정 수준의 네트워크 지연을 달성할 수 있다.  
+ * 서비스의 대상이 국내로 한정된다면, 그리고 인프라가 지나치게 복잡하지 않다면 uCloud를 고려할 만 하다. 
+ * 글로벌 확산을 고려하며, 가용성과 확장성까지 고려한다면 '''aws''' 말고는 답이 없다고 보면 되겠다.(윈도 애저는 잘 모르겠다.) 
+
+== 좀 더 테스트를 진행 해야 겠다. ==
+대한민국과 tokyo region간 레이턴시는 망과 시간에 따라서 차이가 있다고 한다. 각 망별로 오랜시간에 거쳐서 테스트를 진행할 필요가 있겠다. 
+ * ab 스크립트를 5분주기로 일주일 동안 돌리고, 그 결과를 파일에 쌓는다. cron이면 충분할테다. 결과는 gnuplot 등으로 그리거나 RRD에 밀어 넣으면 되겠다. 조만간 스크립트를 만들어서 테스트를 돌려봐야 겠다. 결과는 이 문서를 통해서 공유한다. 
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d60 5
+a64 5
+AWS는 인스턴스 타입에 상관없이 평균 100ms 정도의 지연을 보여줬다. 100ms가 적당한 서비스에 적당한 수준이냐 하는 것은, 서비스 종류에 따라 달라진다.  
+
+빠른 상호작용이 필요한 게임에서 100ms는 너무 긴 지연이다. 이러한 류의 애플리케이션은 한국에서 서비스할 경우 AWS는 좋은 선택이 아니다. 웹 기반 서비스라면 (그리 마음이 편하지는 않지만) 그럭 저럭 봐줄만한 정도의 지연이다.
+
+개발하려는 서비스의 대상이 국내로 한정된다면, 그리고 인프라가 지나치게 복잡하지 않다면 uCloud를 고려할 만 하다. 그러나 글로벌 확산을 고려하며, 꽤 복잡한 인프라를 필요로 하며 거기에 가용성과 확장성까지 고려한다면 aws 말고는 사실상 답이 없다고 보면 되겠다. 
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d10 1
+a10 1
+AWS tokyo에 [wiki:man/12/nginx nginx] 서버를 설치해서 정적페이지를 요청하고, 이때 걸리는 시간을 측정하기로 했다. 비교대상이 있어야 하는데, 국내 테스트는 ucloud를 이용하기로 했다. 
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+d66 1
+a66 1
+=== 좀 더 테스트를 진행 해야 겠다. ===
+@
+
+
+1.1
+log
+@203.247.149.239;;yundream;;
+@
+text
+@d4 64
+@

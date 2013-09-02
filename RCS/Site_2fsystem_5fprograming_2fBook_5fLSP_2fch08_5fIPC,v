@@ -1,0 +1,967 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.07.29.01.40.33;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fsystem_5fprograming_2fBook_5fLSP_2fch08_5fIPC
+@
+
+
+1.1
+log
+@14.63.74.130;;Anonymous;;
+@
+text
+@#title 리눅스 시스템 프로그래밍 8장 IPC
+
+[[TableOfContents]]
+ * http://www.adamsinfo.com/mknod-tutorial/
+== IPC ==
+=== IPC 소개 ===
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/fSzUwWlAHIxMgl_H1OSZDQ?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uRXDMGr1I/AAAAAAAABQM/V2sGty4ZFZo/s800/2b6a7.png" /></a>
+}}}
+
+위의 그림은 [wiki:Site/system_programing/Book_LSP/Ch02_Beginning 2장]에서 간단히 설명했던 '''리눅스 커널 구조'''그림이다. 이번장에는 이중 '''IPC''' 에 대해서 다룰 것이다.
+
+그림에서 처럼 '''Process'''는 완전히 독립된 실행객체이다. 서로 독립되어있다는 것은 다른 프로세스(:12)의 영향을 받지 않는다는 장점이 있다. 그러나 독립되어 있으니 만큼 별도의 설비가 없이는 서로간에 통신이 어렵다는 문제가 있다. 이 문제는 이 전장의 쓰레드(:12)와 비교해보면 두드러진다. 
+
+이를 위해서 커널영역에서 IPC(:12)라는 '''내부 프로 세스간 통신 - Inter Process Communication -'''을 제공한다. 프로세스는 커널(:12)이 제공하는 IPC설비를 이용해서 프로세스간 통신을 할 수 있다.
+
+=== System V IPC 와 POSIX IPC ===
+IPC에는 두 가지 표준이 있다. 하나는 오래된 버전의 System V IPC이고, 다른 하나는 비교적 최근에 개발된 POSIX IPC다. System V IPC는 오랜 역사를 가진 만큼 이 기종간 코드 호환성을 확실히 보장해 주지만, API가 좀 구식이며 함수명도 명확하지 않다. POSIX IPC는 직관적으로 API가 구성되어 있어서 좀 더 사용하기 쉽다. 
+
+우선은 System V IPC를 다루고 나중에 시간이 되면 POSIX IPC를 다루도록 하겠다. 메커니즘은 동일 하므로 어느 것을 배우든 큰 문제는 되지 않을 것이다. 필요하면 System V IPC와 대응하는 POSIX IPC 함수들을 설명하도록 하겠다. 
+
+== IPC 설비들 ==
+현실에서도 필요에 따라 다양한 통신 설비들이 존재하는 것처럼 IPC에도 다양한 설비들이 존재한다. 각각의 필요에 따라 적당한 통신설비들이 준비되어야 하는 것과 마찬가지로 내부 프로세스간 통신에도 그 상황에 맞는 '''IPC 설비'''를 선택할 필요가 있다.
+
+상황에 맞는 IPC의 선택은 특히 fork(:12)를 이용해서 만들어진 '''멀티프로세스'''의 프로그램에 있어서 중요하다. 잘못된 IPC 설비의 선택은 코딩과정을 어렵게 만들거나 프로그램의 작동을 효율적이지 못하게 만들 수 있기 때문이다. 
+
+여기에서는 커널이 제공하는 각각의 IPC 설비들의 사용법과 장점및 단점 어떤 경우에 써야하는지에 대해서 설명할 것이다.
+
+=== PIPE ===
+pipe는 우리가 생각하는 그 파이프와 비슷하게 작동한다고 보면된다. 즉 수도 파이프와 같은 작동 원리다. 
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/zcwOFRZDCkQ0hJEPY5VKIQ?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uRXTlZsbI/AAAAAAAABQQ/BCI99aq1gh8/s800/c4bb7.png" /></a>
+}}}
+
+위 그림은 pipe(:12)의 작동원리를 보여주고 있다. 파이프는 두개의 프로세스(:12)를 연결한다. 하나의 프로세스는 단지 데이터를 쓰기만 하고 다른 하나의 프로세스는 단지 읽기만 할 수 있다. 한쪽 방향으로만 통신이 가능한 이러한 파이프의 특징 때문에 '''Half-duplex 통신 (반이중 통신)''' 라고 부르기도 한다. 이와 달리 하나의 통신선로를 이용해서 송신과 수신을 모두 할 수 있는 방식을 '''Full-duplex 통신 (전이중 통신)'''이라고 부른다.
+
+pipe와 같은 반이중 통신의 경우 하나의 통신선로는 읽기나 쓰기 중 하나만 가능하기 때문에 만약 읽기와 쓰기 즉 송수신을 모두 하길 원한다면 아래처럼 두개의 pipe를 만들어야만 한다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/akljycfyKFYE8e0C1jnVTA?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uRXsnPJnI/AAAAAAAABQU/R5ENIP9QFng/s800/fabb7.png" /></a>
+}}}
+
+==== pipe의 사용 ====
+pipe는 pipe(2)라는 함수를 이용해서 만들  있다.
+{{{#!plain
+#include <unistd.h>
+
+int pipe(int filedes[2]);
+}}}
+함수의 인자로 int형 배열이 들어가는 점에 유의하자. 배열이 넘어가는 이유는 이 함수가 '''읽기전용'''의 파이프와 '''쓰기전용'''의 파이프 2개를 리턴해 주기 때문이다. 배열의 0번째에는 '''읽기'''를 위한 파이프, 1번째에는 '''쓰기'''를 위한 파이프의 지시번호가 들어간다.
+
+
+다음은 pipe를 통해서 통신을 하는 간단한 프로그램이다.
+{{{#!plain linenum
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int main()
+{
+	int n, fd[2];
+	char buf[255];
+	 int pid;
+
+	 if (pipe(fd) < 0)
+	{
+		perror("pipe error : ");
+		exit(0);
+	}
+
+	// 파이프를 생성한다. 
+	if ((pid = fork()) < 0)
+	{
+		perror("fork error : ");
+		exit(0);
+	}
+
+	// 만약 자식프로세스라면 파이프에 자신의 PID 정보를 쓴다.
+	else if (pid == 0)
+	{
+		close(fd[0]);
+		while(1)
+		{
+			memset(buf, 0x00, 255);
+			sprintf(buf, "Hello Mother Process. My name is %d\n", getpid());
+			write(fd[1], buf, strlen(buf));
+			sleep(1);
+			}
+		}
+
+		// 만약 부모프로세스라면 파이프에서 데이타를 읽어들인다. 
+		else
+		{
+			close(fd[1]);
+			while(1)
+			{
+				memset(buf, 0x00, 255);
+				n = read(fd[0], buf, 255);
+				fprintf(stderr, "%s", buf);
+			}
+		}
+}
+}}}
+  11. pipe(2)함수를 이용해서 파이프를 생성했다. 
+  18. fork(2)함수를 이용해서 자식프로세스를 생성한다.
+  25~35. pid == 0 즉 자식 프로세스인 경우 실행될 코드다. 자식프로세스는 부모로부터 파일을 물려받는다 - 파이프도 파일이다 -. 여기에서 만들 자식프로세스는 단지 쓰기만 할 것이다. 그러므로 읽기를 위한 파이프는 close(2)를 이용해서 닫아버렸다. 이제 1초 간격으로 write(2)함수를 이용해서 쓰기파이프에 문자열을 쓴다.   
+  38~47 부모프로세스는 단지 읽기만 할 것이다. 그래서 쓰기파이프는 닫아버렸다. 그리고 read(2)함수를 이용해서 읽기 파이프에 읽을 데이터가 있는지를 기다린다.
+
+==== pipe의 장점과 단점 ====
+pipe는 매우 간단하게 사용할 수 있다는 장점이 있다. 만약 한쪽 프로세스가 단지 읽기만 하고 다른 쪽 프로세스는 단지 쓰기만 하는 단순한 데이터 흐름을 가진다면 고민 없이 pipe를 사용하면 된다. 
+
+단점은 '''반이중 통신'''이라는 점이다. 만약 프로세스가 읽기와 쓰기 통신 모두를 해야 한다면 pipe를 두개 만들어야 하는데, 구현이 꽤나 복잡해 질 수 있다. read(:2)와 write(:2)가 기본적으로 block(봉쇄)로 작동하기 때문으로 프로세스가 read(:2)대기중이라면 read가 끝나기 전에는 write를 할수가 없게 된다. 만약 두개의 프로세스가 모두 read 중이라면 영원히 block되게 될 것이다.  
+
+이러한 문제는 fork(:2)를 이용해서 '''읽기 전용 프로세스와 쓰기 전용 프로세스''' 2개를 만들거나 혹은 (나중에 다루게 될)'''입출력 다중화'''를 이용해서 해결해야 한다. 어떤 방법을 쓰더라도 구현이 복잡해지는 걸 피할 수 없다.
+
+만약 전이중 통신을 고려해야될 상황이라면 pipe 는 좋은 선택이 아니다.
+
+=== FIFO ===
+FIFO는 '''F'''irst '''I'''n '''F'''irst '''O'''ut 의 줄임말이다. 먼저 입력된게 먼저 출력되는 '''선입선출'''의 데이터 구조를 의미한다. IPC 설비로써의 FIFO 라면 '''먼저 입력된 데이터가 먼저 전달되는 내부통신 설비'''로 해석할 수 있을 것이다. 그러나 이러한 해석은 사용자를 혼란시키는 측면이 있다. 앞서의 pipe 역시 선입선출의 데이터 전달 메커니즘을 따르기 때문이다. 
+
+그러니 FIFO는 선입선출이라는 데이터구조로써의 범주가 아닌 named:::pipe(:12)라는 구조적 측면으로써 바라보도록 한다. 이하 FIFO는 named pipe라고 부르기로 하겠다.
+
+==== pipe 와 named pipe ====
+앞서 이미 배운 pipe와 named pipe의 차이점에 대해서 알아보도록 하자. 먼저 입력된 데이터가 먼저 전달되는 흐름을 가진다는 측면에서 동일한 데이터 흐름 메커니즘을 가진다. 
+
+차이점이라면 named pipe 는 사용할 pipe를 '''명명'''할 수 있다는 점이 될 것이다. pipe는 사용할 파이프를 '''명명'''할 수가 없다. 이런 의미에서 pipe는 때때로 '''익명 pipe'''라고 부르기도 한다. 
+
+그럼 파이프를 익명으로 만드는 것과 명명 - named - 해서 사용하는 것의 차이점에 대해서 알아보도록 하자.
+
+익명 파이프는 데이터 통신을 할 프로세스가 명확하게 알 수 있을 때 사용한다. 송신할 프로세스는 수신할 프로세스를 알고, 수신할 프로세스는 송신할 프로세스를 아는 경우다. 가장 대표적인 예는 부모프로세스와 자식프로세스간에 데이터 통신을 하고자 하는 경우다. 자식 프로세스와 부모 프로세스는 서로를 명확히 알고 있으므로 굳이 파이프에 이름을 줄필요가 없을 것이다. 부모와 자식간이니 굳이 이름이 없어도 대화가 통하지 않겠는가 ? 
+
+반면, 자식과 부모프로세스가 아닌 즉 전혀 모르는 프로세스들 사이에서 pipe를 이용해서 통신을 해야하는 경우를 생각해보자. 생판 모르는 사람과 대화를 하려면 '''이름'''을 알고 있어야 하듯이, 전혀 관련없는 프로세스들 사이에서 pipe를 이용해서 통신을 하려면 pipe에 '''이름'''이 주어져야 한다. named pipe 를 만든 이유다.  
+
+이제 named pipe 가 존재하는 방식을 알아보도록 하자. 복잡하게 생각할 것 없다. 리눅스에서 모든 것은 '''파일'''로 통한다고 한 것을 기억하고 있을 것이다. named pipe도 '''파일'''로 존재한다. '''pipe''' 파일이 존재하고, 이 파일의 이름이 바로 pipe의 '''name'''이 된다. 파일은 시스템 전역적으로 관리하는 객체이니, 이름만 안다면 어떤 프로세스라도 접근이 가능하다. 이제 서로 관련없는 프로세스들도 named pipe를 이용해서 통신을 할 수 있게 되었다.    
+
+==== 시스템 명령을 이용한 named pipe의 생성 ====
+named pipe는 파일의 형태로 존재하며 프로세스와 전혀 관련이 없기 때문에, 프로세스와 관련없이 독자적인 파일의 형태로 존재하게 할 수 있다. 해서 반드시 프로세스 생성후에 통신선로가 개설되는 pipe와 달리 named pipe는 미리 파일(:12)로 만들어 둘 수 있다. 일단 파일로 만들어 둔 다음에, 쓰고 싶은 프로세스가 파이프를 열어서 통신을 하는 방식이다. 공중전화와 비슷하다고나 할 수 있을 것 같다. 
+
+리눅스는 mkfifo(:1) 라는 시스템 명령어를 이용해서 named pipe를 생성할 수 있다.  
+{{{#!plain
+# mkfifo mypipe
+}}}
+ls 를 이용해서 파일의 특성을 알아보도록 하자.
+{{{#!plain
+# ls -al mypipe
+prw-r--r-- 1 yundream yundream 0 2009-04-16 19:23 mypipe
+}}}
+가장 앞의 '''p'''는 이 파일이 pipe 임을 의미한다. 성공적으로 mypipe라는 이름을 가지는 pipe가 생성되었음을 확인할 수 있다.
+
+==== 리눅스 표준라이브러리 함수를 이용한 named pipe의 생성 ====
+시스템 명령을 이용해서 named pipe (이하 파이프)를 생성할 수 있지만 이걸로는 좀 부족하다. 우리는 시스템 프로그래머 이니, 프로그램내에서 '''파이프'''를 생성할 수 있어야 한다. 리눅스는 표준 라이브러리(:12)에서 mkfifo(3)이라는 파이프 생성 함수를 제공한다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int mkfifo ( const char *pathname, mode_t mode );
+}}}
+
+다음은 인자로 주어진 문자열을 이름으로 가지는 파이프를 생성하는 간단한 프로그램이다. 
+{{{#!plain
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+    int state;
+    if (argc !=2 )
+    {
+        fprintf(stderr,"Usage : %s [filename]\n", argv[0]);
+        return 1;
+    }
+    state = mkfifo("/tmp/myfifo", S_IRUSR|S_IWUSR);
+    if (state < 0)
+    {
+        perror("mkfifo error \n");
+        return 1;
+    }
+    return 0;
+}
+}}}
+
+==== mknod 시스템 호출을 이용한 파이프 생성 ====
+앞서 mkfifo(3)을 이용해서 간단하게 파이프를 생성해 보았다. 그러나 왠지 기분이 석연치 않다. 표준 라이브러리에서 제공하는 함수를 이용했기 때문이다. 그래도 시스템 프로그래밍이니 이왕이면, 시스템콜(:12)을 이용해서 저수준에서 접근을 해보아야만 할 것 같은 기분이 든다.
+
+리눅스는 mknod(2)라는 시스템콜을 제공한다. mknod는 특수파일의 생성을 위해서 커널에서 제공하는 함수로 사용방법은 다음과 같다.  
+{{{#!plain
+include <sys/stat.h>
+
+int mknod(const char *path, mode_t mode, dev_t dev);
+}}}
+
+아래는 mknod를 이용해서 named pipe를 생성하는 간단한 프로그램이다.
+{{{#!plain
+#include <sys/stat.h>
+
+int main(int argc, char **argv)
+{
+  mknod(argv[1], S_IFIFO, 0);
+  return 0;
+}
+}}}
+
+mknod는 named pipe 외에도 문자장치파일, 블럭장치파일, Unix Domain Socket(:12)등의 파일들도 생성할 수 있다. 자세한 내용은 mknod(2) 메뉴얼 문서를 참고하기 바란다. 
+
+==== named pipe를 이용한 데이터 통신 ==== 
+named pipe를 이용하면 전형적인 서버/클라이언트 모델을 따르는 프로그램의 작성이 가능하다. 클라이언트는 요청을 하는 프로그램이고 서버는 요청을 받아서 처리하고 그 결과를 되돌려주는 프로그램이다. 서버/클라이언트 모델은 일반적으로 인터넷 서비스에 매우 익숙한 방식이다. apache와 같은 '''웹서버'''와 firefox(:12), ie 와 같은 클라이언트 프로그램이 대표적인 예이다. 
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/jBd5Z6h1G1_UN6IjCtDiJw?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uRYHGMcYI/AAAAAAAABQc/TfBOnAFnPkY/s800/sazRjUb49-kOYiDvNoM2dPQ.png" /></a>
+}}}
+
+시스템 프로그래밍에서도 이러한 서버/클라이언트 모델은 매우자주 사용된다. 인터넷에서의 서버/클라이언트 보다 그 역사도 오래되었다고 볼 수 있다.
+
+여기에서는 간단한 계산 프로그램을 named pipe를 이용해서 만들어 보도록 하겠다. 이들 프로그램은 서버/클라이언트 모델을 따르도록 할 것이다. 서버프로그램의 이름은 calc_server.c 이고 클라이언트 프로그램의 이름은 calc.c 이다. calc.c 가 두개의 숫자를 named pipe를 이용해서 calc_server에 넘기면, calc_server 는 계산을 해서 calc로 넘겨주도록 할 것이다.  
+
+=== Message Queue ===
+Queue(큐)는 선입선출의 자료구조를 가지는 통신설비로 커널에서 관리한다. 입출력 방식으로 보자면 named pipe와 동일하다고 볼 수 있을 것이다. named pipe와 다른 점이라면 name pipe가 데이터의 흐름이라면 메시지큐는 메모리공간이라는 점이다. 파이프가 아닌, 어디에서나 물건을 꺼낼수 있는 컨테이너 벨트라고 보면 될 것이다. 
+
+메시지큐의 장점은 컨테이너 벨트가 가지는 장점을 그대로 가진다. 컨테이너 벨트에 올라올 물건에 라벨을 붙이면 동시에 다양한 물건을 다룰 수 있는 것과 같이, 메시지큐에 쓸 데이터에 번호를 붙임으로써, 여러개의 프로세스가 동시에 데이터를 쉽게 다룰 수 있다.
+
+==== 메시지 큐의 생성 ====
+메시큐의 생성과 접근은 msgget(2) 함수를 통해서 이루어진다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+int msgget(key_t key, int msgflg);
+}}}
+  * '''key''' 
+    메시지큐는 커널에서 관리하는 자원으로 여러개의 메시지큐를 가질 수 있다. 그러므로 메시지큐를 실벽할 수 있는 '''key'''가 필요하다. 메시지큐는 이 '''key'''를 유일한 번호로 가지고 생성된다.
+  * '''msgflg'''
+    '''IPC_CREAT''', '''IPC_EXEL'''와 권한을 설정하기 위해서 사용한다. '''IPC_CREAT'''는 메시지큐를 생성할 때 사용한다. '''IPC_CREAT'''와 '''IPC_EXEL'''을 함께 사용하면, '''key'''를 가진 메시지큐가 존재 할때 에러를 리턴한다.
+
+==== 데이터 쓰기와 읽기 ====
+리눅스 커널은 쓰기와 읽기를 위해서 각각 msgsnd(2) 와 msgrcv(2) 함수를 제공한다.
+{{{#!plain
+#include <sys/types.h> 
+#include <sys/ipc.h> 
+#include <sys/msg.h> 
+ 
+int msgsnd (int msqid, (void *)msgp, size_t msgsz, int msgflg) 
+ssize_t msgrcv (int msqid, struct  msgbuf  *msgp,  size_t msgsz,  
+                long msgtyp, int msgflg)  
+}}}
+  * msqid : msgget를 이용해서 생성된 메시지큐 지시번호.
+  * msgp : 보내고자 하는데이터.
+  * msgsz : 보내고자 하는데이터의 크기 
+  * msgtyp : 읽고자하는 메시지의 타입.
+     * msgtyp이 0이라면 큐의 첫번째 데이터를 읽어들인다.
+     * msgtyp가 0보다 크면, 커널은 큐에서 msgtyp 번호를 가지는 가장 오래된 메시지를 찾아내서 되돌려진다. 
+  * msgflg : IPC_NOWAIT가 지정되면 비봉쇄모드로 작동한다. 즉 이용가능한 메시지가 없으면 기다리지 않고 바로 ENOMSG 를 반환한다. 그렇지 않으면 큐에 읽을 데이터가 쌓일때까지 기다린다. 
+
+보내고자 하는 데이터는 '''msgp'''를 이용해서 보내는데, 데이터 구조는 다음과 같다.
+    {{{#!plain
+struct msgbuf 
+{ 
+    long mtype;             // 메시지 타입 
+    char mtext[BUFF_SIZE];  // 보내고자 하는 데이터 
+} 
+}}}
+보내고자 하는 데이터는 어느정도 정형화 되어 있는 측면이 있다. 즉 '''mtype'''을 가져야 하는데, 이것을 이용해서 자기가 읽고 싶은 메시지 만을 읽어올 수 있다. mtype을 이용하면, 여러개의 데이터 큐가 있는 것처럼 사용할 수 있다. 
+{{{#!html
+<br>
+<a href="http://picasaweb.google.com/lh/photo/zfFOTgoJhjpwX2qJTRtNMw?feat=embedwebsite"><img src="http://lh4.ggpht.com/_Os5qf5urx_A/S6uRX3B9hCI/AAAAAAAABQY/6GsGhYufu_Y/s800/s6ki9wihx8SOQltnBlQRyBw.png" /></a>
+}}}
+
+=== 공유메모리 - Shared Memory ===
+데이터를 공유하는 방법에는 크게 두가지가 있다. 하나는 통신을 이용해서 데이터를 주고 받는 것이고, 다른 하나는 데이터를 아예 공유 w즉 함께 사용하는 것이다. pipe, named pipe, message queue(:12)가 통신을 이용한 설비라면 '''공유메모리'''가 데이터 자체를 공유하도록 지원하는 설비다.
+
+프로세스는 자신만의 메모리영역을 가지고 있다. 이 메모리 영역은 다른 프로세스가 접근해서 함부로 데이터를 읽거나 쓰지 못하도록 커널에 의해서 보호가 된다. 만약 다른 다른 프로세스의 메모리 영역을 침범하려고 하면 커널은 침범 프로세스에 '''SIGSEGV''' 경고 시그널을 보내게 된다.
+
+다수의 프로세스가 동시에 작동하는 linux(:12) 운영체제의 특성상 프로세스의 메모리영역은 반드시 보호되어야 할것이다. 그렇지만 메모리영역에 있는 데이터를 다른 프로세스도 사용할 수 있도록 해야할 경우도 있을 것이다. 물론 pipe등을 이용해서 데이터 통신을 이용해서 데이터를 전달하는 방법도 있겠지만 thread(:12)에서 처럼 메모리영역을 공유한다면 더 편하게 데이터를 함께 사용할 수 있을 것이다.
+
+공유메모리는 프로세스간 메모리 영역을 공유해서 사용할 수 있도록 허용한다. 프로세스가 공유메모리 할당을 커널에 요청하면 커널은 해당 프로세스에 메모리 공간을 할당한다. 이후 어떤 프로세스든지 해당 메모리영역에 접근할 수 있다.  
+
+공유메모리는 중개자가 없이 곧바로 메모리에 접근할 수 있기 때문에 다른 모든 IPC들 중에서 가장 빠르게 작동한다.  
+
+
+==== 공유메모리 함수들 ====
+공유메모리는 공간은 커널이 관리한다. 그러므로 프로세스가 종료되면 반환되는 메모리영역과는 달리 생성한 프로세스가 종료하더라도 공유메모리는 그대로 남아있게 된다. 
+
+공유메모리는 다음과 같은 과정을 거쳐서 사용한다.
+  1. 공유메모리 영역을 생성을 요청한다.
+  1. 공유메모리를 자신의 프로세스에서 맵핑해서 사용할 수 있도록 요청한다.
+  1. 공유메모리를 사용한다. 
+이를 위해서 linux(:12)는 다음과 같은 함수를 제공한다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/shm.h>
+
+int shmget(key_t key, int size, int shmflg)
+void *shmat( int shmid, const void *shmaddr, int shmflg )
+int shmdt( const void *shmaddr)
+int shmctl(int shmid, int cmd, struct shmid_ds *buf)
+}}}
+'''shmget''' : 이 함수를 이용해서 공유메모리공의 생성을 요청할 수 있다.
+  * '''key''' : 공유메모리는 커널에 의해서 관리되며, 각각 고유한 식별번호인 '''key'''를 가지고 있다. 이 key 번호를 이용해서 사용할 공유메모리를 명시할 수 있다.
+  * '''size''' : 공유메모리의 최소 크기다.  만약 이미 생성된 공유메모리를 재사용하고자 한다면 크기를 0으로 한다.
+  * '''shmflg''' : 공유메모리는 다른 프로세스도 접근할 수 있다. 그러므로 접근을 제어할 필요가 있는데, shmflag를 이용해서 접근권한을 명시할 수 있다. 또한 '''IPC_CREAT''' 와 '''IPC_EXCL'''을 이용해서, 생성방식을 명시할 수 있다.  
+     1. IPC_CREAT : '''key'''를 식별번호로 가지는 공유메모리 공간을 생성한다. 
+     1. IPC_EXCL : IPC_CREAT와 같이 사용되며, 만약 공유메모리 공간이 이미 존재할 경우 '''error'''를 리턴한다.  
+
+'''shmat''' : 이 함수를 이용해서 프로세스가 생성한 메모리를 생성된 공유메모리 영역으로 맵핑시킬 수 있다.  
+  * '''shmid''' : shmget을 이용해서 생성된 공유메모리의 식별번호.
+  * '''shmaddr''' : 맵핑시킬 공유메모리영역의 주소 
+  * '''shmflg''' : 읽기전용, 읽고쓰기전용, 쓰기전용등의 접근방식을 정의할 수 있다. 
+
+'''shmdt''' : 프로세스가 더이상 공유메모리를 사용할 필요 없다면 이 함수를 이용해서 맵핑정보를 없앤다. 이것은 어디까지나 맵핑정보를 없애는 것일 뿐, 공유메모리를 없애는 것은 아니다.
+
+'''shmctl''' : 공유메모리 영역을 제어하기 위해서 사용한다. 공유메모리를 삭제하거나 잠금의 설정 해제 혹은 권한을 변경하기 위한 목적으로 사용할 수 있다. 두번째 인자인 '''cmd'''를 이용해서 원하는 작업을 내릴 수 있다. 
+  * '''IPC_STAT''' : 공유메모리 공간의 정보를 가져오기 위해서 사용한다. 내용은 '''buf'''에 저장된다. 다음은 struct shmid_ds 의 설명이다.
+    {{{#!plain
+struct shmid_ds
+{
+    struct         ipc_perm shm_perm;    // 퍼미션
+    int            shm_segsz;            // 메모리 공간의 크기
+    time_t         shm_dtime;            // 마지막 attach 시간 
+    time_t         shm_dtime;            // 마지막 detach 시간 
+    time_t         shm_ctime;            // 마지막 변경 시간
+    unsigned short shm_cpid;             // 생성프로세스의 pid
+    unsigned short shm_lpid;             // 마지막으로 작동한 프로세스의 pid
+    short          shm_nattch;           // 현재 접근한 프로세스의 수
+};
+}}}
+  * '''IPC_SET''' : 공유메모리의 권한변경을 위해서 사용된다. 슈퍼유저혹은 공유메모리의 사용권한을 가지고 있어야 한다.
+  * '''IPC_RMID''' : 공유메모리를 삭제한다. 이 명령을 사용한다고 해서 즉시 공유메모리가 삭제되지는 않는다. 다른 프로세스가 공유메모리를 사용하고 있을 수도 잇기 때문이다. 그래서 공유메모리를 맵핑해서 사용하는 프로세스의 갯수가 0, 즉 shm_nattch 가 0일때까지 기다렸다가 삭제된다. 해당 공유메모리영역에 삭제표시를 하는 것이라고 보면 될것 같다. 
+
+
+==== 공유메모리 다루기 ====
+이제 공유메모리를 이용해서 데이터를 공유하는 간단한 프로그램을 만들어보도록 하겠다. 우선 '''check_process.c'''라는 프로그램을 하나 만들 것이다. 이 프로그램은 현재 시스템에서 실행중인 프로세스의 갯수를 1초단위로 계산해서 공유메모리 영역에 쓰는 일을 한다. 다음으로 '''get_process_num.c'''이라는 프로그램을 만들 건데, 이 프로그램은 공유메모리 영역에 접근해서 실행중인 프로세스의 갯수를 얻어와서 화면에 출력하는 일을 한다.
+
+프로세스의 갯수는 popen(3)함수를 이용해서, ps(1)를 실행시킨 다음 라인수를 계산해서 얻어오도록 하겠다. 프로세스 갯수는 proc(:12)파일시스템을 이용해서 얻어올 수도 있겠지만 아직 proc를 다루지 않은관계로 간단한 popen을 이용하기로 했다.
+
+{{{#!plain linenum
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+	int shmid;
+	void *shared_memory = (void *)0;
+	FILE *fp;
+	char buff[1024];
+	int skey = 5678;
+
+	int *process_num;
+	int local_num;
+
+	// 공유메모리 공간을 만든다.
+	shmid = shmget((key_t)skey, sizeof(int), 0666|IPC_CREAT);
+	if(shmid == -1)
+	{
+		perror("shmget failed : ");
+		exit(0);
+	}
+
+	// ipcs(s)를 이용해서 확인하기 위함.
+	printf("Key %x\n", skey);
+
+	// 공유메모리를 맵핑한다.
+	shared_memory = shmat(shmid, (void *)0, 0);
+	if(!shared_memory)
+	{
+		perror("shmat failed : ");
+		exit(0);
+	}
+
+	process_num = (int *)shared_memory;
+
+	for (;;)
+	{
+		local_num = 0;
+		fp = popen("ps axh", "r");
+		if(fp != NULL)
+		{
+			while(fgets(buff,1024, fp))
+			{
+				local_num++;
+			}
+		}
+		*process_num = local_num;
+		printf("process_num is %d\n", (int)*process_num);
+		sleep(5);
+		pclose(fp);
+	}
+}
+}}}
+  '''20''' shmget 을 이용해서 공유메모리 공간을 생성했다. key 번호는 5678로 했다.
+  '''28''' skey를 16진수로 표시했다. 리눅스는 ipcs(1)라는 ipc 관리 프로그램을 제공하는데, 여기에서는 key 번호가 16진수로 표시되기 때문에 확인을 쉽도록 하기 위함이다. 
+  '''31''' shmat를 이용해서 공유메모리를 맵핑한다.
+  '''40 ~ 50''' popen(3)을 이용해서 ps(1)를 실행시키고, 라인수를 계산했다. 라인수가 프로세스의 갯수이다. 프로세스의 갯수는 공유메모리 공간에 저장한다. 이제 다른 프로세스에서 공유메모리 공간에 접근해서 프로세스의 갯수를 얻어올 수 있게 되었다.  
+
+이제 공유메모리 공간에 접근해서 프로세스의 갯수를 읽어오는 프로그램을 만들어 보도록 하겠다. 이 프로그램의 이름은 read_process_num.c 로 하겠다.
+
+{{{#!plain linenum
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{   
+    int shmid;
+    int skey = 5678;
+    
+    int *shared_memory;
+    
+    shmid = shmget((key_t)skey, sizeof(int), 0666);
+    if(shmid == -1)
+    {
+        perror("shmget failed\n");
+        exit(0);
+    }
+    
+    shared_memory = shmat(shmid, (void *)0, 0);
+    if(!shared_memory)
+    {
+        perror("shmat failed : ");
+        exit(0);
+    }
+    printf("shm id : %d\n", shmid);
+    while(1)
+    {   
+        int num = *shared_memory;
+        printf("Process Num : %d\n", num);
+        sleep(1);
+    }
+}
+}}}
+  * '''11''' : 사용할 공유메모리의 키번호는 5678 이다.
+  * '''15~19''' : shmget 를 이용해서, 공유메모리 식별자를 얻어온다.
+  * '''22~27''' : shmat 를 이용해서 공유메모리를 매핑한다. 
+  * '''29~34''' : 1초 간격으로 돌면서 공유메모리의 내용을 읽어온다.
+
+check_process 를 먼저 실행시키고, 그후 get_process_num을 실행시키면, 공유메모리에 있는 프로세스갯수를 읽어오는 것을 확인할 수 있을 것이다.
+
+==== 장점과 한계 ====
+공유메모리는 비교적 간단하게 사용할 수 있다. 또한 커널메모리영역에서 관리하기 때문에 매우 빠르게 접근가능하다는 장점도 가진다. 그러나 커널설정에 종속적이기 때문에, 사용하기전에 커널에서 허용하고 있는 공유메모리 세그먼트의 크기를 확인해야 한다.
+
+일반적으로 리눅스커널의 초기값은 '''32MB'''로 잡혀있다. 상당히 작은 크기인데, 다행이 2.6 이상의 커널에서는 단일 공유메모리 세그먼트의 크기를 1GB까지 사용할 수 있도록 지원되고 있다. 1GB면 왠만한 애플리케이션을 다루는데에는 큰 문제 없을 것으로 생각된다.
+
+공유메모리 세그먼트의 크기는 /proc/sys/kernel/shmmax 에서 확인할 수 있다.  
+{{{#!plain
+# cat shmmax 
+33554432
+}}}
+다음과 같이 세그먼트의 크기를 변경할 수 있다. 512MB로 확장하고 싶다면, 아래와 같이 파일에 써주기만 하면 된다.
+{{{#!plain
+# echo "536870912" > /proc/sys/kernel/shmmax
+혹은
+# echo "512*1024*1024" | bc(3) > /proc/sys/kernel/shmmax
+}}}
+
+공유메모리는 메시지 전달 방식이 아니기 때문에 '''데이터를 읽어야되는 시점을 알 수 없다'''는 단점을 가진다. 이 문제를 해결하려면 다른 IPC 설비들을 응용해야 한다. 
+
+=== Memory Map ===
+메모리맵도 공유메모리 공간과 마찬가지로 메모리를 공유한다는 측면에 있어서는 서로 비슷한 측면이 있다. 다른점은 메모리맵의 경우 '''열린파일을 메모리에 맵핑'''시켜서, 공유한다는 점일 것이다. 파일은 시스템전역적인 자원이니 서로 다른 프로세스들끼리 데이터를 공유하는데 문제가 없을 것임을 예상할 수 있다.
+
+메모리맵으로 할 수 있는 일들은 다음과 같다.
+
+==== Memory map 생성과 삭제 ====
+리눅스는 mmap(2)라는 시스템 함수를 제공 한다. 이 함수를 이용해서, 열려진 파일을 메모리에 맵핑시킬 수 있다.  
+{{{#!plain
+#include <sys/mman.h>
+
+void *mmap(void *addr, size_t length, int prot, int flags,
+       int fd, off_t offset);
+}}}
+  * addr : '''NULL'''일경우 매핑시킬 메모리 영역을 커널이 선택한다. 이반적으로 '''NULL'''을 사용하면 된다. mmap은 매핑된 메모리를 가리키는 주소를 반환한다. 
+  * length : '''offset'''에서 시작하여 length 만큼을 주소로 대응하도록 한다. 보통은 0으로 지정한다.
+  * prot : 메모리 보호모드를 설정하기 위해서 사용한다.
+    || PROT_EXEC   || 페이지는 실행될 수 있다.   ||
+    || PROT_READ   || 페이지는 읽을 수 있다.     ||
+    || PROT_WRITE  || 페이지는 쓰여질 수 있다.   ||
+    || PROT_NONE   || 페이지는 접근될 수 없다.   ||
+  * fd : 대응시킬 파일의 파일지정번호
+  * flag : 대응되는 객체의 타입, 페이지 복사본에 대한 수정이 다른 프로세스도 가능하게 할것인지, 혹은 복사할 것인지, 독립된 메모리 영역으로 복사시킬 건지등을 결정 한다.
+    || MAP_FIXED    || 지정된 주소 이외의 다른 주소를 선택하지 않는다. 사용하지 않는게 좋다.  ||
+    || MAP_SHARED   || 다른 프로세스들과 대응영역을 공유한다.                                 ||
+    || MAP_PRIVATE  || copy-on-write 한다. 즉 독립적으로 다른 프로세스에 복사된다. 대응영역이 공유되지 않는다. ||
+
+==== 예제 : 생산자 ====
+간단한 예제 프로그램을 만들어 보기로 했다. 이 프로그램은 '''mymmap.mm'''이라는 파일을 만들고 메모리에 대응시킨다. 대응시킨 메모리에는 int형 데이터를 쓴다. 
+{{{#!plain linenum
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+
+int main()
+{
+    int fd;
+    int *pmmap;
+    int i;
+    fd = open("mymmap.mm", O_RDWR|O_CREAT, 0666);
+    if(fd < 0)
+    {
+        perror("open");
+        exit(1);
+    }
+    ftruncate(fd, 4096);
+
+    pmmap = (int *)mmap(0, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if((unsigned)pmmap == (unsigned)-1)
+    {
+        perror("mmap");
+        exit(1);
+    }
+
+    for(i = 0; i < 100; i++)
+    {
+        pmmap[i] = i*i; 
+    }
+    pmmap[i+1] = -1; 
+    getchar();
+    munmap(pmmap, 4096);
+    close(fd);
+    return 0;
+}
+}}}
+  1. '''13''' : open(2) 함수를 이용해서 mymap.mm 파일을 오픈한다.
+  1. '''19''' : 파일이 메모리에 대응되고 데이터가 저장되기 때문에, 데이터의 사이즈를 예상해서 적당한 파일크기를 만들어줘야 한다. malloc(2)대신 사용하는 거라고 볼 수 있다. 파일의 크기는 4096으로 잡았고, ftruncate(2)라는 함수를 이용해서 파일을 생성했다. 
+  1. '''21''' : mmap(2)를 이용해서 mymap.mm 파일을 메모리에 대응시킨다. 
+  1. '''28-31''' : 만들어진 메모리맵에 int형 데이터를 쓴다. 100개의 값을 저장하기로 했으니, 100 * sizeof(int) 만큼의 공간이 사용될 것이다. 
+  1. '''32''' : 마지막에 '''-1'''을 입력한다. 배열의 끝임을 알려주기 위해서 사용했다.
+  1. '''33''' : getchar(3)함수로 키보드 입력을 기다린다.
+
+==== 예제 : 소비자 ====
+이 프로그램은 위에서 만들어진 메모리맵 파일의 데이터를 읽어오는 일을 한다. 
+{{{#!plain linenum
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+
+int main(int argc, char **argv)
+{
+    int fd;
+    int i=0;
+    char *file = NULL;
+    char *linebuf;
+    int *maped;
+    int flag = PROT_WRITE | PROT_READ;
+
+    if ((fd = open("mymmap.mm", O_RDWR, 0666)) < 0)
+    {
+        perror("File Open Error");
+        exit(1);
+    }
+
+    // mmap를 이용해서 열린 파일을 메모리에 대응시킨다. 
+    // file은 대응된 주소를 가리키고, file을 이용해서 필요한 작업을  
+    // 하면 된다.  
+    if ((maped =
+        (int *) mmap(0, 4096, flag, MAP_SHARED, fd, 0)) == -1)
+    {
+        perror("mmap error");
+        exit(1);
+    }
+
+    while(1)
+    {
+        if (maped[i] == -1) break;
+        printf("> %d\n",maped[i]);
+        i++;
+    }
+    close(fd);
+}
+}}}
+  1. '''32-37''' : 배열의 끝. 즉 배열의 값이 -1인게 확인될 때까지 루프를 돌면서 메모리맵에 저장된 데이터를 읽어 온다. 
+
+==== 메모리 맵의 장점 ====
+메모리맵은 파일을 메모리에 대응시킴으로써, 프로세스간 메모리를 서로 공유할 수 있다는 IPC(:12)로서의 장점을 가진다는 것을 알 수 있다. 이외에 또다른 장점이 있는데, 파일 입출력에서의 비용을 줄일 수 있다는 점이다. 파일에서의 작업은 open(2), read(2), write(2), lseek(2)와 같은 상당한 비용을 지불하는 함수를 통해서 이루어진다. 매모리 맵을 이용하면 이러한 비용을 줄일 수 있다.
+
+또하나의 장점은 메모리의 내용을 파일로 남길 수 있다는 점이다. 메모리의 내용은 휘발성으로 프로세스가 종료되면 증발하게 된다. 보통 메모리의 정보를 남겨야할 필요가 생기면 프로세스의 종료전에 파일로 남기는데, 메모리맵의 경우 파일로 대응되기 때문에, 비교적 안전하게 정보를 남길 수 있다는 장점도 가진다. 
+
+=== 세마포어 - Semaphore ===
+세마포어는 전통적인 IPC(:12) 설비의 하나로 제공되기는 하지만 다른 IPC(:12) 설비와는 약간 다른 특징을 가진다. 다른 IPC(:12) 설비들은 모두가 데이터를 공유하기 위한 특징을 가지는데 반해서 세마포어는 자원에 대한 접근을 제어하기 위한 목적으로 사용된다. 세마포어 그 자체가 데이터를 공유하기 위한 어떤 공간을 제공하지는 않는다는 얘기다. 대게의 경우에는 다른 IPC(:12)설비를 지원하기 위한 이유로 사용된다.
+
+매모리맵을 예로 들어보자. 여러개의 프로세스가 하나의 메모리맵에 엑세스를 한다면, 메모리맵에 한번에 하나씩의 프로세스만 접근이 가능하도록 제어할 필요가 있을 것이다. 그렇지 않다면 다음과 같은 문제가 발생할 수 있다.  
+
+count ++ 하는 프로그램
+  1. 메모리맵에 0이 저장되어 있다. count = 0;
+  1. A 프로그램이 메모리맵의 값을 읽어들인다. count = 0; 
+  1. B 프로그램이 메모리맵의 값을 읽어들인다. count = 0;
+  1. A 프로그램이 매모리맵의 값 + 1 한다. count = 1;
+  1. B 프로그램이 매모리맵의 값 + 1 한다. count = 1;
+
+뭔가 잘못되었다는 것을 알 수 있다. A와 B 프로세스가 count++ 을 했으니, count 에는 2가 들어있어야 겠지만 접근제어가 되지 않은 관계로 count에 1이 들어 있다.
+
+이 문제는 특정 영역에 단지 하나의 프로세스만 진입가능하도록 하는 것으로 해결할 수 있을 것이다.
+
+count ++ 하는 프로그램 : 접근제어를 한 버전
+  1. 메모리맵에 0이 저장되어 있다. count = 0;
+  1. A 프로그램이 메모리맵의 값을 읽어들인다. count = 0; 
+  1. 다른 프로세스가 접근하지 못하도록 한다. 
+     1. B 도 메모리맵의 값을 읽을려고 하지만 접근을 하지 못하기 때문에 대기한다.
+  1. A 프로그램이 매모리맵의 값 + 1 한다. count = 1;
+  1. 다른 프로세스가 접근하도록 허용한다.
+  1. 기다리던 B 프로세스가 메모리맵의 값을 읽어들인다. count = 1; 
+  1. B 프로세스가 +1 연산을 한다. count = 2;
+바로 세마포어를 이용해서 할 수 있는 일이다.
+
+==== 세마포어의 작동원리 ====
+세마포어 '''S'''는 정수값을 가지는 변수며, '''P'''와 '''V''' 두개의 명령에 의해서 접근할 수 있다. '''P'''는 '''테스트'''를 위한 명령이며 '''V'''는 '''증가'''를 위한 명령이다.
+
+진입을 제한해야 하는 영역을 '''임계영역'''이라고 하면, '''P'''는 임계구역에 진입하기 위해서 수행이되고, '''V'''는 (작업을 마치고)임계영역에서 나올때 수행된다. 당연히 '''P'''와 '''V''' 명령의 수행은 원자성을 보장해야 한다. 하나의 프로세스가 '''P'''와 '''V'''를 이용해서 세마포어 값을 변경할때, 다른 프로세스가 이 값을 변경할 수 있으면 안된다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/SZ86uxszJuL_2ybuhBhOYw?feat=embedwebsite"><img src="http://lh6.ggpht.com/_Os5qf5urx_A/S6uQyy6P40I/AAAAAAAABQI/SZDsuBKcAqk/s800/shsUfX51nBSZEZ769uIlfng.png" /></a>
+}}}
+   1. P(S) 를 이용해서, 세마포어의 값을 테스트한다. 
+      * 세마포어의 값이 1이라면, 임계영역에 들어가게 된다.
+      * 세마포어의 값은 1만큼 감소한다.
+      * 이제 세마포어의 값은 0이기 때문에 다른 프로세스는 임계영역에서 입구에서 대기해야 한다. 
+   1. V(S) 를 이용해서, 세마포어의 값을 증가한다.
+      * 작업을 마치고 임계영역을 빠져나갈때, 세마포어의 값을 1증가한다. 
+      * 세마포어의 값이 1이 되었기 때문에, 대기하던 프로세스가 임계영역에 진입할 수 있게 된다.
+
+==== 세마포어의 사용 ====
+세마포어는 3개의 함수(:12)를 제공한다. 즉
+   1. 세마포어의 생성 : 자원을 사용하기 위해서 알림판을 만드는 거라고 보면 된다.
+   1. 세마포어의 획득 및 되돌려주기 : 알림판을 '''사용가능/불가능'''으로 만드는 작업
+   1. 세마포어의 세부값 제어
+
+{{{#!plain
+#include <sys/types.h> 
+#include <sys/ipc.h> 
+#include <sys/sem.h> 
+ 
+int semget(key_t key, int nsems, int semflg); 
+int semop (int semid, struct sembuf *sops, unsigned nsops); 
+int semctl(int semid, int semnum, int cmd, union semun arg); 
+}}}
+
+세마포어는 커널이 관리한다. semget을 이용해서 커널에 세마포어의 생성 혹은 기존에 만들어진 세마포어의 접근을 요청할 수 있다. semget의 인자는 다음과 같다.
+  * key : 세마포어에 접근하기 위한 key 값 
+  * nsems : 세마포어 계수로 접근제하하려는 자원의 수  
+  * semflg : 세마포어 동작제어를 위한 옵션 
+     || IPC_CREATE   || '''key'''에 해당하는 세마포어가 없다면 새로 생성한다. ||
+     || IPC_EXCL     || 세마포어가 이미 있다면, 에러를 리턴해서 세마포어에 접근하지 못한다. 이미 열려진 세마포어에 접근하려면 이 옵션이 없어야 한다. ||
+
+==== 세마포어 예제 프로그램 ====
+{{{#!plain
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+#include <sys/types.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
+#include <stdio.h>
+
+#define MAX_THREAD  2
+
+int count = 0;
+
+void *myThreadFunc(void *data);
+
+struct sembuf mysem_open = {0, -1, SEM_UNDO};
+struct sembuf mysem_close = {0, 1, SEM_UNDO};
+
+union snum
+{
+	int val;
+};
+
+static int semid;
+
+int main(int argc, char **argv)
+{
+	int thr_id;
+	int status;
+	int i;
+	union snum s_union;
+	pthread_t pt[MAX_THREAD];
+
+	semid = semget(2345, 1, 0600|IPC_CREAT);
+
+	if(semid == -1)
+	{
+		perror("semget error");
+		return 1;
+	}
+
+	s_union.val = 1;
+	if(semctl(semid, 0, SETVAL, s_union) == -1)
+	{
+		return 1;
+	}
+
+	for(i = 0; i < MAX_THREAD; i++)
+	{
+		thr_id = pthread_create(&pt[i], NULL, myThreadFunc, (void *)&i);
+		if(thr_id < 0)
+		{
+			perror("Thread Create Error");
+			return 1;
+		}
+		sleep(1);
+	}	
+	for(i = 0; i < MAX_THREAD; i++)
+	{
+		pthread_join(pt[i], NULL);
+	}	
+}
+
+void *myThreadFunc(void *data)
+{
+	int thread_num = *(int *)data;
+	int lnum;
+	printf("Thread Create %d\n", thread_num);
+	while(1)
+	{
+		semop(semid, &mysem_open, 1);
+		lnum = count;
+		sleep(1);
+		lnum = lnum+1; 
+		count = lnum;
+		printf("[%d] count : %d\n", thread_num, count);
+		semop(semid, &mysem_close, 1);
+	}
+}
+
+}}}
+이 프로그램은 카운팅 프로그램이다. 두 개의 스레드가 하나의 count 변수에 접근하는데, 세마포어를 이용해서 접근을 제어하고 있다. 스레드 함수인 myThreadFunc에서 semop 부분을 주석 처리한 후 어떤 결과가 나오는지 확인해 보도록 하자. 
+
+==== 세마포어의 장점과 단점 ====
+세마포어는 변수의 값을 확인해서 임계영역으로의 진입을 제어한다. 그렇다면 프로그램변수로도 임계영역의 진입을 제어할 수 있을 것이다. 대략 다음과 같다. 
+
+{{{#!plain
+P(S) 
+{
+    while (S <= 0)
+        continue;
+    S--;
+}
+/* 임계영역 */
+
+V(S)
+{
+    S++;
+}
+}}}
+매우 간단한 구현으로 보이지만, 이방법을 이용하게 될 경우 프로세스가 busy wait 상태에 놓이기 된다. 또한 다른 프로세스들간에는 사용하기 힘들다는 문제점도 가진다. 반면 세마포어는
+  1. busy wait 상태에 놓이지 않는다.
+  1. 커널에서 관리되기 때문에 다른 프로세스들간에도 사용할 수 있다.
+는 장점을 가진다.
+
+세마포어를 제어하기 위해서는 P함수와 V함수를 사용해야 하는데, 이 두개의 함수는 독립적이다. 때문에 잘못사용하게 될경우 deadlock(:12)에 빠질 수 있다.
+
+=== Socket ===
+Socket는 물리적으로 멀리 떨어져 있는 컴퓨터끼리의 통신을 도와주기 위한 '''통신계층'''이다. Socket(:12)은 원격통신을 위한 여러가지 함수들을 제공하는데, 이들을 이용해서 물리적으로 떨어진 컴퓨터 간의 통신이 가능하게 된다. 인터넷을 이용한 통신 프로그램의 대부분이 socket 기반으로 작성된다고 보면 틀림없을 것이다.  
+
+컴퓨터와 컴퓨터간의 통신이라고는 하지만 실질적으로는 이쪽 컴퓨터의 '''프로세스와 저쪽 컴퓨터의 프로세스가 통신'''을 하는 것다. 이렇게 프로세스간 통신을 한다는 점에서 봤을 때 IPC(:12)설비와 근본적으로 다른점은 없다고 볼 수 있다. 차이점이라면 통신이 이루어지는 영역이 컴퓨터 내부인지 아니면 온라인인지 하는 것이될 것이다.
+
+{{{#!html
+<a href="http://picasaweb.google.com/lh/photo/QWcnlGbYVX1eL4FraZsVgw?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S6uRbNvlGYI/AAAAAAAABQg/hRN2DM45MZQ/s800/sxVrO5lmNAPD9L_s0mDodMA.png" /></a>
+}}}
+
+비록 socket이 원격의 컴퓨터 프로세스들간의 통신을 위한 도구이지만 이러한 '''프로세스간 통신'''이라는 비슷한 특성으로 '''내부 프로세스간 통신'''을 위한 방법을 제공한다. 즉 '''외부 프로세스간 통신'''으로 사용할건지 '''내부 프로세스간 통신'''으로 사용할 건지를 선택할 수 있게끔 하고 있다. socket(:12)는 단일 주제만으로도 책한두권은 만들어낼 수 있는 방대한 양이다. 여기에서는 socket의 기능중 '''내부 프로세스간 통신'''지원 기능에 대해서만 알아보도록 할 것이다. 
+
+==== Unix Domain Socket 의 장점  ====
+Unix Domain Socket(이하 소켓)의 가장 큰 장점은 네트워크 통신에 사용하던 기술을 그대로 사용할 수 있다는 점일 것이다. 코딩의 일관성을 유지할 수 있도록 도와준다. 얻을 수 있는 장점은 단지 함수(:12)를 그대로 사용할 수 있다는 점 이상이다. 다수의 클라이언트를 동시에 처리하기 위한 방법, 메시지 관리를 위한 방법등 네트워크 프로그래밍에서 사용하던 응용기술들 역시 그대로 사용할 수 있다는 장점을 가진다.
+
+또한 소켓은 다른 IPC 설비와는 달리 꽤나 높은 수준에서 추상화가 되어 있어서, 좀더 직관적으로 프로그램을 작성할 수 있다. 
+
+다른 IPC 설비 들은 특정용도에 맞도록 제작된 측면이 있어서, 어떤 곳에서는 효율적이지만 또다른 곳에서는 비효율적이거나 컴퓨터자원의 제한을 많이 받는다거나 하는 단점이 있다. 이에 비해서 소켓은 매우 범용적으로 사용할 수 있다. 물론 범용적으로 사용할려면 그만큼 생각해야 할 것들이 좀더 있을 수 있긴하다.
+
+파이프로도 충분한 간단한 프로그램에 소켓을 사용하는 건 비효율적이긴 하지만 어느정도 이상의 규모가 된다면 소켓을 이용하는 걸 추천한다.  
+
+==== Unix Domain Socket 예제 ====
+이 프로그램은 에코서버/클라이언트의 IPC 버전이다. 
+
+먼저 서버 프로그램이다.
+{{{#!plain
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <sys/socket.h> 
+#include <sys/un.h> 
+#include <unistd.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+
+#define MAXLINE 1024
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int state, client_len;
+    pid_t pid;
+
+    FILE *fp;
+    struct sockaddr_un clientaddr, serveraddr;
+
+    char buf[MAXLINE];
+
+    if (argc != 2)
+    {
+        printf("Usage : %s [socket file name]\n", argv[0]);
+        printf("예    : %s /tmp/mysocket\n", argv[0]); 
+        exit(0);
+    }
+
+    if (access(argv[1], F_OK) == 0)
+    {
+        unlink(argv[1]);
+    }
+
+    // internet 기반의 스트림 소켓을 만들도록 한다. 
+    client_len = sizeof(clientaddr);
+    if ((server_sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sun_family = AF_UNIX;
+    strcpy(serveraddr.sun_path, argv[1]);
+
+    state = bind(server_sockfd , (struct sockaddr *)&serveraddr, 
+            sizeof(serveraddr));
+    if (state == -1)
+    {
+        perror("bind error : ");
+        exit(0);
+    }
+
+    state = listen(server_sockfd, 5);
+    if (state == -1)
+    {
+        perror("listen error : ");
+        exit(0);
+    }
+
+    while(1)
+    {
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, 
+                               &client_len);
+        pid = fork();
+        if (pid == 0)
+        {
+            if (client_sockfd == -1)
+            {
+                perror("Accept error : ");
+                exit(0);
+            }
+            while(1)
+            {
+                memset(buf, 0x00, MAXLINE);
+                if (read(client_sockfd, buf, MAXLINE) <= 0)
+                {
+                    close(client_sockfd);
+                    exit(0);
+                }
+                write(client_sockfd, buf, strlen(buf));
+            }
+        }
+    }
+    close(client_sockfd);
+}
+}}}
+
+다음은 클라이언트 프로그램이다.
+{{{#!plain
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <sys/socket.h> 
+#include <unistd.h> 
+#include <sys/un.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+
+#define MAXLINE 1024
+
+int main(int argc, char **argv)
+{
+
+    int client_len;
+    int client_sockfd;
+
+    FILE *fp_in;
+    char buf_in[MAXLINE];
+    char buf_get[MAXLINE];
+
+    struct sockaddr_un clientaddr;
+
+    if (argc != 2)
+    {       
+        printf("Usage : %s [file_name]\n", argv[0]);
+        printf("예    : %s /tmp/mysocket\n", argv[0]);
+        exit(0);
+    }       
+
+    client_sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client_sockfd == -1)
+    {
+        perror("error : ");
+        exit(0);
+    }
+    bzero(&clientaddr, sizeof(clientaddr));
+    clientaddr.sun_family = AF_UNIX;
+    strcpy(clientaddr.sun_path, argv[1]);
+    client_len = sizeof(clientaddr);
+
+    if (connect(client_sockfd, (struct sockaddr *)&clientaddr, client_len) < 0)
+    {
+        perror("Connect error: ");
+        exit(0);
+    }
+    while(1)
+    {
+	memset(buf_in, 0x00, MAXLINE);
+	memset(buf_get, 0x00, MAXLINE);
+	printf("> ");
+        fgets(buf_in, MAXLINE, stdin);
+        write(client_sockfd, buf_in, strlen(buf_in));
+        read(client_sockfd, buf_get, MAXLINE); 
+        printf("-> %s", buf_get);
+    }
+
+    close(client_sockfd);
+    exit(0);
+}
+}}}
+[[Category(4)]]
+@

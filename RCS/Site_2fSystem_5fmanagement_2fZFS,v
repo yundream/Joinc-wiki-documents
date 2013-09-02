@@ -1,0 +1,240 @@
+head	1.4;
+access;
+symbols;
+locks
+	root:1.4; strict;
+comment	@# @;
+
+
+1.4
+date	2013.08.31.14.28.45;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.08.31.12.57.00;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.08.31.12.56.12;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.08.31.08.41.37;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fZFS
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title ZFS
+
+[[TableOfContents]]
+== ZFS ==
+유닉스의 파일 시스템을 대체하기 위해서 SUN에서 개발한 파일 시스템으로 Solaris 10에 소개된다. 기능을 보면 알겠지만 단순한 파일 시스템으로 보기는 힘들다. 모든 잡다한 관리기능까지를 포함한 볼륨메니저로 봐야 한다. 예컨데 파일 시스템과 [wiki:Site/System_management/LVM Logical Volume manager], snapshots, copy-on-write clones, continuous integrity checking, automatic repaire, 등 무슨 기능일지도 모를 것 같은 다양한 기능들을 가지고 있는 확장된 파일 시스템이다. ZFS를 써본 사람들은 지상 최대의 파일 시스템이라는 찬사를 보낸다. --정말 그러하다.-- 
+
+나는 Cloud 환경에서 신뢰성과 확장성, 성능과 관리성까지 두루 갖춘 만능 File System을 찾아보자라는 목적으로 살펴보게 됐다.
+
+ZFS의 기능을 정리했다. 
+  1. Data Integrigy
+     다른 파일 시스템과 구분되는 가장 큰 특징이다. 디스크 상의 유저 데이터를 보호준다. bit rot, cosmic radiation, current spikes, bugs in disk firmware, ghost writes 등으로 부터 데이터를 보호해 준다. 물론 Ext, XFS, JFS, ReiserFS, NTFS 등도 유저 데이터를 보호하기 위한 기능을 가지고 있기는 하지만, ZFS는 이들 보다 탁월한 성능을 보여준다.
+  1. Storage Pool
+     LVM과 마찬가지로 하나 이상의 장치를 통합해서 관리할 수 있다. 이 논리적인 Storage Pool을 '''zpools'''라고 하며, block device 처럼 작동한다. 블럭 장치들은 다양한 레벨로 조합할 수 있습니다. non-redundantly ([wiki:man/12/raid RAID] 0과 비슷), mirror ( RAID 1과 비슷 ), RAID-Z (RAID-5와 비슷), RAID-Z2 (RAID-6와 비슷) 등등이다. 
+  1. Capacity : ZFS는 128-bit 파일 시스템으로 용량에는 제약기 없다고 보면 되겠다. 페타바이트급 파일시스템이라고 하는 이유가 있다.
+    * 2^48 개의 독립된 디렉토리를 다룰 수 있다. 
+    * 파일의 최대크기는 '''16 exabytes ( 16 X 10^18)'''
+    * zpool의 최대 크기는 '''256 zettabytes (2^78)'''
+    * 시스템에서 zpools의 갯수는 '''2^64'''
+    * zpools에서 파일 시스템의 갯수 '''2^64'''
+
+== Linux와 ZFS ==
+Linux에 ZFS를 이식하기 위한 노력이 진행 중이다. 이식은 두 가지 방향으로 이루어지고 있다.
+  1. native ZFS
+    리눅스 커널이 ZFS를 지원하도록 하는 프로젝트
+  1. zfs-fuse 
+    fuse를 이용해서 ZFS를 지원하도록 하는 프로젝트
+아직까지는 Linux에서 마음놓고 사용할 만한 수준이 아닌 것 간다. zfs-fuse 같은 경우에는 성능에 문제가 상당히 있어서 '''zfs란 이런 거구나'''를 체험하기 위한 수준 정도에서나 사용할 수 있을 것 같다. . [wiki:cloud/Storage/NativeZFSOnLinux Native ZFS]는 눈여겨 볼만하다. 꾸준히 개발하고 있는 것 같기는 한데, 언제쯤 1.0이 되서 믿고 쓸만한 날이 올지 모르겠다. 1년전에 0.6.x 버전이었는데, 지금(2013년 9월)도 0.6.x 버전이다.
+
+=== zfs-fuse ===
+  1. apt-get install zfs-fuse
+  1. zpoll create mypool /dev/sdb /dev/sdc /dev/sdd /dev/sde 
+  1. zpool status mypool
+  1. zfs create mypool/testzfs
+  1. FS 성능 측정 : Bonnie++
+
+== Solaris와 ZFS ==
+=== opensolaris 설치 ===
+솔라리스는 ZFS를 기본 파일 시스템으로 하고 있다. 이렇게 된거 x86기반의 opensolaris를 설치해서 ZFS를 경험해 보기로 했다. VirtualBox를 이용 해서 가상으로 올렸다.
+  * hypervisor : [wiki:Site/cloud/virtualbox VirtualBox]
+    VirtualBox 와 opensolaris 모두 Oracle에서 개발하고 있으니, 궁합이 잘 맞을 거란 생각이 든다. 
+  * OpenSolaris 
+    * [http://hub.opensolaris.org/bin/view/Main/downloads opensolaris 다운로드 사이트] 
+    * 버전 : OpenSolaris 2009.06 (x86 LiveCD) 
+설치는 윈도우보다 간단하다. 설치 과정은 생략.
+
+솔라리스를 마지막으로 써본게 아마 9년전 쯤인것 같다. 2002년이던가 ? 당시만 해도 상당히 투박한(하지만 왠지 멋져 보이긴 했음) CDE 화면이었는데, 지금은 gnome이 뜬다. 예쁘다.
+
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/hmHKyzX-cO58OIxvArlczg?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-GbCjddSyi8U/Tmh00qW5yZI/AAAAAAAABxM/38goFRk9-gM/s640/opensolaris.png" height="502" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== zpool ===
+논리적 볼륨 관리자의 핵심은 장치를 아우르는 하나의 pool을 만드는 거다. 이 pool을 zpool이라고 부른다. 
+
+테스트를 위해서 SATA 2G x 2 장치를 준비했다. 리눅스에서 하던 것처럼 fdisk -l로 장치를 확인하려고 했더니, 내가 원하는 그 fdisk가 아니다. format으로 장치를 확인할 수 있다.
+{{{#!plain
+# format
+AVAILABLE DISK SELECTIONS:
+       0. c7d0 <DEFAULT cyl 2085 alt 2 hd 255 sec 63>
+          /pci@@0,0/pci-ide@@1,1/ide@@0/cmdk@@0,0
+       1. c9t0d0 <ATA-VBOX HARDDISK-1.0-2.00GB>
+          /pci@@0,0/pci8086,2829@@d/disk@@0,0
+       2. c9t1d0 <ATA-VBOX HARDDISK-1.0-2.00GB>
+          /pci@@0,0/pci8086,2829@@d/disk@@1,0
+}}}
+
+c9t0d0, c9t1d0을 '''tank'''라는 이름의 zpool로 묶기로 했다.
+{{{#!plain
+# zpool create tank c9t0d0 c9t1d0
+}}}
+
+제대로 만들어 졌는지 확인.
+{{{#!plain
+# zpool list
+NAME    SIZE   USED  AVAIL    CAP  HEALTH  ALTROOT
+rpool  15.9G  3.80G  12.1G    23%  ONLINE  -
+tank   3.97G   232K  3.97G     0%  ONLINE  -
+}}}
+
+zfs로 파일 시스템에 대한 상세 정보를 확인. 
+{{{#!plain
+# zfs list
+NAME                         USED  AVAIL  REFER  MOUNTPOINT
+rpool                       4.16G  11.5G  77.5K  /rpool
+rpool/ROOT                  3.16G  11.5G    19K  legacy
+rpool/ROOT/opensolaris      3.16G  11.5G  3.02G  /
+rpool/dump                   511M  11.5G   511M  -
+rpool/export                5.04M  11.5G    21K  /export
+rpool/export/home           5.02M  11.5G    21K  /export/home
+rpool/export/home/yundream     5M  11.5G     5M  /export/home/yundream
+rpool/swap                   512M  11.8G   137M  -
+tank                        74.5K  3.91G    19K  /tank
+}}}
+
+zfs는 디렉토리 형태로 pool을 관리할 수 있다. tank 밑에 music, movie, source 3개의 파일 시스템을 만들어 봤다. 
+{{{#!plain
+# zfs create tank/music
+# zfs create tank/movie
+# zfs create tank/source
+# zfs list
+NAME                         USED  AVAIL  REFER  MOUNTPOINT
+...
+tank                         154K  3.91G    23K  /tank
+tank/movie                    19K  3.91G    19K  /tank/movie
+tank/music                    19K  3.91G    19K  /tank/music
+tank/source                   19K  3.91G    19K  /tank/source
+}}}
+3개의 파일 시스템이 추가로 만들어지긴 했지만 volume을 모두 공유해서 사용하고 있다. 내 목적은 각 파일 시스템 별로 쿼터를 정하는 거다. /tank/movie를 1G를 사용하도록 쿼터를 할당했다.
+{{{#!plain
+# zfs set quota=1g tank/movie
+# zfs list | grep tank
+tank                         154K  3.91G    23K  /tank
+tank/movie                    19K  1024M    19K  /tank/movie
+tank/music                    19K  3.91G    19K  /tank/music
+tank/source                   19K  3.91G    19K  /tank/source
+
+# df -h /tank/movie
+Filesystem            Size  Used Avail Use% Mounted on
+tank/movie            1.0G   19K  1.0G   1% /tank/movie
+}}}
+
+=== mirror, RAIDZ, RAIDZ2 ===
+ZFS는 mirror와 RAIDZ, RAIDZ2 3가지 RAID 레벨을 지원한다. 10G SATA Disk 6개를 추가해서 각 모드별로 테스트를 진행했다.
+
+RAIDZ와 RAIDZ2는 각각 RAID 5와 RAID 6와 매우 유사하다. 즉
+  * RAIDZ : RAID 5 처럼 블럭 기반 striped 와 하나의 분산 parity 블럭을 가진다. 
+  * RAIDZ2 : RAID 6 처럼 블럭 기반 striped 와 두개의 분산 parity 블럭을 가진다.
+
+
+== Native ZFS on Linux ==
+  * [wiki:Site/cloud/Storage/NativeZFSOnLinux Native ZFS on Linux] : 앞으로 오픈 솔라리스 대신 리눅스를 이용해서 zfs를 테스트할 계획이다. 
+
+== Nexenta ==
+[wiki:Site/cloud/Storage/Nexentar Nexenta]는 opensolaris 기반의 NAS/[wiki:man/12/san SAN]어플라이언스 제품이다. 기업환경에서 ZFS를 이용해서 안정적으로 스토리지 시스템을 구성할 수 있도록 HA(High Availability cluster), Namespace Cluster, CLI및 GUI(웹 기반의) 인터페이스를 제공한다. 
+== History ==
+  1. 작성일 : 2011년 9월 6일
+  1. 수정이력
+     1. 작성 : 2011/9/6 
+     1. [[Date(2013-08-31T12:56:12)]] : 문장을 다듬었음. 링크 추가 
+
+[[Tag(Cloud,LVM,iSCSI)]]
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d134 1
+a134 1
+[wiki:Site/cloud/Storage/Nexentar Nexenta]는 opensolaris 기반의 NAS/SAN 어플라이언스 제품이다. 기업환경에서 ZFS를 이용해서 안정적으로 스토리지 시스템을 구성할 수 있도록 HA(High Availability cluster), Namespace Cluster, CLI및 GUI(웹 기반의) 인터페이스를 제공한다. 
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 1
+a5 3
+유닉스의 파일 시스템을 대체하기 위해서 SUN에서 개발한 파일 시스템으로 Solaris 10에 소개된다. 기능을 보면 알겠지만 단순한 파일 시스템으로 보기는 힘들다. 모든 잡다한 관리기능까지를 포함한 볼륨메니저로 봐야 한다. 예컨데 파일 시스템과 [wiki:Site/System_management/LVM Logical Volume manager], snapshots, copy-on-write clones, continuous integrity checking, automatic repaire, 등 무슨 기능일지도 모를 것 같은 다양한 기능들을 가지고 있는 확장된 파일 시스템이다.
+
+ZFS를 써본 사람들은 지상 최대의 파일 시스템이라는 찬사를 보내더라. 
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d110 1
+a110 1
+3개의 파일 시스템이 추가로 만들어지긴 했지만 volume을 모두 공유해서 사용하고 있습니다. 각 파일 시스템 별로 쿼터를 정해야 겠죠. /tank/movie를 1G를 사용하도록 쿼터를 할당해 보겠습니다. df로 확인까지 했습니다.
+a122 1
+잘 할당 됐네요.
+d125 1
+a125 1
+ZFS는 mirror와 RAIDZ, RAIDZ2를 지원합니다. 이들을 이해하려면 레이드레벨에 대한 지식이 필요합니다. 10G SATA Disk 6개를 추가해서 각 모드별로 테스트 하기로 했습니다.
+d127 3
+a129 9
+RAIDZ과 RAIDZ2를 이해하기 위해서는 RAID Level에 대한 지식이 필요합니다. 간단히 정리해봤습니다. 스토리지에 전문적인 지식을 가지고 있지 않기 때문에 대략 조사했습니다. 언젠가 RAID에 대해서 자세히 조사해보고 싶네요.
+  * RAID-0 : 데이터를 striped해서 저장합니다. 최소 두 개의 장치가 필요하겠죠. A, B 두개의 장치가 RAID-0으로 묶였다고 가정을 해보겠습니다. 여기에 1,2,3,4 4개의 데이터를 쓴다고 하면, 1을 A에 2를 B에 동시에 씁니다. 쓰기 성능을 높일 수 있겠죠. 읽기 성능도 높일 수 있는지는 잘 모르겠습니다.
+  * RAID-1 : 디스크를 미러링 합니다. 최소 2개의 디스크가 필요하겠죠. 데이터를 중복 저장하기 때문에 하나의 디스크에 문제가 발생할 경우 완벽하게 복구할 수 있습니다. 두배의 저장공간이 필요하다는 단점이 있습니다. 
+  * RAID-2 : 더 이상 사용하지 않습니다.
+  * RAID-3 : parity를 사용하며, striping 합니다. striping을 위해서는 두 개 이상의 디스크가 필요하겠죠. 여기에 parity를 위한 디스크가 하나더 들어가서 최소 3개의 디스크가 필요한 구성입니다. dedicated parity사용
+  * RAID-4 :  
+  * RAID-5 : parity를 사용하며, striping 합니다.  
+  * RAID-6 : 각 디스크에 분배되는 doule parity를 사용, striping. 두개의 드라이브까지 고장나는 것을 허용.
+  * RAID-10: RAID 1 + RAID 0 입니다. mirror하고 striping 합니다. 
+d133 1
+a133 1
+  * [wiki:Site/cloud/Storage/NativeZFSOnLinux Native ZFS on Linux] : 앞으로 오픈 솔라리스 대신 리눅스를 이용해서 zfs를 테스트할 생각입니다. 
+d135 2
+a136 2
+== 관련 문서 ==
+  * [wiki:Site/cloud/Storage/Nexentar Nexenta]
+d141 1
+@

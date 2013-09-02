@@ -1,0 +1,75 @@
+#title parity
+
+[[TableOfContents]]
+== Parity ==
+Parity는 라틴어 paritas로 부터 파생된 단어로 동등한(equal, equivalent)의 뜻을 가진다. 컴퓨터 공학에서는 데이터를 복원할 수 있는 정보를 디스크의 다른 영역에 저장해서, 나중에 문제가 생겼을 때 저장된 데이터를 이용해서 원래 데이터를 복원하는 기술을 의미한다. 복원할 수 있는 이 정보를 담은 정보조각을 '''parity bit'''라고 한다.
+
+Pariti [wiki:man/12/bit bit]를 '''P'''라고 했을 때, P는 다음과 같이 만들어진다. Dn은 데이터 블록이고 xor는 xor 연산을 의미한다.
+{{{#!plain
+P=D1 xor D2 xor D3 ... xor Dn
+}}}
+
+|| Value A   || Value B   || Xor Result  ||
+|| 0         || 0         || 0           ||
+|| 1         || 0         || 1           ||
+|| 0         || 1         || 1           ||
+|| 1         || 1         || 0           ||
+Xor 연산을 이용하면, 하나의 값을 알고 있을 때 다른 하나의 값을 정확히 알 수 있다. Value B의 모든 데이터가 유실됐다고 가정해 보자. Value A가 0 이고 Xor result 가 0이면 Value B는 반드시 0이어야 한다. Value A가 1이고, Xor result가 1이라면 Value B는 반드시 0이어야 한다. 이런 식으로 xor 연산을 하는 것으로 데이터를 복원할 수 있다.
+
+== RAID와 parity ==
+Rarity는 몇개 [wiki:man/12/raid RAID] 레벨에서 사용한다. 만약 디스크 어레이에 문제가 생기면, 다른 디스크에 남아있는 parity 값을 이용해서 문제가 생긴 데이터를 복원한다.
+
+예를들어 RAID 5 어레이에 다음과 같은 데이터가 있다고 가정해보자.
+{{{#!plain
+Drive 1: 01101101
+Drive 2: 11010100
+}}}
+이제 두개의 Drive에 있는 데이터에 대해서 XOR 연산을 수행해서 parity 값을 만든다.
+{{{#!plain
+    01101101
+XOR 11010100
+_____________
+    10111001
+}}}
+parity 값 '''10111001'''은 Drive 3에 저장한다.
+
+만약 Drive 2에 문제가 생겨서 데이터가 유실됐다면, Drive 3에 있는 parity 값과 Drive 1의 값을 XOR 연산하는 것으로 Drive 2의 값을 복원할 수 있다.
+{{{#!plain
+Drive 1: 01101101
+Drive 3: 10111001
+}}}
+두개의 데이터를 XOR 연산을 하면 
+{{{#!plain
+    10111001
+XOR 01101101
+_____________
+   11010100
+}}}
+Drive 2의 값인 '''11010100'''이 복원된다.
+
+여기에서 우리는 RAID5를 구성하기 위해서는 최소 3개의 disk가 필요함을 알 수 있다.
+
+== Hot spare ==
+2개의 드라이브와 1개의 parity 드라이브로 구성된 RAID5 어레이가 있다고 가정해 보자. 이 경우 하나의 디스크가 고장나면, parity 드라이브를 이용해서 복원할 수 있다. 그러나 복원을 하려면 여분의 디스크가 있어야 한다. 
+
+이 여분의 드라이브를 spare 드라이브라고 한다. spare 드라이브로의 교체는 자동으로 이루어지는데, 이러한 기능을 '''hot spare'''라고 한다. 자동차의 스패어 타이어와 같은 개념이다. 
+
+아래 그림은 RAID 5 디스크 어레이에서 hot spare의 작동원리를 보여준다.
+
+{{{#!plain
+<img src="https://docs.google.com/drawings/d/1OyqVpRjgyNSYLzVbymUdlcCm65bK287_Vjia4TC7vwI/pub?w=573&amp;h=214">
+}}}
+  * '''p'''는 parity 값이 들어있는 디스크를 의미한다.
+  * 여분의 Spare disk를 하나 가지고 있다. 
+  * C2 디스크에 문제가 생겼다. 
+  * '''C1 XOR Cp'''로 C2의 데이터를 '''Spare disk'''에 복원한다.  
+  * Spare disk가 C2를 대체한다.
+
+== Mirror vs Parity ==
+Mirror역시 디스크에 문제가 생겼을 때 데이터를 복원하기 위해서 사용한다. '''RAID 1'''이 데이터를 복원하기 위해서 사용하는 방법이다. Parity와 용도는 비슷하지만 몇 가지 차이가 있다.
+  * Mirror는 디스크를 그대로 복제하기 때문에, '''x N'''만큼의 추가적인 디스크가 필요하다. 즉 복사본을 하나를 유지하기 원한다면 '''x 2'''만큼의 디스크가 필요하다. 1T의 정보를 저장하기 위해서 2T만큼의 디스크가 필요한 셈. 디스크 낭비가 심하다. Parity는 공간을 더 효과적으로 사용한다. 
+  * Mirror는 데이터 복원을 위한 연산이 필요하지 않다. 복제본을 그대로 사용하면 된다. 반면 Parity는 데이터복원을 위해서 연산을 해야 한다. 이 시간동안 데이터 입출력이 원할하지 않을 수 있다.  
+
+== 관련 글 ==
+  * http://en.wikipedia.org/wiki/Parity_bit
+  * http://www.raidtips.com/hot-spares.aspx 

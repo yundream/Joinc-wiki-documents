@@ -1,0 +1,170 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2013.08.16.06.34.24;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.08.16.06.33.32;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.08.16.06.32.00;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.08.16.05.24.20;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.08.16.03.08.01;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.08.15.14.56.56;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fAWS_2fReference_2fSimple01
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title AWS 참조 아키텍처 - 간단한 웹 서비스
+
+[[TableOfContents]]
+== 서비스 시나리오 ==
+나는 사내용으로 사용할 웹 기반의 커뮤니티 시스템을 만들려고 한다. 게시판, 블로그, 위키 등을 서비스 한다. 
+
+필요한 자원은 다음과 같이 잡았다.
+  * 하나의 웹 서버 : 가용성을 고려하지 않는다.  
+  * RDBMS : 컨텐츠를 저장하기 위한 용도로 사용한다. 역시 가용성을 고민하지 않는다.
+
+하나의 웹 서버와 하나의 데이터베이스로 구성된 아주 간단한 구성을 가진다.
+
+== 구조 ==
+구조는 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1AzS7fBGgCjdRm4xC0RosH6p3ULiilBOwVfIcGyYMCds/pub?w=452&amp;h=587">
+}}}
+
+=== Network ===
+Web server는 외부에서 연결할 수 있어야 하므로 [wiki:Site/cloud/AWS/EIP EIP]를 할당 받아서 사용해야 한다. EIP 신청한 다음 web server instance에 attach 하는 걸로 끝이다.  
+
+Mysql 데이터베이스는 외부에서 직접 연결할 일이 없으므로 EIP를 가질 필요는 없다. 하지만 AWS는 인스턴스에 고정된 private ip를 제공하지 않는다. EC2 인스턴스의 private ip는 [wiki:man/12/dhcp DHCP]에 의해서 자동 할당되는데, '''DHCP lease 시간 만료, 인스턴스의 셧다운'''등의 사건이 발생 할 때, DHCP IP pool로 IP를 회수해 버린다. 다음번 IP 할당때는 어떤 IP가 할당될지 알 수 없다.  
+
+원만한 해결책은 다음과 같다. 
+
+  1. '''VPC 환경을 구축한다.''' :  [wiki:Site/cloud/AWS/VPCManagement VPC]를 신청하면, 유저는 마음대로 네트워크를 구성할 수 있다. 별도 비용도 없다. 다만 직접 네트워크 환경을 구축해야 하기 때문에, 네트워크에 대한 약간의 지식이 필요하다. 
+  1. '''RDS를 이용한다''' :  AWS에서 제공하는 RDBMS 서비스인 [wiki:Site/cloud/AWS/RDS RDS]를 이용하는 방법이 있다. RDS를 만들면 데이터베이스 서버를 포함한 인스턴스가 만들어진다. 이 때 데이터베이스 서버에 접근을 위한 endpoint 도메인 주소가 만들어진다. Endpoin 도메인 주소는 변경되지 않으므로, 안정적인 연결 통로로 사용할 수 있다. 추가 비용이 생길 수 있다는 단점이 있다.
+  1. '''ELB의 사용''' : ELB를 만들면, 변하지 않는 도메인 이름이 만들어진다. 이 도메인 이름을 CNAME으로 해서 서비스 하는 방법이 있다. 여기에서는 ELB를 사용하지 않을 거다. 
+
+=== RDBMS ===
+RDS를 사용한다. RDS는 아래의 단점이 있다.
+  1. 추가비용 
+  1. RDS는 데이터베이스 시스템이 설치된 운영체제다. 하지만 오로지 데이터베이스 서비스만 사용할 수 있을 뿐, (관리등의 목적으로)ssh 서비스등을 사용할 수 없다. 따라서 직접 설치해서 관리하는 것과 비교해서 사용상의 제약이 있다. 
+
+하지만 내가 지금 만들려고 하는 서비스에서 1,2는 큰 문제가 되지 않는다고 판단, RDS를 사용하기로 했다.
+
+=== Security ===
+AWS에서 제공하는 호스트 기반 필터링 도구인 Security group를 이용해서 패킷 보안이 가능하다. 
+
+== 참고 ==
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a41 1
+ * [http://blog.jidolstar.com/865 [AWS]RDS CLI(RDS command-line toolkit) 설치 및 설정 그리고 사용예시]
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+d27 3
+a29 10
+'''VPC 환경을 구축한다.'''
+[wiki:Site/cloud/AWS/VPCManagement VPC]를 신청하면, 유저는 마음대로 네트워크를 구성할 수 있다. 별도 비용도 없다. 다만 직접 네트워크 환경을 구축해야 하기 때문에, 네트워크에 대한 약간의 지식이 필요하다. 
+
+'''RDS를 이용한다'''
+AWS에서 제공하는 RDBMS 서비스인 [wiki:Site/cloud/AWS/RDS RDS]를 이용하는 방법이 있다. RDS를 만들면 데이터베이스 서버를 포함한 인스턴스가 만들어진다. 이 때 데이터베이스 서버에 접근을 위한 endpoint 도메인 주소가 만들어진다. Endpoin 도메인 주소는 변경되지 않으므로, 안정적인 연결 통로로 사용할 수 있다. 
+
+추가 비용이 생길 수 있다는 단점이 있다.
+
+'''ELB의 사용'''
+ELB를 만들면, 변하지 않는 도메인 이름이 만들어진다. 이 도메인 이름을 CNAME으로 해서 서비스 하는 방법이 있다. 여기에서는 ELB를 사용하지 않을 거다. 
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d20 1
+a20 1
+Web server는 외부에서 연결할 수 있어야 하므로 EIP를 할당 받아서 사용해야 한다. EIP 신청한 다음 web server instance에 attach 하는 걸로 끝이다.  
+d22 1
+a22 1
+Mysql 데이터베이스는 외부에서 직접 연결할 일이 없으므로 EIP를 가질 필요는 없다. 하지만 AWS는 인스턴스에 고정된 private ip를 제공하지 않는다. EC2 인스턴스의 private ip는 DHCP에 의해서 자동 할당되는데, '''DHCP lease 시간 만료, 인스턴스의 셧다운'''등의 사건이 발생 할 때, DHCP IP pool로 IP를 회수해 버린다. 다음번 IP 할당때는 어떤 IP가 할당될지 알 수 없다.  
+d27 1
+a27 1
+VPC를 신청하면, 유저는 마음대로 네트워크를 구성할 수 있다. 별도 비용도 없다. 다만 직접 네트워크 환경을 구축해야 하기 때문에, 네트워크에 대한 약간의 지식이 필요하다. 
+d30 6
+d38 6
+a43 1
+=== Load balancer ===
+d45 1
+d47 2
+a48 1
+
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d20 11
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d7 4
+a10 3
+  * 두개의 웹 서버 : 아무리 사내용 서비스라고 하지만 어느정도의 가용성은 보장해야 하지 않겠는가. 해서 두 개의 웹 서버를 '''active-active'''방식으로 돌리기로 했다. 
+  * Load balancer : 두 개의 웹 서버를 로드밸런서로 묶는다. 로드 밸런서 장비(혹은 소프트웨어)의 선택이 중요하다.  
+  * RDBMS : 컨텐츠를 저장하기 위한 용도로 사용한다. 
+d14 11
+@

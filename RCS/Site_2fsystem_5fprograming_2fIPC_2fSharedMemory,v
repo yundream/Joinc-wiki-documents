@@ -1,0 +1,369 @@
+head	1.5;
+access;
+symbols;
+locks
+	root:1.5; strict;
+comment	@# @;
+
+
+1.5
+date	2013.08.23.01.07.08;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.08.12.09.05.39;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.07.31.11.42.15;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.07.31.11.40.43;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.07.25.01.22.12;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fsystem_5fprograming_2fIPC_2fSharedMemory
+@
+
+
+1.5
+log
+@112.216.200.107;;Anonymous;;
+@
+text
+@#title 공유 메모리의 사용
+
+[[TableOfContents]]
+
+== 공유메모리 (shared memory) ==
+보통 프로세스에서 사용되는 메모리영역은 해당 프로세스만이사용할수 있다. 하지만 때때로 여러개의 프로세스가 특정 메모리영역을 사용했으면 하는때가 있을것이다. 
+
+System V IPC 설비중의 하나인 "공유메모리"를 통해서 이러한일을 할수있다.
+
+=== 개요 ===
+모든 프로세스(:12)는 자신의 업무를 수행하기 위해서 필요한 자료를 저장하기 위한 메모리 공간을 가지게 된다. 이러한 메모리공간에는 CPU에 의해 수행되는 명령어들, 프로그램 시작시 정의되고 초기화된 데이타, 프로그램 시작시 정의되었지만 초기화 되지 않은 데이타, 함수호출에 필요한 정보, 동적할당이 이루어지는 데이타등 이 들어가게 된다.
+hjh
+프로세스는 시작시 혹은 실행중에 이러한 데이타를 저장하고 사용하기 위한 메모리 공간을 커널에 요구하여서 할당받아 사용하게 되는데, 이러한 메모리공간은 기본적으로 메모리를 요청한 프로세스만이 접근가능하도록 되어있다.  하지만 가끔은 여러개의 프로세스가 특정 메모리 공간을 동시에 접근해야할 필요성을 가질때가 있을것이다.
+
+공유메모리는 이러한 작업을 위한 효율적인 방법을 제공한다. 
+
+공유메모리는 여러 IPC 중에서 가장 빠른 수행속도를 보여준다. 
+
+그이유는 하나의 메모리를 공유해서 접근하게 되므로, 데이타 복사와 같은 불필요한 오버헤드가 발생하지 않기 때문으로, 빠른 데이타의 이용이 가능하다.  그러나 하나의 프로세스가 메모리에 접근중에 있을때, 또다른 프로세스가 메모리에 접근하는 일이 발생하면 자칫 데이타가 홰손될수 있을것이므로, 한번에 하나의 프로세스가 메모리에 접근하고 있다는걸 보증해줄수 있어야 할것이다. 
+
+이러한 작업을 위해서 Unix(:12) 에서는 Semaphore(:12) 라는 또다른 공유자원을 제어할수 있도록 해주는 도구를 제공해준다.  이번 문서에서는 Semaphore 를 다루지는 않을것이다. 이것은 다른 문서에서 다루도록 하고 여기에서는 단지 공유메모리에 대해서만 다루도록 할것이다. 
+
+다음은 공유메모리에 관련된 함수들의 모음이다. 
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+#include &lt;sys/types.h&gt;
+#include &lt;sys/shm.h&gt;
+
+int shmget(key_t key, int size, int shmflg)
+void *shmat( int shmid, const void *shmaddr, int shmflg )
+int shmdt( const void *shmaddr)
+int shmctl(int shmid, int cmd, struct shmid_ds *buf)
+</pre>
+</td></tr>
+</table>
+}}}
+
+
+=== 공유메모리는 어떻게 할당되는가 ===
+위의 함수들을 설명하기 전에 우선 공유메모리가 어떻게 할당되고, 어떤 과정을 통해서 접근가능한지에 대해서 우선 알아보도록 하겠다.
+
+공유메모리의 생성요청은 최초 공유메모리 영역을 만드는 프로세스가 커널에 공유메모리 공간의 할당을 요청함으로써 이루어지며, 만들어진 공유메모리는 커널에 의해서 관리 되게 된다.
+
+이런 이유로 한번만들어진 공유메모리는 운영체제를 리부팅하거나, 직접 공유메모리 공간을 삭제시켜주지 않은한, 공유메모리를 사용하는 모든 프로세스가 없어졌다고 하더라도, 계속적으로 유지되게 된다. 
+
+프로세스가 커널에게 공유메모리 공간을 요청하게 되면, 커널은 공유메모리 공간을 할당시켜주고 이들 공유메모리공간을 관리하기 위한 내부자료구조를 통하여, 이들 공유메모리를 관리하게 된다. 이 자료는 shmid_ds 라는 구조체에 의해서 관리되며 '''shm.h''' 에 정의되어 있다.
+{{{#!html
+<table width=100%>
+<tr><td bgcolor=E0E0E0>
+<pre>
+struct shmid_ds
+{
+    struct         ipc_perm shm_perm;    // 퍼미션
+    int            shm_segsz;            // 메모리 공간의 크기
+    time_t         shm_dtime;            // 마지막 attach 시간 
+    time_t         shm_dtime;            // 마지막 detach 시간 
+    time_t         shm_ctime;            // 마지막 변경 시간
+    unsigned short shm_cpid;             // 생성프로세스의 pid
+    unsigned short shm_lpid;             // 마지막으로 작동한 프로세스의 pid
+    short          shm_nattch;           // 현재 접근한 프로세스의 수
+};
+</pre>
+</td></tr>
+</table>
+}}}
+Unix 버젼에 따라서 멤버변수들이 약간씩 차이를 보일수 있다.  
+  * shm_perm
+    공유메모리는 여러개의 프로세스가 동시에 접근 가능하므로, 파일과 같이 그 접근권한을 분명히 명시해줘야 한다.
+  * shm_segsz
+    할당된 메모리의 byte 크기이다
+  * shm_atime
+    가장최근의 프로세스가 세그먼트를 attach한 시간
+  * shm_dtime
+    가장최근의 프로세스가 세그먼트를 detach한 시간
+  * shm_ctime
+    마지막으로 이 구조체가 변경된 시간
+  * shm_cpid
+    이 구조체를 생성한 프로세스의 pid
+  * shm_lpid
+    마지막으로 작동을 수행한 프로세스의 pid
+  * shm_nattch
+    현재 접근중인 프로세스의 수
+이러한 공유메모리에 접근을 하기 위해서는 고유의 공유메모리 key 를 통해서 접근가능해지며, 이 key값을 통해서 다른 여러개의 공유메모리들과 구분되어 질수 있다.  
+
+
+=== shmget ===
+shmget 은 커널에 공유메모리 공간을 요청하기 위해 호출하는 시스템 호출 함수이다. key 는 바로 위에서 설명했듯이 고유의 공유메모리임을 알려주기 위해서 사용된다. shmget 을 이용해서 새로운 공유메모리 영역을 생성하거나 기존에 만들어져있던 공유메모리 영역을 참조할수 있다 
+
+
+
+
+  첫번째 아규먼트는 여러개의 공유메모리중 원하는 공유메모리에 접근하기 위한 Key 값이다. 이 Key 값은 커널에 의해서 관리되며, Key 값을 통해서 선택적인 공유메모리에의 접근이 가능하다. 
+  두번째 아규먼트는 공유메모리 의 최소크기 이다. 새로운 공유메모리를 생성하고자 한다면 크기를 명시해주어야 한다.  존재하는 메모리를 참조한다면 크기는 0으로 명시한다.
+  3번째 아규먼트는 공유메모리의 접근권한과, 생성방식을 명시하기 위해서 사용한다. 아규먼트의 생성방식을 지정하기 위해서 IPC_CREAT 와 IPC_EXCL 을 사용할수 있다. 아래 이들에 대해서 설명을 해두었다. 
+
+
+
+
+  * IPC_CREAT
+     key 를 이용 새로운 공유메모리 공간을 만든다.  
+  * IPC_EXCL
+     IPC_CREAT와 같이 사용되며, 공유메모리 공간이 이미 존재할경우 error 를 되돌려준다. 
+
+만약 IPC_CREAT 만 사용된다면 shmget()은 새로 생성되는 공유메모리공간을 지시하는 공유메모리공간 "식별자" 되돌려준다. 만약 입력된 key 값이 지시하는 공유메모리 공간이 이미 존재하고 있다면 존재하는 공유메모리 공간의 "식별자"를 되돌려준다. IPC_EXCL 과 IPC_CREAT 를 같이 사용할경우, 공유메모리 공간이 존재하지 않으면 새로 생성시켜주며, 존재할경우에 error 를 되돌려준다. 
+
+3번째 아규먼트는 이외에도 권한을 지정해줄수도 있다. 권한은 파일권한과 동일하게, 유저, 그룹, Other 에 대한 읽기/쓰기 권한을 지정할수 있다. 단 실행권한은 줄수 없도록 되어 있다. 아래와 같이 사용가능하다. 
+{{{#!plain
+int shmid;
+key_t keyval;
+
+keyval = 1234;
+shmid = shmget(keyval, 1024, IPC_CREAT | 0666)); 
+if (shmid == -1)
+{
+    return -1;
+}
+}}}
+=== shmat ===
+일단 공유메모리 공간을 생성했으면, 우리는 공유메모리에 접근할수 있는 int 형의 "식별자" 를 얻게 된다. 우리는 이 식별자를 shmat 를 이용해서 지금의 프로세스가 공유메모리를 사용가능하도록 "덧붙임" 작업을 해주어야 한다.
+
+  첫번째 아규먼트는 shmget을 이용해서 얻어낸 식별자 번호이며, 
+  두번째 아규먼트는 메모리가 붙을 주소를 명시하기 위해 사용하는데, 0을 사용할경우 커널이 메모리가 붙을 주소를 명시하게 된다. 특별한 사항이 없다면 0을 사용하도록 한다.
+  세번째 아규먼트를 이용해서, 우리는 해당 공유메모리에 대한 "읽기전용", "읽기/쓰기가능" 모드로 열수 있는데, SHM_RDONLY를 지정할경우 읽기 전용으로, 아무값도 지정하지 않을경우 "읽기/쓰기 가능" 모드로 열리게 된다. 
+
+=== shmdt ===
+프로세스가 더이상 공유메모리를 사용할필요가 없을경우 프로세스와 공유메모리를 분리 하기 위해서 사용한다. 이 함수를 호출할 경우 단지 현재 프로세스와 공유메모리를 분리시킬뿐이지, 공유메모리 내용을 삭제하지는 않는다는 점을 기억해야 한다. 공유메모리를 커널상에서 삭제 시키길 원한다면 shmctl 같은 함수를 이용해야 한다.
+
+'''shmdt''' 가 성공적으로 수행되면 커널은 shmid_ds 의 내용을 갱신한다. 즉 shm_dtime, shm_lpid, shm_nattch 등의 내용을 갱신하는데, shm_dtime 는 가장 최근에 dettach (즉 shmdt 를 사용한)된 시간, shm_lpid 는 호출한 프로세세의 PID, shm_nattch 는 현재 공유메모리를 사용하는 (shmat 를 이용해서 공유메모리에 붙어있는) 프로세스의 수를 돌려준다. shmdt 를 사용하게 되면 shm_nattch 는 1 감소하게 될것이며, shm_nattch 가 0 즉 더이상 붙어있는 프로세스가 없다라는 뜻이 될것이다. shm_nattch 가 0이 되어있을때 만약 이 공유메모리가 shm_ctl 등에 의해 삭제표시 가 되어 있다면, 이 공유메모리는 삭제되게 된다. 
+
+=== shmctl ===
+이것은 공유메모리를 제어하기 위해서 사용한다. 즉 shmid_ds 를 직접 제어함으로써, 해당 공유메모리에 대한 소유자, 그룹 등의 허가권을 변경하거나, 공유메모리를 삭제혹은, 공유메모리의 잠금을 설정하거나 해제하는 등의 작업을 한다.
+
+2번째 아규먼트를 이용해서 shmid 가 가르키는 공유메모리를 제어하며, cmd 를 이용해서 원하는 제어를 할수 있다. cmd 를 이용해 내릴수 있는 명령에는 다음과 같은 것들이 있다.
+  * IPC_STAT
+    공유메모리 공간에 관한 정보를 가져오기 위해서 사용된다. 정보는 buf 에 저장된다. 
+  * IPC_SET
+    공유메모리 공간에 대한 사용자권한 변경을 위해서 사용된다. 사용자 권한 변경을 위해서는 슈퍼유저 혹은 사용자권한을 가지고 있어야 한다. 
+  * IPC_RMID
+    공유메모리 공간을 삭제하기 위해서 사용된다. 이 명령을 사용한다고 해서 곧바로 사용되는건 아니며, 더이상 공유메모리 공간을 사용하는 프로세스가 없을때, 즉 shm_nattch 가 0일때 까지 기다렸다가 삭제된다. 즉 해당 공유메모리 공간에 대해서 삭제표시를 하는거라고 생각하면 된다. 
+
+다음은 실제로 공유메모리를 사용하는 방법에 대한 가장간단한 예제이다. 자식과 부모프로세스간에 어떻게 메모리가 공유되는지 보여준다.
+
+'''예제 : shm.c'''
+{{{#!plain
+#include <sys/ipc.h> 
+#include <sys/shm.h> 
+#include <string.h> 
+#include <unistd.h> 
+
+
+int main()
+{
+    int shmid;
+    int pid;
+
+    int *cal_num;
+    void *shared_memory = (void *)0;
+
+
+    // 공유메모리 공간을 만든다.
+    shmid = shmget((key_t)1234, sizeof(int), 0666|IPC_CREAT);
+
+    if (shmid == -1)
+    {
+        perror("shmget failed : ");
+        exit(0);
+    }
+
+    // 공유메모리를 사용하기 위해 프로세스메모리에 붙인다. 
+    shared_memory = shmat(shmid, (void *)0, 0);
+    if (shared_memory == (void *)-1)
+    {
+        perror("shmat failed : ");
+        exit(0);
+    }
+
+    cal_num = (int *)shared_memory;
+    pid = fork();
+    if (pid == 0)
+    {
+        shmid = shmget((key_t)1234, sizeof(int), 0);
+        if (shmid == -1)
+        {
+            perror("shmget failed : ");
+            exit(0);
+        }
+        shared_memory = shmat(shmid, (void *)0, 0666|IPC_CREAT);
+        if (shared_memory == (void *)-1)
+        {
+            perror("shmat failed : ");
+            exit(0);
+        }
+        cal_num = (int *)shared_memory;
+        *cal_num = 1;
+
+        while(1)
+        {
+            *cal_num = *cal_num + 1;
+            printf("child %d\n", *cal_num); 
+            sleep(1);
+        }
+    }
+
+    // 부모 프로세스로 공유메모리의 내용을 보여준다. 
+    else if(pid > 0)
+    {
+        while(1)
+        {
+            sleep(1);
+            printf("%d\n", *cal_num);
+        }
+    }
+}
+}}}
+예제 프로그램이 하는 일은 간단하다. int 형의 공유메모리 공간을 할당한다음. 자식프로세스에서 여기에 1씩을 더하고 부모프로세스에서는 공유메모리 내용을 출력하는 일을한다.  
+
+== 공유메모리 제어하기 ==
+쉘에서 공유메모리의 상황을 보여주기 위해서 ipcs(1)란 도구를 제공한다. ipcs 를 사용하면 공유메모리 뿐만 아닌, Semaphore, Message Queue 등 소위 sytem V IPC 설비에 대한 내용을 보여준다.  그리고 ipcrm 도구를 이용해서 필요없는 공유메모리, Message Queue, Semaphore 등을 지워줄수 있다.
+
+위의 예제코드를 컴파일 시켜서 실행시킨다음 ipcs 를 이용해서 확인을 해보면 공유메모리 자원이 어떤식으로 관리되는지 좀더 이해를 쉽게 할수 있을것이다.
+
+=== 공유 메모리 정보 확인 ===
+-l 옵션과 함께 ipcs를 실행하면 ipc(:12)자원 제한 정보를 확인할 수 있다.
+{{{#!plain
+$ ipcs -l
+------ Shared Memory Limits --------
+max number of segments = 4096
+max seg size (kbytes) = 32768
+max total shared memory (kbytes) = 8388608
+min seg size (bytes) = 1
+
+------ Semaphore Limits --------
+max number of arrays = 128
+max semaphores per array = 250
+max semaphores system wide = 32000
+max ops per semop call = 32
+semaphore max value = 32767
+
+------ Messages: Limits --------
+max queues system wide = 1706
+max size of message (bytes) = 8192
+default max size of queue (bytes) = 16384
+}}}
+-m 옵션으로 실행하면 현재 사용중인 ipc 자원 정보를 확인할 수 있다.
+{{{#!plain
+$ ipcs -m
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00000000 0          root       777        135168     2                       
+0x00000000 819201     yundream   600        393216     2          dest         
+0x00000000 950274     yundream   600        393216     2          dest         
+0x00000000 983043     yundream   600        393216     2          dest         
+0x00000000 917508     yundream   600        393216     2          dest         
+0x00000000 1015813    yundream   600        393216     2          dest         
+0x00000000 1048582    yundream   600        393216     2          dest         
+0x00000000 27590663   yundream   600        393216     2          dest         
+0x00000000 35684360   yundream   666        4343780    2          dest         
+0x00000000 35717129   yundream   666        282808     2          dest  
+}}}
+
+=== /proc 파일 시스템으로 제어하기 ===
+리눅스 운영체제(:12)는 /proc 파일 시스템으로 공유 메모리 자원 값을 변경할 수 있다. 
+  * /proc/sys/kernel/shmmax : 프로세스가 생성할 수 있는 공유 메모리의 최대 크기
+  * /proc/sys/kernel/shmall : 현재 사용중인 공유 메모리 크기
+프로세스가 생성할 수 있는 공유 메모리 크기는 다음과 같이 변경하면 된다.
+{{{#!plain
+// 500M로
+# echo 536870912 > /proc/sys/kernel/shmmax
+}}}
+
+[[Category(4)]]
+@
+
+
+1.4
+log
+@183.100.209.35;;Anonymous;;
+@
+text
+@d89 1
+a89 1
+shmget 은 커널에 공유메모리 공간을 요청하기 위해 호출하는 시스템 호출 함수이다. key 는 바로 위에서 설명했듯이 고유의 공유메모리임을 알려주기 위해서 사용된다. shmget 을 이용해서 새로운 공유메모리 영역을 생성하거나 기존에 만들어져있던 공유메모리 영역을 참조할수 있다.  
+@
+
+
+1.3
+log
+@218.50.32.99;;Anonymous;;
+@
+text
+@d12 1
+a12 1
+ㅗㅓㅗ
+@
+
+
+1.2
+log
+@218.50.32.99;;Anonymous;;
+@
+text
+@d40 1
+d88 12
+d101 1
+@
+
+
+1.1
+log
+@112.169.63.165;;Anonymous;;
+@
+text
+@a86 2
+=== shmget ===
+shmget 은 커널에 공유메모리 공간을 요청하기 위해 호출하는 시스템 호출 함수이다. key 는 바로 위에서 설명했듯이 고유의 공유메모리임을 알려주기 위해서 사용된다. shmget 을 이용해서 새로운 공유메모리 영역을 생성하거나 기존에 만들어져있던 공유메모리 영역을 참조할수 있다.  
+a87 5
+  첫번째 아규먼트는 여러개의 공유메모리중 원하는 공유메모리에 접근하기 위한 Key 값이다. 이 Key 값은 커널에 의해서 관리되며, Key 값을 통해서 선택적인 공유메모리에의 접근이 가능하다. 
+  두번째 아규먼트는 공유메모리 의 최소크기 이다. 새로운 공유메모리를 생성하고자 한다면 크기를 명시해주어야 한다.  존재하는 메모리를 참조한다면 크기는 0으로 명시한다.
+  3번째 아규먼트는 공유메모리의 접근권한과, 생성방식을 명시하기 위해서 사용한다. 아규먼트의 생성방식을 지정하기 위해서 IPC_CREAT 와 IPC_EXCL 을 사용할수 있다. 아래 이들에 대해서 설명을 해두었다. 
+
+  * IPC_CREAT
+@

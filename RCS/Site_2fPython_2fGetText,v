@@ -1,0 +1,146 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.09.12.16.13.51;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.09.12.15.18.59;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fPython_2fGetText
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title Python에서 gettext 사용하기
+
+[[TableOfContents]]
+== gettext에 대해서 ==
+gettext는  응용 소프트웨어에서 사용하는 메시지들의 다국어지원을 도와주는 소프트웨어다. C,C++,Java,Perl,ruby,Python.. 거의 모든언어에서 사용할 수 있는 툴로, 국제화(i18n)관련해서는 표준적인 툴이라고 보면 되겠다. 
+
+gettext의 사용방법은 언어에 상관없이 비슷하다. [wiki:Site/PHP/gettext php언어 에서의 i18n]적용을 다룬 문서가 있으니 참고바란다.
+
+== python에서의 gettext 프로세스 ==
+gettext를 사용하는 기본 프로세스는 다음과 같다.[[FootNote(Python외의 다른 언어들도 프로세스는 동일하다.)]]
+  1. 각 언어는 gettext 함수(혹은 메서드 혹은 클래스)를 제공한다. 메시지 출력에 gettext를 사용한다. gettext는 매개변수로 '''msgid'''를 가진다. 나중에 msgid가 해당 언어의 문자열로 치환된다. 
+  1. xgettext라는 외부 실행 프로그램을 이용해서 소스코드로 부터 '''msgid'''를 추출할 수 있다. msgid를 어떤 언어로 번역할지에 대한 규칙을 담은 파일로 확장자는 '''.po'''다. 개발자는 .po 파일을 열어서 '''msgid'''에 맞는 텍스트를 입력하면 된다. 
+  1. msgfmt 프로그램을 실행하면 '''.po'''파일을 읽어서, 컴파일된 .mo 파일을 만든다. 애플리케이션은 .mo 파일을 읽어서 메시지를 출력한다. 
+
+== 테스트 ==
+=== 테스트 환경 ===
+우분투 리눅스 13.04에서 테스트를 진행했다. Locale는 '''ko_KR.UTF8'''이다. 
+{{{#!plain
+# echo $LANGUAGE
+ko_KR
+}}}
+
+=== 간단한 테스트 ===
+기능을 확인하는 수준의 간단한 프로그램을 만들어보기로 했다.
+{{{#!plain
+# cat gettextsample.py
+#!/usr/bin/python
+import gettext
+
+t=gettext.translation('gettextsample', 'locale', fallback=True)
+_=t.ugettext
+
+print _('__HELLO__')
+print _('__BYE__')
+}}}
+
+po 파일 생성을 만든다.
+{{{#!plain
+# xgettext -d gettextsample gettextsample.py 
+}}}
+
+po 파일이다. charset와 Content-Transfer-Encoding를 utf-8로 수정했다. 
+{{{#!plain
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-09-13 00:58+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: utf-8\n"
+
+#: gettextsample.py:7
+msgid "__HELLO__"
+msgstr "안녕하세요."
+
+#: gettextsample.py:8
+msgid "__BYE__"
+msgstr "안녕히가세요."
+}}}
+msgid가 추출된걸 확인할 수 있다. 번역할 문자열로 msgstr 값을 설정했다.
+
+po 파일을 LC_MESSAGES 디렉토리 밑으로 옮긴다음. mo 파일을 만들었다. 
+{{{#!plain
+# mkdir -p locale/ko_KR/LC_MESSAGES
+# cp gettextsample.po locale/ko_KR/LC_MESSAGES
+# cd gettextsample.po locale/ko_KR/LC_MESSAGES
+# msgfmt gettextsample.po -o gettextsample.mo
+}}}
+
+샘플 프로그램을 실행해보자.
+{{{#!plain
+$ ./gettextsample.py 
+안녕하세요.
+안녕히가세요.
+}}}
+잘 된다.
+
+이제 영어(en_US)메시지를 만들어서 테스트 해보자. po 파일의 메시지를 영어에 맞게 수정했다.
+{{{#!plain
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: gettextsample.py:7
+msgid "__HELLO__"
+msgstr "How are you"
+
+#: gettextsample.py:8
+msgid "__BYE__"
+msgstr "Good night !"
+}}}
+mo 파일의 위치는 "locale/en_US/LC_MESSAGES/"이다.
+
+LANGUAGE를 en_US로 바꾼다음 테스트를 진행한다.
+{{{#!plain
+# LANGUAGE=en_US
+# ./gettextsample.py 
+How are you
+Good night !
+}}}
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+a3 1
+미완성 ..
+d14 91
+@

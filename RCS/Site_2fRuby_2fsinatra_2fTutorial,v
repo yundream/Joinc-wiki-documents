@@ -1,0 +1,377 @@
+head	1.8;
+access;
+symbols;
+locks
+	root:1.8; strict;
+comment	@# @;
+
+
+1.8
+date	2013.09.17.15.48.03;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.09.17.12.31.46;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.09.17.07.39.12;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.09.15.16.17.52;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.09.15.16.15.49;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.09.15.08.50.48;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.09.15.07.53.25;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.09.15.04.29.32;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fsinatra_2fTutorial
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title Sinatra Tutorial
+
+[[TableOfContents]]
+== Tutorial ==
+Sinatra 설치에서, Hello world를 출력하는 간단한 서비스 개발. erb 템블릿을 붙이고, Database 연결하는 것까지를 '''따라하기(Tutorial)''' 느낌으로 정리해 보려고 한다. 
+
+=== 환경 ===
+  * [wiki:Site/cloud/virtualbox VirtualBox] : VM으로 운영체제 하나 띄워서 개발 및 테스트
+  * Ubuntu Linux 13.04 server
+  * Ruby 1.9.1
+
+=== Sinatra 설치 ===
+Ruby 버전을 확인한다. Ruby가 없다면 설치
+{{{#!plain
+# ruby --version
+ruby 1.9.3p194 (2012-04-20 revision 35410) [x86_64-linux]
+}}}
+
+[wiki:Site/Ruby/gemCommandReference gem]으로 sinatra를 설치한다.
+{{{#!plain
+gem install sinatra
+Successfully installed sinatra-1.4.3
+1 gem installed
+Installing ri documentation for sinatra-1.4.3...
+Installing RDoc documentation for sinatra-1.4.3...
+}}}
+
+=== Hello World ===
+'''Hello World'''를 출력하는 프로그램으로 이름은 '''hi.py'''다.
+{{{#!plain
+#!/usr/bin/ruby
+require 'sinatra'
+
+get '/hi' do
+    "Hello World!"
+end
+}}}
+
+{{{#!plain
+# python hi.rb 
+[2013-09-15 21:18:40] INFO  WEBrick 1.3.1
+[2013-09-15 21:18:40] INFO  ruby 1.9.3 (2012-04-20) [x86_64-linux]
+== Sinatra/1.4.3 has taken the stage on 4567 for development with backup from WEBrick
+[2013-09-15 21:18:40] INFO  WEBrick::HTTPServer#start: pid=1451 port=4567
+}}}
+Sinatra는 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 웹 서버 라이브러리인 '''[wiki:man/12/webrick WEBrick]'''를 이용한 자체 웹 서버를 내장하고 있다. 성능과 기능은 믿음직 하지 않지만 테스트 용도로 간단하게 사용할 수 있다. 
+
+Sinatra의 기본 바인드 주소는 '''127.0.0.1:4567'''이다. 따라서 외부에서는 접근할 수 없다. 다음과 같이 바인드 주소를 설정할 수 있다. 
+{{{#!plain
+require 'sinatra'
+
+set :bind, '0.0.0.0'
+set :port, 80
+get '/hi' do
+    "Hello World!"
+end
+}}}
+
+=== URL 파라메터 읽기 ===
+{{{#!plain
+get '/user/:name' do
+    "Hello #{params[:name]}"
+end
+}}}
+혹은 
+{{{#!plain
+get '/user/:name' do |name|
+    "Hello #{name}"
+end
+}}}
+
+두 개이상의 파라메터도 처리할 수 있다.
+{{{#!plain
+get '/user/:first/:second' do |name1, name2|
+    "Hello #{name1}-#{name2}"
+end
+}}}
+
+=== HTTP Request 정보 읽기 ===
+유저의 요청 정보를 처리하기 위해서는 '''HTTP header'''와 '''Body''' 정보를 읽어야 한다. Header에서는 content-type, cookie 정보, 기타 애플리케이션 헤더 정보를 가져올 수 있다. Body에서 유저요청의 상세 내용을 읽어온다.
+{{{#!plain
+#!/usr/bin/ruby
+require 'sinatra'
+require 'json'
+require 'pp'
+
+post '/user' do
+    user_data = JSON.parse(request.body.read)
+    pp user_data
+    "Content_type : #{request.env['CONTENT_TYPE']}"
+end
+}}}
+Sinatra 서버를 실행한 다음, [wiki:Site/Tip/curl curl]로 테스트를 해보자. curl이 익숙치 않다면, postman 으로 테스트를 해도 된다. 
+{{{#!plain
+# cat data.json 
+{'name':'yundream', 'mail':'yundream@@gmail.com', 'address':'seoul' }
+
+# curl -X POST http://192.168.56.101/user -d @@data.json -H "Content-Type: application/json"
+}}}
+
+Rack의 Request로 가져올 수 있는 정보들을 정리했다.
+{{{#!plain
+get '/foo' do
+  request.body              # 클라이언트의 요청 데이터 
+  request.scheme            # "http"
+  request.script_name       # "/example"
+  request.path_info         # "/foo"
+  request.port              # 80
+  request.request_method    # "GET"
+  request.query_string      # ""
+  request.content_length    # request.body의 크기
+  request.media_type        # request.body의 media 타입
+  request.host              # request host 
+  request.get?              # true (similar methods for other verbs)
+  request.form_data?        # false
+  request["SOME_HEADER"]    # value of SOME_HEADER header
+  request.referer           # the referer of the client or '/'
+  request.user_agent        # user agent (used by :agent condition)
+  request.cookies           # 브라우저 cookie의 해쉬 값 
+  request.xhr?              # is this an ajax request?
+  request.url               # "http://example.com/example/foo"
+  request.path              # "/example/foo"
+  request.ip                # 클라이언트 IP 주소 
+  request.secure?           # false
+  request.env               # raw env hash handed in by Rack
+end
+}}}
+문서를 보면 request!["SOME_HEADER"!]로 헤더값을 읽을 수 있다고 했는데, 실행해보면 읽어오지 않는다. 
+
+=== 템플릿 ===
+템플릿은 애플리케이션이 처리한 값을 문서에 집어넣기 위해서 사용한다. 수십종의 템플릿엔진이 있는데([wiki:Site/Ruby/sinatra/ReadMe Sinatra readme 참고], 주로 (기본 내장 템플릿 엔진인)erb와 haml(HTML abstraction markup language)를 사용한다. HTML 문서 처리의 경우 성능 때문에 haml을 많이 사용하는 추세인것 같다. Haml의 단점은 HTML 전용이라는 점이다. 나는 주로 REST + JSON 기반의 API 서버 개발 목적으로 sinatra를 사용하기 때문에, 범용적으로 사용할 수 있는 erb를 사용한다.  
+{{{#!html
+<table>
+<tr><td>ERB</td><td>Haml</td></tr>
+<tr valign=top><td>
+}}}
+{{{#!plain
+<section class=”container”>
+  <h1><%= post.title %></h1>
+  <h2><%= post.subtitle %></h2>
+  <div class=”content”>
+    <%= post.content %>
+  </div>
+</section>
+}}}
+{{{#!html
+</td><td>
+}}}
+{{{#!plain
+%section.container
+  %h1= post.title
+  %h2= post.subtitle
+  .content
+    = post.content
+}}}
+{{{#!html
+</td></tr></table>
+}}}
+
+==== ERB 사용 ====
+Sinatra는 view 파일들을 '''views''' 디렉토리에서 읽는다. views 디렉토리를 만든다음 index.erb 파일을 배치했다. 
+{{{#!plain
+# cat views/index.erb
+{
+    "first":<%=name1%>,
+    "second":<%=name2%>
+}
+}}}
+
+{{{#!plain
+get '/user/:first/:second' do |name1, name2|
+    erb :index
+end
+}}}
+
+==== haml 사용 ====
+haml은 내장 템플릿엔진이 아니다. 먼저 설치해야 한다.
+{{{#!plain
+# gem install haml
+}}}
+
+index.haml 파일을 만들었다.
+{{{#!plain
+# cat views/index.haml
+!!!
+%html
+    %head
+        %title Test !!!
+    %body
+        %h2 #{@@first}.#{@@second}
+}}}
+
+{{{#!plain
+#!/usr/bin/ruby
+require 'sinatra'
+require 'haml'
+
+get '/user/:first/:second' do |name1, name2|
+        @@first = name1
+        @@second = name2
+        haml :index
+}}}
+
+=== 응답 헤더 편집 ===
+Sinatra의 ResponseHelpers 모듈을 이용해서 응답헤더를 편집할 수 있다.
+
+content_type 변경
+{{{#!plain
+get '/test' do
+    content_type 'text/html', :charset => 'utf-8'
+    "<h1>안녕하세요<h1>"
+end
+}}}
+
+headers를 이용한 변경
+{{{#!plain
+headers 'Content-Type'=> 'application/json', 
+       'X-APP-NAME'=> 'test-app'
+}}}
+
+URL redirect
+{{{#!plain
+get '/redirect' do
+    redirect '/somewhere/else', 301
+end
+}}}
+
+== 참고 ==
+  * [http://stackoverflow.com/questions/4014996/how-to-dump-an-http-request-from-within-sinatra Sinatra에서 http 요청 가져오기]
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a2 2
+<!> 미완성
+
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d163 8
+d172 5
+d178 5
+a182 1
+=== 응답 ===
+d184 45
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d103 1
+a103 1
+Request 클래스를 정리했다. 
+d130 34
+a163 1
+HTTP 헤더 값은 request.env로 가져올 수 있다. 
+d167 1
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d48 1
+a48 1
+Sinatra는 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 웹 서버 라이브러리인 '''WEBrick'''를 이용한 자체 웹 서버를 내장하고 있다. 성능과 기능은 믿음직 하지 않지만 테스트 용도로 간단하게 사용할 수 있다. 
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 3
+d10 1
+a10 1
+  * VirtualBox : VM으로 운영체제 하나 띄워서 개발 및 테스트
+d21 1
+a21 1
+gem으로 sinatra를 설치한다.
+d29 107
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d6 1
+a6 1
+== 환경 ==
+d10 16
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 5
+@

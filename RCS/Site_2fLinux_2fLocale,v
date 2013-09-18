@@ -1,0 +1,120 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.09.14.07.42.02;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fLinux_2fLocale
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title 리눅스 locale 설정
+
+[[TableOfContents]]
+== Locale ==
+Locale(로케일은) 프로그램을 언어와 국가에 최적화하기 위해서 사용하는 "지역/언어"정보다. 프로그램은 유저(보통 시스템 관리자)가 설정한 locale에 따라서, 입/출력 인코딩을 적용해서 메시지를 출력한다.  
+
+로케일관련 패키지는 '''locales'''이고, 보조적으로 각 언어별로 '''language-pack-*'''패키지가 있다.
+
+== Locale 목록 확인 ==
+'''locale -a'''로 [wiki:man/12/운영체제 운영체제]에서 사용할 수 있는 로케일 정보를 볼 수 있다.
+{{{#!plain
+# locale -a
+yundream@@yundream:~$ locale -a
+C             # ASCII 인코딩
+C.UTF-8
+POSIX
+en_AG
+en_DE.utf8    # 독일어,    독일,      UTF-8 encoding 
+en_CA.utf8    # 캐나다어,  캐나다,    UTF-8 encoding 
+en_US.utf8    # 영어,      미국,      UTF-8 encoding
+ko_KR.utf8    # 한국어,    대한민국,  UTF-8 encoding
+}}}
+
+== 현재 로케일 정보 확인하기 ==
+'''locale'''명령으로 시스템의 로케일 정보를 확인할 수 있다.
+{{{#!plain
+$ locale
+LANG=ko_KR.UTF-8
+LANGUAGE=ko_KR
+LC_CTYPE="ko_KR.UTF-8"
+LC_NUMERIC="ko_KR.UTF-8"
+LC_TIME="ko_KR.UTF-8"
+LC_COLLATE="ko_KR.UTF-8"
+LC_MONETARY="ko_KR.UTF-8"
+LC_MESSAGES="ko_KR.UTF-8"
+LC_PAPER="ko_KR.UTF-8"
+LC_NAME="ko_KR.UTF-8"
+LC_ADDRESS="ko_KR.UTF-8"
+LC_TELEPHONE="ko_KR.UTF-8"
+LC_MEASUREMENT="ko_KR.UTF-8"
+LC_IDENTIFICATION="ko_KR.UTF-8"
+LC_ALL=
+}}}
+
+|| LANG         || LC_* 값들을 설정하지 않았을 때 적용되는 기본 값                                                     ||
+|| LC_ADDRESS   ||                                                                                                     ||
+|| LC_ALL       || LC_ALL의 값으 LC_*의 값이 override 된다.                                                            ||
+|| LC_TIME      || 시간 출력 양식 설정                                                                                 ||
+|| LC_TELEPHONE || 전화번호의 출력 양식 설정                                                                           ||
+|| LC_PAPER     || 종이의 크기 형식. 11 x17 inches, A4 등등                                                            ||
+|| LC_NUMBER    || 숫자표현양식. 대부분 소수구분으로 "."을 사용하지만, 어떤 나라는 ","을 사용한다.                     ||
+|| LC_NAME      || 이름 표기 형식. first, last name등                                                                  ||
+|| LC_MESSAGES  || 시스템 메시지 출력에 사용할 언어                                                                    ||
+|| LC_CTYPE     || 대문자, 소문자간의 변환 형식                                                                        ||
+|| LC_COLLATE   || 알파벳의 정렬과 관련된 규칙. "C"나 "POSIX" 로케일의 경우 strcmp()를 적용한 것과 같은 결과를 보인다. ||
+
+== 로케일별 출력 예제 ==
+로케일 관련된 환경변수 설정에 따른 출력 결과
+{{{#!plain
+# date
+2013. 09. 14. (토) 14:31:54 KST
+
+# export LC_TIME=en_US.utf8
+
+# date
+Sat Sep 14 14:34:21 KST 2013
+}}}
+
+== 로케일 설정 변경 ==
+시스템 기본 로케일 설정은 '''/etc/default/locale'''을 수정하면 된다.
+{{{#!plain
+# cat /etc/default/locale
+LANG="ko_KR.UTF-8"
+}}}
+
+== 로케일 생성 ==
+[wiki:Site/cloud/virtualbox VirtualBox]로 Ubuntu 13.04 server 운영체제를 설치했다. 그런데 로케일에 '''ko_KR.utf8'''이 설치가 안됐다. 아마도 설치하면서 언어설정을 기본(영어)로 했기 때문인 것 같다. 종종 이런 경우를 경험한다. 특히 [wiki:Site/cloud/AWS AWS]에서 리눅스 인스턴스를 올린 후에는 거의 반드시 로케일 설정을 해줘야 한다.
+
+'''ko_KR.utf8''' 로케일을 추가해 보자.  
+{{{#!plain
+# locale-gen ko_KR.UTF-8
+Generating locales...
+  ko_KR.UTF-8... done
+Generation complete.
+
+# locale -a | grep ko_KR
+ko_KR.utf8
+}}}
+이제 /etc/default/locale를 수정하는 것으로 기본 로케일 설정을 변경할 수 있다.
+
+혹은 ([wiki:Site/Bash/BeginningBashScript/index.html bash]를 사용한다면).bash_profile을 수정하는 방법도 있다.
+{{{#!plain
+# cat ~/.bash_profile
+export LANG=ko_KR.utf8
+}}}
+@

@@ -1,0 +1,168 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2013.09.14.02.01.54;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.09.12.14.41.05;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.09.11.15.50.30;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fPython_2fKorean
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title Korean package 
+
+[[TableOfContents]]
+== 한글 처리 ==
+=== 애로사항이 꽃피더라 ===
+i18n에 대응하는 유저 메시지시스템을 만들려고 한다. i18n하면 가장 먼저 떠오르는게 '''gettext'''다. 내가 알기로 오픈소스진영에서 가장 널리 사용하는 메시지 관리 툴로 알고 있다. C, C++, Java, Ruby, Perl, javascript, C#, Python, aws, shell, PHP 거의 모든 언어에서 사용할 수 있는 좋은 툴이다.
+
+그런데 메시지 품질관련된 문제가 좀 있다. 정적 메시지라면 상관이 없는데, 변수가 들어가는 메시지의 경우 특히 "조사"의 문제로 메시지 품질이 떨어진다는 점이다. 다음과 같은 경우다.  
+
+"%s는 %s를 획득했다."라는 메시지 형식이 있다고 가정하자. %s는 다른 문자열로 치환된다고 하면
+  1. 나'''는''' 도마'''를''' 획득했다. : 괜찮다.   
+  1. 나'''는''' 칼'''를''' 획득했다. : 이상하다. 
+  1. 톰슨'''는''' 블레이드'''를''' 획득했다 : 역시 이상하다. 
+아래와 같이 대충 대응할 수 있기는 하다.
+{{{#!plain
+"%s은(는) %s을(를) 획득했다."
+}}}
+편하긴 하지만 전혀 마음에 들지 않는다. (몇몇의 경우에 임시방편으로 써먹을 수는 있겠지만) 
+
+=== 뭔가 방법을 찾아보려고 했다. ===
+그래 한글의 조사를 처리할 수 있는 방법을 찾아보기로 했다. 조사처리에는 일정한 규칙이 있으니, 좀 노가다를 뛰어야 하겠지만 개발은 할 수 있을 거라고 생각은 했다. 목적격 조사 "을", "를"의 경우 체언이 자음으로 끝나면 '''을''', 모음으로 끝나면  '''를'''이 오는 규칙이 있다. 
+  * '''칼'''을 획득했다. 
+  * '''블레이드'''를 획득했다.
+주격조사, 보격조사 도 마찬가지의 규칙이 있다. 관형격조사, 부사격조사 등 다른 조사들도 있는데 이들은 신경쓰지 않아도 될 것 같다. --정말 그런지는 좀더 조사를 해봐야 겠다.-- 
+
+=== 이미 바퀴가 있더라 ===
+굳이 삽질을 하고 싶진 않아서 여기저기 인터넷을 뒤지다가 한글 처리를 위한 python "korean 형태론 라이브러리'''가 있다는 것을 알게 됐다. 내가 원하는 툴 같아서 그냥 감사한 마음으로 잘 사용하기로 했다. 
+
+=== 테스트 환경 ===
+  * Ubuntu 리눅스 13.04 
+  * [wiki:man/12/locale locale]: ko_KR.UTF-8 이 아니면 테스트가 잘 안돼더라. 
+    {{{#!plain
+# echo $LANG
+ko_KR.UTF-8
+# locale 
+LANG=ko_KR.UTF-8
+LANGUAGE=
+LC_CTYPE="ko_KR.UTF-8"
+LC_NUMERIC="ko_KR.UTF-8"
+LC_TIME="ko_KR.UTF-8"
+LC_COLLATE="ko_KR.UTF-8"
+LC_MONETARY="ko_KR.UTF-8"
+LC_MESSAGES="ko_KR.UTF-8"
+LC_PAPER="ko_KR.UTF-8"
+LC_NAME="ko_KR.UTF-8"
+LC_ADDRESS="ko_KR.UTF-8"
+LC_TELEPHONE="ko_KR.UTF-8"
+LC_MEASUREMENT="ko_KR.UTF-8"
+LC_IDENTIFICATION="ko_KR.UTF-8"
+LC_ALL=
+root@@ip-10-146-57-31:~# 
+}}}
+=== korean 패키지 설치 ===
+{{{#!plain
+# pip install korean 
+Downloading/unpacking korean
+  Downloading korean-0.1.7.tar.gz
+  Running setup.py egg_info for package korean
+    
+Requirement already satisfied (use --upgrade to upgrade): distribute in /usr/lib/python2.7/dist-packages (from korean)
+Installing collected packages: korean
+  Running setup.py install for korean
+    
+Successfully installed korean
+Cleaning up...
+}}}
+
+=== 테스트 ===
+{{{#!plain
+import sys
+from korean import Noun, NumberWord, Loanword
+
+foo=unicode(sys.argv[1], 'utf-8')
+bar=unicode(sys.argv[2], 'utf-8')
+
+fmt = u'{subj:은} {obj:을} 획득했다.'
+#print fmt.format(subj=Noun(u'나'), obj=Noun(u'밥'))
+print fmt.format(subj=Noun(foo), obj=Noun(bar))
+
+fmt = u'{subj:이} 나타났다'
+print fmt.format(subj=Noun(foo))
+}}}
+
+테스트 결과
+{{{#!test
+# ./kor.py 그 탕수육
+그는 탕수육을 획득했다.
+그가 나타났다
+
+# ./kor.py 용사 고기
+용사는 고기를 획득했다.
+용사가 나타났다
+
+# ./kor.py 탐 육분의
+탐은 육분의를 획득했다.
+탐이 나타났다
+
+# ./kor.py 2 3
+2는 3을 획득했다.
+2가 나타났다
+}}}
+
+Ruby용으로 포팅하고 싶다. --Ruby 버전이 있을려나--
+
+== gettext에서 korean 패키지 활용 ==
+
+== chef를 이용한 메시지 관리 ==
+
+== 참고 ==
+  * https://pypi.python.org/pypi/korean
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d31 1
+a31 1
+  * locale : ko_KR.UTF-8 이 아니면 테스트가 잘 안돼더라. 
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d4 1
+a4 1
+== 한글 메시지 처리 ==
+d104 5
+@

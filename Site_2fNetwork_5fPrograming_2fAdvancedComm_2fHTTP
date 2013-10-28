@@ -41,6 +41,7 @@ http://www.joinc.co.kr/index.php 를 분석해보자.
   1. index.php : 요청할 자원의 이름이다.  
 이렇게  "프로토콜", "위치", "자원명"으로 (인터넷 상에서) 어디에 있던지 자원에 접근할 수 있다.
 
+ㅌㅌ
 === Method(메서드) ===
 메서드는 요청의 종류를 서버에게 알려주기 위해서 사용한다. 다음은 요청에 사용할 수 있는 메서드들이다.
   * GET : 정보를 요청하기 위해서 사용한다. (SELECT) 
@@ -244,75 +245,8 @@ HTTP를 기반으로 하는 웹 서비스는 '''connectless'''방식으로 이�
   * 서버는 cookie를 키로하는 값을 데이터베이스에 저장하는 방식으로 "세션"을 유지한다.
       * ex) 로그인한 클라이언트가 "물건 - A"를 구매했다면, 클라이언트의 cookie id를 key로 데이터베이스에 구매정보를 update 한다.
 
-==== 쿠키 발행 과정 ====
-하나의 서버는 하나 이상의 클라이언트의 상태정보를 저장해야 하므로, 서버와 각 클라이언트는 서로 유일한 key를 공유해야 한다. 이 key를 이용해서 클라이언트의 상태를 저장하고 다음 접속때 꺼내올 수 있기 때문이다. 쿠키가 하는 일이다. 
-
-쿠키는 다음과 같이 주고 받는다. 로그인 과정을 예로 들어보자. 
-
-{{{#!html
-<img src="https://docs.google.com/drawings/d/12QAVL7mmbD4mtDoI6oRYUwgS0lRiMtTVq88U4jdxAos/pub?w=757&amp;h=651">
-}}}
-  1. id/password를 입력해서 로그인을 요청한다.
-  1. 서버는 id와 password를 조회해서 로그인 허용 여부를 결정한다.
-  1. 로그인을 성공하면
-  1. session_id를 생성하고, 유저정보와 함께 데이터베이스에 저장한다. 
-  1. 생성한 session_id는 cookie에 담아서 보낸다. 이때 서버는 HTTP 헤더의 '''set_cookie''' 필드에 session_id 값을 보낸다.
-  1. 클라이언트는 set_cookie에 설정된 session_id의 값을 메모리에 저장한다.
-연결을 끊는다.
-  1. 클라이언트가 서버에 접근하면, session_id 값을 보낸다. 이때 클라이언트는 HTTP 헤더의 '''cookie''' 필드를 이용한다. 
-  1. 서버는 클라이언트가 보낸 session_id 값을 읽어서, 데이터베이스에 같은 값이 있는지 확인한다. 이로서 서버는 이 클라이언트가 로그인 한 유저라는 걸 알 수 있다.  
-
-==== 쿠키 설정 ====
-처음 서버에 접속할 때, 클라이언트는 다음과 같은 헤더정보를 서버에게 보낼 것이다. 
-{{{#!plain
-GET /index.php HTTP/1.1
-Host: www.joinc.co.kr
-}}}
-Browser ------> Server 
-
-서버는 다음과 같이 쿠키 값을 클라이언트에게 보낸다.
-{{{#!plain
-HTTP/1.1 200 OK
-Content-type: text/html
-Set-Cookie: name=value
-Set-Cookie: name2=value2; Expires=Wed, 09 Jun 2021 10:18:14 GMT
-}}}
-Browser <------ Server
-
-클라이언트는 Set-Cookie 값을 읽어서, 메모리에 저장한다. 이제 www.joinc.co.kr에 접속하면 쿠키값을 헤더에 박아서 보낸다. 
-{{{#!plain
-GET /spec.html HTTP/1.1
-Host: www.joinc.co.kr
-Cookie: name=value; name2=value2
-Accept: */*
-}}}
-쿠키값은 도메인을 구분한다. www.joinc.co.kr에서 받은 쿠키는 www.joinc.co.kr를 방문할 때만 전송한다.
-
-==== 쿠키의 구성요소 ====
-===== Domain과 Path =====
-클라이언트에 쿠키를 보낼 때, 쿠키를 사용할 Domain과 Path를 지정할 수 있다.
-{{{#!plain
-Set-Cookie: MyID=DQAAAK…Eaem_vYg; Domain=docs.foo.com; Path=/accounts; Expires=Wed, 13 Jan 2021 22:23:01 GMT; 
-}}}
-이 경우 클라이언트가 doc.foo.com/accounts를 방문할 때만 MyID 쿠키를 서버에 전송한다. 만약 '''Path=/'''로 설정한다면, doc.foo.com 의 모든 페이지를 방문할 때, 쿠키를 전송한다.  
-
-===== Expires =====
-Expires는 쿠키의 유효기간이다. 브라우저는 Expires에 지정된 시간이 지나면 쿠키를 삭제한다.  
-{{{#!plain
-Set-Cookie: lu=Rg3vHJZnehYLjVg7qi3bZjzg; Expires=Tue, 15 Jan 2013 21:47:38 GMT; Path=/; Domain=.example.com; HttpOnly
-Set-Cookie: made_write_conn=1295214458; Path=/; Domain=.example.com
-}}}
-첫 번째 쿠키는 2013년 1월 15일 21시에 파기된다. 두 번째는 expires를 설정하지 않았는데, 이 경우 브라우저가 닫히면 쿠키도 삭제된다.   
-
-==== 쿠키와 보안 ====
-Expires를 설정할 경우 쿠키 정보는 브라우저가 종료되더라도 디스크에 남게 된다. 
-
-예컨데 "자동로그인"을 설정한 상태라면, 디스크에는 "로그인을 위한 정보"가 남게 될 것이다. 이 정보는 파일 형태로 저장되기 때문에 쉽게 읽을 수 있다. 어떤 형태로든 쿠키정보가 유출되면, 개인정보가 유출될 수 있음을 의미한다.
-
-따라서 "자동로그인" 같은 위험한 기능은 가능하면 사용하지 않는게 좋다. 사용할 거라면 개인 PC에서만 사용해야 한다. PC방 같은 공용 PC에서는 절대 자동로그인 기능을 켜서는 안된다. 자리를 뜨기전에, 브라우저의 그동안의 사용이력을 전부 지워버리는 방법이 있긴 하다. 나 같은 경우에도 부득이하게 PC방을 이용해야 할 경우, 자동로그인을 켜지 않았다고 해도 확실히 하기 위해서 데이터를 지워버린다.
-
-==== 쿠키 응용 ====
-===== 자동 접속 설정 =====
+==== 쿠키 ====
+쿠키 관련 내용은 [wiki:man/12/cookie cookie]문서를 참고한다.
 
 == 디버깅 및 성능 측정  ==
 HTTP를 기반으로 하는 웹 서버를 디버깅하는 방법에 대해서 알아본다. 모든 디버깅이 그렇듯이, 핵심은 헤더의 확인 특히 응답코드를 확인하는데 있다.  
@@ -523,17 +457,18 @@ Connection: Keep-Alive
 === URL Redirect ===
 URL Redirect를 위해서 서버는 301 코드를 반환한다. '''Location'''에 리다이렉트할 URL을 명시한다. 301 코드를 받은 클라이언트는 Location 주소로 접속을 시도한다.  
 {{{#!plain
-HTTP/1.1 301 Moved Permanently                                                                                    
-Content-Type: text/html;charset=utf-8                                                                             
-Location: http://192.168.56.101/ok                                                                                
-Content-Length: 0                                                                                                 
-X-Xss-Protection: 1; mode=block                                                                                   
-X-Content-Type-Options: nosniff                                                                                   
-X-Frame-Options: SAMEORIGIN                                                                                       
-Server: WEBrick/1.3.1 (Ruby/1.9.3/2012-04-20)                                                                     
-Date: Tue, 17 Sep 2013 12:36:01 GMT                                                                               
-Connection: Keep-Alive  
+HTTP/1.1 301 Moved Permanently
+Content-Type: text/html;charset=utf-8
+Location: http://192.168.56.101/ok
+Content-Length: 0
+X-Xss-Protection: 1; mode=block
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN 
+Server: WEBrick/1.3.1 (Ruby/1.9.3/2012-04-20)
+Date: Tue, 17 Sep 2013 12:36:01 GMT
+Connection: Keep-Alive
 }}}
+
 
 == 참고 문서 ==
   1. http://ko.wikipedia.org/wiki/HTTP_%EC%83%81%ED%83%9C_%EC%BD%94%EB%93%9C
@@ -543,3 +478,4 @@ Connection: Keep-Alive
   1. 웹 브라우저 점유율 : http://gs.statcounter.com/
   1. 웹 서버 시장 자료 : http://news.netcraft.com/archives/category/web-server-survey/ 
   1. http://en.wikipedia.org/wiki/HTTP_Secure
+  1. [http://icecreamie.tistory.com/entry/HTTP-11-%EC%BA%90%EC%8B%9C-%EA%B4%80%EB%A0%A8-%ED%97%A4%EB%8D%94 캐쉬 관련 헤더]

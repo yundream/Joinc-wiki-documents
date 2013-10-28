@@ -1,10 +1,55 @@
-head	1.1;
+head	1.10;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.10; strict;
 comment	@# @;
 
+
+1.10
+date	2013.10.13.14.39.39;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.10.12.04.38.43;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2013.10.12.04.28.21;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.10.09.15.17.08;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.10.09.14.50.33;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.10.09.14.33.54;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.10.09.13.55.27;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.10.09.06.56.39;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.10.08.16.02.53;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2013.07.26.06.22.27;	author root;	state Exp;
@@ -17,14 +62,25 @@ desc
 @
 
 
-1.1
+1.10
 log
-@1.214.223.250;;yundream;;
+@128.134.217.152;;yundream;;
 @
 text
 @#title Ruby thread
 
+[[TableOfContents]]
 == 멀티 스레드 프로그램 ==
+새로운 언어를 배워야 겠다는 생각이 들적에 사용하는 나름의 방식이 있다. 
+  1. 문법은 대략 쭉 훑어 본다. 문법을 외울 것도 아니고, 그럴 필요성도 못 느끼겠다. 쭈욱 읽어 내려간 다음, 몇 줄이라고 코드를 짜보면서 익힌다.
+  1. 자료구조 관련된 것들 훑어본다. 배열, 해쉬, 맵, set 등등
+  1. 파일 관리 쪽 본다. 
+  1. [wiki:Site/Thread쓰레드]를 본다. 
+  1. 프로세스 관리쪽 본다.
+  1. 소켓 프로그래밍 쪽 본다.
+  1. 끝... 나머지는 그때 그때 찾아가면서.
+물론 내가 시스템/네트워크 프로그래밍이 기반이라서 이런 방식을 따르는 거겠다. 그리고 언어자체를 뭔가 파고들어가는 성격이 아니라 활용할 수 있으면 된다 라는 마인드라서 가능한 방식이겠다. 이제 멀티 스레드 프로그래밍 쪽을 살펴볼 순간이다.
+
 싱글 스레드 프로그램은 프로그램을 구성하는 모든 명령이 종료 할 때까지 순차적으로 실행되는 프로그램을 말한다. 이 명령의 흐름(문맥)을 스레드라고 한다. 즉 싱글 스레드 프로그램은 스레드 하나로 실행되는 프로그램을 의미한다.  
 
 멀티 스레드 프로그램은 2 개 이상의 스레드가 동시에 실행된다. 각 스레드에서 문맥은 순차적으로 수행되지만 멀티 코어 CPU일 경우 여러 코어에서 동시에 실행 될 수 있다.  
@@ -40,7 +96,7 @@ text
 이 흐름에 따라서 ruby의 메서드들을 살펴보면 될 것 같다. 
 
 == 루비 스레드 만들기 ==
-루비는 멀티 스레드 프로그래밍을 위해서 '''Thread'''클래스를 제공한다. Thread.new를 하는 것으로 새로운 스레드를 만들 수 있다. 스레드가 수행할 코드는 block({..})문으로 넘기면 된다. 
+루비는 멀티 스레드 프로그래밍을 위해서 '''Thread'''클래스를 제공한다. Thread.new를 하는 것으로 새로운 스레드를 만들 수 있다. 스레드가 수행할 코드는 블럭문에 기술하면 된다. 
 {{{#!plain
 # 메인 스레드 
 Thread.new{
@@ -49,16 +105,352 @@ Thread.new{
 # 메인 스레드는 여기에 있는 코드를 수행한다.
 }}}
 
+웹 서버에 GET 요청을 하는 스레드 예제 프로그램이다.
+{{{#!plain
+require 'net/http'
+require 'pp'
+
+pages = %w( www.joinc.co.kr 
+            www.kldp.org
+            www.linux.com 
+           )
+
+threads = []
+
+for page in pages
+    threads << Thread.new(page) { |myPage|
+        h = Net::HTTP.new(myPage,80)
+        puts "Fetching: #{myPage}"
+        resp, data = h.get('/')
+        puts "Got #{myPage}:  #{resp.message} #{resp.http_version}"
+    }
+end
+
+threads.each{ |aThread| aThread.join}
+}}}
+
+실행 결과
+{{{#!plain
+Fetching: www.linux.com
+Fetching: www.joinc.co.kr
+Fetching: www.kldp.org
+
+Got www.kldp.org:  Found 1.1
+Got www.joinc.co.kr:  OK 1.1
+Got www.linux.com:  OK 1.1
+}}}
+
+Thread.new 메서드를 이용해서 새로운 스레드를 만들었다. 스레드의 매개변수로는 pages 배열에 있는 값들을 넘겼다. Thread.new 메서드를 성공적으로 호출하면, 블럭문을 수행하고 즉시 스레드 객체를 반환한다. 코드에서는 스레드 객체를 배열에 넣었다. 스레드 블럭은 매개변수로 넘어온 page를 긁어온다. 
+
+작업을 모두 끝낸 후에는 thread를 join해서, 스레드가 종료하기를 기다린다. 모든 스레드가 종료하면 프로세스가 끝난다. 
+
 == 스레드 종료 ==
+예제 프로그램의 마지막을 보면 모든 스레드 객체에 대해서 '''Thread#join'''을 호출하고 있다. 
 
-== 스레드와 변수 ==
+루비 프로세스가 종료되면, 스레드의 상태가 어떠하든지 간에 모든 스레드는 kill이 된다. 스레드가 실행 중이라고 해서 스레드를 기다리지 않는다. 따라서, 프로그램이 제대로 작동하게 하려면 Thread#join 메서드를 이용해서 스레드가 종료되는 걸 기다려야 한다. 이 메서드를 호출하면 프로세스는 스레드가 종료할 때까지 블럭된다. 예제 스레드 프로그램은 3개의 스레드가 있으므로 3개의 스레드 모두에 대해서 join 메서드를 호루했다. 
 
-== 뮤텍스 ==
+== 스레드 변수 ==
+스레드는 모든 전역변수를 서로 공유하며, 스레드 블럭의 변수는 스레드내에서만 사용할 수 있다. 하지만 때때로 각 스레드의 변수를 메인스레드와 공유해야 할 때도 있다. 이 때는 thread-local 변수를 이용하면 된다. 다음은 thread-local 변수 예제다. 
+{{{#!plain
+count = 0
+arr = []
 
+10.times do |i|
+   arr[i] = Thread.new {
+      sleep(rand(0)/10.0)
+      Thread.current["mycount"] = count
+      count += 1
+   }
+end
+
+arr.each {|t| t.join; print t["mycount"], ", " }
+puts "count = #{count}"
+}}}
+
+실행 결과
+{{{#!plain
+5, 2, 6, 7, 3, 9, 4, 0, 8, 1, count = 10
+}}}
+
+
+== 상호 배제 - Mutual Exlusion ==
+상호배제는 동시 프로그래밍에서 공유하는 자원의 동시 사용을 피하기 위해서 사용하는 알고리즘이다. 이 알고리즘은 임계 구역(critical section)으로 불리는 코드영역에 대한 사용 접근으로 구현한다.  
+=== 뮤텍스 ===
+뮤텍스는 공유영역에 잠금을 거는 것으로 상호배제를 구현하는 간단한 세마포어 잠금의 구현이다. 뮤텍스를 이용해서 주어진 시간에 단지 하나의 스레드만 잠금을 얻을 수 있도록 제어할 수 있다. 다른 스레드들은 잠금을 얻을 수 있을 때까지 - 잠금을 얻은 스레드가 잠금을 되돌려 줄때까지 - 해당 코드에서 기다려야 한다. 필요에 따라서 기다리는 대신 에러를 반환하도록 할수도 있다.  
+
+뮤텍스의 종종 공유 자원에 대한 원자성(atomic)을 보장하기 위해서 사용한다. 카운터 정보의 유지가 대표적인 경우다. 카운터 정보는 모든 스레드가 공유를 하지만 한번에 하나의 스레드만 카운터에 접근할 수 있어야 한다. 그렇지 않으면, 카운터 정보를 제대로 유지할 수가 없을 것이다. 스레드가 카운터 정보를 읽어서 여기에 +1 연산을 한 후 쓰기 전에 다른 스레드가 카운터 정보를 읽을 수 있기 때문이다.   
+
+간단한 예제 프로그램을 만들었다.
+{{{#!plain
+count = 0
+arr = []
+2.times do | i |
+    arr[i] = Thread.new{
+        while true
+            lcount = count
+            sleep(1.0/(24.0+i))
+            count = lcount+1
+            puts "#{i} : #{count}"
+        end
+    }
+end
+
+arr.each { |t| t.join}
+}}}
+
+결과는 대략 아래와 같다.
+{{{#!plain
+1 : 1
+0 : 1
+1 : 2
+0 : 2
+1 : 3
+0 : 3
+1 : 4
+0 : 4
+}}}
+
+물론 우리가 원하는 결과가 아니다. 아래는 뮤텍스를 이용한 코드다.
+{{{#!plain
+require 'thread'
+
+mutex = Mutex.new
+count = 0
+arr = []
+2.times do | i |
+    arr[i] = Thread.new{
+        while true
+            mutex.synchronize do
+                lcount = count
+                count = lcount+1
+                puts "#{i} : #{count}"
+            end
+            sleep(1.0/(24.0+i))
+        end
+    }
+end
+
+arr.each { |t| t.join}
+}}}
+
+counter 값이 제대로 증가하는 걸 확인할 수 있다.
+{{{#!plain
+0 : 1
+1 : 2
+1 : 3
+0 : 4
+1 : 5
+0 : 6
+1 : 7
+0 : 8
+1 : 9
+0 : 10
+1 : 11
+}}}
+
+멀티 스레드 프로그래밍의 목적은 두 개 이상의 스레드가 동시에 연산을 수행함으로써, 소프트웨어의 성능을 높이는데 있다. 그런데 뮤텍스는 특정 코드에 대해서 "잠금"을 하기 때문에, 잘 못 사용할 경우 뮤텍스가 병목구간이 될 수도 있다. 뮤텍스를 사용할 경우 병목이 생기지 않도록 주의할 필요도 있다. 예컨데, 뮤텍스 구간은 연산을 최소화해서 가능한 빠르게 뮤텍스 구간을 빠져나올 수 있게 해야 한다.
+
+
+== 조건 변수 - Condition Variables == 
+데이터를 보호하는데, 뮤텍스만으로 충분치 않을 수가 있다. 크리티컬 섹션(뮤텍스로 보호하는 구간)에 진입해서 작업을 하는 중에, 다른 스레드로 부터 자원이 준비되는 걸 기다려야 하는 경우를 생각해 보자. 이렇게 되면, 뮤텍스 잠금을 얻기 위한 다른 모든 스레드들이 -- 자원을 준비하는 스레드들 까지 -- 블럭되버릴 것이다. 결국 프로세스는 작동불능 상태에 빠지고 말 것이다.
+
+
+이 경우 사용할 만한 해법은 다음과 같을 거다. 
+   1. 뮤텍스를 얻고 크리티컬 섹셔에 진입한다. 
+   1. 자원을 기다리기(wait)전에, 뮤텍스를 반환한다.
+   1. 기다리는 자원을 얻었다면, 뮤텍스를 얻는다. (다른 스레드와 경쟁하기 때문에, 뮤텍스를 얻기 위해서 일정시간 기다릴 수는 있겠다.)  
+   1. 작업을 끝낸 후 뮤텍스를 반환한다.
+
+조건 변수를 사용한 예제 프로그램이다.
+{{{#!plain
+
+require 'thread'
+mutex = Mutex.new
+cv = ConditionVariable.new  # 조건변수를 만든다.
+
+a = Thread.new {
+  mutex.synchronize {       # 뮤텍스를 요청한다. 요청즉시 얻을 거다. 
+    puts "A: I have critical section, but will wait for cv"
+    cv.wait(mutex)          # 조건변수를 기다린다. 뮤텍스를 반환한다. 
+    puts "A: I have critical section again! I rule!"
+  }
+}
+
+puts "(Later, back at the ranch...)"
+
+b = Thread.new {
+# 뮤텍스를 요청한다. a 스레드가 조건변수를 기다리면서 뮤텍스를 반환하는 시점에서
+# 뮤텍스를 얻고 임계영역에 진입한다.
+  mutex.synchronize {     
+    puts "B: Now I am critical, but am done with cv" 
+    cv.signal     # 시그널을 보낸다.
+    puts "B: I am still critical, finishing up"
+  }
+}
+a.join
+b.join
+}}}
+
+실행 결과는 다음과 같다.
+{{{#!plain
+(Later, back at the ranch...)
+A: I have critical section, but will wait for cv
+B: Now I am critical, but am done with cv
+B: I am still critical, finishing up
+A: I have critical section again! I rule!
+}}}
+== 주요 스레드 메서드들 == 
+=== Thread.current ===
+현재 실행중인 스레드를 반환한다. 
+{{{#!plain
+Thread.current   #=> #<Thread:0x401bdf4c run>
+}}}
+
+=== Thread.status ===
+스레드의 상태를 반환한다.
+{{{#!plain
+require 'thread'
+
+a = Thread.new {
+    t = Thread.current
+    puts t.status
+    puts "Hello World!!!"
+}
+a.join
+}}}
+
+실행결과
+{{{#!plain
+run
+Hello World!!!
+}}}
+
+== 참고 ==
+  * [http://www.ruby-doc.org/docs/ProgrammingRuby/html/tut_threads.html Programming Ruby - threads and Processes]
+  * [http://ruby-doc.org/core-2.0.0/Thread.html Ruby 2.0.0 thread 레퍼런스]
+  * [http://ruby-doc.org/stdlib-2.0.0/libdoc/net/http/rdoc/Net/HTTP.html Ruby Net::HTTP 레퍼런스]
+  * [http://ruby-doc.org/stdlib-2.0.0/libdoc/net/http/rdoc/Net/HTTP.html Ruby Net::HTTPResponse 레퍼런스]
+
+[[Category(420)]]
+@
+
+
+1.9
+log
+@203.247.149.239;;yundream;;
+@
+text
+@d9 1
+a9 1
+  1. 쓰레드 본다. 
+@
+
+
+1.8
+log
+@203.247.149.239;;yundream;;
+@
+text
+@d265 1
+a265 1
+[[Category(450)]]
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d6 1
+a6 1
+  1. 문법은 대략 쭉 훑어 본다. 문법을 외울 것도 아니고, 그럴 필요성도 못 느끼겠다. 대략 차이만 훑어보고나서 익히는건 몇 줄이라고 코드를 짜보면서
+d8 1
+a8 1
+  1. 파일 제어 쪽 본다. 
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d264 2
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a2 1
+<!> 미완성
+d5 10
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d233 2
+d236 13
+d252 1
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d98 2
+a99 1
+== Mutual Exlusion ==
+d137 19
+d158 17
+a174 1
 == 조건 변수 == 
-
+d176 54
+d231 2
+a232 1
 == Thread Class method == 
-
+a233 1
 == Thread Instance Methods ==
+@
 
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d102 35
+a136 1
+뮤텍스의 종종 공유 자원에 대한 원자성(atomi)을 보장하기 위해서 사용한다.
+d140 1
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 2
+d21 1
+a21 1
+루비는 멀티 스레드 프로그래밍을 위해서 '''Thread'''클래스를 제공한다. Thread.new를 하는 것으로 새로운 스레드를 만들 수 있다. 스레드가 수행할 코드는 block({..})문으로 넘기면 된다. 
+d30 39
+d70 27
+d98 3
+a100 1
+== 스레드와 변수 ==
+d102 1
+a102 1
+== 뮤텍스 ==
+d110 4
 @

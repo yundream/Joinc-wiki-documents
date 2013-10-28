@@ -1,10 +1,25 @@
-head	1.8;
+head	1.11;
 access;
 symbols;
 locks
-	root:1.8; strict;
+	root:1.11; strict;
 comment	@# @;
 
+
+1.11
+date	2013.10.08.13.58.27;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2013.10.06.20.58.26;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.10.06.14.18.33;	author root;	state Exp;
+branches;
+next	1.8;
 
 1.8
 date	2013.09.17.15.48.03;	author root;	state Exp;
@@ -52,7 +67,7 @@ desc
 @
 
 
-1.8
+1.11
 log
 @128.134.217.152;;yundream;;
 @
@@ -96,7 +111,7 @@ end
 }}}
 
 {{{#!plain
-# python hi.rb 
+# ruby hi.rb 
 [2013-09-15 21:18:40] INFO  WEBrick 1.3.1
 [2013-09-15 21:18:40] INFO  ruby 1.9.3 (2012-04-20) [x86_64-linux]
 == Sinatra/1.4.3 has taken the stage on 4567 for development with backup from WEBrick
@@ -232,6 +247,8 @@ get '/user/:first/:second' do |name1, name2|
 end
 }}}
 
+[wiki:Site/Ruby/ERB ERB관련 내용은 여기를 참고] 
+
 ==== haml 사용 ====
 haml은 내장 템플릿엔진이 아니다. 먼저 설치해야 한다.
 {{{#!plain
@@ -284,8 +301,111 @@ get '/redirect' do
 end
 }}}
 
+=== HTTP authentication ===
+HTTP 인증을 위한 두 개의 옵션이 있다.
+
+첫번째 인증은 '''Rack::Auth::Basic'''를 이용한 인증이다.
+{{{#!plain
+require 'sinatra'
+
+use Rack::Auth::Basic, "Restricted Area" do |username, password|
+  username == 'admin' and password == 'admin'
+end
+
+get '/' do
+  "You're welcome"
+end
+
+get '/foo' do
+  "You're also welcome"
+end
+}}}
+
+특정 URL만 보호하고 싶다거나 복잡한 인증 방식을 구현하길 원할 경우.
+{{{#!plain
+require 'sinatra'
+
+helpers do
+  def protected!
+    return if authorized?
+    headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+    halt 401, "Not authorized\n"
+  end
+
+  def authorized?
+    @@auth ||=  Rack::Auth::Basic::Request.new(request.env)
+    @@auth.provided? and @@auth.basic? and @@auth.credentials and @@auth.credentials == ['admin', 'admin']
+  end
+end
+
+get '/' do
+  "Everybody can see this page"
+end
+
+get '/protected' do
+  protected!
+  "Welcome, authenticated client"
+end
+}}}
+
+=== 세션 이용하기  ===
+세션은 disabled 상태로 시작한다. 세션을 사용하기 위해서는 enable 상태로 하면 된다. 세션은 hash 형태로 사용할 수 있다. 
+{{{#!plain
+enable :sessions
+
+get '/foo' do
+  session[:message] = 'Hello World!'
+  redirect to('/bar')
+end
+
+get '/bar' do
+  session[:message]   # => 'Hello World!'
+end
+}}}
+
+세션의 다른 파라메터에 대한 수정이 필요하다면 '''Rack::Session::Cookie'''를 이용하면 된다. 
+{{{#!plain
+use Rack::Session::Cookie, :key => 'rack.session',
+                           :domain => 'foo.com',
+                           :path => '/',
+                           :expire_after => 2592000,
+                           :secret => 'change_me'
+}}}
+=== Rack 미들웨어 개발 ===
+[wiki:Site/Ruby/Rack Ruby Rack]문서 참고
+
 == 참고 ==
   * [http://stackoverflow.com/questions/4014996/how-to-dump-an-http-request-from-within-sinatra Sinatra에서 http 요청 가져오기]
+@
+
+
+1.10
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d300 3
+@
+
+
+1.9
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d176 2
+d230 70
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d40 1
+a40 1
+# python hi.rb 
 @
 
 

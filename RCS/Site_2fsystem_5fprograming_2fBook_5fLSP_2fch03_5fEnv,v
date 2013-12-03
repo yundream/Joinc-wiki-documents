@@ -1,0 +1,953 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.09.30.08.10.02;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fsystem_5fprograming_2fBook_5fLSP_2fch03_5fEnv
+@
+
+
+1.1
+log
+@117.17.172.121;;Anonymous;;
+@
+text
+@#title Joinc와 함께하는 리눅스 시스템 프로그래밍 3장 입력과 출력 
+
+
+[[TableOfContents]]
+=== 소개 ===
+기계는 조작자의 '''입력'''을 받아서, 프로그래밍 된데로 일을 하고 그 결과물을 '''출력'''한다. 믹서기는 사과를 입력받고 버튼을 누르면, 프로그래밍 된데로 모터를 돌려서 사과를 잘개 쪼개고 그 결과물로 '''사과쥬스'''를 '''출력'''한다.
+
+컴퓨터는 정보를 처리하기 위한 기계로 입력을 받아서 처리하고 그 결과를 출력한다는 점에서 봤을 때, 근본적으로 믹서와 다를 바가 없다. 믹서와 다른 점이라면 입력으로 사과 대신 (비트로 이루어진)정보를 입력받아서 처리하고 그 결과물로 정보를 출력한다는 점 정도일 것이다.  
+
+여러분은 이미 컴퓨터 시스템은 '''키보드'''를 통해서 데이터를 입력받아서 프로그램에 넘겨서 처리하고 그 결과물을 '''모니터'''로 출력하고 있다는 것을 알고 있을 것이다. 처리하고자 하는 데이터의 종류에 따라서 입력기기가 '''마우스'''나 '''팬''', '''터치스크린'''이 된고, 출력기기 역시 파일, 프린터, 테이프 등이 되기도 할 것이다.  
+
+attachment:system2_2.png
+
+이번장에서는 컴퓨터 시스템에서의 입력(:12)과 출력(:12)을 제어하는 방법에 대해서 알아볼 것이다. 
+
+=== 모든건 파일이다 ===
+유닉스에서는 모든걸 파일(:12)로 취급한다. 하드디스크(:12)에 존재하는 파일, 디렉토리는 물론이고 네트워크(:12)카드, 사운드카드, 키보드, 마우스, 하드디스크 그 자체 까지 몽땅 파일로 취급한다.
+
+유닉스 시스템을 처음 접할때 꽤나 혼동되는 부분이기도 하다. 윈도우에는 파일은 단지 하드디스크상에 존재하는 논리적인 정보의 집합을 그 대상으로 하기 때문이다. 예를 들자면 하드디스크는 '''C: D:'''와 같은 '''파일'''이 아닌 '''장치'''로 인식한다.
+
+그러나 유닉스 시스템에서는 장치도 파일로 취급된다. 리눅스도 유닉스와 동일한 파일시스템을 가지고 있으므로, 리눅스를 예로 들어서 설명하겠다. 리눅스에서 하드디스크는 /dev/hda1, /dev/hda2 이런식으로 하드디스크상의 파일로 존재한다. 뿐만 아니다. 사운드 카드는 /dev/dsp, 프린트는 /dev/lp, cdrom은 /dev/cdrom 의 이름을 가진 파일로 존재한다. 
+
+일반사용자의 입장에서 장치를 파일로 인식하는건 불합리해 보일 수 있다. 그러나 개발자 입장에서는 매우합리적인 방법이다. 모든 장치라는 것은 '''입력'''을 받아들여서 '''출력'''하는 매커니즘을 가지는데, 이는 파일의 매커니즘과 완전히 동일하기 때문으로 파일을 다루는 것과 동일한 방식으로 다른 장치들도 접근할 수 있도록 통일할 수 있음을 의미한다. 사운드카드를 예로 든다면, '''test.wav''' 파일을 읽어서 '''/dev/dsp'''에 쓴다는 식으로 사운드를 플레이할 수 있다.   실제로 프로그래밍 할때도 일반 파일을 읽고 쓰는 것처럼 장치들에 접근할 수 있다. 물론 일반 파일들에 읽고 쓰는 것보다는 약간 복잡하긴 하지만 원리적으로는 동일하다.
+
+attachment:system2.png
+
+결국 프로그래머는 복잡한 장치제어와 관련된 학습을 최소화 하면서, 파일을 사용하는 것처럼 여러 장치들을 사용할 수 있게 된다.
+
+=== 파일의 종류 ===
+위에서 예상했겠지만 파일이라고 해서 다 같은 파일은 아니다. 일반적으로 알고 있는 '''비트 데이터'''를 저장한 파일이 있는가 하면, 장치와 대응되는 파일도 있다. 내부통신과 외부통신을 이용해서 사용되는 소켓파일 - 리눅스는 네트워크(:12) 통신도 파일을 통해서 한다 - 파이프(:12)와 대응되는 파일, 디렉토리와 대응되는 파일등이 있다. 예컨데 모든것이 파일이다.
+
+리눅스에서는 ls(:12) 명령을 이용해서 이러한 파일의 종류를 알아낼 수 있다.
+{{{#!plain
+# ls -al
+drwxr-xr-x 12 root root       13820 2007-11-12 22:19 .
+drwxr-xr-x 21 root root        4096 2007-10-31 23:47 ..
+drwxr-xr-x  2 root root         100 2007-11-13 06:45 .initramfs
+-rw-r--r--  1 root root           0 2007-11-13 06:45 .initramfs-tools
+drwxr-xr-x  3 root root          60 2007-11-13 06:45 .static
+drwxr-xr-x  5 root root         120 2007-11-12 22:19 .udev
+lrwxrwxrwx  1 root root          13 2007-11-13 06:45 MAKEDEV -> /sbin/MAKEDEV
+crw-rw----  1 root root     10,  63 2007-11-12 21:46 acpi
+crw-rw----  1 root audio    14,  12 2007-11-12 21:46 adsp
+crw-rw----  1 root audio    14,   4 2007-11-12 21:46 audio
+drwxr-xr-x  3 root root          60 2007-11-13 06:45 bus
+lrwxrwxrwx  1 root root           3 2007-11-13 06:45 cdrom -> hda
+}}}
+ls 의 가장 앞 필드의 첫문자가 파일의 종류를 나타낸다. 아래는 ls 를 통해서 알아낼 수 있는 파일의 종류이다. 파일들은 아래의 종류중 하나에 포함된다. pipe, 링크, 소켓 등에대해서는 나중에 자세히 언급할 것이다. 우선은 아래와 같은 다양한 종류의 파일이 있다는 것만 이해하고 넘어가도록 하자.
+ || - || 일반 파일  || txt, jpg, wav, pdf...               ||
+ || d || 디렉토리   ||                                     ||
+ || l || 링크(:12)  || 심볼릭 링크, 혹은 하드링크          ||
+ || c || 장치       || 프린터, 사운드카드, cdrom 등의 장치 ||
+ || s || 소켓(:12)  || 프로세스(:12)간 통신에 사용         ||
+ || p || pipe(:12)  || 파이프(:12)                         ||
+
+=== 파일 열기 ===
+파일을 다루는 기본적인 흐름은 다음과 같다.
+  1. 파일을 연다. 
+  1. 열려진 파일에서 데이터를 '''읽거나''', 데이터를 '''쓴다'''
+  1. 모든 작업이 끝났다면, 파일을 닫는다.
+
+가장 먼저 해야할일이 파일을 open(여는)것임을 알 수 있다. 이것은 커널에게 '''파일을 가지고 작업할 수 있도록 요청'''하는 것으로, 커널은 여러가지 조건을 판단해서 파일을 오픈해 줄것인지 아닌지를 결정하고 그 결과를 리턴한다. 결과는 open을 요청한 프로세스에게 되돌려지게 된다. 
+
+파일을 오픈해 줄것인지 아닌지를 결정하는 데에는 다음과 같은 이유가 있다.
+  1. 실제로 존재하는 파일인지 아닌지 확인 
+  1. 존재하지 않을 경우 파일을 새로 생성할 것인지 아닌지를 결정 
+  1. 파일을 쓸 수 있는 권한이 있는지 확인 
+     리눅스는 다중 사용자 운영체제(:12)로 파일을 비롯한 모든 자원에 대한 접근 권한이 설정되어 있다. 따라서 해당 파일을 사용할 수 있는 권한이 있는지 확인하는 것은 당연한 절차다.
+
+==== open 시스템콜을 이용한 파일 열기 ====
+파일 작업을 하기로 마음을 먹었다면, 커널에 정해진 파일을 열 수 있도록 허용해 달라고 요청을 해야 할 것이다. 커널에 요청을 할 수 있도록 지원되는 함수를 시스템콜(혹은 시스템함수)라고 언급했던 것을 기억하고 있을 것이다. 리눅스는 파일 오픈과 관련된 요청을 위해서 open(2) 이라는 시스템함수를 제공한다. 
+
+open(2)함수는 다음과 같이 선언되어 있다.
+{{{#!plain
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode)
+}}}
+'''pathname''' : 열기를 요청하는 파일이다. 상대경로 혹은 절대경로를 지정할 수 있다.
+
+'''flags''' : 어떤 방식으로 열것인지를 결정하기 위해서 사용하며 bitwise연산을 이용해서, 다양한 방식을 조합할 수 있다. 다음은 대표적으로 사용되는 flag 들이다.
+ * '''O_RDONLY''' 
+    읽기 전용으로 파일을 연다. 쓸수 없다.
+ * '''O_WRONLY'''
+    쓰기 전용으로 파일을 연다.
+ * '''O_RDWR'''
+    읽기와 쓰기 모두가 가능하도록 파일을 연다.
+ * '''O_CREAT'''
+    파일이 존재하지 않을 경우 파일을 생성한다.
+ * '''O_EXCL'''
+    O_CREAT를 써서 파일을 오픈할 경우, 이미 파일이 존재한다면 error를 리턴하게 한다. 파일을 덮어쓰거나 하는 실수를 방지하기 위한 용도로 사용할 수 있다.  
+ 
+3번째 인자인 '''mode'''는 파일의 권한을 결정하기 위해서 사용하며, 생략이 가능하다. 파일이 생성되면 파일에 대한 소유자와 그룹은 자신이 된다. 이 인자를 사용하면 owner(사용자), group(그룹), other(타인) 각각에 대해서 '''읽기, 쓰기, 실행''' 권한을 부여할 수 있다. 역시 bitwise 연산을 이용해서 다양한 조합이 가능하다.   
+ * '''S_IRWXU'''
+    00700 모드로 파일 소유자에게 읽기, 쓰기, 쓰기 실행권한을 준다. 
+ * '''S_IRUSR'''
+    00400 으로 사용자에게 읽기 권한을 준다. 
+ * '''S_IWUSR'''
+    00200 으로 사용자에게 쓰기 권한을 준다. 
+ * '''S_IXUSR'''
+    00100 으로 사용자에게 실행 권한을 준다. 
+ * '''S_IRWXG'''
+    00070 으로 그룹에게 읽기, 쓰기, 실행 권한을 준다. 
+ * '''S_IRGRP'''
+    00040 으로 그룹에게 읽기권한을 준다. 
+ * '''S_IWGRP'''
+    00020 으로 그룹에게 쓰기권한을 준다. 
+ * '''S_IXGRP'''
+    00010 으로 그룹에게 실행권한을 준다. 
+ * '''S_IRWXO'''
+    00007 으로 기타 사용자 에게 읽기, 쓰기, 실행 권한을 준다. 
+ * '''S_IROTH'''
+    00004 으로 기타 사용자 에게 읽기 권한을 준다. 
+ * '''S_IWOTH'''
+    00002 으로 기타 사용자 에게 쓰기 권한을 준다. 
+ * '''S_IXOTH'''
+    00001 으로 기타 사용자 에게 실행 권한을 준다. 
+
+예를 들자면 다음과 같은 방식으로 파일을 열 수 있을 것이다.
+{{{#!plain
+// 파일이름 hello.txt 에 데이터를 (단지)쓰기 위해서 연다.
+// 파일이 없을 경우 생성하며
+// 권한은 640 으로 한다.
+open("hello.txt", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+}}}
+
+실제로 위의 권한으로 파일을 오픈하는 프로그램을 만들어 보도록 하자. 아래의 프로그램은 단지 파일을 열기만 할 뿐이지만 성공적으로 파일을 생성할 것이다. 프로그램의 이름은 '''hello.c''' 로 하겠다. 프로그램의 작성과 실행은 '''yundram'''계정을 이용했다.
+{{{#!plain
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int main()
+{
+  int fd;
+  fd = open("hello.txt", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+}
+}}}
+ls(1)를 이용해서 hello.txt를 확인해 보도록하자.
+{{{#!plain
+yundream@@yundream:~$ ls -al hello.txt
+-rw-r----- 1 yundream yundream 0 2007-11-20 20:23 hello.txt
+}}}
+소유자과 그룹이 '''yundream'''이고 640의 권한을 가지는 파일이 생성되었음을 알 수 있다. 파일을 열기만 했을 뿐, 아무런 작업을 하지 않았기 때문의 파일의 크기는 0이다. 
+
+==== file descriptor ====
+open(2) 함수를 다시 보도록 하자. open(2)함수는 리턴결과로 다루게될 파일의 이름이 아닌 int형 정수를 넘겨주는 것을 알 수 있다. 이 int형 정수가 바로 파일을 가리키는 역할을 한다. '''파일을 지정'''하기 때문에, '''file descriptor''' 혹은 ''''파일 지정번호'''라고 한다. 이것은 우리가 일반적으로 알고 있는 숫자가 아닌 열려진 '''파일객체'''를 가리키는 것임에 유의 하기 바란다. 
+
+open(2)을 이용해서 파일을 성공적으로 열었다면, 이후의 모든 쓰기/읽기 등의 작업은 파일이름 대신 '''파일지정번호'''를 이용하게 된다.  
+{{{#!plain
+  +------+
+  | FILE |<---- file discriptor = open(2)
+  |      |
+  +------+
+  open으로 리턴된 int형 정수는 file discriptor 로써, 열린 파일을 가리킨다.
+}}}
+
+파일지정번호는 0이상이여야 한다. 0보다 작은 경우는 어떤이유로 파일을 여는것이 실패했음을 의미한다. 위의 프로그램은 아래처럼 파일 오류까지 검사하는 좀더 그럴듯한 프로그램으로 바꿀 수 있을 것이다.
+{{{#!plain
+  fd = open("hello.txt", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+  if (fd < 0)
+  {
+    perror("file open error:");
+    return 1;
+  }
+}}}
+
+
+=== 파일에서 읽기 ===
+파일을 성공적으로 열었다면, 이제 읽거나 쓰는 등의 작업을 하면 된다. 여기에서는 파일을 읽는 법에 대해서 알아보도록 할 것이다. 우선 다음의 내용을 가지는 셈플 파일을 하나 준비하도록 하자. 우리는 아래의 파일의 내용을 읽어서 화면에 출력하는 프로그램을 작성하는 것으로 파일읽는 법에 대해서 배울 것이다. 파일의 이름은  fly.txt로 하겠다.
+{{{#!plain
+Fly me to the moon And let me play among the stars
+Let me see what spring is like on Jupiter and Mars
+In other words hold my hand
+In other words darling kiss me
+}}}
+유명한 '''fly me to the moon'''가사중 일부분이다. 어떤 노래인지 궁금하다면 머리도 식힐겸 [wiki:music/Fly_me_to_the_moon 여기]를 방문해 보기 바란다.
+
+파일에서 읽기 위해서는 당연히 '''읽기전용''' 혹은 '''읽기/쓰기''' 상태로 파일이 열려야 한다. 여기에서는 읽기 전용 모드로 열도록 할것이다. 만들어진 파일을 여는 것이기 때문에 '''O_CREAT'''는 필요가 없을 것이다. 파일을 생성하는 것이 아니기 때문에 모드 인자역시 필요없다. open 함수는 다음과 같이 사용할 수 있을 것이다. 
+{{{#!plain
+  fd = open("fly.txt", O_RDONLY);
+  if (fd < 0)
+  {
+    ...
+  }
+}}}
+
+성공적으로 파일을 열었다면 fd는 0보다 큰수가 리턴되었을 것이고, - 대부분의 경우 2보다 큰수가 리턴될 것이다. 이 이유는 아래에서 설명할 것이다 - 리턴받은 정수를 '''파일지정번호'''로 사용하게 된다. 우리는 이 파일지정번호를 이용해서 파일의 내용을 읽어들이게 된다.
+
+==== read 시스템콜 ====
+열린 파일로 부터 데이터를 읽기 위해서 제공하는 시스템함수가 read(2)이다. 이 함수는 인자로 주어진 '''파일지정번호'''가 가리키는 파일로 부터, 지정된 크기만큼의 데이터를 읽어들이게 된다. 다음은 read(2) 함수의 원형이다.
+{{{#!plain
+#include <unistd.h>
+
+size_t read(int fd, void *buf, size_t count);
+}}}
+ 1. '''fd'''    : open(2)으로 열린 파일을 가리키는 파일지정번호
+ 1. '''buf'''   : 읽어들인 데이터를 저장할 공간  
+ 1. '''count''' : 읽어들일 데이터의 크기로 byte(:12) 단위
+
+함수는 단순하며 직관적이다. read 함수는 성공적으로 실행될 경우 0보다 큰수를 리턴한다. 파일의 끝에 다다라서 더이상 읽어들일 데이터가 없다면 0을 리턴한다. read 함수를 이용하는 일반적인 방법은 루프를 돌면서 리턴값이 0이 될때까지 - 즉 파일의 끝을 만날 때까지 - 데이터를 읽어들이는 것이다. 다음과 같은 형태로 사용할 수 있을 것이다. 
+{{{#!plain
+int readn = 0;
+int fd;
+char buf[80];
+fd = open(...);
+
+memset(buf, 0x00, 80);
+while( (readn = read(fd, buf, 79) )
+{
+  // 읽어들인 데이터가 있는 buf를 이용해서 필요한 작업을 한다.
+  memset(buf, 0x00, 80);
+}
+}}}
+
+주의해야할 점은 데이터가 저장되는 buf를 memset(3) 함수를 이용해서 초기화 시켜줘야 한다는 점이다. read 함수는 count만큼 데이터를 읽어들여서 buf에 복사하기만 할뿐, 내용을 초기화 시키기 않기 때문이다. 예를들어 이전에 79byte를 읽어들였고, 이번에 읽어들인 데이터가 20byte였다면, 21byte 이후의 이전 데이터가 그대로 남아 있어서 잘못 처리할 수 있기 때문이다. 물론 read의 리턴값을 이용해서 20byte를 읽어왔다는 것을 알 수 있으므로 주의해서 처리하면 되긴 하겠지만 실수할 만한 여지는 미리 제거하는게 좋을 것이다. 
+
+아래의 프로그램을 실행시켜 보기 바란다. 프로그램의 이름은 '''fly.c'''로 하자.
+{{{#!plain linenum adsense
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define MAXLEN 80
+int main()
+{
+  int fd;
+  int readn = 0;
+  char buf[MAXLEN];
+  fd = open("fly.txt", O_RDONLY);
+  if (fd < 0)
+  {
+    perror("file open error:");
+    return 1;
+  }
+  memset(buf, 0x00, MAXLEN);
+  while( (readn = read(fd, buf, MAXLEN-1 )) > 0)
+  {
+    printf("%s", buf);
+  }
+}
+}}}
+프로그램을 실행시켜 보면, 마지막에 다음과 같이 이전에 읽어들인 값이 출력되는 것을 볼 수 있을 것이다.
+{{{#!plain
+Fly me to the moon And let me play among the stars
+Let me see what spring is like on Jupiter and Mars
+In other words hold my hand
+In other words darling kiss me
+on Jupiter and Mars
+In other words hold my hand
+...
+}}}
+
+이제 21줄 다음에 memset(buf, 0x00, MAXLEN); 을 추가하고나서 다시 실행시켜 보도록 하자. 문제없이 깔끔하게 출력되는걸 확인할 수 있을 것이다.
+
+또하나 코드에서 궁금한점이 있을 것이다. read 에서 버퍼의 최대크기인 MAXLEN 만큼을 읽어들이지 않고 MAXLEN-1 만큼을 읽어들이는 점이다. 이는 역시 버퍼의 크기를 넘어서서 데이터를 읽어버리는 만약의 실수를 막기 위함이다. printf(3)함수의 경우 널문자('\0')를 만나기 전까지 데이터를 읽어들이게 된다. 버퍼를 가득채워서 읽어들였는데, 버퍼메모리 영역의 마지막이 '\0'이 아닐 경우 끝이 아니라고 판단해서, '\0'을 만날때까지 메모리영역을 벗어나서 계속 읽어 버리는 문제가 발생할 수 있기 때문이다. 그러하니 버퍼의 마지막라인을 '\0'으로 만들어 버리는게 깔끔하다. 
+{{{#!plain
+  01 ...  89 80
+ +-------+--+--+--------------------------+
+ | ..... |  |  | '\0'이 아닌 알수 없는 값 |
+ +-------+--+--+--------------------------+
+ |<--- buf --->|
+}}}
+
+이 경우에도 읽어들인 데이터의 크기를 알 수 있기 때문에 snprintf()와 같은 함수를 이용해서 문제를 해결할 수 있을 것이다. 그렇지만 가능한 문제 발생 여지를 없애는 쪽으로 코딩을 하는게 좋을 것이다.
+
+그렇다고 해서, 모든 경우에 있어서 문제가 되는건 아니다. 파일로부터 읽어들일 데이터가 char, int 와 같은 원시데이터 타입일 경우에는 크기가 명확히 명시되므로 위에서와 같은 초기화 관련된 문제가 발생하지 않는다. 
+
+==== 버퍼공간의 크기 ====
+'''buffer'''가 사용되는 일반적인 이유는 '''잡음'''을 없애고 '''성능'''을 높이기 위함이다. 읽어들일 데이터가 1024 만큼이 있다고 가정해보자. 버퍼의 크기를 1로 잡았다면, read(2) 함수를 1024번 호출해야 될것이다. 만약 버퍼의 크기를 512로 잡는다면, 단 2번만 read(2)함수를 호출하면 될 것이다. 후자가 더 효율적일 거라는 것은 분명하다. 
+
+그렇다고 해서 무작정 메모리를 크게잡는 것도 낭비다. 시간과 비용이 관련된 대부분의 현상이 그렇듯이 어느정도 크기가 지나면 성능의 증가폭이 줄어드는 지점이 오기 때문이다. 적당한 선에서 트레이드오프(:12) 해야할 필요가 있다. 
+
+어떤 데이터를 처리하느냐에 따라다르겠지만 '''512byte'''나 '''1024byte'''정도의 크기로 하는게 무난하다고 알려져 있다. 
+
+=== 파일에 쓰기 ===
+파일에 데이터를 쓰기 위해서는 '''쓰기전용''' 혹은 '''읽기/쓰기 가능'''모드로 열어야 한다. 리눅스 커널은 쓰기요청을 위한 write(2) 함수를 제공한다.
+{{{#!plain
+#include <unistd.h>
+
+ssize_t write(int fd, const void *buf, size_t count);
+}}}
+이 함수는 buf에 있는 내용을 count 크기만큼 파일지정번호 '''fd'''가 가리키는 파일에 쓸 것을 커널에 요청한다. 성공하게 되면은 쓴 byte 크기만큼을 리턴한다. 
+
+다음은 data.txt 파일을 열어서 int형 데이터를 쓰는 프로그램이다. 이 프로그램의 이름은 '''write.c'''로 하겠다.
+{{{#!plain linenum
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+int main()
+{
+    int fd;
+    int i;
+    int wdata = 0;
+    int wsize = 0;
+    fd = open("data.txt", O_CREAT|O_WRONLY);
+    if (fd < 0)
+    {
+        perror("file open error");
+        return 1;
+    }
+
+    for (i = 0; i < 100; i++)
+    {
+        wdata = i * 2;
+        wsize = write(fd, (void *)&wdata, sizeof(int));
+        printf("Write %d (%d byte)\n", i*2);
+    }
+    close(fd);
+}
+}}}
+
+'''22'''줄을 주의깊게 살펴보도록 하자. '''fd'''에 int형 변수인 wdata에 저장된 값을 '''쓰려고'''하고 있다. wdata는 int형 데이터이기 때문에, ''void *''형으로 형변환(:12)을 했다. 마지막으로 sizeof 함수를 이용해서 쓰고자 하는 데이터의 크기를 구해서, write의 3번째 인자로 되돌려 줬다. int 데이터 타입의 크기는 4byte라는 것을 이미 알고 있기 때문에, sizeof를 쓰지 않고 '''4'''를 직접 명시해도 될 것이다. 
+
+그러나 어떤 운영체제(:12)와 컴파일러(:12)의 환경에 따라서 int가 2byte 혹은 8byte가 되는 경우도 있다. 그러므로 이식성을 고려한다면 sizeof 함수를 이용해서 데이터타입의 크기를 얻어내는 방법을 사용하는걸 권장한다.  
+
+프로그램을 컴파일 하고 실행시키면 다음과 같은 결과를 볼 수 있을 것이다.
+{{{#!plain
+# gcc -o write write.c
+# ./write
+Write 0 (4 byte)
+Write 2 (4 byte)
+Write 4 (4 byte)
+Write 6 (4 byte)
+Write 8 (4 byte)
+}}}
+ls로 data.txt 파일이 생성된걸 볼 수 있을 것이다. 이 파일의 내용을 살펴보기 위해서 vi(:12)로 열어도 내용을 알아볼 수는 없을 것이다. 이 파일의 내용은 ASCII(:12) printable 데이터 - 흔히 말하는 문자데이터 - 가 아니기 때문이다.
+=== 파일 닫기 ===
+열린 파일을 더이상 쓰지 않는다면, 닫아주어야 한다. 그렇지 않을경우 프로그램이 종료될때까지, 계속 남아서 컴퓨터 시스템의 자원을 소비하게 된다. 파일의 종료는 close(2) 함수를 이용하면 된다.
+{{{#!plain
+#include <unistd.h>
+
+int close(int fd);
+}}}
+
+=== 원시 데이터타입의 데이터와 구조체데이터 읽고 쓰기 === 
+그럼 바로 위에서 다룬 '''data.txt'''에 저장된 int형 정보를 읽어서 화면에 출력하는 프로그램을 작성해 보도록 하자. 프로그램의 흐름은 간단하다. data.txt 를 읽기전용 으로 연다음 read(2) 함수를 이용해서 4byte씩 읽어들인다. 읽어들인 데이터는 printf(3) 함수를 이용해서 화면에 출력하면 된다.
+{{{#!plain linenum
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define MAXLEN 80
+int main()
+{
+  int fd;
+  int readn = 0;
+  int buf;
+  fd = open("data.txt", O_RDONLY);
+  if (fd < 0)
+  {
+    perror("file open error:");
+    return 1;
+  }
+  while( (readn = read(fd, (void *)&buf, sizeof(buf) )) > 0)
+  {
+    printf("Read Data : %d\n", buf);
+  }
+}
+}}}
+'''fly.c'''와 달라진 점은 19줄 정도다. 읽을 정보가 int형 데이터 이므로, int형 데이터타입의 크기만큼 - 대부분의 경우 4byte일 것이다 - 읽어서 buf에 복사하고 있다. 읽어들인 정보는 21줄에서 print를 통해서 출력을 했다.  
+
+이 프로그램을 실행시키면 다음과 같은 결과를 보여줄 것이다. 
+{{{#!plain
+# ./read
+Read Data : 0
+Read Data : 2
+Read Data : 4
+Read Data : 6
+Read Data : 8
+...
+}}}
+
+문자열 데이터이든지 아니면 int 형 숫자 데이터이든지간에 컴퓨터의 입장에서는 비트의 나열일 뿐임을 명심할 필요가 있다. 단지 표현의 차이을 뿐이다. 똑같은 비트의 나열이라도 문자열로 표현하고자 하면 문자열이 되는 거고, 숫자로 표현하고자 하면 숫자로 펴현된다. 
+
+==== 좀더 복잡한 구조체 데이터 읽고 쓰기 ====
+컴퓨터 관점에서 모든 데이터는 동일한 bit의 나열일 뿐이라는걸 이해한다면, 구조체를 읽고 쓰는 것 역시 전혀 문제될게 없다. 대부분의 고수준 응용 프로그램이라면 문자열이나 int, long과 같은 원시데이터타입 보다는 구조체 데이터를 읽고 쓰도록 되어 있다.
+
+유저정보를 저장하고 읽는 간단한 프로그램을 작성한다고 가정해보자. 하나의 유저를 나타내기 위해서 필요한 정보는 다음과 같다고 가정해보자. 
+{{{#!plain
+이름
+나이
+성별
+취미
+}}}
+프로그래머는 대략 다음과 같은 구조체를 사용할 것이다. 구조체는 데이터를 레코드 단위로 관리할 수 있도록 도와주기 때문이다. 
+{{{#!plain
+struct userInfo
+{
+  char name[28];
+  int  age;
+  int  sex;
+  char hobb6[28];
+};
+}}}
+
+그럼 위의 구조체 정보를 저장하는 간단한 '''유저정보 과리'''프로그램을 만들어 보도록 하자. 제대로 만들려고 하면, 각 구조체변수 데이터를 입력받기 위환 인터페이스까지 만들어야 겠지만 생략하도록 할 것이다. 이 프로그램은 뒷부분에서 사용자 입력을 받을 수 있도록 확장될 것이다.
+
+테스트를 위해서 읽기와 쓰기를 전담하는 2개의 프로그램을 작성할 것이다. 우선 쓰기 프로그램이다. 이 프로그램의 이름은 UserInfoWrite.c 로 하겠다. 
+{{{#!plain linenum
+nclude <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+
+struct userInfo
+{
+  char name[28];
+  int age;
+  int sex;
+  char hobby[28];
+};
+
+void makeUserInfo(struct userInfo *uinfo,
+  char *name, // 이름
+  int age,    // 나이
+  int sex,    // 성 (남: 0, 여: 1)
+  char *hobby) // 취미
+{
+  memset((void *)uinfo, 0x00, sizeof(struct userInfo));
+  strcpy(uinfo->name, name);
+  uinfo->age = age;
+  uinfo->sex = sex;
+  strcpy(uinfo->hobby, hobby);
+}
+
+int main()
+{
+  int fd;
+  struct userInfo myAddrBook;
+  fd = open("hello.txt", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+  if (fd < 0)
+  {
+    perror("file open error");
+    return 1;
+  }
+
+  makeUserInfo((void *)&myAddrBook, "yundream", 19, 0, "프로그래밍");
+  write(fd, (void *)&myAddrBook, sizeof(myAddrBook));
+
+  makeUserInfo((void *)&myAddrBook, "hello", 22, 1, "게임");
+  write(fd, (void *)&myAddrBook, sizeof(myAddrBook));
+
+  makeUserInfo((void *)&myAddrBook, "드라고너", 33, 1, "사냥");
+  write(fd, (void *)&myAddrBook, sizeof(myAddrBook));
+
+  close(fd);
+  return 0;
+}
+}}}
+
+유저정보와 유저정보와 유저정보 구조체인 userInfo를 넘기면, 구조체를 체우는 '''makeuserInfo'''라는 함수를 만들었다. 현재는 프로그램상에 직접 유저정보를 집어 넣었지만 나중에는 키보드로 입력받을 수 있도록 할 것이다. 
+
+40 ~ 47에서 유저정보 구조체 '''myAddrBook'''을 파일에 쓰고 있다. int형데이터 char 형 데이터를 쓰는 것과 발다를게 없음을 알 수 있다. 컴퓨터의 입장에서는 int형 데이터이든지 char 형 데이터이든지 간에 '''비트의 나열'''일 뿐임으로 근본적으로 다를게 없기 때문이다. 몇바이트의 정보를 저장할 것인지에 대한 '''저장크기'''에만 차이가 있을 뿐이다.
+
+다음은 '''hello.txt'''에 저장된 유저정보를 읽어들여서 출력하는 프로그램이다. 프로그램의 이름은 UserInfoRead.c 로 하겠다. 
+{{{#!plain linenum
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+
+struct userInfo
+{
+  char name[28];
+  int age;
+  int sex;
+  char hobby[28];
+};
+
+int main()
+{
+  int fd;
+  struct userInfo myAddrBook;
+  int dataSize;
+  fd = open("hello.txt", O_RDONLY);
+  if (fd < 0)
+  {
+    perror("file open error");
+    return 1;
+  }
+
+  dataSize = sizeof(myAddrBook);
+  printf("User Info =====================\n\n");
+  while(read(fd, (void *)&myAddrBook, dataSize) == dataSize)
+  {
+    printf("name  : %s\n", myAddrBook.name);
+    printf("age   : %d\n", myAddrBook.age);
+    printf("sex   : %d\n", myAddrBook.sex);
+    printf("hobby : %s\n", myAddrBook.hobby);
+    printf("===============================\n");
+  }
+  close(fd);
+  return 0;
+}
+}}}
+데이터를 읽기만 할 것이기 때문에, '''O_RDONLY'''를 사용했다. 다음 while문을 돌면서 userInfo 구조체의 크기만큼, 파일로 부터 데이터를 읽어들여서 myAddrBook에 저장하고 있음을 알 수 있다. 
+
+=== 파일의 권한과 모드 ===
+리눅스는 다중사용자 운영체제이며, 때문에 모든파일에는 권한이 부여된다. 리눅스상에서는 모든 것이 파일로 표현되기 때문에, 파일에 권한을 부여한다는 얘기는 운영체제와 컴퓨터의 모든 것에 대한 권한이 부여될 수 있다는 것과 마찬가지가 된다. 
+
+예컨데 권한이라함은 '''이파일은 내것이며 나만 읽을 수 있다'''라든지 '''스터디 그룹에 포함된 사람들은 읽을 수 있지만 다른 사람들은 읽을 수 없다'''등과 같은 접근 권한을 말한다. 여기에 접근권한 외에도 '''읽기'''와 '''쓰기''' 가능에 대한 행위까지 세부적으로 분류할 수 있다. 현실에서와 마찬가지다. 현실에서도 직위나 직책, 부서에 따라서 문서에 대한 접근권한이 정해져 있으며, 읽기와 쓰기에 대한 행위도 정의된다.   
+
+정리하자면 파일에 대한 소유자가 누구인가에 대한 것이 '''권한'''이고, 권한을 가진 사용자에 대한 읽기/쓰기에 대한 가능한 접근범위가 '''모드'''이다. 
+
+리눅스 운영체제의 파일은 '''읽기와 쓰기'''외에 '''실행'''에 대한 모드도 가지고 있다는게 현실세계에서의 문서시스템과 다른점이라 할 수 있을 것이다. 
+
+파일에 대한 권한은 '''소유자''', '''그룹''', '''other''' 세부분으로 나뉜다. '''소유자'''는 개인이라고 생각할 수 있다. 파일에 대한 모드는 위에서 언급했듯이 '''읽기,쓰기,실행''' 3개로 세분화 될 수 있다. 이들의 조합으로 파일의 권한과 모드가 정의 된다.
+
+우리는 '''ls'''를 통해서 파일의 권한과 모드를 확인할 수 있다.
+
+{{{#!plain
+# ls -al
+-rw-r--r--  1 yundream yundream 4806656 2006-07-28 14:00 My_sweet_darlin.mp3
+drwxr-xr-x  5 yundream yundream    4096 2007-07-29 01:26 PicasaDocuments
+-rwxr-xr-x  1 yundream yundream    7402 2007-11-26 00:01 UserInfoRead
+-rw-r--r--  1 yundream yundream     751 2007-11-26 00:02 UserInfoRead.c
+-rwxr-xr-x  1 yundream yundream    7433 2007-11-25 23:33 UserInfoWrite
+-rw-r--r--  1 yundream yundream    1087 2007-11-25 23:56 UserInfoWrite.c
+drwxr-xr-x  2 yundream yundream    4096 2007-07-31 23:51 backup
+}}}
+
+파일의 권한과 모드에 대한 내용은 [wiki:Site/C/Documents/CprogramingForLinuxEnv/Ch2_LiuxAndC 리눅스 환경에서의 C 프로그래밍]에서 자세히 언급하고 있으니 참고바란다. 여기에서는 이정도로만 설명하고 다음으로 넘어가도록 하겠다.
+
+=== 파일의 종류와 권한,모드 알아내기 ===
+모든 것이 파일로 표현될 수 있다는 점과 다중사용자 운영체제라는 리눅스 운영체제의 특성상 파일의 종류와 권한,모드를 알아내는 것은 매우 중요하다. 파일을 다루는 프로그램을 작성할 경우 가장 먼저하는 일이 접근가능한 파일인지를 확인하는 일이다. 리눅스는 파일에 대한 정보를 얻어올 수 있는 '''stat'''라는 함수를 제공한다. 
+{{{#!html
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int stat(const char *file_name, struct stat *buf);
+}}}
+파일 이름 '''file_name'''를 인자로 주면, 그에 대한 정보를 '''stat'''구조체에 담아서 되돌려준다. stat에는 다음과 같은 파일 정보들이 담겨져 있다. 
+{{{#!plain
+struct stat {
+    dev_t         st_dev;      /* device */
+    ino_t         st_ino;      /* inode */
+    mode_t        st_mode;     /* protection */
+    nlink_t       st_nlink;    /* number of hard links */
+    uid_t         st_uid;      /* user ID of owner */
+    gid_t         st_gid;      /* group ID of owner */
+    dev_t         st_rdev;     /* device type (if inode device) */
+    off_t         st_size;     /* total size, in bytes */
+    blksize_t     st_blksize;  /* blocksize for filesystem I/O */
+    blkcnt_t      st_blocks;   /* number of blocks allocated */
+    time_t        st_atime;    /* time of last access */
+    time_t        st_mtime;    /* time of last modification */
+    time_t        st_ctime;    /* time of last change */
+};
+}}}
+주석을 보는 정도로 각 멤버변수가 의미하는 바를 쉽게이해할 수 있을 것이다. 그러니 몇개 생소한 멤버변수들만을 설명하도록 하겠다.
+  * '''st_ino ''' : 파일의 일련번호다. 이 번호는 하나의 장치에서 유일하게 존재하며, 파일과 파일을 구분하게 해준다. 하나의 장치에서만 유일하다는 것에 주의하기 바란다. 
+  * '''st_dev'''   : 파일이 속한 장치의 식별번호다. st_ino 와 st_dev 의 쌍은 전체 시스템에서 유일하다. 
+  * '''st_nlink''' : 파일의 hard:::link(이하 하드링크)의 갯수를 알려준다. 하드링크에 대한 내용은 따로 자세히 다루도록 하겠다.
+  * '''st_mode'''  : 파일의 형식을 알려준다. 이 값을 이용해서, 파일이 디렉토리인지, 링크인지, 장치 파일인지등을 알아낼 수 있다. 이 값을 분석하기 위한 다음과 같은 메크로를 제공한다. 각 메크로는 검사하고자 하는 내용이 참이면 0이 아닌 값을 리턴한다.
+     1. S_ISDIR(st_mode) : 파일이 디렉토리(:12) 인지 검사한다.
+     1. S_ISCHR(st_mode) : 파일이 문자장치(:12) 파일인지 검사한다. 
+     1. S_ISREG(st_mode) : 일반파일인지 검사한다.
+     1. S_ISFIFO(st_mode) : FIFO(:12) 혹은 pipe(:12) 파일인지 검사한다.
+     1. S_ISLNK(st_mode) : symbolic 링크 인지 검사한다. 
+     1. S_ISSOCK(st_mode) : 소켓(:12) 파일인지 검사한다.
+
+st_mtime, st_atime, st_ctime 에서 되돌려주는 시간은 Unix 시간으로 1970년 1월 1일 00:00:00 부터 현재까지 흐른시간을 초로 환산한 값이다. 이 초로된 시간을 인간이 읽기 쉬운 형태로 만들어주는 시간관련 함수가 있는데, 이들 내용은 따로 다루도록 할 것이다. 
+
+다음은 파일의 각종 정보를 읽어오는 프로그램이다. 프로그램의 이름은 stat.c로 하겠다.
+{{{#!plain
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <pwd.h>
+#include <grp.h>
+
+int main(int argc, char **argv)
+{
+    int return_stat;
+    char *file_name;
+    struct stat file_info;
+
+    mode_t file_mode;
+
+    if (argc != 2 )
+    {
+        printf("Usage : ./file_info [file name]\n");
+        exit(0);
+    }
+    file_name = argv[1];
+
+    if ((return_stat = stat(file_name, &file_info)) == -1)
+    {
+        perror("Error : ");
+        exit(0);
+    }
+
+    file_mode = file_info.st_mode;
+    printf("파일이름 : %s\n", file_name);
+    printf("=======================================\n");
+    printf("파일 타입 : ");
+    if (S_ISREG(file_mode))
+    {
+        printf("정규파일\n");
+    }
+    else if (S_ISLNK(file_mode))
+    {
+        printf("심볼릭 링크\n");
+    }
+    else if (S_ISDIR(file_mode))
+    {
+        printf("디렉토리\n");
+    }
+    else if (S_ISCHR(file_mode))
+    {
+        printf("문자 디바이스\n");
+    }
+    else if (S_ISBLK(file_mode))
+    {
+        printf("블럭 디바이스\n");
+    }
+    else if (S_ISFIFO(file_mode))
+    {
+        printf("FIFO\n");
+    }
+    else if (S_ISSOCK(file_mode))
+    {
+        printf("소켓\n");
+    }
+
+    printf("OWNER : %d\n", file_info.st_uid);
+    printf("GROUP : %d\n", file_info.st_gid);
+    printf("dev   : %d\n", file_info.st_dev);
+    printf("inode : %d\n", file_info.st_ino);
+    printf("FILE SIZE IS : %d\n", file_info.st_size);
+    printf("마지막 읽은 시간 : %d\n", file_info.st_atime);
+    printf("마지막 수정 시간 : %d\n", file_info.st_mtime);
+    printf("하드링크된 파일수 : %d\n", file_info.st_nlink);
+}
+}}}
+
+테스트 삼아서 stat.c 에 대한 조사를 해보자.
+{{{#!plain
+$ ./stat stat.c
+파일이름 : stat.c
+=======================================
+파일 타입 : 정규파일
+OWNER : 1000
+GROUP : 1000
+dev   : 2051
+inode : 6603353
+FILE SIZE IS : 1692
+마지막 읽은 시간 : 1196074251
+마지막 수정 시간 : 1196074249
+하드링크된 파일수 : 2
+}}}
+
+==== hard link와 symbolic link ====
+바로 위에서 link(이하 링크)가 몇번 언급되었었다. 이 링크에 대해서 자세히 알아보도록 하겠다. 
+
+링크는 파일을 가리키는 일종의 '''별칭'''으로 주로 관리의 목적으로 사용한다. 예를 들어 오픈오피스(:12)의 문서 프로그램을 실행시키기 위해서 '''/usr/local/openoffice/bin/openoffice_swrite'''를 실행시켜야 한다고 가정해보자. 이거 기억해서 수행시킬려면 보통 곤욕스러운 일이 아닐 것이다. 이 경우 링크를 이용해서 간단하게 문제를 해결할 수 있다. 
+{{{#!plain
+# ln -s /usr/local/openoffice/bin/openoffice_swrite /usr/bin/swrite 
+}}}
+/usr/bin 은 환경변수(:12) '''PATH'''에 등록이 되어있을 것이기 때문에, 간단하게 ''swrite''만 입력하는 정도로 /usr/local/openoffice/bin/openoffice_swrite 를 실행할 수 있게 된다. 이제 ls를 이용해서 /usr/bin/swrite 의 정보를 확인해 보도록 하자.
+{{{#!plain
+$ ls -al swrite
+lrwxrwxrwx 1 root root 43 2007-11-26 23:44 swrite -> /usr/local/openoffice/bin/openoffice_swrite
+}}}
+'''swrite'''가 원본 openoffice_swrite 를 링크하고 있는 것을 확인할 수 있을 것이다. 
+
+직관적으로 이해할 수 있을 것이다. 그러나 link 는 두가지 종류가 있다. '''심볼릭 링크와 하드링크'''가 그것이다. 이둘의 차이점에 대해서 알아보도록 하겠다.
+
+==== hard link ====
+앞서 파일은 장치내에서 식별되기 위해서 '''inode''' 를 가진다는 것을 언급했었다. 여기에 inode 가 1234 인 파일 '''myfile'''이 있다고 가정해보자. 이것을 다른 Directory에 복사하기 위한 가장 일반적인 방법은 파일을 copy 하는 것으로 이경우 새로운 inode 를 가지는 파일이 생길 것이다. 그럼 cp(1)를 이용해서 파일을 복사해보도록 하자. 
+{{{#!plain
+# mkdir testdir
+# cp myfile testdir/myfile2
+}}}
+이제 두개 파일의 inode를 확인해 보도록하자. stat(:2)함수를 이용해서 프로그램을 만들 필요는 없다. ls 의 '''-i'''옵션을 사용하면 간단하게 파일의 inode 값을 알아낼 수 있다. 
+{{{#!plain
+# ls -i myfile 
+1131883 myfile 
+# ls -i testdir/myfile2
+1163816 testdir/myfile2
+}}}
+내용은 동일하지만 완전히 다른 파일이 생성되었음을 알 수 있다.
+
+이 방법은 대부분의 경우 유용하게 사용할 수 있겠지만 하나의 파일을 여러개의 디렉토리에 공유할 목적으로 사용하고자 할 경우 문제가 발생한다. 예를 들어 주소록 파일인 /home/yundream/mydata.txt 가 있다고 가정해보자. 이 파일을 /home/dragona 에 공유하길 원한다. 만약 mydata.txt에 새로운 내용이 추가되거나 삭제되면 /home/dragona 에도 그대로 적용되어야 한다. 단순히 copy 할경우에는 한쪽에서 변경하면, 다른 한쪽에는 반영되지 않을 것이다. 링크를 사용하면 이 문제를 간단하게 해결할 수 있다.
+
+{{{#!plain
+# ln mydata.txt /home/dragona
+}}}
+이제 한쪽에서 파일을 수정해보자. 다른 쪽도 그대로 수정된 내용이 반영되어 있음을 확인할 수 있을 것이다. ls -i 로 확인해보면 두개의 파일이 동일한 inode를 가지고 있음을 확인할 수 있을 것이다. 이것을 링크라고 하며, 위에서와 같이 inode를 공유해서 사용하는 것을 '''하드 링크''' 라고 한다. 이해하기 쉽게 그림으로 나타내보자면 다음과 같다. 
+
+attachment:inode.png
+
+file_name 1과 file_name2 가 서로동일한 inode를 가리키고 있음을 확인할 수 있다. 이러한 하드링크로 얻을 수 있는 장점은 데이터를 공유할 수 있다는 것 외에, 디스크를 아낄 수 있다는 장점도 가진다. 데이터를 직접복사하는게 아니기 때문이다. 원본은 하나이고 inode 만 공유할 뿐이다. 하드링크를 하나 생성하면 inode 공유 카운터가 1증가할 뿐이다. ls -al 로 mydata.txt 원본파일의 정보를 확인해 보자  
+{{{#!plain
+# ls -al mydata.txt
+-rw-r----- 2 yundream yundream 192 2007-11-26 23:57 mydata.txt
+}}}
+하드링크 카운터가 하나 증가해서 '''2'''가 되어 있는걸 확인할 수 있을 것이다. 파일을 하나 지우고 나서 ls 결과를 보면 카운터가 하나 줄어서 '''1'''이 되는걸 확인할 수 있을 것이다.
+
+하드링크를 사용할 때, 주의해야할 점이 있다. 하드링크는 inode 를 가리킨다. 이 때, inode 는 하나의 장치에서만 유일하므로 다른 장치로의 하드링크는 불가능 하다는 점이다. 왜냐하면 다른 장치에서 유일하다는 것을 보장할 수 없기 때문이다. 이런 경우에는 심볼릭링크를 사용해야 할 것이다. 1
+
+=== 심볼릭 링크 ===
+이와 달리 심볼릭 링크는 별도의 '''inode'''를 가지는 파일로 원본파일에 대한 '''inode'''와 함께 '''장치 정보'''까지를 가지고 있다. 어떤파일에 대한 inode와 장치정보를 알고 있다면, 전 시스템에서 유일한 파일을 가리킬 수 있기 때문에 장치에 관계없이 링크를 걸 수 있게 된다.
+
+attachment:inode2.png
+
+그럼 mydata.txt 를 원본파일로 하는 심볼릭링크 mydata2.txt를 만들어 보도록 하자. ln 명령에 '''-s'''옵션을 주면 심볼릭링크를 생성할 수 있다. 
+{{{#!plain
+# ln -s mydata.txt mydataln.txt
+}}}
+이제 -i 옵션을 이용해서 두개 파일의 inode를 비교해 보면 서로 다른 별개의 inode를 유지하고 있음을 알 수 있을 것이다. ls -l 을 이용해서 심볼릭링크가 가리키는 원본파일의 이름을 얻어올 수 있다.
+
+{{{#!plain
+# ls -l mydataln.txt 
+lrwxrwxrwx 1 yundream yundream 10 2007-11-28 01:49 mydataln.txt -> mydata.txt
+}}}
+
+=== 표준입력 표준출력 표준에러 ===
+프로그램은 어떤 값을 '''입력''' 받아서 처리하고 그 결과를 '''출력'''하는 일을 한다. 입력은 보통 키보드를 통해서 이루어지고 출력은 모니터를 통해서 이루어진다. 대부분의 프로그램이 이러한 입/출력 방식을 사용한다.
+
+해서 프로그램이 실행될때에는 기본적으로 '''키보드'''장치와 '''모니터'''장치를 열어서 입출력이 가능하게 해놓았다. 이렇게 키보드 장치를 통한 입력을 '''표준입력'''이라하고 모니터를 통해 출력하는 것을 '''표준출력'''이라고 한다.  
+
+키보드를 통한 입력을 표준입력이라고 정의 하는건 문제가 없다. 그러나 모니터를 통한 표준출력에는 약간의 문제가 있다. 프로그램이 모니터에 출력하는 정보에는 '''입력 데이터를 정상적으로 처리해서 나오는 결과값'''외에 '''잘못 처리되어서 출력되는 결과값'''이 있기 때문이다. 덧셈 프로그램을 만들었는데, 피연산자에 숫자대신 알파벳 문자등을 넣었다면, 프로그램은 에러메시지를 출력할 것이다. 그런데 똑같이 모니터에 출력이 되어버리면, 결과값이 에러인지 아닌지 구분할 수가 없을 것이다.
+
+이렇게 출력값이 정상인지 에러인지를 구분하기 위해서 '''표준출력'''외에 '''표준에러'''를 제공한다. 결과적으로 프로그램은 최초 실행시 다음과 같은 3개의 입출력 장치를 open하게 된다.
+  * 표준입력 : 키보드를 통한 입력
+  * 표준출력 : 모니터로 출력되는 정상 메시지 
+  * 표준에러 : 모니터로 출력되는 에러 메시지
+
+우리는 리눅스는 모든것을 파일로 처리한다는 것을 배워서 알고 있다. 표준입력,출력,에러 역시 파일로 처리된다. 더불어 리눅스에서 파일을 다룰때에는 파일이름이 아닌, 파일지정번호를 이용한다는 것도 알고 있다. 리눅스는 이들 3개의 파일에 대해서는 아예 고유번호를 지정하고 있다.
+  * 표준입력 : 0
+  * 표준출력 : 1
+  * 표준에러 : 2
+
+다음은 표준입력, 표준출력, 표준에러를 이용해서 만든 간단한 나눗셈 프로그램이다. 표준입력을 통해서 2개의 수를 입력받아서 나눈 결과를 표준출력을 통해서 출력한다. 이 프로그램의 이름은 stdio.c 로 하겠다.
+{{{#!plain linenum
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+
+#define STDIN  0
+#define STDOUT 1
+#define STDERR 2
+
+#define ERRMSG "Devide Not Zero\n"
+int main()
+{
+  int a;
+  int b;
+  char buf[80];
+
+  read(STDIN, buf, 80);
+  a = atoi(buf);
+
+  read(STDIN, buf, 80);
+  b = atoi(buf);
+  if (b == 0)
+  {
+    write(STDERR, ERRMSG, strlen(ERRMSG));
+    return 1;
+  }
+
+  sprintf(buf, "%d / %d = %d\n", a, b, (int)(a/b));
+
+  write(STDOUT, buf, strlen(buf));
+  return 0;
+}
+}}}
+  * '''18'''
+    표준입력으로 분자를 입력받는다. 키보드로 부터 입력받는 값은 문자열로 atoi(3) 함수를 이용해서 int형 값으로 변경했다.
+  * '''21'''
+    표준입력으로 분모를 입력받는다. 
+  * '''23 ~ 27'''
+    나눗셈에서는 분모가 0이 되는걸 허용하지 않고 있다. 그러나 실수로 0을 입력할 수 있으므로, 입력값을 검사해서 0이면 에러메시지를 출력하고 종료하도록 하고 있다. 이때 결과값은 에러메시지 이므로 표준에러를 통해서 출력했다. 
+  * '''31'''
+    나눈 결과값을 표준출력을 이용해서 모니터에 출력한다.
+
+표준출력과 표준입력을 어떻게 사용하는지 이해하는 것은 어렵지 않을 것이다. 그러나 표준에러를 어떻게 사용해야 할지는 감이오지 않을 것이다. 걱정할 필요 없다. 아래의 재지향을 공부하다 보면, 자연스럽게 감이 오게 될 것이다. 
+
+=== 입출력 재지향 ===
+입출력 재지향 혹은 '''I/O Redirection'''에 대해서 알아보자. 일단 재지향의 의미에 대해서 알고 넘어갈 필요가 있을것 같다. 재지향의 사전적 의미는 '''다른 방향으로 보낸다''' 이다. 여기에 마추어 입출력 재지향을 사전적의미 그대로 해석을 하자면, 입력과 출력을 다른 방향으로 보낸다가 될 것이다. 실제 입출력 재지향은 사전적의미 그대로 이해하면 된다. 
+
+리눅스에서 모든 것은 파일로 다루어진다고 했다. 이는 입력과 출력에도 예외없이 적용이 되므로, '''입력과 출력을 다른 방향으로 보낸다'''는 '''입력과 출력을 다른 파일로 보낸다'''와 동일함을 의미한다.  예컨데, 키보드로 부터 입력 받은 데이터 - 즉 표준입력 - '''일반 파일'''로 보내거나 '''프린터 - 프린터도 파일이니까'''로 보내는등의 일이 가능하다는 얘기가 된다. 일반 파일을 프린터로 보내거나, 표준출력을 표준에러로 보내는 등의 일역시 가능하다. 모든 것이 파일이기 때문에 모든 방향으로의 재지향이 가능하다.  
+
+stdio.c 파일을 예로 들어서 설명해보도록 하겠다.
+
+stdio.c 프로그램은 입력을 검사해서 분모가 0이 되면, 에러메시지를 출력하도록 했다. 이 에러메시지는 표준에러 형태로 모니터에 출력된다. 입력이 제대로 이루어져서 결과값이 나올경우에는 표준출력 형태로 모니터에 출력이 된다. 이걸 파일로 재지향 해보도록 하자. 
+
+쉘에서는 꺽쇠를 이용해서 재지향을 이용할 수 있다. 표준출력을 result.txt 파일로 재지향하고 결과를 확인해 보도록 하자.
+{{{#!plain
+# ./stdio > result.txt
+1234
+2
+# cat result.txt
+1234 / 2 = 617
+}}}
+
+프로그램을 만들어서 테스트 할경우 디버깅(:12)등의 목적으로 에러메시지를 파일로 따로 저장해둬야 할필요가 생긴다. 그렇다면 stdio의 표준에러를 파일로 재지향 시키면 될것이다. 
+{{{#!plain
+# ./stdio 2> err.txt
+1000
+0
+# cat err.txt
+Devide Not Zero
+}}}
+표준에러를 표준출력으로 재지향 시킬 수도 있다.
+{{{#!plain
+# ./stdio 2>1& 
+}}}
+이제 표준에러도 표준출력 형태로 모니터에 뿌려지게 된다. 표준에러를 표준출력으로 재지향 시키는 예는 grep 등을 이용해서 결과를 모니터링 하는 스크립트를 만들기 위해서 자주 이용된다. 아래의 경우를 보도록 하자. 
+{{{#!plain
+# ./stdio | grep Not  > err.log
+}}}
+위의 스크립트는 stdio의 실행결과중 분모가 0인 경우를 err.log로 남기기 위한 목적으로 작성되었다. 그렇지만 예상과는 다르게 분모가 0인 경우도 err.log로 남겨지지 않을 것이다. 왜냐하면 파이프 '''|'''는 표준출력 결과만을 grep로 넘기는데 '''Device Not Zero'''는 표준에러이므로 파이프를 통해서 grep로 넘어가지 않기 때문이다.
+
+이때 표준에러를 표준출력으로 재지향 시키는 방법으로 문제를 해결할 수 있다. 위의 스크립트를 아래와 같이 수정한다음에 테스트해보도록 하자.
+{{{#!plain
+# ./stdio 2>&1 | grep Not > err.log
+1000
+0
+# cat err.log
+Devide Not Zero
+}}}
+표준출력결과가 파일로 저장된걸 확인할 수 있을 것이다.
+
+이론적으로는 파일에 저장된 내용을 각 장치에 재지향 시키는 것만으로도 해당 장치를 이용할 수 있다. 예를 들자면 wav 파일을 읽어서 사운드카드를 가리키는 장치파일에 재지향 시켜서 wav 파일을 플레이 하는 것이다. 
+{{{#!plain
+# cat sound.wav > /dev/audio
+}}}
+
+재지향의 개념에 대해서 알아보았는데, 정작 중요한건 재지향이 시스템 프로그래밍의 관점에서 어떻게 구현이 되는가 하는 것이다. 간단히 생각해 보자면, 두개의 파일을 연다음에 하나의 파일의 내용을 읽어서 다른 파일로 복사하면 된다. 표준출력을 파일로 재지향한다면, 표준출력과 파일을 연다음에 표준출력의 내용을 읽어서 파일에 그대로 쓰는 형식이다. 
+
+그러나 이 방식은 매우 복잡하다. 이보다는 dup2()함수를 이용해서 좀더 간단하게 재지향을 구현할 수 있다. 아래의 코드를 컴파일 한다음 실행시켜 보도록 하자. 
+{{{#!plain linenum
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+
+#define STDIN  0
+#define STDOUT 1
+#define STDERR 2
+
+int main(int argc, char **argv)
+{
+  int fd;
+  fd = open("test.log", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+  fd = dup2(fd, STDOUT);
+  printf("Hello World %d\n", fd);
+}
+}}}
+ * 15 : 재지향할 파일로 ''test.log''를 오픈했다. fd는 아마도 3일 것이다.
+ * 16 : dup2()함수를 이용해서 fd를 STDOUT로 복사했다. 
+ * 17 : printf 함수를 이용해서 표준출력했지만 STDOUT는 test.log의 파일지정자로 복사가 되었기 때문에, 모니터로 출력이 되느넥 아니고 파일로 출력이 된다. 
+이정도면 재지향의 구현개념에 대해서 정리가 되었으리라 생각된다. dup와 dup2는 프로세스간 입출력을 공유하기 위한 용도로 '''나중에'''자세히 언급이 될 것이다. 우선은 이런 함수가 있다는 정도만 이해하고 넘어가도록 하자. 
+
+=== 입출력 버퍼 비우기 ===
+일반적으로 버퍼는 성능을 높이기 위한 목적으로 사용한다. 예컨데, 1byte씩 2048번 쓰는 것 보다는 , 1024byte씩 2번 쓰는게 훨씬 효율적일 것이다. 이에 대한 문서는 [wiki:Site/system_programing/File/buffer_size_perf 버퍼크기가 읽기/쓰기 성능에 미치는 영향]문서를 읽어보기 바란다. 
+
+일반응용 차원에서 뿐만 아니라, 운영체제차원에서도 이러한 규칙은 동일하게 적용된다. 이에 따라 입력과 출력에 대해서도 별도의 버퍼를 유지하게 된다. 예를들어 write(2)를 이용해서 화면서 데이터를 출력한다고 하면, 1byte씩 쓸때마다 출력되는게 아니고, 버퍼에 쌓아두고 있다가 버퍼가 가득 찼을 때 출력을 하게 된다.   
+
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+  int i = 1;
+  while(1)
+  {
+    printf("%d",i);
+    usleep(100);
+  }
+}
+}}}
+위 코드를 실행시켜 보기 바란다. 버퍼가 가득차기 전까지는 화면에 출력시키지 않는 것을 확인할 수 있을 것이다. 대개의 경우 버퍼의 크기는 1024이므로, 1024개의 문자가 기록되었을 때, 한번에 화면에 출력되는 것을 확인할 수 있을 것이다.  
+
+그러나 때때로, 곧바로 버퍼가 채워지기 전에 버퍼의 내용을 파일에 쓰고, 버퍼를 비울 필요가 있을 것이다. 만약 버퍼가 다 채워지지 않아서 파일에 쓰지 않은 상태에서 프로그램이 종료되어 버린다면, 버퍼에 있는 내용은 날아가 버릴 것이다. 위의 프로그램을 중간에 Ctrl+C를 눌러서 종료시켜 보기 바란다. 버퍼의 내용이 버려짐을 확인할 수 있을 것이다. 이때 쓰는 함수가 fflush()로, 이 함수를 호출하게 되면, 버퍼의 내용을 즉시 파일에 쓰게 된다. 
+
+위 코드를 아래와 같이 수정해보자.
+{{{#!plain
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+  int i = 1;
+  while(1)
+  {
+    printf("%d",i);
+    fflush(stdout);
+    usleep(100);
+  }
+}
+}}}
+이제 매번 버퍼에 있는 내용을 파일(여기에서는 모니터)에 쓰는 것을 확인할 수 있을 것이다.
+
+=== 사용한 함수들 정리 ===
+ * open(2) : 파일을 연다.
+ * write(2) : 파일을 쓴다.
+ * read(2) : 파일의 내용을 읽는다.
+ * close(2) : 열린 파일을 닫는다.
+ * printf(3) : 문자열을 화면에 표준출력 한다.
+ * dup2(2) : 파일지정번호를 복사한다.
+ * perror(3) : 에러메시지를 표준에러로 출력한다.
+@

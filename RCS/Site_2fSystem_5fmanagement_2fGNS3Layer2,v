@@ -1,0 +1,296 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.11.30.13.51.06;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fGNS3Layer2
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title GNS3로 알아보는 OSI7 - L2
+
+[[TableOfContents]]
+== GNS3로 알아보는 OSI7 - L2 ==
+네트워크 공부는OSI7의 각 계층을 이해하는 것에서부터 시작합니다. 각 계층의 프로토콜의 특성을 이해하고 응용하는 거죠.
+
+얼마전 부터 네트워크 시뮬레이션 도구인 [wiki:man/12/GNS3 GNS3]를 사용하고 있습니다. 좋은 툴도 손에 쥐게 됐으니 이번 참에 OSI7을 처음부터 공부해보기로 마음 먹었습니다. 대략 알고 있기는 하지만, (에뮬레어터 이긴 하지만)장비를 가지고 직접 경험하는 것과는 분명히 차이가 있을테니 말입니다. 알고 있었던 것은 확실히 확인하고, 그러면서 새로운 것도 배우고. 
+
+대게의 소프트웨어 개발자들이 그렇듯이, 저 역시 OSI7 계층에 대해서는 이런게 있구나 하는 정도만 알고 있습니다. 공부하면서 문서를 만드는 거죠. 따라서 잘못된 내용이 있을 수 있음을 밝혀둡니다.  
+== OSI 7 Layer ==
+OSI7에 대한 내용은 [wiki:man/12/OSI7 OSI7]과 링크 문서들을 참고하시고..
+
+== L2 ==
+L1은 물리적 세부 사항들을 정의하는 계층으로 소프트웨어 개발자에게는 필요가 없을 것이라 생각됩니다. 그래서 건너뛰고 L2부터 공부하기로 합니다. 
+
+L2는 데이터 링크 계층입니다. point-to-point간 신뢰성있는 전송을 위한 계층입니다. point-to-point 라고 하니 좀 헛갈릴 수 있을 것 같은데, 이더넷 카드와 이더넷 카드가 직접 연결되는 구조라고 보시면 됩니다. 때때로 컴퓨터와 컴퓨터가 연결된 이라고 설명하기도 하는데, 빠른 이해를 위해서는 도움이 되지만 나중에 헛갈리게 되므로 컴퓨터가 아닌 '''이더넷 카드'''를 최소단위로 하겠습니다.
+
+이더넷 카드와 이더넷 카드가 직접 연결하는 구조로 이더넷 카드를 중계하는 네트워크 브리지, 스위치 등이 대표적인 L2장비입니다. 
+
+가장 일반적인 L2구조는 아래와 같이 하나의 스위치와 하나 이상의 이더넷 카드로 구성된 네트워크 구성입니다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1tlnMz_t4yt_Qz30LrgD4je42Dxw6rivxNNKKsJwEtq4&amp;w=598&amp;h=337">
+}}}
+
+=== STP ===
+L2 네트워크에서 패킷교환은 MAC 기반으로 이루어진다. 만약 L2 네트워크가 2개 이상의 브릿지로 구성될경우 루핑이 발생할 수 있는데, STP(Spanning Tree protocol)을 이용해서 이를 방지한다. 자세한 내용은 [wiki:man/12/stp stp]를 참고한다.   
+
+==== Eternet Frame ====
+L2 에서 사용하는 패킷 프레임구조를 먼저 알아야 겠습니다. L2는 Ethernet Frame을 사용합니다. L2를 이해한다는 것은 Ethernet Frame에 있는 정보를 이해한다는 거죠.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10rCwvny9P2EY3gaJ0QQ3cdQmX7CB_VcgKts-W3x7PJY&amp;w=646&amp;h=229">
+}}}
+  1. Destnation MAC Address : 목적지 이더넷 인터페이스의 물리적인 주소
+  1. Source MAC Address : 출발지 이더넷 인터페이스의 물리적인 주소
+
+Link Layer의 핵심은 MAC Address 입니다. 그리고 그림에는 나오지 않는 VLAN(:12)이 있습니다. 여기에서는 MAC을 중심으로 살펴볼 겁니다. 
+
+=== MAC Address ===
+스위치를 중심으로 이더넷 카드를 연결했는데요. 데이터 통신을 하려면 아래의 두 가지 조건이 만족돼야 합니다.  
+  1. 이더넷 카드가 서로를 식별할 수 있어야 한다. 
+  1. 스위치는 데이터를 중계한다. 그러므로 자기에게 연결된 이더넷 카드의 식별 정보를 가지고 있어야 한다. 
+
+이더넷 카드는 식별 정보로 MAC Address를 이용하며, 세부 사항은 IEEE802에 정의되있습니다. '''M'''edia '''A'''ccess '''C'''ontrol '''address'''의 줄임말로 이더넷 카드에 부여된 물리적 주소로 48bit 크기를 가집니다. 이더넷 카드 제조시 읽기 전용의 메모리 카드에 저장됩니다. 표기법은 01-23-45-67-39-ab 혹은 01:23:45:67:39:ab 입니다. 
+
+스위치는 연결돼 있는 이더넷 카드의 MAC Address 테이블을 유지하고 있습니다. 이 테이블 정보를 이용해서 패킷을 어느 포트로 보낼지를 결정합니다. MAC Address <-> Port 정보를 저장하는 거죠.
+
+=== GNS3로 L2 환경 구성 ===
+L2 네트워크와 L2 네트워크에서 사용하는 프로토콜을 테스트 하기위해서 GNS3로 L2 환경을 구성했습니다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/8oz0MDIlIajIWjQ9PjkCBNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-SzJFee-6brg/TvnOOtVfPhI/AAAAAAAAB7k/qKHtZXXVjjg/s800/gns05.png" height="327" width="366" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+테스트할 내용을 정리했습니다.
+  * 같은 subnet의 다른 이더넷 카드를 어떻게 인식하는가. 
+  * 다른 subnet으로 구성했을때, 어떤 일이 발생하는가. 
+  * switch에서는 무슨 일이 일어나는가.
+VBOX1와 VOBX2는 리눅스 VM으로 ifconfig를 이용해서 IP 주소를 설정했습니다.
+
+VBOX1 설정
+{{{#!plain
+# ifconfig eth2 192.168.105.1 up
+}}}
+
+VBOX2 설정
+{{{#!plain
+# ifconfig eth2 192.168.105.2 up
+}}}
+
+이더넷의 MAC Address는 ifconfig 명령으로 확인할 수 있습니다.
+{{{#!plain
+# ifconfig -a
+...
+eth2      Link encap:Ethernet  HWaddr 08:00:27:6c:b0:73  
+          inet addr:192.168.105.2  Bcast:192.168.105.255  Mask:255.255.255.0
+          inet6 addr: fe80::1278:d2ff:fe2f:a253/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:52458 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:46654 errors:0 dropped:0 overruns:0 carrier:1
+          collisions:0 txqueuelen:1000 
+          RX bytes:50772538 (50.7 MB)  TX bytes:8457892 (8.4 MB)
+          Interrupt:44 
+}}}
+
+=== Switch의 MAC Address Table 확인 ===
+이더넷 스위치인 '''SW1'''의 MAC Address 테이블을 확인해 보겠습니다. gns3상에서 SW1을 선택한다음 마우스 우클릭하면 "MAC Address Table" 명령이 나오는데, 이 명령으로 스위치가 관리하고 있는 MAC Address Table를 확인할 수 있습니다.
+{{{#!plain
+0800.272f.b464 learned from port 1
+0800.276c.b073 learned from port 2
+}}}
+VBOX1과 VBOX2의 Mac Address를 확인할 수 있습니다. 
+
+VBOX1에서 VBOX2로 보낼 패킷을 만들면 이더넷 프레임에 VBOX2의 MAC Address를 적습니다. 이 패킷을 받은 SW1은 Mac Accress Table에 일치하는 MAC Address가 있는지 확인해서, 일치하는 포트로 패킷을 내보내죠.
+
+=== ARP ===
+VBOX1은 VBOX2로 데이터를 전송하려면 VBOX2의 MAC Address를 알고 있어야 합니다. 이 외에도 IP 주소를 알고 있어야 하죠. 그런데 우리가 실제 데이터를 전송할 때는 MAC Address가 아닌 IP(:12) 주소를 사용하기 때문에, IP 주소와 MAC Address를 맵핑해주는 정보가 있어야 합니다. 
+
+IP 주소와 MAC Address의 맵핑 정보를 만들기 위해서 사용하는 프로토콜이 ARP(Address resolution protocol)프로토콜입니다. 
+
+처음 운영체제가 올라오면, 이 운영체제는 주변의 네트워크 상황을 알지 못합니다. 그래서 주변의 운영체제와 통신해야할 상황이 오면, 스위치로 ARP 요청을 전송합니다. 이때 ARP 패킷은 브로드캐스팅 주소로 보냅니다. 그러면 스위치는 모든 링크로 ARP 패킷을 보냅니다. ARP 패킷을 받은 운영체제는 자신의 MAC주소와 IP주소를 ARP헤더에 채워서 응답하는 거죠.  
+
+ARP 응답을 받은 운영체제는 ARP 테이블을 관리합니다. 이후 데이터 전송은 ARP 테이블을 이용하죠. 리눅스에서는 arp 명령을 이용해서 arp 테이블을 확인할 수 있습니다.
+{{{#!plain
+# arp -an
+}}}
+이제막 운영체제를 부팅했다면, arp 테이블에는 아무런 정보가 없을 겁니다. 사용자가 arp 테이블에 없는 IP로 데이터 전송을 시도하면, 그때 arp 요청을 브로드캐스팅 합니다. 
+
+tcpdump로 확인 해보겠습니다. 아직 어떤 통신도 하지 않는 상태, 그러니까 arp table에 아무런 내용이 없는 상태에서 VBOX2에서 tcpdump를 띄웠습니다.
+{{{#!plain
+# tcpdump -ennqti eth1 \(arp or icmp\)
+}}}
+
+이제 VBOX1에서 VBOX2로 PING을 보냅니다.
+{{{#!plain
+# ping 192.168.105.2
+}}}
+
+VBOX2의 tcpdump 정보입니다.
+{{{#!plain
+# tcpdump -ennqti eth1 \(arp or icmp\)
+listening on eth1, link-type EN10MB (Ethernet), capture size 65545 bytes
+08:00:27:2f:b4:64 > ff:ff:ff:ff:ff:ff, ARP, length 60: Request who-has 192.168.105.2 tell 192.168.105.1, length 46
+08:00:27:6c:b0:73 > 08:00:27:2f:b4:64, ARP, length 42: Reply 192.168.105.2 is-at 08:00:27:6c:b0:73, length 46
+08:00:27:2f:b4:64 > 08:00:27:6c:b0:73, IPv4, length 98: 192.168.105.1 > 192.168.105.2: ICMP echo request, id 935, seq 1,length 64
+...
+}}}
+VBOX1에서 192.168.105.2로 PING을 보냅니다. 192.168.105.2는 같은 서브넷 IP 주소이므로 L2 통신을 하려고 하겠죠. 그럴려면 ARP 테이블에 192.168.105.2의 MAC 주소 정보가 있어야 하는데, 찾을 수 없습니다. 그래서 PING을 보내기 전에 먼저 ARP를 브로드캐스팅 합니다. 
+  1. ARP를 보낼 때는 자신의 MAC과 IP 주소를 함께 보냅니다. 
+     * 08:00:27:2f:b4:64 과 192.168.105.1 주소를 보낸걸 확인할 수 있습니다. 
+     * ARP의 주요 필드는 4개입니다. 자신의 MAC과 IP주소 그리고 상대편 MAC과 IP주소입니다. ARP 요청을 받은 운영체제는 자신의 MAC과 IP주소를 채워서 전송을 합니다. 하지만 처음 ARP 요청을 보낼때는 상대편의 MAC 주소를 모릅니다. 그래서 ff:ff:ff:ff:ff:ff를 채워서 보냅니다. 목적지 MAC이 ff:ff:ff:ff:ff:ff는 브로드캐스팅 하겠다는 의미입니다.
+  1. ARP 요청을 받은 VBOX2가 자신의 MAC주소를 ARP필드에 채워서 보내고 있습니다. 
+  1. ARP 응답을 받은 VBOX1은 VBOX2의 MAC주소를 확인했습니다. 비로서 ICMP를 전송합니다.
+VBOX1의 arp 테이블을 확인해 보죠.
+{{{#!plain
+# arp -an
+? (192.168.105.2) at 08:00:27:6c:b0:73 [ether] on eth2
+}}}
+
+정말 ARP가 브로드케스팅 되는지 확인하고 싶다면, VM을 하나 더 붙이면 됩니다. 브로드케스팅 된다면 모든 VM에 ARP가 전송되는 걸 확인할 수있을 테니까요. 직접 해보세요.  
+
+==== 다른 subnet으로 ARP를 전송하면 ? ====
+위 예제에서 VBOX1과 VBOX2는 같은 subnet에 있습니다. 다른 subnet을 가진다면 어떻게 될까요. VBOX1은 192.168.105.1 VBOX2는 192.168.205.1인 경우에도 ARP가 전송될까요 ?
+
+ARP는 브로드 캐스팅이니까. 서브넷이 다르더라도 전송될 거라는 생각이 들긴합니다. 하지만 실제 테스트 해보면, ARP 요청이 가지 않는 걸 확인할 수 있습니다. 이유는 다음과 같습니다. VBOX1을 기준으로 설명해 보겠습니다.
+
+VBOX1의 route정보를 보면 Default gateway가 없는 걸 확인할 수 있습니다.
+{{{#!plain
+# route -n
+Kernel IP routing table
+Destination    Gateway    Genmask          Flags Metric Ref    Use Iface
+192.168.105.0  0.0.0.0    255.255.255.0    U     0      0        0 eth2
+}}}
+만약 192.168.205.1로 데이터를 보내려고 한다면, 이 주소는 라우팅 경로를 정할 수가 없습니다. 따라서 패킷을 폐기해버립니다. 아예 스위치로 가지도 않는 거죠. 당연한 결과입니다.
+
+하나 이상의 서브넷을 가질려면 원칙적으로 서브넷의 갯수 만큼 스위치가 있어야 합니다. 
+
+==== arping ====
+arping을 이용해서 주변 호스트에 arp 요청을 전송할 수 있습니다.
+{{{#!plain
+# arping -q -c 3 -A -I eth1 192.168.105.1
+}}}
+
+192.168.105.1에서 tcpdump로 arp 패킷을 확인했습니다.
+{{{#!plain
+# tcpdump -c 3 -nni eth2 arp
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth2, link-type EN10MB (Ethernet), capture size 65535 bytes
+22:51:02.431907 ARP, Request who-has 192.168.105.1 tell 192.168.105.2, length 46
+22:51:02.431936 ARP, Reply 192.168.105.1 is-at 08:00:27:2f:b4:64, length 28 
+22:51:02.432818 ARP, Request who-has 192.168.105.1 tell 192.168.105.2, length 46
+}}}
+
+==== arp cache ====
+리눅스는 arp cache 테이블을 유지합니다. 만약 데이터를 전송하려는 IP에 대한 MAC 주소 정보가 있다면, arp를 날리지 않고 바로 데이터를 전송합니다. arp cache를 유지함으로써, 패킷 낭비와 반응 속도 낭비를 줄일 수 있습니다.
+
+'''arp'''와 '''ip'''명령으로 arp cache 테이블의 정보를 확인할 수 있습니다.
+{{{#!plain
+# arp -na
+? (192.168.105.2) at 08:00:27:6c:b0:73 [ether] on eth2
+# ip neigh show
+192.168.105.2 dev eth2 lladdr 08:00:27:6c:b0:73 STALE 
+}}}
+
+  * gc_stale_time
+    네트워크 환경은 변합니다. 그러므로 주기적으로 arp테이블을 갱신할 필요가 있습니다. 이 값은 gc_stale_time에 저장되있습니다. 기본 값은 60초 입니다. 
+{{{#!plain
+# cat /proc/sys/net/ipv4/neigh/eth2/gc_stale_time
+60
+}}}
+  * delay_firat_probe_time
+    네트워크 항목이 gc_stale_time을 초과했다고 판단하면, gc_interval 시간이 지난후 ARP요청을 전송합니다. 
+
+==== arp flux ====
+리눅스 여러개의 네트워크 카드로 네트워크에 연결할 경우 MAC 주소와 IP 주소를 맵핑에 문제가 생길 수도 있습니다. 응답하는 호스트가 가지고 있는 다수의 이더넷 인터페이스를 가지고 있을 경우 여러 개의 ARP 응답을 보낼 수 있는데, 이 때 잘못된 정보가 전송될 수 있습니다. ARP는 L2 MAC 주소와 L3 IP 주소를 맵핑하는 프로토콜인데, 서로 다른 레이어를 맵핑하다보니 발생하는 문제입니다. 
+
+그림을 보면서 설명하겠습니다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1_NzWoY4uZt_YbbPTk3UG7Q_skj4OkYglHyw7-0xrRVw&amp;w=621&amp;h=200">
+}}}
+  1. Host A에서 ARP 요청을 보냅니다.
+  1. Host B는 2개의 이더넷 인터페이스를 가지고 있습니다. 
+  1. 첫 ARP 요청은 브로드캐스트 됩니다.
+  1. 그러므로 Host B의 2개 인터페이스에서 ARP 응답이 나갈 겁니다.
+  1. 첫번째 ARP 응답 : 192.168.105.2 & 11:11:11:11:11:11
+  1. 두번째 ARP 응답 : 192.168.105.2 & 22:22:22:22:22:22
+  1. 결국 Host A는 ARP cache를 제대로 유지할 수가 없습니다. 
+
+이 문제를 해결하려면 arp 값을 튜닝해야 합니다.
+
+'''arp_filter'''
+arp 요청이 올 때, arp를 요청한 호스트와 같은 서브넷에 있는 이더넷 인터페이스만 응답을 보내도록 설정할 수 있습니다. 
+{{{#!plain
+[root@@real-server]# echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+[root@@real-server]# echo 1 > /proc/sys/net/ipv4/conf/eth0/arp_filter
+[root@@real-server]# echo 1 > /proc/sys/net/ipv4/conf/eth1/arp_filter
+[root@@real-server]# ip address show dev eth0
+2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast qlen 100
+    link/ether 00:80:c8:e8:1e:fc brd ff:ff:ff:ff:ff:ff
+    inet 10.10.20.67/24 scope global eth0
+[root@@real-server]# ip address show dev eth1
+3: eth1: <BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast qlen 100
+    link/ether 00:80:c8:7e:71:d4 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.100.1/24 brd 192.168.100.255 scope global eth1  
+
+[root@@real-client]# arping -I eth0 -c 3 10.10.20.67
+ARPING 10.10.20.67 from 10.10.20.33 eth0
+Unicast reply from 10.10.20.67 [00:80:C8:E8:1E:FC]  0.882ms
+Unicast reply from 10.10.20.67 [00:80:C8:E8:1E:FC]  1.221ms
+Unicast reply from 10.10.20.67 [00:80:C8:E8:1E:FC]  1.487ms
+Sent 3 probes (1 broadcast(s))
+Received 3 response(s)
+
+[root@@real-client]# arping -I eth0 -c 3 192.168.100.1
+ARPING 192.168.100.1 from 192.168.100.2 eth0
+Unicast reply from 192.168.100.1 [00:80:C8:7E:71:D4]  0.804ms
+Unicast reply from 192.168.100.1 [00:80:C8:7E:71:D4]  1.381ms
+Unicast reply from 192.168.100.1 [00:80:C8:7E:71:D4]  2.487ms 
+Sent 3 probes (1 broadcast(s))
+Received 3 response(s)
+}}}
+
+'''arp_hidden'''
+혹은 arp_hidden 값을 이용할 수도 있습니다.
+{{{#!plain
+[root@@real-client]# arping -I eth0 -c 1 172.19.22.254
+ARPING 172.19.22.254 from 172.19.22.2 eth0
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2D]  0.704ms
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2E]  0.844ms
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2F]  0.918ms
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2C]  0.974ms
+Sent 1 probes (1 broadcast(s))
+Received 4 response(s)
+[root@@real-server]# for i in all eth2 eth3 eth4 eth5 ; do
+> echo 1 > /proc/sys/net/ipv4/conf/$i/hidden
+> done
+[root@@real-client]# arping -I eth0 -c 2 172.19.22.254
+ARPING 172.19.22.254 from 172.19.22.2 eth0
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2D]  0.710ms
+Unicast reply from 172.19.22.254 [00:60:F5:08:8A:2D]  0.624ms
+Sent 2 probes (1 broadcast(s))
+Received 2 response(s)
+}}}
+
+== 다음 할 것들 ==
+ * [wiki:man/12/VLAN VLAN]
+   VLAN은 L2 프로토콜이지만 내용이 많아서 문서를 나누기로 했습니다.
+ * Link aggreation 
+ * L3
+   VLAN까지 끝나면 L3로 고고
+
+[[tag(OSI7,gns3,L2)]]
+[[Category(15)]]
+@

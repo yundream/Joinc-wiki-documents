@@ -1,0 +1,291 @@
+#title Rsync 10가지 사용 예제들 
+
+[[TableOfcontents]]
+== Rsync ==
+Rsync(Remoe Sync)는 원격에 있는 파일과 디렉토리를 복사하고 동기화 하기 위해서 사용하는 툴이며 동시에 네트워크 프로토콜이다. [wiki:Site/Linux 리눅스]와 유닉스에서는 백업용도로 (아마도)가장 널리 사용하는 툴일 것이다(윈도우와 애플에도 포팅됐다). Rsync는 CLI툴로, 커맨드 라인의 옵션들을 이용해서 배치 프로그램을 개발하기 쉬다는 장점이 있다. 이 스크립트를 cron 등에 올리는 걸로 간단하게 백업 혹은 미러(mirror) 시스템을 구축할 수 있다. 
+
+== Rsync의 기능상 장점들 ==
+  * 원격 시스템으로 부터 파일을 효율적으로 복사하거나 동기화 할 수 있다.
+  * [wiki:man/12/link Link], device, 파일의 소유자와 [wiki:man/2/chmod 그룹 권한(permissions)]등 파일의 부가정보도 복사할 수 있다.
+  * scp보다 빠르다. rsync는 remote-update 프로토콜을 이용해서 차이가 있는 파일만 복사한다. 처음에는 모든 파일과 디렉토리를 복사하겠지만, 다음부터는 차이가 있는 파일만 복사하기 때문에 더 빠르고 효율적으로 작동한다.  
+  * 데이터를 압축해서 송/수신하기 때문에 더 적은 대역폭을 사용한다. 
+
+== Rsync의 동기화 알고리즘 ==
+=== 파일 전송 결정 ===
+기본적으로 rsync는 파일의 크기와 수정 시간(modification)을 비교하는 것으로 파일을 전송할지 말지를 결정한다. 이 방법은 아주 작은 CPU 자원을 소모하지만 실수가 발생할 수 있다. 일반적으로 파일의 내용을 변경하면 크기와 수정시간이 변하지만 항상 그렇다고 단정할 수는 없기 때문이다.
+
+'''--checksum''' 옵션을 이용하면 비교 방법을 개선할 수 있다. 이 옵션을 켜면, 파일의 checksum을 비교한다. 크기/시간을 이용한 비교 방법보다 안전하지만 더 느리고 더 많은 자원을 사용한다. 
+
+=== 전송할 파일 부분의 결정 ===
+파일 전송을 결정했다고 가정해보자. 파일을 전송하기 위한 간단한 방법은 "전체 파일을 그대로 복사"해버리는 거다. 쉬운 방법이긴 한데, (특히 파일의 크기가 클 경우) 효율적이지는 않다. 1G 크기의 파일이 있다고 가정해보자. 여기에서 바뀐 부분이 1k 라고 할 때, 1k 때문에 1G를 복사하게 될거다. 
+
+Rsync는 파일의 변경된 부분만 효과적으로 복사하기 위한 알고리즘을 가지고 있다.  
+
+Rsync는 파일을 고정 크기를 가지는 청크(chunk)로 나눈다음에 checksum을 계산한다. 이 checksum을 서로 계산해서, 다를 경우 해당 부분의 청크만을 복사한다.  
+
+만약 파일의 앞 부분의 정보가 수정돼서 정보들이 밀린다면 모든 청크의 checksum이 어긋날 것이다. 이 문제를 피하기 위해서 "Rolling hash"를 사용한다. (참고 : [http://en.wikipedia.org/wiki/Rolling_hash Rolling hash] 
+
+== 기본 사용 법 ==
+{{{#!plain
+# rsync options source destination
+}}}
+
+== 주요 옵션들 ==
+  * -v : verbose
+  * -r : Recursively 데이터 복사
+  * -a : archive mode. 이 모드를 이용하면 심볼릭 링크, 파일 유저/그룹 권한, timestamp도 복사한다. 
+  * -z : 파일 데이터 압축. 대역폭을 아낄 수 있다. 물론 시간도
+
+== rsync 설치하기  ==
+모든 배포판에서 패키지 형태로 제공한다. CentOS는 yum, Ubuntu는 [wiki:Site/Linux/Documents/UbuntuPackageManagement apt-get]으로 설치 끝.
+{{{#!plain
+# yum install rsync 
+# apt-get install rsync
+}}}
+
+
+== 테스트 환경 ==
+  * 로컬 시스템 : 우분투 리눅스 데스크탑 13.04
+  * 원격 시스템 : 우분투 리눅스 서버 13.04
+  * [wiki:Site/cloud/virtualbox Virtualbox] : Virtualbox로 우분투 리눅스 서버를 띄운다음 테스트를 진행했다.  
+== 로컬 컴퓨터에서 파일과 디렉토리 복사 및 동기화  == 
+=== 로컬 컴퓨터에서 파일 복사 및 동기화 ===
+원격 파일 복사 프로그램이지만 로컬 컴퓨터에서 사용도 문제 없다.  
+{{{#!plain
+# rsync -zvh backup.tar /tmp/backups/
+backup.tar
+
+sent 6.56K bytes  received 31 bytes  13.18K bytes/sec
+total size is 6.48K  speedup is 0.98
+}}}
+만약 목적지 디렉토리가 없다면, 자동으로 디렉토리를 만든다. 
+
+=== 로컴 컴퓨터에서 디렉토리 복사 및 동기화 ===
+디렉토리를 로컬의 다른 위치로 복사할 수 있다. '''moniwiki''' 디렉토리를 '''/tmp/backups'''디렉토리로 복사했다.
+{{{#!plain
+# rsync -avzh moniwiki/ /tmp/backups/
+....
+....
+wikiseed/WikiSlide
+wikiseed/WikiWikiWeb
+wikiseed/WordIndex
+
+sent 2.19M bytes  received 23.72K bytes  885.45K bytes/sec
+total size is 5.70M  speedup is 2.57
+}}}
+moniwiki 디렉토리를 다시 한번 복사해봤다. rsync에 대한 설명이 맞다면, 복사하는 파일이 없어야 할 거다. 
+{{{#!plain
+# rsync -avzh moniwiki/ /tmp/backups/
+sending incremental file list
+
+sent 27.16K bytes  received 119 bytes  54.56K bytes/sec
+total size is 5.70M  speedup is 208.89
+}}}
+
+파일을 하나 추가해서, 추가된 파일만 복사되는지 확인해보자. README.txt 파일을 만든다음 rsync를 실행했다.
+{{{#!plain
+# touch moniwiki/README.txt
+# rsync -avzh moniwiki/ /tmp/backups/
+sending incremental file list
+./
+README.txt
+
+sent 27.22K bytes  received 141 bytes  54.73K bytes/sec
+total size is 5.70M  speedup is 208.23
+}}}
+예상대로 잘 작동한다.
+
+README.txt 파일을 수정한 다음 rsync를 실행했다. 
+{{{#!plain
+# echo "hello world" >> moniwiki/README.txt
+ rsync -avzh moniwiki/ /tmp/backups/
+sending incremental file list
+./
+README.txt
+
+sent 27.24K bytes  received 141 bytes  54.76K bytes/sec
+total size is 5.70M  speedup is 208.11
+}}}
+
+== 서버로부터 파일과 디렉토리를 복사 혹은 동기화 하기 ==
+=== 로컬 서버에서 원격 서버로 디렉토리 복사하기 ===
+로컬 컴퓨터에 있는 moniwiki 디렉토리를 원격 컴퓨터로 복사하는 예제다.
+{{{#!plain
+# rsync -avz moniwiki/ yundream@192.168.56.101:/home/yundream/backups
+......
+......
+wikiseed/WikiSlide
+wikiseed/WikiWikiWeb
+wikiseed/WordIndex
+
+sent 2189995 bytes  received 23737 bytes  491940.44 bytes/sec
+total size is 5698359  speedup is 2.57
+}}}
+
+=== 원격 서버의 디렉토리를 로컬 서버로 복사하기 ===
+{{{#!plain
+# rsync -avzh yundream@192.168.56.101:/home/yundream/backups ./
+backups/wikiseed/WikiSlide
+backups/wikiseed/WikiWikiWeb
+backups/wikiseed/WordIndex
+
+sent 23.74K bytes  received 2.19M bytes  885.51K bytes/sec
+total size is 5.70M  speedup is 2.57
+}}}
+
+== SSH 위에서 rsync 사용 ==
+Rsync는 -e 옵션을 이용해서 ssh, rsh와 같은 remote shell 프로그램을 선택할 수 있다. 보통 안전한 통신을 보장해주는 ssh를 이용한다. -e 옵션이 없다면 ssh를 사용한다.  
+
+== Rsync server 모드로 사용 ==
+=== Rsyn 데몬 프로그램 설정 ===
+'''--daemon'''옵션을 이용, 서버모드로 작동할 수 있다. [wiki:Site/Network_Programing/Documents/inet_prog xinetd]를 이용해서 시스템 서비스로 등록했다. 
+
+xinetd 패키지를 설치하자.
+{{{#!plain
+# apt-get install xinetd
+}}}
+
+/etc/xinetd.d/rsync 설정 파일을 만들자.
+{{{#!plain
+# cat /etc/xinetd.d/rsync
+service rsync
+{
+    disable = no
+    socket_type = stream
+    wait = no
+    user = root
+    server = /usr/bin/rsync
+    server_args = --daemon
+    log_on_failure += USERID
+    flags = IPv6
+}
+}}}
+
+rsync 설정파일은 /etc/rsyncd.conf 이다. 설정파일이 없는 경우 직접 만들어줘야 한다. 
+{{{#!plain
+max connections = 2
+log file = /var/log/rsync.log
+timeout = 300
+
+[share]
+comment = Public Share
+path = /home/share
+read only = no
+list = yes
+uid = nobody
+gid = nogroup
+auth users = yundram 
+secrets file = /etc/rsyncd.secrets
+}}}
+  * 복사(동기화) 디렉토리로 /home/share를 선택했다. 
+  * 읽기/쓰기 모두 가능하게 했다.
+  * 디렉토리에 대한 소유자는 nobody.nogroup로 했다. /home/share 소유자를 nobody.nogroup로 변경한다.
+  * 접속 허용 유저로 yundream을 추가했다.
+  * auth users에 대한 설정파일은 /etc/rsyncd.secrets에 저장한다.
+
+/etc/rsyncd.serets 파일에 접속유저이름과 패스워드를 지정할 수 있다. 패스워드는 plain/text 다.
+{{{#!plain
+# cat /etc/rsyncd.secrets
+yundream:mypassword
+}}}
+
+읽기 테스트를 해보자.
+{{{#!plain
+$ rsync yundream@192.168.56.101::share
+}}}
+
+쓰기 테스트를 해보자.
+{{{#!plain
+# rsync -avz HelloWorld yundream@192.168.56.101::share
+Password: 
+sending incremental file list
+HelloWorld/
+HelloWorld/HelloWorld.desktop
+HelloWorld/HelloWorld.pro
+HelloWorld/HelloWorld.pro.user
+HelloWorld/HelloWorld.svg
+...
+sent 17798 bytes  received 252 bytes  7220.00 bytes/sec
+total size is 46543  speedup is 2.58
+}}}
+
+== 데이터 복사 진행 상황 확인하기 ==
+'''--progesss''' 옵션을 키면, 진행정도를 화면에 출력한다.
+{{{#!plain
+# rsync -avzh --progress yundream@192.168.56.101:/home/yundream/backups ./
+......
+......
+backups/wikiseed/WikiWikiWeb
+         944 100%    1.64kB/s    0:00:00 (xfer#1225, to-check=1/1334)
+backups/wikiseed/WordIndex
+          34 100%    0.06kB/s    0:00:00 (xfer#1226, to-check=0/1334)
+
+sent 23.74K bytes  received 2.19M bytes  885.51K bytes/sec
+total size is 5.70M  speedup is 2.57
+}}}
+
+== include, exclude 옵션  ==
+'''include'''와 ''exclude'''옵션을 이용해서 복사할 파일을 추가하거나 제외할 수 있다.
+
+data 디렉토리를 복사에서 제외한다.
+{{{#!plain
+# rsync -avz  --exclude 'data' yundream@192.168.56.101:/home/yundream/backups ./
+}}}
+
+별표(*)도 사용할 수 있다.
+
+{{{#!plain
+# rsync -avz  --exclude '*.bak' yundream@192.168.56.101:/home/yundream/backups ./
+}}}
+
+== delete 옵션 ==
+rsync는 파일이나 디렉토리가 없으면 새로 만든다. 그러나 파일이나 디렉토리가 존재할 경우 삭제하고 싶을 때도 있을 거다. 이럴때 '''--delete''' 옵션을 사용한다.
+
+로컬 서버에 "text.txt"파일이 있으면 삭제한 후 복사하는 예제다.
+{{{#!plain
+# touch test.txt
+# rsync -avz --delete yundream@192.168.56.101:/home/yundream/backups ./
+receiving file list ... done
+deleting test.txt
+
+....
+....
+}}}
+
+== 전송할 파일의 최대 크기 정하기 ==
+'''--max-size'''옵션을 이용해서 전송할 파일의 최대 크기를 정할 수 있다. 아래는 10k 이내의 파일만 복사하는 예제다.
+{{{#!plain
+# rsync -avz --max-size='10k' yundream@192.168.56.101:/home/yundream/backups ./
+}}}
+
+== 성공적으로 전송한 후 원본파일 지우기 ==
+"--remove-source-files"를 이용하면, 전송이 끝난 후 원본파일을 삭제한다.
+{{{#!plain
+# rsync --remove-source-files -zvh backup.tar /tmp/backups/
+
+backup.tar
+
+sent 14.71M bytes  received 31 bytes  4.20M bytes/sec
+
+total size is 16.18M  speedup is 1.10
+
+# ll backup.tar
+ls: backup.tar: No such file or directory
+}}}
+
+== Bandwidth 제한 설정 ==
+'''--bwlimit''' 옵션을 이용해서 파일전송에 사용할 네트워크 대역폭을 제한할 수 있다. 인터넷 서비중인 서버에서, 다른 서비스에 영향을 주지 않는 범위내에서 파일 복사를 원할 경우 유용하게 사용할 수 있다. 
+
+bwlimit를 사용해서 대역폭을 제한했다. 
+{{{#!plain
+# rsync --bwlimit=100 -avzhe ssh  /var/lib/rpm/  root@192.168.56.101:/root/tmprpm/
+root@192.168.0.100's password:
+sending incremental file list
+sent 324 bytes  received 12 bytes  61.09 bytes/sec
+total size is 38.08M  speedup is 113347.05
+}}}
+
+== 참고 ==
+  * [http://en.wikipedia.org/wiki/Rsync wikipedia - Rsync]
+  * [http://www.tecmint.com/rsync-local-remote-file-synchronization-commands/?utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+tecmint+%28Tecmint%3A+Linux+Howto%27s+Guide%29 Rsync : 10 Practical Examples of Rsync Command in Linux] 
+  * [https://help.ubuntu.com/community/rsync 우분투 리눅스 문서 - rsync]

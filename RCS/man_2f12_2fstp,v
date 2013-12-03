@@ -1,0 +1,240 @@
+head	1.7;
+access;
+symbols;
+locks
+	root:1.7; strict;
+comment	@# @;
+
+
+1.7
+date	2013.11.30.05.01.18;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.11.30.02.14.30;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.11.29.14.25.18;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.11.28.14.47.53;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.11.28.14.47.08;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.11.27.15.13.56;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.11.26.15.17.04;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fstp
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title STP - spanning tree protocol
+
+[[TableOfContents]]
+== STP ==
+[wiki:Site/System_management/GNS3Layer2 L2]로 구성된 두개 이상의 컴퓨터 네트워크를 연결하기 위해서 "네트워크 브릿지"를 이용한다. 네트워크를 연결하는 브릿지는 패킷을 목적지로 보내기 위해서 연산을 해야 한다. 즉 패킷을 송신측과 동일한 네트워크 세그먼트로 보내야 하는지, 아니면 다른 세그먼트로 보내야하는지를 결정해야 한다.  
+
+이렇게 여러개의 브릿지로 구성된 네트워크의 경우 패킷이 목적지까지 여러 경로를 가질 수 있는데, 이로인한 루핑이 발생할 수 있다. STP는 "루핑을 막아주기 위한 알고리즘을 포함한 프로토콜"이다. STP는 스위치나 브릿지에서 출발한 패킷이 목적지에 도착하기 까지의 경로를 하나만 가지도록 만들어준다. 경로가 하나이니 루핑이 발생할리도 없다. 경로가 하나일 경우  경로를 구성하는 스위치에 문제가 생길경우 네트워크가 단절되는 문제가 생길 수 있는데, 이를 위해서 새로운 경로를 만드는 기능도 가지고 있다.  
+
+=== Path cost ===
+'''Path Cost'''는 브릿지가 얼마나 빠른 링크로 연결돼 있는지를 나타내는 값이다. 링크가 빠를 수록 작은 STP Cost를 가진다. 이 값은 나중에 '''Root Bridge'''를 선출하기 위한 값으로 사용된다.
+
+|| 대역폭       || STP Cost            || RSTP Cost (802.1D - 2004 / 802.1w)  ||
+|| 4Mbps        || 250                 || 5,000,000                           ||
+|| 10Mbps       || 100                 || 2,000,000                           ||
+|| 16Mbps       || 62                  || 1,250,000                           ||
+|| 100Mbps      || 19                  || 200,000                             ||
+|| 1Gbps        || 4                   || 20,000                              ||
+|| 2Gbps        || 3                   || 10,000                              ||
+|| 10Gbps       || 2                   || 2,000                               ||
+
+=== STP 작동방식 ===
+STP를 이해하려면, STP의 3가지 구성요소에 대해서 알고 있어야 한다.
+  1. Root Bridge : 네트워크당 하나의 Root Bridge가 존재한다. Tree의 최상위 노드라고 보면 되겠다.  
+  1. Root Port : RB를 제외한 모든 브릿지는 하나의 '''RP'''를 가진다. 
+  1. Designated Port : 주변에 하나 이상의 브릿지가 있을 때, 이 브릿지와 연결되는 '''DP'''를 하나 가지고 있어야 한다. 
+
+아래의 네트워크 구성을 이용해서 STP의 작동방식을 살펴보도록 하자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1nxTyocprsPTR7C1nZYk5WPM-UsUSNa1MH8GUgPrkYYA/pub?w=557&amp;h=423">
+}}}
+
+==== Root Bridge의 선택 ====
+L2 네트워크는 [wiki:man/12/MAC MAC]을 기반으로 작동한다. [wiki:Site/System_management/GNS3Layer2 L2 네트워크]에서 주변의 브릿지를 인식하기 위해서 '''브릿지 ID'''를 사용하는데, 브릿지 ID 역시 '''MAC'''을 브릿지 ID 구성요소로 사용한다. 여기에 '''Bridge Priority'''가 가장 낮은 브릿지가 root 브릿지가 된다. 만약 같은 브릿지 priority가 존재할 경우에는 MAC Address를 비교해서, 가장 낮은 MAC Address를 가지는 브릿지를 root 브릿지로 설정한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1GHQbOf00M7PrB3sgWdV_amCTRJ0W0kWqSNqlvJjy91w/pub?w=531&amp;h=174">
+}}}
+
+브릿지 priority를 별도로 설정하지 않을 경우 32768을 기본 값으로 가지게 된다. 따라서 관리자가 브릿지 priority를 조작하지 않았다면, 가장 낮은 MAC address를 가진 브릿지가 root 브릿지로 선택될 것이다. 네트워크 관리자는 브릿지 priority를 설정하는 것으로 루트 브릿지를 선택할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1d2kw62j9T5NxOJgccVtYXeXXpJ7-MUzz9EoNdSeDNeo/pub?w=556&amp;h=253">
+}}}
+
+위 예제의 경우 브릿지들이 모두 32768의 기본 priority를 가지고 있다. 해서 가장 낮은 MAC address '''cc:03:00:00:00:00'''를 가진 브릿지가 root 브릿지로 선택됐다. 
+
+이러한 과정을 거쳐서 브릿지 ID가 3인 브릿지를 Root Bridge로 선택했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17AnXqc7TJLD14a9nSDu6dg1MW7nZv3F22isw9qHo1bw/pub?w=557&amp;h=423">
+}}}
+
+==== Root Port의 선택 ====
+Root 브릿지를 제외한 나머지 브릿지들은 각각 '''Root Port'''를 선출한다. Root Port는 루트 브릿지와 연결되는 포트를 의미한다. 만약 루트 브릿지와 직접 연결돼 있다면, 당연히 루트 브릿지와 연결된 포트가 '''Root Port'''가 된다.    
+
+Root 브릿지와 직접연결돼지 않은 브릿지들은 '''Path cost'''가 가장 작은 Port를 '''Root Port'''로 선택한다. 예컨데 Root 브릿지와의 최단거리 Path를 가지는 포트를 찾겠다는 것으로 이 패스를 '''least cost path'''라고 한다.  
+
+RP가 선택 됐다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1NSTTT4-Bc9Vo7vvc-Gml9kuFmLzySdm8tbMmSc3D9iU/pub?w=557&amp;h=423">
+}}}
+
+
+==== Designated port ====
+Designated port(DP)는 브릿지가 관리하는 네트워크 세그먼트로 연결되는 port다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Xg4AUYmtp-sZL9yv9gwZUmOP_33AJzogasrmfpie_9c/pub?w=557&amp;h=423">
+}}}
+
+=== Blocked Port ===
+DP를 선택하는 것으로 모든 네트워크가 연결되긴 했는데, 문제가 있다. '''loop''' 구간이 눈에 보인다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1pFYqNM2hwxW8HKLzd-WQ6PAWRibGuF-Ww2tzRm8BqKA/pub?w=557&amp;h=423">
+}}}
+
+루프의 제거는 간단하다. '''네트워크 세그먼트가 단지 하나의 DP 만을 가지도록''' 하면 된다. 예제에서는 '''d'''와 '''f''' 네트워크 세그먼트가 2개의 DP를 가지고 있다. 하나만 남기고 DP를 제거하면되는데, 제거되는 Port를 Blocked Port라고 한다. '''Blocked Port'''를 선택하는 것으로 네트워크가 완성됐다. 
+
+=== 에러복구 ===
+STP는 구성이 완료된 네트워크에 문제 구간이 생기면 Path를 재설정하는 것으로 에러를 복구한다.   
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/11DqFbnFNZpSNyQRlA1F8_0ncgN8ZgUYYUx03Gi3qloQ/pub?w=557&amp;h=423">
+}}}
+
+== 참고 ==
+ 1. [http://en.wikipedia.org/wiki/Spanning_Tree_Protocol Spanning Tree Protocol - wikipedia]
+ 1. [https://drive.google.com/file/d/0B6p_m8EvqxeuZWJJWWVGcDRaVGs/edit?usp=sharing Spanning Tree Protocol - PDF] 
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 1
+a5 1
+L2로 구성된 두개 이상의 컴퓨터 네트워크를 연결하기 위해서 "네트워크 브릿지"를 이용한다. 네트워크를 연결하는 브릿지는 패킷을 목적지로 보내기 위해서 연산을 해야 한다. 즉 패킷을 송신측과 동일한 네트워크 세그먼트로 보내야 하는지, 아니면 다른 세그먼트로 보내야하는지를 결정해야 한다.  
+d10 1
+a10 1
+Path Cost는 브릿지가 얼마나 빠른 링크로 연결돼 있는지를 나타내는 값이다. 링크가 빠를 수록 작은 STP Cost를 가진다. 이 값은 나중에 '''Root Bridge'''를 선출하기 위한 값으로 사용된다.
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d34 1
+a34 1
+L2 네트워크는 MAC을 기반으로 작동한다. L2 네트워크에서 주변의 브릿지를 인식하기 위해서 '''브릿지 ID'''를 사용하는데, 브릿지 ID 역시 '''MAC'''을 브릿지 ID 구성요소로 사용한다. 여기에 '''Bridge Priority'''가 가장 낮은 브릿지가 root 브릿지가 된다. 만약 같은 브릿지 priority가 존재할 경우에는 MAC Address를 비교해서, 가장 낮은 MAC Address를 가지는 브릿지를 root 브릿지로 설정한다. 
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+a3 1
+<!> 미완성
+d77 1
+a77 1
+<img src="https://docs.google.com/drawings/d/1Xg4AUYmtp-sZL9yv9gwZUmOP_33AJzogasrmfpie_9c/pub?w=557&amp;h=423">
+d83 1
+a83 1
+STP는 구성이 완료된 네트워크에 문제 구간이 생기면 Path를 재설정하는 것으로 에러를 복구한다. 
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d28 1
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d27 5
+d45 9
+a53 1
+==== Root Port의 선출 ====
+d58 29
+d88 3
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a8 7
+=== 브릿지 ID ===
+L2 네트워크는 MAC을 기반으로 작동한다. L2 네트워크에서 주변의 브릿지를 인식하기 위해서 '''브릿지 ID'''를 사용하는데, 브릿지 ID 역시 '''MAC'''을 브릿지 ID 구성요소로 사용한다. 여기에 '''Bridge Priority'''를 함께 사용하는 것으로 주변의 여러 브릿지 중 어느 브릿지를 우선적으로 사용해야 할지를 결정할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1GHQbOf00M7PrB3sgWdV_amCTRJ0W0kWqSNqlvJjy91w/pub?w=531&amp;h=174">
+}}}
+
+d12 8
+a19 10
+|| 대역폭       || STP Cost            ||
+|| 4Mbps        || 250                 ||
+|| 10Mbps       || 100                 ||
+|| 16Mbps       || 62                  ||
+|| 45Mbps       || 39                  ||
+|| 100Mbps      || 19                  ||
+|| 155Mbps      || 14                  ||
+|| 622Mbps      || 6                   ||
+|| 1Gbps        || 4                   ||
+|| 10Mbps       || 2                   ||
+d26 20
+@

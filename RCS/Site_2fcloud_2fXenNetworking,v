@@ -1,0 +1,161 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.11.25.07.58.55;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fXenNetworking
+@
+
+
+1.1
+log
+@221.153.194.99;;Anonymous;;
+@
+text
+@#title Xen / Xenserver networking
+
+[[TableOfContents]]
+== Xen Virtual Ethernet Interfaces ==
+=== Xen Interface ===
+Xen 가상화에서 물리적 네트워크 인터페이스는 오로지 dom0만이 직접 엑세스할 수 있다. domU는 dom0에서 만든 가상 인터페이스를 이용해서 네트워킹을 한다. Xen이 만들어지면 Xen은 dom0에서 사용할 가상 인터페이스를 생성하는데, 이들 가상 인터페이스는 물리적인터페이스의 가상 네트워크카드로 veth0, veth1 등의 이름을 가진다. 이 가상 네트워크카드는 '''vif'''이름을 가지는 가상 인터페이스와 연결이 되는데, domU는 이 vif를 이용해서 dom0의 네트워크 자원을 사용한다. 
+
+vif는 L2 스위치의 인터페이스라고 생각하면 이해가 쉽다. vif는 vif1.1형식으로 표현되는데, 처음 숫자는 domU의 번호와 대응하며, 두번째 숫자는 domU의 인터페이스 번호와 대응한다. 예를들어 vif1.2는 dom1의 eth2와 L2레벨에서 직접 연결된다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1ZCE92E6K9zr8KPHyUwEiF6njA-FwaXzIO3n5ccNacd4&amp;w=719&amp;h=332">
+}}}
+
+=== Xen Bridge ===
+브릿지는 L2에서 여러 네트워크 세그먼트를 연결하기 위해서 사용한다. 물리적인 인터페이스와 논리적인 인터페이스를 모두 관리하는 dom0는 bridge를 이용해서 두 개의 인터페이스를 서로 연결한다. dom0는 브릿지를 이용 가상의 스위치를를 만들어서 패킷을 포워딩 한다.
+
+요약하자면 이렇다.
+  * 모든 노드는 같은 서브넷 IP(:12) 주소를 가진다.
+  * dom0는 가상의 스위치 역할을 한다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1Q8MIO_afEcG8L-lwo-JQ6IgEmHo30e05umx8hj1d3gE&amp;w=988&amp;h=581">
+}}}
+
+그림에서 Xen Host는 domu가 Private LAN에 연결하기 위한 브릿지 역할을 하고 있음을 알 수 있다. 실제, Xen 호스트는 물리적 인터페이스와 가상 인터페이스 vif를 연결하는 브릿지 인터페이스를 만들어서 domU와 외부 네트워크를 연결한다. 브리지 인터페이스의 이름은 xenbr0 ~ xenbrn의 형식을 가지는데, 숫자는 브릿지하는 물리적 인터페이스의 번호를 의미한다. 예를 들어 xenbr0은 eth0을 브릿지 하고 xenbr1은 eth1을 브릿지 한다. 대략 그림과 같이 연결된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=18_B7Weg5lQd3_ml0pt-39PvYfBSV2RZEzL02LBxHso0&amp;w=697&amp;h=260">
+}}}
+
+xenbr의 설정을 살펴보자. 다른 네트워크 인터페이스와 마찬가지로 '''/etc/sysconfig/network-script'''에 위치한다.
+{{{#!plain
+# cat ifcfg-xenbr1
+XEMANAGED=yes
+DEVICE=xenbr1   # 디바이스 이름
+ONBOOT=no
+NOZEROCONF=yes
+TYPE=Bridge     # 디바이스 타입을 Bridge로 설정
+DELAY=0
+STP=off
+PIFDEV=eth1     # 브릿지할 물리적 디바이스
+BOOTPROTO=none
+NETMASK=255.255.255.0
+IPADDR=192.168.6.3
+GATEWAY=192.168.6.254
+MTU=1500
+DNS1=8.8.8.8
+DNS2=8.8.4.4
+}}}
+
+dom0의 물리적인 인터페이스들은 xenbr로 브릿지 되어서 물리적인 포트만 제공하는 역할을 하기 때문에, 인터페이스에 IP와 MAC 주소가 할당되지 않는다. dom0에서 ifconfig를 실행해보면, 물리적인 인터페이스에 IP와 MAC이 할당되지 않은 걸 확인할 수 있을 것이다. MAC 주소와 IP domu의 인터페이스 정보가 나가게 된다.
+
+brctl 명령을 이용해서 브릿지된 가상인터페이스와 MAC 주소를 확인할 수 있다.
+{{{#!plain
+## 브리지 이름과 브릿지된 vif 목록을 보여준다. 
+# brctl show
+....
+xenbr1          8000.f46d04105943       no              eth1
+                                                        vif27.0
+                                                        vif31.1
+                                                        vif10.0
+                                                        vif29.0
+                                                        vif75.1
+....
+## 브리징 된 인터페이스의 MAC 주소를 보여준다.
+# brctl showmacs xenbr1
+port no mac addr                is local?       ageing timer
+  1     00:08:9f:f4:78:f3       no                 0.02
+  1     40:01:c6:e6:fa:01       no                 1.61
+  1     48:5b:39:0a:52:94       no               271.31
+ 11     56:1e:f9:7a:c0:59       no                33.77
+  1     8a:28:3a:c8:b8:6b       no                30.31
+  9     9e:5d:53:9d:64:8d       no                 4.45
+  1     ba:f1:13:c3:82:fa       no                 2.68
+  1     ca:4a:68:d0:92:d4       no                 5.50
+  1     f4:6d:04:10:58:89       no               119.41
+  1     f4:6d:04:10:59:43       yes                0.00
+  9     fe:ff:ff:ff:ff:ff       yes                0.00
+}}}
+브릿지 인터페이스는 vif와 xapi 두 가지 형식이 있다. 외부 인터페이스와 브릿징 할 경우 vif 이름을, 내부 인터페이스를 브릿징 할 경우 xapi를 사용한다. 예를들어 eth0의 vlan 인터페이스인 eth0.10의 브릿지 인터페이스는 xapi이름으로 만들어진다. 
+
+=== VLAN ===
+vlan 인터페이스는 eth0.20의 이름 형식을 가지고 있다. 앞의 숫자는 인터페이스의 이름이고, 뒤의 숫자는 VID이다. doum0는 vlan 인터페이스와 vif의 브릿지 인터페이스를 만든다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1cFXxjXCZGNDxupwDU0ZkSeATQvXgBGbM0PuQv6VIPGM&amp;w=897&amp;h=191">
+}}}
+
+brctl로 확인할 수 있다.
+{{{#!plain
+# brctl show
+bridge name     bridge id               STP enabled     interfaces
+xapi12          8000.f46d04105943       no              eth1.20
+                                                        vif76.1
+                                                        vif77.1
+}}}
+
+VLAN을 만들기 위한 xen 명령어들
+  1. VLAN을 위한 새로운 네트워크를 만든다. 성공적으로 네트워크를 만들면 UUID를 반환한다.   
+    {{{#!plain
+# xe network-create name-label=vlannet5
+c36f7949-6d90-0255-7502-70d33c22e97b
+}}}
+  1. pif-list 명령으로 VLAN 태깅을 할 물리적인 네트워크 카드를 검색한다. 네트워크 카드의 UUID와 디바이스 이름, VLAN ID를 확인할 수 있다.
+    {{{#!plain
+# xe pif-list 
+......
+uuid ( RO)                  : 53ce62f8-2ed1-261f-e134-b9283f120009
+                device ( RO): eth1
+    currently-attached ( RO): true
+                  VLAN ( RO): 21
+          network-uuid ( RO): 50d25ad2-cbb3-5069-c774-5939841b7d22
+......
+}}}
+  1. vlan-create 명령을 이용해서 VLAN 태깅을 원하는 PIF에대한 VLAN 객체를 만든다.
+    {{{#!plain
+# xe vlan-create network-uuid=<network UUID> pif-uuid=<pif UUID> vlan=110
+You tried to create a VLAN on top of another VLAN - use the underlying physical ... 
+PIF: 53ce62f8-2ed1-261f-e134-b9283f120009
+}}}
+이렇게 만들어진 네트워크를 VM에 attach 하면 된다.
+  1. vm-list 명령을 이용해서 VIF를 추가할 UUID를 검색한다. 예를들어 VM 이름이 Ubuntuvm01이라면, 아래와 같이 UUID를 찾을 수 있다. 
+    {{{#!plain
+# xe vm-list params=uuid name-label=Ubuntuvm01
+uuid ( RO)    : 3ee9ef47-d205-9809-0434-a0504fe46f56
+}}}
+  1. vif-create 명령을 이용해서 VM에 VIF를 추가한다.  
+    {{{#!plain
+# xe vif-create vm-uuid=<VM UUID> network-uuid=<network UUID> device=0
+}}}
+
+== 다음에 할일 ==
+ 1. Xenserver networking
+    cloudstack에서 xenserver를 사용하고 있기 때문에.
+
+[[tag(xen,가상화,network,vlan,brctl)]]
+?
+@

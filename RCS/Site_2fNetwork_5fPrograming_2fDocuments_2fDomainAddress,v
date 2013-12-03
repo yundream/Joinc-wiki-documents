@@ -1,0 +1,263 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2013.11.28.02.30.41;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fNetwork_5fPrograming_2fDocuments_2fDomainAddress
+@
+
+
+1.1
+log
+@211.118.10.226;;Anonymous;;
+@
+text
+@#title 인터넷 주소 변환
+
+[[TableOfContents]]
+== 소개 ==
+이번 글은 도메인주소 그리고 점 표기 방식주소 (xxx.xxx.xxx.xxx), 32 bit 주소간의 변환이 어떻게 이루어지는지에 대한 내용을 담고 있다.
+
+이들에 대한 이해는 인터넷 관련 어플리케이션을 제작하는데 많은 도움을 줄것이다.
+
+== 2진 인터넷 주소 ==
+IPv4에서 인터넷(:12) 주소의 크기는 4byte 크기를 가지며, int 형 숫자로 표시된다. 이를테면 219810019 이런 식이다. 이 값은 라우터와 같은 컴퓨터기기가 읽기는 쉽지만 인간이 이용하기는 힘들다. 그래서 도메인 주소를 맵핑해서 사용한다.
+
+1019811872 대신에 www.joinc.co.kr을 사용하는 식이다. 도메인 주소는 기억과 사용이 쉽기 때문에 인터넷 사용자 애플리케이션은 도메인 주소를 활용한다.
+
+== 인터넷 도메인 주소에 대해서 ==
+firefox, ftp, ssh 등 프로그램들이 도메인 주소를 이용해서 원격 컴퓨터에 연결한다. 하지만 이 도메인 주소는 인간을 위해서 개발된 상징체계로 컴퓨터는 도메인 주소를 사용할 수 없다. 그러므로 이들 인터넷 클라이언트 프로그램은 입력 받은 도메인 주소를 인터넷 주소로 변환해줘야한다.
+ 
+이 변환 시스템을 Domain Name Service 혹은 Domain Name System 이라고 한다. 이 시스템은 서버/클라이언트 모델을 따르고 있는데, 즉 어플리케이션에서 도메인 주소에 대한 인터넷주소를 요청하면 DNS 서버로 이 요청을 보내서 DNS 서버로 부터 도메인 주소에 대한 인터넷 주소를 얻어오는 방식으로 작동한다.
+
+DNS는 족잡한 시스템으로 자세한 내용은 [ftp://ftp2.kr.freebsd.org/FreeBSD-kr/doc/misc/PoweredByDNS/PoweredByDNS.html Powered by DNS] 문서를 참고하기 바란다.
+
+이 문서에서는 프로그래머의 입장에서 위의 과정이 어떻게 이루어지는지만 확인해 볼것이다.
+
+=== 도메인 주소를 인터넷 주소로 변환 ===
+도메인 주소에 대한 인터넷주소의 변환은 2가지 방법을 따른다. 즉 /etc/resolv.conf 를 이용해서 외부 도메인주소에 대한 인터넷주소를 가져오는 것과, /etc/hosts 를 이용해서 인터넷주소를 가져오는 것이다. 엄밀히 말하자면 2가지 방법이 있는게 아니고, 우선 /etc/hosts 의 호스트 정보를 참조하고 없을경우 /etc/resolv.conf 를 참조하는 순서를 따른다.
+
+이번장에서는 이 순서에 따른 인터넷주소를 가져오는 방법에 대한 설명을 할것이다.
+
+=== resolv.conf 참조 ===
+어플리케이션에서 도메인 주소를 받았다면 이 도메인주소에 대응하는 인터넷주소를 얻어와야 한다. 이 작업은 소켓(:12) 함수인 gethostbyname(:3)함수를 이용하면 된다.
+
+{{{#!plain
+#include <netdb.h>
+
+struct hostent *gethostbyname(const char *name);
+}}}
+위 함수를 실행하면 주소 목록을 담고 있는 hostent 구조체의 포인터를 돌려 준다. 이 구조체는 다음과 같은 정보들을 가지고 있으며, 이 정보들을 이용해서 주어진 도메인 주소 name 의 인터넷주소 목록을 얻어올수 있다.
+{{{#!plain
+struct hostent
+{
+    char *h_name;         /* 호스트의 공식 이름 */
+    char **h_aliases;     /* 별칭 리스트 */
+    int  h_addrtype;      /* 호스트 주소 타입 */
+    int  h_length;        /* 주소의 길이 */ 
+    char **h_addr_list;   /* 주소 리스트 */
+}
+}}}
+
+DNS는 서버/클라이언트 모델을 따르므로, 도메인 변환 서비스를 요청할 서버의 정보를 알고 있어야 한다. 리눅스(:12) 운영체제(:12)는  /etc/resolv.conf에 DNS 서버의 목록을 저장한다. gethostbyname 함수를 호출하면, resolv.conf에 등록된 서버에 요청을 한다. 다음은 reslov.conf의 내용이다. 
+{{{#!plain
+search localhost
+nameserver 211.62.36.242
+nameserver 164.124.101.2
+}}}
+
+만약에 인터넷상에 등록되지 않은 도메인이름에 대한 정보를 요청할경우 NULL을 돌려준다. 하나의 도메인 이름은 두개 이상의 인터넷 주소에 대응할 수 있기 때문에 h_addr_list는 목록을 char의 2차원 배열 구조를 가진다. 
+
+다음은 gethostbyname() 을 이용해서 인터넷 주소를 얻어오는 간단한 예제 프로그램이다.
+
+gethostbyname.c
+{{{#!plain
+#include <netdb.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+int main(int argc, char **argv)
+{
+    struct hostent     *myent;
+    struct in_addr    myen;
+    long int *add;
+
+    myent = gethostbyname(argv[1]);
+    if (myent == NULL)
+    {
+        perror("ERROR : ");
+        exit(0);
+    }
+
+    printf("%s\n", myent->h_name);
+
+    while(*myent->h_addr_list != NULL)
+    {
+        add = (long int *)*myent->h_addr_list;
+        myen.s_addr = *add;
+        printf("%s\n", inet_ntoa(myen));
+        myent->h_addr_list++;
+    }
+}
+}}}
+			
+다음은 위 프로그램으로 www.joinc.co.kr 과 www.yahoo.com를 테스트 했다.
+{{{#!plain
+[root@@localhost test]# ./gethostbyname www.joinc.co.kr
+www.joinc.co.kr
+211.234.96.147
+[root@@localhost test]# ./gethostbyname www.yahoo.com  
+www.yahoo.akadns.net
+66.218.71.83
+66.218.71.84
+66.218.71.86
+66.218.71.87
+66.218.71.89
+66.218.71.80
+66.218.71.81
+}}}
+			
+각 도메인에 할당된 주소정보를 제대로 가져오고 있음을 알수 있다.
+
+=== /etc/hosts 참조 ===
+앞서 언급했듯이 gethostbyname() 을 호출할경우 우선적으로 /etc/hosts 의 호스트 정보를 찾게 되고 정보가 없을경우 /etc/reslov.conf 를 참조하게 된다. 다음은 테스트를 위한 /etc/hosts 정보이다.
+
+{{{#!plain
+192.168.1.102	gateway	
+192.168.1.103	test.web.co.kr	
+}}}
+				
+위의 프로그램을 실행시켜 보면 다음과 같은 결과를 보여줄것이다.
+{{{#!plain
+[root@@coco test]# ./gethostbyname gateway       
+gateway
+192.168.1.102
+[root@@coco test]# ./gethostbyname test.web.co.kr
+test.web.co.kr
+192.168.1.103
+}}}
+
+/etc/hosts는 지역 네트워크에서 사용할 도메인 시스템을 만들기 위해서 유용하게 사용할 수 있다. 약 100대 정도의 검색을 위한 시스템으로 구성된 내부 네트워크가 있다고 가정해 보자. 이들을 어떻게 관리할 것인가 ? 점표기 방식 인터넷 주소로 ? 그건 너무 번거롭다. 알파벳을 이용한 도메인 이름을 사용하는게 나을 것이다. 이 도메인 이름은 단지 내부에서만 사용할 것이므로 내부 호스트들 간에 /etc/hosts 정보만 동기화 시키면 된다. 대략 다음과 같은 구성이 가능할 것이다.   
+{{{#!plain
+# 검색을 위한 컴퓨터 시스템
+192.168.0.2 search1.mycorp.co.kr
+192.168.0.3 search2.mycorp.co.kr
+192.168.0.4 search3.mycorp.co.kr
+...
+
+# 색인을 위한 컴퓨터 시스템
+192.168.0.51 indexer1.mycorp.co.kr
+192.168.0.52 indexer2.mycorp.co.kr
+192.168.0.53 indexer3.mycorp.co.kr
+}}}
+관리하기가 훨씬 용이해 졌다.
+
+=== 인터넷 주소를 이진 데이터로 변환 ===
+때때로 우리는 점표기 인터넷 주소를 이진 인터넷 주소로 변환해야될 때가 있다.
+
+이 변환 작업은 소켓 함수 inet_addr(:3)를 이용하면 된다.
+{{{#!plain
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h> 
+
+unsigned long int inet_addr(const char *cp);
+}}}
+이 함수는 매개 변수로 넘어온 점 표기 방식 인터넷 주소를 인터넷바이트 순서를 따르는 32bit 이진 데이타 형태로 변환 한다. 
+
+다음은 간단한 예제이다.
+
+{{{#!plain
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h<
+#include <unistd.h>
+ 
+int main(int argc, char **argv)
+{
+    unsigned long int bin_addr;     
+    int dot_addr[4]; 
+ 
+    bin_addr = inet_addr(argv[1]);
+ 
+    printf("%u\n", bin_addr);   
+}   
+}}}
+
+프로그램을 테스트해 보았다.
+{{{#!plain
+[root@@localhost test]# ./inet_addr 192.168.100.130
+2187634880
+}}}
+
+이것을 이진코드로 변경하면 아래와 같이 계산할 수 있다.
+{{{#!plain
+		10000010 01100100 10101000 11000000
+		130      100      168      192  
+}}}
+		
+기본적으로 inet_addr 을 했을경우 네트워크 바이트 순서가 적용되므로 리눅스의 리틀 엔디안(:12)과는 반대의 바이트 오더를 보여준다. 그러므로 위의 값은 192.168.100.130 으로 표현된다. 
+
+=== 이진 데이타를 인터넷주소로 변환 ===
+어플리케이션 측에서 도메인주소를 인터넷주소로 인터넷 주소를 다시 이진 데이타로 변경했다면 이제 데이타를 인터넷을 통해서 목적지까지 보내기 위한 모든 준비가 완료된 셈이다.
+
+이제 이데이타는 게이트 웨이를 거치고 라우터를 거치면서 최종목적지를 향하여 전송될것이고 목적지 인터넷주소가 인터넷에 물려있는 호스트라면 호스트까지 보내어질 것이고, 이것은 다시 해당 포트에 대기하고 있는 서버 어플리케이션으로 보내어질 것이다.
+
+이제 데이타를 받은 서버 어플리케이션 측에서는 이 데이타가 어느 인터넷 주소로부터 도착했는지 알아야 할것이다(보통의 경우 굳이 알필요 없긴하지만 여러가지 이유로 - 이를테면 디버깅 이라든지 인터넷 데이타 통계를 위해서 - 상대방의 인터넷주소정보를 가져와야 한다.) 이럴경우 이진데이타를 다시 인터넷주소로 변경해야 하는데 이때 사용하는 함수가 inet_ntoa(3) 이다.
+
+{{{#!plain
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+char *inet_ntoa(struct in_addr in);
+}}}
+
+다음은 inet_ntoa함수를 이용해서 점표기 방식 인터넷 주소를 가져오는 예제다.
+{{{#!plain
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+int main(int argc, char **argv)
+{
+	char *addr;	
+	struct in_addr in;	
+	unsigned long int bin_addr;
+
+	bin_addr = inet_addr(argv[1]);
+
+	in.s_addr = bin_addr; 
+	printf("%u\n", in.s_addr);
+	addr = inet_ntoa(in);
+
+	printf("address is %s\n", addr);
+}
+}}}
+
+=== 결론 ===
+도메인이름 변환 과정을 그림으로 묘사했다. 실제 인터넷 주소는 이진 인터넷 주소가 사용되겠지만, 쉬운 묘사를 위해서 점표기 방식 인터넷 주소를 사용했다.
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1gISM3f6B3FD4ZvKu4ELVEP58EbB2-PRDI0c5vfez1O8&amp;w=515&amp;h=304">
+}}}
+ 1. 사용자가 웹 브라우저의 주소창에 www.joinc.co.kr를 입력했다.
+ 1. 먼저 /etc/hosts를 검색한다. 
+    * www.joinc.co.kr에 대한 주소 정보가 저장되어 있지 않다고 가정하자.
+ 1. /etc/hosts에서 필요한 정보를 찾지 못했으므로 /etc/resolv.conf에 등록된 서버로 DNS 요청을 한다. 
+ 1. DNS 서버는 데이터 베이스에서 www.joinc.co.kr에 대한 인터넷 주소값을 가져온다.
+ 1. DNS 서버로 부터 인터넷 주소를 받은 웹 브라우저는 해당 주소로 연결해서 HTML(:12) 페이지를 요청한다. 
+
+[[tag(네트워크:::프로그래밍,소켓,C,DNS)]]  
+[[Category(5)]]
+@

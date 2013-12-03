@@ -1,0 +1,42 @@
+#title HTML5 Server-Send Events 
+
+== Server-sent events ==
+Server-Sent Events(이하 SSE)는 HTTP 연결을 이용해서 웹브라우저로 데이터를 push하는 기술이다. SSE는 초기에 클라이언트가 서버에 연결했을 때, 데이터를 지속적으로 보내기 위한 방법을 설명하는 표준이다. SSE로 연결이 되면 서버는 SSE 규약에 따라서 연결을 끊거나 하는 일 없이 계속해서 데이터를 전송할 수 있다. 어디까지나 클라이언트측 사양이기 때문에 웹서버가 SSE를 위해서 따로 준비해야 할 건 없다. 그냥 SSE 규격에 맞춰서 데이터를 보내면 그만이다. 
+
+새로운 데이터는 Javascript API를 이용해서 비동기적으로 읽을 수 있다. 단방향으로 데이터를 push하는 기술이라는 점에서 multipart streaming와 매우 비슷한 기술이라고 할 수 있다.
+
+=== 서버측 준비 사항 ===
+클라이언트 브라우저에 SSE 통신을 할 것이라는 걸 알려줘야 한다. Contnet-Type 필드에 명시할 수 있다.
+{{{#!plain
+<?php
+header('Content-Type: text/event-stream');
+header('Cache-Control: no-cache');
+?>
+}}}
+
+=== SSE 형식 ===
+클라이언트에 보내는 메시지는 "data:"뒤에 넣어서 보내면된다. 줄이 끝났다는 것은 두개의 "\n"으로 표현할 수 있다. 
+{{{#!plain
+data: My message\n\n
+}}}
+클라이언트에는 "My message"가 전송된다.
+
+두 줄이상의 메시지를 보내려면 "\n"을 이용 하면된다.
+{{{#!plain
+data: First line\n
+data: Second line\n\n
+}}}
+클라이언트에는 "First line\nSecond line"이 전송된다.
+
+여러 줄로 구성되는 JSON 데이터는 다음과 같이 전송할 수 있다.
+{{{#!plain
+data: {\n
+data: "msg": "hello world",\n
+data: "id": 12345\n
+data: }\n\n
+}}}
+
+=== SSE와 multipart streaming ===
+== 참고 ==
+ * [http://www.w3schools.com/html/html5_serversentevents.asp w3school.com Server-Send Events]
+ * [http://en.wikipedia.org/wiki/Server-sent_events Wikipedia Server-send events]

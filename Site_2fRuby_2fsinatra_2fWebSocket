@@ -1,0 +1,179 @@
+#title Sinatra websocket
+
+[[TableOfContents]]
+== Sinatra WebSocket ==
+[wiki:man/12/websocket WebSocket]을 사용해보기로 했다. 메시지 기반의 채팅서버나 만들어봐야지.
+
+테스트 진행을 위해서 웹소켓을 지원하는 웹 서버를 설치하기로 했다. 먼저 [wiki:man/12/Nginx Nginx]를 살펴보기로 했다. (2013년 10월)현재 우분투 13.04에 설치된 nginx의 버전은 1.2.6이다. 하지만 안타깝게도 1.2.6은 웹소켓을 지원하지 않는다고 한다. 최신버전인 1.3.3은 지원한다고 하는데, 설치하기 귀찮아서 포기하기로 했다.  
+
+다음으로 아파치 웹서버를 살펴보기로 했다. 검색을 했더니, 뭔가 설정이 복잡한 것 같다. 그래서 포기했다. 나는 웹소켓 기능을 테스트하는게 목적이지 삽질이 목적은 아니다. 모든 삽질은 사양한다. 
+
+혹시나 해서 [wiki:Site/Ruby/sinatra sinatra]가 웹소켓을 지원하는지 확인해 봤는데, 지원한단다. 그래서 sinatra를 이용해서 웹소켓을 테스트하기로 했다.
+
+== em-websocket를 이용한 구현 ==
+=== 테스트를 위한 각종 gem 설치 ===
+{{{#!plain
+# gem install em-websocket
+Building native extensions.  This could take a while...
+Fetching: http_parser.rb-0.5.3.gem (100%)
+Building native extensions.  This could take a while...
+Fetching: em-websocket-0.5.0.gem (100%)
+Successfully installed eventmachine-1.0.3
+Successfully installed http_parser.rb-0.5.3
+Successfully installed em-websocket-0.5.0
+3 gems installed
+Installing ri documentation for eventmachine-1.0.3...
+Installing ri documentation for http_parser.rb-0.5.3...
+Installing ri documentation for em-websocket-0.5.0...
+Installing RDoc documentation for eventmachine-1.0.3...
+Installing RDoc documentation for http_parser.rb-0.5.3...
+Installing RDoc documentation for em-websocket-0.5.0...
+}}}
+
+'''thin''' 웹 서버 설치
+{{{#!plain
+# gem install thin
+}}}
+
+=== 테스트 코드 ===
+{{{#!plain
+# cat websocket.rb
+require 'rubygems'
+require 'em-websocket'
+require 'yajl'
+require 'sinatra/base'
+require 'thin'
+
+EventMachine.run do
+        class App < Sinatra::Base
+                get '/' do
+                end
+        end
+
+        @channel = EM::Channel.new
+        EventMachine::WebSocket.start(:host => '0.0.0.0', :port => 8080) do |ws|
+        ws.onopen {
+                sid = @channel.subscribe { |msg| ws.send msg }
+                @channel.push "#{sid} connected!"
+
+                ws.onmessage { |msg|
+          @channel.push "<#{sid}>: #{msg}"
+        }
+
+        ws.onclose {
+          @channel.unsubscribe(sid)
+        }
+      }
+
+  end
+
+  App.run!({:port => 3000})
+end
+}}}
+
+실행
+{{{#!plain
+# ruby websocket.rb 
+== Sinatra/1.4.3 has taken the stage on 3000 for development with backup from Thin
+}}}
+
+em-websocket는 sinatra와는 관계가 없는 독립적인 라이브러리다. 따라서 하나의 포트로 일반 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 연결과 웹소켓을 동시에 처리하도록 구현할 수는 없다. 웹소켓은 HTTP가 아닌 ws프로토콜을 사용하기 때문에 포트번호가 달라진다고 해서 개발에 문제가 될게 없긴 하다. 하지만 sinatra와 같은 프레임워크와 함께 사용하기는 좀 애매모호하다. 뭐랄까! 좀 따로논다는 느낌이든다. 그래서 em-websocket은 대략 살펴보는 정도로만 만족하기로 했다.  
+
+== sinatra-websocket ==
+역시 sinatra에서 사용할 수 있는 모듈이 있었다.
+=== 설치 ===
+sinatra-websocket는 sinatra에서 사용할 수 있는 전용의 웹소켓 모듈이다. gem으로 간단하게 설치할 수 있다.
+{{{#!plain
+# gem install sinatra-websocket
+}}}
+
+=== 예제 프로그램 ===
+view를 포함한 간단한 chat 프로그램을 만들었다.
+{{{#!plain
+# encoding: utf-8
+require 'sinatra-websocket'
+require 'erubis'
+
+set :sockets, []
+get "/" do
+    @title = "Welcome to MyApp"
+    session[:id] = "yundream"
+    haml :main
+end
+
+get "/id" do
+    @title = "Welcome #{session[:id]}"
+    haml :main
+end
+
+get '/chat' do
+    id=session[:id]
+    puts "myid : #{id}"
+    if !request.websocket?
+        erb :index
+    else
+        request.websocket do |ws|
+            ws.onopen do
+                ws.send("Hello World!")
+                settings.sockets << ws
+            end
+            ws.onmessage do |msg|
+                msg = "#{id}: #{msg}"
+                EM.next_tick{settings.sockets.each{|s| s.send(msg)}}
+            end
+            ws.onclose do
+                puts "websocket closed"
+                settings.sockets.delete(ws)
+            end
+        end
+    end
+end
+}}}
+이 웹 애플리케이션은 연결된 모든 웹소켓에 메시지를 출력한다. 일단 sinatra의 routes와 잘 어울리는 모양새다. 포트번호 역시 HTTP 포트번호를 함께 사용해서 깔끔하다. 
+
+다음은 index.erb파일이다.
+{{{#!plain
+<html>
+  <body>
+     <h1>Simple Echo & Chat Server</h1>
+     <form id="form">
+       <input type="text" id="input" value="send a message"></input>
+     </form>
+     <div id="msgs"></div>
+  </body>
+
+  <script type="text/javascript">
+    window.onload = function(){
+      (function(){
+        var show = function(el){
+          return function(msg){ el.innerHTML = msg + '<br />' + el.innerHTML; }
+        }(document.getElementById('msgs'));
+
+        var ws       = new WebSocket('ws://' + window.location.host + window.location.pathname);
+        ws.onopen    = function()  { show('websocket opened'); };
+        ws.onclose   = function()  { show('websocket closed'); }
+        ws.onmessage = function(m) { show('websocket message: ' +  m.data); };
+
+        var sender = function(f){
+          var input     = document.getElementById('input');
+          input.onclick = function(){ input.value = "" };
+          f.onsubmit    = function(){
+            ws.send(input.value);
+            input.value = "send a message";
+            return false;
+          }
+        }(document.getElementById('form'));
+      })();
+    }
+  </script>
+</html>
+}}}
+
+== 웹 브라우저로 테스트 ==
+'''Simple Web Socket'''이라는 크롬 플러그인을 이용해서 테스트를 진행했다. 간단하게 테스트하기 좋은 툴이다.
+
+https://lh6.googleusercontent.com/-Y5ytE_5-ZBs/Ul65HDpfAbI/AAAAAAAADVE/igEabXteQQY/s400/websocket01.png
+
+== 참고 ==
+  * [https://github.com/igrigorik/em-websocket em-websocket]
+  * [https://github.com/simulacre/sinatra-websocket sinatra-websocket]

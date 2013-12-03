@@ -1,0 +1,294 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2013.11.03.13.53.03;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.11.03.13.51.00;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.11.03.13.49.01;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.11.02.15.30.46;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.11.02.10.00.44;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.10.31.15.14.30;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fPython_2fDJango_2fTutorial01
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title Django - 설치 및 Hello World 웹 서비스 만들기  
+
+[[TableOfContents]]
+== 왜 Django == 
+그동안 웹 애플리케이션은 [wiki:Site/Ruby/sinatra Ruby sinatra]로 개발해왔다. 루비쪽은 ROR이 워낙에 유명하긴 하지만 (나는)웹 애플리케이션 전문적으로 개발하진 않는다. 필요할 때, 프로토타이핑이나 POC 정도 하는게 목적이라서 가볍고 사용하기 편한 프레임워크를 찾다보니 ROR이 아닌 sinatra를 선택하게 됐다. 
+
+그러다가 django를 해야 하는 상황에 처했다. 이제와서 python 기반의 웹 프레임워크를 그것도 애초 목적에 맞지도 않는 '''풀 프레임워크인 django'''를 공부하려 하느냐라고 물을 수도 있겠다. 이유를 설명하자면.. '''나도 django 하기 싫다. 그런데 회사 프로젝트가 django 기반이라서 하는'''거다.
+
+=== Django 간단 소개 ===
+Django는 파이선 기반의 웹 프레임워크로 실용적인 디자인을 바탕으로 유려한 모양의 웹 애플리케이션을 빠르게 개발할 수 있도록 도와준다. 
+
+== Django 설치 ==
+=== 환경 ===
+ * 하이퍼바이저 : [wiki:Site/cloud/virtualbox virtualbox 4.2.16]
+ * 운영체제 : Ubuntu 리눅스 13.04 server
+ * python 버전 : 2.7.5+  
+
+=== 설치 ===
+먼저 '''pip'''를 설치한다. pip는 python 패키지 관리자로 루비의 '''[wiki:Site/Ruby/gemCommandReference gem]'''쯤 되는 놈이다. 
+{{{#!plain
+# apt-get install python-pip
+}}}
+
+pip를 이용해서 django를 설치한다.
+{{{#!plain
+# pip install django
+Downloading/unpacking django
+  Downloading Django-1.5.5.tar.gz (8.1MB): 8.1MB downloaded
+  Running setup.py egg_info for package django
+...
+}}}
+
+== Django 애플리케이션 개발 ==
+=== Django 와 MVC ===
+[wiki:man/12/mvc MVC 패턴] 참조
+
+=== Django 애플리케이션 서버 실행 ===
+웹 애플리케이션을 배포하기 위해서 "/opt/webapp" 디렉토리를 만들고 django-admin을 이용해서 "testapp" 프로젝트를 만들었다.  
+{{{#!plain
+# mkdir /opt/webapp
+# cd /opt/webapp
+# django-admin.py startproject testapp 
+}}}
+
+'''testapp''' 디렉토리가 만들어졌다. 디렉토리 구조는 다음과 같다. 
+{{{#!plain
+# tree testapp/
+testapp/
+├── testapp
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+└── manage.py
+}}}
+
+testapp을 실행했다.
+{{{#!plain
+# python manage.py runserver
+Validating models...
+
+0 errors found
+November 02, 2013 - 05:53:27
+Django version 1.5.5, using settings 'helloworld.settings'
+Development server is running at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+}}}
+웹브라우저로 테스트를 해보자.
+
+https://lh5.googleusercontent.com/-6bUULF0T-rY/UnTag20Nv1I/AAAAAAAADWg/BI-QxzknzVE/s640/django01.png
+
+=== Hello World ===
+Django 서버를 실행했으니, 이제 웹 애플리케이션을 개발해보려 한다. 첫번째 애플리케이션은 '''helloworld'''앱으로 브라우저로 '''/hello'''을 요청하면 '''Hello world!!!'''를 출력하는 간단한 일을 한다. 
+
+먼저 view 파일을 만들자.
+{{{#!plain
+# cat views.py
+from django.http import HttpResponse
+def hello(request):
+        return HttpResponse("Hello world!!!")
+}}}
+
+이제 urls.py를 수정한다. 핵심은 브라우저가 /hello를 요청하면 views의 hello 메서드를 호출하는 거다. 
+{{{#!plain
+# cat urls.py
+from django.conf.urls import patterns, include, url
+
+from testapp.views import hello
+# Uncomment the next two lines to enable the admin:
+# from django.contrib import admin
+# admin.autodiscover()
+
+urlpatterns = patterns('',
+        url(r'^hello/$', hello)
+)
+}}}
+서버를 띄우고 브라우저로 localhost:8000/hello를 요청하면 "Hello world!!!"가 출력되는 걸 확인할 수 있다.  
+
+현재 루트디렉토리(localhost:8000/)를 요청하면 '''404 NOT Found'''가 출력된다. 루트디렉토리에 대한 요청도 처리하기를 원한다면 다음과 같이 url을 추가하면 된다. url패턴은 python 정규표현식을 따른다. 
+{{{#!plain
+# cat urls.py
+from django.conf.urls import patterns, include, url
+
+from testapp.views import hello, index
+# Uncomment the next two lines to enable the admin:
+# from django.contrib import admin
+# admin.autodiscover()
+
+urlpatterns = patterns('',
+        url(r'^$', index),
+        url(r'^hello/$', hello)
+)
+}}}
+
+물론 view에 index 메서드는 추가해줘야 한다.
+{{{#!plain
+from django.http import HttpResponse
+def hello(request):
+        return HttpResponse("Hello world")
+def index(request):
+        return HttpResponse("Home page")
+}}}
+
+=== URLconf 설정 ===
+Hello world예제를 만들어봤더니, 대략의 소프트웨어 개발 패턴이 눈에 띈다. '''URLconf'''를 이용해서 URL과 메서드를 느슨하게 결합했다는 점이다. URL은 '''지시'''라고 볼 수 있는데, '''지시'''와 '''코드'''를 느슨하게 결합함으로써, 다른 지시 혹은 코드에 영향을 주지 않는 소프트웨어의 개발이 가능하다. 
+
+Hello world 예제를 확장해 보자. 현재 시간을 알려주는 기능을 추가하기로 했다. 
+{{{#!plain
+# cat views.py 
+import datetime
+from django.http import HttpResponse
+def hello(request):
+        return HttpResponse("Hello world")
+def index(request):
+        return HttpResponse("Home page")
+def currenttime(request):
+        d = datetime.datetime.now()
+        return HttpResponse("Current Time : {0}".format(d))
+
+# cat
+from django.conf.urls import patterns, include, url
+from testapp.views import hello, index, currenttime
+
+urlpatterns = patterns('',
+        url(r'^$', index),
+        url(r'^time/$', currenttime),
+        url(r'^hello/$', hello)
+)
+}}}
+
+
+== 참고 ==
+  * [http://youngrok.com/Django_vs_Rails 영록 Django vs Rails]
+  * [http://www.djangobook.com/en/2.0/index.html Django Book]
+[[Tag(Django,python)]]
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 1
+a5 1
+그동안 웹 애플리케이션은 Ruby sinatra로 개발해왔다. 루비쪽은 ROR이 워낙에 유명하긴 하지만 (나는)웹 애플리케이션 전문적으로 개발하진 않는다. 필요할 때, 프로토타이핑이나 POC 정도 하는게 목적이라서 가볍고 사용하기 편한 프레임워크를 찾다보니 ROR이 아닌 sinatra를 선택하게 됐다. 
+d14 1
+a14 1
+ * 하이퍼바이저 : virtualbox 4.2.16 
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d19 1
+a19 1
+먼저 '''pip'''를 설치한다. pip는 python 패키지 관리자로 루비의 '''gem'''쯤 되는 놈이다. 
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a2 1
+<!> 미완성
+d5 3
+a7 1
+그동안 웹 애플리케이션은 Ruby sinatra로 개발해왔다. 루비쪽은 ROR이 워낙에 유명하긴 하지만 웹 애플리케이션 전문적으로 개발할 것도 아니고 필요할 때, 프로토타이핑이나 하는게 목적이라서 가볍고 사용하기 편한 프레임워크를 찾다보니 sinatra를 선택하게 됐다. 
+a8 1
+그래 이제와서 python 기반의 웹 프레임워크를 그것도 애초 목적에 맞지도 않는 풀 프레임워크인 django를 공부하려 하느냐라고 물을 수도 있겠다. 이유는 이렇다 '''나도 django 하기 싫다. 그런데 회사 프로젝트가 django 기반이라서 하는 거다'''  
+d99 1
+a99 1
+현재 루트디렉토리(localhost:8000/)를 요청하면 '''404 NOT Found'''가 출력된다. 루트디렉토리에 대한 요청도 처리하기를 원한다면 다음과 같이 url을 추가하면 된다.  
+d124 28
+d154 1
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a11 3
+대표적인 특징은 다음과 같다.
+  * ORM(Object - relation mapper)
+
+d34 2
+a35 2
+=== Hello World ===
+그래 언어든 프레임워크든 배울려면 일단 '''Hello World'''를 찍어봐야지. 
+d37 2
+a38 1
+웹 애플리케이션을 배포하기 위해서 "/opt/webapp" 디렉토리를 만들고 django-admin을 이용해서 "helloworld" 프로젝트를 만들었다.  
+d42 1
+a42 1
+# django-admin.py startproject helloworld
+d45 1
+a45 1
+'''helloworld''' 디렉토리가 만들어졌다. 디렉토리 구조는 다음과 같다. 
+d47 3
+a49 3
+# tree helloworld/
+helloworld/
+├── helloworld
+d56 67
+a122 2
+디렉토리를 살펴봐야 겠다.
+  * helloworld/ : 웹 애플리케이션을 담는 컨테이너다. 이름이 중요하지는 않다.  
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d9 5
+d61 2
+@

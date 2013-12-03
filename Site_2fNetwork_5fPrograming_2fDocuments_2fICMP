@@ -1,0 +1,603 @@
+#title ICMP 프로그래밍
+
+{{{#!html
+<HTML
+><HEAD
+><TITLE
+>ICMP 프로그래밍</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.59"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>ICMP 프로그래밍</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN9"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN15"
+>ICMP 프로토콜에 대해서</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN17"
+>ICMP 의 사용목적</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN22"
+>ICMP 프로토콜의 구조</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN66"
+>ICMP 프로그래밍</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN9"
+>1&#51208;. 소개</A
+></H1
+><P
+>		이문서는 실제로 ICMP 를 어떻게 이용할수 있는지에 대한 내용을 담고 있다. 
+		간단한 ICMP 프로토콜에 대한 개요를 설명한후에 socket 를 이용해서 어떻게 
+		ICMP 프로토콜의 사용이 가능한지에 대해서 얘기하게 될것이다.  
+	</P
+><P
+>		이 문서는 여러분이 네트웍 프로토콜들과 TCP/IP 4계층과 socket 프로그래밍 환경에 
+		대한 기본적인 이해를 하고 있다는 가정하에 만들어 졌다. 이들 내용은 
+		이 사이트에서 여러개의 문서에 걸쳐서 다루고 있다. 
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=Search&query=&topic=35&author="
+TARGET="_top"
+>네트웍 프로그래밍</A
+> 섹션과 
+		<A
+HREF="http://www.joinc.co.kr/modules.php?name=Search&query=&topic=37&author="
+TARGET="_top"
+>TCP/IP</A
+> 섹션의 문서들을 참고하기 바란다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN15"
+>2&#51208;. ICMP 프로토콜에 대해서</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN17"
+>2.1&#51208;. ICMP 의 사용목적</A
+></H2
+><P
+>			ICMP 는 <B
+CLASS="EMPHASIS"
+>Inernet Control Message Protocol</B
+> 의 줄임말이다. 
+			ICMP 프로토콜은 보통 다른 호스트나 게이트웨이 와 연결된 
+			네트웍에 문제가 있는지 확인하기 위한 목적으로 
+			주로 사용된다. 
+		</P
+><P
+>			ICMP 를 이용한 가장 유명한 프로그램으로는 ping 프로그램이 있다. 
+			우리는 ping 프로그램을 애용해서 특정한 게이트웨이, 호스트, 라우터 등이 
+			제대로 작동을 하고 있는지 등을 조사하며, ICMP 요청에 대한 응답시간을 검사 
+			함으로써 네트웍 상태도 어느정도 확인할수 있다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN22"
+>2.2&#51208;. ICMP 프로토콜의 구조</A
+></H2
+><P
+>			ICMP 메시지는 기본적으로 IP header 를 이용해서 보내어진다. IP header 정보를 
+			보면 (<A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=54"
+TARGET="_top"
+>IP 자세히보기</A
+> 를 참조하라), 9번째 필드가 protocol 을 위해서 사용되고 있음을 알수 
+			있을것이다. ICMP protocol 을 위해서는 "1" 을 사용한다. 
+		</P
+><P
+>			ICMP 는 다음과 같은 구조를 가진다. 첫번째 32 비트까지가 ICMP 헤더이며, 
+			나머지부분은 ICMP 데이타이다. 이 데이타 영역은 ICMP의 어떤 기능을 이용할것이냐에 
+			따라 다르게 설정될수 있다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#FFFFFF"
+WIDTH="100%"
+><TR
+><TD
+>
+<img src="https://docs.google.com/drawings/pub?id=1W5Aw2ptQWCOx3v7qSKf9IJqPhl4B_0ArrzUNN4htmMQ&amp;w=555&amp;h=152">
+</TD
+></TR
+></TABLE
+>
+			Type 필드에는 ICMP 오류 메시지의 종류를 식별하는 코드가 채워진다. 
+			Code 는 각 Type 종류에 대한 자세한 오류의 유형을 알려주기 위해서 사용된다. 
+			이 Type 에는 다음과 같은 종류가 있다.  
+			<DIV
+CLASS="TABLE"
+><A
+NAME="AEN28"
+></A
+><P
+><B
+>&#54364; 1. ICMP Type 필드 유형</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>icmp echo replay</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>icmp 요청에 대한 icmp 응답</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>3</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Destination Unreachable Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>수신지까지 메시지가 도착할수 없음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>4</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Source Quench Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>송신지 억제</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>5</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Redirect Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>재지시</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>8</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>icmp echo request</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>목적지 호스트에 ICMP 응답을 요청한다</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>11</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Time Exceeded Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>데이타그램 시간초과(TTL 초과)</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>12</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Parameter Problem Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>데이타그램에서의 파라메타 문제 </TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>13,14</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>Timestamp or Timestamp Reply Message</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>13:시간기록요청, 14:시간기록응답</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+		</P
+><P
+>			Code 필드는 위에서 말했듯이 Type 에 따라 각각 다른 값을 가진다. 
+			예를들어서 Type 3 번에 Code 0 번이 발생했을경우에는 
+			오류 메시지 종류는 "수신지까지 메시지가 도착할수 없음" 이며, 그 이유는 
+			Redirect datagrams for the Network, 즉 "네트웍을 획술할수 없음"이 된다. 
+			이문서에서는 각 ICMP Type 에 따른 Code 까지 설명하진 않겠다. 
+			이에 대한 자세한 내용은 <A
+HREF="http://www.faqs.org/rfcs/rfc792.html"
+TARGET="_top"
+>rfc729</A
+> 를 참고하기 바란다. 
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN66"
+>3&#51208;. ICMP 프로그래밍</A
+></H1
+><P
+>		그럼 이제 ICMP 를 이용해서 실제 프로그래밍을 해보도록 하겠다. 
+	</P
+><P
+>		ICMP 응답을 위해서 전송해야할 ICMP 헤더정보는 다음과 같다(rfc 문서에 정의되어 있음).  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |     Type      |     Code      |          Checksum             |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |           Identifier          |        Sequence Number        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |     Data ...
+   +-+-+-+-+-
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		그러므로 우리는 Type, Code, Checksum, Identfier, Sequence Number 를 
+		채워서 완전한 ICMP 패킷을 만들어줘야 한다. Type 는 8번이 될것이고, Code 
+		는 0, Checksum, Identifier, Sequence Number 은 적당히 만들어줘서 채워주면 될것이다.  		
+		Identifier 와 Sequence Number 는 
+		내가 보낸 ICMP 응답에 대한 메시지인지를 확인하기 위한 목적으로 사용한다. 만약 내가 
+		Identifier 를 120 으로 세팅해서 보냈다면, 수신된 ICMP 메시지의 Identifer 이 120인지를 
+		확인함으로써, 내가 보낸 ICMP 요청에 대한 응답인지를 확인가능하다. 여기에 Sequence Number 
+		를 이용함으로써, 패킷의 일련번호까지 확인할수 있다. 
+	</P
+><P
+>		그럼 실제 프로그래밍 과정을 통해서 확인해 보도록 하자. 일단 socket 를 만들때 
+		RAW 소켓(생소켓 혹은 날소켓이라고도 한다). ICMP 는 IP 와 같은 계층에 있음으로 
+		TCP/UDP 소켓을 이용한 접근은 불가능하기 때문이다. 어쩔수 없이 RAW 소켓을 이용해서 
+		직접 ICMP 헤더를 고쳐주어야 한다.  
+	</P
+><P
+>		icmp 헤더를 세팅하는건 icmp 구조체에 필요한 값을 써줌으로써 간단히 해결할수 있다. 
+		icmp 헤더구조체는 /usr/include/netinet/ip_icmp.h 에 선언되어 있다. 구조체를 보면 
+		상당히 많은 다양한 멤버 변수들을 가지고 있는데, 우리는 이들 값중 Type, Code, Checksum, 
+		Identifier, Sequence Number 만을 사용하면된다. 이들을 가르키는 멤버변수는 각각 
+		icmp_type, icmp_code, icmp_id, icmp_seq 이다. 
+	</P
+><P
+>		<B
+CLASS="EMPHASIS"
+>예제 : icmp_echo.c</B
+>
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>	
+#include &#60;stdlib.h&#62;
+#include &#60;string.h&#62;
+#include &#60;netinet/ip.h&#62;
+#include &#60;netinet/ip_icmp.h&#62;
+#include &#60;arpa/inet.h&#62;
+#include &#60;errno.h&#62;
+#include &#60;sys/socket.h&#62;
+#include &#60;stdio.h&#62;
+#include &#60;unistd.h&#62;
+
+int in_cksum(u_short *p, int n);
+
+int main(int argc, char **argv)
+{
+    int icmp_socket;
+    int ret;
+    struct icmp *p, *rp;
+    struct sockaddr_in addr, from;
+    struct ip *ip;
+    char buffer[1024];
+    int sl;
+    int hlen;
+    int ping_pkt_size;
+
+    icmp_socket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if(icmp_socket &#60; 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+
+    memset(buffer, 0x00, 1024);
+
+    p = (struct icmp *)buffer;
+    p-&#62;icmp_type=ICMP_ECHO;
+    p-&#62;icmp_code=0;
+    p-&#62;icmp_cksum=0;
+    p-&#62;icmp_seq=15;
+    p-&#62;icmp_id=getpid();
+
+    p-&#62;icmp_cksum = in_cksum((u_short *)p, 1000);
+    memset(&#38;addr, 0, sizeof(0));
+    addr.sin_addr.s_addr = inet_addr(argv[1]);
+    addr.sin_family = AF_INET;
+
+
+    ret=sendto(icmp_socket,p,sizeof(*p),MSG_DONTWAIT,(struct sockaddr *)&#38;addr, sizeof(addr));
+    if (ret&#60; 0)
+    {
+        perror("sendto error : ");
+    }
+
+    sl=sizeof(from);
+    ret = recvfrom(icmp_socket,buffer, 1024, 0, (struct sockaddr *)&#38;from, &#38;sl);  
+    if (ret &#60; 0)
+    {
+        printf("%d %d %d&#92;n", ret, errno, EAGAIN);
+        perror("recvfrom error : ");
+    }
+
+    ip = (struct ip *)buffer;
+    hlen = ip-&#62;ip_hl*4;
+    rp = (struct icmp *)(buffer+hlen);
+    printf("reply from %s&#92;n", inet_ntoa(from.sin_addr));
+    printf("Type : %d &#92;n", rp-&#62;icmp_type);
+    printf("Code : %d &#92;n", rp-&#62;icmp_code);
+    printf("Seq  : %d &#92;n", rp-&#62;icmp_seq);
+    printf("Iden : %d &#92;n", rp-&#62;icmp_id);
+    return 1;
+}
+
+int in_cksum( u_short *p, int n )
+{
+    register u_short answer;
+    register long sum = 0;
+    u_short odd_byte = 0;
+
+    while( n &#62; 1 )
+    {
+        sum += *p++;
+        n -= 2;
+    
+    }/* WHILE */
+
+
+    /* mop up an odd byte, if necessary */
+    if( n == 1 )
+    {
+        *( u_char* )( &#38;odd_byte ) = *( u_char* )p;
+        sum += odd_byte;
+    
+    }/* IF */
+
+    sum = ( sum &#62;&#62; 16 ) + ( sum &#38; 0xffff );    /* add hi 16 to low 16 */
+    sum += ( sum &#62;&#62; 16 );                    /* add carry */
+    answer = ~sum;                            /* ones-complement, truncate*/
+    
+    return ( answer );
+
+} /* in_cksum() */
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		in_cksum 함수는 다른 ICMP 를 이용하는 프로그램에서 공통적으로 사용된다. 
+		checksum 을 만들기 위한 알고리즘 정도로 생각하면 될것 같다. 
+		실제로 ping, aping, fping 등의 관련 어플리케이션에서 사용되어지고 있다.  
+	</P
+><P
+>		이제 위의 코드를 컴파일한후 테스트를 해보자.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@local ping]# ./icmp_echo 66.218.71.89
+reply from 66.218.71.89
+Type : 0 
+Code : 0 
+Seq  : 15 
+Iden : 2323
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		ICMP ECHO REPLY(Type 0) 로 ICMP ECHO(Type 8) 에 대한 응답이 왔음을 알수 있다. 
+		또한 Seq과 Iden값을 이용해서 icmp_echo 가 보낸 어플리케이션의 ICMP ECHO 
+		에 대한 응답임을 알수 있다. 
+	</P
+><P
+>		심심한데? tcpdump 를 이용해서 실제 패킷이 어떻게 이동하는지 알아보자. 아래는 
+		위의 결과를 tcpdump 한 화면이다. -x 는 16진수 코드로 출력받기 원할때 사용하는 
+		옵션이다.  
+		<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@coco ping]# tcpdump icmp -x
+11:08:00.763994 eth0 &#62; localhost &#62; w10.scd.yahoo.com: icmp: echo request (DF)
+                         4500 0030 0000 4000 4001 8b6f c0a8 6482
+                         42da 4759 0800 d5f6 1309 0f00 0000 0000
+                         0000 0000 0000 0000 0000 0000 0000 0000
+11:08:00.933994 eth0 &#60; w10.scd.yahoo.com &#62; localhost: icmp: echo reply (DF)
+                         4500 0030 8352 4000 3501 131d 42da 4759
+                         c0a8 6482 0000 ddf6 1309 0f00 0000 0000
+                         0000 0000 0000 0000 0000 0000 0000 0000
+...
+		</PRE
+></TD
+></TR
+></TABLE
+>
+		위의 dump 화면에서 하나의 문자는 4비트를 나타낸다. 
+		위의 dump 를 간단히 분석해 보자면 4500 ~ 4759 까지가 TCP 헤더이고, 
+		나머지 부분이 ICMP 헤더+데이타 부분임을 알수 있다(IP표준 헤더의 크기는 160 bit 
+		임으로). 
+		ICMP 헤더부분은 0800 에서 d5f6 까지의 부분이며(ICMP 표준 헤더크기는 32 bit 임으로), 
+		1309 이하가 ICMP 데이타 부분임을 알수 있다. 
+	</P
+><P
+>		
+		또한 우리는 IP 의 버전이 4 이고 프로토콜이 1을 사용하고 있음을 알수 있다. 
+		IP 헤더의 처음 4비트가 
+		Version 정보를 나타내므로 4500 의 4가 version 정보, 5가 IHL정보 임을 알수 
+		있다. 이런식으로 찾아보면 protocol 정보가 72bit 후에 존재하고 8bit 크기를 
+		가짐으로 dump 의 5번째 값인 4001 의 01 임을 알수 있다. 그러므로 
+		40 은 TTL 임을 알수 있을것이다. 또한 source address 는 c0a8 6482 
+		destination address 는 42da 4759 임을 유추해 낼수 있을것이다(IPv4 의 주소체계에서 
+		주소는 32비트 크기를 가짐으로). IP헤더 정보는 <A
+HREF="http://www.joinc.co.kr/modules.php?name=News&file=article&sid=54"
+TARGET="_top"
+>IP 자세히보기</A
+> 를 참조하기 바란다. 
+	</P
+><P
+>		그럼 ICMP 를 분석해보도록 하자. Type와 Code 는 각각 8bit 크기를 가짐으로 0800 이 
+		Type 와 Code 를 가리킴을 알수있다. d5f6 는 cheksum 이며 1309 가 바로 Identifier 이다. 
+		1309 가 정말로 우리가 입력한 Identifier 번호인 2323 인지 확인해보길 원한다면 
+		10 진수를 16진수로 변환 가능한 계산기를 이용해서 계산해 보면된다. 0f 는 우리가 
+		입력한 Sequence Number 15 임을 알수 있다.  
+	</P
+><P
+>		w10.scd.yahoo.com 에서 넘어온 ICMP ECHO REPLAY dump 화면의 Identifier 과 Sequence Number 가 
+		일치함을 알수 있다. 그러므로 우리는 해당 ICMP ECHO REPLAY 패킷이 우리가 전송한 ICMP ECHO에 
+		대한 응답 패킷임을 알수 있다. 
+	</P
+><P
+>		위 프로그램은 ICMP ECHO 체크를 위한 최소한의 기능만을 가지고 있다. 만약에 ICMP REPLAY 가 
+		되지 않는 IP에 대해서는 계속 블럭된 상태로 있게 될것이다. 이럴때는 기다리는 시간을 
+		체크하는 방법등을 이용해서 체크를 해주어야 할것이다.
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+}}}
+[[Category(5)]]

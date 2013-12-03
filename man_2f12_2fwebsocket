@@ -1,0 +1,197 @@
+#title websocket
+
+[[TableOfContents]]
+== Websocket ==
+=== HTTP의 단점 ===
+[wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 프로토콜의 가장 큰 장점중 하나는 "견고하면서도 간단하다"는 점이다. 프로토콜은 인간이 쉽게 이해할 수 있는 영문 알파벳으로 이루어지며, 필수 헤더 10개 정도면 왠만한 애플리케이션의 제작이 가능하다. 게다가 '''인터넷 역사상 가장 성공적인 프로토콜'''이기도 하다. 즉시 사용할 수 있는 광범위한 서버/클라이언트 애플리케이션들을 가지고 있다. 
+
+HTTP의 단점은 연결을 유지하지 않는 다는 점이다. 기본적으로 하나의 요청을 보내면, 응답을 받고 연결을 끊는 식으로 작동한다. 10번의 요청을 보내려면, 10번 연결을 맺고 끊는 과정을 거쳐야 한다. 게다가 모든 요청에 헤더파일이 중복해서 들어간다. 비효율적일 수 밖에 없다[[FootNote(TCP는 연결을 위해서 3번의 패킷교환이 필요하며, 완전한 종료를 위해서 4번의 패킷교환이 이루어져야 한다. 여기에는 상당히 많은 비용이 들어간다.)]].
+
+또 다른 문제는 "실시간 상호작용 성"이 떨어진다는 점이다. 예컨데, HTTP를 기반으로 채팅서버를 구현하려면 애로사항이 꽃핀다. Polling, Long Polling등과 같은 방법들을 이용해야 하는데, 효율적이지도 않고 깔끔하지도 않는 억지구현이다.
+
+=== Websocket 개요 ===
+[wiki:man/12/TCP TCP]와 마찬가지로 웹소켓은 full-duplex 통신[[FootNote(전 이중통신이라고 부른다. 수신과 송신을 동시에 처리할 수 있는 통신 방식을 의미한다.)]]을 지원한다. TCP와 다른 점이라면, bytes 스트림을 사용하지 않고 오로지 메시지 스트림만 이용한다는 점이다. 
+
+웹 소켓이 나오기전에는 Comet 채널을 이용해서 full-duplex 통신을 구현했지만, TCP 연결과정(Threeway handshake)에서의 오버헤드와 HTTP 오버헤드 때문에 비효율적이었다. 웹소켓은 HTTP를 기반으로 하면서도 HTTP의 문제점을 해결하는 것을 목표로 하고 있다. 
+
+=== 브라우저 지원 ===
+웹소켓은 2011년 [http://tools.ietf.org/html/rfc6455 RFC 6455]에 의해서 표준화 됐으며 웹소켓 API들은 W3C에 의해서 표준으로 채택됐다. 이후 브라우저들에서 지원하기 시작했다. 지금은 PC 브라우저들 뿐만 아니라 모바일 브라우저에서도 지원하고 있다. 조만간 거의 모든 브라우저들이 웹소켓을 지원할 것으로 기대된다. 
+
+https://lh3.googleusercontent.com/-d5L35-NO55o/UmUkmCOVTXI/AAAAAAAADVc/QSjtD0U9Uns/s640/websocket02.png
+
+출처 : http://caniuse.com/
+
+최신 브라우저의 대부분이 웹소켓을 지원하는 것 같다 그런데 안드로이드 브라우저가 웹 소켓을 지원하지 않는 건 좀 의외다. HTML5는 구글이 열심히 밀고 있지 않던가. ?
+
+=== 웹소켓 프로토콜 ===
+웹소켓은 HTTP를 기반으로 하지만 HTTP 프로토콜과는 전혀 다른 프로토콜이다. HTTP를 기반으로 한다는 것의 의미는 '''웹소켓 연결을 맺는 과정에 HTTP가 개입'''한다는 의미다. Handshake 과정이 성공적으로 끝나면, HTTP를 웹소켓 프로토콜로 바꾸는 '''protocol switching'''과정을 진행한다. 이제 웹소켓을 위한 새로운 소켓이 만들어지고, 이 소켓을 이용해서 통신을 한다. 이때 사용하는 프로토콜은 '''ws'''와 '''wss'''프로토콜이다. 
+  * ws : 일반적인 웹소켓
+  * wss : 데이터 보안을 위해서 SSL을 적용한 프로토콜. ws가 HTTP라면 wss는 HTTPS에 대응한다고 보면 된다. 
+
+웹소켓을 호출할 때는 "ws://"를 사용한다. 예를 들자면 "ws://localhost/chat"와 같이 사용한다.
+
+웹소켓 통신에 사용하는 데이터는 '''UTF8'''인코딩을 따르며, 0x00과 0xff 사이에 데이터를 실어보낸다.  
+==== 웹소켓 Handshake 과정 ====
+웹소켓 Handshake 과정, 즉 웹소켓을 초기화하기 위한 과정은 HTTP로 진행된다. 아래 그림은 웹소켓 handshake가 이루어지는 과정을 보여준다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14n0nLH5NZWNNHRgFUpg0KHbXGEK-RX2npA-AnzG3sl4/pub?w=460&amp;h=410">
+}}}
+
+HTTP로 웹소켓을 사용할 수 있는지 서버에게 묻는다.  
+{{{#!plain
+GET /mychat HTTP/1.1
+Host: server.example.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
+Sec-WebSocket-Protocol: chat
+Sec-WebSocket-Version: 13
+Origin: http://example.com
+}}}
+HTTP기반의 TCP 연결을 websocket 기반으로 upgrade하겠다고 요청한다.
+
+웹소켓을 지원하는 웹서버의 응답이다.
+{{{#!plain
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: HSmrc0sMlYUkAGmm5OPpG2HaGWk=
+Sec-WebSocket-Protocol: chat
+}}}
+HTTP를 websocket으로 switching 하겠다고 응답한다. 새로운 웹소켓이 만들어지고, 웹소켓 프로토콜을 이용해서 데이터 통신을 하다.
+
+=== 웹소켓과 HTTP Comet ===
+웹소켓개발 이전에도 HTTP를 이용해서 서버측과 실시간으로 데이터를 주고바아야 하는 요구는 계속 있어왔다. 그래서 임기응변식으로 만든 기술이 '''HTTP Comet'''다. Comet는 특정기술에 대한 이름은 아니고 HTTP상에서 데이터를 push를 하기 위한 방식자체를 일컫는 기술 모두를 일컫는다. 
+
+Comet구현을 위해서 일반적으로 사용하는 방식은 '''Long Polling'''과 '''Streaming'''이다. 
+
+==== LongPolling vs websocket ====
+Long Polling는 이름에서 처럼 데이터가 있는지 주기적으로 Polling을 하돼, polling할 데이터가 있을 때까지 오랫동안 기다리는 방식으로 네트워크 자원을 효율적으로 사용하는 기술이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1GCWVdfsMoMp2uIME-uv2vnR-7CH_lh4aLGOuIipqiEw/pub?w=541&amp;h=366">
+}}}
+  1. 웹서버로 HTTP 요청을 보낸다.
+  1. 요청을 받은 웹서버는 데이터가 있을 때까지(혹은 이벤트가 발생할 때까지) 기다린다.
+  1. 데이터가 있으면 HTTP 응답을 한다. 
+  1. 응답을 받은 웹브라우저는 데이터를 출력하고 HTTP 연결을 끊는다.
+  1. 다시 HTTP 요청을 보낸다.
+  1. 기다린다.
+  1. 계속 반복한다.
+일정시간 간격으로 주기적으로 Polling하는 것보다는 효율적이지만 여전히 비효율적이다. 
+
+'''웹소켓은 요청을 위해서 새로운 연결을 만들 필요가 없고, 추가적인 헤더가 필요없기 때문에 Long Polling 방식에 비해서 효율적으로 작동한다'''
+
+==== Multipart streaming vs websocket ====
+Multipart streaming은 '''multipart/x-mixed-replace'''를 이용해서, 연결을 끊지 않고 하나의 HTTP 연결에서 데이터를 보내는 방식이다. 서버측은 Content-type를 multipart/x-mixed-replace로 하고 스트림 메시지의 boundary를 구분하기 위한 '''boundary'''문자를 정의하면 된다. 대략 아래와 같은 모습이다. 
+{{{#!plain
+HTTP/1.1 200 OK
+Date: Fri, 08 Jul 2011 00:59:41 GMT
+Server: Apache/2.2.4 (Unix) PHP/5.2.0
+Content-Type: multipart/x-mixed-replace;boundary=myboundarystring
+
+--myboundarystring
+Content-type: text/html
+
+Chating message 1
+--myboundarystring
+Content-type: text/html
+
+Chating message 2
+}}}
+데이터를 일방적으로 보내는(말그대로 streaming) 용도라면 쓸만하다. 하지만 하나의 TCP 포트로 읽기와 쓰기를 동시에 할 수 있는 웹소켓과 달리, 읽기만 할 수 있기 때문에 상호작용하는 서비스를 만들려면 약간의 꼼수를 부려야 하는 단점이 있다. 예컨데 채팅 서비스를 구현할 경우 메시지 입력은 다른 포트를 통해서 받아야 한다.
+
+대략 아래와 같은 과정을 밟아야 할 거다. 깔끔하지 않다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1EhkoVnM-02dfTkeLFDUBrQq62AAUQTQ3zpJxfn5jNn8/pub?w=473&amp;h=219">
+}}}
+
+==== socket.io ====
+socket.io는 이용해서 브라우저의 종류에 상관없이 실시간 통신을 구현할 수 있도록 한 도구다. 도구라고 한 이유는 웹소켓과 같은 단일 기술이 아닌, 여러 기술들의 모음이기 때문이다. socket.io는 웹소켓, FlashSocket, AJAX long polling, AJAX multipart streaming, Forever Iframe, JSONP Polling 기술들을 포함하고 있다.
+
+socket.io는 웹브라우저의 사양을 확인해서 적당한 기술을 선택해서 실시간 통신을 구현한다. 웹소켓의 경우 IE 9.0 이하 버전은 지원하지 않는다. 우리나라에서는 IE 9.0도 무시할 수가 없는데, socket.io는 좋은 선택이 될 수 있다. 대부분의 브라우저에 대해서는 웹소켓을 이용해서 통신을 하고, 지원하지 않는 브라우저는 Login polling등의 기술을 이용해서 실시간 통신을 구현할 수 있기 때문이다.
+
+단점은 Node.JS에서만 사용할 수 있다는 점이다. 웹소켓은 언어별/프레임워크별로 구비되 있다.  
+
+=== 웹소켓과 세션 ===
+예컨데 [wiki:man/12/cookie cookie] 값을 읽을 수 있느냐 하는 건데, 브라우저마다 다른 것 같다. chrome(28.0.1500)의 경우 handshake때 cookie를 전송하지 않았는데, firefox(24.0)은 [wiki:man/12/cookie cookie]를 전송했다. cookie를 이용해서 값을 넘겨주는 건 좋은 방법이 아닌 것 같다. URL 파라메터로 넘기는게 제일 깔끔하다. 채팅에 이름을 입력하고 싶다면 아래와 같이 값을 넘겨야 하겠다.
+{{{#!plain
+ws://localhost:3000/chat?name=yundream
+}}}
+
+=== 클라이언트에서 웹소켓 API 사용하기 ===
+웹소켓 API는 W3C에서 관리한다. 클라이언트는 단지 6개의 API로 모든 통신이 가능하다. 4개의 이벤트 핸들러와 2개의 함수로 구성된다. 이벤트 핸들러는 네트워크 상태를 알려주기 위해서 사용한다. 나머지 2개의 함수는 메시지를 보내고 웹소켓을 닫기 위해서 사용한다.  
+
+|| 이벤트 핸들러        || 설명                          ||
+|| onopen               || 웹소켓이 열리면 호출          ||
+|| onmessage            || 메시지가 도착하면 호출        ||
+|| onerror              || 에러가 발생하면 호출          ||
+|| onclose              || 웹소켓이 닫히면 호출          ||
+
+|| 함수                 || 설명                          ||
+|| send                 || 메시지 전송                   ||
+|| close                || 웹소켓 닫기                   ||
+
+사용 예제 : 채팅을 위한 클라이언트 프로그램이다. 테스트할 수 있는 완전한 코드는 [wiki:Site/Ruby/sinatra/WebSocket 여기]를 참고. 
+{{{#!plain
+<script type="text/javascript">
+    window.onload = function(){
+      (function(){
+        var show = function(el){
+          return function(msg){ el.innerHTML = msg + '<br />' + el.innerHTML; }
+        }(document.getElementById('msgs'));
+
+        var ws       = new WebSocket('ws://' + window.location.host + window.location.pathname);
+        ws.onopen    = function()  { show('websocket opened'); };
+        ws.onclose   = function()  { show('websocket closed'); }
+        ws.onmessage = function(m) { show('websocket message: ' +  m.data); };
+
+        var sender = function(f){
+          var input     = document.getElementById('input');
+          input.onclick = function(){ input.value = "" };
+          f.onsubmit    = function(){
+            ws.send(input.value);
+            input.value = "send a message";
+            return false;
+          }
+        }(document.getElementById('form'));
+      })();
+    }
+</script>
+}}}
+
+== 디버깅 및 테스트 ==
+=== 웹브라우저의 웹소켓 지원여부 확인 ===
+http://www.websocket.org/echo.html 에서 사용중인 웹 브라우저의 웹소켓 지연여부를 확인할 수 있다.
+
+https://lh3.googleusercontent.com/-8OcjxXXpABQ/Umk0mwAyizI/AAAAAAAADVs/nv0ieI6VxHo/s640/websocket04.png
+
+=== Chrome Simple Websocket Client ===
+크롬웹브라우저를 사용하고 있다면 '''simple websocket cleint extension'''을 이용해서 간단하게 웹소켓을 테스트할 수 있다.
+
+[https://chrome.google.com/webstore/detail/simple-websocket-client/pfdhoblngboilpfeibdedpjgfnlcodoo Simple WebSocket Client 다운로드]
+
+=== CURL로 테스트 ===
+[wiki:Site/Tip/curl CURL]로도 테스트가 가능하다. 그렇다고 메시지 교환까지 테스트 가능한 건 아니고, '''handshake'''과정까지만 테스트할 수 있다. 웹소켓 handshake 과정을 빠르게 디버깅하고 싶을 때 사용할 수 있겠다. chat 서버 띄운다음 테스트를 해봤다. 
+{{{#!plain
+# curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H \
+"Host: echo.websocket.org" -H "Origin: http://localhost:3000" http://localhost:3000/chat
+HTTP/1.1 101 Web Socket Protocol Handshake
+Upgrade: WebSocket
+Connection: Upgrade
+WebSocket-Origin: http://localhost:3000
+WebSocket-Location: ws://echo.websocket.org/chat
+
+}}}
+
+== 참고 ==
+ * [wiki:Site/Ruby/sinatra/WebSocket Ruby sinatra로 웹소켓 사용하기]
+ * [http://en.wikipedia.org/wiki/WebSocket Wikipedia - websocket]
+ * [http://helloworld.naver.com/helloworld/1336 Websocket와 socket.io]
+ * [http://mohwaproject.tistory.com/entry/%E3%85%81%E3%85%81%E3%85%81 웹에서 실시간 데이터 처리하기 - Websocket, Comet] 
+ * [http://blog.outsider.ne.kr/527 Play framework에서 Long polling 구현하기]
+ * [http://www.thenerdary.net/post/24889968081/debugging-websockets-with-curl CURL을 이용한 웹소켓 테스트]
+ * [http://www.infoq.com/news/2012/02/websockets-rest 웹소켓 vs REST]
+ * [http://stackoverflow.com/questions/5195452/websockets-vs-server-sent-events-eventsource 웹소켓 vs server send events]

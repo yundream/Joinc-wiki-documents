@@ -1,0 +1,417 @@
+head	1.10;
+access;
+symbols;
+locks
+	root:1.10; strict;
+comment	@# @;
+
+
+1.10
+date	2013.10.14.04.29.10;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.10.13.14.31.29;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2013.10.13.14.23.09;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.10.13.09.40.15;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.10.13.03.26.32;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.10.10.15.48.04;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.10.10.14.00.09;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.10.07.15.20.10;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.10.07.15.08.13;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.10.07.12.51.57;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fProcsLambdaBlocks
+@
+
+
+1.10
+log
+@112.150.165.137;;yundream;;
+@
+text
+@#title 루비 블럭, Procs, Lambdas 이해하기
+
+[[TableOfContents]]
+== 소개 ==
+루비의 블럭, Procs, 람다(Lambdas)는 강력한, 때로는 마법처럼 보이기도 하는 기능이지만 이해하기 어려운 기능이기도 하다. 다른 언어에서 쉽게 찾아볼 수 있는 기능이 아니기 때문이다. 특히 C, C++, Java, PHP등의 언어를 기본으로 하고 있다면 더욱 그렇다. 이들 언어는 클로저(Closure)라는 프로그래밍 개념이 없기 때문이다. 루비의 블럭, procs, 람다는 클로저를 바탕으로 하고 있기 때문에, 클로저 개념에 익숙해질 필요가 있다. 
+
+=== 블럭 ===
+루비에서 클로저를 이용하는 가장 쉬운 방법은 "블럭"을 이용하는 거다. 다음은 루비 블럭의 사용예다. 
+
+{{{#!plain
+array = [1,2,3,4,5]
+
+array.collect! do | n |
+    n ** 2
+end
+
+puts array.inspect  # => [1, 4, 9, 16, 25]
+}}}
+어떤 일이 일어나는지 확인해 보자.
+   1. 배열과 collect! 메서드를 블럭에 있는 코드로 보낸다. 
+   1. 코드 블럭은 (블럭에 연결된)collect! 메서드를 이용해서 변수의 값을 가져와서 코드를 적용한다. 이 경우 제곱 연산을 한다. 
+   1. 제곱연산을 한 값을 배열에 넣는다.
+collect! 메서드와 block를 간단하게 연결했다. 이제 block의 코드를 이용해서 배열의 원소들을 가져와서 필요한 연산을 할 수 있다.    
+
+collect!와 비슷한 일을 하는 메서드를 직접 만들어보자. 대략 다음과 같은 형태가 될거다.
+{{{#!plain
+class Array
+  def iterate!
+    self.each_with_index do |n, i|
+      self[i] = yield(n)
+    end
+  end
+end
+
+array = [1, 2, 3, 4]
+
+array.iterate! do |n|
+  n ** 2
+end
+
+puts array.inspect
+
+# => [1, 4, 9, 16]
+}}}
+Array 클래스를 열어서 iterate! 라는 메서드를 추가했다. 블럭의 코드를 수행하는 부분은 yield(n)으로, n**2를 수행해서 그 결과를 self![i!]에 입력한다.  
+
+어떤 일이 일어나는지를 추적해 보자.
+  1. 배열의 원소를 iterator! 메서드에 보낸다.    
+  1. yield는 원소의 값 'n'을 매개변수로 호출하는데, 이 때 블럭에 있는 코드 n ** 2를 수행하게 된다. 결국 배열의 원소들에 대한 제곱연산을 수행하게 된다.    
+  1. 블럭 수행 결과 즉 제곱연산 결과는 메서드 내부로 전달되고, 배열에 다시 쓰게 된다.  
+  1. 배열의 모든 원소에 대해서 이 과정이 반복된다.
+
+=== Procedures, AKA, Procs ===
+블럭은 이해하기 쉽운데다가 간단히 사용할 수 있다. 하지만 만약 블럭에 있는 코드를 여러 곳에서 사용하려고 하면, 동일한 블럭문을 copy & paste 해야 한다. 깔끔하지 않다. 다음의 코드를 보자. 
+{{{#!plain
+class Array
+  def iterate!
+    self.each_with_index do |n, i|
+      self[i] = yield(n)
+    end
+  end
+end
+
+array1 = [1,2,3,4,5]
+array2 = [6,7,8,9,10]
+
+
+array1.iterate! do | n |
+    n ** 2
+end
+
+array2.iterate! do | n |
+    n ** 2
+end
+
+puts array1.inspect
+puts array2.inspect
+}}}
+동일한 코드를 여러 군데 쓰는 건 좋은 프로그래밍 습관이 아니다.
+
+이런 문제는 코드를 재 사용하는 것으로 해결할 수 있다. 루비에서는 이런 재 사용 가능한 코드를 Proc(Procedure의 줄임말이다.)라고 부른다. Proc와 블럭의 다른 점이라면, 블럭은 한번만 사용하기 위해서 적당한 방법이고 Proc는 재 사용이 가능하다라는 점이다. 위 코드를 Proc를 이용해서 다듬었다. 
+{{{#!plain
+class Array
+  def iterate!(code)
+    self.each_with_index do |n, i|
+      self[i] = code.call(n)
+    end
+  end
+end
+
+array1 = [1,2,3,4,5]
+array2 = [6,7,8,9,10]
+
+square = Proc.new do |n|
+    n ** 2
+end
+
+array1.iterate!(square)
+array2.iterate!(square)
+
+puts array1.inspect
+puts array2.inspect
+}}}
+
+실행 결과
+{{{#!plain
+[1, 4, 9, 16, 25]
+[36, 49, 64, 81, 100]
+}}}
+
+=== Lambdas ===
+Procs를 이용하는 두 가지 방법이 있다. 첫 번째 방식은 위에서 설명했고, 두번째 방식은 메서드의 매개변수 형태로 코드를 직접 넘기는 방식이다. 자바스크립트에서는 anonymous function이라는 이름으로 부르고 있다. 
+{{{#!plain
+class Array
+  def iterate!(code)
+    self.each_with_index do |n, i|
+      self[i] = code.call(n)
+    end
+  end
+end
+
+array1 = [1,2,3,4,5]
+
+array1.iterate!(lambda {|n| n ** 2})
+
+puts array1.inspect  # [1, 4, 9, 16, 25]
+}}}
+
+Procs와 비슷해 보인다. 몇 가지 조그만 차이가 있는데, lambda는 Procs와 달리 매개변수의 갯수를 검사는 점이다.
+{{{#!plain
+def args(code)
+  one, two = 1, 2
+  code.call(one, two)
+end
+args(Proc.new{|a, b, c| puts "Give me a #{a} and a #{b} and a #{c.class}"})
+args(lambda{|a, b, c| puts "Give me a #{a} and a #{b} and a #{c.class}"})
+}}}
+
+실행결과
+{{{#!plain
+Give me a 1 and a 2 and a NilClass
+lambda.rb:8:in `block in <main>': wrong number of arguments (2 for 3) (ArgumentError)
+        from lambda.rb:3:in `call'
+        from lambda.rb:3:in `args'
+        from lambda.rb:8:in `<main>'
+}}}
+Proc의 경우 추가적인 변수는 '''nil'''로 설정하는 걸 볼 수 있다. 반면 lambda는 에러를 반환한다.
+
+두번째 다른 점은 lambda는 '''diminutive return'''을 할 수 있다는 점이다. 예컨데, Proc는 값을 반환하면 메서드를 중단한다. 따라서 메서드의 최종 반환 값은 Proc의 반환값이 된다. 하지만 lambda는 반환 후에도 메서드가 계속 된다. 다음 예를 보자. 
+{{{#!plain
+def proc_return
+  Proc.new { return "Proc.new"}.call
+  return "proc_return method finished"    # 실행하지 않는다.
+end
+
+def lambda_return
+  lambda { return "lambda" }.call
+  return "lambda_return method finished" # 실행된다.
+end
+
+puts proc_return
+puts lambda_return
+}}}
+
+실핼결과
+{{{#!plain
+Proc.new
+lambda_return method finished
+}}}
+
+Lambda는 아래와 같이 lambda의 반환 값을 받아서, 메서드에서 처리하는게 가능하다. 
+{{{#!plain
+def lambda_return
+  a = lambda { return "lambda" }.call
+  return "#{a} lambda_return method finished"
+end
+}}}
+
+이러한 차이가 발생하는 이유는 루비의 Proc는 '''code snippet'''형태로 작동하기 때문이다. 메서드는 Proc의 return 코드를 수행하게되고, 따라서 다음 코드를 수행하지 않고 바로 반환해 버린다.
+
+Lambda와 Proc의 차이점을 보여주는 다른 예제다.
+{{{#!plain
+def generic_return(code)
+  code.call
+  return "generic_return method finished"
+end
+
+puts generic_return(Proc.new { return "Proc.new" })
+puts generic_return(lambda { return "lambda" })
+}}}
+
+실행 결과
+{{{#!plain
+ruby lambda.rb 
+lambda.rb:6:in `block in <main>': unexpected return (LocalJumpError)
+        from lambda.rb:2:in `call'
+}}}
+루비는 매개변수로 return 키워드를 가지는 코드를 허용하지 않기 때문에 에러가 발생한다. Lambda는 코드가 아닌 리턴값 "lambda"를 매개변수로 넘겨주기 때문에 문제없이 동작한다. 
+
+{{{#!plain
+def generic_return(code)
+  one, two    = 1, 2
+  three, four = code.call(one, two)
+  return "Give me a #{three} and a #{four}"
+end
+
+puts generic_return(lambda { |x, y| return x + 2, y + 2 })   #=> Give me a 3 and a 4
+puts generic_return(Proc.new { |x, y| return x + 2, y + 2 }) #=> 에러 
+puts generic_return(Proc.new { |x, y| x + 2; y + 2 })        #=> Give me a 4 and a 
+puts generic_return(Proc.new { |x, y| [x + 2, y + 2] })      #=> Give me a 3 and a 4
+}}}
+코드가 제대로 작동을 한다면 generic_return은 두 개의 값을 반환해야 한다. 
+  1. lambda코드를 적용한 첫번째 코드 : 원하는 결과를 보여준다.  
+  1. return을 포함한 두번째 코드 : 키워드로 return이 들어가 있다. 에러 발생 
+  1. return을 포함하지 않은 코드 : 에러가 생기진 않지만, 하나만 리턴. 
+  1. 배열을 사용하면 된다. 
+
+== Method Object ==
+이미 만들어놓은 메서드를 다른 메서드의 closure로 사용하고 있다면, 루비의 method 메서드를 이용하면 된다.
+{{{#!plain
+class Array
+  def iterate!(code)
+    self.each_with_index do |n, i|
+      self[i] = code.call(n)
+    end
+  end
+end
+
+def square(n)
+  n ** 2
+end
+
+array = [1, 2, 3, 4]
+array.iterate!(method(:square))
+puts array.inspect
+}}}
+
+실행결과
+{{{#!plain
+[1, 4, 9, 16]
+}}}
+
+method(:square)는 Proc가 아닌 '''Method'''다. 확인해 보자.
+{{{#!plain
+puts method(:square).class  #=> Method
+}}}
+그냥 lambda와 같은 역할을 한다고 보면 되겠다.
+
+== 참고  ==
+  * [http://rubymonk.com/learning/books/1-ruby-primer/chapters/34-lambdas-and-blocks-in-ruby/lessons/77-lambdas-in-ruby Lambdas In Ruby]
+  * [http://www.robertsosinski.com/2008/12/21/understanding-ruby-blocks-procs-and-lambdas/ Understanding Ruby blocks, Pros and Lambdas]
+  * [http://drken.tistory.com/24 루비블록, Proc 클래스, Lambda]
+  * [http://en.wikipedia.org/wiki/Lambda_(programming) wikipedia - Lambda]
+@
+
+
+1.9
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 1
+a3 1
+
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d253 1
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@a3 1
+<!> 미완성
+d213 35
+a247 1
+  1. lambda코드를 적용한  
+d250 1
+a250 1
+
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d213 2
+@
+
+
+1.5
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d132 29
+d162 50
+d215 1
+@
+
+
+1.4
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d113 21
+@
+
+
+1.3
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d55 57
+d113 1
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d54 2
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d24 1
+d26 27
+@

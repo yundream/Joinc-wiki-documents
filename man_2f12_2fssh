@@ -1,12 +1,59 @@
 #title ssh - secure shell
 
 [[TableOfContents]]
-=== ssh ===
-'''Secure Shell''' 이라고 불리우기도 하는 SSH는 두개의 [wiki:man/12/컴퓨터 컴퓨터]사이에 보안채널을 만들어주는 [wiki:man/12/네트워크 네트워크] 프로토콜이다. SSH는 공개키 암호화방식을 이용해서 원격지 컴퓨터를 인증한다. 
+== ssh ==
+Secure Shell(SSH)는 네트워크로 서로 연결된 호스트들간에 안전한 데이터 통신을 위해서 만들어진 프로토콜이다. SSH를 이용하면, 원격 로그인, 원격 명령실행, 데이터 복사와 같은 작업을 안전하게 수행할 수 있다.   
 
-SSH는 데이터를 정송하는 것 뿐만 아닌, 원격 컴퓨터의 명령을 실행할 수도 있다. 또한 SFTP와 SCP를 이용해서 안전하게 파일을 전송할 수도 있다. '''SFTP'''는 보안의 기능을 가진 FTP라고 보면 되겠다. 
+SSH는 SSH Server와 SSH client를 통해서 구현된다.
 
-SSH는 서버/클라이언트 모델을 따른다. 서버측에는 '''sshd'''라는 ssh 데몬 프로그램이 [wiki:man/2/listen listen]상태로 클라이언트의 연결을 기다린다. 기본 listen [wiki:man/12/포트번호 포트]는 22번이다. 최근의 리눅스는 거의 대부분 [wiki:man/12/telnet telnet]대신 ssh를 사용하고 있다. 
+=== 정의  ===
+SSH는 공개키 암호화를 이용해서 원격 컴퓨터의 접근을 허용하고 필요할 경우 유저 인증도 수행한다. SSH를 사용하는 방법은 여러가지가 있다. 
+
+첫번째, 자동으로 생성된 public-private key를 이용해서 암호화된 네트워크 연결을 만드는 방법이 있다. 로그인 할 때 패스워드를 물어본다. 
+
+두번째, 암호를 지정하지 않고 자동으로 로그인하도록 할 수 있다. 이 경우 public-private key자체가 유저인증을 위한 수단이 되기 때문에, 수동으로 key를 만들어서 사용자에게 배포한다. 이 시나리오에서는 관리자(공공 혹은 민간)가 (public-private)key pair를 만들 수 있다. 
+
+관리자는 공개키(Public key)는 접근할 모든 호스트에 배치하고, 개인키는 접근을 허용할 유저에게 배포한다. 
+ 이제 개인키를 받은 유저는 개인키를 이용해서 (공개키가 배치된)호스트에 연결할 수 있게 된다. 
+
+=== 키 관리 ===
+범유닉스(Unix-like)시스템에서, 원격에서의 접근을 인증하기 위해서 사용할 퍼블릭키는 유저 홈디렉토리에 있는 ~/.ssh/authorized_keys에 저장 된다. 퍼블릭키는 소유자와 루트유저에게만 읽고 쓸수 있다.
+{{{#!plain
+# ls -al ~/.ssh/authorized_keys
+total 12
+drwx------ 2 ubuntu ubuntu 4096 Dec 12 15:03 .
+drwxr-xr-x 4 ubuntu ubuntu 4096 Dec 12 15:51 ..
+-rw------- 1 ubuntu ubuntu  400 Dec 12 15:03 authorized_keys
+}}}
+
+공개키와 개인키가 서로를 인증했다면 암호없이 소프트웨어를 실행 할 수 있다. 이 방식에서의 가장 큰 보안 문제는 개인키가 누출되는 경우가 되겠다. 어떤 경로로든 개인키를 입수했다면, 즉시 소프트웨어를 실행할 수 있기 때문이다. 만약 개인키 누출까지도 걱정이 된다면, 추가적인 보안을 위해서 개인키에 암호를 부여할 수 있다.
+
+유저는 두 개 이상의 개인키를 가질 수 있기 때문에, 개인키를 선택할 수 있어야 한다. ssh에 -i 옵션으로 개인키를 선택할 수 있다. Key pair는 ssh-keygen 유틸리티를 이용해서 만들 수 있다.  
+
+=== 용도 ===
+SSH는 보통 원격 호스트에 로그인하거나 명령을 수행하기 위해서 사용한다. 이밖에도 터널링(tunneling)와 TCP 포트 포워딩, X11 연결을 위해서 사용할 수도있다. 기타 SSH file transfer(SFTP)와 secure copy(SCP)프로토콜과 함께 사용하기도 한다.   
+
+SSH는 서버 & 클라이언트 모델로 서버의 표준 서비스 포트번호는 22번이다.
+
+SSH 클라이언트 프로그램은 원격에 있는 SSH 서버에 연결 하기 위해서 사용한다. Mac OSX, 모든 종류의 GNU/LINUX 배포판, OpenBSD, FreeBSD, NetBSD, Solaris, OpenVMS 운영체제들이 SSH 클라이언트를 기본으로 탑재하고 있다. 
+
+윈도우즈는 SSH 서버/클라이언트 프로그램을 포함하지 않는 몇 안되는 운영체제 중 하나다. 윈도우즈는 다양한 수준의 완성도를 가지는 프리웨어나 오픈소스 소프트웨어를 직접 찾아서 설치해줘야 한다. 윈도우즈를 SSH 서버로 사용하는 경우는 별로 없는 것 같다. 주로 SSH 클라이언트 프로그램을 사용하는데, 나 같은 경우 putty와 winscp를 주로 사용한다. 
+
+SSH는 클라우드 환경에서 가상머신에 대한 연결문제와 보안문제를 해결하기 위해서 특히 중요하게 사용한다.
+
+== 응용 ==
+SSH는 광범위한 운영체제와 애플리케이션에서 사용하고 있다.  
+  * 원격 호스트에 접근하기 위해서 (Telnet와 rlogin의 대체) 
+  * 원격 호스트에 명령을 내리기 위해서 (rsh의 대체)
+  * 안전한 파일 전송 (Secure file transfer) 
+  * 보안성을 높이기 위해서 rsync 백업 시스템과 함께 사용
+  * [http://www.joinc.co.kr/modules/moniwiki/wiki.php/Site/System_management/Proxy#s-4 Forwarding, tunneling]를 위해서
+  * 암호화된 VPN의 용도.
+  * X11 호스팅  
+  * SOCKS 프로토콜의지원 
+  * Secure copy(SCP)
+  * SSH File Transfer Protocol(SFTP). FTP의 보안성을 높이기 위해서.
+  * Files transferred over shell protocol(FISH 라고 부르기도 한다_. 
 
 === 원격 명령 실행 ===
 다음과 ssh 클라이언트 프로그램을 이용해서 원격 컴퓨터의 명령을 실행할 수 있다.

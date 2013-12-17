@@ -1,0 +1,966 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.12.14.14.33.11;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.12.14.13.55.24;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fTCP_5fIP_2fIP_5fHeader
+@
+
+
+1.2
+log
+@128.134.217.152;;yundream;;
+@
+text
+@#title IP 자세히 보기
+
+<!> 미완성 : 정리가 필요 함
+== 소개 ==
+IP를 헤더 차원에서 좀 더 깊이 정리해 보려한다.
+
+이 문서를 읽기전에 아래의 문서들을 먼저 읽어두면 도움이 될 것이다.
+  * [wiki:Site/Network_Programing/Documents/IntroTCPIP TCP/IP 개요 - 1]
+  * [wiki:Site/Network_Programing/Documents/IntroTCPIP2 TCP/IP 개요 - 2]
+  * [wiki:Site/Network_Programing/Documents/IntroTCPIP3 TCP/IP 개요 - 3]
+== IP == 
+=== IP 란 ===
+IP 는 인터넷으로 연결된 호스트들간에 데이터 교환을 지원하기 위해서 만들어진 프로토콜이다. IP는 인터넷 환경에서 host 간 데이타 그램의 교환을 목적으로 하므로 host-to-host 프로토콜이라고 부르기도 한다. 
+
+인터넷으로 보내려는 데이터가 있다면, IP는 이 데이타를 한꺼번에 보내지 않고, 여러개의 조그만 데이타 그램으로 단편화(fragmentation)하는 작업을 수행하게 된다. 그리고 이러한 단편화된 데이터에 목적지로 찾아갈수 있도록 하기 위한 정보 들을 추가한다. 즉 '''원본 데이터 + 추가 정보'''형태의 데이터가 만들어지는데, 추가정보는 IP Header의 형태로 원본 데이터 앞에 붙는다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1qjHQBoA6fdi3N77wZjbhC-Z8U0tXDJrRtiYtm6IrQfs/pub?w=668&amp;h=184">
+}}}
+
+위의 그림을 데이터를 보내기 위해서 원본 데이터를 3개의 조그만 데이타로 쪼개고 이 앞에 IP Header 을 붙인걸 확인할 수 있다. 
+
+IP 프로토콜은 다음과 같은 몇가지 특징을 가지고 있다.
+
+  * 비신뢰성(unreliable)
+    IP 는 데이타 그램이 목적지로 전달될 것이라는 것을 보증하지 않는다. IP 데이타 그램은 목적지로 가는 도중 여러가지 원인에 의해서 손실될수도 있는데, IP 헤더에는 이러한 손실을 복구하기 위한 어떠한 장치도 마련되어 있지 않다. 대신에 TCP(:12) 에 이러한 데이타 손실을 복구하기 위한 장치를 마련한다.
+  * 비연결지향성(connectionless)
+    호스트와 호스트간에 데이타 그램을 전달하기 위하여서 세션을 개설하지 않는다. 모든 데이타 그램은 각각 독립적으로 전달된다. 받는 호스트에서는 해당 데이타 그램간의 연관성에 대해서 전혀 알지 못한다. 만약 A와 B 데이타가 호스트로 전달되고, A가 첫번째 데이타 B가 두번째 데이타라고 한다면, 받은측에서는 어느 데이타가 첫번째 데이타인지 알지 못한다. 또한 B데이타가 A데이타 보다 먼저 전달될수도 있는데, IP는 이를 교정할수 있는 장치를 가지고 있지 않다.
+
+=== IP 헤더 ===
+IP의  핵심 정보는 IP Header에 정의돼 있다. IP를 헤더 차원에서 분석해보기로 했다. 
+
+그림 2. IP 헤더
+
+https://lh3.googleusercontent.com/-knB0RLjuP1w/UqxktvL08qI/AAAAAAAADcg/OGsjjX6llL0/s640/ipv4_packet_header.jpg
+
+  * Version: 4bits
+    IP 포맷의 버젼을 나타낸다. 현재는 주로 IPv4 가 가장 널리 쓰이며, 차세대 포맷으로 IPv6(:12) 가 제안되어서 조금씩 사용범위가 늘어나고 있는 추세이다.
+  * IHL(Internet Header Length): 4bits
+    IP 헤더의 길이다. 보통은 32bit 크기를 가지는 5개의 열로 이루어진다. 나마지 하나의 열은(Options, Padding)는 옵션사항이다.
+  * Type of Service: 8 bits
+    인터넷에는 다양한 종류의 데이타 그램이 돌아다닌다. 이중 어떤것은 상대적으로 중요한 데이터 그램이라서 데이타 전송에 있어서 다른 데이타 그램보다 전송에 있어서 우선순위를 두어야 하는 그런경우가 있을것이다. 이럴때 Type of Service 를 이용함으로써, 데이타 그램의 전송에 대한 우선순위 등을 제어할수 있다. 간단한 형태의 QOS(Quality of service) 라고 볼수 있다.
+  * Total Length: 16 bits
+    IP 헤더와 실제 데이타의 크기를 모두 합친 크기이다.
+  * Identification: 16 bits
+   보내려는 데이타에 단편화(fragmentation)가 일어났을경우 단편화된 각 데이타 그램을 구분할수 있는 일련의 번호이다. 이 값을 이용해서 이 데이타 그램이 어떤 데이타 그램에서 단편화 된것인지를 알수 있다.
+  * Flags: 3bits
+    데이타 그램의 단편화에 대한 정보를 알려주기 위해서 사용된다. 첫번째 비트는 예비로 사용되며, 0으로 세팅된다. 두번째 비트와 세번째 비트는 단편화된 데이타그램의 정보를 세팅하기 위해서 사용된다. 두번째 비트가 0으로 세팅되었을경우 단편화된 데이타임을 의미하며, 1일경우 단편화 되지 않은 데이타를 의미한다. 3번째 비트가 0일경우 마지막 단편화 데이타 임을 나타내며, 1일경우에는 단편화된 데이타가 더 있다는것 나타낸다.
+
+표 1. Flags 세팅
+||0 ||예비: 반드시 0                                            ||
+||1	||(DF) 0 = 단편화되었음, 1 = 단편화되지 않았음              ||
+||2	|| (MF) 0 = 마지막 단편화 데이타, 1 = 단편화 데이타 더 있음 ||
+{{{#!plain
+     0   1   2
+   +---+---+---+
+   |   | D | M |
+   | 0 | F | F |
+   +---+---+---+
+}}}
+  * Fragment Offset: 13bits
+    데이타그램에 대한 단편화가 일어났을경우 현재 데이타 그램이 원래 데이타 그램의 몇번째 위치부터 단편화가 이루어 졌는지를 나타낸다.
+  * Time To Live: 8bits
+    TTL 이라고 부르는 값으로 데이타 그램이 살아있을 시간을 지정한다. 시간 이라고 해서 1시간 2시간 하는 시간이 아닌, 몇개의 라우터(:12)를 이동할수 있는지를 명시함으로써 데이타 그램의 생존기간을 명시한다. IP 데이타 그램이 라우터를 경유하게 되면 라우터는 TTL 필드를 조사해서 TTL의 값에 1을 빼준다. 만약 TTL 에 16의 값이 세팅되어 있다면 16번째 라우터를 지날때 TTL 값은 0이 될것이며, 라우터는 이 데이타 그램을 전달하지 않고 drop 시켜버린다. TTL 값을 명시하는 이유는 데이타 그램이 라우터 상에서 무한 순환 하는 사태가 발생할수 있기 때문이다.
+  * Header Checksum: 16bits
+    Header 정보는 고정된게 아니고 필요에 따라 바뀌게 된다(TTL 과 같은정보). 그러므로 헤더를 체크할수 있는 장치를 필요로 한다.
+  * Source Address: 32bits
+    데이터를 전송한 호스트의  IP 주소다.
+  * Destination Address: 32bits
+    데이타를 받을 호스트의 IP 주소다.
+  * Options :  
+    프로그램의 특성에 의해서 특정한 기능을 추가하기 위해서 사용된다. 이 필드는 필수적인 것이 아니다. 데이타 그램에 보안기능을 추가하거나, QOS 와 같은 기능, 혹은 라우팅관련된 부가적인 여러 기능을 추가하기 위해서 사용된다.
+  * Padding: 
+    특별한 사용용도는 없다. 단지 32bit 크기를 맞추기 위해서 사용되며, 0으로 세팅된다.
+
+=== 경로배정(routing) ===
+IP 데이타는 목적지까지의 경로는 Destination Address 필드에 세팅되어 있는 IP 주소로 결정된다. 일단 데이타 그램이 보내질 목적지가 LAN 상에 존재하면, 데이타 그램은 곧바로 해당 목적지 호스트로 보내진다. 그렇지 않을경우 데이타 그램은 설정되어 있는 default gateway로 향한다. 패킷은 default gateway를 통해서 인터넷으로 나가게 되는데, 여러 router를 거치면서 최종 목적지까지 도착하게 된다.
+
+== 데이타 단편화 (fragmentation) ==
+위에서 IP 헤더 필드를 설명하면서 "데이타 단편화" 에 대한 언급을 했었다. 이번장에서는 이러한 데이타 단편화가 일어나는 원인과 어떻게 단편화된 데이타를 재조합 할수 있는지에 대해서 알아보도록 하겠다.
+
+=== MTU(Maximum Transmission Unit) ===
+MTU 란 다음 호스트에 한번에 보낼수 있는 데이타의 크기를 의미한다. 어쨋든 데이타를 한번에 몽땅 보낼수는 없으므로 호스트에서는 이것을 적당한 크기로 잘라내야 할것이다. 그런데 이 적당한 크기라는게 말 그대로 적당한 크기로 망에 따라서 약간씩 그 크기가 다르다. 
+
+MTU 사이즈는 여러번의 테스트를 걸쳐서 각망에 최적화된다라고 생각되는 실험적인 크기로 정해진다. 우리가 보통 사용하는 이더넷 망의 경우 1500, ATM 망의 경우 9600 의 사이즈를 가지며, SLIP 의 경우 576로 정해져 있다.
+
+{{{#!plain
+[root@@localhost root]# ifconfig
+eth0      Link encap:Ethernet  HWaddr 00:50:BF:2C:7B:B2  
+          inet addr:192.168.0.4  Bcast:192.168.0.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:355481 errors:1 dropped:0 overruns:0 frame:0
+          TX packets:360573 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:5023 
+          RX bytes:369176288 (352.0 Mb)  TX bytes:33374363 (31.8 Mb)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:68 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:68 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 
+          RX bytes:3400 (3.3 Kb)  TX bytes:3400 (3.3 Kb)
+}}}
+MTU 의 크기는 ifconfig 를 통해서 확인 가능하며, 변경도 가능하다. 위의 ifconfig 정보는 리눅스박스에서 측정한 크기이다. 
+=== 단편화및 재조립 ===
+이렇게 단편화 되어서 전송되는 데이타 그램의 경우 목적지에 서로 다른 순서로 도달 할수 있다. 그러므로 단편화 작업을 수행할때, 각각의 단편화된 데이타 그램이 원래의 데이타그램의 어떤 위치에서 단편화 되었는지등의 정보를 넣어둠으로써 최종도착지점에서 단편화된 데이타를 다시 조립할수 있도록 만들어야 한다. 이러한 작업은 커널의 IP를 담당하는 모듈에서 자동적으로 수행하며, IP 테이블의 Flags 와 Fragment Offset 필드를 수정함으로써 단편화 정보를 관리하게 된다. 
+
+여기에는 현재의 데이타 그램의 단편화가 되어있는지 단편화가 되어 있다면, 어떤 데이타그램에서 단편화 된것인지, 몇번째 단편화 데이타 인지, 마지막 단편화 데이타 인지, 원래 데이타 그램에서 offset 은 어느정도가 되는지등의 정보가 들어가게 된다. 최종적으로 목적지에서는 데이타 그램의 Identification 과 Flag, Fragment Offset 을 이용해서 단편화된 데이타를 조립하게 될것이다.
+
+== IP 헤더의 예 ==
+다음은 IP 헤더의 가장간단한 예로 단편화가 일어나지 않은 데이타 그램의 IP 헤더의 형태이다.
+{{{#!plain
+    0                   1                   2                   3  
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |Ver= 4 |IHL= 5 |Type of Service|        Total Length = 168     |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |      Identification = 111     |Flg=0|   Fragment Offset = 0   |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |   Time = 123  |  Protocol = 1 |        header checksum        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                         source address                        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                      destination address                      |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |     data      |                                               
+   +-+-+-+-+-+-+-+-+                                               
+}}}
+			
+데이트 그램의 총 크기는 168bit 이고, 이중 헤더의 크기가 160bit 데이터의 크기가 8bit 임을 알수 있다. IPv4 버전이며, 단편화가 일어나지 않았(Flg=0)음을 알수 있다.
+
+이번에는 좀더 복잡한 예로, 단편화가 일어난 데이타 그램의 경우이다. MTU 사이즈는 2048 이며, 보내고자 하는데이타의 크기는 2500 이라고 가정하겠다.
+
+첫번째 데이타 그램이다.
+{{{#!plain
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |Ver= 4 |IHL= 5 |Type of Service|       Total Length = 2208     |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |     Identification = 112      |Flg=1|     Fragment Offset = 0 |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |   Time = 119  | Protocol = 6  |        Header Checksum        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                         source address                        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                      destination address                      |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+                                                                  
+                                                                  
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+}}}
+데이타 그램의 총크기는 2048 + (32*5) = 2208 이 될것이다. 데이타 그램의 단편화가 이루어졌음으로 Flg = 1 이 세팅된다. 그리고 단편화된 데이타 중 첫번째 데이타 그램이므로 Fragment Offset 는 0이 될것이다.
+
+다음은 두번째 데이타 그램이다.
+{{{#!plain
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |Ver= 4 |IHL= 5 |Type of Service|       Total Length = 612      |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |     Identification = 112      |Flg=0|  Fragment Offset = 2048 |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |   Time = 119  | Protocol = 6  |        Header Checksum        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                         source address                        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                      destination address                      |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+                                                                  
+                                                                  
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |             data              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+}}}
+			
+Identification 이 112 임을 주목하라. 마지막 단편화 데이타 이므로 (더이상 단편화된 데이타가 없음) Flg 가 0으로 세팅되어있다. 이 데이타 그램의 Total Length 는 (32 * 5) + (2500 - 2048) = 612 가 될것이다. 그리고 이 단편화된 데이타 그램이 원래 데이타 그램에서 단편화된 위치는 2048 이 될것임으로 Fragment Offset 는 2048 이 될것이다.
+
+
+@
+
+
+1.1
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d3 14
+a16 23
+=== Protocol ===
+IP 헤더중 Protocol 부분을 빼트려 먹었다. 나중에 챙겨 넣어야지. Protocol은 IP데이터위에 '''encapsulated'''된 데이터의 protocol을 명시한다. 256개가 정의되어 있는데, 중요하다고 생각되는 것만 간추렸다.
+ || 0   || HOPOPT, IPv6 Hop-by-Hop Options              || RFC 1883   ||
+ || 1   || ICMP(:12), Internet Control Message Protocol || RFC 792    ||
+ || 2   || IGAP(:12), IGMP(:12), RGMP(:12)              ||  ||
+ || 3   || GGP(:12), Gateway to Gateway Protocol        ||  ||
+ || 4   || IP in IP encapsulation                       ||  ||
+ || 5   || ST, Internet Stream Protocol                 ||  ||
+ || 6   || TCP(:12), Transmission Control Protocol      ||  ||
+ || 7   || UCL, CBT                                     ||  ||
+ || 8   || EGP(:12), Exteriro Gateway Protocol          ||  ||
+ || 9   || IGRP(:12), Interior Gateway Routing Protocon ||  ||
+ || 10  || BBN RCC Monitoring  || ||
+ || 11  || NVP(:12), Network Voice Protocol  ||  ||
+ || 12  || PUP || ||
+ || 13  || ARGUS || ||
+ || 14  || EMCON, Emission Control Protocol  ||  ||
+ || 15  || XNET, Cross Net Debugger   || ||
+ || 16  || Chaos  || ||
+ || 17  || UDP(:12), User Datagram Protocol || ||
+ || 41  || IPv6(:12) over IPv4 || ||
+ || 50  || ESP(:12), Encapulating Security Payload || ||
+ || 132 || SCTP, Stream Control Transmission Protocol || ||
+d18 38
+a55 402
+<HTML
+><HEAD
+><TITLE
+>IP (Internet Protocol)</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.64
+"><META
+http-equiv="Content-Type"
+content="text/html; charset=euc-kr"></HEAD
+><BODY
+CLASS="ARTICLE"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="TITLE"
+><A
+NAME="AEN2"
+>IP (Internet Protocol)</A
+></H1
+><H3
+CLASS="AUTHOR"
+><A
+NAME="AEN4"
+>윤 상배</A
+></H3
+><DIV
+CLASS="AFFILIATION"
+><DIV
+CLASS="ADDRESS"
+><P
+CLASS="ADDRESS"
+>				dreamyun@@yahoo.co.kr<br>
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="REVHISTORY"
+><TABLE
+WIDTH="100%"
+BORDER="0"
+><TR
+><TH
+ALIGN="LEFT"
+VALIGN="TOP"
+COLSPAN="3"
+><B
+>&#44368;&#51221; &#44284;&#51221;</B
+></TH
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+>&#44368;&#51221; 0.8</TD
+><TD
+ALIGN="LEFT"
+>2003년 3월 19일 23시</TD
+><TD
+ALIGN="LEFT"
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+COLSPAN="3"
+>이미지추가</TD
+></TR
+></TABLE
+></DIV
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>&#52264;&#47168;</B
+></DT
+><DT
+>1&#51208;. <A
+HREF="#AEN14"
+>소개</A
+></DT
+><DT
+>2&#51208;. <A
+HREF="#AEN21"
+>IP (Internet Protocol)</A
+></DT
+><DD
+><DL
+><DT
+>2.1&#51208;. <A
+HREF="#AEN23"
+>IP 란</A
+></DT
+><DT
+>2.2&#51208;. <A
+HREF="#AEN40"
+>IP 헤더</A
+></DT
+><DT
+>2.3&#51208;. <A
+HREF="#AEN114"
+>경로배정(routing)</A
+></DT
+><DT
+>2.4&#51208;. <A
+HREF="#AEN117"
+>데이타 단편화 (fragmentation)</A
+></DT
+><DD
+><DL
+><DT
+>2.4.1&#51208;. <A
+HREF="#AEN120"
+>MTU(Maximum Transmission Unit)</A
+></DT
+><DT
+>2.4.2&#51208;. <A
+HREF="#AEN125"
+>단편화및 재조립</A
+></DT
+></DL
+></DD
+><DT
+>2.5&#51208;. <A
+HREF="#AEN130"
+>IP 헤더의 예</A
+></DT
+></DL
+></DD
+><DT
+>3&#51208;. <A
+HREF="#AEN139"
+>결론</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN14"
+>1&#51208;. 소개</A
+></H1
+><P
+>	
+		우리는 그동안 몇번의 기사를 통해서 IP에 대해서 이미 알아보았다. 
+		이번에는 IP에 대한 좀더 자세한 내용을 알아보도록 하겠다. 
+	</P
+><P
+>	
+		이문서는 여러분이 TCP/IP(:12) 에 대한 기본적인 이해를 하고 있다고 가정할것이다. 
+		이 문서를 읽기전에 
+		<A
+HREF="http://www.joinc.co.kr/article.php?sid=29"
+TARGET="_top"
+>TCP/IP 개요</A
+>, 
+		<A
+HREF="http://www.joinc.co.kr/article.php?sid=33"
+TARGET="_top"
+>TCP/IP 개요(2)</A
+>, 
+		<A
+HREF="http://www.joinc.co.kr/article.php?sid=36"
+TARGET="_top"
+>TCP/IP 개요(3)</A
+> 
+		에 대한 문서를 먼저 읽어서 TCP/IP 에 대한 어느 정도의 이해를 해놓길 바란다. 
+	</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN21"
+>2&#51208;. IP (Internet Protocol)</A
+></H1
+><DIV
+CLASS="SECTION"
+><H2
+CLASS="SECTION"
+><A
+NAME="AEN23"
+>2.1&#51208;. IP 란</A
+></H2
+><P
+>			IP 는 인터넷(:12)으로 연결된 호스트 사이에 bit 데이터 (인터넷 데이타 그램)의 교환을 
+			가능하도록 하기 위해 만들어진 프로토콜이다. IP는 인터넷 환경에서 host 간 데이타 
+			그램의 교환을 목적으로 하므로 host-to-host 프로토콜이라고 불리우기도 한다. 
+		</P
+><P
+>			IP는 addressing(주소지정) 과 데이타 그램의 단편화(:12)를 통해서 데이타 그램을 
+			교환한다. 일단 보내고자 하는 크기의 데이타가 있다면, IP는 이 데이타를 
+			한꺼번에 보내지 않고, 여러개의 조그만 데이타 그램으로 단편화 (fragmentation) 작업을 
+			수행하게 된다. 그리고 이러한 단편화된 데이타 앞에 목적지로 찾아갈수 있도록 하기 위한 
+			여러가지 정보 들을 채워 넣게 된다 (이것을 IP Header 이라고 한다). 
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN27"
+></A
+><P
+><B
+>&#44536;&#47548; 1. 단편화된 데이타들</B
+></P
+><P
+>
+<a href="http://picasaweb.google.com/lh/photo/0i8Hn_1psOiWnN0M_aYYYw?feat=embedwebsite"><img src="http://lh5.ggpht.com/_Os5qf5urx_A/S1CUz9aNk-I/AAAAAAAABBs/G1FF3niZzuk/s800/data_plag.png" /></a>
+</P>
+</DIV
+>
+			위의 그림을 보면 하나의 Internet Data 를 보내기 위해서 3개의 조그만 
+			데이타로 쪼개고 이앞에 IP Header 을 붙였음을 알수 있다.   
+		</P
+><P
+>			IP 프로토콜은 다음과 같은 몇가지 특징을 가지고 있다. 
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>비신뢰성(unreliable)</DT
+><DD
+><P
+>							IP 는 데이타 그램이 목적지로 전달될 것이라는 것을 보증하지 않는다. 
+							IP 데이타 그램은 목적지로 가는 도중 여러가지 원인에 의해서 손실될수도 
+							있는데, IP 헤더에는 이러한 손실을 복구하기 위한 어떠한 장치도 마련되어 
+							있지 않다. 대신에 TCP(:12) 에 이러한 데이타 손실을 복구하기 위한 장치를 마련한다.
+						</P
+></DD
+><DT
+>비연결지향성(connectionless)</DT
+><DD
+><P
+>							호스트와 호스트간에 데이타 그램을 전달하기 위하여서 세션을 
+							개설하지 않는다. 모든 데이타 그램은 각각 독립적으로 
+							전달되게 된다. 받는 호스트에서는 해당 데이타 그램간의 연관성에 대해서 
+							전혀 알지 못한다. 만약 A와 B 데이타가 호스트로 전달되고, 
+							A가 첫번째 데이타 B가 두번째 데이타라고 한다면, 받은측에서는 
+							어느 데이타가 첫번째 데이타인지 알지 못한다. 또한 B데이타가 A데이타 
+							보다 먼저 전달될수도 있는데, IP는 이를 교정할수 있는 장치를  
+							가지지 않는다. 
+						</P
+></DD
+></DL
+></DIV
+>
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN40"
+>2.2&#51208;. IP 헤더</A
+></H2
+><P
+>			이번장에서는 IP 프로토콜의 헤더 포맷에 대해서 알아보도록하겠다. 
+			<DIV
+CLASS="FIGURE"
+><A
+NAME="AEN43"
+></A
+><P
+><B
+>&#44536;&#47548; 2. IP 헤더</B
+></P
+><P
+><IMG
+SRC="https://lh3.googleusercontent.com/-knB0RLjuP1w/UqxktvL08qI/AAAAAAAADcg/OGsjjX6llL0/s640/ipv4_packet_header.jpg"></P
+></DIV
+>
+			<P
+></P
+><DIV
+CLASS="VARIABLELIST"
+><DL
+><DT
+>Version: 4bits</DT
+><DD
+><P
+>							IP 포맷의 버젼을 나타낸다. 현재는 주로 IPv4 가 가장 널리 쓰이며, 
+							차세대 포맷으로 IPv6(:12) 가 제안되어서 조금씩 사용범위가 늘어나고 있는 추세이다. 
+						</P
+></DD
+><DT
+>IHL(Internet Header Length): 4bits</DT
+><DD
+><P
+>							IP 헤더의 길이다. 보통은 32bit 크기를 가지는 5개의 열로 이루어진다. 
+							나마지 하나의 열은(Options, Padding)는 옵션사항이다.  
+						</P
+></DD
+><DT
+>Type of Service: 8 bits</DT
+><DD
+><P
+>							인터넷에는 다양한 종류의 데이타 그램이 돌아다닌다. 이중 어떤것은 
+							상대적으로 중요한 데이터 그램이라서 데이타 전송에 있어서 다른 
+							데이타 그램보다 전송에 있어서 우선순위를 두어야 하는 그런경우가 있을것이다. 
+							이럴때 Type of Service 를 이용함으로써, 데이타 그램의 전송에 대한 우선순위 
+							등을 제어할수 있다. 간단한 형태의 QOS(Quality of service) 라고 볼수 있다. 
+						</P
+></DD
+><DT
+>Total Length: 16 bits</DT
+><DD
+><P
+>							IP 헤더와 실제 데이타의 크기를 모두 합친 크기이다. 
+						</P
+></DD
+><DT
+>Identification: 16 bits</DT
+><DD
+><P
+>							보내고자 하는 데이타 그램에 단편화(fragmentation)가 일어났을경우 
+						 	단편화된 각 데이타 그램을 구분할수 있는 일련의 번호이다. 
+							이 값을 이용해서 이 데이타 그램이 어떤 데이타 그램에서 단편화 된것인지를 
+							알수 있다. 
+						</P
+></DD
+><DT
+>Flags: 3bits</DT
+><DD
+><P
+>							데이타 그램의 단편화에 대한 정보를 알려주기 위해서 사용된다. 
+							첫번째 비트는 예비로 사용되며, 0으로 세팅된다. 
+							두번째 비트와 세번째 비트는 단편화된 데이타그램의 정보를 세팅하기 
+							위해서 사용된다. 두번째 비트가 0으로 세팅되었을경우 단편화된 데이타임을
+							의미하며, 1일경우 단편화 되지 않은 데이타를 의미한다. 3번째 비트가 0일경우 
+							마지막 단편화 데이타 임을 나타내며, 1일경우에는 단편화된 데이타가 
+							더 있다는것 나타낸다. 
+							<DIV
+CLASS="TABLE"
+><A
+NAME="AEN71"
+></A
+><P
+><B
+>&#54364; 1. Flags 세팅</B
+></P
+><TABLE
+BORDER="1"
+CLASS="CALSTABLE"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>0</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>예비 : 반드시 0</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>1</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>(DF) 0 = 단편화되었음, 1 = 단편화되지 않았음</TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>2</TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+>(MF) 0 = 마지막 단편화 데이타, 1 = 단편화 데이타 더 있음</TD
+></TR
+></TBODY
+></TABLE
+></DIV
+>
+						</P
+><P
+>							<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="90%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>     0   1   2
+a59 94
+						</PRE
+></TD
+></TR
+></TABLE
+>
+						</P
+></DD
+><DT
+>Fragment Offset: 13bits</DT
+><DD
+><P
+>							데이타그램에 대한 단편화가 일어났을경우 현재 데이타 그램이 원래 데이타 그램의 
+							몇번째 위치부터 단편화가 이루어 졌는지를 나타낸다. 
+						</P
+></DD
+><DT
+>Time To Live: 8bits</DT
+><DD
+><P
+>							TTL(:12) 이라고 불리우는 값으로 데이타 그램이 살아있을 시간을 지정한다. 
+							시간 이라고 해서 1시간 2시간 하는 시간이 아닌, 몇개의 라우터(:12)를 이동할수 있는지를 
+							명시함으로써 데이타 그램의 생존기간을 명시한다. IP 데이타 그램이 라우터를 경유하게 
+							되면 라우터는 TTL 필드를 조사해서 TTL의 값에 1을 빼준다. 만약 TTL 에 16의 값이 
+							세팅되어 있다면 16번째 라우터를 지날때 TTL 값은 0이 될것이며, 라우터는 이 데이타 
+							그램을 전달하지 않고 drop 시켜버린다. TTL 값을 명시하는 이유는 데이타 그램이 
+							라우터 상에서 무한 순환 하는 사태가 발생할수 있기 때문이다.  
+						</P
+></DD
+><DT
+>Header Checksum: 16bits</DT
+><DD
+><P
+>							Header 정보는 고정된게 아니고 필요에 따라 바뀌게 된다(TTL 과 같은정보). 
+							그러므로 헤더를 체크할수 있는 장치를 필요로 한다.  
+						</P
+></DD
+><DT
+>Source Address: 32bits</DT
+><DD
+><P
+>							데이타그램을 보내는 측의 IP 주소이다.  
+						</P
+></DD
+><DT
+>Destination Address: 32bits</DT
+><DD
+><P
+>							데이타그램을 받는측의 IP 주소이다. 
+						</P
+></DD
+><DT
+>Options: 크기변화</DT
+><DD
+><P
+>							프로그램의 특성에 의해서 특정한 기능을 추가하기 위해서 사용된다. 
+							이 필드는 필수적인 것이 아니다. 데이타 그램에 보안기능을 추가하거나, 
+							QOS(:12) 와 같은 기능, 혹은 라우팅관련된 부가적인 여러 기능을 추가하기 위해서 
+							사용된다. 
+						</P
+></DD
+><DT
+>Padding: 크기변화</DT
+><DD
+><P
+>							특별한 사용용도는 없다. 단지 32bit 크기를 맞추기 위해서 사용되며, 0으로 세팅된다. 		
+						</P
+></DD
+></DL
+></DIV
+>
+			
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN114"
+>2.3&#51208;. 경로배정(routing)</A
+></H2
+><P
+>			IP 데이타 그램의 목적지까지의 경로 배정은 Destination Address 필드에 세팅되어 
+			있는 IP 주소를 통하여서 이루어진다. 일단 데이타 그램이 보내질 목적지가 LAN(:12) 상에 
+		 	존재하면, 데이타 그램은 곧바로 해당 목적지 호스트로 보내어진다. 그렇지 않을경우 
+			데이타 그램은 설정되어 있는 default:::gateway(router) 로 보내어진다. 이것은 
+			router 의 ip routing:::table(:12) 에 의해서 목적지까지 경우되어서 최종 호스트로 
+			도착하게 된다. 여기에 대한 내용들은 이미 다른 기사에서 자세히 언급되어 있음으로 
+			이정도에서 끝내도록 하겠다. 
+		</P
+></DIV
+><DIV
+CLASS="SECTION"
+>
+d61 28
+a88 43
+[[adsense]]
+{{{#!html
+<HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN117"
+>2.4&#51208;. 데이타 단편화 (fragmentation)</A
+></H2
+><P
+>			위에서 IP 헤더 필드를 설명하면서 "데이타 단편화" 에 대한 언급을 했었다. 
+			이번장에서는 이러한 데이타 단편화가 일어나는 원인과 어떻게 단편화된 데이타를 
+			재조합 할수 있는지에 대해서 알아보도록 하겠다. 
+		</P
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN120"
+>2.4.1&#51208;. MTU(Maximum Transmission Unit)</A
+></H3
+><P
+>				MTU 란 다음 호스트에 한번에 보낼수 있는 데이타 그램의 크기이다.  
+				어쨋든 데이타를 한번에 몽땅 보낼수는 없으므로 호스트에서는 
+				이것을 적당한 크기로 잘라내야 할것이다. 그런데 이 적당한 크기라는게 
+				말그대로 적당한 크기로 망에 따라서 약간씩 그 크기가 다르며, 각 망에서 
+				통신하기에 가장 최적화된 크기의 MTU를 가지고 있다. MTU 사이즈는 
+				헤더를 제외한 data 만의 크기이다. 
+			</P
+><P
+>				이러한 MTU 사이즈는 여러번의 테스트를 걸쳐서 각망에 최적화된다라고 생각되는 
+				실험적인 크기로 정해진다. 우리가 보통 사용하는 이더넷 망의 경우 1500,  
+				ATM 망의 경우 9600 의 사이즈를 가지며, SLIP 의 경우 576 의 크기를 가진다. 또한 
+				이 값은 망 상태에 따라서 네트웍 관리자에 의해서 임의로 조정될수 있다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>[root@@localhost root]# ifconfig
+d104 11
+a114 82
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				이러한 MTU 의 크기는 ifconfig 를 통해서 확인 가능하며, 변경도 가능하다. 위의 ifconfig 정보는 
+				필자의 리눅스(:12)박스에서 측정한 크기이다. 필자의 리눅스 박스는 보통의 이더넷카드를 이용하므로 
+				MTU 1500 으로 세팅되어 있다. 
+			</P
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H3
+CLASS="SECTION"
+><A
+NAME="AEN125"
+>2.4.2&#51208;. 단편화및 재조립</A
+></H3
+><P
+>				인터넷은 다양한 환경을 가지는 망으로 서로 연결되어 있음으로, 데이타 그램이 목적지로 
+				이동하는 동안 다양한 MTU 크기를 가지는 망을 통과하게 된다. 만약 1500 의 MTU 크기를 가지는 
+				호스트에서 만들어진 데이타 그램이 576 MTU 크기를 가지는 SLIP 를 통과하게 되면 어떻게 될까 ?
+				1500 의 크기로는 576 크기를 통과할수 없음으로, 576 크기에 맞도록 데이타가 단편화 되게 된다. 
+				<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>   IPH : IP Header
+   +-----+------------------------+
+   | IPH | 1500                   | 
+   +-----+------------------------+
+  
+   +-----+-----+  +-----+-----+  +-----+-----+
+   | IPH | 576 |  | IPH | 576 |  | IPH | 348 |
+   +-----+-----+  +-----+-----+  +-----+-----+
+				</PRE
+></TD
+></TR
+></TABLE
+>
+				위의 그림처럼 1500 데이타는 2개의 576크기를 가지는 데이타 그램과 348 크기를 가지는 데이타 
+				그램으로 단편화 되게 될것이다. 또한 이 데이타 그램은 단편화 된다고 하더라도, IP 데이타 그램의 
+				특성을 가져야 함으로 각각 IP 헤더를 가지는 완전한 IP 데이타 그램의 형태가 될것이다.   
+			</P
+><P
+>				이렇게 단편화 되어서 전송되는 데이타 그램의 경우 목적지에 서로 다른 순서로 도달할수가 있을것이다. 
+				그러므로 단편화 작업을 수행할때, 각각의 단편화된 데이타 그램이 원래의 데이타그램의 어떤 위치에서 
+				단편화 되었는지등의 정보를 넣어둠으로써 최종도착지점에서 단편화된 데이타를 
+				다시 조립할수 있도록 만들어줘야 할것이다. 이러한 작업은 
+				커널의 IP를 담당하는 모듈에서 자동적으로 수행하며, IP 테이블의 Flags 와 Fragment Offset 
+				필드를 수정함으로써 단편화 정보를 유지하게 된다. 여기에는 현재의 데이타 그램의 단편화가 되어있는지 
+				단편화가 되어 있다면, 어떤 데이타그램에서 단편화 된것인지,  
+				몇번째 단편화 데이타 인지, 마지막 단편화 데이타 인지, 원래 데이타 그램에서 
+				offset 은 어느정도가 되는지등의 정보가 들어가게 된다. 최종적으로 목적지에서는 
+				데이타 그램의 Identification 과 Flag, Fragment Offset 을 이용해서 단편화된 데이타를 
+				재조립하게 될것이다. 
+			</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H2
+CLASS="SECTION"
+><A
+NAME="AEN130"
+>2.5&#51208;. IP 헤더의 예</A
+></H2
+><P
+>			다음은 IP 헤더의 가장간단한 예로 단편화가 일어나지 않은 데이타 그램의 IP 헤더의 형태이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    0                   1                   2                   3  
+d129 9
+a137 23
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			데이타 그램의 총 크기는 168bit 이고, 이중 헤더의 크기가 160bit 데이타의 크기가 8bit 임을 
+			알수 있다. IPv4 버전이며, 단편화가 일어나지 않았(Flg=0)음을 알수 있다. 
+		</P
+><P
+>			이번에는 좀더 복잡한 예로, 단편화가 일어난 데이타 그램의 경우이다. MTU 사이즈는 2048 이며, 
+			보내고자 하는데이타의 크기는 2500 이라고 가정하겠다.  
+		</P
+><P
+>			이것은 첫번째 데이타 그램이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+d158 6
+a163 21
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			데이타 그램의 총크기는 2048 + (32*5) = 2208 이 될것이다. 
+			데이타 그램의 단편화가 이루어졌음으로 Flg = 1 이 세팅된다. 
+			그리고 단편화된 데이타 중 첫번째 데이타 그램이므로 Fragment Offset 는 0이 
+			될것이다.  
+		</P
+><P
+>			다음은 두번째 데이타 그램이다. 
+			<TABLE
+BORDER="0"
+BGCOLOR="#E0E0E0"
+WIDTH="100%"
+><TR
+><TD
+><PRE
+CLASS="SCREEN"
+>    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+a183 37
+			</PRE
+></TD
+></TR
+></TABLE
+>
+			Identification 이 112 임을 주목하라. 마지막 단편화 데이타 이므로 
+			(더이상 단편화된 데이타가 없음) Flg 가 0으로 세팅되어있다. 
+			이 데이타 그램의 Total Length 는 (32 * 5) + (2500 - 2048) = 612 
+			가 될것이다. 그리고 이 단편화된 데이타 그램이 원래 데이타 그램에서 
+			단편화된 위치는 2048 이 될것임으로 Fragment Offset 는 2048 이 
+			될것이다.  
+		</P
+></DIV
+></DIV
+><DIV
+CLASS="SECTION"
+><HR><H1
+CLASS="SECTION"
+><A
+NAME="AEN139"
+>3&#51208;. 결론</A
+></H1
+><P
+>		이상 IP 프로토콜에 대한 좀더 자세한 내용들을 알아보았습니다. 
+		이러한 내용들에 대한 좀더 자세한 내용을 원한다면 
+		<A
+HREF="http://rfc.sunsite.dk/rfc/rfc791.html"
+TARGET="_top"
+>RFC791</A
+> 와 
+		W. Richard Stevens 의 TCP/IP Illustrated Volume 1 을 참고하기 바랍니다. 
+	</P
+></DIV
+></DIV
+></BODY
+></HTML
+>
+d185 4
+@

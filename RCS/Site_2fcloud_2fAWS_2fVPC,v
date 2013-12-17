@@ -1,10 +1,65 @@
-head	1.6;
+head	1.17;
 access;
 symbols;
 locks
-	root:1.6; strict;
+	root:1.17; strict;
 comment	@# @;
 
+
+1.17
+date	2013.12.08.01.34.39;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2013.12.07.16.12.19;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2013.12.07.15.42.20;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2013.12.07.15.39.03;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2013.12.07.14.44.38;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2013.12.07.14.12.19;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2013.12.07.14.10.30;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2013.12.07.13.27.31;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.12.06.15.14.25;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2013.12.06.15.12.28;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.12.05.15.55.02;	author root;	state Exp;
+branches;
+next	1.6;
 
 1.6
 date	2013.04.02.16.25.49;	author root;	state Exp;
@@ -42,7 +97,7 @@ desc
 @
 
 
-1.6
+1.17
 log
 @128.134.217.152;;yundream;;
 @
@@ -51,12 +106,62 @@ text
 
 [[TableOfContents]]
 == 개요 ==
-AWS VPC를 이용하면, AWS region에 private network를 만들 수 있다. AWS는 16비트 크기의 충분한 네트워크를 제공한다. 여기에 라우터를 이용해서 다층 구조의 네트워크를 구성할 수 있다.
+=== VPC 소개 ===
+AWS VPC를 이용하면, AWS region에 논리적인 가상의 네트워크를 만들 수 있다. Public network상에 private network를 구축하도록 지원하는 서비스라고 보면 되겠다. 이 가상의 네트워크에서 유저는 [wiki:man/12/IP IP] 주소, 서브넷, 라우팅 테이블, 인터넷 게이트웨이 등을 자유롭게 구성할 수 있다. 
 
-VPC를 이용해서 다층 네트워크를 만들어 보려한다.
+=== VPC 의 장점 ===
+  * 격리된 자신만의 네트워크를 구성할 수 있다. 
+  * 격리된 네트워크는 subnet 관리가 가능하며, 관리자는 인터넷에 노출될 public subnet과 그렇지 않은 private subnet을 나눌 수 있다. 웹 서버등은 public subnet에 두고, 외부로 부터 격리가 필요한 데이터베이스, WAS등은 private subnet에 두는 등의 자오로운 구성이 가능하다.
+  * 라우터를 만들고 설정 할 수 있다. 라우터를 이용해서 패킷의 경로를 재 조정할 수 있다. public subnet에 [wiki:Site/System_management/NAT NAT]를 만들고 private subnet의 패킷을 NAT를 경유하게 해서 인터넷 접근이 가능하게 하는 등의 구성이 가능하다.   
+  * VPN을 구성해서 기업의 데이터 센터를 AWS로 확장할 수 있다.
+
+=== VPC 구성요소 정리 ===
+VPC를 자세히 설명하기 전에 VPC의 구성요소들을 살펴볼 필요가 있을 것 같아서, 그림으로 정리했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1bt8pRzcTmOtLK0Q8VuOIjGRNoB7pztwMk2zWzt_rgdY/pub?w=588&amp;h=461">
+}}}
+
+==== Subnets ====
+네트워크 '''Subnet'''의 그 Subnet이다. VPC를 만들면 10.0.0.0/16 주소가 할당되는데, 관리자는 이 16비트 주소를 subnet으로 나눠서 사용할 수 있다. 
+
+10.50.0.0/16 네트워크를 가지는 VPC를 만들었다면
+  * 10.50.10.0/24
+  * 10.50.20.0/24
+  * 10.50.30.0/24
+  * 10.50.40.0/24
+이런식으로 subnet을 나눌 수 있다.
+==== Public subnet ====
+인터넷으로 연결되는 서브넷이다. 라우팅 테이블에 Internet Gateway가 있다면, Public subnet이 된다. Public subnet에 생성된 인스턴스에 EIP를 할당하면, 인터넷에서 인스턴스로 접근할 수 있다.
+
+==== Private subnet ====
+인터넷에서 격리된 서브넷이다. Public subnet과 별다른 차이가 있는건 아니다. 라우팅 테이블에 Internet Gateway로 향하는 경로가 없다면, private subnet이다. private subnet의 instance는 [wiki:Site/cloud/AWS/EIP EIP]를 가지더라도 인터넷에서 접근할 수 없다. 
+
+==== Route Tables ====
+VPC를 만들면 가상의 Router가 만들어진다. 관리자는 Route Tables를 수정해서 트래픽 흐름을 제어할 수 있다. 예를들어 private subnet에 생성된 인스턴스들은 인터넷에서의 접근은 불 가능하지만, 인터넷으로는 나갈 수 있어야 한다. Public subnet에 [wiki:Site/System_management/NAT NAT] 인스턴스를 두고 0.0.0.0/0 트래픽을 NAT로 보내도록 Route tables을 추가하는 것으로 인터넷에 접근하도록 할 수 있다. [wiki:Site/System_management/VPN/OpenVPN OpenVPN]등의 VPN 소프트웨어를 이용해서 VPN으로 연결도 route tables을 조작해서 설정할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1W_k8Y34mMU_fQecX5w6XpGRiFltl3YnjA_ugra_AgZY/pub?w=584&amp;h=458">
+}}}
+
+VPC를 활용하기 위한 가장 중요한 요소라 할 수 있다.
+
+==== Internet Gateway ====
+인터넷으로 트래픽을 보내기 위한 게이트 웨이다. Route Tables에 Internet Gateway가 있는지 없는지에 따라서 '''Public subnet'''과 '''Private Subnet'''으로 구분된다. Inter Gateway는 '''IGW'''라고 부르기도 한다.
+
 == VPC 구성 ==
 === 단일 네트워크 구성 ===
-하나의 네트워크로 구성한다. 간단하게 구성할 수 있지만, 모든 자원이 같은 브로드케스트 도메인에 놓이기 때문에 보안성이 떨어진다는 단점이 있다. 
+하나의 Public subnet을 가지는 단순한 구성이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1SmkFYM3YhM5-PHKSznehVFz2brs1SJ0zKcchr54Ibd0/pub?w=537&amp;h=447">
+}}}
+
+"네트워크와 시스템에 대한 최소한의 지식만 가지고 있어도 인프라를 구성할 수 있다"는게 AWS의 장점이긴 하지만, VPC의 경우에는 좀 다르다. 상당한 수준의 네트워크 지식을 가지고 있어야 제대로 활용할 수 있다. 
+
+만약 아직 VPC를 제대로 활용할 만한 지식을 가지고 있지 않다면, 하지만 VPC 환경의 장점을 사용하고 있다면 초기에는 하나의 public subnet을 가지는 구조로 시작하는 것도 괜찮다. 하나의 구조로 시작한 후 VPC(그리고 네트워크에 대한)관리 경험이 쌓이면 그때, 다층 네트워크 구조로 확장하면 된다.
+
+물리적인 인프라라면, 초기의 네트워크 구조를 바꾸는게 굉장히 어렵겠지만 AWS의 VPC는 간단히 변경할 수 있다.
 
 === 다층 네트워크 구성 ===
 나는 다층 네트워크 구성을 만들 것이다. 즉 2개 이상의 subnet을 가지는 네트워크를 만든다. 나는 총 5개의 subnet으로 이루어진 VPC 네트워크를 설계할 것이다. 
@@ -112,7 +217,7 @@ Private subnet의 rougint 테이블
 
 == 또 다른 구성 ==
 === DMZ trust 구성 ===
-VPC가 비록 public subnet와 private subnet을 구성하도록 하고 있기는 하지만 igw가 있느냐 없느냐의 차이일 뿐 별다른 의미를 가지지는 못한다. 따라서 다층 네트워크 구조를 만들었다고 하더라도 우리가 알고 있는 그런 DMZ trust 구성은 아니다. Security group을 이용한 트래픽 필터링이 가능하기는 하지만, 이건 호스트 레벨의 필터링일 뿐으로 제대로 구성하려면 router와 router 사이에 방화벽을 둬야 한다. 
+VPC가 비록 public subnet와 private subnet을 구성하도록 하고 있기는 하지만 igw가 있느냐 없느냐의 차이일 뿐 별다른 의미를 가지지는 못한다. 따라서 다층 네트워크 구조를 만들었다고 하더라도 우리가 알고 있는 그런 [wiki:man/12/dmz DMZ] trust 구성은 아니다. Security group을 이용한 트래픽 필터링이 가능하기는 하지만, 이건 호스트 레벨의 필터링일 뿐으로 제대로 구성하려면 router와 router 사이에 방화벽을 둬야 한다. 
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1PgP6xmMrGZ1HHgUgOAqQQBDOK2sAj2_rwNSjaq3mMdU/pub?w=468&amp;h=412">
@@ -120,8 +225,178 @@ VPC가 비록 public subnet와 private subnet을 구성하도록 하고 있기�
 
 대략 이런 구조다. 방화벽은 리눅스 인스턴스로 구성하면 된다. 단 VPC 환경안에서 굳이 이런 복잡한 구성이 필요한지에 대한 의문은 있다. 내 생각에 이건 (구성하는 재미는 있겠지만) 배보다 배꼽이 더 큰 구성인 것 같다. 그냥 Security group으로 충분하지 싶다.
 
+== Security ==
+=== Security Groups ===
+Security Groups는 아마존에서 제공하는 '''방화벽 정책 적용 툴'''이다. 이 툴을 이용해서 유저는 입/출력을 허용할 IP와 PORT 번호를 지정할 수 있다. 인스턴스는 반드시 하나 이상의 securigy groups를 가지고 있어야 한다.
+
+EC2 classic과 VPC의 Security group는 기능에 차이가 있다.
+  * EC2 classic은 '''Inbound 트래픽'''만 제어할 수 있다. 
+  * VPC는 '''Inbount와 Outbound 트래픽''' 모두를 제어할 수 있다.
+
+=== Network ACLs ===
+Security Groups와 같은 '''방화벽 정책 적용 툴'''이다. 주요한 차이점은 Security group은 '''인스턴스 단위의 방화벽''' 정책 툴인 반면, Network ACLs는 '''Subnet 단위의 방화벽'''정책 툴이라는 점이다. Security group와 Network ACLs의 차이점을 정리했다. 
+
+||Security Group                                        ||Network ACL                                        ||
+||인스턴스 레벨에서 제어 한다.                          ||Subnet 단위로 제어한다.                            ||
+||Allow 룰만 적용할 수 있다.                            ||Allow 룰과 deny룰을 적용할 수 있다.                ||
+||리턴 트래픽은 자동으로 허용된다.                      ||리턴 트래픽에 대한 정책이 분리된다.                ||
+||트래픽을 허용할지 판단하기 전에 모든 룰을 평가 한다.  ||We process rules in number order when deciding whether to allow traffic        ||
+||인스턴스 단위로 일일이 적용을 해줘야 한다.            ||Subnet에 포함된 모든 인스턴스에 자동으로 적용된다. ||
+
+
 == 히스토리 ==
   * 작성일 : [[Date(2013-04-02T16:07:25)]]
+  * 수정
+     * [[Date(2013-12-07T15:39:03)]] : VPC 소개 부분 보강   
+@
+
+
+1.16
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d135 6
+a140 6
+|| Security Group                                        || Network ACL                                        ||
+|| 인스턴스 레벨에서 제어 한다.                          || Subnet 단위로 제어한다.                            ||
+|| Allow 룰만 적용할 수 있다.                            || Allow 룰과 deny룰을 적용할 수 있다.                ||
+|| 리턴 트래픽은 자동으로 허용된다.                      || 리턴 트래픽에 대한 정책이 분리된다.                ||
+|| 트래픽을 허용할지 판단하기 전에 모든 룰을 평가 한다.  || We process rules in number order when deciding whether to allow traffic        ||
+|| 인스턴스 단위로 일일이 적용을 해줘야 한다.            || Subnet에 포함된 모든 인스턴스에 자동으로 적용된다. ||
+@
+
+
+1.15
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d126 6
+d133 9
+@
+
+
+1.14
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d43 1
+a43 1
+VPC를 활용하기 위한 가장 중요한 요소라 할 만 하다.
+d60 1
+a60 1
+물리적인 인프라라면, 초기의 네트워크 구조를 바꾸는게 굉장히 어렵겠지만 AWS의 VPC는 간단히 바꿀 수 있다. 
+@
+
+
+1.13
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d124 4
+d130 2
+@
+
+
+1.12
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d116 1
+a116 1
+VPC가 비록 public subnet와 private subnet을 구성하도록 하고 있기는 하지만 igw가 있느냐 없느냐의 차이일 뿐 별다른 의미를 가지지는 못한다. 따라서 다층 네트워크 구조를 만들었다고 하더라도 우리가 알고 있는 그런 DMZ trust 구성은 아니다. Security group을 이용한 트래픽 필터링이 가능하기는 하지만, 이건 호스트 레벨의 필터링일 뿐으로 제대로 구성하려면 router와 router 사이에 방화벽을 둬야 한다. 
+@
+
+
+1.11
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d6 1
+a6 1
+AWS VPC를 이용하면, AWS region에 논리적인 가상의 네트워크를 만들 수 있다. Public network상에 private network를 구축하도록 지원하는 서비스라고 보면 되겠다. 이 가상의 네트워크에서 유저는 IP 주소, 서브넷, 라우팅 테이블, 인터넷 게이트웨이 등을 자유롭게 구성할 수 있다. 
+d34 1
+a34 1
+인터넷에서 격리된 서브넷이다. Public subnet과 별다른 차이가 있는건 아니다. 라우팅 테이블에 Internet Gateway로 향하는 경로가 없다면, private subnet이다. private subnet의 instance는 EIP를 가지더라도 인터넷에서 접근할 수 없다. 
+d37 1
+a37 1
+VPC를 만들면 가상의 Router가 만들어진다. 관리자는 Route Tables를 수정해서 트래픽 흐름을 제어할 수 있다. 예를들어 private subnet에 생성된 인스턴스들은 인터넷에서의 접근은 불 가능하지만, 인터넷으로는 나갈 수 있어야 한다. Public subnet에 [wiki:Site/System_management/NAT NAT] 인스턴스를 두고 0.0.0.0/0 트래픽을 NAT로 보내도록 Route tables을 추가하는 것으로 인터넷에 접근하도록 할 수 있다. OpenVPN등의 VPN 소프트웨어를 이용해서 VPN으로 연결도 route tables을 조작해서 설정할 수 있다. 
+@
+
+
+1.10
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d11 1
+a11 1
+  * 라우터를 만들고 설정 할 수 있다. 라우터를 이용해서 패킷의 경로를 재 조정할 수 있다. public subnet에 NAT를 만들고 private subnet의 패킷을 NAT를 경유하게 해서 인터넷 접근이 가능하게 하는 등의 구성이 가능하다.   
+d37 7
+a43 1
+VPC를 만들면 가상의 Router가 만들어진다. 관리자는 Route Tables를 수정해서 트래픽 흐름을 제어할 수 있다. 
+d50 11
+a60 1
+하나의 네트워크로 구성한다. 간단하게 구성할 수 있지만, 모든 자원이 같은 브로드케스트 도메인에 놓이기 때문에 보안성이 떨어진다는 단점이 있다. 
+@
+
+
+1.9
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d15 6
+a41 6
+지금까지의 내용을 하나의 그림으로 정리했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1bt8pRzcTmOtLK0Q8VuOIjGRNoB7pztwMk2zWzt_rgdY/pub?w=588&amp;h=461">
+}}}
+
+@
+
+
+1.8
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d24 1
+a24 1
+===== Public subnet ====
+d27 1
+a27 1
+===== Private subnet ====
+@
+
+
+1.7
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d12 29
+a40 1
+  * VPN을 구성해서 기업의 데이터 센터를 AWS로 확장할 수 있다. 
+@
+
+
+1.6
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d5 8
+a12 1
+AWS VPC를 이용하면, AWS region에 private network를 만들 수 있다. AWS는 16비트 크기의 충분한 네트워크를 제공한다. 여기에 라우터를 이용해서 다층 구조의 네트워크를 구성할 수 있다.
+a13 1
+VPC를 이용해서 다층 네트워크를 만들어 보려한다.
 @
 
 

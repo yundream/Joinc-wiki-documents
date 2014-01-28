@@ -1,10 +1,35 @@
-head	1.1;
+head	1.6;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.6; strict;
 comment	@# @;
 
+
+1.6
+date	2014.01.26.14.13.45;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.01.26.14.04.09;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.01.26.11.44.58;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.01.26.04.04.39;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.01.26.02.36.24;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2013.02.04.01.54.24;	author root;	state Exp;
@@ -17,33 +42,60 @@ desc
 @
 
 
-1.1
+1.6
 log
-@106.240.8.226;;yundream;;
+@119.64.102.68;;yundream;;
 @
 text
 @#title moniwiki 설치
 
-작성 중...
-== 환경 ==
-  * Ubuntu 12.04
-  * apache2 + php5
-  * moniwiki 1.1.5 : http://kldp.net/projects/moniwiki/download
+== 모니위키에 대하여 ==
+PHP기반의 국산 위키엔진. [http://rigvedawiki.net/r1/wiki.php 엔하위키], [http://no-smok.net 노스모크] 그리고 joinc등이 대표적인 모니위키 사이트다.
+
+=== 특징 ===
+데이터베이스를 사용하지 않는다. 모든 문서는 text파일로 저장된다. 예를 들어 "language/c/debug"라는 문서를 만들었다면 "language_2fc_2fdebug"이름의 일반파일로 저장된다. 파일 이름 변환 규칙은 1. URL 인코딩 한 후, 2. %를 언더바로 변환하는 식이다. 문서의 버전관리는 RCS를 이용한다. 
+
+파일로 저장하기 때문에 관리가 편할 수도 있지만 파일의 갯수가 늘어날 경우 성능저하가 발생할 수 있다. 만건 이상의 중대규모 위키에서 문제가 발생할 수 있다고 한다. 엔하 위키를 제외하고 만건 이상의 문서를 다루는 사이트가 있는지는 잘 모르겠는데, 어쨋든 고려해야 할 문제다.
+
+만건이상의 컨텐츠를 유지하려 하면, 사이트 튜닝이 필수적이다. Joinc의 경우에는 
+  1. 각 문서에 대한 cache 유지 
+  1. 디렉토리 인덱스 생성 
+  1. 검색을 위한 문서 색인
+등의 방법을 사용하고 있다.
+
+Plugin 방식으로 필요한 기능을 쉽게 확장할 수 있다. 아마 다른 어떤 위키 시스템 보다 확장이 쉬울거다. Joinc의 경우 아래와 같은 모듈을 개발해서 사용하고 있다.
+  1. 검색엔진 모듈 
+  1. 디렉토리 네비게이션 모듈 
+  1. Front 컨텐츠 관리 모듈 
+  1. (지금은 사용하고 있지 않지만) 구글 애드센스 모듈 
+
+개인적으로 모니위키를 사용하는 가장 큰 이유는 플러그인을 이용한 확장이 쉽기 때문. 사내에서 사용하는 모니터링 시스템, 이벤트 관리 시스템을 모니위키를 이용해서 개발하기도 했다.  
+
+누구든지 문서작업에 참여할 수 있다는 원칙에 충실하다. 아이디/패스워드 기반의 단순한 인증 시스템을 가지고 있을 뿐, 유저 혹은 페이지 단위의 권한 시스템은 가지고 있지 않다. 처음 위키가 나왔을 때는 단순한 인증시스템이 문제가 아니었으나, 위키가 여기저기 널리 사용되면서 부터 문제가 되기 시작한다.   
+
+내 경우만 하더라도 회사에 위키 시스템을 도입하려고 하면, 인증/권한 시스템의 부재로 모니위키를 선택하기가 꺼려진다. 조직이 조금만 커지면, 외부로의 공개여부는 물론이고 내부 조직간에도 공개 범위를 제어할 수 있어야 하기 때문이다. 
 
 == 설치 ==
-Apache + php 설치 
+=== 환경 ===
+  * 우분투 리눅스 13.10 server 
+  * apache2 + php5
+  * moniwiki 1.2.2
+  * Virtualbox : 우분투 리눅스 VM을 만들어서 moniwiki를 설치하고 테스트 했다.
+
+=== apache2, php5 설치===
+apt-get으로 설치했다.
 {{{#!plain
 # apt-get install apache2
 # apt-get install php5
 }}}
 
-Document Root : /var/www/moniwiki
+'''Document Root''' 즉 moniwiki가 설치될 디렉토리는 /var/www/moniwiki 로 하기로 했다. moniwiki를 다운로드 받은 다음 /var/www 디렉토리밑에 설치했다. moniwiki는 [http://dev.naver.com/projects/moniwiki naver 개발자 센터]에서 다운로드 받았다. (2014년 1월)현재 모니위키 버전은 1.2.2다.
 {{{#!plain
-# mv moniwiki-1.1.5.tgz /var/www
-# tar -xvzf moniwiki-1.1.5.tgz
+# mv moniwiki-1.2.2.tgz /var/www
+# tar -xvzf moniwiki-1.2.2.tgz
 }}}
 
-apache 서버 설정 변경
+apache 설정을 변경한다.
 {{{#!plain
 # cat /etc/apache2/sites-enabled/000-default 
 ....
@@ -65,24 +117,122 @@ apache 서버 재 시작
 # /etc/init.d/apache restart
 }}}
 
-접근하면 설정화면이 뜬다.
+=== moniwiki 설정 ===
+웹 브라우저로 VM에 접근하면 아래와 같은 설치화면이 뜬다. '''Agree'''를 클릭하고 다음으로 넘어가자.
+
+https://lh5.googleusercontent.com/-9YiAPDaZfR4/UuUZpz10xVI/AAAAAAAADdg/ZQFdLlHIp8U/s640/moniwiki01.png
+
+설정파일을 건드리기 위해서 파일 권한설정을 해줘야 한다. monisetup.sh를 실행하거나 chmod를 이용해서 직접 권한을 변경하면 된다. 권한 변경후 '''다시부르기'''를 클릭한다. 
+
+https://lh6.googleusercontent.com/-LCEIZKs7zvo/UuUZp6IJuTI/AAAAAAAADdc/n4Nt8_4JtZY/s640/moniwiki02.png
 
 설정데이터 등을 저장하기 위해서 파일 권한을 변경한다.
 {{{#!plain
 # chmod 777 /var/www/moniwiki/data/ /var/www/moniwiki/
 }}}
 
-Moniwiki root 패스워드를 입력한다. Moniwiki는 개방형 위키로 문서에 대한 유저권한이라는게 없다. 다른 유저라고 할지라도 문서를 마음대로 편집하고 삭제할 수 있다. 따라서 root 유저라고 해서 별다른 권한이 있는 것은 아니다. 하지만 혹시 모르니 어쨋든 root 패스워드를 입력하자. 
 
-wikiseed를 설치한다. wikiseed에는 moniwiki 매크로들이 설치돼 있다.
+이제 moniwiki 상세 설정으로 넘어간다. 다른 것들은 신경쓸 것 없고, 아래 두개의 내용만 신경쓰면 된다.
+  1. 관리자 비밀번호 : 관리자는 위키의 모든 페이지에 대한 권한을 행사할 수 있다. 
+  1. 위키씨앗 : 위키씨앗은 '''추가적인 플러그인'''이다. 위키씨앗을 설치하면, 도움말, 칼랜더, 투표매크로등 다양한 기능들을 추가할 수 있다. 쓸데없는 것들이 좀 있기는 한데, 나중에 정리할 수 있으니 일단 설치하자.
 
-보안을 위해서 권한설정을 되돌린다. 
+보안을 위해서 권한설정을 되돌리는 것으로 설치완료
 {{{#!plain
 # cd /var/www/moniwiki
 # sh secure.sh
 }}}
 
-
 == 히스토리 ==
   * 문서작성 : [[Date(2013-02-04T01:54:24)]]
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a72 1
+{{{#!html
+d74 1
+a74 1
+}}}
+a76 2
+{{{#!hml
+}}}
+d78 1
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a29 1
+
+d31 1
+a31 1
+  * Ubuntu 12.04
+d33 2
+a34 1
+  * moniwiki 1.1.5 : http://kldp.net/projects/moniwiki/download
+d36 2
+a37 2
+== 설치 ==
+Apache + php 설치 
+d43 1
+a43 1
+Document Root : /var/www/moniwiki
+d45 2
+a46 2
+# mv moniwiki-1.1.5.tgz /var/www
+# tar -xvzf moniwiki-1.1.5.tgz
+d49 1
+a49 1
+apache 서버 설정 변경
+d71 10
+a80 1
+접근하면 설정화면이 뜬다.
+a86 1
+Moniwiki root 패스워드를 입력한다. Moniwiki는 개방형 위키로 문서에 대한 유저권한이라는게 없다. 다른 유저라고 할지라도 문서를 마음대로 편집하고 삭제할 수 있다. 따라서 root 유저라고 해서 별다른 권한이 있는 것은 아니다. 하지만 혹시 모르니 어쨋든 root 패스워드를 입력하자. 
+d88 3
+a90 1
+wikiseed를 설치한다. wikiseed에는 moniwiki 매크로들이 설치돼 있다.
+d92 1
+a92 1
+보안을 위해서 권한설정을 되돌린다. 
+a97 1
+
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d23 9
+a31 1
+== 환경 ==
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d17 6
+@
+
+
+1.1
+log
+@106.240.8.226;;yundream;;
+@
+text
+@d3 14
+a16 1
+작성 중...
 @

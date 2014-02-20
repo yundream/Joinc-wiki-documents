@@ -1,0 +1,170 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2014.02.02.15.35.38;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.02.02.08.52.15;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.01.30.04.07.31;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fJavascript_2fjQuery_2fLearnjQuery_2fEvents
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title jQuery - Events
+
+[[TableOfContents]]
+== Events ==
+jQuery를 이용하면 간단하게 selection에 이벤트 핸들러를 붙일 수 있다. 이벤트가 발생하면 proided 함수가 실행되는데, 이벤트가 발생할 앨리먼트에 대한 '''this'''를 가지고 있다. 
+
+이벤트 핸들링 함수는 이벤트 객체(event object)를 받을 수 있다. 이 객체를 이용해서 이벤트의 기본동작을 방지하고 이벤트의 성질을 결정할 수 있다. 이벤트 객체에 대한 자세한 내용은 [http://api.jquery.com/category/events/event-object/ Event Object]를 참고하자.
+== jQuery Event Basics ==
+=== jQuery 이벤트 기초 ===
+==== DOM 앨리먼트에 대한 이벤트 응답 설정하기 ====
+jQuery는 페이지 앨리먼트에 대해서 event-driven 응답을 설정한다. 이들 이벤트들은 종종 페이지에 대한 종단 유저(end user)에 대한 트리거들, 예컨데 마우스 포인터의 이동이나 폼 앨리먼트의 작성들에 의해서 발생(trigger)된다. 페이지의 로드와 언로드 이벤트의 경우에는 브라우저가 이벤트를 발생하는 경우도 있다.
+
+jQuery는 브라우저의 모든 기본(native)이벤트들을 다루기 위한 메서드들을 제공한다. '''.click()''', '''.focus()''', '''.blur()''', '''.change()'''과 jQuery가 제공하는 '''.on'''메서드들이다.
+
+{{{#!plain
+$("p").click(function() {
+  console.log("You clicked a paragraph!")
+});
+}}}
+
+{{{#!plain
+// .on() 메서드를 이용해서 동일한 일을 할 수 있다.
+$("p").on("click", (function() {
+  console.log("You clicked a paragraph!")
+});
+}}}
+==== Inside the Event Handler Function ====
+모든 이벤트 핸들러 함수는 메서드와 프로퍼티(properties)들을 포함한 이벤트 객체를 받는다. 예를들어 이벤트 객체가 받는 가장 일반적인 메서드는 .preventDefault()로, 이 메서드를 이용해서 기본 이벤트의 발생을 막을 수 있다. 아래 이벤트 객체가 가지는 유용한 프로퍼티와 메서드를 설명한다.
+
+'''pageX, pageY''' : 이벤트가 발생한 마우스의 위치.
+
+'''type''' : "click"과 같은 이벤트 타입
+
+'''whitch''' : 
+
+'''data''' : 이벤트가 발생할 때, 넘길 데이터
+{{{#!plain
+$( "input" ).on(
+    "change",
+    { foo: "bar" }, // associate data with event binding
+    function( eventObject ) {
+        console.log("An input value has changed! ", eventObject.data.foo);
+    }
+);
+}}}
+
+'''target''': 이벤트가 발생한 DOM 앨리먼트
+
+'''namespace''' : 
+
+'''timeStamp''' : 1970년 1월 1일부터 이벤트가 발생한 시간까지의 차이를 밀리세컨드로 계산한 값을 알려준다. 
+
+'''preventDefault()''' : 이벤트에 대한 기본 행동을 막는다. (예. link를 클릭할 경우 해당 페이지로 이동하는 행동)  
+
+'''stopPropagation()''' : 상위 앨리먼트먼트로 이벤트가 전달되지 않도록 한다.
+
+이와 더불어 이벤트 핸들링 함수의 '''this'''키워드를 이용해서 이벤트 객체에 바인딩된 DOM 앨리먼트에 접근할 수 있다. 아래는 일반적인 사용방법이다. 
+{{{#!plain
+var $this = $(this)
+}}}
+
+아래는 예제 코드다.
+{{{#!plain
+$( "a" ).click(function( eventObject ) {
+    var $this = $( this );
+    // 이벤트가 발생한 앨리먼트의 href 정보를 읽어와서 evil 문자열과 일치하는지
+    // 확인한다.
+    if ( $this.attr( "href" ).match( /evil/ ) ) {
+        eventObject.preventDefault();
+        $this.addClass( "evil" );
+    }
+});
+}}}
+
+==== Multiple 이벤트 설정 ====
+때대로 두개 이상의 이벤트를 처리해야 하는 경우가 있다. 이때는 '''.on()'''안에 처리해야 할 이벤트를 공백문자를 구분자로 나열하면 된다. 이벤트에 상관없이 동일한 코드를 실행한다. 
+{{{#!plain
+$( "input" ).on(
+    "click change",  // bind listeners for multiple events
+    function() {
+        console.log( "An input was clicked or changed!" )
+    }
+);
+}}}
+
+만약 이벤트별로 다른 핸들러를 실행하기를 원한다면 '''.on()'''안에 key/pair 형식으로 이벤트와 이벤트 핸들러를 명시하면 된다. 
+{{{#!plain
+$( "p" ).on({
+    "click": function() { console.log( "clicked!" ); },
+    "mouseover": function() { console.log( "hovered!" ); }
+});
+}}}
+
+==== Namespacing 이벤트 ====
+==== Tearing Down Event Listeners ====
+
+
+== Event Helpers ==
+== Introducing Events ==
+== Handling Events ==
+== Inside the Event Handling Function ==
+== Understanding Event Delegation ==
+== Triggering Event Handlers ==
+== History of jQuery Events ==
+== Introducing Custom Events ==
+== jQuery Event Extensions ==
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d27 70
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d5 32
+a36 10
+=== jQuery Event Basics ===
+=== Event Helpers ===
+=== Introducing Events ===
+=== Handling Events ===
+=== Inside the Event Handling Function ===
+=== Understanding Event Delegation ===
+=== Triggering Event Handlers ===
+=== History of jQuery Events ===
+=== Introducing Custom Events ===
+=== jQuery Event Extensions ===
+@

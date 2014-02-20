@@ -1,0 +1,509 @@
+#title jquery - ajax
+
+[[TableOfContents]]
+== Ajax ==
+전통적으로 웹 페이지의 내용을 업데이트하기 위해서는 웹 페이지를 다시 요청(reload)해야 했다. 웹 메일의 경우, 메일 박스에 새로운 메일이 도착했는지를 확인하기 위해서 F5 키를 누르는 식으로 웹 페이지를 통째로 받아와야 했다. 유저의 키입력이 필요하며, 전체 페이지를 로딩하는 거라서 반응이 매우 느렸기 때문에, 현대적인 웹 애플리케이션을 만드는데 큰 문제였다. 
+
+웹이 아닌 다른 애플리케이션 프로그램이었다면, 단지 변경된 내용만 가져와서 화면에 뿌렸을 것이다. 이 문제를 풀기 위해서 2003년 모든 주요 웹 브라우저들은 XMLHttpRequest(XHR) 객체를 지원하기 시작했다. 이로써 웹 브라우저는 웹서버에게 변경된 내용만 요청하고 출력할 수 있게 됐다. 
+
+XMLHttpRequest 객체는 Ajax(Asynchronous JavaScript and XML)기술을 구성하는 기술 중 하나다. Ajax를 이용하면, XMLHttpRequest API를 이용해서 페이지 리로드 없이 브라우저와 서버간 데이터 통신을 할 수 있다. Ajax를 이용하면서 구글 맵과 Gmail과 같은 상호작용성이 뛰어난 웹 기반 애플리케이션을 사용할 수 있게 됐다.  
+
+Ajax 요청은 javaScript code에 의해서 만들어진다. JavaScript 코드는 [wiki:man/12/URL URL]로 요청을 보내고 응답을 받는데, 이때 응답에 대한 콜백 함수(callback function)을 호출한다. 이 콜백함수를 이용해서 응답을 처리하면 된다. 요청은 비동기적으로 처리되기 때문에, 다른 요청이 실행되는 동안에도 콜백이 응답을 처리할 수 있다.  
+
+불행하게도 Ajax는 브라우저마다 구현에 있어서 차이가 있다. 이는 개발자가 브라우저에 따라서 작동하는 서로 다른 코드를 만들어야 한다는 것을 의미한다. 다행히 jQuery는 브라우저의 차이를 추상화해서 동일한 Ajax 구현이 가능하도록 지원하고 있다. jQuery는 $.ajax() 메서드의 모든 기능을 지원하며, $.get(), $getScript(), $.getJSON(), $.post() 그리고 $().load()를 이용해서 편리하게 Ajax의 기능을 사용할 수 있다.  
+
+
+Ajax이름에 XML이 포함돼 있긴 하지만, jQuery는 XML을 사용하지 않는다. 대신 plain HTML이나 JSON을 이용해서 데이터를 처리한다.
+
+일반적으로 Ajax는 across domain에서 작동하지 않는다. 예를들어 example1.com에서 로딩된 웹페이지는 example2.com에 대해서 Ajax 호출을 할 수 없다. 최근의 브라우저는 서로 다른 도메인으로의 요청을 처리하기 위해서 CORS(Cross-Origin Resource Sharing) 기술을 지원한다. 
+
+== Key Concepts ==
+=== GET vs POST ===
+웹에서 데이터를 요청하기 위해서 사용하는 메서드(method)로 '''GET'''과 '''POST'''가 있다. 웹 애플리케이션을 개발하기 위해서는 이들 두개 method에 대한 이해가 필수적이다. 
+
+GET 메서드는 non-destructive한 작업을 위해서 사용한다. non-destructive ? 파괴하지 않는 ? 뭔가 번역하기가 애매모호한데, 서버에 있는 데이터에 대한 변경 없이 단지 데이터를 가져오기만(getting)할 때 사용하는 메서드다. 검색(search)이 대표적인 GET 메서드를 이용한 요청이다. 데이터를 가져오기 위해서는 여러 정보들이 필요할 수 있는데, GET 요청은 모든 정보를 쿼리 문자열에 넣어서 보낸다. 
+
+POST는 서버측 데이터 변경이 필요한 destructive한 작업을 위해서 사용한다. 예를들어 블로그에 글을 올리는 작업들이 POST 요청이다. 쿼리 문자열은 URL 형식으로 전달되지만, 데이터는 post data 형태로 분리돼서 전달된다.   
+
+=== Data 타입 ===
+일반적으로 jQuery는 프로그래머가 Ajax 요청으로 받을 데이터의 타입을 명시하도록 한다. 아래는 jQuery에서 사용하는 데이터 타입들이다.
+
+'''text''' : 일반적인 문자열
+'''html''' : HTML을 포함한 문자열
+'''script''' : 새로운 스크립트 
+'''json''' : JSON 형식의 데이터로 배열, 객체를 포함하는 문자열.
+'''jsonp''' : 다른 도메인으로 부터 전송되는 JSON 데이터. 
+'''xml''' : XML 형식의 데이터 
+
+나는 가능하면 JSON 형식의 데이터를 사용하는 걸 강력히 권장한다. JSON은 사용하기 쉽고, 유연한 형식으로 필요하다면 HTML과 데이터도 함께 전송할 수 있다.
+
+=== A is for Asynchronous ===
+Ajax 호출은 기본적으로 비동기 이기 때문에 응답을 즉시 사용할 수 없다. 응답은 콜백함수를 이용해서 처리할 수 있다. 따라서 아래의 코드는 작동하지 않는다. 
+{{{#!plain
+var response;
+$.get("foo.php", function(r) {
+  response = r;
+})
+
+console.log(response); // 작동하지 않는다.
+}}}
+
+대신 요청을 처리할 모든 코드를 콜백함수에 둬야 한다.
+{{{#!plain
+$.get("foo.php", function(r) {
+  console.log(response);
+})
+}}}
+
+=== Same-Origin Policy and JSONP ===
+==== JSONP ====
+JSONP(JSON with padding)은 웹브라우저가 다른 도메인으로 부터 데이터를 얻기위해서 사용하는 자바스크립트의 기술이다. 일반적으로 (SOP)same origin policy를 회피하기 위한 목적으로 사용한다.
+
+웹 브라우저는 SOP에 의해서 다른 도메인으로 부터 데이터를 가져올 수가 없는데, '''<script>''' 태그의 href 어트리뷰트를 이용해서 데이터를 가져오는 것은 허용한다.
+
+예를 들어서 http://server2.example.com/users/1234 를 호출할 경우 유저아이디가 1234인 유저의 정보를 돌려주는 서비스가 있다고 가정해 보자. 브라우저로 이 URL을 호출하면 다음과 같은 값을 반환할 거다.
+{{{#!plain
+{
+   "Name": "Foo",
+   "Id": 1234,
+   "email": "foo@example.com"
+}
+}}}
+
+아래와 같이 <script> 태그를 이용 하면, 다른 도메인에서도 데이터를 읽어올 수는 있다.
+{{{#!plain
+<script type="application/javascript"
+        src="http://server2.example.com/Users/1234">
+</script>
+}}}
+문제는 이 코드를 읽은 브라우저는 다운로드한 파일을 javascript 파일로 해석을 해서 syntax error이 발새한다는 점이다. 
+
+확인을 위해서 테스트를 진행했다. 아래는 "http://test.joinc.co.kr/users.php"의 코드다.
+{{{#!plain
+<?
+$data = <<<FOOT
+{
+   "Name": "Foo",
+   "Id": 1234,
+   "email": "foo@example.com"
+}
+FOOT;
+echo $data;
+?>
+}}}
+
+크롬 브라우저로 http://www.joinc.co.kr 도메인에서 아래의 코드를 호출했다.
+{{{#!plain
+<script type="application/javascript" src="http://test.joinc.co.kr/users.php">
+</script>
+}}}
+
+https://lh4.googleusercontent.com/-QuAKRUhcYWI/UvEvW-HzN7I/AAAAAAAADd8/ZBLhkYRnw7Q/s640/JSONP01.png
+
+JavaScript syntax 에러가 나는 걸 확인할 수 있다. 
+
+이때 JSONP를 이용하면 <script>의 src를 호출해서 받은 JSON 데이터를 '''function call'''로 wrapped 해서 받을 수 있다. 이 방법을 이용하면 아래와 같이 javascript로 호출가능한 형태로 데이터를 받기 때문에, JSON 데이터를 사용할 수 있다. 
+{{{#!plain
+functionName({"Name":"Foo", "Id":1234, "email":"foo@example.com"})
+}}}
+'''functionName'''은 호출 할 콜백 함수의 이름으로 URL 파라메터로 넘겨야 한다. 나는 URL 파라메터 '''q'''에 콜백 함수의 이름을 넘기기로 했다.
+{{{#!plain
+<script type="application/javascript" src="http://test.joinc.co.kr/users.php?q=myCallback">
+</script>
+}}}
+
+서버측에서는 아래와 같이 콜백 함수이름으로 JSON 데이터를 패딩 해서 넘겨주면 된다. 
+{{{#!plain
+myCallback({ "Name": "Foo", "Id": 1234, "email": "foo@example.com" });
+}}}
+
+테스트에 사용한 PHP코드
+{{{#!plain
+$callback_name = $_GET['q'];
+$data = <<<FOOT
+$callback_name({ "Name": "Foo", "Id": 1234, "email": "foo@example.com" });
+FOOT;
+echo $data;
+}}}
+
+== jQuery의 Ajax 메서드 ==
+jQuery가 제공하는 많은 메서드들 중에 핵심은 '''$.ajax()''' 메서드다. 먼저 $.ajax()를 살펴보고 이후 다른 메서드들(ajax convenience method)을 살펴보려 한다. 
+
+나는 보통 convenience 메서드들 대신 $.ajax() 메서드를 이용한다. 
+
+=== $.ajax() ===
+'''$.ajax()'''메서드는 Ajax 요청을 만드는 가장 강력하고 빠른방법이다. $.ajax() 메서드는 jQuery 요청 명세서를 작성하기 위한 설정 객체(configuration object)를 가지고 있다. "key:value"의 직관적인 방식으로 요청 명세서를 만들 수 있다.  $.ajax()는 성공과 실패 각각에 대해서 콜백함수를 지정할 수 있으며, 쉽게 재사용할 수 있는 코드를 작성할 수 있다. configuration option에 대한 자세한 내용은 [http://api.query.com/jQuery.ajax jQuery.ajax 문서]를 읽어보자. 
+
+{{{#!plain
+<script>
+// $.ajax() 메서드를 이용한다.
+$.ajax({
+  // 요청할 URL
+  url: "test.php",
+
+  // 데이터를 전송한다. Query 문자열로 변환된다.
+  data:{
+    id: 123
+  },
+
+  // GET 메서드로 호출한다.
+  type: "GET",
+  // 응답 데이터가 json일 것으로 기대한다.
+  dataType: "json",
+
+  // 요청이 성공했을 경우 처리 코드
+  success: function(json) {
+    $("<h1 />").text(json.Name).appendTo("body");
+    $("<div class=\"content\"/>").html(json.email).appendTo("body");
+  }, 
+
+  // 요청이 실패하면 경고창을 띄운다.
+  error: function(xhr, status) {
+    alert("Sorry, ther was a problem!");
+  },
+
+  // 성공과 실패 모든 경우에 실행하는 코드 
+  complete: function(xhr, status) {
+    alert("Complete");
+  }
+})
+</script>
+}}}
+
+테스트에 사용한 test.php 코드는 다음과 같다.
+{{{#!plain
+$data = <<<FOOT
+{
+   "Name": "Foo",
+   "Id": 1234,
+   "email": "foo@example.com"
+}
+FOOT;
+echo $data;
+}}}
+
+'''dataType''' 설정한 형식과 다른 형식의 데이터가 넘어온다면, 에러가 발생한다. 이때 에러의 원인을 정확히 파악할 수 없다. 왜냐하면 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 응답코드는 이러한 종류의 에러코드는 가지고 있지 않기 때문이다. 
+
+이 문제는 서버측에서 '''Content-type''' 헤더를 이용해서 데이터 타입을 명시하는 것으로 어느정도 해결할 수 있다. 예를 들어 이 경우에는 '''Content-type''' 헤더의 값을 '''application/json'''으로 하면 된다. 이에 맞춰 php 코드를 수정했다.
+{{{#!plain
+header('Content-type: application/json');
+$data = <<<FOOT
+{
+   "Name": "Foo",
+   "Id": 1234,
+   "email": "foo@example.com"
+}
+FOOT;
+echo $data;
+}}}
+
+=== $.ajax() 옵션 ===
+$.ajax()는 많은 종류의 옵션을 가지고 있다. 완전한 옵션의 목록은 [http://api.jquery.com/jQuery.ajax jQuery.ajax 문서]를 참고하자. 여기에서는 주로 사용되는 옵션들만 간단히 설명한다. 
+
+'''async'''
+
+'''false'''를 설정하면 동기적(synchronously)으로 작동한다. 기본 값은 '''true''' 즉, 비동기적으로 작동한다. 만약 '''false'''로 설정하면, 요청에 대한 응답을 받기까지 블락된다.  
+
+'''cache'''
+
+캐시된 응답을 사용할 것인지를 결정한다. 기본 값은 "script"와 "jsonp"를 제외한 모든 데이터 타입에 대해서 true 이다. 
+
+'''complete'''
+
+요청이 완료됐을 때 호출할 콜백 함수를 설정한다.  
+
+'''data'''
+
+서버에 보낼 데이터로 URL 문자열 형식(foo=bar=baz=bim)으로 변환된다.
+
+'''dataType'''
+
+기대되는 응답 데이터의 형식. dataType를 명시하지 않으면 MIME로 판단한다.  
+
+'''error'''
+
+요청에 대해서 에러가 발생했을 때, 호출할 콜백 함수를 설정한다.
+
+'''succes'''
+
+요청이 성공했을 때, 호출할 콜백 함수를 설정한다.
+
+'''timeout'''
+
+응답을 기다리는 시간을 밀리세컨드 단위로 설정할 수 있다. timeout 시간동안 응답이 없다면 요청이 실패한 걸로 간주한다.
+
+'''type'''
+
+요청의 타입으로 '''POST'''와 '''GET'''이 있다. '''PUT'''과 '''DELETE'''를 사용할 수도 있는데, 모든 브라우저가 지원하는 것은 아니다.
+
+'''url'''
+
+요청을 보낼 URL
+
+=== Convenience 메서드 ===
+만약 $.ajax()가 제공하는 확장된 설정 기능이 필요하지 않거나 에러 핸들링에 크게 신경쓰지 않을거라면, jQuery가 제공하는 Ajax convenience 함수를 사용해서 간단하게 Ajax 요청을 처리할 수 있다. 사용해 보면 Convenience methods를 사용하기 쉽게, 주요 옵션을 미리 설정하고 이것들을 wrapper 함게 $.ajax() 메서드라는 걸 알 수 있을 것이다. 
+
+jQuery에서 제공하는 주요 convenience 메서드들을 정리했다.
+
+'''$.get'''
+
+URL에 대한 GET 요청을 수행한다.
+
+'''$.post'''
+
+URL에 대한 POST 요청을 수행한다.
+
+'''$.getScript'''
+
+GET 요청으로 서버로 부터 받은 JavaScript 파일을 로드해서 실행한다.
+
+'''$.getJSON'''
+
+GET 요청을 수행한다. JSON 형식의 값이 리턴될걸 기대한다.
+
+각각의 메서드들에 대해서 아래의 매개 변수들을 설정할 수 있다.
+
+'''url'''
+
+요청할 URL
+
+'''data'''
+
+서버에 보낼 데이터로 '''foo=bar&baz=bim'''형식의 쿼리 문자열로 변환된다.
+
+'''success callback'''
+
+요청이 성공했을 때 실행할 콜백 함수.
+
+'''data type'''
+
+서버의 리턴할 데이터의 (기대하는)형식.
+
+{{{#!plain
+// GET 방식으로 /test.php를 호출한다.
+$.get( "/test.php", {
+    userId: 1234
+}, function( resp ) {
+    console.log( resp ); // server response
+});
+
+// add a script to the page, then run a function defined in it
+//$.getScript( "/static/js/myScript.js", function() {
+ //   functionFromMyScript();
+//});
+
+// 서버로 부터 JSON 형식의 데이터를 GET 방식으로 요청한다. 
+$.getJSON( "/test.php", function( resp ) {
+// log each key in the response data
+    $.each( resp, function( key, value ) {
+        console.log( key + " : " + value );
+    });
+});
+}}}
+
+'''$.fn.load'''
+
+'''.load()''' 메서드로 selection으로 부터 jQuery의 Ajax 메서드를 호출할 수 있다. '''.load()''' 메서드는 URL로 부터 HTML 문서를 읽어와서 선택된 앨리먼트에 HTML 문서를 출력하기 위한 목적으로 유용하게 사용할 수 있다.   
+
+GET 방식으로 /test.php를 요청하고, 결과 값을 <div>에 출력한다.
+{{{#!plain
+<div id="newContents">
+</div>
+<script>
+$("#newContents").load("/test.php");
+</script>
+}}}
+
+== Ajax and Forms ==
+=== Serialization ===
+아주 간단하게 직렬화(serialization)할 수 있다. jQuery는 '''.serialize()'''와 '''.serializeArray()''' 두 개의 직렬화 메서드를 제고한다.  
+  * .serialize() : form의 모든 데이터를 URL 문자열(field_1=value1&field_2=value2)형태로 변환한 후 반환한다.
+  * .serializeArray() : from의 모든 데이터를 배열로 변환해서 반환한다.
+{{{#!plain
+<form name="myForm">
+id : <input name="id" size=10><br>
+email : <input name="email" size=20><br>
+name : <input name="name" size=20> 
+</form>
+<button id="myClick">click</button>
+
+<script>
+// myForm의 데이터를 URL 문자열로 반환한다.
+$("#myClick").click(
+  function(ev) {
+    var str = $("form[name=myForm]").serialize();
+    alert(str);
+  }
+)
+// id=something&email=something2&name=something3
+// 형식으로 반환한다.
+</script>
+
+// .serializeArray()를 이용할 경우
+// [
+//   {
+//     name : "id",
+//     value : "something"
+//   },
+//   {
+//     name : "email",
+//     value : "something2"
+//   }
+//   {
+//     name : "name",
+//     value : "something3"
+//   }
+// ]
+}}}
+
+=== Client-side validation ===
+다른 기능들과 마찬가지로 클라이언트측 유효성(validation) 검사 역시 쉽게 사용할 수 있다. 클라이언트측 유효성 검사는 필수 입력 확인, 유저이름/이메일/전화번호 등의 유효성 검사와 "확인, 동의" 선택을 검사하는 용도로 사용할 수 있다. 
+
+클라이언트측 유효성 검사와는 별개로 서버측에서도 입력데이터에 대한 유효성 검사를 하긴 하지만, 클라이언트측에서 유효성을 검사하면 양식을 제출하지 않아도 되기 때문에, 더 나은 사용자 경험을 제공할 수 있다. 
+
+바로 예제로 넘어가자. 아래 예제 코드는 유저가 form을 작성하고 submit 버튼을 클릭했을 때, 값을 입력했는지를 확인한다.
+{{{#!plain
+$("#form").submit(function(event) {
+  if($(".required").val().length === 0) {
+    alert("Error");
+    return false;
+  } else {
+    alert("Form submit success!!");
+  }
+});
+}}}
+'''[wiki:Site/Code/JavaScript/InpuValidation 테스트]'''
+
+전화번호의 경우에는 입력한 문자열의 길이 뿐만 아니라, 입력한 문자열이 숫자로만 이루어졌는지도 확인을 해야 한다. 
+{{{#!plain
+$("#myForm").submit(function(event) {
+  var inputtedPhoneNumber = $("#phone").val();
+
+  // 정규표현식을 이용해서 입력 값이 숫자로만 이루어졌는지 확인한다.
+  var phoneNumberRegex = /^[0-9]+$/;
+  if(!phoneNumberRegex.test(inputtedPhoneNumber)) {
+    alert("Invalid failure");
+    return false;
+  } else {
+    alert("Invalid success");
+    return true;
+  }
+});
+}}}
+
+=== Prefiltering ===
+jQuery 1.5.x 버전부터 지원하는 기능으로 Ajax 요청을 보내기 전에 Ajax의 요청을 수정하기 위해서 사용한다. 아래와 같이 사용할 수 있다. 
+{{{#!plain
+$.ajaxPrefilter(function (options, originalOptions, jqXHR) {
+  // 여기에 코드를 둔다.
+});
+}}}
+  * options : 요청 옵션들  
+  * originalOptions : ajaxSettings에서 수정하지 않은 ajax 메서드에서 제공하는 옵션들
+  * jqXHR : jQuery HTTP Request
+
+테스트 프로그램을 만들었다. 이 프로그램은 submitform을 클릭하면 "test.php"를 ajax로 호출하는 일을 한다. 여기에 ajaxPrefilter를 이용해서, ajax 호출전에 url을 test2.php로 변경했다. 결과적으로 이 프로그램은 test2.php 페이지를 호출한다.
+{{{#!plain
+<script>
+$("#submitform").click(function(event) {
+  var inputtedPhoneNumber = $("#phone").val();
+  var phoneNumberRegex = /^[0-9]{3}-[0-9]{4}-[0-9]{4}$/;
+
+  $.ajax({
+    url: "test.php",
+    type: "GET",
+    dataType: "json",
+    success: function(json) {
+      $("#contents").text(json.Name);
+    },
+    error: function(xhr, status) {
+      alert("error");
+    }
+  }) 
+})
+$.ajaxPrefilter(function( options, originalOptions, jqXHR ) {
+  options.url = "test2.php"
+});
+</script>
+}}}
+
+특히 크로스 도메인 문제를 해결하기 위한 방법으로 널리 사용하는 것 같다. 프락시(proxy) 페이지를 하나 만들어서 다른 도메인으로의 요청이 있을 때, 이 요청을 프락시를 거치게 변경하는 방식이다. 프락시 페이지가 http://mydomain.net/proxy/ 라면 
+{{{#!plain
+$.ajaxPrefilter(function(options) {
+  if (options.crossDomain) {
+    options.url = "http://mydomain.net/proxy/" + encodeURIComponent(options.url);
+    options.crossDomain = false;
+  }
+});
+}}}
+
+== JSONP 사용하기 ==
+JSONP는 XSS(cross-site scripting)를 우회하기 위해서 주로 사용한다. 특히 자신들이 만든 자바스크립트 애플리케이션을 3rd-party 사이트에 제공하기 위해서 많이 사용한다.
+
+Yahoo는 JSONP를 위한 다양한 API를 제공한다. 아래는 야후 news의 top rss를 가져오는 코드다. 실행하면 top 40개의 rss 정보를 가져온다.   
+{{{#!plain
+$(document).ready(function() {
+$.ajax({
+    url: "http://query.yahooapis.com/v1/public/yql",
+ 
+    // the name of the callback parameter, as specified by the YQL service
+    jsonp: "callback",
+ 
+    // tell jQuery we're expecting JSONP
+    dataType: "jsonp",
+ 
+    // tell YQL what we want and that we want JSON
+    data: {
+        q: "select * from rss where url='http://news.yahoo.com/rss/topstories'",
+
+        format: "json"
+    },
+ 
+    // work with the response
+    success: function( response ) {
+        console.log( response ); // server response
+    }
+});
+});
+}}}
+
+== Ajax Events ==
+종종 Ajax 요청이 시작하거나 끝날 때, 어떤 작업을 하기를 원할 때가 있다. 예컨데, 요청의 시작과 끝을 알려주거나 작업 진행정도를 알려주는 인터페이스의 구현등이다. jQuery는 Ajax의 이벤트를 처리할 수 있다. ajax 이벤트의 완전한 목록은 [http://api.jquery.com/Ajax_Events Ajax Event]문서를 참고하자. 아래는 Ajax 이벤트를 처리하는 간단한 예제 코드다.
+{{{#!plain
+
+// Ajax 요청이 시작하면, 즉 클릭 버튼을 누르면, <div id="log">영역에 "로딩 중..." 메시지를 출력한다. 
+// 요청이 완료되면 <div id="log">를 숨긴다.
+$(document).ajaxStart(function(){
+  $("#log").text("로딩 중...");
+}).ajaxStop(function() {
+  $("#log").hide();
+})
+
+$("#click").click( function() {
+$.ajax({
+  // 요청할 URL
+  url: "test.php",
+
+  // 데이터를 전송한다. Query 문자열로 변환된다.
+  data:{
+    id: 123
+  },
+
+  // GET 메서드로 호출한다.
+  type: "GET",
+  // 응답 데이터가 json일 것으로 기대한다.
+  dataType: "json",
+
+  // 요청이 성공했을 경우 처리 코드
+  success: function(json) {
+    $("<h1 />").text(json.Name).appendTo("body");
+    $("<div class=\"content\"/>").html(json.email).appendTo("body");
+  }, 
+
+  // 요청이 실패하면 경고창을 띄운다.
+  error: function(xhr, status) {
+    alert("Sorry, ther was a problem!");
+  },
+})
+});
+}}}

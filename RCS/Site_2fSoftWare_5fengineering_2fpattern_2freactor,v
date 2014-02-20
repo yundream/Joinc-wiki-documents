@@ -1,0 +1,85 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2014.02.11.15.24.06;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.02.10.16.11.06;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.02.10.16.04.30;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSoftWare_5fengineering_2fpattern_2freactor
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title reactor pattern
+
+== reactor pattern ==
+Reactor 패턴은 하나 이상의 클라이언트로 부터의 요청(입력)을 동시처리하기 위해서 사용하는 패턴이다. 서버는 각 입력에 대해서 받을 이벤트를 동적으로 등록/해제하는 식으로 처리해야할 입력과 이벤트를 관리할 수 있다. 
+  1. 새로운 연결이 들어온다.
+  1. 이 연결과 연결에 대해서 처리할 이벤트를 일괄 등록한다.
+     * 이벤트는 "입력 데이터", "출력 데이터", "종료"등이 있을 수 있다.
+  1. 주기적으로 이벤트를 확인한다.
+  1. 이벤트가 발생하면 '''dispatcher''' 에 전달해서 처리한다. 
+
+2번이 '''multiplexing'''과정이다. 즉 여러 개의 입력을 처리할 수 있도록 다중화 한다. 3번 과정이 '''demultiplexing''' 과정으로 이벤트가 발생한 "하나의" 입력을 찾아낸다. 마지막으로 dispacher이 데이터를 처리한다.  
+
+기본적으로 demultiplexing 에서 multiplexing의 과정이 단일 스레드에서의 처리에 적합한 관게로 단일 프로세스 프로그램에서 두 개 이상의 입력을 처리하기 위해서 주로 사용한다. 
+
+Reactor pattern은 유닉스에서는 [wiki:Site/Network_Programing/Documents/select select], [wiki:Site/Network_Programing/Documents/Poll poll]을 이용해서 매우 오래전 부터 [wiki:man/12/입출력다중화 입출력다중화]라는 이름으로 사용해왔다. 아래는 select의 전형적인 입력 처리 구조다. 
+  * FD_SET을 이용, multiplexing 과정을 거쳐서 입력을 등록하고
+  * select를 이용, demultiplexing 과정을 거쳐서 이벤트가 발생한 입력을 검사
+  * 입력의 데이터를 처리
+
+Reactor pattern의 흐름을 그림으로 나타냈다. 유닉스에서 입출력 다중화 기반으로 서버를 개발한 경험이 있다면, 이해가 쉬울 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1w6tNV2wHin9QyotGMF7vOiPXXl6-0aJe6bzOOOcJiTE/pub?w=644&amp;h=417">
+}}}
+
+Reactor Initiator : 서버를 비 봉쇄로 초기화 하고 dispatcher를 설정한다. 가장 먼저 서버는 클라이언트의 연결을 받을 서버 소켓을 등록한다. 이제 클라이언트가 연결을 하면, 이 소켓에 이벤트가 발생하고 accept 함수를 호출해서 클라이언트 소켓을 만든다.
+
+Dispatcher : 클라이언트가 (connect 함수를 이용해서)연결하면, 클라이언트 소켓이 만들어 진다. 이 클라이언트 소켓을 이벤트에 등록한다. 클라이언트가 연결을 끊을 경우에는 제거하는 일도 함께 한다. 이제 dispatcher는 select() 함수를 이용해서, 등록된 소켓에서 이벤트가 발생하는 지를 확인한다.   
+
+Event Handler : 클라이언트 소켓에서 이벤트가 발생하면, 이벤트에 대한 이벤트 핸들러를 호출해서 이벤트를 처리한다. 
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d19 12
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d15 1
+a15 1
+Reactor pattern은 유닉스에서는 select, poll을 이용해서 매우 오래전 부터 사용해왔다. 아래는 select의 전형적인 입력 처리 구조다. 
+@

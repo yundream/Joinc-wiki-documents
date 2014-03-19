@@ -1,0 +1,49 @@
+#title FastCGI
+
+[[TableOfContents]]
+== FastCGI ==
+FastCGI는 웹 서버와 프로그램이 상호작용(데이터를 주고 받기 위한) [wiki:man/12/interface 인터페이스] 개발을 위한 프로토콜이다. FastCGI는 [wiki:man/12/CGI CGI](Common Gateway Interface)를 개선한 [wiki:man/12/interface 인터페이스]다. [wiki:man/12/CGI CGI]는 데이터 처리 요청이 있을 때마다 매번 프로세서를 실행해야만 했다. FastCGI는 매번 프로세스를 만들지 않고, 미리 만들어 놓은 프로세스와 데이터를 주고 받음으로서 CGI 보다 더 효율적이고 빠르게 작동한다. 예컨데, FastCGI는 CGI의 개선된 [wiki:man/12/interface 인터페이스]다. 
+
+웹 서버는 유저가 요청한 파일을 읽어서 출력하는 것을 목적으로 하지, 데이터를 처리하는 것을 목적으로하지는 않는다. 웹 서버는 데이터의 처리를 외부 프로그램에 맡기는데, 이럴려면 외부 프로그램에 처리해야 하는 데이터를 넘기고 그 결과를 받는 [wiki:man/12/interface 인터페이스]가 필요하다. CGI는 웨 서버와 외부 프로그램과 데이터를 주고받기 위한 표준인터페이스다. 
+
+CGI는 단순한 인터페이스로 간단하게 구현할 수 있다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Cnsx2fQL-IDjyvT1CjgD_-o8mgWBIwAiHpdFWhWeKNA/pub?w=747&amp;h=317">
+}}}
+  1. 데이터를 처리할 프로세스를 실행한다. 
+  1. 처리할 데이터는 환경 변수를 통해서 프로세스에 넘긴다. 
+  1. 처리 결과는 표준출력으로 가져와서 클라이언트(웹 브라우저)로 보낸다.  
+CGI는 프로세스를 이해하기 쉽고, 개발도 간단하지만 성능과 확장성에 문제가 있다. 1990년대 중반 '''Open Market'''은 [wiki:man/12/CGI CGI]의 문제를 해결한 FastCGI를 개발해서 자신들의 웹 서버에 도입했다. 
+
+FastCGI는 '''Open Market'''이 자신들의 문제를 해결하기 위해서 자체개발한 솔루션이었지만 다른 웹 서버 업체들에도 적용이 됐다. 이후 mode_perl, mode_php와 같은 다른 모듈들과 함게, 빠르게 인기를 얻었다. 
+
+[[adtext]]
+== 구현 방식 ==
+FastCGI는 각각의 요청에 대해서 새로운 프로세스를 만드는 대신에 하나의 프로세스에서 여러 요청을 처리한다. 이 프로세스는 웹 서버가 아닌 FastCGI 서버가 관리한다. 클라이언트로 부터 요청을 받은 웹 서버는 환경 변수와 페이지의 요청을 [wiki:man/12/socket socket] 이나 [wiki:man/12/TCP TCP]연결을 이용해서 FastCGI 프로세스에 전달한다.
+
+응답은 웹서버와 연결된 [wiki:man/12/socket 소켓]채널을 이용한다. 응답을 받은 웹서버는 HTML 문서를 만들어서 클라이언트에 전송한다. 응답을 클라이언트에 전송한 후에 웹서버와 클라이언트는 연결이 끊어지지만, 이와는 상관없이 웹서버와 FastCGI 서버의 연결은 계속 유지된다.   
+
+FastCGI는 프로세스가 여러 개의 요청을 처리하기 때문에, 프로세스의 생성과 종료에 따른 오버헤드를 방지하며, 더 많은 요청을 러히라 수 있다. FastCGI 프로세스는 내부적으로 입출력을 다중화 하는 것으로 하나의 연결을 이용해서 여러 요청을 처리할 수 있으며, 두 개 이상의 웹 서버와의 연결을 유지할 수도 있다. 
+
+FastCGI를 위한 일반적인 웹 서비스 구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1OLW8n8VeMTSUB6U2ClNWtEypGmfk2ZI0rMu7KHSmcAw/pub?w=288&amp;h=353">
+}}}
+
+FastCGI 서버를 여러개 두고, 웹서버는 여러 FastCGI에 연결을 만드는 것으로 가용성과 성능을 확보할 수 있다.
+
+FastCGI 방식과 함께 내장 인터프리터 방식(mode_perl, mode_php 등)이 자주 사용된다. FastCGI 방식을 사용하면, 웹 서버와 FastCGI 서버를 분리해서 운용할 수 있다. 따라서 각각의 서버를 독립적으로 재시작할 수 있다. 또한 웹 서버를 DMZ 구간에 두고 FastCGI 서버를 private internal network에 두는 식으로 보안성을 높일 수 있다. 웹 서버와 FastCGI서버가 하는 일은 서로 다르다. 이들을 분리하는 것으로 효율적인 서버 운용이 가능하다. 
+
+== FastCGI 구현 소프트웨어 ==
+ * Apache HTTP Server
+   * mod_fcgid : TCP 소켓을 지원하지 않는다. UNIX socket만 지원한다.  
+   * mod_proxy_fcgi : Apache 2.4에 들어있다. TCP 소켓을 지원한다. 
+ * Nginx 
+ * Lighttpd
+ * Zeus Web Server
+ * Sun Java System Web Server
+ * LiteSpeed Web Server
+ * Roxen Web Server 
+

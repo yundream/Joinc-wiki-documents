@@ -1,0 +1,606 @@
+head	1.9;
+access;
+symbols;
+locks
+	root:1.9; strict;
+comment	@# @;
+
+
+1.9
+date	2014.03.19.15.45.26;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.03.19.15.38.53;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.03.18.16.48.10;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.03.18.16.12.59;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.03.16.16.48.21;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.03.16.04.19.37;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.03.16.03.06.53;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.03.16.02.54.23;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.03.10.02.24.39;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSearch_2fDocument_2fSolr
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Solr로 로컬 검색서비스 만들기
+
+[[TableOfcontents]]
+<!> 4.7 버전에 맞추어 새로 작성 중
+== Solr ==
+Solr은 Apache [wiki:man/12/lucene Lucene]프로젝트에 기반을 둔 검색엔진으로 기업 대상으로 개발을 했다. 현재(@@DATE) 최신 버전은 Apache solr 4.7.0 버전이다.
+
+=== Solr의 기능들 ===
+Solr는 단독 애플리케이션 서버 형태로 작동하며, REST 형식의 API를 제공한다. 문서들은 HTTP를 이용해서 XML, JSON, CSV 혹은 바이너리 형태등으로 색인요청을 할 수 있다. 검색 역시 HTTP GET 으로 요청하며, 검색결과는 XML, JSON, CSV, 바이너리 형태로 가져올 수 있다. 
+   * Full-text search 
+   * 높은 웹 트래픽을 감당할 수 있도록 최적화.
+   * XML, JSON과 HTTP등의 표준 오픈 인터페이스를 제공.
+   * HTML 기반의 관리자 인터페이스 
+   * Linearly scalable, auto index replication, 자동 failover와 복구
+   * 유연하고 강력한 XML파일 기반의 설정 환경
+   * 확장가능한 플러그인 아키텍처
+
+==== Solr의 Lucene 확장 기능 ====
+   * 일반 문자열을 비롯 Numberic 타입, 다이나믹 필드, 유니크 키 지원 
+   * Lucene 쿼리 랭퀴지 확장지원 
+   * 검색과 필터링 지원
+   * Geospatial 검색 지원
+   * 성능 최적화 
+   * AJAX 기반의 관리자 인터페이스
+   * 로그 모니터링
+   * 실시간(Near Real-time) 증분 색인과 색인 복제(replication)지원
+   * 분산 검색과 다중 호스트간 샤드(sharded) 지원  
+   * 데이터베이스와 XML 파일 그리고 HTTP를 이용한 다양한 색인방식 지원 
+   * Apache Tika를 이용한 다양한 형식의(PDF, Word, HTML 등등) 문서 색인 
+
+== Joinc 컨텐츠 검색 서비스 만들기 ==
+대부분의 CMS 툴들이 그렇듯이 (joinc의 CMS인)모니위키 역시 검색기능이라고 할 만한게 없다. Full text search기능이 있긴 하지만 '''grep'''을 이용한 건데, 그냥 쓰지 않는게 낫다.
+
+하여 구글 custom search를 도입했다. 2007년 부터 2011년까지 custom search(이하 CS)를 이용해서 검색서비스를 제공했는데, 쓸만했지만 몇 가지 문제가 있었다.
+  1. 색인 갱신 주기를 조절할 수 없다. 컨텐츠를 옮기거나 하는 등으로 URL이 변경되면, 다음번 색인 까지 한참 동안 링크가 깨진다. : 실시간 색인을 포기해야 한다는 의미다. 
+  1. URL 맵이 엉망으로 만들어진다. 구글 CS는 웹 크롤러를 이용해서 문서를 수집한다. 모든 가능한 링크에 대해서 색인이 만들어 지는데, 그러다 보니 ?action=diff 등과 같은 wiki 액션 페이지들도 색인을 한다. memset 페이지 뿐만 아니라 memset??action=diff 와 같은 페이지까지 색인한다. 쓸데없는 문서들까지 recall 된다는 이야기다.
+  1. 텍스트 브라우저로 브라우징 할 수 없다. 주로 [wiki:man/12/w3m w3m]을 이용해서 브라우징을 한다. 구글 CS는 Ajax 호출이기 때문에 w3m에서는 검색결과를 볼 수 없다. 대부분의 사람들에게는 상관없겠지만 w3m을 이용해서 브라우징하고 컨텐츠를 작성하는 나에게는 중요한 문제다. 
+
+문제를 해결하기 위해서는 컨텐츠 기반으로 색인을 하면 되는데, lucene이 거의 유일한 해결책이라 할 수 있겠다. 하지만 lucene는 너무 무겁고, 설치/운용이 귀찮다. 직접 만드는 건 더 귀찮다. (Mysql도 full text search를 제공한다고 하긴하더라.)
+
+이래 저래 귀찮아서 그냥 CS를 사용하고 있었는데, [wiki:Site/cloud/automation chef]를 가지고 놀다가 우연찮게 solr를 발견했다. chef에서는 메타 정보 검색을 위해서 solr를 사용 한다. 이게 뭔가 하고 살펴봤더니 루신기반의 검색 소프트웨어란다.  게다가 설치/운용도 간단하더라. 이후 검색서비스를 solr로 대체해서 지금까지 사용하고 있다. 
+
+2007년 처음 solr를 적용했을 때 버전이 3.x 였는데,  어느덧 2014년 지금은 4.7이다. solr 4.7을 설치하고 운용하는 방법을 정리하려고 한다.
+
+=== Joinc Solr 적용 방법 ===
+Joinc 컨텐츠에 대해서 색인 및 검색 테스트를 진행하고, 문제 없으면 Joinc 사이트에 적용한다.
+  * 테스트 서버 : 개인 리눅스 데스크탑 Ubuntu 13.10
+  * 테스트 방식 : 모니위키는 컨텐츠를 특정 디렉토리밑에 일반 텍스트 파일로 관리한다. 이 텍스트 파일을 모두 로컬로 복사해서 색인한다. 
+  * 검색 서비스 테스트 : 색인이 끝나면, solr 검색 서버를 실행한다. 검색요청은 HTTP로 할 수 있으니, 모니위키 페이지에서 Ajax호출해서 결과를 가져와서 뿌려주면 끝난다. 
+  * 실시간 색인 테스트 : 모니위키는 컨텐츠를 파일로 저장한다. 파일로 저장할 때, 파일의 내용으로 색인 요청하면 된다. 색인은 HTTP POST 간단히 요청할 수 있다. 
+
+이렇게 해서 테스트를 다 끝내고 나서, joinc에 실제로 적용하기로 했다. 테스트 환경은 아래와 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1rwaXc8TsAERtiWmCRIn5Os1d5deRAhvtPa7iVJYQlaI/pub?w=489&amp;h=315">
+}}}
+  * Virtualbox로 테스트한다.
+  * 두 개의 '''Solr server'''를 준비한다. '''solr server 1''', '''solr server 2''' 라고 부르기로 했다. 분산 검색 테스트를 위해서다. joinc에서 가져온 텍스트 파일은 1/2로 나눠서 각각의 solr server에 분산해서 색인한다. 
+
+== Solr Tutorial ==
+Joinc 컨텐츠를 색인하기 전에 solr tutorial에 있는 내용을 테스트 해보기로 했다. 
+=== 요구 사항 ===
+Java 1.6 이상이 필요하다. Java는 Oracle, Open JDK, IBM에서 찾을 수 있다. 나는 Open JDK를 사용하기로 했다. 
+{{{#!plain
+# apt-get install default-jre
+# java -version
+java version "1.7.0_51"
+OpenJDK Runtime Environment (IcedTea 2.4.4) (7u51-2.4.4-0ubuntu0.13.10.1)
+OpenJDK 64-Bit Server VM (build 24.45-b08, mixed mode)
+}}}
+
+=== solr 다운로드 및 설치 ===
+http://lucene.apache.org/solr 에서 다운로드 했다. ([[Date(2014-03-16T04:19:37)]])현재 최신 버전은 4.7.0이다.
+
+다운로드한 solr 소프트웨어는 '''solr server 1'''에 설치했다. 분산 검색전에 단일 호스트에서의 검색부터 끝내야 하지 않겠는가. 단일 호스트 검색을 끝낸 후 분산 검색을 수행한다. 나는 /opt/solr 디렉토리에 설치했다.
+
+==== solr server 실행 ====
+example 디렉토리 밑에 있는 start.jar를 실행한다.
+{{{#!plain
+# java -jar start.jar
+[main] INFO  org.eclipse.jetty.server.Server  – jetty-8.1.10.v20130312
+20   [main] INFO  org.eclipse.jetty.deploy.providers.ScanningAppProvider  – Deployment monitor /opt/solr/example/contexts at interval 0
+30   [main] INFO  org.eclipse.jetty.deploy.DeploymentManager  – Deployable added: /opt/solr/example/contexts/solr-jetty-context.xml
+......
+}}}
+Jetty 애플리케이션 서버가 8983 포트로 시작하는 걸 확인할 수 있다.
+{{{#!plain
+# netstat -nap
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      821/sshd        
+tcp        0      0 192.168.56.5:22         192.168.56.1:52694      ESTABLISHED 944/sshd: yundream 
+tcp6       0      0 :::22                   :::*                    LISTEN      821/sshd        
+tcp6       0      0 :::8983                 :::*                    LISTEN      7519/java       
+}}}
+웹 브라우저로 '''http://192.168.56.5:8983/solr'''에 접근하면, Solr 대쉬보드 화면을 볼 수 있다.  
+
+https://lh6.googleusercontent.com/-OvGe99HqSqg/UyXVxWqf0yI/AAAAAAAADfI/cc9GjYqXOdg/s640/solr01.png
+
+예쁘다. 
+
+==== solr example 문서 색인 ====
+Joinc 컨텐츠를 색인하기 전에 solr에서 tutorial 용으로 제공하는 example 문서를 색인해보기로 했다. solr는 실행시간에 컨텐츠 '''색인의 추가/업데이트/삭제'''가 가능하다. XML, JSON, CSV 등 다양한 형식으로 컨텐츠를 색인할 수 있다. 
+
+exampledocs 디렉토리에 샘플파일이 있는데, 이 파일을 색인해 보기로 했다. exampledocs 디렉토리 밑에는 컨텐츠를 색인하고 업데이트 할 수 있는 자바 프로그램인 '''post.jar'''가 있다. '''post.jar'''를 이용해서 solr.xml과 monitor.xml을 색인했다.
+{{{#!plain
+# cd /opt/solr/example/exampledocs
+# java -jar post.jar solr.xml monitor.xml
+SimplePostTool version 1.5
+Posting files to base url http://localhost:8983/solr/update using content-type application/xml..
+POSTing file solr.xml
+POSTing file monitor.xml
+2 files indexed.
+COMMITting Solr index changes to http://localhost:8983/solr/update..
+Time spent: 0:00:00.256
+}}}
+두개의 문서가 색인됐다. 색인 정보는 solr 관리자 페이지의 Core Admin 탭에서 확인할 수 있다.
+
+https://lh4.googleusercontent.com/-EqeZ4Q3kSNI/UyhssLbj64I/AAAAAAAADfg/z08TvRqI-jo/s640/solr02.png
+
+관리자 페이지에서 검색결과도 확인할 수 있다. '''collection'''탭에서 테스트할 collection(지금은 collection1 하나만 있을거다)를 선택하면, '''Query'''메뉴가 있다. 클릭하면 질의어와 각종 검색 옵션을 설정할 수 있는 페이지가 뜬다. 질의어를 넣고 '''Execute Query'''버튼을 클릭하면, 검색결과를 확인할 수 있다. solr로 검색을 할 경우 http://192.168.56.5:8983/solr/collection1/select?q=solr&wt=json&indent=true 와 같은 요청이 생성된다. 
+
+https://lh6.googleusercontent.com/-1x305BQIi9o/Uyhv1gfDFJI/AAAAAAAADfs/pblXtjOUEWU/s640/solr03.png
+
+exampledocs에 있는 다른 문서들도 색인해서 테스트를 해보자.
+{{{#!plain
+# java -jar post.jar *.xml
+SimplePostTool version 1.5
+Posting files to base url http://localhost:8983/solr/update using content-type application/xml..
+POSTing file gb18030-example.xml
+POSTing file hd.xml
+POSTing file ipod_other.xml
+POSTing file ipod_video.xml
+POSTing file manufacturers.xml
+POSTing file mem.xml
+POSTing file money.xml
+POSTing file monitor2.xml
+POSTing file monitor.xml
+POSTing file mp500.xml
+POSTing file sd500.xml
+POSTing file solr.xml
+POSTing file utf8-example.xml
+POSTing file vidcard.xml
+14 files indexed.
+COMMITting Solr index changes to http://localhost:8983/solr/update..
+Time spent: 0:00:00.336
+}}}
+solr에서 사용할 수 있는 질의어 형식은 [http://wiki.apache.org/solr/SolrQuerySyntax Solr Query Syntax]문서를 참고하면 되겠다.
+
+==== 색인 업데이트 ====
+이 문서대로 색인을 했다면 '''solr.xml''' 문서를 두번 색인했을 것이다. 하지만 "solr"로 검색하면 여전히 하나의 문서만 검색된다. 이유는 문서를 색인할 때 참고하는 '''schema.xml'''에 "uniqueKey"로 "id"필드를 설정했기 때문이다. uniqueKey로 설정된 필드는 단지 하나만 존재할 수 있기 때문에, 필드의 값이 같을 경우에는 추가되는 대신에 "업데이트"된다.  
+
+이제 다시 '''java -jar post.jar'''를 실행하더라도 (모든 문서가 중복되기 때문에) 색인정보는 변하지 않을 것이다.
+
+==== 색인 삭제 ====
+역시 동적으로 색인을 삭제할 수 있다. '''uniqueKey'''로 delete 명령을 전송하면 된다. 사용방법은 다음과 같다.
+{{{#!plain
+# java -Ddata=args -Dcommit=false -jar post.jar "<delete><id>SP2514N</id></delete>"
+SimplePostTool version 1.5
+POSTing args to http://localhost:8983/solr/update..
+Time spent: 0:00:00.032
+}}}
+id 가 SP2514N인 문서를 찾아서 삭제한다. 하지만 commit가 false인 관계로 여전히 검색이 된다. delete를 실제 색인에 적용하기 위해서는 명시적으로 "commit"해줘야 한다.
+{{{#!plain
+# java -jar post.jar -
+SimplePostTool version 1.5
+COMMITting Solr index changes to http://localhost:8983/solr/update..
+Time spent: 0:00:00.030
+}}}
+색인 정보를 보면 numDocs가 1줄어든걸 확인할 수 있다.
+
+commit를 true로 하면, 즉시 색인에 반영할 수 있다.
+{{{#!plain
+# java -Ddata=args -Dcommit=true -jar post.jar "<delete><id>SOLR1000</id></delete>"
+SimplePostTool version 1.5
+POSTing args to http://localhost:8983/solr/update..
+COMMITting Solr index changes to http://localhost:8983/solr/update..
+Time spent: 0:00:00.038
+}}}
+
+uniqueKey가 아닌, 일반 질의어로도 삭제할 수 있다. name 필드에 "solr"을 포함한 모든 문서를 지우기 위한 예다.
+{{{#!plain
+# java -Dcommit=false -Ddata=args -jar post.jar "<delete><query>name:solr</query></delete>"
+}}}
+
+색인에는 많은 cpu 자원이 소모된다. 따라서, 실시간으로 매번 commit 하는 것보다는 일괄 commit하는걸 권장한다. 물론 joinc는 즉시 commit 할거다. 어차피 문서작성하는 사람이 혼자라서 배치작업하는게 의미가 없다. 
+
+=== 검색 Query ===
+검색은 '''HTTP GET'''을 이용하면 된다. query는 '''q'''파라메터의 값으로 넘긴다. 일단은 '''q''' 파라메터를 이용하는 것으로 검색이 가능하지만, 정교한 검색을 위해서 옵션 파라메터를 사용할 수 있다. 예컨데, '''fl''' 파라메터를 이용해서 검색 필드를 지정하거나 소트(sort) 필드의 지정, 출력 형식(XML, JSON)등을 지정할 수 있다.  
+  * q=video&fl=name,id : name과 id 필드에서 video를 검색한다.
+  * q=video&fl=name,id,score : 문서의 가중치(score)를 출력한다.
+  * q=video&fl=*,score : 모든 필드에서 video를 검색하고, 문서 가중치도 출력한다.
+  * q=video&sort=price desc&fl=name,id,price : price를 내림차순(desc)으로 정렬한다.
+=== 하일라이팅 ===
+검색 결과는 "검색어를 포함한" 문자열의 일부를 출력한다. 하일라이팅 설정을 하면 "검색어"를 강조해서 보기 좋은 검색출력 화면을 만들 수 있다.
+  * q=video%20card&fl=name,id&hl=true&hl.fl=name,features&wt=json 
+하일라이팅에 대한 자세한 내용은 [http://wiki.apache.org/solr/HighlightingParameters solr Highlighting parameters] 문서를 참고하자.
+
+=== 내장 검색 UI ===
+Solr는 검색결과를 확인하기 위한 검색 UI를 내장하고 있다. 색인결과를 테스트하기 위해서 사용할 수 있는데, 검색, 하일라이팅, 자동완성, 위치 검색등의 주요 기능들을 포함하고 있다. 
+  * http://192.168.56.5:8983/solr/collection1/browse
+
+== CURL API ==
+Solr는 POST와 GET을 이용해서 검색과 색인을 관리할 수 있다. CURL을 이용해서 Solr의 기능을 테스트 해본다.  
+
+== Joinc 색인 생성 ==
+Joinc의 컨텐츠를 색인한다.
+  * title과 body(본문이 저장되는) 두 개의 field로 구성된다. title field의 boost를 body 보다 높게 설정한다. 
+  * uniqueKey는 컨텐츠가 저장된 파일의 이름으로 한다. 
+  * 영문과 한글 숫자만 색인한다. 그 외의 문자들은 색인에서 제외한다.   
+  * 하일라이팅 기능을 지원한다. css 작업 좀 하면 되겠다. 
+  * 자동완성 기능을 사용한다. ajax 삽질을 좀 해야겠지. 
+
+== 히스토리 ==
+  * 작성일 : [[Date(2012-07-19T09:28:44)]]
+
+== 참고 ==
+  *  
+[[Tag(검색,Lucene,Solr)]]
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d203 9
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d154 49
+a202 1
+==== 색인 삭제 ===
+d207 2
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d77 1
+a77 1
+==== solr server 실행 ===
+d147 1
+a147 1
+solr에서 사용할 수 있는 질의어 형식은 [http://wiki.apache.org/solr/SolrQuerySyntax Solr Query Syntax]문서를 참고하자.
+d149 6
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d102 47
+a148 1
+Joinc 컨텐츠를 색인하기 전에 solr에서 tutorial 용으로 제공하는 example 문서를 색인해보기로 했다. 
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 1
+d32 1
+a32 1
+대부분의 CMS 툴들이 그렇듯이 (joinc의 CMS인)모니위키 역시 검색기능이라고 할 만한게 없다. Full text search기능이 있긴 하지만 '''grep'''을 이용한 것으로 그냥 쓰지 않는게 낫다. 
+d39 1
+a39 1
+문제를 해결하기 위해서는 컨텐츠 기반으로 색인을 하면 되는데, lucene가 거의 유일한 해결책이라 할 수 있겠다. 하지만 lucene는 너무 무겁고, 설치/운용이 귀찮다. 직접 만드는 건 더 귀찮다.
+d41 1
+a41 1
+이래 저래 귀찮아서 그냥 CS를 사용하고 있었는데, [wiki:Site/cloud/automation chef]를 가지고 놀다가 우연찮게 solr를 발견했다. chef에서는 메타정보 검색을 위해서 solr을 사용를 사용하는데, 이게 뭔가 하고 살펴봤더니 루신 색인을 그대로 사용하는거 아닌가. 게다가 설치/운용도 간단해 보여서, 이후 검색서비스를 solr로 대체해서 지금까지 사용하고 있다. 
+d43 1
+a43 1
+처음 solr를 적용했을 때 버전이 3.x 였는데, 어느날 보니 4.7 버전까지 나왔더라. 4.7 버전을 기준으로 solr를 설치하고 운용하는 방법을 정리하려고 한다.
+d45 2
+a46 2
+=== Solr 테스트 환경 ===
+Joinc 컨텐츠에 대해서 테스트를 진행하려고 한다. 테스트를 진행해서 문제 없으면, Joinc 사이트에 적용한다.
+d49 2
+d52 1
+a52 2
+=== 다운로드 ===
+http://lucene.apache.org/solr 에서 다운로드 했다. ([[Date(2014-03-16T04:19:37)]])현재 최신 버전 4.7.0을 다운로드 했다.
+d54 2
+a55 17
+압축을 풀면 컨테이너까지 제공을 한다. 해서 Tomcat 대신, 소스 패키지에서 제공하는 컨테이너를 사용하기로 했다. 
+
+=== 색인 준비 ===
+다행히 lucene로 삽질한 경험이 있어서, 별 어려움 없이 사용할 수 있었다. 색인을 위해서 먼저 schema를 설계 한다. 여기에는 필드이름과 필드타입등이 들어간다.
+
+아 schema 수정하기 귀찮다. 그래서 소스코드에 들어있는 schema를 그대로 사용하기로 했다.
+{{{#!plain
+# cat schema.xml
+...
+   <field name="id" type="string" indexed="true" stored="true" required="true" />
+   <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
+   <field name="name" type="text_general" indexed="true" stored="true"/>
+   <field name="alphaNameSort" type="alphaOnlySort" indexed="true" stored="false"/>
+   <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
+   <field name="cat" type="string" indexed="true" stored="true" multiValued="true"/>
+   <field name="features" type="text_general" indexed="true" stored="true" multiValued="true"/>
+...
+d57 2
+a58 4
+이 schema는 예제로 제공하는 컨텐츠의 색인을 위한 용도다. 이중 id와 cat 필드를 사용하기로 했다. 두 개만 사용할 거라면 필요없는 것 지우고 name만 바꿔도 되지 않겠느냐 라고 할 수도 있는데, 귀찮다. 그리고 괜히 바꿔서 에러나면 삽질해야 할 것 같아서. 어차피 색인 새로 만드는 시간이라고 해봐야 10분인데, 나중에 정교하게 하면 되겠다. 
+
+  * id : wiki 파일 이름으로 한다. 검색 후에 id 이름으로 페이지 링크를 만들면 된다. 
+  * cat : wiki 본문 내용으로 한다. wiki 내용은 wiki 포맷을 따르기 때문에, 검색 결과를 예쁘게 보여주려면, 정리작업이 필요하다. 하지만 귀찮아서 그냥 wiki 문서 그대로 색인하기로 했다.   
+d60 4
+a63 1
+내가 사용하는 moniwiki 파일은 data/text에 plain text형태로 저장 된다.   
+d65 5
+a69 5
+# cat man_2f12_2fmemset
+# title memset
+
+=== memset ===
+memset은 어쩌고 저쩌고 하는 함수다....
+d72 2
+a73 10
+색인을 하려면 schema에 맞게 작성해야 한다. 
+{{{#!plain
+<add>
+<doc>
+    <field name="id">man_2f12_2fmemset</field>
+    <field name="cat">memset은 어쩌고 저쩌고 하는 함수다....</field>
+</doc>
+</add>
+}}}
+cat field의 경우 CDATA를 써줘야 할 것이다.
+d75 1
+a75 41
+python 스크립트 하나 만들어서 모든 wiki 파일을 schema 형식에 맞게 변환해서 doc.xml 이름으로 저장했다. 귀찮아서 대충 돌아가게만 만들었다.
+{{{#!plain
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+import sys
+import os
+import re
+import urllib
+import codecs
+
+output = codecs.open('doc.xml', 'w', 'utf8')
+for file in os.listdir('./text'):
+    if re.match("^Site_2f|^man_2f",file):
+        try:    
+            handle = codecs.open('./text/'+file, 'r', 'utf8')
+            print file  
+        except IOError:
+            print "Open Error"
+        else:   
+            firstline = 1
+            body = ""   
+            for line in handle:
+                if firstline == 1: 
+                    if line.find('#title') != -1:
+                        firstline = 0;          
+                        title = line            
+                        #print u"<field name=\"title\">{0}</field>".format(line)
+                else:           
+                    #output.write(line) 
+                    body = body + line  
+            output.write("<doc>\n")
+            output.write("\t<field name=\"id\">{0}</field>\n".format(file))
+            body = u"\t<field name=\"cat\">\n{0}\n</field>\n\n".format(body)
+            output.write(body)
+            output.write("</doc>\n")
+            handle.close()
+            #print "\t<field name=\"id\">{0}</field>".format(file)
+            #print "</doc>"
+}}}
+python에서 utf8 처리하려다 멘붕 올뻔했다. 약 올리려고 까다롭게 한건가 ? 
+d77 2
+a78 1
+Solr 컨테이너 띄우고
+d80 5
+a84 1
+# java -jar start.jar &
+d86 1
+a86 24
+8983 포트로 연결하면 관리자 화면이 뜬다. 여기에서 질의 결과를 테스트할 수 있다. 
+
+색인 시작
+{{{#!plain
+# java -jar post.jar doc.xml
+}}}
+했더니 끝이다. wiki 컨텐츠 중에 CDATA를 포함한 문서가 있어서, 수정 작업을 좀 했다. 나중에 wiki 컨텐츠를 깔끔하게 변환하도록 프로그램을 수정해야 겠다.  
+
+8983 포트로 연결해서 테스트 하면 된다.
+=== 테스트 ===
+{{{#!html
+  <form action="http://www.joinc.co.kr/modules/moniwiki/wiki.php/search">
+    <div>
+    <input name="q" type="text" size="10" class=goto value=""/>
+    <input type="submit" name="sa" value="검색" class='submitBtn' />
+    </div>
+  </form>
+}}}
+
+TF * IDF에 기반한 전형적인 Lucene 검색 결과를 보여준다. 형태소분석기 없이 ngram 색인을 돌렸는데, CMS 컨텐츠를 대상으로 본다면 충분히 쓸만한거 같다. 문서가 수백만건인 것도 아닌데, 굳이 형태소분석기를 돌릴 필요는 없는 것 같다. 차라리 데이터 클랜징, title field 추가, token이 일정 갯수 이하일 경우 score를 낮추도록 LengthNorm 알고리즘을 변경하는게 (별다른 노력없이)검색품질을 높일 수 있는 방법이지 싶다. 
+
+=== moniwiki와 통합 ==
+==== 검색 요청 ====
+이제 moniwiki와 통합할 차례다. Solr를 별도의 컨테이너로 띄웠으니, php 함수로 URL을 open 해서 처리할 수 밖에 없겠다. php에서 직접 solr를 처리하는 방법이 있으나, 현재 php solr의 지원버전이 3.2라서 그냥 URL 오픈하기로 했다. 
+d88 6
+a93 8
+// ...
+$xmlUrl = "http://localhost:8983/solr/select/?q=$q&version=2.2&start=$start&rows=10&indent=on";
+$xmlStr = file_get_contents($xmlUrl);
+$xmlObj = simplexml_load_string($xmlStr);
+$arrXml = objectsIntoArray($xmlObj);
+$q = ($arrXml['lst']['lst']['str'][2]);
+$rows = ($arrXml['lst']['lst']['str'][4]);
+// ...
+d95 1
+a95 1
+검색 결과는 xml 형식으로 돌려준다. php의 내장 xml 함수를 이용해서 파싱해서 처리했다. 이렇게 해서 지금의 joinc 검색 서비스가 만들어졌다. (아직은 보기에 그닥 좋지 않지만)  
+d97 1
+a97 21
+==== 데이터 클랜징 ====
+위키 원문을 그대로 색인하다 보니, 검색 결과에 위키 문법을 포함한 문서가 노출이 된다. 보기에 썩 좋지 않다. 위키 원문을 색인하기 보다는 HTML로 해석된 위키 문서를 HTML strip해서 색인하는게 좋을 것이다. 
+
+느리고 아름다운 방법 대신 스크립트를 이용해서 '''빠르고 지저분한 방식'''으로 데이터를 클랜징하기로 했다.
+  * 색인할 위키 문서의 URL 링크 목록을 만든다.  
+  * [wiki:man/12/w3m w3m]으로 위키 문서를 요청한다. 그러면 위키엔진이 해석한 HTML 문서를 가져올 것이다. 그리고 w3m이 알아서 HTML strip 해준다. 깔끔해진 문서를 별도의 디렉토리에 저장한다.  
+    {{{#!plain
+import getopt, sys
+import os
+import re
+import urllib
+import codecs
+
+for file in os.listdir('./text'):
+    if re.match("^Site_2f|^man_2f",file):
+        uri = file.replace('_', '%')
+        command = "w3m -dump \"http://www.joinc.co.kr/modules/moniwiki/wiki.php/{0}?action=print\" > rawindex/{1}".format(urllib.unquote(uri), file)
+        os.system (command)
+}}}
+  * 이 문서를 색인한다.  
+검색 결과가 훨씬 보기 좋아졌다.
+d99 1
+a99 2
+==== 문서 추가/업데이트/삭제시 색인 업데이트 ====
+주기적으로 추가및 업데이트된 문서에 대한 색인을 만드는 방법이 있다. 모니위키는 '''editlog'''파일에 문서 변경내용을 추가한다. 그러하니 주기적으로 editlog 파일을 읽어서 색인을 업데이트 하면 된다.   
+d101 2
+a102 17
+문서 변경내용을 실시간에 색인에 적용하기를 원한다면, moniwiki 스크립트를 약간 수정해야 한다. moniwiki는 '''send_page'''라는 함수를 호출해서 문서를 저장하는데, 저장 한 다음 색인 추가 프로그램을 호출하면 된다. 
+  1. wiki에서 파일을 저장하면
+  1. w3m을 이용해서 수정한 웹 페이지를 읽어서 
+  1. xml 데이터로 만든 다음에  
+  1. 색인한다.
+
+=== 앞으로 해야 할 것. ===
+  1. Moniwiki와 연동해야 한다. 
+     * 글을 새로 만들 때, 색인 Add.
+     * 글을 수정 할 때, 색인 Update.
+     * 글 삭제시, 색인 Delete
+  1. 색인 업데이트 삭제등을 wiki 페이지 업데이트 삭제와 연동해야 한다.
+  1. Snippet, hit highlighting 적용
+  1. 색인 컨텐츠 정규화
+  1. field 정리. time field, tag 필드 추가 
+  1. solr을 이용한 분산 검색 아이디어
+  1. solr를 이용한 RDBMS 색인
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a13 1
+   * 실시간(Near Real-time) 색인 
+d18 11
+a28 4
+   * hit highlighting 
+   * dynamic clustering
+   * database integration
+   * Word, PD와 같은 rich document 색인 지원
+d30 7
+a36 1
+Solr은 Java 기반으로 만들어졌으며, Tomcat와 같은 servlet container에 올릴 수 있다.
+d38 1
+a38 5
+== Joinc 컨텐츠 검색 서비스 만들기 ==
+지금까지는 구글 custom search(이하 CS)를 사용해 왔다. 쓸만하지만 몇 가지 문제가 있다.
+  1. 색인 갱신 주기를 조절할 수 없다. 컨텐츠를 옮기거나 하는 등으로 URL이 변경되면, 다음번 색인 까지 한참 동안 링크가 깨진다. 
+  1. URL 맵이 엉망으로 만들어진다. 구글 CS는 크롤을 기반으로 한다. 따라서 모든 가능한 링크에 대해서 색인이 만들어 지는데, 그러다 보니 ?action=diff 등과 같은 wiki 액션 페이지들도 색인이 되버린다. memset 페이지 뿐만 아니라 memset??action=diff 와 같은 페이지까지 색인이 되버린다. 그리고 어느게 score가 높을지 예상할 수가 없다. memset??action=diff 같은 URL이 링크걸리면, 재수 없을 경우 아예 컨텐츠를 확인할 수 없는 경우가 비일비재 하다. 
+  1. 텍스트 브라우저로 브라우징 할 수 없다. 주로 [wiki:man/12/w3m w3m]을 이용해서 브라우징을 한다. 구글 CS는 Ajax 호출이기 때문에 w3m에서는 검색결과를 볼 수 없다. 대부분의 사람들에게는 상관없겠지만 나에게는 중요한 문제다. 
+d40 1
+a40 1
+문제를 해결하기 위해서는 컨텐츠 기반으로 색인을 하면 되는데, lucene가 거의 유일한 해결책이라 할 수 있겠다. 하지만 lucene는 너무 무겁고, 설치/운용이 귀찮다. 직접 만드는 건 더 귀찮다. 
+d42 1
+a42 1
+이래 저래 귀찮아서 그냥 CS를 사용하고 있었는데, [wiki:Site/cloud/automation chef]를 가지고 놀다가 우연찮게 발견했다. chef에서는 메타정보 검색을 위해서 solr을 사용를 사용하는데, 이게 뭔가 하고 살펴봤더니 루신 색인을 그대로 사용하는거 아닌가. 게다가 설치/운용도 간단해 보였다.!!!
+d44 4
+a47 1
+그래 Solr을 이용해서 컨텐츠 기반의 검색 서비스를 만들어 보기로 했다.
+d50 1
+a50 3
+Joinc 서버는 Ubuntu 리눅스를 사용하고 있는데, 친절하게도 Tomcat까지 포함해서 Solr을 배포한다. 하지만 Tomcat은 너무 무겁다는 생각이 들어서 Tomcat 없이 설치하기로 했다. Joinc 서버는 (가장 저렴한)VM에서 돌아간다. 그래서 Tomcat 올리는게 좀 무섭다. 
+
+http://lucene.apache.org/solr 에서 다운로드 했다. (2012년 7월 현재)4.0버전을 사용할 수 있지만 아직 Beta를 벗어나지 못한 상태라서, 3.6.0을 설치하기로 했다.
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d5 4
+a8 1
+Solr은 Apache Lucene 프로젝트에 기반을 둔 검색엔진으로 기업 대상으로 개발을 했다. [wiki:man/12/lucene Lucene]의 강력한 기능의 대부분을 그대로 사용할 수 있다.  
+d10 9
+a19 1
+   * faceted search
+@
+
+
+1.1
+log
+@110.45.159.201;;Anonymous;;
+@
+text
+@d5 1
+a5 1
+Solr은 Apache Lucene 프로젝트에 기반을 둔 검색엔진으로 기업용을 대상으로 개발을 했다. [wiki:man/12/lucene Lucene]의 강력한 기능의 대부분을 그대로 사용할 수 있다.  
+@

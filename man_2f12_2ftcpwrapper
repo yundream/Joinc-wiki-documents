@@ -1,0 +1,261 @@
+#title TCP Wrapper
+
+[[TableOfContents]]
+== TCP Wrapper ==
+[wiki:man/12/TCP TCP] Wrapper는 호스트 기반의 네트워크 ACL 시스템으로, 리눅스나 BSD 같은 Unix-like 운영체제에서 Internet Protocol 서버로의 네트워크 접근을 필터링 하기 위해서 사용한다. TCP wrapper 그냥 줄여서 wrappers라고 부르기도 한다. 설정이 간단해서 널리 사용하고 있다.
+
+TCP wrapper를 사용하기 위해서는 애플리케이션이 libwrap.a 라이브러리를 포함해서 컴파일해야 한다. '''[wiki:man/1/ldd ldd]'''명령을 이용해서, 애플리케이션이 wrapper를 지원하는지 확인할 수 있다. [wiki:man/12/ssh ssh], ftp, finter, exec, rsh, rlogin, tftp, talk 등의 네트워크 애플리케이션이 wrapper를 지원한다. 
+{{{#!plain
+# ldd /usr/sbin/sshd  | grep libwrap
+        libwrap.so.0 => /lib/x86_64-linux-gnu/libwrap.so.0 (0x00007fb751992000)
+}}}
+wrappers를 지원하는 애플리케이션을 보면, "접근 제어가 필요한" 애플리케이션이라는 걸 알 수 있다. apache와 같은 애플리케이션은 wrappers를 지원하지 않는다. 
+
+libwrap을 가지고 있지 않은 소프트웨어의 경우에는 '''tcpd'''라고 부르는 wrapper [wiki:Site/system_programing/process/daemon daemon]을 이용해서 네트워크 접근을 필터링 할 수 있다. tcpd는 /etc/hosts.allow 와 /etc/hosts.deny를 읽어서 네트워크 접근을 허용하거나 막는다. tcpd는 [wiki:Site/Network_Programing/Documents/inet_prog xinetd]나 [wiki:Site/Network_Programing/Documents/Inet_daemon inetd]로 작동하는 애플리케이션에 대해서 작동한다.  
+
+=== TCP wrappers와 xinetd ===
+아래 그림은 TCP wrappers와 xinetd 그리고 iptables와의 관계를 묘사하고 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/19zdBk4TGNWbFE3_4cUcLcGEB2qySdETt9rmZ-h3YWR4/pub?w=511&amp;h=651" width=357 height=455>
+}}}
+  1. 방화벽 장비(Firewall)에서 패킷 필터링 
+  1. 운영체제의 iptables에서 패킷 필터링
+  1. TCP Wrappers에 의해서 애플리케이션 단위로 필터링 된다.
+     1. libwrapp.so를 가지고 있는 애플리케이션들은 직접 연결을 제어한다. 
+     1. xinetd로 실행되는 애플리케이션의 경우, xinetd가 연결을 제어한다.  
+
+=== TCP Wrapper 간단 self 테스트 ===
+xinetd를 이용해서 tcpwrapper의 작동을 테스트 했다. 먼저 xinetd 프로그램을 설치했다.
+{{{#!plain
+# apt-get install xinetd
+}}}
+
+[wiki:Site/Network_Programing/Documents/inet_prog xinetd]에 등록해서 테스트할 간단한 echo server 프로그램을 하나 만들었다.
+{{{#!plain
+# cat /usr/local/bin/mytest.rb
+#!/usr/bin/ruby
+require 'readline'
+
+while buf = Readline.readline
+  buf
+end
+}}}
+
+mytest 서비스를 등록한다.
+{{{#!plain
+# cat /etc/xinetd.d/mytest
+service mytest
+{
+        type            = UNLISTED
+        disable         = no
+        socket_type     = stream
+        protocol        = tcp
+        server          = /usr/local/bin/mytest.rb
+        user            = root
+        wait            = no
+        port            = 12345
+}
+}}}
+
+xinetd를 재시작하면 12345 [wiki:man/12/포트번호 포트]가 열린것을 확인할 수 있다.
+{{{#!plain
+# /etc/init.d/xinetd restart
+# netstat -nap | grep 12345
+tcp        0      0 0.0.0.0:12345           0.0.0.0:*               LISTEN      2086/xinetd     
+}}}
+
+현재 hosts.deny에는 아무것도 등록하지 않은 상태로 telnet로 접근 가능하다.
+{{{#!plain
+# telnet 192.168.56.101 12345
+Trying 192.168.56.101...
+Connected to 192.168.56.101.
+Escape character is '^]'.
+hello
+hello
+}}}
+
+외부에서 mytest 서비스를 이용하지 못하도록 hosts.deny 설정을 변경했다.
+{{{#!plain
+# cat /etc/hosts.deny
+# ... 생략
+12345: ALL
+}}}
+
+telnet으로 다시 테스트 했다. mytest 서비스 연결이 되지 않는다.  
+{{{#!plain
+# telnet 192.168.56.101 12345
+Trying 192.168.56.101...
+Connected to 192.168.56.101.
+Escape character is '^]'.
+Connection closed by foreign host.
+}}}
+
+192.168.56.1에서 접근이 가능하도록 허용했다.
+{{{#!plain
+# cat /etc/hosts.allow
+# ... 생략
+12345: 192.168.56.1
+}}}
+
+== TCP wrapper 설정 ==
+Wrapper는 아래 두개의 파일을 읽어서, 클라이언트의 연결을 허용할지를 결정한다.
+  * /etc/hosts.allow
+  * /etc/hosts.deny
+
+Wrapper는 클라이언트의 연결 요청을 받으면 아래의 단계를 거친다.
+   1. '''/etc/hosts.allow''' 파일에 있는 허용 규칙을 읽어서, 일치하는 규칙이 있는지 확인한다. 만약 일치하는 규칙이 있다면, 연결을 허용한다. 일치하는 규칙이 없다면, 다음 단계로 넘어간다.
+   1. '''/etc/hosts.deny''' 파일에 있는 규칙을 읽는다. 일치하는 규칙이 있다면, 클라이언트 연결을 거부한다. 일치하는 규칙이 없다면 클라이언트 연결을 허용한다.
+
+위 단계에서 중요한 점은
+   * '''hosts.deny'''를 적용하기 전에 '''hosts.allow'''를 먼저 적용한다. 그러므로 '''hosts.allow'''와 '''hosts.deny'''에 중복되는 규칙이 있다면, hosts.deny의 규칙은 무시된다. 
+   * 일치하는 규칙이 있는지 탑-다운방식으로 검사한다. 처음에 일치한(제일 위에 있는) 규칙하나만 적용된다. 규칙을 만들 때 주의해야 한다.
+   * hosts.allow아 hosts.deny에 아무런 내용이 없다면, 클라이언트 접근은 무조건 허용한다.
+   * hosts.allow, hosts.deny의 규칙은 캐쉬되지 않는다. 따라서 파일의 규칙이 변경되면 (네트워크 서비스의 재 시작 없이) 즉시 반영된다. 
+==== 규칙 형식 ====
+/etc/hosts.allow와 /etc/host.deny의 규칙 형식은 동일하다. 하나의 줄에 하나의 규칙만 사용되며, 공백줄과 #는 무시한다. 각 줄의 규칙 형식은 다음과 같다.
+{{{#!plain
+<데몬 목록> : 클라이언트 목록 ![: <옵션> : <옵션: ... !]
+}}}
+  * <데몬 목록> : 콤마로 프로세스의 이름을 나열한다. '''ALL'''을 사용할 수도 있다. 
+  * <클라이언트 목록> : 호스트의 이름이나 IP 주소를 콤마를 구분자로 나열한다. 
+
+설정 예제
+{{{#!plain
+vsftpd : .example.com
+}}}
+FTP 데몬(vsftpd)에 대한 규칙이다. 이 규칙은 도메인이 '''example.com'''인 모든 호스트에 적용된다. 예컨데 *.example.com 이라고 보면 되겠다. 이 규칙이 hosts.allow에 있다면 허용, hosts.deny에 있으면 거부한다.
+
+좀 더 복잡한 예제
+{{{#!plain
+sshd : .example.com \
+   : spawn /bin/echo `/bin/date` access denied >> /var/log/sshd.log \
+   : deny
+}}}
+"*.example.com" 호스트에서 ssh 연결을 요청할 경우 에러로그를 /var/log/sshd.log 에 기록한다. 그리고 이 요청을 deny 한다. deny 할 것을 규칙에 직접 명시했기 때문에, 이 규칙이 hosts.allow에 있더라도 클라이언트 요청을 거부한다.    
+
+==== 와일드 카드 ====
+Wrapper 규칙에서 사용할 수 있는 와일드 카드를 정리한다.
+  * ALL : 모든것과 매칭한다. 데몬 목록과 클라이언트 목록 모두에 사용할 수 있다.
+  * LOCAL : localshot와 같이 '''.'''을 포함하지 않은 모든 호스트에 매칭한다.  
+  * KNOWN : 호스트 IP와 호스트 이름을 알 수 있다면, 모두 매칭한다. 
+  * UNKNOWN : 알 수 없는 호스트 IP와 호스트 이름에 대해서 매칭한다.
+  * PARANOID : 호스트 이름으로 출발지 IP 주소를 알 수 있을 경우로 DNS lookup을 수행해서 IP 주소를 가져올 수 있을 경우 매칭한다. 
+
+==== 옵션들 ====
+Wrapper에서 지원하는 옵션들을 정리했다.
+===== 로깅 =====
+앞서 옵션 필드에서 shell 명령을 실행하는 방법을 살펴봤다. 이외에도 옵션 필드를 이용해서 syslog로 로그를 보낼 수도 있다.
+{{{#!plain
+sshd : ALL : severity local0.alert
+}}}
+이렇게 설정하면 facility가 local0이고 level이 LOG_ALERT인 syslog가 발생한다.   
+===== Access Control =====
+옵션필드에 직접 '''allow'''와 '''deny'''를 설정할 수 있다. 이렇게 설정하면 설정파일에 상관 없이 옵션의 값이 그대로 적용된다. 예를 들엇 hosts.allow에 "sshd: client-1.example.com: deny"를 설정하면, hosts.allow라는 파일 이름에 상관없이 deny가 적용된다. 
+{{{#!plain
+# cat /etc/hosts.allow
+ssh: 192.168.56.1: deny
+}}}
+
+===== shell 명령어 =====
+옵션에 shell 명령으를 설정할 수 있다. 두 가지 방법으로 shell 명령을 실행할 수 있다. 
+  * spawn : 자식 프로세스로 shell 명령을 실행한다. 
+  * twist : 클라이언트가 요청한 서비스 대신에 다른 서비스를 실행한다. 침입자를 '''honey pots'''으로 유도하거나 경고메시지등을 출력하기 위해서 사용할 수 있다. 
+
+앞서 만들었던 '''mytest'''서비스를 이용해서 twist 테스트를 진행했다. 
+{{{#!plain
+# cat /etc/hosts.deny
+12345: ALL:twist /bin/echo "421 This domain has been black-listed. Access denied!"
+}}}
+telnet을 이용해서 12345 포트로 연결을 하면
+{{{#!plain
+$ telnet 192.168.56.101 12345
+Trying 192.168.56.101...
+Connected to 192.168.56.101.
+Escape character is '^]'.
+421 This domain has been black-listed. Access denied!
+Connection closed by foreign host.
+}}}
+twist로 설정한 프로세스가 실행되는 걸 알 수 있다.
+
+===== 변수들 =====
+spawn과 twist에서 사용할 수 있는 확장변수[[FootNote(cnetos 영문 문서에는 Expansions라고 소개하고 있다. 확장이라고 하기엔 이상해서 그냥 변수라고 번역했다.)]]들이 있다. 이 변수들을 이용해서 클라이언트, 서버, 프로세스들에 대한 정보를 알아낼 수 있다.
+
+지원하는 변수들은 다음과 같다.
+||%a ||클라이언트의 IP 주소                                                               ||
+||%A ||서버의 IP 주소                                                                     ||
+||%A ||서버의 IP 주소                                                                     ||
+||%c ||유저이름, 호스트이름, IP주소와 같은 다양한 클라이언트 정보                         ||
+||%d ||데몬 프로세스 이름                                                                 ||
+||%h ||클라이언트의 호스트 이름. 만약 호스트이름을 가져올 수 없다면, IP주소를 출력한다.   ||
+||%H ||서버의 호스트이름. 호스트 이름을 가져올 수 없다면, IP주소를 출력한다.              ||
+||%n ||클라이언트의 호스트 이름. 호스트이름이 없다면 '''unknown'''을 출력한다.            ||
+||%N ||서버의 호스트이름. 호스트 이름을 가져올 수 없다면 '''unknown'''을 출력한다.        ||
+||%p ||데몬의 프로세스 ID                                                                 ||
+||%s ||데몬 프로세스, 호스트 이름, IP 주소와 같은 다양한 서버의 정보                      ||
+||%u ||클라이언트의 유저이름. 유저이름을 알 수 없다면 '''unknown'''을 출력한다.           ||
+
+접근 실패하면 호스트의 이름 혹은 IP를 출력하는 예제 
+{{{#!plain
+# cat /etc/hosts.deny
+12345: ALL:twist /bin/echo "421 %h has been banned from this server"
+}}}
+
+telnet으로 테스트를 했다.
+{{{#!plain
+$ telnet 192.168.56.101 12345
+Trying 192.168.56.101...
+Connected to 192.168.56.101.
+Escape character is '^]'.
+421 192.168.56.1 has been banned from this server
+Connection closed by foreign host.
+}}}
+
+로그인 실패하면, 접근시간과 호스트 아이피를 로그로 남기는 예제
+{{{#!plain
+12345: ALL:spawn /bin/echo `/bin/date` access denied to %h>> /var/log/sshd.log
+}}}
+
+=== TCP wrapper 예제들 ===
+virtualbox로 ubuntu 13.10 서버를 실행해서 TCP wrapper가 어떻게 작동하는지 확인해 보기로 했다.
+  * 테스트에 사용할 guest 운영체제 : ubuntu 13.10 server
+  * 테스트에 사용할 guest 운영체제의 IP : 192.168.56.101
+  * 호스트 운영체제의 IP ; 192.168.56.1 
+Guest 운영체제의 wrapper 설정을 바꿔가면서, 호스트 운영체제에서 연결 하는 식으로 테스트를 진행한다.  
+
+아무 설정도 하지 않은 상태. hosts.allow, hosts.deny 모두 아무런 값도 설정하지 않았다. 22번 포트로 테스트를 했다. 연결 성공하는 걸 확인할 수 있다.  
+{{{#!plain
+# tail -f /var/log/auth.log
+Mar  8 01:46:29 ubuntu sshd[1633]: Accepted password for yundream from 192.168.56.1 port 50056 ssh2
+Mar  8 01:46:29 ubuntu sshd[1633]: pam_unix(sshd:session): session opened for user yundream by (uid=0)
+}}}
+
+모든 IP에서 22번으로의 연결을 막는다.  
+{{{#!plain
+# cat /etc/hosts.deny
+22 : ALL
+}}}
+22번으로 연결하면, 에러 로그가 남는다.
+{{{#!plain
+# tail -f /var/log/auth.log
+Mar  8 01:50:33 ubuntu sshd[1914]: refused connect from 192.168.56.1 (192.168.56.1)
+}}}
+syslog로 에러를 보내보자.
+{{{#!plain
+22 : ALL : severity local0.alert
+}}}
+syslog로 전송됐는지 확인.
+{{{#!plain
+# tail -f /var/log/syslog
+Mar  8 01:58:57 ubuntu sshd[2001]: refused connect from 192.168.56.1 (192.168.56.1)
+}}}
+이 정보들을 syslog-ng로 보내면, 중앙에서 유저 접근을 모니터링 하는 관제 시스템을 개발할 수 있을테다.
+
+192.168.56.1에서의 연결만 허용하기로 했다. hosts.deny설정은 그대로 두고 host.allow에 허용할 ip만 설정하면 된다. 
+{{{#!plain
+# cat /etc/hosts.allo
+22: 192.168.56.1
+}}}
+
+== 참고 ==
+ * [https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Security_Guide/sect-Security_Guide-TCP_Wrappers_and_xinetd.html RHEL Security Guid - TCP Wrapper] 

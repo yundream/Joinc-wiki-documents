@@ -1,5 +1,7 @@
 #title nginx 
 
+<!> 미완성
+[[TableOfContents]]
 == Nginx ==
 Nginx(엔진 x)는 오픈소스기반의 리버스 프록시 서버로 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]뿐만 아니라, HTTPS, SMTP, POP3, IMAP 프로토콜을 지원한다. 또한 load balancer, HTTP cache, web server 용도로도 사용할 수 있다.
 
@@ -10,9 +12,321 @@ http://gigaom2.files.wordpress.com/2013/08/web-server-market-share-august-2013.j
 === 무얼하려고 ? ===
 Nginx에 PHP, Sinatra, Django을 붙여보려고 한다. 특히 Django를 붙이는게 주 목적이다. Django는 사용해 본적이 없는데, 프로젝트가 Django 기반이라서 미리 경험해 볼 필요가 있기 때문이다. 설치하고 난다음에는 Django를 공부해야 할 분위기다. 
 
-=== Nginx 설치 ===
+=== Nginx와 성능 ===
+Nginx는 아파치의 C10K 문제를 보고, 이를 해결하기 위한 목적에서 개발을 시작한 프로젝트다. 
+
+아파치 웹 서버는 구조적으로 멀티 스레드/멀티 프로세스 기반으로 작동한다. 클라이언트의 요청이 들어오면 스레드를 생성하거나 혹은 이미 만들어져 있는 스레드에 작업을 요청하는 방식이다. 반면 Nginx는 Reactor 패턴을 기반으로 한 event loop 방식으로 작동한다. 
+
+즉 기본적으로 단일 스레드 방식으로 작동한다.(물론 멀티 코어의 활용을 위해서 두 개 이상의 프로세스를 fork 하는 식의 구성도 사용한다.) 단일 스레드 방식은 다수의 연결을 효과적으로 처리할 수 있다는 장점이 있다. 예컨데 멀티 스레드 방식의 경우, 서버가 클라이언트의 요청을 모두 마치거나 클라이언트가 연결을 끊기 전까지 스레드가 계속 유지된다. 유저의 요청이 많아지면 과도하게 많은 스레드가 만들어 질 수 있다. 그만큼 메모리, CPU, 문맥교환(context-switching)에서 낭비가 생긴다. 단일 스레드로 돌아가는 Nginx는 이러한 문제에서 상대적으로 자유롭다.  
+
+<!> NginX가 정말 apache에 배해서 C10K에 잘 대응하는지 그리고 더 나은 성능을 보여주는지는 테스트를 해 봐야 겠다.
+[[adtext]]
+=== Nginx 설치 및 실행 ===
 설치 환경은 다음과 같다. 
   * [wiki:Site/cloud/virtualbox Virtualbox 4.2.10]
   * ubuntu server 13.04
 
-... 계속
+apt-get으로 설치할 수 있다.
+{{{#!plain
+# apt-get install nginx
+}}}
+함께 설치되는 init 스크립트로 서버 시작, 중지, 재시작을 관리할 수 있다.
+{{{#!plain
+# /etc/init.d/nginx [start|stop|restart]
+}}}
+
+웹 서버 설정파일은 사이트별로 '''/etc/nginx/sites-available''' 디렉토리 밑에 만들면 된다. 만든 설정파일을 '''/etc/nginx/sites-enabled'''로 옮기고 nginx 서버를 재 시작하면, 설정이 적용된다.  (아파치의 서버 설정과 비슷하다.) 
+
+=== Hello World 서비스 === 
+'''Hello World'''를 출력하는 페이지를 만들기로 했다. 설정 파일을 찾아서 서버설정을 하고, '''Document Root'''에 HTML 문서를 만들면 된다. Nginx 설정파일의 위치는 /etc/nginx다.   
+
+'''Hello world'''를 서비스하기 위해서 /etc/nginx/sites-enabled/default 파일을 수정했다. '''Hello world''' 서비스 개요는 다음과 같다.
+  * Document root : /var/www/helloworld  
+  * 서비스 도메인 이름 : www.helloworld.joinc  
+{{{#!plain
+# cat /etc/nginx/sites-enabled/default
+server {
+        listen 80;
+        listen [::]:80 default_server ipv6only=on;
+
+        root /var/www/helloworld;
+        index index.html index.htm;
+
+        # Make site accessible from http://localhost/
+        server_name www.helloworld.joinc;
+
+        location / {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                try_files $uri $uri/ /index.html;
+                # Uncomment to enable naxsi on this location
+                # include /etc/nginx/naxsi.rules
+        }
+
+        location /doc/ {
+                alias /usr/share/doc/;
+                autoindex on;
+                allow 127.0.0.1;
+                allow ::1;
+                deny all;
+        }
+}
+}}}
+
+=== master process와 worker process ===
+Nginx 웹서버를 실행 하면 하나의 master process와 하나 이상의 worker process가 실행된다. master 프로세스는 설정파일을 읽어서 적용하고 워커 프로세스를 관리하는 일을 한다. 실제 요청 처리는 '''워커 프로세스'''가 맡는다. 워커 프로세스의 갯수는 설정 가능한데, CPU 코어 갯수만큼 만드는게 일반적이다. 
+
+== Nginx 기본 운용 ==
+=== Nginx 시작, 종료, 재시작 ===
+Nginx는 -s 파라미터를 이용해서, 작동과 관련된 몇 가지 시그널을 보낼 수 있다. Nginx에서 처리하는 시그널은 다음과 같다. 
+  * stop : Nginx 서비스를 내린다.(fast shutdown) 
+  * quit : Nginx 서비스를 내린다.(graceful shutdown) 
+  * reload : 설정파일을 다시 적용한다.
+  * reopen : log 파일을 다시 오픈한다.
+'''stop'''는 서비스를 즉시 종료한다. 
+
+'''quit'''는 서비스를 우아하게 종료하기 위해서 사용한다. 프로세스는 현재 클라이언트의 처리가 끝날 때까지 기다린 다음 중료된다. '''stop'''는 프로세스를 즉시 종료하기 위해서 사용한다. 
+
+=== Virtual host 설정 ===
+Virtual host 별로 설정파일을 만들면 된다. virtual host에 대한 설정파일은 /etc/nginx/sites-available 와 /etc/nginx/sites-enabled 디렉토리에 위치한다. 
+
+sites-available에는 virtual host에 대한 모든 설정파일을 두는데, 여기에 있는 설정파일은 '''설정 파일 저장'''용도다. 여기에 virtualhost에 대한 설정파일을 만든다고 해서, 실제 virtual host가 활성화 되는 것은 아니다. 설정파일이 site-enabled에 있어야지만 virtual host가 활성화 된다. 
+
+그래서 보통 site-available에 설정파일을 두고, virtual host가 실제 필요하면 site-enabled에 설정파일을 복사하거나 링크하는 식으로 관리한다.
+
+www.helloworld.joinc 와 www.okworld.joinc 두 개의 도메인을 서비스해야 한다고 가정해보자.
+
+sites-available에 default 파일에 www.helloworld.joinc 설정을, okworld 파일에 www.okworld.joinc 설정을 하기로 했다. 
+
+default 파일의 내용이다.
+{{{#!plain
+server {
+    listen 80;
+    #listen [::]:80 default_server ipv6only=on;
+
+    root /var/www/helloworld;
+    index index.html index.htm;
+
+    # Make site accessible from http://localhost/
+    server_name www.helloworld.joinc;
+
+    location / {
+            try_files $uri $uri/ /index.html;
+    }
+}
+}}}
+Document root는 /var/www/helloworld 로 했다. server_name은 www.helloworld.joinc로 했다. 브라우저 주소에 www.helloworld.joinc를 입력하면, nginx 서버는 /var/www/helloworld 디렉토리에 있는 문서를 읽어서 서비스한다.   
+
+okworld 파일의 내용이다.
+{{{#!plain
+server {
+    listen 80;
+    #listen [::]:80 default_server ipv6only=on;
+
+    root /var/www/okworld;
+    index index.html index.htm;
+
+    # Make site accessible from http://localhost/
+    server_name www.okworld.joinc;
+
+    location / {
+            try_files $uri $uri/ /index.html;
+    }
+}
+}}}
+Document root와 server_name 만 변경했다.
+
+sites-enabled 디렉토리에 default와 okworld에 대한 링크를 만들고 nginx 서비스를 재시작하면 된다.
+{{{#!plain
+# cd sites-enabled
+# ln -s ../sites-available/default www.helloworld.joinc
+# ln -s ../sites-available/okworld www.okworld.joinc                      
+# /etc/init.d/nginx restart
+}}}
+
+웹 브라우저로 테스트하기 위해서는 /etc/hosts에 www.helloworld.joinc와 www.okworld.joinc를 등록해야 한다.  
+{{{#!plain
+# cat /etc/hosts
+127.0.0.1       localhost yundream
+192.168.56.101  www.helloworld.joinc
+192.168.56.101  www.okworld.joinc
+}}}
+
+이제 웹 브라우저 주소창에 www.helloworld.joinc를 입력하면, 서버측으로 아래와 같은 HTTP 요청이 전송된다.
+{{{#!plain
+GET / HTTP/1.1
+Host: www.helloworld.joinc
+// 이하 생략 ..
+}}}
+nginx 서버는 Host의 이름을 이용해서 어떤 서비스를 해야 할지를 결정할 수 있다.
+
+=== static page 설정 ===
+
+=== Proxy 설정 ===
+
+== Nginx를 이용한 웹 서비스 구성 ==
+PHP, RoR, Rack, Sinatra 등 다양한 조합이 가능하지만, 여기에서는 FastCGI를 이용해서 Nginx와 PHP를 연동하는 방법만 간단히 살펴보고 넘어가려 한다. 다른 애플리케이션 서버(혹은 프레임워크)와의 연동은 각 프레임워크를 다루면서 자세히 살펴볼 생각이다. 
+
+=== Nginx와 PHP-FPM 구성 ===
+아파치는 PHP를 실행하는 두 가지 방법이 있다. 가장 많이 사용하는 방법은 mod_php로 아파치가 PHP 파일을 직접 해석하는 방식으로 작동한다. FastCGI로 연결 하는 방법도 있는데, mod_php사용이 워낙 편하기도 하고, FastCGI의 지원이 비교적 늦은 탓인지(Apache 2.4.x 부터 지원) 그다지 많이 사용하지는 않는 것 같다.
+
+Nginx는 FastCGI를 통한 연결을 지원한다. PHP는 5.4부터 FastCGI 서버를 기본내장한 PHP-FPM(PHP FastCGI Process Manager)을 제공하고 있다. Nginx와 PHP-FPM을 이용해서 웹 서비스를 만들어 보려 한다. 
+
+다음과 같이 구성하기로 했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1RnWMCFgMR0UlkjLH7ukpEqmW9Dw8sPoAF-He2wXhVqM/pub?w=637&amp;h=173">
+}}}
+  * 하나의 Nginx 서버
+  * 두개의 PHP-FPM 서버
+Nginx 서버는 static 데이터를 처리하고, PHP-FPM 서버는 동적인 데이터를 처리한다. 요청을 분산처리하기 위해서 2개의 PHP-FPM 서버를 만들었다.  
+
+==== PHP-FPM 설치 ====
+두 개의 리눅스에 php-fpm서버를 설치했다. 설정파일은 모두 동일하다. 
+{{{#!plain
+# apt-get install php5-fpm
+}}}
+
+TCP 소켓을 이용하도록 설정을 변경했다.(기본 설정은 Unix 소켓이다.) 
+{{{#!plain
+# cat /etc/php5/fpm/pool.d/www.conf
+;;;;
+; 앞부분 생략
+;;;;
+; listen = /var/run/php5-fpm.sock
+listen = 0.0.0.0:8000
+
+;;;;
+; 뒷 부분 생략
+;;;;
+}}}
+
+php-fpm 서버를 실행한다.
+{{{#!plain
+# /etc/init.d/php5-fpm restart
+}}}
+
+테스트를 위해서 /var/www/helloworld/test.php 파일을 만들었다. 파일의 내용은 다음과 같다.
+{{{#!plain
+<?php
+phpinfo();
+?>
+}}}
+
+==== Nginx 설정 ====
+클라이언트의 요청을 받은 Nginx 서버는 확장자가 .php인 경우 php-fpm 서버로 요청을 전달한다. php-fpm 서버가 두대인데, 라운드로빈 방식으로 번갈아 가면서 요청을 전송한다. Nginx 서버가 로드밸런서의 역할까지 하는 셈이다. 
+
+{{{#!plain
+# 2개의 php-fpm 서버를 등록했다.
+upstream serverpool {
+        server 192.168.56.201:8000;
+        server 192.168.56.202:8000;
+}
+
+server {
+        listen 80;
+        listen [::]:80 default_server ipv6only=on;
+
+        root /var/www/helloworld;
+        index index.html index.htm;
+
+        # Make site accessible from http://localhost/
+        server_name www.helloworld.joinc;
+       
+        # 정적 페이지의 경우 php-fpm으로 넘기지 않고, Nginx가 직접 처리한다. 
+        location / {
+                try_files $uri $uri/ /index.html;
+        }
+
+        # .php 요청일 경우 php-fpm 서버로 전달한다. 
+        location ~ \.php$ {
+                include fastcgi_params;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_pass serverpool;
+        }
+}
+}}}
+일반 사용자를 대상으로 서비스를 하려면 '''health check''' 설정, 로드밸런싱 알고리즘 설정(라운드로빈, least connection, client ip hash ..등)등 신경써야 할게 많지만, 테스트용도는 이정도 설정으로도 충분하다.   
+
+=== Nginx와 Sinatra 구성 ===
+'''Reverse proxy'''는 가장 일반적인 웹 애플리케이션 서버 구성방법이다. 실제 요청을 처리하는 서버 앞에, 요청을 분배하는 서버를 두는 방식이다. 나는 Nginx와 Sinatra를 이용해서 reverse proxy 방식의 웹 애플리케이션 서비스 시스템을 구축하기로 했다. Sinatra를 위한 웹 서버로 thin을 사용했다. '''Nginx <-----> Thin <-> sinatra''' 구성이라는 이야기다. [wiki:Site/Ruby/sinatra/UbuntuInstall Thin sinatra 설치는 여기]를 참고하자. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1FgzHhbf2VGjCTNtdCP-VamBnWt3aT_Kkjm3lMkynK6g/pub?w=389&amp;h=307">
+}}}
+
+총 4개의 인스턴스가 필요하다.
+  1. Nginx : Reverse proxy 용도로 사용한다.
+  1. Linux F/W : 리눅스를 방화벽 대용으로 사용한다. Linux F/W 은 2개의 네트워크 인터페이스를 가진다. 하나는 Nginx와 연결하는 인터페이스고 다른 하나는 Thin Sinatra WAS와의 연결에 사용할 '''내부 네트워크'''다.   
+  1. Thin Sinatra : 웹 애플리케이션 서버.  
+==== 테스트 환경 ====
+  * VirtualBox 4.2.16
+  * Guest 운영체제 : 우분투 리눅스 13.10 server 버전.
+==== Virtualbox Network 구성 ====
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1PWPhEYADO2N7segY_BqTBjvnbgfpzEKZk8Kt8QVBsYg/pub?w=565&amp;h=343">
+}}}
+ 1. 호스트 전용 네트워크 : 호스트와 Guest가 연결된 네트워크다.
+ 1. 내부 네트워크 : Guest 운영체제들만 사용할 수 있는 내부 네트워크다. 
+호스트 네트워크와 내부 네트워크 사이에 Linux F/W를 둬서 트래픽을 (iptables로)필터링 한다.
+==== Nginx proxy server ====
+Nginx prox server로 ip는 192.168.56.2다. 네트워크 설정은 다음과 같다.
+{{{#!plain
+auto eth0
+iface eth0 inet static
+  address 192.168.56.2 
+  netmask 255.255.255.0
+  gateway 192.168.56.1 
+}}}
+
+==== Linux F/W ====
+2개의 인터페이스를 가진다.
+  1. 호스트 전용 네트워크 : 192.168.56.0/24
+  1. 내부 네트워크 : 10.50.0.0/24 
+  1. IP 주소 : 10.50.0.1 
+라우터 역할도 해야 하는데, 라우팅 프로토콜 공부할 것도 아니니 그냥 static 라우팅 룰 추가하는 걸로 구성을 끝내려 한다. 방화벽 규칙 ? iptables 공부할 것도 아닌데, 굳이 iptables를 만지작 거리진 않으련다. 필요하면 iptables로 구축하면 되겠지.
+
+네트워크 설정은 다음과 같다.
+{{{#!plain
+# cat /etc/network/interface
+auto eth0
+iface eth0 inet static
+  address 192.168.56.5 
+  netmask 255.255.255.0
+  gateway 192.168.56.1 
+
+auto eth1
+iface eth0 inet static
+  address 10.50.0.1
+  netmask 255.255.255.0
+}}}
+
+==== Thin sinatra server ====
+Virtualbox의 내부 네트워크(internal network)로 구성한다. 내부 네트워크는 다른 네트워크와 완전히 분리된다. 따라서 직접 네트워크 환경을 만들어야 한다. 10.50.0.0/24 네트워크를 구성하기로 했다. gateway는 Linux F/W로 했다.
+
+Thin sinatra server 01
+{{{#!plain
+# cat /etc/network/interface
+auto eth0
+iface eth0 inet static
+  address 10.50.0.2
+  netmask 255.255.255.0
+  gateway 10.50.0.1
+}}}
+
+Thin sinatra server 02
+{{{#!plain
+# cat /etc/network/interface
+auto eth0
+iface eth0 inet static
+  address 10.50.0.3
+  netmask 255.255.255.0
+  gateway 10.50.0.1
+}}}
+
+==== 테스트 ====
+
+== 참고 ==
+ * [http://nginx.org/en/docs/beginners_guide.html Nginx Beginner's Guide]
+ * [http://stackoverflow.com/questions/3436808/how-does-nginx-handle-http-requests How does nginx handle http requests]
+ * [http://nginx.org/en/docs/http/ngx_http_upstream_module.html Nginx http upstream 설정]

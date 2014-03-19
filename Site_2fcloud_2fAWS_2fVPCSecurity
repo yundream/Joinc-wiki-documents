@@ -1,0 +1,185 @@
+#title AWS VPC 보안
+
+[[TableOfContents]]
+== VPC 보안 ==
+[wiki:Site/cloud/AWS AWS]에서 [wiki:Site/cloud/AWS/VPCManagement VPC]보안을 몇 개 카테고리 별로 살펴보려 한다. ([wiki:Site/cloud/AWS/EC2 EC2]에 대한 보안은 단순하기도 하고 VPC를 다루다보면 나오는 내용이라서 그냥 넘어간다.) 
+
+[wiki:Site/cloud/AWS AWS]를 이용하면, 기존에는 엄두도 내지 못했던 16bit 크기의 네트워크 인프라를 쉽게 구축할 수 있다. 버튼 몇번이면 (적어도 논리적 규모로는)데이터센터급의 네트워크를 가질 수 있는 것. 쉽게 구축해서 좋기는 한데, 너무 쉽게 그리고 빠르게 구축한다는 점이 보안측면에 좋지않은 영향을 줄 수도 있다. 
+
+물리적으로 구축할 경우를 가정해보자. 물리적으로 구축하려고 하면, 장비 선정에서 구매까지 상당한 비용과 시간이 소모된다. 전문 보안 조직까지 함께 투입될테니, 설계에서 구축 테스트까지 보안정책을 설계하고 테스트 할 충분한 시간이 있다. 
+
+AWS위에서는 그냥 버튼 한번에 끝난다. 네트워크와 시스템 보안에 대한 심각한 고민을 할 시간도 없고, 그럴 사람도 없다. 구축전에 보안정책을 수립하고 구축과 함께 적용/테스트 하는게 아니라, 구축이 먼저 끝나고 보안정책을 수립하는 경우가 많다. 슬슬 클라우드 환경도 보안에 대해서 생각해봐야 할 때가 된 것같다. 이 문서를 만든 이유다.
+=== AWS 인프라 보안 ===
+AWS 인프라 측면에서의 보안수준은 제 3자에의한 어떤 보안인증을 획득하고 있는지로 평가할 수 있겠다. AWS의 보안인증 획득 정보를 보면 
+  1. ISO 27001 획득
+  1. PCI(Payment Card Industry) DSS(Data Security Standard) 레벨 1 검증
+
+AWS 인프라 보안에 대한 자세한 내용은 [http://aws.amazon.com/ko/security/ AWS 보안 센터] 문서를 참고한다.
+
+=== 서비스 시나리오 ===
+보안정책은 시나리오에 따라 달라지는 거라서, 나름대로 서비스 시나리오를 세웠다.
+  1. 이 서비스는 글로벌 서비스다. 
+  1. 이 서비스를 위한 유저 정보는 사내망에 유지하고 있다. 
+  1. DEV, staging, operation stage를 거쳐서 서비스를 배포한다. 이들 모든 stage는 접근관리가 필요하다. 다른 말로... 개발자, 테스터, 운영자의 역할이 분리돼야 한다. 
+  1. 관리 트래픽과 서비스 트래픽은 분리해야 한다.
+== 네트워크 트래픽 보안 ==
+[[adtext]]
+=== Subnet & IGW  ===
+VPC를 만들면 16bit 크기의 네트워크를 할당받는다. 이 네트워크는 여러 개의 '''서브넷(subnet)'''으로 구성해서 관리할 수 있다. VPC는 인터넷으로 부터 독룁된 사설 네트워크로 인터넷과 사설 네트워크를 연결하기 위한 gateway가 필요하다. 이 gateway를 '''IGW(Internet gateway)'''라고 한다. 
+
+서브넷은 "Public subnet"과 "Private subnet"의 두가지 타입이 있다.
+  * Public subnet : IGW로 라우팅 된다. Public subnet에 배치된 인스턴스는 [wiki:Site/cloud/AWS/EIP EIP]를 이용해서 인터넷에서 직접 연결 할 수 있다.
+  * Private subnet : IGW를 가지고 있지 않다. 따라서 Private subnet에 배치된 인스턴스는 (EIP를 할당 하더라도) 인터넷으로 연결할 수 없다. 때때로 private subnet에 있는 인스턴스라 하더라도 인터넷으로의 접근이 필요할 때가 있는데, 이 경우 NAT를 경유해야만 한다.   
+
+Public subnet과 Private subnet의 유일한 차이는 '''IGW'''로 라우팅이 가능한지 여부다. 단지 IGW를 라우팅 테이블에 넣고 빼는 정도로 Public subnet과 Private subnet으로 전환할 수 있다.  
+
+Private subnet을 따로 구성하는 이유는 외부로 부터의 직접적인 접근을 막기 위해서다. Web server, WAS, Database로 구성된 인터넷 서비스를 만든다면, Web server를 제외한 인스턴스들을 Private subnet에 구성해서 트래픽을 분리할 수 있다. 이들 사이에 security group이나 subnet acl을 적용하면 [wiki:man/12/dmz DMZ]을 구성할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1jT9yWfw9eb5vx0AH9a6P1-_zPySZDk6Gs5eQ3b5qJkY/pub?w=463&amp;h=476" width=324 height=333>
+}}}
+
+=== Security Group & Network ACL ===
+Security group(이하 SG)는 인스턴스에 방화벽을 제공한다. 이름에서 알 수 있듯이, 방화벽 정책은 하나 이상의 인스턴스 그러니까 인스턴스 그룹단위로 적용할 수 있다.
+
+EC2의 경우 inbound 트래픽에 대해서만 방화벽 설정이 가능하지만, VPC는 Inbound와 Outbound 모두에 대한 방화벽 설정이 가능하다. 방화벽 정책을 만들기 위해서 제어할 수 있는 요소들은 다음과 같다.   
+  * 프로토콜 : TCP, UDP, ICMP
+  * TCP, UDP의 경우 허용할 포트의 범위 
+  * ICMP의 경우 ICMP 타입과 코드 
+Inbound의 경우 트래픽을 허용할 개별적인 목적지 IP 주소 혹은 같은 CIDR 표기법을 사용할 수 있다. 예를들어, 203.0.113.1 혹은 203.0.113.1/32, 203.0.113.0/24 등으로 IP를 설정할 수 있다. 목적지 IP를 허용한 다음에는 목적지 IP에 대한 Port 번호를 설정하면 된다. 
+
+Inbound 트래픽에 대한 기본 설정은 '''ALL:DENY'''로 외부로 부터의 모든 트래픽을 막는다. Outbound 트래픽에 대한 기본 설정은 '''ALL:ALLOW'''로 외부로 나가는 모든 트래픽을 허용한다.
+
+VPC의 경우 Outbound 트래픽에 대한 설정도 변경할 수 있는데, '''ALL:ALLOW'''를 삭제하고, 허용할 프로토콜과 포트를 설정하는 것으로 보안 설정을 높일 수 있다. VPC라면, outbound 트래픽도 제어를 해주는 걸 권장한다.
+||          || 설명                         || 대상 IP             || 대상 Port                  ||
+|| Inbound  || 입력 트래픽을 필터링한다.    || Source IP 기반      || 목적지(인스턴스) 포트      ||
+|| Outbound || 출력 트래픽을 필터링 한다.   || Destination IP 기반 || 목적지(외부 서버) 포트     ||
+
+VPC는 subnet 레벨에서 '''network access control list(ACL)'''을 관리할 수 있다. IP와 Port 기반으로 트래픽을 제어한다는 점에서 작동방식은 같다고 할 수 있지만, 작동범위와 영역에 있어서 차이점이 있다. SG와 Network ACL를 비교했다. 
+||Security Group                                                       ||Network ACL                          ||
+||인스턴스 레벨로 첫 단계 방어                                         ||Subnet 레벨로 두 번째 단계 방어      ||
+||Allow 룰만 지원한다.                                                 ||Deny룰도 지원한다.                   ||
+||Stateful: 허용하는 트래픽에 대해서는 리턴트래픽을 자동으로 허용한다. ||stateless: 응답 트래픽도 따로 허용 정책을 세워야 한다.   ||
+||인스턴스에 대해서 SG를 설정해야지만 적용된다.                        ||따로 설정을 하지 않더라도 subnet에 포함된 인스턴스는 Network ACL의 제어를 받는다. ||
+
+Network ACL은 전선을 방어하는 1차 방어선, Security Group는 각 분대를 방어하는 2차 방어선 정도로 생각하면 되겠다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14Fj3-egKMY-Ub6rvRCGpSzD6sefLpdUJVj8idPuNiUE/pub?w=578&amp;h=618" width=404 height=432>
+}}}
+  * IGW를 통해서 들어온 패킷은 먼저 '''Network ACL''' 정책에 의해서 필터링 된다. 
+  * Network ACL에 의해서 필터링된 패킷은 VPC subnet에 있는 인스턴스들에 전달되는데, 이 패킷은 다시 '''SG'''에 의해서 필터링 된다. 
+
+=== VPN 구성 ===
+글로벌 서비스를 한다면, 원할한 서비스를 위해서는 지역마다 VPC가 만들어야 한다. Tokyo와 North.calr 두 개의 region에서 서비스를 한다고 가정한다. 그리고 소스코드 형상관리, CI, 모니터링 툴, Chef 등을 포함한 관리 VPC까지 총 3개의 VPC가 있다. 서비스를 위한 VPC는 Service VPC, 관리를 위한 VPC는 Manager VPC 라고 이름을 붙였다. 
+
+어쨋든 VPC 내부에 있는 인스턴스들을 관리하기 위해서는 ssh로 각 인스턴스에 접근을 해야 한다. 간단한 방법은 0.0.0.0/0에 대해서 22번 포트를 열어주는 건데, 정책을 이렇게 세울수는 없는 노릇이다. 약간 더 정책을 강화 하면, 기본 정책을 ALL DENY로 하고, 접근 허용할 IP를 일일이 설정하는 방법이 있겠다. 하지만 관리하기가 너무 까다롭다. 
+
+Manager VPC는 Service VPC의 인스턴스를 모니터링하고, 소스코드 혹은 패키지를 배포하고 (Chef를 이용한)인스턴스 형상을 관리 해야 한다. 이들 구간 역시 VPN으로 연결해야 한다. AWS VPC는 IPSec 기반의 VPN을 지원하는데, 나는 OpenVPN을 사용하기로 했다. 어떤 툴을 사용하더라도 구성에 차이는 없을 것이다. VPN을 이용해서 아래와 같은 구조의 VPC 환경을 만들었다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1neWs6vjRTatq0odxRb0wwEWFSWkWdkQbBKrAXtwnuAg/pub?w=889&amp;h=430" width=622 height=301>
+}}}
+  * Manager VPC와 Service VPC들은 [wiki:Site/System_management/SitetoSiteVPN Site-to-Sost VPN]으로 서로 연결한다.
+  * Service VPC가 Manager VPC를 통해서 다른 Service VPC로 가는 건 막는다.
+  * Manager VPC는 Chef port와 Git port만 open한다. 예컨데, Service VPC를 통해서 Manager VPC의 인스턴스로의 (ssh등을 이용해서)접근을 허용하지 않는다.
+
+이제 Manager VPC와 Service VPC의 인스턴스 운영체제에 접근을 위한 정책을 만든다.
+
+==== VPN client 트래픽 제어 ====
+VPN을 이용하면 흩어져 있는 여러 개의 네트워크를 네트워크를 하나의 네트워크로 묶을 수 있다. 관리가 쉬워지지만, 네트워크가 하나로 묶이는 만큼 보안 문제가 발생할 수 있다. 이 문제는 각 네트워크 단위로 권한을 제한하는 걸로 해결할 수 있다.
+
+위의 VPN 구성을 보자. Tokyo VPC와 N.calr VPC의 접근을 서로 분리해야 한다고 가정해 보자. 가장간단한 방법은 Tokyo VPC와 N.calr VPC에 연결하기 위한 VPN subnet을 분리하는 거다. 아래와 같은 VPN subnet계획을 세웠다. 
+|| VPN subnet 이름        || VPN subnet 대역       || 설명                                      ||
+|| Tokyo client VPN       || 192.168.50.0/24       || Tokyo VPC에 연결하기 위한 VPN subnet      ||
+|| N.calr client VPN      || 192.168.55.0/24       || N.calr VPC에 연결하기 위한 VPN subnet     ||
+
+위의 VPN subnet 계획을 바탕으로 아래 그림과 같은 VPN 구조를 만들었다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1EQjiMpkMuAKYvRurVHcKqhkoQbXZFi5HjMrHoDwDeYU/pub?w=976&amp;h=419" width=683 height=293>
+}}}
+
+Tokyo VPC를 예로 들어보자면 192.168.50.0/24에서 출발하는 트래픽만 허용하고, N.calr VPC는 192.168.55.0/24에서 출발하는 트래픽만 허용하도록 제한하면 된다. 22번 트래픽에 대한 Inbound Network ACL은 대략 다음과 같을 것이다.
+||||||||Inbound                                                 ||
+||Source IP         ||Protocol    ||Port     ||Allow/Deny       ||
+||192.168.50.0/24   ||TCP         ||22       ||ALLOW            ||
+||0.0.0.0/0         ||ALL         ||ALL      ||DENY             ||
+
+다음은 인스턴스에 대한 SG 설정이다. 이 인스턴스는 80번과 443포트로 웹 서비스를 한다. 웹 서버스는 인터넷에서 접근할 수 있어야 하며, 22번 포트는 VPN을 통해서만 접근하도록 설정했다. 
+
+||||||||Inbound                                                 ||
+||Source IP         ||Protocol    ||Port     ||Allow/Deny       ||
+||0.0.0.0/0         ||TCP         ||80       ||ALLOW            ||
+||0.0.0.0/0         ||TCP         ||443      ||ALLOW            ||
+||192.168.50/24     ||TCP         ||22       ||ALLOW            ||
+||0.0.0.0/0         ||ALL         ||ALL      ||DENY             ||
+  * 80,443번 포트는 ANY로 열었다. 
+  * 22번 포트는 Tokyp VPN subnet에서만 접근할 수 있도록 설정했다.
+  * 기타 모든 포트는 DENY 설정했다. 
+이 설정은 같은 subnet에 있는 인스턴스들끼리의 통신도 모두 막고 있다. 하나의 웹 서버에 22번 포트로 연결했다고 하더라도, 옆에 있는 다른 웹서버에는 연결할 수가 없다. 이유는 두 가지다. 
+  1. 하나의 웹 서버가 뚫렸다고 하더라도, 내부 통신을 통해서 다른 인스턴스에 도달해서는 안된다. 
+  1. 인스턴스에 누가 접근해서 작업을 하는지 확인할 수 있어야 한다. VPN을 통해서 직접 접근할 경우 VPN에서 할당한 IP로 로그인 하기 때문에 누가 무슨 작업을 하는지 확인할 수 있다. 하지만 인스턴스를 거쳐서 들어오면 확인이 (가능은 하지만)번거로워 진다. 
+
+=== VPN 클라이언트 모니터링 ===
+1. '''누가''', 2. '''언제''', 3. '''어디에서''' 4. '''무슨작업'''을 했는지 파악하는 것은 가장 중요한 보안활동 중 하나다. 
+
+인스턴스에 누가 로그인 했는지는 source ip를 확인하면 된다. Source ip만을 가지고 어떤 유저인지 확인하려면, VPN 클라이언트 key를 발급할 때, 클라이언트에 대해서 static ip를 할당하면 된다. 예컨데, yundream 이라는 VPN 계정에 대해서 192.168.50.5를 할당했다면, 인스턴스에 로그인 할 때, source ip가 192.168.50.5로 보일테니 yundream 유저가 로그인 했다는 걸 확인할 수 있다.     
+
+이제 로그 파일(리눅스의 경우 /var/log/auth.log)를 모니터링 하다가 원격에서 유저가 로그인하면, 이 정보를 데이터베이스에 기록하고 필요할 경우 알람을 전송하면된다.
+{{{#!plain
+# cat /var/log/auth.log
+...
+Mar  2 17:04:46 yundream sshd[9728]: Accepted publickey for yundream from 192.168.50.5 port 56110 ssh2
+Mar  2 17:04:46 yundream sshd[9728]: pam_unix(sshd:session): session opened for user yundream by (uid=1001)
+...
+}}}
+로그 모니터링 기능을 제공하는 툴들이 몇개 있는데, 나는 [wiki:Site/QOS/Monitering_Tool/zabbix/AWSMonitering zabbix]를 사용하고 있다. zabbix는 정규표현을 이용해서, 일치하는 문자열이 있을 경우 zabbix 서버로 이벤트를 보낼 수 있다. 이 정보는 zabbix 서버의 데이터베이스에 기록이 되기 때문에, 작업자의 이력을 중앙관리할 수 있다.
+
+== 운영체제 보안 ==
+=== TCP Wrapper ===
+TCP Wrapper는 호스트 레벨의 네트워크 ACL 시스템이다. subnet 레벨에서 Network ACL 정책을 이미 마련해둔 상태에서 호스트 레벨에까지 ACL을 적용하면, 쓸데없는 중복이라고 생각할 수 있을 것 같다. 내 생각은 이렇다. 만약 보안 정책을 적용하고 관리하는데, 큰 비용이 들지 않는다면 중복 적용하는 것도 괜찮다. 그리고 Subnet 레벨과 호스트 레벨의 ACL은 영향을 미치는 범위가 다르다. 동일한 범위에서 같은 역할을 하는 두 개의 보안 장치를 마련하는 건, 쓸데 없는 낭비겠지만 범위가 다르다면 그자체로 의미가 있다. 예컨데, 어떤 이유로(관리자의 실수도 여기에 포함된다) Subnet 레벨의 ACL이 깨지더라도, 호스트 레벨 ACL이 그 역할을 대신할 수 있다.  
+
+iptables 기반의 방화벽을 이용한 패킷 필터링과는 다른 레이어에서 작동한다. TCP Wrapper는 iptables를 통과한 패킷에 대해서 서비스 레벨에서 작동하는 도구다. TCP Wrapper의 특징이다.
+  1. 쉽게 설정할 수 있다. 
+  1. iptables를 통과한 패킷에 대해서 연결을 허용할지를 결정한다.
+  1. DENY 혹은 ALLOW룰에 대해서 '''스크립트'''를 실행할 수 있다. 예를들어 특정 서비스에 대해서 접근할 경우 관리자에게 경고 메일을 보내는 스크립트를 실행할 수 있다.    
+  1. TCP wrapper는 패킷 필터링 툴이 아니다. libwrap가 설치돼 있거나, tcpd로 작동하는 서비스들 - ssh, ftp, finger .... -에서 접근을 통제하기 위해서 사용한다
+
+여기에서 Wrapper는 ssh 접근을 제어하기 위해서 사용한다. 기본 정책은 다음과 같다.
+  * ssh : 192.168.50.0/24 만 허용 한다.
+세밀하게 조정하고 싶다면 192.168.50.xxx/32 로 설정할 수도 있겠다. ssh 접근통제는 sshd 설정으로도 할 수 있다. sshd 설정이라면 유저단위로 할 수 있으니 더 세밀한 설정이 가능하다. 하지만 sshd 설정을 변경할 경우 sshd 설정파일은 꽤 복잡해서 자동화하기가 귀찮은 데다가, 설정적용을 위해서 sshd 데몬을 다시 시작해야 한다. 그냥 TCP wrapper로 한다. 
+
+자세한 내용은 [wiki:man/12/tcpwrapper TCP Wrapper]를 참고한다.
+
+=== iptables ===
+난 iptables를 사용하지 않을거다. VPC network acl과 SG 그리고 TCP Wrapper 정도로 충분하다고 생각하기 때문이다. 필요하면 그때 사용하련다. 
+
+=== 리눅스 계정 보안 및 계정 관리 ===
+유저는 크게 3개의 카테고리로 나눈다.
+  1. admin 계정 : root 권한을 획득할 수 있는 관리자 계정이다. 허가된 소수의 인원에게만 ssh-key를 배포한다. admin 계정으로 로그인 한 유저는 즉시 root 계정으로 switch user할 수 있다. 너무 강력한 권한을 가지는 거라는 생각이 든다면, 패스워드를 입력하도록 설정할 수 있다. 물론 그 만큼 관리가 복잡해 질 것이다. 
+  1. application 실행 계정 : 모든 애플리케이션은 root 계정이 아닌 application 실행 계정으로 실행한다. 애플리케이션을 root 권한으로 실행해야 한다면 sudo설정을 한다.
+  1. 일반 작업 계정 : 운영중에 개발, 디버깅, 로그 확인, 점검등의 목적으로 계정이 필요한 경우가 있다. 이런 계정은 정식 계정 발급 프로세스를 따라서 발급하도록 한다.  
+
+어떻게 관리를 할지가 관건이다. [wiki:Site/cloud/automation chef]를 이용할 계획이다. 서비스의 종류에 따라서 툴 선택이 달라질 수 있는데, 기업내부에서 다양한 권한을 가지는 많은 수의 계정을 관리할 거라면 LDAP를 이용해야 겠지만, 제한된 계정만 관리할 거라서 굳이 LDAP를 이용할 필요는 없기 때문이다. 인프라 형상 관리를 위해서 chef를 사용하고 있으니, chef로 계정관리까지 해도 상관 없다고 생각했다.  
+
+chef를 이용한 계정 관리 구성안은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1UxfX0ZQKJVY1eRfojcjr14gsNRDP6kd-hLIxMnhNKp8/pub?w=891&amp;h=237">
+}}}
+
+Manager VPC에 웹 기반의 Admin Portal을 둔다. 관리자는 Admin portal을 이용해서, 계정을 신청한다. 계정 신청을 위해서 필요한 정보는 대략 다음과 같을 거다. 
+  * 인스턴스의 호스트 주소 혹은 ip
+  * 계정 이름 
+  * 패스워드 : 패스워드는 패스워드 생성 툴을 이용해서 랜덤하게 생성된다. 
+  * 계정의 권한 : 일반 유저인지, root나 application 계정으로 su 할 수 있는지. 
+  * email, 전화번호, 이름 
+  * 계정 만료 기간
+
+관리자가 계정 정보를 입력하고 submit 하면, chef 정보를 update 한다. 그리고 [wiki:man/12/ssh ssh]로 해당 인스턴스에 chef 계정으로 접근해서 chef-client를 실행한다. chef 계정은 일반계정이지만 chef-client를 루트권한으로 실행할 수 있도록 sudo 설정을 한 상태다. 물론 Admin portal은 chef 계정 접속을 위한 ssh-key를 가지고있어야 한다. 
+
+chef-client는 chef-server에서 계정정보를 읽어서 계정을 추가한다. Chef를 이용한 리눅스 계정관리는 정리할 내용이 많다. 따로 정리해야 겠다. 
+
+=== SSH 접근 관리 ===
+[wiki:Site/System_management/AddcountSecurity 리눅스 유저 보안 참고]

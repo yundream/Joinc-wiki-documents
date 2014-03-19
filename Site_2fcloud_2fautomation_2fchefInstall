@@ -1,6 +1,20 @@
 #title chef install
 
 [[tableofcontents]]
+== Chef 구성 ==
+Chef를 설치하기 전에 Chef로 어떻게 형상관리가 이루어지는지 간단하게 정리하고 넘어가야 할 것 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1wBJ8AuF4XODZ7V-0ZSCZ_Lkjc96sI_v5nYRCDahLSX4/pub?w=672&amp;h=315">
+}}}
+
+Chef는 크게 3개 영역으로 구성된다.
+  1. Chef server : Chef server에는 관리하려는 인프라의 '''형상정보'''와 형상을 제어하기 위한 '''코드'''를 저장하고 있다. 예를들어 인프라를 구성하는 노드의 정보, 노드에 설치 해야하는 애플리케이션의 정보, 노드의 네트워크 정보들과 이들 정보를 제어하기 위한 코드(네트워크 설정, 애플리케이션 설정)들을 가지고 있다.
+  1. Chef workstation : Chef 개발자의 개발 PC다. Chef 개발자는 형상정보와 코드를 개발/테스트하고, 이 코드들을 chef server에 올린다. 이 코드들의 모음을 cookbook 이라고 한다.  
+  1. Chef node : Chef server를 이용해서 관리하는 node 들이다. 이 node들에는 chef client가 설치된다. chef client는 chef server에 접속해서 cookbook을 다운로드 해서 실행한다.
+
+이 문서는 이 3개의 영역을 어떻게 구축하는지에 대한 정보를 담고 있다.
+
 == chef install ==
 클라우드의 가장 큰 이슈 중의 하나가 "어떻게 설정을 자동화할수 있을까?"이다. 예컨데 automatic. 몇 가지 automatic 툴들이 있는 것 같은데, chef를 선택했다. 이유는 딴거 없고, 회사에서 쓰고 있기 때문.
 
@@ -59,8 +73,10 @@ setup script를 실행한다.
 <table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/IuGswbkU0zpp9pz8m1r2fNMTjNZETYmyPJy0liipFm0?feat=embedwebsite"><img src="https://lh5.googleusercontent.com/-kKVg2jgywOk/TzoxV4B35wI/AAAAAAAACA0/KcTjiKwT3ck/s640/chef01.png" height="319" width="640" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/100777432396831651498/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
 }}}
  * chef server를 설치하면 chef client도 함께 설치된다.
-=== chef server 설정 ===
-chef 설정파일들을 살펴보자. chef 설정 파일들은 /etc/chef 밑에 있다. 중요한 것은 server.rb와 chef client 인증을 위해 사용하는 private key 파일들 (.pem)들이다. 먼저 server.rb를 수정.
+
+
+== chef server 설정 ==
+chef 설정 파일들은 /etc/chef 밑에 있다. 중요한 것은 server.rb와 chef client 인증을 위해 사용하는 '''private key''' 파일들 (.pem)들이다. 먼저 server.rb를 수정한다.
 {{{#!plain
 # 딱히 손댈건 없다.
 log_level          :info
@@ -102,6 +118,14 @@ umask 0022
 
 Mixlib::Log::Formatter.show_time = false
 }}}
+
+== Chef workstation 설정 ==
+=== 개요 ===
+개발자는 Chef workstation에서 chef 코드를 개발한다. '''ruby DSL'''로 개발을 하며, chef에서 제공하는 knife를 이용해서 코드와 인프라 관리를 한다. 코드를 만드는 걸 제외하면, 실제 chef 시스템의 관리는 전적으로 knife를 통해서 이루어진다. Chef workstation 설정이라는 것은 결국 개발자 PC에서 chef knife를 운용할 수 있는 환경을 만드는 거라고 보면 된다. 
+
+knife로 하는 대표적인 작업은 1. 관리할 node를 chef server에 등록하고 2. node에서 실행할 code(cookbook)을 업로드하는 거다. 
+=== knife 설치 ===
+chef server 설치시 함께 설치된다.
 
 === knife 사용 설정 ===
 [wiki:Site/cloud/automation/chefknife knife]는 chef 자원을 버무려서 chef 코드를 관리하는 만능 도구다. 현실 세계의 요리사가 요리를 만들기 위해서는 knife 뿐만 아니라, 가스렌지 기타등등 여러가지 도구가 필요하지만 chef는 knife로 모든일을 할 수 있다. 
@@ -164,7 +188,6 @@ chef-client 설치. 역시 한번에 끝.
 {{{#!plain
 # yum install rubygem-chef
 }}}
-
 
 kinfe를 이용해서 chef client를 설정한다.
 {{{#!plain

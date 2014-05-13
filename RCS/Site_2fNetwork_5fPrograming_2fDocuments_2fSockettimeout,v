@@ -1,0 +1,531 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.05.13.08.27.58;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fNetwork_5fPrograming_2fDocuments_2fSockettimeout
+@
+
+
+1.1
+log
+@218.147.248.89;;Anonymous;;
+@
+text
+@#title 소켓 타임아웃
+
+[[TableOfContents]]
+== 소개 ==
+서버 / 클라이언트 모델 구축을 위해서 우리는 보통 Socket API 를 사용하게 된다. 이 Socket API 는 전송계층 레벨에서 통신을 가능하도록 도와주며, 매우 신뢰성있게 작동한다. 대부분의 read/write 작업을 할때 문제가 생기면 문제 상황을 리턴해 주기 때문에 문제상황에 대처하기도 쉽다.
+
+그러나 네트워크 단절, 클라이언트 프로그램의 오작동(죽거나, 살아 있어도 제대로 작동을 못하는)의 경우 유연하게 대처하지 못하는 경우가 생긴다. 이 문서는 이러한 상황에 대처하기 위한 방법중 가장 일반적인 Time out 을 이용한방법에 대해서 알아보도록 하겠다.
+
+이 문서의 내용을 제대로 이해하기 위해서는 TCP(:12), IP(:12)에 대한 내용을 이해하고 있어야 한다. 이외에도 시그널(:12) 처리와 입출력다중화(:12)와 관련된 내용을 알고 있으면 도움이 될것이다.
+
+== 네트워크 어플리케이션 문제발생과 해결 ===
+=== 테스트용 서버/클라이언트 준비 ===
+테스트를 위해서 간단한 echo 서버/클라이언트를 준비하도록 하겠다. 코드는 간단함으로 설명을 하진 않겠다.
+
+{{{#!plain
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    char buf[80];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    client_len = sizeof(clientaddr);
+
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, 80);
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr,
+                            &client_len);
+
+        if ((n = read(client_sockfd, buf, 80)) <= 0)
+        {
+            close(client_sockfd);
+            continue;
+        }
+        if (write(client_sockfd, buf, 80) <=0)
+        {
+            perror("write error : ");
+            close(client_sockfd);
+        }
+        close(client_sockfd);
+    }
+}
+}}}
+			
+echo_client.c
+{{{#!plain
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(int argc, char **argv)
+{
+    struct sockaddr_in serveraddr;
+    int server_sockfd;
+    int client_len;
+    char buf[80];
+    char rbuf[80];
+
+
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("error :");
+        exit(0);
+    }
+
+    server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = inet_addr("218.234.19.87");
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    client_len = sizeof(serveraddr);
+
+    if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len) < 0)
+    {
+        perror("connect error :");
+        exit(0);
+    }
+
+    memset(buf, 0x00, 80);
+    read(0, buf, 80);
+    if (write(server_sockfd, buf, 80) <= 0)
+    {
+        perror("write error : ");
+        exit(0);
+    }
+    memset(buf, 0x00, 80);
+    if (read(server_sockfd, buf, 80) <= 0)
+    {
+        perror("read error : ");
+        exit(0);
+    }
+    close(server_sockfd);
+    printf("read : %s", buf);
+}
+}}}
+			
+== 발생할수 있는 문제들 ==
+=== 클라이언트 비정상 종료 ===
+우리는 [wiki:Site/TCP_IP/TCP_Header TCP 자세히 보기] 에서 정상종료 상태에 대해서 알아보았다. TCP 의 정상연결 및 정상종료 는 최초의 세션 맺음을 위한 3번악수기법에 의한 패킷교환이 이루어 지게 된다. 정상 종료의 경우에는 클라이언트에서 close()를 호출하면, FIN-ACK 패킷교환이 일어나고, 서버측에서는 FIN-ACK 후 close()를 호출해서 다시한번 FIN-ACK 패킷교환이 일어남으로 도합 4번의 패킷 교환이 일어나게 된다. 다음은 echo 서버/클라이언 프로그램을 이용해서 테스트한 결과이다. 서버측 IP 는 218.234.19.87 클라이언트측 IP 는 210.205.210.230 이다
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=17FII0Ha2j4YXpr6af-BcWVcIc3Isn9hCy1x6O9n2d1Y&amp;w=483&amp;h=337">
+}}}
+
+빨간원으로 표시해둔부분이 바로 CODE BITS 를 나타낸다. 위의 결과는 클라이언트에서 close(:2)함수를 호출한후 부터의 패킷을 캡춰한 내용이다. 처음 2개의 패킷은 클라이언트의 close 함수 호출에 의해서 발생한 FIN-ACK 패킷이며, 마지막 2개는 서버측 close 함수 호출에 의해 발생한 FIN-ACK 패킷이다.
+
+클라이언트 프로그램이 서버에 연결해서 3번 악수 기법에 의해서 세션이 만들어 져서, 해당 세션통로를 이용해서 데이타를 주고 받고 있는중이라고 치자, 그런데 어떤 이유로 - 잘못된 코딩이나, 시스템 환경상의 문제등 - 비정상종료를 해버렸다고 하면, 당연히 클라이언트 측에서의 세션종료과정이 일어날수 없게된다. 이럴경우 서버측에서 강제로 세션을 종료 시켜줘야 한다.
+
+그럼 클라이언트 프로그램이 어떤 이유로 죽어버렸다면. 과연 정상종료가 일어나는지에 대해서 알아보도록 하겠다. 클라이언트 프로그램이 죽었을때 정상종료가 일어나려면 커널에서 프로세스를 정리할때 열린 포트도 함께 정리하면 될것이다.
+
+다행히도 비정상적인 네트워크 어플리케이션의 종료가 일어날경우 커널에서 알아서 처리해준다. 보통 어플리케이션이 종료되는 경우는 SIGNAL 을 받았을경우가 된다. SIGINT, SIGSEGV, SIGBUS, SIGKILL 등이 대표적인 어플리케이션 종료와 관련된 시그널들이다. 이러한 시그널들이 발생해서 프로세스가 종료하게 되면, 커널에서는 해당프로세스의 모든 자원을 해제 시키게 된다. 이들 자원에는 소켓 파일 지정자도 포함된다. 다음은 echo_client 로 echo_server 에 접근한후 CTRL+C 를 입력해서 echo_client 를 강제 종료시킨 경우의 tcpdump(:12) 내용이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1bbJOdn2DTWX9KCur0i6uwl4ykpkAIZoyXsQfjk92RsA&amp;w=484&amp;h=337">
+}}}
+
+결과를 보면 알겠지만 close(:2) 함수를 이용해서 정상종료를 하는경우와 마찬가지로 FIN-ACK 메시지가 제대로 전달되고 있음을 알수 있다. 이는 소켓(:12)이 유닉스 커널(:12)의 일부로 작동하면서, 커널에서 프로세스를 정리할때 소켓을 정상종료를 시켜주기 때문이다.
+
+결론적으로 말하자면 비록 프로그램이 비정상종료 되더라도, 서버/클라이언트측 프로그램에서 에러처리만 제대로 해주는 정도로 - 읽기/쓰기에 에러가 있을경우 해당 소켓지정자를 close() 시켜주는 - 비정상종료에 유연하게 대처할수 있음을 알수 있다.
+
+=== 네트워크 단절 ===
+그러나 네트워크 단절은 "어플리케이션의 비정상 종료" 와는 약간 다르다. 만약 클라이언트가 서버로부터의 데이타를 기다리는중에(read) 네트워크 단절이 일어났다면, 클라이언트는 도착하지 않을 서버데이타를 기다리면서 영원히 봉쇄될수 있다.
+
+만약 클라이언트가 서버로 데이타를 쓰려고 하는데 단절이 일어나면 어떤일이 벌어질까? 2가지 경우를 생각해볼수 있는데 우선은 클라이언트 어플리케이션을 생성시키기 이전에 이미 네트워크이 단절된 상태와, 세션이 맺어진 다음 네트워크이 단절된 상태이다. 2개의 경우 모두 동일한 결과를 보여주는데, 해당영역에서 영원히 봉쇄되게 된다.
+
+만약 네트워크 연결이 끊어져 있는 상태에서 클라이언트를 실행시킬 경우 클라이언트는 3번 악수기법을 이용해서 서버와 세션을 맺고자 할것이다. 그렇다면 다음과 같은 SYN 패킷을 만들어 보낼것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1laILVzJpAybJbjLqAfPEMI_0NfVcaU2HUVTwXkNDQOM&amp;w=488&amp;h=100">
+}}}
+
+그러나 네트워크은 단절된 상태이기 때문에 결코 이 SYN 패킷에 대한 ACK 패킷은 도착하지 않을것이며, 클라이언트는 SYN(ACK) 패킷을 기다리면서 봉쇄된다. 정확하게 구현을 설명하자면 커널은 SYN 에 대한 SYN(ACK)가 도착하지 않을경우 일정시간마다 재전송하도록 되어 있다. 재전송 간격은 운영체제 마다 다를수 있는데 대략 5초 정도이다.
+
+네트워크 단절을 테스트할수 있는 가장 간단한 방법은 서버/클라이언트 통신중 랜선을 뽑아버리는 것이다. 실제 위의 테스트들도 랜선을 뽑아버리는 방법을 이용해서 테스트 했다.
+
+=== 어플리케이션의 비정상작동 ===
+코딩이 잘못되어서 데이타를 받았음에도 불구하고 데이타를 전송하지 않는 경우, 혹은 데이타를 읽지 않는 경우등이 포함된다. 이경우에는 SYN-ACK 패킷이 서로 정확히 전달되지만 제대로된 통신결과를 기약할수 없게되며, 영원히 봉쇄될수도 있다.
+
+== 문제 해결 ==
+=== 비정상종료 ===
+비정상 종료의 경우 윗장에서 보았다시피, 열린 소켓에 대해서 알아서 커널에서 정리해 줌으로 에러처리만 신경써주면 문제가 없다. 아주 심플하다. 이건 설명할 필요가 없을것 같다.
+
+=== 네트워크 단절 ===
+read/write함수에 대한 에러처리로 알아낼수 없는 네트워크단절과 같은 문제에 가장 널리 사용되는 방법은 해당 시스템호출에 Time Out 을 주는 방법이다. 이방법은 해당 시스템콜에 대해서 일정 시간동안 응답이 없으면 에러가 발생한것으로 판단하고 연결을 끊는다. 이 방법은 비단 네트워크단절과 같은 문제 외에도, 연결은 하고 있으나 오랜시간동안 아무런 일도 하지 않는 클라이언트의 연결을 끊기 위한 용도 등으로도 사용한다.
+
+Time Out 를 주는 가장 간단한 방법은 alarm(:2)함수를 이용해서 SIGALRM 을 발생시키는 방법이다. 또다른 방법으로는 select(2) 나 poll(2)와 같은 입출력 다중화 함수를 이용한 방법이다.
+
+==== alarm 함수의 이용 ====
+데이타를 읽기 전에 alarm(2)함수를 이용해서 일정시간동안 입력이 없으면 SIGALRM 이 전달되게 한다. 만약 SIGALRM 이 전달되면 현재 상태(read) 에 Interrupt 가 전달되게 한다. 그러면 read 함수는 Interrupt 가 전달되었음을 감지하고 리턴되는데, 이때 close 함수등을 이용해서 연결을 종료시키면 된다.
+{{{#!plain
+// signal 설정
+// SIGALRM 이 불리워지면 프로세스에게 
+// interrupt 가 전달되도록 설정한다. 
+signal 설정 SIGALRM:
+
+// 10 초후에 SIGALRM 이 전달되도록 세팅
+alarm(10);
+if (read(...) < 0)
+{
+    // 만약 Interrupt 를 받고 read 함수가 리턴되었을경우 
+    if (errno == EINTR)
+    {
+        // close 시키는등의 작업을 한다. 
+        close();
+        ....
+    }
+}
+}}}
+위 구현의 핵심은 SIGALRM에 대한 interrupt가 프로세스로 전달되게 하는 부분이다. 또한 read, write 등의 함수가 Interrupt 를 받아서 리턴되었을경우를 처리하기 위한 코드가 추가된다. 이들 함수는 Interrupt 를 받고 리턴되었을경우 errno 값을 EINTR 로 설정함으로 errno 값을 한번만 검사해주면 문제 없이 처리 가능하다. 이들 함수에 대한 man 페이지를 확인해보면 Interrupt 와 관련된 내용들을 볼수 있다.
+
+다음은 echo_server.c를 alarm(:2)함수를 이용 해서 Time out을 정의할수 있도록 수정한 코드다.
+
+{{{#!plain
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h> 
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+
+// 시그널 핸들러이다. 하는일은 아무것도 없다.  
+static void sig_handler(int signo)
+{
+    return;
+}
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd; 
+    int client_len, n;
+    char buf[80];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    // signal 설정
+    struct sigaction sigact, oldact;
+    sigact.sa_handler = sig_handler;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    // 바로 이부분이 SIGNAL 을 받았을때 
+    // Interrupt 가 발생하도록 설정하는 부분이다.  
+    sigact.sa_flags |= SA_INTERRUPT;
+
+    if (sigaction(SIGALRM, &sigact, &oldact) < 0)
+    {
+        perror("sigaction error : ");
+        exit(0);
+    }
+
+    client_len = sizeof(clientaddr);
+
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, 80);
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, 
+                            &client_len);
+        printf("Accept ok read data\n");
+      
+        // alarm 을 5초로 설정했다.
+        alarm(5);
+        if ((n = read(client_sockfd, buf, 80)) <= 0) 
+        {
+            // 만약 5초동안 read 가 리턴이 안된다면
+            // SIGALRM 이 발생하고 read 에 Interrupt 가 발생하고 
+            // read 는 errno 를 EINTR 로 설정하고 리턴하게 된다. 
+            if (errno == EINTR)
+            {
+                printf ("signal Interrupt\n");
+            }
+            alarm(0);
+            usleep(10);
+            close(client_sockfd);
+            continue;
+        }
+
+        alarm(0);
+        if (write(client_sockfd, buf, 80) <=0)
+        {
+            perror("write error : ");
+            close(client_sockfd);
+        }
+        close(client_sockfd);
+    }
+}
+}}}
+한 10줄 추가 정도로 어렵지 않게 구현가능함을 알수 있다. 그러나 alarm(:2)함수를 이용한 Time out 의 구현은 복잡한 코드에는 사용하는걸 권장하지 않는다. SIGALRM 의 경우는 단지 alarm(:2)에서만 발생시키는게 아니고 다른 여러가지 함수들에서도 사용하는 경우가 있는데, 이럴경우 작동하지 않을수 있기 때문이다. 물론 제대로 신경을 써주면 되긴 하겠지만 대기열이 존재하지 않는다는 시그널의 특성상 복잡한 코드에 적용시키기에는 문제가 따른다.
+
+==== select/poll 의 이용 ====
+select/poll 은 입출력 다중화를 위한 목적으로 주로 사용된다. 그러나 이들 함수의 경우 스스로가 Time out 을 결정하기 위한 방법을 제공함으로 비록 입출력다중화의 목적이 아닌 단순한 Time out 결정을 위해서도 유용하게 사용할수 있다.
+
+{{{#!plain
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
+int main(int argc, char **argv)
+{
+    int server_sockfd, client_sockfd;
+    int client_len, n;
+    int state;
+    char buf[80];
+    struct sockaddr_in clientaddr, serveraddr;
+
+    // select time out 설저을 위한 timeval 구조체	
+    struct timeval tv;
+    fd_set readfds;
+
+    client_len = sizeof(clientaddr);
+    if ((server_sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket error : ");
+        exit(0);
+    }
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons(atoi(argv[1]));
+
+    bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(server_sockfd, 5);
+
+    while(1)
+    {
+        memset(buf, 0x00, 80);
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr,
+                            &client_len);
+        // client_sockfd 의 입력검사를 위해서 
+        // fd_set 에 등록한다. 
+        FD_ZERO(&readfds);
+        FD_SET(client_sockfd, &readfds);
+        // 약 5초간 기다린다. 
+        tv.tv_sec = 5;
+        tv.tv_usec = 10;
+
+        // 입력이 있는지 기다린다. 
+        state = select(client_sockfd+1, &readfds,
+                        (fd_set *)0, (fd_set *)0, &tv);
+        switch(state)
+        {
+            case -1:
+                perror("select error :");
+                exit(0);
+            // 만약 5초안에 아무런 입력이 없었다면 
+            // Time out 발생상황이다. 
+            case 0:
+                printf("Time out error\n");
+                break;
+            // 5초안에 입력이 들어왔을경우 처리한다. 
+            default:
+                if ((n = read(client_sockfd, buf, 80)) <= 0)
+                {
+                    perror("read error : ");
+                    usleep(10);
+                    break;
+                }
+                if (write(client_sockfd, buf, 80) <=0)
+                {
+                    perror("write error : ");
+                    break;
+                }
+                break;
+        }
+        close(client_sockfd);
+    }
+}
+}}}
+					
+여기에서는 select 만을 예로 들었는데 poll 로도 비슷하게 구현 가능하다. select 를 이용할경우 alarm() 에 비해서 신뢰성있게 서버를 구성하는게 가능하다. 그러나 입출력다중화 + time out 검사용으로 사용하기에는 적당하지 가 않다. 위에서의 경우에는 단지 하나의 연결에 대해서만 time out 을 검사했는데, 만약 여러개의 연결을 받아들여서 입출력 다중화를 할경우 select 는 모든 입력에 대한 time out 만을 검사함으로, 각각의 개별적인 입력에 대해서는 time out 결과를 알수 없기 때문이다.
+
+=== 연결 소켓 Time out 처리 ===
+클라이언트에서 서버로 연결 할 때의 Time out 처리에 대해서 알아보자. select(:2)함수만을 이용해서 처리할 수는 없다. connect(:2) 함수에서 봉쇄되기 때문이다. 결국 소켓을 비 봉쇄로 만든다음 select(:2)함수로 기다려야 한다.
+
+다음과 같은 방식으로 connect 타임아웃을 구현할 것이다. fcntl(2) 함수를 이용해서 듣기소켓을 비 봉쇄 소켓으로 만든다.이제  connect(:2)함수를 호출하면 바로 리턴될 것이다. select(2)를 이용해서 timeout을 체크하도록 한다. timeout 체크가 끝난 뒤에는 소켓을 원래의 blocking 상태로 되돌린다.
+
+{{{#!plain
+#include <sys/stat.h> 
+#include <arpa/inet.h> 
+#include <stdio.h> 
+#include <string.h> 
+#include <unistd.h> 
+#include <fcntl.h> 
+#include <errno.h> 
+ 
+int ConnectWait(int sockfd, struct sockaddr *saddr, int addrsize, int sec) 
+{ 
+    int newSockStat; 
+    int orgSockStat; 
+    int res, n; 
+    fd_set  rset, wset; 
+    struct timeval tval; 
+ 
+    int error = 0; 
+    int esize; 
+ 
+    if ( (newSockStat = fcntl(sockfd, F_GETFL, NULL)) < 0 )  
+    { 
+        perror("F_GETFL error"); 
+        return -1; 
+    } 
+ 
+    orgSockStat = newSockStat; 
+    newSockStat |= O_NONBLOCK; 
+ 
+    // Non blocking 상태로 만든다.  
+    if(fcntl(sockfd, F_SETFL, newSockStat) < 0) 
+    { 
+        perror("F_SETLF error"); 
+        return -1; 
+    } 
+ 
+    // 연결을 기다린다. 
+    // Non blocking 상태이므로 바로 리턴한다. 
+    if((res = connect(sockfd, saddr, addrsize)) < 0) 
+    { 
+        if (errno != EINPROGRESS) 
+            return -1; 
+    } 
+ 
+    printf("RES : %d\n", res); 
+    // 즉시 연결이 성공했을 경우 소켓을 원래 상태로 되돌리고 리턴한다.  
+    if (res == 0) 
+    { 
+        printf("Connect Success\n"); 
+        fcntl(sockfd, F_SETFL, orgSockStat); 
+        return 1; 
+    } 
+ 
+    FD_ZERO(&rset); 
+    FD_SET(sockfd, &rset); 
+    wset = rset; 
+ 
+    tval.tv_sec        = sec;     
+    tval.tv_usec    = 0; 
+ 
+    if ( (n = select(sockfd+1, &rset, &wset, NULL, NULL)) == 0) 
+    { 
+        // timeout 
+        errno = ETIMEDOUT;     
+        return -1; 
+    } 
+ 
+    // 읽거나 쓴 데이터가 있는지 검사한다.  
+    if (FD_ISSET(sockfd, &rset) || FD_ISSET(sockfd, &wset) ) 
+    { 
+        printf("Read data\n"); 
+        esize = sizeof(int); 
+        if ((n = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&esize)) < 0) 
+            return -1; 
+    } 
+    else 
+    { 
+        perror("Socket Not Set"); 
+        return -1; 
+    } 
+ 
+ 
+    fcntl(sockfd, F_SETFL, orgSockStat); 
+    if(error) 
+    { 
+        errno = error; 
+        perror("Socket"); 
+        return -1; 
+    } 
+ 
+    return 1; 
+} 
+ 
+int main(int argc, char **argv) 
+{ 
+    struct sockaddr_in serveraddr; 
+    int sockfd; 
+    int len; 
+ 
+    if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) 
+    { 
+        perror("error"); 
+        return 1; 
+    } 
+    serveraddr.sin_family = AF_INET; 
+    serveraddr.sin_family = AF_INET; 
+    serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+    serveraddr.sin_port = htons(atoi(argv[1])); 
+ 
+    len = sizeof(serveraddr); 
+ 
+    if (ConnectWait(sockfd, (struct sockaddr *)&serveraddr, len, 5) < 0) 
+    { 
+        perror("error"); 
+    } 
+    else 
+    { 
+        printf("Connect Success\n"); 
+    } 
+    while(1) 
+    { 
+        sleep(1); 
+    } 
+    close(sockfd); 
+} 
+}}} 
+
+http://www.developerweb.net/forum/showthread.php?p=13486
+
+[[Category(5)]]
+@

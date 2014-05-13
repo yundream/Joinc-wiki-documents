@@ -52,6 +52,7 @@ VPN를 제대로 테스트 하려면 최대한 3대의 컴퓨터가 필요할 �
 }}}...
 
 === OpenVPN 서버 설치 ===
+==== Ubuntu ====
 '''VPN GW'''에 해당 하는 OpenVPN 서버를 설치하고 설정하는 과정을 정리한다. 우분투 리눅스 10.0.4를 기준으로 한다.
   1. openvpn 패키지를 설치한다.
     {{{#!plain
@@ -114,6 +115,66 @@ ca.crt
 yundream.crt
 yundream.key
 }}}
+
+==== CentOS ====
+CentOS 6.3을 기준으로 한다. 우분투리눅스는 기본 레포지토리에서 openvpn을 제공하지만, centos는 '''EPEL'''레포지토리를 등록해야 한다. 
+{{{#!plain
+# wget http://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm
+# rpm -Uvh epel-release-6-8.noarch.rpm
+# yum install openvpn -y 
+}}}
+
+키 관리를 도와주는 '''easy-rsa'''를 따로 설치해야 한다. (귀찮다) 
+{{{#!plain
+# yum install easy-rsa
+}}}
+
+easy-rsa 파일들을 /etc 밑에 복사한다.
+{{{#!plain
+# cp -rf /usr/share/easy-rsa/2.0/* /etc/openvpn/easy-rsa
+}}}
+
+OpenVPN은 OpenSSL 라이브러리를 사용한다. 이를 위해서 openssl 설정파일을 만들어야 하는데, 미리 만들어져 있는 예제 설정파일을 복사해서 사용하면 된다. openssl 버전에 맞는 파일을 사용하자. "최대한 편하고 쉽게!!!" easy-rsa를 설치한 이유다.
+{{{#!plain
+cp /etc/openvpn/easy-rsa/openssl-1.0.0.cnf /etc/openvpn/easy-rsa/openssl.cnf
+}}}
+
+easy-rsa 디렉토리 밑에 있는 vars 파일을 편집한다. 다른 건 수정할 필요 없다. "KEY_"로 시작하는 변수들만 수정하자. 
+{{{#!plain
+# vi /etc/openvpn/easy-rsa/vars
+}}}
+대략 아래와 같은 환경변수들을 수정하면 된다.
+{{{#!plain
+export KEY_COUNTRY="US"
+export KEY_PROVINCE="NY"
+export KEY_CITY="New York"
+export KEY_ORG="Organization Name"
+export KEY_EMAIL="administrator@example.com"
+export KEY_CN=droplet.example.com
+export KEY_NAME=server
+export KEY_OU=server
+}}}
+
+var를 적용하고, key를 빌드하기 시작한다.
+{{{#!plain
+# cd /etc/openvpn/easy-rsa
+# source ./vars
+# ./clean-all
+# ./build-ca
+}}}
+OpenVPN 서버를 위한 CA를 만든다.
+{{{#!plain
+# ./buid-key-server server
+}}}
+
+Diffie Hellman key를 만든다. dh 키와 함께 build-key-server로 만든 키 파일들을 openvpn 디레고리로 복사한다.
+{{{#!plain
+# ./build-dh
+# cd keys
+# cp dh1024.pem ca.crt server.crt server.key /etc/openvpn 
+}}}
+
+서버를 시작하면 끝. 클라이언트 키를 만들고 유지하는 것은 우분투리눅스의 openvpn과 동일하므로 생략한다.
 
 === OpenVPN 서버 설정 ===
 이제 남은 건 설정파일이다. OpenVPN을 소개하는 책이 따로 출판되었을 정도로 OpenVPN은 많은 기능을 제공한다. 여기에서는 TUN 디바이스를 이용해서 step 3 VPN 환경 구축을 할 것이다.

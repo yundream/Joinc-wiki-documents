@@ -1,0 +1,567 @@
+head	1.16;
+access;
+symbols;
+locks
+	root:1.16; strict;
+comment	@# @;
+
+
+1.16
+date	2014.04.23.12.59.41;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2014.04.23.01.36.53;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.04.06.04.22.38;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.04.06.02.13.07;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.04.05.18.43.33;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.04.05.15.00.30;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.04.05.04.58.31;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.04.02.09.17.44;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.04.02.08.18.33;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.04.02.08.17.39;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.04.02.06.23.26;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.04.01.16.22.38;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.04.01.14.36.33;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.04.01.09.09.15;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.03.31.16.05.25;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.03.31.15.59.05;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fjira
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title jira API를 이용한 매쉬업 서비스 개발 
+
+[[TableOfContents]]
+== Jira API를 이용한 매쉬업 서비스 개발 ==
+=== CS 지원 시스템 개발 ===
+서비스를 오픈하려고 하니, CS(Customer service) 시스템에 대한 요구가 나왔다. 고객이 웹에서 CS요청을 하면, 이 요청이 CS 담당자에게 전달해서 처리하고 그 결과를 고객에게 알려주는 시스템이 필요하다는 거다.   
+
+대략 이런 프로세스다.
+  1. 고객이 웹 폼이나 메일을 이용해서 CS를 요청한다. 
+  1. CS는 CS담당자에게 전달된다.
+  1. CS 담당자는 요청을 처리한다. 직접 처리할 수 있는 것은 직접처리하겠지만, 엔지니어의 도움이 필요할 경우에는 담당 엔지니어에게 할당한다. 
+  1. 작업을 할당받은 엔지니어는 업무를 처리하고 resolve 한다.
+  1. CS 담당자는 resolve한 이슈를 테스터에게 넘겨서, 제대로 resolve 됐는지 판단하고
+  1. Close 한다.
+
+예전에 모니위키를 기반으로 이런 [wiki:Site/QOS/Process/Wiki_Support 비슷한 시스템을 만든] 경험도 있어서, 직접 만들려고 했다. 시간이 충분하다면 직접 만들었을 지도 모르겠으나, 시간이 "아주 매우 많이" 부족한 관계로 이미 만들어져 있는 이슈트래킹 시스템을 도입하기로 했다. '''버그질라'''의 사용을 고려하기도 했는데, 결국 jira를 선택했다. 안정적으로 빠르게 개발해야 했기 때문이다. 시간이 약간 더 있었다면 버그질라를 사용했을 지도 모르겠다.
+
+=== 테스트 환경 ===
+Jira ondemand 30일 trial 버전(다시 말해서 공짜)를 사용해서 CS 시스템으로의 개발 가능성을 확인해 보기로 했다. 테스트 해보고 쓸만하다 싶으면, 온디멘드 정식 버전을 구입하거나 설치버전을 구입하려 한다.  
+
+ * 테스트를 위한 계정도 하나 만들었다. 계정 이름은 test01,패스워드는 1111로 ticket create등의 API를 실행할 계정이다.
+ * 테스트는 curl로 진행한다.
+ * 테스트할 호스트 주소는 jira.mytest.co.kr 이다.
+ * 테스트를 위해서 '''TEST01''' 프로젝트를 만들었다. 프로젝트 ID는 '''TEST'''다. JIRA REST API를 이용해서 TEST 프로젝트에 이슈를 발행하고, 검색하는게 테스트 목표다. 
+
+== Jira API ==
+Jira는 매쉬업 애플리케이션 개발을 위한 REST API를 제공한다. 많은 수의 API들이 있는데, CS를 위해서 딱 필요한 수준의 API만을 테스트할 생각이다.  
+
+=== 인증 ===
+Jira는 일반 아이디/패스워드 방식과 oAuth인증을 지원한다. 나는 아이디/패스워드 방식을 사용했다.
+
+Jira API는 [wiki:Site/Network_Programing/AdvancedComm/HTTP#s-7.1 HTTP Basic Authorization]을 지원한다. curl은 -u를 이용해서 인증정보를 보낼 수 있다.     
+{{{#!plain
+# curl -D- -u test01:1111 -X GET -H "Content-Type: application/json" http://jira.mytest.co.kr/rest/api/2/issue/createmeta
+}}}
+
+HTTP basic authorization은 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 헤더의 '''Authorization''' 필드를 직접 설정하는 방법도 있다. 값으로 아이디와 패스워드의 base64 인코딩 문자열을 사용한다.
+{{{#!plain
+# echo -n "test01:1111" | openssl enc -base64
+dGVzdDAxOmdrd2xhaw==
+
+# curl -D- -H "Authorization: Basic dGVzdDAxOmdrd2xhaw==" -X GET -H "Content-Type: application/json" http://jira.mytest.co.kr/rest/api/2/issue/createmeta
+}}}
+
+기타 애플리케이션 레이어에서 인증을 받은 다음 session값을 cookie로 저장하고, 이 cookie로 인증하는 방법도 있기는 하다. 이 방법은 (테스트 하기 귀찮아서)패스.
+
+=== Ticket 생성 ===
+이제 ticket을 만들어 보자. Ticket 생성은 POST 메서드를 이용하면 된다. 데이터는 json 형식을 따른다.
+{{{#!plain
+# cat test.data
+{
+    "fields": {
+       "project":
+       {
+          "key": "TEST"
+       },
+       "summary": "Hello World issue Create",
+       "description": "Jira REST API를 이용해서 매쉬업 서비스를 만든다.",
+       "issuetype": {
+          "name": "Task"
+       }
+   }
+}
+}}}
+데이터는 쉽게 이해할 수 있다. 필드에 ticket을 구성하는 필드명과 값을 입력하면 된다. 이 예제는 기본 필드만을 포함하고 있다. 중요한 건 "project" 필드다. 티켓을 발행할 프로젝트를 선택하기 위한 '''필수 필드'''다. jira에 프로젝트를 만들면 프로젝트 key도 함께 만들어지는데, 이 key를 이용해서 ticket을 발행할 프로젝트를 선택할 수 있다. 
+
+curl을 이용해서 ticket 생성을 요청한다.
+{{{#!plain
+$ curl -D- -u test01:1111 -X POST --data @@test.json -H "Content-Type: application/json" http://localhost:8080/rest/api/2/issue/
+HTTP/1.1 201 Created
+Server: Apache-Coyote/1.1
+X-AREQUESTID: 60x107x1
+Set-Cookie: JSESSIONID=DB522199B28C774293D52D198820C24F; Path=/; HttpOnly
+X-Seraph-LoginReason: OK
+Set-Cookie: atlassian.xsrf.token=BWZS-DTJJ-6MFF-68GG|30b4ba6d0d7be9292950e1c6705d8d9a958551e8|lin; Path=/
+X-ASESSIONID: 1f09mj9
+X-AUSERNAME: yundream
+Cache-Control: no-cache, no-store, no-transform
+X-Content-Type-Options: nosniff
+Content-Type: application/json;charset=UTF-8
+Transfer-Encoding: chunked
+Date: Tue, 01 Apr 2014 16:00:55 GMT
+
+{"id":"10000","key":"TEST-1","self":"http://localhost:8080/rest/api/2/issue/10000"}
+}}}
+id가 10000인 ticket이 만들어졌다.
+
+https://lh6.googleusercontent.com/-4F6S4O205ho/UzrjMGnTzqI/AAAAAAAADgg/tf07lW4w7lQ/s640/jira03.png
+
+==== 커스텀 필드 ====
+앞의 예제는 기본 필드만을 보여주고 있다. 하지만 나는 jira를 CS관리 용도로 사용하는게 목표다. 기본 필드만으로는 CS를 처리하기에는 정보가 부족하다. 커스텀 필드를 만들기로 했다.
+||필드명        ||타입     ||설명                ||비고                                                  ||
+||user_name     ||string   ||유저의 이름         ||                                                       ||
+||user_email    ||string   ||유저의 이메일 주소  ||ticket을 완료하면 이메일 주소로 처리 결과를 알려준다. ||
+||user_req_type ||select   ||요청의 종류         ||기기고장, 계정정보 분실, 기타.. 등등의 요청 종류      ||
+Jira 관리자 권한을 가지고 있으면 프로젝트 단위로 ticket의 세부사항들을 조절할 수 있다. TEST01 프로젝트의 관리페이지의 커스텀 필드 편집 기능을 이용해서 세 개의 커스텀 필드를 추가했다. 커스텀 필드를 만드는 법은 설명하지 않는다. 
+
+
+user_req_type는 "아이디및 패스워드 분실", "일반 사용법", "고장" 3개의 값 중 하나를 선택하게 했다. 
+
+Jira에서는 커스텀 필드의 이름이 유일하지 않다. 중복가능하기 때문에, 필드 이름을 사용할 수 없다. 대신 필드에 대한 유일한 값인 필드 아이디(field id)를 사용한다. 형식은 "customfield_fieldid"이다. 예를 들어 field id가 10050 이라면 필드 이름은 "customfield_10050"이 된다. 필드 아이디는 필드 관리자 화면에서 확인할 수 이다.
+{{{#!plain
+"fields": {
+  "customfield_10050":"My first field",
+  "customfield_10051":"My second field"
+}
+}}}
+
+커스텀 필드를 추가해서 다시 테스트를 했다.
+{{{#!plain
+{
+    "fields": {
+       "project":
+       {
+          "key": "TEST"
+       },
+       "summary": "커스텀 필드 테스트",
+       "description": "커스텀 필드를 추가했다. 유저이름, 유저 이메일, CS 타입등을 명시한다.",
+       "issuetype": {
+          "name": "Task"
+       },
+       "customfield_10000":"yundream",
+       "customfield_10001":"yundream@@gmail.com",
+       "customfield_10002":{"value":"일반 사용법"}
+   }
+}
+}}}
+
+
+=== Ticket 조회 ===
+==== 기본 조회 ====
+'''yundream'''유저에게 할당된 이슈를 검색
+{{{#!plain
+# curl -D- -u test01:1111 -X GET -H "Content-Type: application/json" http://localhost:8080/rest/api/2/search?jql=assignee=yundream
+}}}
+
+검색 결과. 
+{{{#!plain
+{"expand"=>"names,schema",
+ "startAt"=>0,
+ "maxResults"=>50,
+ "total"=>1,
+ "issues"=>
+  [{"expand"=>"editmeta,renderedFields,transitions,changelog,operations",
+    "id"=>"10100",
+    "self"=>"http://localhost:8080/rest/api/2/issue/10100",
+    "key"=>"TEST-2",
+    "fields"=>
+     {"summary"=>"커스텀 필드 테스트",
+      "progress"=>{"progress"=>0, "total"=>0},
+      "issuetype"=>
+       {"self"=>"http://localhost:8080/rest/api/2/issuetype/3",
+        "id"=>"3",
+        "description"=>"A task that needs to be done.",
+        "iconUrl"=>"http://localhost:8080/images/icons/issuetypes/task.png",
+        "name"=>"Task",
+.... .... 생략.... ....
+      "aggregatetimespent"=>nil}}]}
+}}}
+
+startAt과 Results를 이용해서 페이지를 제어할 수도 있다. Mysql의 limit, offset이라고 보면 되겠다. 
+{{{#!plain
+# curl -D- -u test01:1111 -X GET -H "Content-Type: application/json" http://localhost:8080/rest/api/2/search?jql=assignee=yundream&startAt=2&maxResults=2
+}}}
+
+==== jql을 이용한 조회 ====
+Jira는 jira의 자원을 조회할 수 있는 질의어인 jql(Jira Query Language)를 제공한다. Advanced searching를 위한 용도로 주로 사용한다. 이슈의 모든 필드들을 검색 조건으로 할 수 있다. 
+
+TEST 프로젝트에서 user_email이 yundream@@gmail.com이고 아직 해결하지 않은 상태(Unresolved)의 이슈를 검색하기 위한 질의어다.  
+{{{#!plain
+project = TEST AND resolution = Unresolved AND user_email ~ "yundream@@gmail.com" ORDER BY priority DESC, key DESC
+}}}
+
+URL encoding 해서 REST API로 요청하면 된다. 내용이 길이서 좀 짤랐다.
+{{{#!plain
+# curl -D- -u teat01:1111 -X GET -H "Content-Type: application/json" \
+http://localhost:8080/rest/api/2/search?jql=project%20%3D%20TEST%20AND%20resolution%20%3D%20Unresolved \
+%20AND%20user_email%20~%20%22yundream%40gmail.com%22%20ORDER%20BY%20priority%20DESC%2C%20key%20DESC
+}}}
+
+jql 사용 법은 [https://blogs.atlassian.com/2013/01/jql-the-most-flexible-way-to-search-jira-14/ jql the most flexible way to search jira]문서를 참고하자.
+
+굳이 jql을 밑바닥 부터 공부할 생각이 아니라면, jira 웹에서 조건을 만든다음 조건에 대한 jql내용을 확인하면 편하고 빠르게 jql 사용법을 익힐 수 있다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1iQd2fH7FYQGYP5-r5vvRACiW23lpEbQyHknFpZbg4wQ/pub?w=951&amp;h=561">
+}}}
+
+=== 매쉬업 서비스를 위한 몇 가지 팁 ===
+==== 페이지 네비게이션 ====
+매쉬업 서비스를 개발하려 하면, jql을 이용해서 티켓을 조회하고 분류하고 정렬하는 기능이 가장 중요한 기능일 거다.    
+
+maxResults와 startAt 매개변수를 사용하면 된다. 사용법은 간단하다.
+{{{#!plain
+# curl -D- -u teat01:1111 -X GET -H "Content-Type: application/json" \
+http://localhost:8080/rest/api/2/search?jql=project%20%3D%20TEST%20AND%20resolution%20%3D%20Unresolved \
+%20AND%20user_email%20~%20%22yundream%40gmail.com%22%20ORDER%20BY%20priority%20DESC%2C%20key%20DES \
+\&startAt=0\&maxResults=20
+}}}
+이거면 페이지 네비게이션도 쉽게 만들 수 있겠다.
+
+== 통합 작업 상황판 ==
+요즘 IOT(Internet of things) 관련된 일을 하고 있다. 하는 일의 성격상, 서로 다른 다양한 조직에서 발생하는 작업을 통합관리해야 하는 필요를 느낀다. 
+
+서비스를 제대로 통합하려면, 작업도 통합해서 관리해야 함이 마땅할 것이다. 문제는 프로젝트 작업 관리가 따로 따로 이루어진다는 것.
+  1. 인프라 관리 
+     * 시스템 형상/설정 관리
+     * 네트워크 형상/설정 관리
+     * 보안 : 시스템, 네트워크, 서비스, 계정 
+     * 애플리케이션 배포
+     * WEB, WAS, 데이터베이스, 메시지큐등 다양한 인프라 애플리케이션 관리 
+  1. QA
+  1. 기획
+  1. 설계/개발 
+  1. 서비스 운영 
+     * 고객 C/S 처리
+     * 서비스영역에서 발생하는 다양한 이슈들 처리
+이런 모든 영역에서 발생하는 일들이 유기적으로 결합되야 하는데, 그럴려면 전체 작업을 한눈에 볼 수 있는 대쉬보드가 필요할거다. Jira 시스템을 각 조직별로 관리하고 있더라도, 문제될게 없을 거다. 그렇다면 
+  1. 중장기적 관점에서 해야 할일
+  1. 1주일 이내에 해야 할일
+  1. 당장 시급하게 해야 할 일
+  1. 끝낸 일들
+을 하나의 화면에서 통합적으로 볼 수 있을테고, 업무현황도 그만큼 파악하기가 쉬울거다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1XQ-37z2ByUZdjuj0dZHxLXk7un6RlECcatBnI9EmOLU/pub?w=826&amp;h=426">
+}}}
+
+이런 시스템 구축하고 싶다.
+
+== Jira 설치 ==
+이건 부록이다. 까먹지 않기 위해서 대충 정리했다. 나중에 자세히 정리해야지.
+
+=== Mysql 데이터베이스 설치 ===
+Jira는 Mysql, Postgres, Oracle, MS SQL Server를 지원한다. 익숙한 mysql을 선택했다. jira를 위한 데이터베이스를 만들었다. 데이터베이스 이름은 '''myjira'''로 했다. 
+{{{#!plain
+mysql> CREATE DATABASE jiradb CHARACTER SET utf8 COLLATE utf8_bin;
+}}}
+
+=== Install ===
+([[Date(2014-04-01T14:36:33)]])현재 Jira의 최신버전인 6.2.2를 설치한다. 물론 trial 버전이다. Jira 기능 테스트와 매쉬업 개발용도라서 trial 로도 충분하다. --한달마다 한번씩 갱신하는게 귀찮긴 하지만--. 로컬 PC에 설치했다. 개인적으로 사용하고 있는 가상 호스트에 올릴려고 했는데, 시스템 사양이 구려서인지 설치하다가 실패했다. 의외로 시스템 사양을 타는가 보다.  
+
+[https://www.atlassian.com/ Atlassian]에서 다운로드 받았다. 패키지는 self extract형태의 bash 스크립트 파일로 배포하고 있다.
+{{{#!plain
+# bash atlassian-jira-6.2.2-x64.bin
+.... 설치 과정은 생략 ....
+# service jira start 
+To run JIRA in the foreground, start the server with start-jira.sh -fg
+executing using dedicated user: jira
+......
+......
+Server startup logs are located in /opt/atlassian/jira/logs/catalina.out
+Using CATALINA_BASE:   /opt/atlassian/jira
+Using CATALINA_HOME:   /opt/atlassian/jira
+Using CATALINA_TMPDIR: /opt/atlassian/jira/temp
+Using JRE_HOME:        /opt/atlassian/jira/jre/
+Using CLASSPATH:       /opt/atlassian/jira/bin/bootstrap.jar:/opt/atlassian/jira/bin/tomcat-juli.jar
+Using CATALINA_PID:    /opt/atlassian/jira/work/catalina.pid
+Existing PID file found during start.
+Tomcat appears to still be running with PID 9585. Start aborted.
+}}}
+기본 서비스 포트는 8080이 되겠다. 웹 브라우저를 이용해서 http://localhost:8080 으로 접근했다. 
+
+데이터베이스는 '''MySQL'''로 선택한다. JDBC 드라이버를 설치해야 하는데 [https://confluence.atlassian.com/display/JIRA/Connecting+JIRA+to+MySQL Connecting JIRA to MySQL]문서를 참고해서 설치하자. 요약하자면 이렇다.
+  1. [http://dev.mysql.com/downloads/connector/j JDBC 드라이버]를 다운로드한다.
+  1. 압축을 풀면 mysql-connector-java-5.1.30-bin.jar 파일을 찾을 수 있다. 이 파일을 /opt/atlassian/jira/lib 에 복사한다. 
+  1. jira 서비스를 재 시작하면, mysql jdbc 드라이버를 이용할 수 있다. 
+
+== 참고 ==
+  * https://docs.atlassian.com/software/jira/docs/api/REST/latest/
+@
+
+
+1.15
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a2 1
+<!> 미완성
+d189 42
+d233 1
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d94 1
+a94 1
+||user_name     ||string   ||유저의 이름         ||                                                       || 
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d168 21
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d132 1
+d167 2
+d205 3
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d132 4
+d137 28
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d96 1
+a96 1
+||user_req_type ||options  ||요청의 종류         ||기기고장, 계정정보 분실, 기타.. 등등의 요청 종류      ||
+d99 3
+d112 16
+d130 1
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d99 1
+a99 1
+Jira에서는 커스텀 필드의 이름이 유일하지 않다. 중복가능하기 때문에, 필드 이름을 사용할 수 없다. 대신 필드에 대한 유일한 값인 필드 아이디(field id)를 사용한다. 형식은 "customfield_fieldid"이다. 예를 들어 field id가 10050 이라면 필드 이름은 "customfield_10050"이 된다.     
+d106 5
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d33 1
+a33 1
+Jira API는 '''HTTP Basic Authorization'''을 지원한다. curl은 -u를 이용해서 인증정보를 보낼 수 있다.     
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d38 1
+a38 1
+HTTP basic authorization은 [Site/Network_Programing/AdvancedComm/HTTP HTTP] 헤더의 '''Authorization''' 필드를 직접 설정하는 방법도 있다. 값으로 아이디와 패스워드의 base64 인코딩 문자열을 사용한다.
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d38 1
+a38 1
+HTTP basic authorization은 HTTP 헤더의 '''Authorization''' 필드를 직접 설정하는 방법도 있다. 값으로 아이디와 패스워드의 base64 인코딩 문자열을 사용한다.
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d38 1
+a38 1
+아이디와 패스워드가 직접 노출되는게 기분 나쁘다면, 직접 헤더를 설정하면 된다. HTTP basic authorization은 HTTP 헤더의 '''Authorization''' 필드를 이용한다. 값으로 아이디와 패스워드의 base64 인코딩 문자열을 사용한다. 보안을 생각한다면 이 방법이 더 좋겠다. 
+d46 1
+a46 1
+기타 애플리케이션 레이어에서 인증을 받은 다음 session값을 cookie로 저장하고, 이 cookie로 인증하는 방법도 있기는 하다. 이 방법은 귀찮아서 패스.
+d66 1
+a66 1
+데이터는 쉽게 이해할 수 있다. 필드에 ticket을 구성하는 필드명과 값을 입력하면 된다. 이 예제는 기본 필드만을 포함하고 있다. 중요한 건 "project" 필드다. 티켓을 발행할 프로젝트를 선택하기 위한 필수 필드다. jira에 프로젝트를 만들면 프로젝트 key도 함께 만들어지는데, 이 key를 이용해서 프로젝트를 선택할 수 있다.   
+d92 6
+a97 6
+앞의 예제는 기본 필드만을 보여주고 있다. 하지만 나는 jira를 CS관리 용도로 사용하길 워한다. 기본 필드만으로는 CS를 처리하기에는 정보가 부족하다. 그래서 커스텀 필드를 만들기로 했다. 
+|| user_name     || string   || 유저의 이름         ||                                                       || 
+|| user_email    || string   || 유저의 이메일 주소  || ticket을 완료하면 이메일 주소로 처리 결과를 알려준다. ||
+|| user_req_type || options  || 요청의 종류         || 기기고장, 계정정보 분실, 기타.. 등등의 요청 종류      ||
+Jira 관리자 권한을 가지고 있으면 프로젝트 단위로 ticket의 세부사항들을 조절할 수 있다. TEST01 프로젝트의 관리페이지의 커스텀 필드 편집 기능을 이용해서 세 개의 커스텀 필드를 추가했다.
+
+d99 7
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d49 1
+a49 1
+이제 ticket을 만들어 보자. 
+d51 14
+d66 31
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d25 2
+d49 4
+d55 38
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d17 1
+a17 1
+예전에 모니위키를 기반으로 이런 [wiki:Site/QOS/Process/Wiki_Support 비슷한 시스템을 만든] 경험도 있어서, 직접 만들려고 했다. 시간이 충분하다면 직접 만들었을 지도 모르겠으나, 시간이 "아주 매우 많이" 부족한 관계로 이미 만들어져 있는 이슈트래킹 시스템을 도입하기로 했다. '''버그질라'''의 사용을 고려하기도 했는데, 결국 jira를 선택했다. 이유는 안정적으로 빠르게 개발해야 했기 때문이다. 시간이 약간 더 있었다면 버그질라를 사용했을 거다. 
+d22 4
+a25 1
+=== Jira API ===
+d28 2
+a29 1
+==== API 인증 ====
+d31 4
+a34 1
+==== Ticket 생성 ====
+d36 13
+a48 1
+==== Ticket 조회 ====
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d16 1
+a16 1
+예전에 모니위키를 기반으로 이런 [wiki:Site/QOS/Process/Wiki_Support 비슷한 시스템을 만든] 경험도 있어서, 직접 만들려고 했다. 시간이 충분하다면 직접 만들었을 지도 모르겠으나, 시간이 "아주 매우 많이" 부족한 관계로 이미 만들어져 있는 이슈트래킹 시스템을 도입하기로 했다. ''''버그질라'''의 사용을 고려하기도 했는데, 결국 jira를 선택했다. 이유는 안정적으로 빠르게 개발해야 했기 때문이다. 시간이 약간 더 있었다면 버그질라를 사용했을 거다. 
+@

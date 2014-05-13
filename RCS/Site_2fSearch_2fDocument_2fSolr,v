@@ -1,10 +1,60 @@
-head	1.9;
+head	1.19;
 access;
 symbols;
 locks
-	root:1.9; strict;
+	root:1.19; strict;
 comment	@# @;
 
+
+1.19
+date	2014.03.23.12.17.06;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2014.03.23.03.43.53;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2014.03.22.17.25.37;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2014.03.22.12.52.00;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2014.03.22.07.29.46;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.03.22.04.36.54;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.03.21.09.57.30;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.03.21.09.48.44;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.03.20.16.35.14;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.03.19.16.17.43;	author root;	state Exp;
+branches;
+next	1.9;
 
 1.9
 date	2014.03.19.15.45.26;	author root;	state Exp;
@@ -57,7 +107,7 @@ desc
 @
 
 
-1.9
+1.19
 log
 @119.64.102.68;;yundream;;
 @
@@ -70,7 +120,7 @@ text
 Solr은 Apache [wiki:man/12/lucene Lucene]프로젝트에 기반을 둔 검색엔진으로 기업 대상으로 개발을 했다. 현재(@@DATE) 최신 버전은 Apache solr 4.7.0 버전이다.
 
 === Solr의 기능들 ===
-Solr는 단독 애플리케이션 서버 형태로 작동하며, REST 형식의 API를 제공한다. 문서들은 HTTP를 이용해서 XML, JSON, CSV 혹은 바이너리 형태등으로 색인요청을 할 수 있다. 검색 역시 HTTP GET 으로 요청하며, 검색결과는 XML, JSON, CSV, 바이너리 형태로 가져올 수 있다. 
+Solr는 단독 애플리케이션 서버 형태로 작동하며, REST 형식의 API를 제공한다. 문서들은 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]를 이용해서 XML, JSON, CSV 혹은 바이너리 형태등으로 색인요청을 할 수 있다. 검색 역시 HTTP GET 으로 요청하며, 검색결과는 XML, JSON, CSV, 바이너리 형태로 가져올 수 있다. 
    * Full-text search 
    * 높은 웹 트래픽을 감당할 수 있도록 최적화.
    * XML, JSON과 HTTP등의 표준 오픈 인터페이스를 제공.
@@ -118,7 +168,7 @@ Joinc 컨텐츠에 대해서 색인 및 검색 테스트를 진행하고, 문제
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1rwaXc8TsAERtiWmCRIn5Os1d5deRAhvtPa7iVJYQlaI/pub?w=489&amp;h=315">
 }}}
-  * Virtualbox로 테스트한다.
+  * [wiki:Site/cloud/virtualbox Virtualbox]로 테스트한다.
   * 두 개의 '''Solr server'''를 준비한다. '''solr server 1''', '''solr server 2''' 라고 부르기로 했다. 분산 검색 테스트를 위해서다. joinc에서 가져온 텍스트 파일은 1/2로 나눠서 각각의 solr server에 분산해서 색인한다. 
 
 == Solr Tutorial ==
@@ -263,16 +313,119 @@ uniqueKey가 아닌, 일반 질의어로도 삭제할 수 있다. name 필드에
 Solr는 검색결과를 확인하기 위한 검색 UI를 내장하고 있다. 색인결과를 테스트하기 위해서 사용할 수 있는데, 검색, 하일라이팅, 자동완성, 위치 검색등의 주요 기능들을 포함하고 있다. 
   * http://192.168.56.5:8983/solr/collection1/browse
 
-== CURL API ==
-Solr는 POST와 GET을 이용해서 검색과 색인을 관리할 수 있다. CURL을 이용해서 Solr의 기능을 테스트 해본다.  
+== HTTP API ==
+Solr은 모든 기능을 HTTP를 통해서 제공한다. 여기에는 색인, 검색, 삭제, 업데이트 뿐만 아니라 스키마추가/업데이트, 리플리케이션 등 모든 기능을 포함한다. 여기에서는 색인 추가,업데이트,삭제, 검색 등 필수 기능만 테스트한다.
 
-== Joinc 색인 생성 ==
+Solr는 POST와 GET을 이용해서 색인을 관리하고 검색을 요청할 수 있다. HTTP 만으로 모든 작업을 할 수 있기 때문에, CURL등의 도구를 이용해서 간단하게 검색 애플리케이션을 개발할 수 있다. 나는 php에서 제공하는 CURL(client URL Library)를 이용해서 웹 애플리케이션을 개발했다.
+
+CURL을 이용해서 Solr의 기능을 테스트 한다.  exampledoc 디렉토리 밑에 보면 '''books.json'''이 있는데, 이 파일의 스키마로 테스트하기로 했다.
+
+books.json 파일을 참고해서 테스트에 사용할 '''cosmos.json'''을 만들었다.
+{{{#!plain
+[
+  {
+    "id" : "0-394-50294-9",
+    "cat" : ["book","paperback"],
+    "name" : "cosmos",
+    "author" : "Carl sagan",
+    "sequence_i" : 1,
+    "genre_s" : "Popular science",
+    "inStock" : true,
+    "price" : 28.20,
+    "pages_i" :365 
+  }
+]
+}}}
+
+=== Update와 Insert ===
+JSON 데이터를 Update 한다.
+{{{#!plain
+# URL=http://192.168.56.5:8983/solr/update/json
+# curl -X POST $URL -H 'Content-type:application/json' -d @@cosmos.json
+{"responseHeader":{"status":0,"QTime":2}}
+}}}
+commit를 해야 적용된다.
+{{{#!plain
+# curl "$URL?commit=true"
+}}}
+=== Search ===
+cosmos로 검색해보자.
+{{{#!plain
+# curl "http://localhost:8983/solr/select?q=cosmos&wt=json&indent=true"
+{
+  "responseHeader":{
+    "status":0,
+    "QTime":1,
+    "params":{
+      "indent":"true",
+      "q":"cosmos",
+      "wt":"json"}},
+  "response":{"numFound":1,"start":0,"docs":[
+      {
+        "id":"0-394-50294-9",
+        "cat":["book",
+          "paperback"],
+        "name":"cosmos",
+        "author":"Carl sagan",
+        "author_s":"Carl sagan",
+        "sequence_i":1,
+        "genre_s":"Popular science",
+        "inStock":true,
+        "price":28.2,
+        "price_c":"28.2,USD",
+        "pages_i":365,
+        "_version_":1463107060941979648}]
+  }}
+}}}
+
+=== delete ===
+delete와 update등 색인을 수정하는 것은 모두 "/solr/update"로 이루어진다. delete 할건지, update(혹은 insert)할 건지는 JSON에 정보로 명시를 한다. 색인을 delete하는 예제다.
+{{{#!plain
+# cat cosmos.json
+{
+  "delete":{"id": "0-394-50294-9"}
+}
+
+# curl -X POST $URL -H 'Content-type:application/json' -d @@cosmos.json
+# curl "$URL?commit=true"
+}}}
+이제 id가 0-394-50294-9인 문서(cosmos)는 검색되지 않을 것이다.
+
+
+== Joinc 검색 서비스 개발 ==
 Joinc의 컨텐츠를 색인한다.
   * title과 body(본문이 저장되는) 두 개의 field로 구성된다. title field의 boost를 body 보다 높게 설정한다. 
   * uniqueKey는 컨텐츠가 저장된 파일의 이름으로 한다. 
   * 영문과 한글 숫자만 색인한다. 그 외의 문자들은 색인에서 제외한다.   
   * 하일라이팅 기능을 지원한다. css 작업 좀 하면 되겠다. 
   * 자동완성 기능을 사용한다. ajax 삽질을 좀 해야겠지. 
+=== schema 설계 ===
+schema를 설계하기 위해서는 문서를 어떤 기준으로 나눌 것인지를 결정해야 한다. joinc의 컨텐츠는 moniwiki에서 관리하는데, 데이터베이스가 아닌 text로 저장된다. 데이터 형식은 html이 아닌 moniwiki의 고유 마크다운 형식을 따른다.
+
+문서는 title과 body만 가지고 있다. 문서저자, 작성일과 같은 정보는 없다. 따라서 "title"과 "body" 단지 두 개의 필드로 구성한다.
+
+id는 문서가 저장된 파일 이름으로 한다. 정리하자면 이렇다.
+||필드명 ||색인 데이터      ||타입           ||설명                                                     ||
+||id     ||파일이름         ||UniqueKey      ||                                                         ||
+||title  ||문서제목         ||string         ||body보다 높은 boost 값을 가진다.                         ||
+||body   ||문서 본문        ||               ||                                                         ||
+||update ||문서 최종 변경일 ||               ||Moniwiki는 RCS로 저장한며, 최종 업데이트일을 알 수 있다. ||
+
+=== 색인 ===
+마크다운 형식의 joinc wiki 문서를 그대로 색인하기에는 문제가 있다. 유저가 웹 브라우저를 이용해서 보는 페이지의 내용 그대로 색인을 해야 한다. HTML 문서를 색인하기로 했다. 링크기반으로 웹 문서를 수집하는 삽질은 하지 않기로 했다. 어차피 원문을 내가 관리하고 있으니, 색인해야 할 URL의 목록은 간단히 만들 수 있다. 간단한 스크립트를 돌려서 URL 목록을 만든 후, [wiki:man/12/w3m w3m]으로 URL을 읽어서 text 파일로 변환하기로 했다. 
+
+w3m으로 웹 문서를 txt로 저장하는 방법이다.
+{{{#!plain
+# w3m -O utf-8 -dump "http://www.sample.com" > index.txt
+}}}
+
+이렇게 w3m으로 긁어온 컨텐츠는 HTML로 저장되는게 아니고, 렌더링된 plain/text 형태로 저장된다. 해서 아래의 문제를 해결해야 한다.
+   1. 제목과 본문을 알 수 없다. 
+   1. 쓸데없는 문자들이 많다. 색인할 텍스트만 포함하도록 문서를 정리해야 한다. 
+
+=== 검색 인터페이스 개발 ===
+=== 검색 출력 페이지 개발 ===
+=== 분석기 ===
 
 == 히스토리 ==
   * 작성일 : [[Date(2012-07-19T09:28:44)]]
@@ -280,6 +433,161 @@ Joinc의 컨텐츠를 색인한다.
 == 참고 ==
   *  
 [[Tag(검색,Lucene,Solr)]]
+@
+
+
+1.18
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d294 5
+a298 4
+||필드명 ||색인 데이터 ||타입           ||설명                               ||
+||id     ||파일이름    ||UniqueKey      ||                                   ||
+||title  ||문서제목    ||string         ||body보다 높은 boot 값을 가진다.    ||
+||body   ||문서 본문   ||               ||                                   ||
+a307 31
+Moniwiki는 모든 데이터를 "./data/text"밑에 저장을 하는데, 파일이름이 URL이 된다. 예를들어 "UsedMake"라는 위키페이지를 만들었다면 "./data/text/UsedMake"로 저장이 되고, http://www.joinc.co.kr/wiki.php/UsedMake 이런식으로 접근할 수 있다. 
+
+w3m으로 모든 문서를 읽어오는 간단한 스크립트를 하나 만들었다.
+{{{#!plain
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+import getopt, sys
+import os
+import re
+import urllib
+import codecs
+
+def allIndex():
+    for file in os.listdir('./text'):
+        if re.match("^Site_2f|^man_2f",file):
+            uri = file.replace('_', '%')
+            command = "/usr/bin/w3m -O utf-8 -dump \"http://www.joinc.co.kr/modules/moniwiki/wiki.php/{0}?action=print\" > ./rawindex/{1}".format(urllib.unquote(uri), file)
+            os.system (command)
+
+def main():
+    allIndex()
+
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
+}}}
+  * Joinc의 컨텐츠는 로컬 디스크의 text 디렉토리 밑에 저장된다. 
+  * Joinc의 거의 대부분의 컨텐츠는 Site와 man 디렉토리 밑에 관리한다. 이들 디렉토리 밑에 있는 컨텐츠만 색인하기로 했다.
+  * 파일이름을 URL decoding해서 URL로 만든 다음 w3m으로 긁어와서 rawindex 디렉토리 밑에 저장한다.
+
+a311 1
+
+@
+
+
+1.17
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d333 4
+d338 3
+a340 1
+}}}
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d311 23
+@
+
+
+1.15
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d281 1
+a281 1
+== Joinc 색인 생성 ==
+d296 1
+a296 1
+||title  ||문서제목    ||string         ||body보다 높은 boot 값을 가진다.   ||
+d299 15
+a313 1
+=== 분석기 ===
+d316 2
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d274 3
+d278 2
+d289 10
+@
+
+
+1.13
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d268 7
+@
+
+
+1.12
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d9 1
+a9 1
+Solr는 단독 애플리케이션 서버 형태로 작동하며, REST 형식의 API를 제공한다. 문서들은 HTTP를 이용해서 XML, JSON, CSV 혹은 바이너리 형태등으로 색인요청을 할 수 있다. 검색 역시 HTTP GET 으로 요청하며, 검색결과는 XML, JSON, CSV, 바이너리 형태로 가져올 수 있다. 
+d57 1
+a57 1
+  * Virtualbox로 테스트한다.
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d202 3
+a204 1
+== CURL API ==
+d267 2
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d203 61
+a263 1
+Solr는 POST와 GET을 이용해서 검색과 색인을 관리할 수 있다. CURL을 이용해서 Solr의 기능을 테스트 해본다.  
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d212 4
+a215 1
+
 @
 
 

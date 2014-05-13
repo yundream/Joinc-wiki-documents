@@ -1,0 +1,176 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.03.20.10.36.07;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fDevelopment_2fEnv_2fcmake
+@
+
+
+1.1
+log
+@112.171.37.81;;Anonymous;;
+@
+text
+@#title cmake 사용기
+  * 2011/3/17
+[[TableOfContents]]
+== cmake 소개 ==
+Makefile을 만들기 위해서 qmake를 사용해왔다. 사용하기 간단하기 때문인데, 일단 qmake(:12)로 '''Makefile'''을 만들고, 환경에 맞게 손작업하는 식이다.
+
+간단한 방법이기는 한데, 여러 플렛폼에 포팅가능한 makefile을 만들기가 여간 까다롭지 않다는 문제가 있다. 그래서 사용한게 automake. 근데 이거 너무 복잡하다. 그래서 kdevelop(:12)를 이용해서 automake 파일을 만들고 수정하는 방식으로 automake를 이용했다. 아마 kdevelop3.x 까지 automake를 사용했던 것으로 알고 있다.
+
+그 뒤 한 2년은 automake 툴을 잊어버리고 산거 같다. 시스템/네트워크 애플리케이션 개발에서 웹 서비스 개발로 C/C++ 프로젝트를 할일이 거의 생기지 않았기 때문이다. 
+
+=== kdevelop 와 cmake ===
+자동 빌드 툴에 관심을 가지게 된 건 kdevelop를 개발툴로 사용하면서 부터다. kdevelop.. 훌륭한 개발툴이긴 한데, 그동안 사용하지 않았던 이유는 순전히 vim(:12) 키를 사용할 수 없다는 것 때문이었다. 그런데 언젠가 부터 kdevelop에 vim키가 지원되기 시작했다. 4.0부턴가 ? 아뭏든 그래서 kdevelop를 사용해기로 했는데. 
+
+빌드툴로 automake 대신 cmake를 사용하는 것이다.
+
+=== cmake 와 automake ===
+일단 automake에 대한 기억은 좋지 않다. 빌드 파일을 만드는게 너무 복잡했기 때문이다. 지금도 그때도 난 automake 빌드파일을 만들 자신이 없다. 그나마 kde가 자동으로 만들어줬기 때문에 사용했지. 
+
+cmake도 automake와 마찬가지로 스크립트 파일을 읽어서, 해당 플랫폼에서 빌드하기 위한 프로젝트 파일들을 만든다. 리눅스라면 Makefile 윈도우라면 Visual Studio 프로젝트 파일, Apple은 Xcode를 만들어준다.
+
+'
+== cmake 스크립트 만들기 ==
+CMakeLists.txt에 cmake 명령들을 이용해서, 빌드 규칙을 만들면 된다. 테스트를 위해서 main.c foo.c h heooll.c를 만들었다. 
+{{{#!plain
+// main.c
+#include <stdio.h>
+#include <hello.h>
+#include <foo.h>
+
+int main(int argc, char **argv)
+{
+    pthread_self();
+    hello("yundream");
+    return 0;
+}
+
+// foo.c
+#include <foo.h>
+#include <stdio.h>
+
+void foo(int a, int b)
+{
+  printf("SUM : %d + %d = %d\n", a, b, a+b);
+}
+
+// hello.c
+#include <hello.h>
+#include <stdio.h>
+
+void hello(char *name)
+{
+    printf("Hello %s1!\n", name);
+}
+}}}
+
+{{{#!plain
+PROJECT(myproject)
+
+set(ROOT_DIR /home/yundream/cmake)
+set(MYLIB_PATH /home/yundream/cmake/lib)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
+
+ADD_EXECUTABLE(hello main.c foo.c hello.c)
+
+set(UNITLIB ${MYAPILIB})
+
+FIND_LIBRARY(MYAPILIB NAMES pthread PATHS /usr/lib)
+TARGET_LINK_LIBRARIES(hello sqlite3 pthread ${UNITLIB})
+
+INCLUDE_DIRECTORIES(${ROOT_DIR})
+
+ADD_DEFINITIONS(-Wall -DSQLITE_THREADSAFE=1 -g -O2)
+}}}
+ * PROJECT : 프로젝트 이름
+ * SET : cmake에서 사용할 변수 지정 (이름 값1 값2 값3...), 혹은 cmake의 환경설정
+ * ADD_EXECUTABLE : 실행파일의 이름과 실행파일을 만들기 위해서 필요한 소스코드들을 명시 
+ * TARGET_LINK_LIBRARIES : 타겟을 만들기 위해서 필요한 라이브러리를 명시한다. gcc의 -l 
+ * INCLUDE_DIRECTORIES : 헤더파일 경로, gcc의 '''-I''' 
+ * ADD_DEFINITIONS : 컴파일 옵션들 
+
+=== Makefile 만들기 ===
+cmake 명령으로 Makefile를 만들면 된다.
+{{{#!plain
+# cmake ./
+}}}
+
+=== 라이브러리 만들기 ===
+'''ADD_LIBRARY'''를 이용해서 소스코드를 공유 라이브러리로 혹은 정적 라이브러리로 만들 수 있다. 
+{{{#!plain
+# 공유라이브러리로 만들기
+ADD_LIBRARY(mylib SHARED hello.c foo.c)
+
+# 정적라이브러리로 만들기
+ADD_LIBRARY(mylib STATIC hello.c foo.c)
+}}}
+
+=== 서브 디렉토리로 계층적 프로젝트 관리 ===
+프로젝트를 진행하다 보면, 서브 프로젝트를 관리해야할 경우가 생긴다. 이 경우 서브 디렉토리 별로 프로젝트를 관리할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=18Hv2xI6JswjugHDgB6O5BFhjulySbFQy9ehv1ky5cvk&amp;w=608&amp;h=252">
+}}}
+
+나는 위의 myproject를 두개의 서버 프로젝트로 나누기로 했다. 하나는 주 개발이 이루어지는 hello 프로젝트고, 다른 하나는 모듈 테스트를 위한 test 프로젝트다. 그래서 hello 와 test 디렉토리를 만들었다.
+{{{#!plain
+# pwd
+/home/yundream/cmaketest
+# mkdir hello test
+}}}
+cmaketest의 '''MakeLists.txt''' 파일의 내용이다.
+{{{#!plain
+PROJECT(myproject)
+
+ADD_SUBDIRECTORY(hello)
+ADD_SUBDIRECTORY(test)
+}}}
+
+다음은 hello 와 test에 있는 MakeLists.txt 내용이다.
+{{{#!plain
+#############################
+# hello MakeLists.txt
+#############################
+PROJECT(hello)
+
+ADD_EXECUTABLE(hello main.c foo.c hello.c)
+TARGET_LINK_LIBRARIES(hello pthread)
+INCLUDE_DIRECTORIES(./)
+
+ADD_DEFINITIONS(-Wall -O2)
+
+# test 에서 사용할 정적라이브러리를 만들었다.
+ADD_LIBRARY(mylib STATIC hello.c foo.c)
+
+#############################
+# test MakeLists.txt
+#############################
+PROJECT(test)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+ADD_EXECUTABLE(test test.c)
+
+# 정적 라이브러리를 링크하기 위한 디렉토리를 정의 
+FIND_LIBRARY(UNIT_LIB NAMES mylib PATHS /home/yundream/cmaketest/hello)
+TARGET_LINK_LIBRARIES(test pthread ${UNIT_LIB})
+
+INCLUDE_DIRECTORIES(../hello)
+
+ADD_DEFINITIONS(-Wall -O2)
+}}}
+
+[[tag(automake,cmake,make,makefile,c,c++)]]
+@

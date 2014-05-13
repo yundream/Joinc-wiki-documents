@@ -1,0 +1,270 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.04.28.05.00.19;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fThread_2fBeginning_2fWhatThread
+@
+
+
+1.1
+log
+@220.120.246.241;;Anonymous;;
+@
+text
+@#title 쓰레드에 대해서
+
+  * 매우 오래된 문서라서 다시 정리할 필요가 있음 - 2009/11/26
+[[tag(Thread,시스템프로그래밍)]]
+=== 개요 ===
+'''SMP'''와 같은 '''shared memory multiprocessor architectures'''에서 thread는 병렬화를 달성하기 위해서 사용된다. 쓰레드 구현은 하드웨어 벤더에서 그들자신의 필요에 의해서 만들어서 사용했으며 후에 소프크웨어 개발자들이 간단하게 사용할 수 있도록 작성하게 되었다. UNIX(:12)에서는 C(:12) 언어를 위한 표준 thread 프로그래밍 인터페이스를 사용하는데, IEEE POSIX 1003.1c 에 그 표준이 정의되어 있다. 이를 POSIX Thread 라고 부르게 되었고, 더욱 줄여서 pthread 라고 부르고 있다. 
+
+이 문서는 thread의 개념에 대해서 간단히 설명하고, 그 구현물인 pthread를 이용한 병렬처리 프로그래밍 기법에 대해서 설명할 것이다. 
+
+=== 쓰레드는 무엇이며, 왜 이용하는가 ===
+쓰레드는 세미(semi)프로세스, 혹은 Light Weight 프로세스라고 불리우며, 여러개의 클라이언트를 처리하는 서버/클라이언트 모델의 서버프로그래밍 작업을 위해서 주로 사용된다. 비슷한 일을 하는 fork(2) 에 비해서 빠른 프로세스 생성 능력과, 적은 메모리를 사용하는게 Light Weight 프로세스라고 불리우는 이유이다.
+
+보통의 유닉스 프로세스는 main()함수에 의해서 시작되고 실행되는 single 쓰레드 로 이루어지며, 하나의 연속된 명령어들만을 처리한다. 반면 멀티쓰레드 프로그램은 여러개의 연속된 명령어들을 동시에 처리할수 있다.   
+
+스레드는 자기자신의 스택메모리영역을 가지고, 코드의 조각을 실행한다. 실(real) 프로세스 와는 달리 쓰레드는 다른 형제 쓰레드들과 메모리를 공유하게 된다.(보통 프로세스는 자기자신만의 메모리영역을 가진다). 이렇듯 전역 메모리를 공유하게 되므로 fork 방식에 비해서 좀더 작은 메모리를 소비하게 된다.
+
+fork 에 비해서 thread 가 가지는 장점은 위에서 언급했듯이 "빠른 프로세스 생성" 능력과, 메모리 공유에 위한"적은 메모리의 사용"과 메모리 공유에 따른 쓰레드간의 좀더 쉬운 정보공유이다.  fork(2) 시스템에서 부모와 자식같이 통신을 위해서는 IPC(:12)를 사용해야 하며 이는 꽤 어려운 작업이 될수도 있는데, 메모리를 공유함으로 IPC의 사용을 줄이면서도 쓰레드간 정보교환을 쉽게 할수있다. 
+
+아래는 fork()를 이용한 프로세스 생성과 pthread_create()를 이용한 thread 생성간의 비용을 비교한 표이다. 
+{{{#!html
+<TABLE BORDER=1 CELLSPACING=0 CELLPADDING=5 WIDTH=90% class=wiki>
+<TR>
+<TH ROWSPAN=2>Platform</TH>
+<TH COLSPAN=3><TT>fork()</TH>
+<TH COLSPAN=3><TT>pthread_create()</TH>
+</TR><TR>
+<TH>real</TH>
+<TH>user</TH>
+
+<TH>sys</TH>
+<TH>real</TH>
+<TH>user</TH>
+<TH>sys</TH>
+
+</TR><TR VALIGN=top ALIGN=right>
+<TD ALIGN=left><B>AMD 2.4 GHz Opteron (8cpus/node)</B>
+<TD>41.07</TD>
+<TD>60.08</TD>
+<TD>9.01</TD>
+
+<TD>0.66</TD>
+<TD>0.19</TD>
+<TD>0.43</TD>
+
+</TR><TR VALIGN=top ALIGN=right>
+<TD ALIGN=left><B>IBM 1.9 GHz POWER5 p5-575 (8cpus/node)</B>
+<TD>64.24</TD>
+<TD>30.78</TD>
+<TD>27.68</TD>
+<TD>1.75</TD>
+
+<TD>0.69</TD>
+<TD>1.10</TD>
+
+</TR><TR VALIGN=top ALIGN=right>
+<TD ALIGN=left><B>IBM 1.5 GHz POWER4 (8cpus/node)</B>
+<TD>104.05</TD>
+<TD>48.64</TD>
+<TD>47.21</TD>
+<TD>2.01</TD>
+<TD>1.00</TD>
+
+<TD>1.52</TD>
+
+</TR><TR VALIGN=top ALIGN=right>
+<TD ALIGN=left><B>INTEL 2.4 GHz Xeon (2 cpus/node)</B>
+<TD>54.95</TD>
+<TD>1.54</TD>
+<TD>20.78</TD>
+<TD>1.64</TD>
+<TD>0.67</TD>
+<TD>0.90</TD>
+
+</TR><TR VALIGN=top ALIGN=right>
+<TD ALIGN=left><B>INTEL 1.4 GHz Itanium2 (4 cpus/node)</B>
+<TD>54.54</TD>
+<TD>1.07</TD>
+<TD>22.22</TD>
+<TD>2.03</TD>
+<TD>1.26</TD>
+<TD>0.67</TD>
+
+</TR></TABLE>
+}}}
+
+fork 에 비해서 쓰레드가 더 빠른 수행능력을 보이는 이유는 fork 가 기본적으로 모든 메모리와 모든 기술자(파일기술자등)을 '''copy-on-write''' 방식으로 자식에게 복사하는데 비해서 쓰레드는 많은 부분을 공유하기 때문이다. copy-on-write 자체가 효율적이긴 하지만, 메모리 자원을 공유하는 것보다는 느릴 수 밖에 없다. 
+
+아래는 쓰레드 생성과 프로세스 생성의 성능에 대한 또다른 자료다.
+
+http://www.ibm.com/developerworks/kr/library/l-rt7/c07-fig1.gif
+
+http://www.ibm.com/developerworks/kr/library/l-rt7/c07-fig2.gif
+
+출처 : http://www.ibm.com/developerworks/kr/library/l-rt7
+
+반면 단점도 가지고 있는데, 모든 쓰레드가 같은 메모리 공간을 공유하게 되므로, 하나의 쓰레드가 잘못된 메모리연산을 하게 되면, 모든 프로세스가 그 영향을 받게 된다는 것이다. fork 등을 통한 프로세스 생성방식에 있어서는 OS(:12) 가 가각의 프로세스를 보호해줌으로 한 프로세스의 문제는 해당 프로세스의 문제로 끝나게 된다. 그러나 쓰레드는 이러한 프로세스 보호를 기대할수 없다. 하나의 쓰레드에 문제가 생기면 전체 쓰레드에 문제가 생길가능성이 크다. 이런 이유로 멀티 쓰레드 프로그램은 좀더 주의를 기울여서 작성해야 한다. 또단 하나의 흐름을 가지는 단일 프로세스 프로그램과 달리, 여러개의 흐름으로 분리가 되기 때문에, 디버깅을 하기가 까다롭다는 문제도 가진다. 
+
+쓰레드의 일반적인 개념을 정리했다.
+  * 기술적으로 thread는 운영체제(:12)에서 스케쥴링이 가능한 독립된 명령(instructions)흐름의 단위이다. 여기에서 독립된 명령 단위를 보통 '''문맥'''이라고 표기한다. 스케쥴링 가능한 문맥 혹은 코드조각 으로 이해하면 될 것 같다. 
+  * 소프트웨어 개발자에게 있어서 thread는 main 프로그램으로 부터 독립적으로 실행될 수 있는 '''procedure'''로 보는게 이해가 더 쉬울 수 있을 것 같다. 
+  * main 프로그램은 여러개의 독립적으로 실행 가능한 프로시져 즉 쓰레드를 포함할 수 있는데, 이들을 동시에 운용할 경우 이를 multi thread 프로그램이라고 한다.  
+
+아래는 쓰레드간에 서로 공유하는 자원들을 나열한 것이다. 
+  * 작업디렉토리
+  * 파일지시자들
+  * 대부분의 전역변수와 데이타들
+  * UID 와 GID
+  * signal
+다음은 각각의 쓰레드가 고유하게 가지는 자원들을 나열한 것이다. 
+  * 에러번호(errno)
+  * 쓰레드 우선순위
+  * 스택
+  * 쓰레드 ID
+  * 레지스터 및 스택지시자
+다음은 멀티쓰레드 프로세스가 어떻게 각종 자원을 공유하는지를 나타낸것이다.
+
+http://www.joinc.co.kr/albums/album01/abg.gif
+
+파일은 기본적으로 공유하며, 메모리 영역중에 상당부분을 공유한다는걸 볼수 있을것이다. 
+
+=== thread 프로그래밍의 주요 요소들 ===
+==== 병렬 프로그래밍 ====
+최근들어 - 2009년 11월 현재 - 멀티 cpu 컴퓨터가 일반적으로 사용되는 추세로 접어들고 있다. 과거에는 기업에서 운용하는 서버급 컴퓨터에서나 multi cpu를 볼 수 있었지만 이제 개인 PC도 multi cpu를 사용하는걸 어렵지 않게 볼 수 있다. multi cpu가 사용되면서, 병렬프로그래밍 기법의 중요성이 더욱 커지고 있다. 
+
+하지만 병렬프로그램의 작성에는 고려해야할 여러가지 사항들이 있다. 때때로 이들은 프로그램의 작성을 매우 어렵게 만들기도 한다.
+  * 로드 밸런싱  
+  * Data dependencies
+  * 동기화 그리고 race conditions
+  * 메모리 이슈 
+  * IO 이슈
+  * 프로그램의 복잡도 증가 
+  * 개발시간과 비용의 증가
+
+일반적으로 사용되는 쓰레드 프로그램 모델은 다음과 같다.
+  * Manager/worker
+    boss/worker 모델이라고 부르기도 한다. 일반적으로 Manager 쓰레드가 모든 입력을 제어하고 각 쓰레드에 작업을 배분한다. server & client 모델을 사용하는 네트워크 프로그램의 제작에 널리 사용된다. Manager 쓰레드에서 client의 accept를 받아들이고 새로운 worker 쓰레드를 생성해서 input (연결)을 전달하는 방식이다. 
+  * pipeline
+    task가 여러개의 suboperation 으로 나뉘어서 수행이 된다. 각 task가 처리한 결과를 다음 task에 넘겨서 처리하고 최종적으로 main thread는 완전히 처리된 데이터를 넘겨받는 식이다. 입력데이터가 long stream 일 경우에 사용할 수 있다. 자동차 조립 라인과 비슷하다. 조립라이을 컨테이너 벨트식으로 만들게 됨으로 실제 조립라인에는 여러대의 자동차가 존재하게 된다.
+  * peer
+    Manager/worker 모델과 비슷하다. 그러나 main 쓰레드는 단지 새로운 쓰레드를 생성하기만 한다. 생성된 쓰레드가 독립적으로 자신의 작업을 수행한다. 네트워크 프로그래밍으로 보자면, 각각의 생성된 쓰레드가 client accept()를 기다리는 방식이라고 보면 된다. 
+    
+==== shared memory 모델 ====
+모든 쓰레드가 전역 메모리공간을 공유하는 방식이다. 프로그래머는 전역 메모리 공간에 대한 Access 동기화에 특시 신경을 써줘야 한다. 이들 공간에 대해서 
+
+==== thread safeness ====
+쓰레드는 공유하는 메모리공간에 대해서 서로 제어권을 얻기위해서 경쟁하는 상태에 놓일 수 있다. 이들 쓰레드가 자원을 놓고 경쟁하는 것을 제어하지 않으면 쓰레드가 안전 - safeness - 하지 않은 상태에 놓이게 된다.
+
+예를들어 여러개의 쓰레드가 동일한 library(:12) 루틴을 이용해서 다음과 같은 작업을 한다고 가정해보자.
+   1. 라이브러리가 메모리의 전역 구조체를 엑세스 한다.
+   1. 거의 같은 시간에 쓰레드가 전역 구조체의 데이터를 읽고/쓰려고 한다. 
+   1. 이때 보호하고자 하는 데이터영역에 대한 동기화장치가 마련되어 있지 않았다면, thread:::safe(:12) 하지 않은 라이브러리가 된다.   
+이 문제는 멀티쓰레드 프로그래밍시 발생하게 되는데, 100% thread-safe 하지 않은 외부라이브러리를 사용하게 될경우 프로그램에 문제가 발생할 수 있다. 외부 라이브러리를 사용할때는 thread-safe 한지를 확인해볼 필요가 있다. 대부분의 잘 정의된 라이브러리는 thread-safe 한지를 명시하고 있다.
+
+=== POSIX thread ===
+흔히 Pthread 라고 불리우며, POSIX(:12) 에서 표준으로 제안한 thread 함수모음으로 thread 를 지원하기위한 C(:12) 표준 라이브러리 셋을 제공한다. 이후 모든 예제는 Pthread 를 통해서 구현하고 설명하게 될것이다. 
+
+=== 쓰레드의 생성과 종료 ===
+멀티 쓰레드 프로그램이 처음 시작되었을때 그것은 main()함수를 실행하는 단일 프로세스 상태로 작동하게 될것이다. 이것은 그 자체로 하나의 완전한 쓰레드이다.  이 상태에서 우리는 pthread_create(3) 함수를 부름으로써 새로운 쓰레드를 생성할수 있다.  
+
+쓰레드를 이용한 프로그램은 기본적으로 아래와 같은 순서로 작동하게 된다.
+{{{#!plain
+     Master Thread
+           |
+           |             pthread_create() 에 의해서 worker 생성
+           |
+     +---+----+---+      worker 시작
+     |   |    |   |
+     |   |    |   |      각각의 worker는 그들의 작업을 수행한다.
+     |   |    |   |
+     +---+----+---+      worker 를 종료한다.  
+           |
+           |             pthread_join()에 의해서 worker 를 join 한다.
+           |
+     Master Thread
+}}}
+
+worker 은 쓰레드로 바꾸어 생각할수도 있다. 
+
+아래는 쓰레드 프로그램의 가장 간단한 예이다. 
+{{{#!html
+<pre>
+<font COLOR=#00b800>#include</font> &lt;stdio.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;unistd.h&gt; 
+<font COLOR=#00b800>#include</font> &lt;pthread.h&gt; 
+
+<b><font COLOR=#0000ff>void</font></b>* do_loop(<b><font COLOR=#0000ff>void</font></b> *data)
+{
+    <b><font COLOR=#0000ff>int</font></b> i;
+
+    <b><font COLOR=#0000ff>int</font></b> me = *((<b><font COLOR=#0000ff>int</font></b> *)data);
+    <b><font COLOR=#0000ff>for</font></b> (i = <font COLOR=#a900a9>0</font>; i &lt; <font COLOR=#a900a9>10</font>; i++)
+    {
+        printf(<font COLOR=#ff0000>"%d - Got %d&#92;n"</font>, me, i);
+        sleep(<font COLOR=#a900a9>1</font>);
+    }
+}
+
+<b><font COLOR=#0000ff>int</font></b> main()
+{
+    <b><font COLOR=#0000ff>int</font></b>       thr_id;
+    pthread_t p_thread[<font COLOR=#a900a9>3</font>];
+    <b><font COLOR=#0000ff>int</font></b> status;
+    <b><font COLOR=#0000ff>int</font></b> a = <font COLOR=#a900a9>1</font>;
+    <b><font COLOR=#0000ff>int</font></b> b = <font COLOR=#a900a9>2</font>;      
+    <b><font COLOR=#0000ff>int</font></b> c = <font COLOR=#a900a9>3</font>;      
+
+    thr_id = pthread_create(&amp;p_thread[<font COLOR=#a900a9>0</font>], NULL, do_loop, (<b><font COLOR=#0000ff>void</font></b> *)&amp;a);
+    thr_id = pthread_create(&amp;p_thread[<font COLOR=#a900a9>1</font>], NULL, do_loop, (<b><font COLOR=#0000ff>void</font></b> *)&amp;b);
+    thr_id = pthread_create(&amp;p_thread[<font COLOR=#a900a9>2</font>], NULL, do_loop, (<b><font COLOR=#0000ff>void</font></b> *)&amp;c);
+
+    pthread_join(p_thread[<font COLOR=#a900a9>0</font>], (<b><font COLOR=#0000ff>void</font></b> **) &status);
+    pthread_join(p_thread[<font COLOR=#a900a9>1</font>], (<b><font COLOR=#0000ff>void</font></b> **) &status);
+    pthread_join(p_thread[<font COLOR=#a900a9>2</font>], (<b><font COLOR=#0000ff>void</font></b> **) &status);
+
+    printf(<font COLOR=#ff0000>"programing is end&#92;n"</font>);
+    <b><font COLOR=#0000ff>return</font></b> <font COLOR=#a900a9>0</font>;
+}
+</pre>
+}}}
+
+위의 프로그램을 컴파일 시키기 위해선 pthread 라이브러리를 링크시켜줘야 한다. 
+{{{#!plain
+[yundream@@localhost test]# gcc -o thread thread.c -lpthread
+}}}
+최초에 main() 쓰레드가 시작되고 나서  pthread_create 를 이용해서 3개의 쓰레드를 생성 시켯다. 각각의 쓰레드는 do_loop 코드를 실행한다. 쓰레드가 모든 작업을 마쳤다면, pthread_join 을 이용해서 다른 쓰레드가 종료될때까지 기다리고, 모든 쓰레드가 종료되었다면, main()쓰레드가 종료되고 프로세스는 완전히 끝나게 된다.
+
+쓰레드의 생성은 pthread_create()를 호출함으로써 이루어진다. 첫번째 아규먼트는 pthread_t 데이타 구조체에 대한 포인터를 돌려주는데, 쓰레드에 대한 지시값이 들어 있다. 각각의 쓰레드는 각각의 유일한 pthread_t 를 가지고 있어야만 한다.  위의 프로그램에서 우리는 각각의 쓰레드가 유일한 p_thread 를 가지도록 하기 위해서 생성할 쓰레드의 수만큼(3)을 배열로 만들었다. 2번째 아규먼트는 쓰레드가 만들어질때의 타입이다. 
+
+(스케쥴링 우선순위 같은). 보통은 NULL 값을 사용한다. 쓰레드 타입에 대한 내용은 pthread_attr_init(3) 을 참조하기 바란다. 3번째 아규먼트가 바로 쓰레드가 실행할 코드이다. 4번째 아규먼트는 쓰레드에 넘겨주고 싶은 값을 명시해주면 된다. 여기에서는 각 쓰레드에 번호를 부여하기위한 int 값을 넘겼다.
+
+각 쓰레드는 1부터 10까지 증가 시킨다음에 쓰레드를 종료하도록 되어 있다. 
+
+그동안 메인 쓰레드는 pthread_join 을 호출하여서 각각의 쓰레드가 종료할때까지 기다린다. 3개의 쓰레드가 모두 종료가 된다면 메인 쓰레드는 "programing is end" 메시지를 출력하고 프로그램을 완전히 종료하게 될것이다.
+
+pthread_join 은 fork 의 wait(2) 와 비슷하다고 볼수 있다. fork 에서도 자식프로세스가 모두죽고 나서 부모프로세스가 죽어야 하듯이(예외를 만들수도 있지만), 쓰레드도 모든 생성된 쓰레드가 종료된 다음에 메인 쓰레드가 종료되어야 한다.
+
+pthread_join 을 사용하게 되면 메인 쓰레드는 pthread_join 에 명시된 쓰레드가 종료할때까지 잠자면서(sleep)기다리게 된다. 이는 모든 쓰레드가 종료하기 전에 부모쓰레드가 종료하는 사태를 막기 위해서 사용된다. 하나의 쓰레드가 모든일을 종료하고, pthread_join 을 깨우게 되면, 쓰레드가 가지고 있던 자원들을 모두 되돌려주게 된다 (free). 만약 실행되고 있는 쓰레드를 즉시 중지하길 원한다면 pthread_cancel() 과 pthread_testcancel()을 사용하면 된다.
+
+=== 공용으로 사용되는 자원의 동기화 ===
+위에서 우리는 쓰레드를 사용할경우 상당히 많은 자원을 서로 공유하게 됨으로 얻는 여러가지 이점에 대해서 알아봤었다. 그러나 하나의 자원을 여러개의 쓰레드가 동시에 공유하게 됨으로 자원획득에 관한 문제가 발생할수 있다.  실지로 쓰레드를 사용하게 될경우 가장 주의해야 할점 중 하나가 바로 자원의 동시 접근에 대한 제어이다. 
+
+기본적으로 하나의 쓰레드가 하나의 자원에 접근하고 있을때, 다른 쓰레드는 그 자원에 대한 이전 쓰레드의 작업이 모두 끝나기전엔 접근하면 안될것이다.
+
+이런한 공유되는 자원에 대한 접근제어는 IPC 설비의 세마포어와 매우 비슷한 점이 있다. 쓰레드에서는 이러한 공유되는 자원의 접근 제얼르 위해서 Mutexe 라는 것을 제공한다. Mutexe 는 다루어야할 내용이 꽤 많음으로 다음번 강좌에서 다루도록 하겠다. 
+[[category(4)]]
+@

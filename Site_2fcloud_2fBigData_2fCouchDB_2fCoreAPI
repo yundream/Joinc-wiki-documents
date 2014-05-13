@@ -1,0 +1,397 @@
+#title couchDB core api
+
+[[TableOfContents]]
+== CouchDB core api ==
+CouchDB는 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 기반의 [wiki:man/12/rest REST API]를 제공한다. 이 API를 이용해서 CouchDB의 모든 것을 관리할 수 있다. 나는 위키 문서를 저장하기 위한 위키 데이터베이스를 만들고, 여기에 문서를 저장하고, 읽고, 삭제 테스트를 해볼 거다. 이러한 과정을 API로 정리한다.
+
+=== Server ===
+아주 간단하게 CouchDB 서버의 (실행)상태와 버전정보들을 확인할 수 있다.
+{{{#!plain
+yundream@home:~$ curl http://localhost:5984/ | json_pp 
+{
+   "vendor" : {
+      "name" : "Ubuntu",
+      "version" : "14.04"
+   },
+   "version" : "1.5.0",
+   "couchdb" : "Joinc",
+   "uuid" : "f083866f51380df7f5c5bc0c6495b4b2"
+}
+}}}
+사실 이걸로 얻을 수 있는 유용한 정보는 없다. 그냥 잘 실행되고 있는지 정도만 확인할 수 있다. 나는 외부에서 CouchDB의 상태를 모니터링 하기 위한 용도로 사용하고 있다.
+
+=== Naming/Addressing ===
+CouchDB에서 저장하는 모든 문서는 고유한 '''DocID'''를 가진다. DocID는 대/소문자를 구분하며, 데이터베이스 내에서 유일하다. DocID를 키로 문서를 관리할 수 있다. 
+{{{#!plain
+http://localhost:5984/test/some_doc_id
+http://localhost:5984/test/another_doc_id
+http://localhost:5984/test/BA1F48C5418E4E68E5183D5BD1F06476
+}}}
+'''test'''는 데이터베이스고 "som_doc_id", "another_doc_id", "BA1F48C5418E4E68E5183D5BD1F06476"가 DocID다.
+
+=== 문서(Documents) ===
+CouchDB 문서는 JSON 객체로, JSON 형식을 만족하는 어떤 정보라도 입력할 수 있다. 개발자는 문서의 revision 정보를 조회할 수 있다. 
+
+CouchDB의 문서 형태는 다음과 같다.
+{{{#!plain
+{
+ "_id":"discussion_tables",
+ "_rev":"D1C946B7",
+ "Sunrise":true,
+ "Sunset":false,
+ "FullHours":[1,2,3,4,5,6,7,8,9,10],
+ "Activities": [
+   {"Name":"Football", "Duration":2, "DurationUnit":"Hours"},
+   {"Name":"Breakfast", "Duration":40, "DurationUnit":"Minutes", "Attendees":["Jan", "Damien", "Laura", "Gwendolyn", "Roseanna"]}
+ ]
+}
+}}}
+==== 특수 필드 ====
+CouchDB는 "_"로 시작하는 몇 개의 특수 필드를 가지고 있다. 
+|| 필드 이름 || 설명                                                          ||
+|| _id       || 문서의 유일한 아이디. 필수 값이며 변경할 수 없다.             ||
+|| _rev      || 최근의 MVCC 토큰으로 문서의 버전정보다. 필수 값이며 변경할 수 없다.  ||
+|| _attachments || 만약 문서가 첨부파일을 가지고 있다면, 첨부파일의 정보를 가진다.   ||
+|| _deleted     || 문서가 삭제됐는지를 체크한다.                                     ||
+|| _revisions   || 문서의 revision 히스토리                                          ||
+|| _revs_info   || 문서의 revision 목록                                              ||
+|| _conflicts   || conflicts 정보                                                    ||
+|| _deleted_conflicts   || conflicts 정보                                            ||
+|| _local_seq   || Sequence number of the revision in the database                   ||
+... 계속...
+
+
+=== HTTP를 이용한 문서작업 ===
+==== 데이터베이스 만들기 ====
+CouchDB는 Database management system(DMS)다. 이는 CouchDB가 여러 개의 데이터베이스를 동시에 운용할 수 있음을 의미한다. 데이터베이스는 관련된 데이터를 한데 모아 놓은 '''bucket'''이다. 이에 대한 상세한 내용은 API를 다루면서 이해할 수 있을거다.
+
+나는 위키 문서의 정보를 저장하기 위해서 '''wiki'''라는 이름의 데이터베이스를 만들기로 했다.
+{{{#!plain
+# curl -X PUT http://localhost:5984/wiki
+{"ok":true}
+}}}
+데이터베이스가 성공적으로 만들어졌다. 이 명령을 한 번 더 실행하면 "이미 데이터베이스가 존재"한다는 오류 메시지를 출력할 거다.
+{{{#!plain
+# curl -X PUT http://localhost:5984/wiki
+{"error":"file_exists","reason":"The database could not be created, the file already exists."}
+}}}
+
+wiki 데이터베이스를 백업하기 위한 wiki-backup 이라는 데이터베이스를 새로 만들어보자. '''-v''' 옵션을 이용해서, 요청과 응답을 살펴보자.
+{{{#!plain
+# curl -vX PUT http://localhost:5984/wiki-backup
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 5984 (#0)
+> PUT /wiki-backup HTTP/1.1
+> User-Agent: curl/7.35.0
+> Host: localhost:5984
+> Accept: */*
+> 
+< HTTP/1.1 201 Created
+* Server CouchDB/1.5.0 (Erlang OTP/R16B03) is not blacklisted
+< Server: CouchDB/1.5.0 (Erlang OTP/R16B03)                                                               
+< Location: http://localhost:5984/wiki-backup                                                             
+< Date: Mon, 05 May 2014 10:22:21 GMT                                                                     
+< Content-Type: text/plain; charset=utf-8                                                                 
+< Content-Length: 12                                                                                      
+< Cache-Control: must-revalidate
+< 
+{"ok":true}
+* Connection #0 to host localhost left intact
+}}}
+
+=== 문서 저장 및 업데이트 하기 ===
+wiki 데이터베이스에 데이터를 저장하기 전에, 문서의 스키마를 설계 했다.
+||필드이름    ||저장하는 데이터                 ||
+||Author      ||위키 문서를 만든 사람의 이름    ||
+||Title       ||위키 문서의 제목                ||
+||PostedDate  ||위키 문서를 등록한 날자와 시간  ||
+||Body        ||위키 문서의 본문                ||
+||Tag         ||위키 문서의 태그                ||
+
+위 스키마에 맞는 첫 번째 데이터를 만들었다.
+{{{#!plain
+# cat test0001.json
+{
+    "Author":"yundream",
+    "Title":"리눅스 시스템 프로그래밍",
+    "PostedDate":"2014-5-5T17:30:12",
+    "Body":"리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다....",
+    "Tag":["리눅스","시스템 프로그래밍","Perl"]
+}
+}}}
+
+문서 저장은 '''PUT''' 혹은 '''GET''' 메서드를 이용하면 된다.
+{{{#!plain
+# curl -X PUT -d @test0001.json -H "application/json" http://localhost:5984/wiki/test0001
+{"ok":true,"id":"test0001","rev":"1-56606932d33b3e15abdcc4c3ab815398"}
+}}}
+데이터베이스 이름 다음에 '''document id'''를 설정하면, 이 document id를 키로 couchdb에 저장된다. 만약 같은 이름의 document id가 이미 있다면, 실패한다. 
+{{{#!plain
+{"error":"conflict","reason":"Document update conflict."}
+}}}
+
+문서를 업데이트하기 위해서는 업데이트할 문서의 "rev"와 "document id"를 명시하면 된다.
+{{{#!plain
+{
+    "_id":"test0001",
+    "_rev":"1-56606932d33b3e15abdcc4c3ab815398",
+    "Author":"yundream",
+    "Title":"리눅스 시스템 프로그래밍",
+    "PostedDate":"2014-5-5T17:30:12",
+    "Body":"리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다. 편집중입니다.",
+    "Tag":["리눅스","시스템 프로그래밍","Perl"]
+}
+}}}
+
+{{{#!plain
+curl -X PUT -d @wiki_test.json -H "application/json" http://localhost:5984/wiki/test0001
+{"ok":true,"id":"test0001","rev":"2-9d9b7769ff392452800b2c52f4119547"}
+}}}
+문서의 "rev"가 업데이트 된 걸 확인할 수 있다.
+
+couchdb의 문서 관리 정책을 짐작할 수 있는 부분이다. 하나의 문서 버전에서 두 개 이상의 수정본이 존재할 수 있다. 다른 사람의 문서 버전에 신경쓰지 않고 문서를 수정하다가 나중에 합치면 된다. git의 branch와 유사한 방식이라고 볼 수 있겠다. 
+
+=== 데이터베이스 읽기 ===
+'''GET'''메서드를 이용해서 데이터베이스의 정보를 읽을 수 있다.
+{{{#!plain
+# curl http://localhost:5984/wiki | json_pp 
+{
+   "doc_del_count" : 0,
+   "purge_seq" : 0,
+   "data_size" : 499,
+   "db_name" : "wiki",
+   "instance_start_time" : "1399338691086141",
+   "disk_size" : 8290,
+   "disk_format_version" : 6,
+   "committed_update_seq" : 2,
+   "doc_count" : 1,
+   "update_seq" : 2,
+   "compact_running" : false
+}
+}}}
+
+=== 문서 읽기 ===
+'''GET'''메서드를 이용해서 문서를 읽을 수 있다.
+{{{#!plain
+# curl http://localhost:5984/wiki/test0001 | json_pp 
+{
+   "Tag" : [
+      "리눅스",
+      "시스템 프로그래밍",
+      "Perl"
+   ],
+   "Title" : "리눅스 시스템 프로그래밍",
+   "_rev" : "2-9d9b7769ff392452800b2c52f4119547",
+   "Body" : "리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다. 편집중입니다.",
+   "_id" : "test0001",
+   "PostedDate" : "2014-5-5T17:30:12",
+   "Author" : "yundream"
+}
+}}}
+
+지금 test0001 문서는 두 개의 버전을 가지고 있다. 버전 정보를 모두 보려면, revs_info 매개변수를 활성화 화면 된다.
+{{{#!plain
+# curl http://localhost:5984/wiki/test0001?revs_info=true | json_pp 
+{
+   "Body" : "리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다. 편집중입니다.",
+   "_revs_info" : [
+      {
+         "rev" : "2-9d9b7769ff392452800b2c52f4119547",
+         "status" : "available"
+      },
+      {
+         "rev" : "1-56606932d33b3e15abdcc4c3ab815398",
+         "status" : "available"
+      }
+   ],
+   "PostedDate" : "2014-5-5T17:30:12",
+   "Title" : "리눅스 시스템 프로그래밍",
+   "Tag" : [
+      "리눅스",
+      "시스템 프로그래밍",
+      "Perl"
+   ],
+   "_rev" : "2-9d9b7769ff392452800b2c52f4119547",
+   "Author" : "yundream",
+   "_id" : "test0001"
+}
+}}}
+
+'''rev'''매개 변수를 이용하면, 특정한 버전의 문서를 가져올 수 있다.
+{{{#!plain
+# curl http://localhost:5984/wiki/test0001?rev=1-56606932d33b3e15abdcc4c3ab815398 | json_pp 
+{
+   "_rev" : "1-56606932d33b3e15abdcc4c3ab815398",
+   "Title" : "리눅스 시스템 프로그래밍",
+   "PostedDate" : "2014-5-5T17:30:12",
+   "Author" : "yundream",
+   "Body" : "리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다....",
+   "Tag" : [
+      "리눅스",
+      "시스템 프로그래밍",
+      "Perl"
+   ],
+   "_id" : "test0001"
+}
+}}}
+
+=== 삭제 ===
+'''DELETE'''메서드를 이용해서 삭제할 수 있다. 
+{{{#!plain
+# curl -X DELETE  http://localhost:5984/wiki/test0001?rev=2-9d9b7769ff392452800b2c52f4119547
+{"ok":true,"id":"test0001","rev":"3-499a89b4d6ed50f01429346303c0dada"}
+}}}
+
+=== 복사 ===
+== 모든 문서를 대상으로 하는 작업들 ==
+테스트를 위해서 test0002, test0003, test0004 3개의 문서를 추가했다. 
+
+=== all_docs ===
+모든 문서를 가져올 수 있다.
+{{{#!plain
+# curl  -X GET  http://localhost:5984/wiki/_all_docs
+{"total_rows":4,"offset":0,"rows":[
+{"id":"test0001","key":"test0001","value":{"rev":"4-4c1c51de67259e2dfe98dbcd4cd039ae"}},
+{"id":"test0002","key":"test0002","value":{"rev":"1-5e8d62280260d4d0c6e06032f73b81e0"}},
+{"id":"test0003","key":"test0003","value":{"rev":"1-e8100dc208ffc7570ee6fc35b8f50fd7"}},
+{"id":"test0004","key":"test0004","value":{"rev":"1-8c9baf1780898990722d302a8cc1fc53"}}
+]}
+}}}
+
+'''descending=true'''로 내림차순 정렬을 할 수 있다.
+{{{#!plain
+$ curl -X GET  http://localhost:5984/wiki/_all_docs?descending=true
+{"total_rows":4,"offset":0,"rows":[
+{"id":"test0004","key":"test0004","value":{"rev":"1-8c9baf1780898990722d302a8cc1fc53"}},
+{"id":"test0003","key":"test0003","value":{"rev":"1-e8100dc208ffc7570ee6fc35b8f50fd7"}},
+{"id":"test0002","key":"test0002","value":{"rev":"1-5e8d62280260d4d0c6e06032f73b81e0"}},
+{"id":"test0001","key":"test0001","value":{"rev":"4-4c1c51de67259e2dfe98dbcd4cd039ae"}}
+]}
+}}}
+
+startkey_docid와 endkey_docid 그리고 limit를 이용해서 문서를 네비게이션 할 수 있다.
+{{{#!plain
+# curl -X GET  http://localhost:5984/wiki/_all_docs?startkey_docid=test0002\&limit=2
+{"total_rows":4,"offset":1,"rows":[
+{"id":"test0002","key":"test0002","value":{"rev":"1-5e8d62280260d4d0c6e06032f73b81e0"}},
+{"id":"test0003","key":"test0003","value":{"rev":"1-e8100dc208ffc7570ee6fc35b8f50fd7"}}
+]}
+}}}
+
+물론 descending과 함께 사용할 수도 있다.
+{{{#!plain
+# curl -X GET  http://localhost:5984/wiki/_all_docs?startkey_docid=test0002\&limit=2\&descending=true
+{"total_rows":4,"offset":2,"rows":[
+{"id":"test0002","key":"test0002","value":{"rev":"1-5e8d62280260d4d0c6e06032f73b81e0"}},
+{"id":"test0001","key":"test0001","value":{"rev":"4-4c1c51de67259e2dfe98dbcd4cd039ae"}}
+]}
+}}}
+
+_changes API로 문서의 변경내용을 확인할 수 있다.
+{{{#!plain
+# curl -X GET  http://localhost:5984/wiki/_changes
+{"results":[
+{"seq":6,"id":"test0001","changes":[{"rev":"4-4c1c51de67259e2dfe98dbcd4cd039ae"}]},
+{"seq":7,"id":"test0002","changes":[{"rev":"1-5e8d62280260d4d0c6e06032f73b81e0"}]},
+{"seq":8,"id":"test0003","changes":[{"rev":"1-e8100dc208ffc7570ee6fc35b8f50fd7"}]},
+{"seq":10,"id":"test0004","changes":[{"rev":"2-c7186b63f7e2eca36b6f9ad645f0cfa8"}],"deleted":true}
+],
+"last_seq":10}
+}}}
+== 데이터 첨부하기 ==
+문서는 email처럼 첨부파일을 가질 수 있다. 파일을 첨부하는 방법은 크게 두 가지다. 첫번째 방법은 다른 위치에 파일을 저장하고, 이 파일에 대한 URL을 문서에 추가하는 거다. CouchDB는 문서에 첨부파일을 추가하기 위한 REST API를 제공한다. 두번째로 문서내에 직접 넣는 방법이 있다.  
+
+=== Standalone 첨부 ===
+CouchDB는 원본 문서를 건드리지 않고 첨부파일을 생성,변경 및 삭제할 수 있다. 
+
+첨부데이터의 타입은 '''Content-Type'''헤더로 지정할 수 있다. '''test001'''문서에 이미지를 하나 추가했다.   
+{{{#!plain
+# curl -H "Content-Type: image/png" --data-binary @issue.png -X PUT http://localhost:5984/wiki/test0001/test.png?rev=5-f7dfc0c
+{"ok":true,"id":"test0001","rev":"6-dbeee42a2f83b5098f4c37a9949c4894"}
+}}}
+
+이미지는 '''test.png'''로 저장된다. 저장된 이미지는 "/database/document_id/filename"으로 다운로드 할 수 있다.
+{{{#!plain
+# curl http://localhost:5984/wiki/test0001/test.png
+}}}
+
+문서내용에 보면 첨부파일 정보를 확인할 수 있다. 
+{{{#!plain
+curl -X GET http://localhost:5984/wiki-backup/test0001 | json_pp 
+{
+   "Tag" : [
+      "리눅스",
+      "시스템 프로그래밍",
+      "Perl"
+   ],
+   "_attachments" : {
+      "test.png" : {
+         "digest" : "md5-8OdUZ8SXb+q8htiIgJ2FWw==",
+         "revpos" : 17,
+         "content_type" : "image/png",
+         "stub" : true,
+         "length" : 52747
+      }
+   },
+   "Body" : "리눅스 시스템 프로그래밍은 리눅스 시스템을 제어하는 프로그램을 만드는 일련의 과정이다. 편집중입니다.",
+   "PostedDate" : "2014-5-5T17:30:12",
+   "Title" : "리눅스 시스템 프로그래밍",
+   "_id" : "test0001",
+   "_rev" : "17-dbeee42a2f83b5098f4c37a9949c4894",
+   "Author" : "yundream"
+}
+}}}
+
+=== inline 첨부 ===
+문서내에 첨부파일을 추가할 수 있다. 이 경우 첨부파일의 내용은 base64 인코딩해서 JSON 문서에 넣어주면 된다. 예를들어 "This is a base64 encoded text"를 foo.txt로 저장하기를 원한다면 
+{{{#!plain
+# echo -n "This is a base64 encoded text" | base64
+VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=
+# cat test0005.json
+{
+    "Author":"yundream",
+    "Title":"파이슨 프로그래밍",
+    "PostedDate":"2014-5-5T19:30:12",
+    "Body":"Django 애플리케이션 개발을 위한 워밍업. 우선 python을 알아야 겠죠?",
+    "Tag":["프로그래밍","리눅스","Python", "Django"],
+    "_attachments":
+    {
+        "foo.txt":
+        {
+            "content_type":"text\/plain",
+            "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+    }
+}
+# curl -X PUT -d @test0005.json -H "application/json" http://localhost:5984/wiki-backup/test0005
+{"ok":true,"id":"test0005","rev":"1-95bac7799476ae7a2b5b679f47b68009"}
+}}}
+
+=== Multiple Attachment ===
+"_attachments"에 파일을 여러개 두면 된다.
+{{{#!plain
+{
+    "Author":"yundream",
+    "Title":"파이슨 프로그래밍",
+    "PostedDate":"2014-5-5T19:30:12",
+    "Body":"Django 애플리케이션 개발을 위한 워밍업. 우선 python을 알아야 겠죠?",
+    "Tag":["프로그래밍","리눅스","Python", "Django"],
+    "_attachments":
+    {
+        "foo.txt":
+        {
+            "content_type":"text\/plain",
+            "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+        "foo2.txt":
+        {
+            "content_type":"text\/plain",
+            "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+    }
+}
+}}}
+
+== 참고 ==
+  * [http://wiki.apache.org/couchdb/HTTP_Document_API Couchdb API]

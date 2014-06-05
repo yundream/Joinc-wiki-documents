@@ -1,0 +1,53 @@
+#title MVCC - Multiversion concurrency control 
+
+[[TableOfContents]]
+== MVCC ==
+Multiversion concurrency control(MCC 혹은 MVCC 라고 부른다)는 동시 접근을 허용하는 데이터베이스에서, 동시성을 제어하기 위해서 사용하는 방법 중 하나다.  
+
+데이터베이스에 같은 시간에 두 명이상이 데이터를 읽거나 쓰는 경우를 생각해보자. 이런  경우 데이터를 안전하게 읽고 쓰게 하기 위한 몇 가지 동시성 제어 방법들이 있다. 그 중 잠금(lock)을 가장 널리 사용한다. 이유는 ? 구현이 간단해서다. 하지만 이 방법은 데이터베이스 처리 요청을 병렬로 처리할 수 없어서 느리다는 단점이 있다. MVCC는 다른 접근 방식으로 이 문제를 해결한다.  
+
+MVCC 모델에서 데이터에 접근하는 각 유저는 접근한 시간 데이터베이스의 '''snapshot'''를 읽는다. 이 snapshot 데이터에 대한 변경이 완료 될 때까지 만들어진 변경사항은 다른 데이터베이스 사용자가 볼 수 없다(트랜잭션이 commit 될때까지).
+
+이제 사용자가 데이터를 업데이트 하면, 이전의 데이터를 덮었는게 아니라 새로운 버전의 데이터를 만든다. 대신 이전 버전의 데이터와 비교해서 변경된 내용을 기록한다. 이렇게 해서 하나의 데이터에 대해서 여러 버전의 데이터가 존재하게 된다. 유저는 물론 제일 마지막 버전의 데이터를 읽게 된다.     
+
+MVCC의 이런 접근 방식은 '''잠금을 필요로 하지 않기 때문에''' 일반적인 RDBMS 보다 매우 빠르게 작동한다. 또한 데이터를 읽기 시작 할 때, 다른 사람이 그 데이터를 삭제하거나 수정하더라도 영향을 받지 않고 데이터를 사용할 수 있다. 대신 주기적으로 사용하지 않는 버전의 데이터를 삭제하는 시스템이 필요하다.
+
+MVCC 모델은 하나의 데이터에 대한 여러 버전의 데이터를 허용하기 때문에 데이터 버전의 충돌이 발생할 수 있다. 충돌은 애플리케이션 영역에서 해결해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1cEkP6MFvBmBavbQUKu8opVzBpL2TfTaeDDYM_2WL3Tk/pub?w=640&amp;h=314">
+}}}
+
+== MVCC 모델에서의 데이터 업데이트 과정 ==
+  1. 유저 A가 Time-1에 1000 번째 rows의 값 X를 업데이트하기 위해서 읽었다.  
+  1. 유저 B도 Time-2에 1000 번째 rows의 값 X를 읽었다.
+  1. 유저 A가 X의 값을 X11로 변경해서 저장하는 것으로 트랜잭션을 완료했다. 
+  1. 유저 B가 X의 값을 X22로 변경해서 저장하고 트랜잭션을 완료하기 위해서 submit을 시도한다.
+     * 유저 A와 B는 서로 다른 버전의 문서를 가지기 때문에 잠금 없이 독립적으로 트랜잭션을 완료할 수 있다. 
+  1. 데이터베이스는 유저 B의 작업이 더 나중에 일어난 것을 알고 있으므로, 유저에게 "충돌이 발생해서 수정할 수 없다"는 에러 메시지를 출력한다. 유저 B는 문서 X11을 새로 읽은 다음 충돌이 발생한 부분을 제거하면 된다. GIT의 버전 충돌 해결과 동일한 방식이다.   
+
+== MVCC 모델을 지원하는 데이터베이스들 ==
+  * Altibase
+  * ArangoDB
+  * Berkeley DB
+  * Cloudant
+  * Clustrix
+  * CouchDB
+  * IBM DB2
+  * Drizzle 
+  * eXtremeDB
+  * Firebird
+  * FLAIM
+  * FoundationDB
+  * H2 Database Engine
+  * Apache HBase
+  * Ingres
+  * InterBase
+  * MariaDB
+  * Oracle database : Version 4부터 지원
+  * PostgreSQL
+  * SAP HANA
+  * Zope Object Database  
+
+== 참고 ==
+  * [http://en.wikipedia.org/wiki/Multiversion_concurrency_control MVCC - wikipedia]

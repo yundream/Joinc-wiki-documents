@@ -1,0 +1,605 @@
+head	1.21;
+access;
+symbols;
+locks
+	root:1.21; strict;
+comment	@# @;
+
+
+1.21
+date	2014.06.04.10.35.56;	author root;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2014.06.03.15.26.47;	author root;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2014.06.01.10.44.26;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2014.06.01.04.29.26;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2014.06.01.02.46.05;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2014.05.29.16.18.54;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2014.05.29.16.11.11;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.05.27.16.25.25;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.05.26.11.57.12;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.05.25.01.01.47;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.05.25.00.30.19;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.05.25.00.28.39;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.05.25.00.27.44;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.05.24.16.33.29;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.05.24.16.26.11;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.05.24.16.18.48;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.05.24.13.46.41;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.05.24.13.36.34;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.05.24.13.34.12;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.05.24.12.03.01;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.05.24.07.51.40;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fIOT_2fDiscovery
+@
+
+
+1.21
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Device Discovery 프로토콜 
+
+[[TableOfContents]]
+== 소개 ==
+근거리 네트워크에서 기기를 찾기 위한 방법을 알아본다. 
+
+기기를 근거리에서 연결하던, 인터넷에 연결하던지 간에 일단은 discovery(찾을)할 필요가 있다. 기기를 discover하지 않더라도 유저가 직접 기기 앞에서 - NFC, bluetooth 혹은 기기를 wifi AP로 설정해서 - 등록하는 방법이 있겠으나, 사용성을 높이기 위해서는 알아서 주변의 기기를 찾아주는게 좋다. 이런 일을 위한 Discovery 프로토콜이 몇 개 있는데 이들 프로토콜을 살펴보고, 이들 프로토콜을 이용해서 어떻게 기기를 자동으로 찾아서 등록할 수 있을지에 대해서 고민해 보려고 한다. 
+
+== Simple Service Discovery Protocol == 
+SSDP(Simple Service Discovery Protocol)은 네트워크 서비스나 정보를 찾기 위해서 사용하는 네트워크 프로토콜이다. SSDP를 이용하면, [wiki:man/12/dhcp DHCP]나 DNS와 같은 네트워크 서버 혹은 정적인 호스트 설정 없이 이런 일들을 수행할 수 있다. 
+
+SSDP는 일반 거주지와 소규모 사무 환경에서 UPnP(Universal Plug and Play)를 위한 기본적인 프로토콜로 이미 널리 사용하고 있다. 1999년 MS와 HP가 IETF에 드래프트 했다. IETF제안이 만료된 이후 SSDP는 UPnP 표준에 포함됐다. 
+
+=== 주요 용어들 ===
+||[wiki:man/12/ARP ARP]    ||Address Resolution Protocol                               ||
+||CP                       ||Control Point                                             ||
+||DCP                      ||Device Control Protocol                                   ||
+||DDD                      ||Device Description Document                               ||
+||[wiki:man/12/dhcp DHCP]  ||Dynamic Host Configuration Protocol                       ||
+||DNS                      ||Domain Name System                                        ||
+||GENA                     ||General Event Notification Architecture                   ||
+||HTML                     ||Hypertext Markup Language                                 ||
+||[wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] ||Hypertext Transfer Protocol  ||
+||SCPD                     ||Service Control Protocol Description                      ||
+||SOAP                     ||Simple Object Access Protocol                             ||
+||SSDP                     ||Simple Service Discovery Protocol                         ||
+||UUID                     ||Universally Unique Identifier                             ||
+||XML                      ||Extensible Markup Language                                ||
+
+=== 개요 ===
+SSDP는 HTTPU(UDP 기반의 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP])를 이용한다. [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]이니 만큼 모든 데이터는 text로 통신한다. 사용하는 포트는 UDP 1900이며, IP multicast 주소를 이용한다. IPv4에서 멀티캐스트 주소는 239.255.255.250, IPv6에서는 ff0x::c이다.
+
+다음은 SSDP에서 사용하는 멀티캐스트 주소다.
+||IPv4  ||239.255.255.250      ||site-local 주소         ||
+||IPv6  ||FF02::C              ||link-local              ||
+||IPv6  ||FF05::C              ||site-local              ||
+||IPv6  ||FF08::C              ||organization-local      ||
+||IPv6  ||FF0E::C              ||IPv6 global             ||
+
+SSDP는 '''NOTIFY HTTP'''메서드를 어나운스하는 것으로 멀티캐스트 그룹 맴버에게 자신이 join 했음을 알려줄 수 있다. 
+
+=== 자동 네트워크 설정 ===
+Discovery는 같은 '''네트워크에 있는''' 기기를 찾는게 목적이다. 우선은 네트워크에 연결돼야 한다. 이런 기기들은 입/출력 장치가 없을 수 있으므로, 자동으로 네트워크를 설정할 수 있어야 하다. 자동 네트워크 설정을 위해서는 DHCP를 사용하면 된다. 네트워크에 DHCP 서버가 없는 경우는 염두에 두지 않는다. IoT에서 네트워크 자동 설정을 위한 DHCP는 옵션이 아니고 필수다. DHCP에 대한 자세한 내용은 [wiki:man/12/dhcp DHCP]를 참고하자. 
+
+=== Discovery 방법 ===
+SSDP를 이용해서 기기를 discovery 하는 모습을 그림으로 묘사했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1gP7JAtcBsluL7wSavnJwVgZlr4Vwq3AxOWBMFeB8Uts/pub?w=526&amp;h=458">
+}}}
+
+Control point는 기기를 제어하는 녀석이다. "앱"이라고 보면 되겠다. root device(이하 기기)는 제어당하는 기기다. 온도조절기일 수도 있겠고, 조명일 수도 있겠다.    
+
+기기는 두 가지 방법으로 찾을 수 있다. 첫 번째는 기기가 자신의 정보를 멀티캐스트 채널을 통해서 알리는 방법이다. Control point가 멀티캐스트 채널에 붙어 있다면, 연결할 수 있는 기기가 검색됐음을 알려줄 것이다. 두 번째는 control point에서 멀티캐스트 채널로 search 요청을 보내는 방법이다. 멀티캐스트 채널에 붙어 있는 기기가 있다면, search 요청에 응답할 것이다. 기기를 찾은 후에는 기기의 mac과 ip를 이용해서 유니케스트 통신을 한다.
+
+=== SSDP 형식  === 
+==== SSDP 시작 줄 ====
+[wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]를 사용하지만 HTTP와는 약간 다르다. SSDP는 '''Advertisement''', '''Search''' 두 개의 타입이 있는데, 어느 타입의 메시지인지를 첫 줄에 명시해야 한다. 다음 셋 중에 하나다. 
+  * NOTIFY * HTTP/1.1\r\n
+  * M-SEARCH * HTTP/1.1\r\n
+  * HTTP/1.1 200 OK\r\n
+NOTIFY는 '''advertisement'''를 위해서, M-SEARCH는 기기를 찾기 위해서 사용한다. 응답은 일반 HTTP의 응답 형식과 같다. 
+
+==== 헤더 필드 ====
+헤더필드는 [http://tools.ietf.org/html/rfc2616 RFC2616]에 정의한 그대로 사용해야 한다. 그냥 일반 HTTP 헤더 형식 그대로를 사용한다고 보면 된다. 헤더의 각 필드는 필드 이름(field-name)과 값(value)으로 구성된다. 필드와 값은 ":"로 구분한다. 
+{{{#!plain
+HOST: 239.255.255.250:1900 
+}}}
+
+==== SSDP 확장 필드 ====
+SSDP는 UPnP에서 지정한 표준 확장 필드가 있다. 또한 벤더들이 자신들의 필드를 추가하는 걸 허용한다. 이들 확장 필드의 이름은 반드시 "."을 포함한 도메인 형식이어야 한다. 이 규칙은 표준 확장 필드에도 그대로 적용이 된다. 아래는 UPnP에서 지정한 확장 필드들이다.   
+  * BOOTID.UPNP.ORG
+  * CONFIGID.UPNP.ORG
+  * NEXTBOOTID.UPNP.ORG
+  * SEARCHPORT.UPNP.ORG
+각 벤더들은 아래와 같이 사용할 수 있을 거다.
+  * myheader.lge.com: "some value"
+  * myheader.sony.com: "some value"
+
+
+==== UUID 포멧 ====
+SSDP는 기기에 대한 정보를 찾기 위해서 사용하는 프로토콜이다. 기기를 식별하기 위해서는 식별가능한 유일한 값이 필요하다. 이 값이 UUID(Universally Unique Identifier)이다. 
+
+UPnP는 UUID에 대한 형식을 정하고 있다. UUID는 128 비트크기를 가지며, 반드시 아래의 형식을 따라야 한다. 
+  * UUID = 4*<hexOctet> "-" 2*<hexOctet> "-" 2*<hexOctet> "-" 2*<hexOctet> "-" 6*<hexOctet> "-"
+대략 "2fac1234-31f8-11b4-a222-08002b34c003"과 같은 형식이 된다. UUID는 아래의 조건을 만족해야 한다. 
+  1. 당연하지만 중복되면 안된다.
+  1. 128비트 크기를 지켜야 한다.
+  1. UUID는 변경할 수 없는 고정 값이다.
+
+== SSDP 사용 예 ==
+디바이스가 네트워크에 추가되면, '''NOTIFY'''메서드를 이용해서 멀티캐스트에 join 했음을 알려야 한다. 이때의 SSPD 내용은 다음과 같다. 
+{{{#!plain
+NOTIFY * HTTP/1.1
+HOST: 239.255.255.250:1900
+CACHE-CONTROL: max-age = seconds until advertisement expires
+LOCATION: URL for UPnP description for root device
+NT: notification type
+NTS: ssdp:alive
+SERVER: OS/version UPnP/1.1 product/version
+USN: composite identifier for the advertisement
+BOOTID.UPNP.ORG: number increased each time device sends an initial announce or an update
+message
+CONFIGID.UPNP.ORG: number used for caching description information
+SEARCHPORT.UPNP.ORG: number identifies port on which device responds to unicast M-SEARCH
+}}}
+
+  * NOTIFY * HTTP/1.1 : MUST. 네트워크에 참여했음을 알리기 위해서 사용한다. 
+  * HOST : REQUIRED. 멀티캐스트주소와 포트를 설정한다. SSDP는 반드시 239.255.255.250:1900 을 사용해야 한다.  포트를 생략하면 1900으로 가정한다. 
+  * CACHE-CONTROL : REQUIRED. '''max-age'''필드로 설정한다. max-age에 지정한 시간을 초과하면, control points는 기기가 네트워크에 붙어있지 않다고 가정한다. 따라서 기기는 max-age 시간이내에 주기적으로 NOTIFY 메시지를 전송해야 한다. 이 값은 1800초(30분)이상으로 설정할 것을 권장한다.   
+  * LOCATION : REQUIRED. 기기를 찾을 수 있는 URL값을 설정한다. 일반적으로 호스트의 위치는 IP 주소보다는 도메인 이름을 이용해서 찾는다.
+
+== SSDP 테스트 ==
+SSDP 서버/클라이언트 프로그램을 만들어서 테스트를 해보려고 한다. 이들 서버 / 클라이언트는 멀티캐스트 채널에 join 해서, 주변에 연결된 디바이스들을 discover 한다.
+
+Ubuntu 14.04에서 테스트를 진행했다.
+=== Python ===
+twisted를 이용해서 개발 해보자. 계속 ... 
+
+=== Ruby ===
+음 UPnP gem이 있다. 좋구만.
+{{{#!plain
+# gem install UPnP
+Fetching: httpclient-2.3.4.1.gem (100%)
+Fetching: soap4r-1.5.8.gem (100%)
+Fetching: builder-3.2.2.gem (100%)
+Fetching: UPnP-1.2.0.gem (100%)
+Successfully installed httpclient-2.3.4.1
+Successfully installed soap4r-1.5.8
+Successfully installed builder-3.2.2
+Successfully installed UPnP-1.2.0
+...
+}}}
+계속 ...
+
+== 사용 시나리오 ==
+Discovery 관점에서 특히 SSDP를 IoT에 어떻게 응용할지를 유저 사용 관점에서 고민 한다. 
+
+=== 가정 네트워크에서의 사용 시나리오 ===
+Wifi로 구성된 가정 네트워크를 가정해 보자. 기본적으로 Discovery는 기기가 자동으로 네트워크에 붙는 환경에서나 의미가 있다. Wifi로 구성된 네트워크는 auto network configuration이 의미가 없다.  유저는 앱을 이용해서, 기기 앞에서 (NFC, bluetooth 혹은 wifi로)기기를 직접 등록해야 하기 때문이다. 
+
+물론 이건 어디까지나 처음 AP 설정을 할 때 그렇다는 거다. 일단 AP에 붙이고 나면, 나머지 유저들(가정구성원)은 자동으로 기기를 찾을 수 있으니 충분히 의미가 있다고 할 수 있다.
+
+이외에도 discover는 유저가 기기 앞에 있는지를 확인하기 위한 용도로도 사용할 수 있다. 이것은 보안상의 이유로 기기를 재설정하거나 다른 인증 수단 없이 기기를 직접 제어할 수 있게 하는 것으로 의미있는 사용 경험을 설계할 수 있다. 
+
+[http://www.usa.philips.com/e/hue/hue.html 필립스 휴]를 보자.
+
+휴는 두 개의 사용 모드가 있다. 첫번째는 가정내에서만 사용하는 모드, 두번째는 가정바깥에서 그러니까 인터넷을 이용해서 원격으로 제어하는 모드다. 
+
+가정내 모드를 굳이 둔 이유는 사용성 때문일 것이다. 가정내 모드라면 리모콘과 다를바가 없다.리모콘이라면, 기기 앞에서 사용하는 것이라서 보안(인증)이 필요 없다. 하지만 인터넷에서 사용하려면 보안(인증)이 필요한데, 보안이라는게 그렇지만 이게 들어가면 귀찮아 진다. 하다 못해 로그인을 해야 하니까. 
+
+해서 초기에는 리모콘용도로 사용을 하고, 인터넷에서도 사용해야겠다 하면 계정을 만들어서 인증 후 사용하도록 유도하고 있다. 괜찮은 접근 방법인 것 같다. 인증 수단이 구글 oAuth가 아니라는게 좀 에러긴 하지만...
+
+리모콘으로 가정 네트워크에서만 사용하게 하려면, discovery 프로토콜을 이용할 수 있을 것이다. SSDP를 이용하면 로컬네트워크에 멀티케스트 네트워크를 만들어주니, 별다른 장치 없이 리모콘용도로 사용할 수 있다. 
+
+리모콘 용도로 사용하다가 인터넷 사용으로 전환하고 싶으면, 인증을 끝낸후 기기(휴)를 필립스의 어떤 서버에 연결하도록 하면 될거다. 아래 그림처럼 묘사할 수 있을 거다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1tKxZvq1bm-LtuFaBHsO3mmR0Y8iy-KkUZl4IREehkOs/pub?w=663&amp;h=564" width=464 height=394>
+}}}
+
+== Multicast DNS ==
+=== 소개 ===
+Multicast Domain Name System(mDNS)는 로컬 네트워크 영역에서 설정없이(zero configuration)없이 호스트 이름을 찾기 위해서 사용하는 서비스다. Unicast Domain Name System(DNS)와 유사한 프로그래밍 인터페이스와 패킷 형식을 사용한다. 소형 네트워크 환경에서 별도의 네임서버를 사용하지 않고 호스트를 찾을 수 있다.   
+
+mDNS는 멀티캐스트 기술을 이용한다. 애플의 Bonjour과 리눅스의 nss-mdns 서비스가 mDNS를 이용한다.
+
+=== 프로토콜 개요 ===
+mDNS 클라이언트는 호스트 이름을 알아야 할 경우 IP 멀티캐스트 쿼리 메시지를 전송한다. 이때 자신의 호스트 이름과 IP 주소등, 자신을 확인할 수 있는 정보들을 함께 전송한다. 멀티캐스트 채널에 있던 모든 호스트들은 이 정보를 수신해서 mDNS 캐쉬에 업데이트 한다. 
+
+패킷구조를 제외하면 SSDP와 작동방식이 매우 유사함을 알 수 있다.
+=== 패킷 구조 ===
+mDNS는 멀티캐스트 UDP 패킷이다.
+ * MAC 주소는 01:00:5E:00:00:FB(IPv4 용), 33:33:00:00:00:FB(IPv6 용)을 사용한다.
+ * IPv4 멀티캐스트 주소는 224.0.0.251 이고 IPv6 멀티캐스트 주소는 FF0::FB다. 
+ * UDP 포트 5353을 이용한다.
+mDNS는 DNS 패킷을 모델로 하고 있다. Header와 data 두 부분으로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1ZccMR5xV5AE6zY5CDmV-ttkGFytDVJM_pYutT27_nMc/pub?w=613&amp;h=407" width=429 height=284>
+}}}
+ * ID (Transaction ID) 클라이언트가 보낸 요청과 수신한 응답의 일치를 확인하기 위해서 사용한다. 일종의 Sequence 번호다. 
+ * Flags : 패킷의 타입이다. "00 00"은 질의, "84 00"는 응답이다. 
+
+패킷의 '''data'''시작 지점에 FQDN(Fully qualified domain name)형식의 도메인 이름이 들어간다. 그 뒤에 QTYPE와 QCLASS가 들어간다. 일반적인 호스트 주소일 경우 QTYPE는 1, 인터넷일 경우 QCLASS는 1이다.
+  * 질의 요청인 경우 패킷 데이터는 FQDN 주소와 QTYPE, QCLASS 만 들어간다. 
+  * 응답 인 경우, Type, Class, TTL, RDLength, Rdata의 값이 추가된다.  
+IPv4 응답에서 사용하는 패킷 data의 구조다.
+||Name      ||호스트 이름                     ||
+||Type      ||QTYPE                           ||
+||Class     ||QCLASS                          ||
+||TTL       ||Time To Live(초)                ||
+||RDLength  ||데이터 길이 IPv4 주소라면 00 04 ||
+||Rdata     ||IPv4주소                        ||
+
+=== mDNS 구현 - Avahi ===
+  * [wiki:man/12/avahi Avahi 참고]
+
+== 참고 ==
+ * [http://en.wikipedia.org/wiki/Simple_Service_Discovery_Protocol Simple Service Discovery Protocol - wikipedia]
+ * [http://allthingscc.wordpress.com/tag/ssdp/ SSDP service using Java]
+ * [https://drive.google.com/file/d/0B6p_m8EvqxeuNEhLTHBZSVBERTg/edit?usp=sharing UPnP Device Architecture 1.1] 
+ * [http://en.wikipedia.org/wiki/Universal_Plug_and_Play Universal Plug and Play]
+ * [http://quimby.gnus.org/internet-drafts/draft-cai-ssdp-v1-03.txt Draft cai ssdp v1.03]
+@
+
+
+1.20
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a2 1
+<!> 아직 완성된 문서 아님.. 정리 해야 할 내용 열라 많음.
+d10 1
+a10 1
+SSDP(Simple Service Discovery Protocol)은 네트워크 서비스나 정보를 찾기 위해서 사용하는 네트워크 프로토콜이다. SSDP를 이용하면, DHCP나 DNS와 같은 네트워크 서버 혹은 정적인 호스트 설정 없이 이런 일들을 수행할 수 있다. 
+d139 1
+a139 1
+=== 가정 네트워크에서의 사용 ===
+a161 4
+=== 오피스 네트워크에서의 사용 ===
+
+=== 산업 네트워크에서의 사용 ===
+
+a195 2
+=== mDNS를 이용한 Discovery architecture ===
+
+@
+
+
+1.19
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d204 1
+a204 1
+  * Avahi
+@
+
+
+1.18
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d203 3
+@
+
+
+1.17
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d201 2
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d160 1
+a160 1
+<img src="https://docs.google.com/drawings/d/1tKxZvq1bm-LtuFaBHsO3mmR0Y8iy-KkUZl4IREehkOs/pub?w=663&amp;h=564">
+@
+
+
+1.15
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d185 1
+a185 1
+<img src="https://docs.google.com/drawings/d/1ZccMR5xV5AE6zY5CDmV-ttkGFytDVJM_pYutT27_nMc/pub?w=613&amp;h=407">
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a136 11
+== zero-configuration networking == 
+일반적으로 네트워크 구성에는 관리자의 개입이 필요하다. 예컨데 관리자는 DHCP서버와 DNS서버를 구성해야 하고, 네트워크 참여자는 자신의 기기를(그게 PC던 모바일 기기던) 메뉴얼하게 작업을 해야 한다.
+
+Zero-configuration network(이하 zeroconf)는 사람의 개입없이, 네트워크의 환경을 기기들이 알아서 설정할 수 있도록 지원하는 프로토콜 모음이다. 아래 3가지 기술이 zeroconf의 주요 기술이다. 
+  * 네트워크 기기에 네트워크 주소 할당.   
+  * 자동으로 호스트이름 결정.  
+  * 프린터와 같은 서비스 기기의 위치를 자동으로 확인 
+
+
+== Discovery And Launch ==
+
+d167 34
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d151 2
+a152 2
+=== 가정 네트워크에서 사용 ===
+Wifi로 구성된 가정 네트워크를 가정해 보자. 처음 구입한 기기를 등록할 경우를 생각해 보자. Discovery는 기기가 자동으로 네트워크에 붙는 환경에서나 의미가 있다. Wifi로 구성된 네트워크의 경우, auto network configuration이 불가능 하다. 결국 유저는 앱을 이용해서, 기기 앞에서 (NFC, bluetooth 혹은 wifi로)기기를 등록해야 한다.
+d154 23
+a176 1
+이런 경우 유저 관점에서 discovery가 의미있으려면, 유저가 두명 이상이어야 한다. 일단 한 명이 등록해 놓으면, 다른 유저는 앱에서 search해서 바로 등록해서 사용할 수 있다. 
+a177 1
+계속...
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d148 9
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d1 1
+a1 1
+#title Discovery 프로토콜 : SSDP 
+d138 7
+d152 2
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d32 1
+a32 1
+SSDP는 HTTPU(UDP 기반의 HTTP)를 이용한다. HTTP이니 만큼 모든 데이터는 text로 통신한다. 사용하는 포트는 UDP 1900이며, IP multicast 주소를 이용한다. IPv4에서 멀티캐스트 주소는 239.255.255.250, IPv6에서는 ff0x::c이다.
+d59 1
+a59 1
+HTTP를 사용하지만 HTTP와는 약간 다르다. SSDP는 '''Advertisement''', '''Search''' 두 개의 타입이 있는데, 어느 타입의 메시지인지를 첫 줄에 명시해야 한다. 다음 셋 중에 하나다. 
+d138 1
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d20 1
+a20 1
+||[wiki||man/12/dhcp DHCP] ||Dynamic Host Configuration Protocol                       ||
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d16 14
+a29 14
+  * [wiki:man/12/ARP ARP] : Address Resolution Protocol 
+  * CP : Control Point
+  * DCP : Device Control Protocol
+  * DDD : Device Description Document
+  * [wiki:man/12/dhcp DHCP] : Dynamic Host Configuration Protocol  
+  * DNS : Domain Name System 
+  * GENA : General Event Notification Architecture 
+  * HTML : Hypertext Markup Language
+  * [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] : Hypertext Transfer Protocol 
+  * SCPD : Service Control Protocol Description
+  * SOAP : Simple Object Access Protocol
+  * SSDP : Simple Service Discovery Protocol
+  * UUID : Universally Unique Identifier
+  * XML : Extensible Markup Language
+d32 1
+a32 1
+SSDP는 HTTPU(UDP 기잔의 HTTP)를 이용한다. HTTP이니 만큼 모든 데이터는 text로 통신한다. 사용하는 포트는 UDP 1900이며, IP multicast 주소를 이용한다. IPv4에서 멀티캐스트 주소는 239.255.255.250, IPv6에서는 ff0x::c이다.
+d41 1
+a41 1
+SSDP는 '''NOTIFY HTTP'''메서드를 어나운스하는 것으로 멀티캐스트 그룹에 자신이 join 했음을 알려줄 수 있다. 
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d117 18
+d139 1
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d114 7
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d15 1
+a15 1
+=== 주요 약들 ===
+d43 3
+a92 1
+=== 기기가 추가 될 때 ===
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d114 1
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d14 16
+d53 1
+a53 1
+=== SSDP 포멧  === 
+d77 1
+d79 26
+a104 1
+UPnP는 UUID에 대한 형식을 정하고 있다. UUID는 반드시 아래의 룰에 따라서 만들어야 한다.  
+d106 4
+a109 1
+=== SSDP 테스트 ===
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d12 2
+a13 1
+=== SSDP 개요 ===
+d25 37
+a61 1
+=== SSDP 프로토콜 구성 ===
+@

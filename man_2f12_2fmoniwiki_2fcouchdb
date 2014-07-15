@@ -1,0 +1,132 @@
+#title Monwiki - couchdb 변환 작업 기록 정리
+
+[[TableOfContents]]
+== 소개 ==
+Moniwiki를 couchdb기반으로 재 작성하는 과정을 기록으로 남긴다. 
+
+== 목적 ==
+[wiki:Site/cloud/BigData/CouchDB CouchDB] 기반으로 바꾸려는 이유는 다음과 같다.
+
+Moniwiki가 가지는 문제의 핵심은 모든 정보를 '''파일기반'''으로 관리하는데 있다. 물론 파일기반이라서 가지는 장점도 있다. 데이터의 관리를 운영체제에 맡기는 거라서, 다른 소프트웨어를 설치할 필요가 없다. Apache와 PHP만 설치돼 있다면 - Apache와 PHP 설치는 패키지 관리자로 간단하게 설치할 수 있다. -, 모니위키 패키지를 다운로드 해서 압축을 풀기만 하면 된다. 그걸로 끝이다.
+
+대신 단점도 명확하다. 파일기반이기 때문에, 데이터(위키문서)를 관리하는데 애로사항이 꽃핀다.  
+   1. 접속유저가 많아지면 '''Scale-out'''을 해야 한다. 웹 서버라면 로드밸런서를 이용해서 유저 요청을 분산할 테고, 데이터베이스라면 샤딩을 하거나 읽기전용 리플리카를 뜨거나 등의 작업을 해야 한다. 모니위키는 파일기반이라서 scaloe-out이 힘들다.  
+   1. 구조변경의 어려움 : 파일기반이기 때문에 구조변경이 힘들다. 데이터베이스 시스템을 구상 할때, 파일 시스템의 디렉토리 구조를 그대로 이용하면 구조변경에 따른 문제를 해결할 수 있었을지도 모른다. 하지만 모니위키는 디렉토리도 파일이름으로 표시를 하는 flat file system을 사용하고 있다. "/Programming/Ruby/tutorial" 이라는 파일이 있다면, Programming_2fRuby_2ftutorial 이런 형식의 파일을 만드는 식이다. 처음부터 파일 시스템의 디렉토리를 그대로 이용했다고 하더라도, 1 번(Scalue-out)한계는 여전하다.   
+   1. 검색 : 모니위키로 본문내용 검색을 하고 싶은가 ? 포기하는게 좋다. 아예 생각조차 하지 마시라. 
+
+== 작업이 필요한 주요 내용 정리 ==
+작업은 순서대로 정리했다. 
+
+=== 이름정하기 ===
+귀찮다. Moniwiki-se로 하련다.
+
+=== 컴포넌트 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/131ig2e2134_ml9eBYH-uG7MDrjJMcPgZvf_k3osbPxE/pub?w=871&amp;h=306" weight=609 height=214>
+}}}
+
+일반적인 구성이겠다.
+  * 데이터는 couchdb로 저장한다. 읽는 것 역시 couchdb에서.
+  * couchdb로 저장한 문서는 solr로 색인한다.
+  * Full text 검색은 solr를 이용한다. 
+
+=== Directory 탐색 지원을 위한 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1LAdIVHV0MG8tRbDD17i7_WocuTxxQqZdk1nCaanXOzI/pub?w=854&amp;h=419" weight=854 height=293>
+}}}
+
+음.. 결국 링크기반으로 가야겠는데, 이 경우 아래의 기능은 구현할 수 있다.
+  * 디렉토리 이동 : parent 링크를 바꿔주면 되겠다. 밑에있는 파일들 혹은 디렉토리들은 신경쓸게 없이 자연스럽게 이동할 수 있다.   
+  * 파일 이동 : 역시 parnet 링크를 바꿔주면 되겠다. 
+
+하지만 directory와 파일을 검색하는게 좀 애매모호 하다.전제조건이 있다. 나는 지금의 모니위키가 그런 것 처럼 "/Language/Java/Tutorial"과 같이 URL을 사용할 수 있기를 원한다. 
+유저가 /Language/Java/Tutorial 이라고 유저가 요청 을 하면 아래와 같이 하면 되겠다. 의사코드로 구현했다. 
+{{{#!plain
+$dirent = split("/Language/Java/Tutorial", "/");
+for($i=0, $doc_id=nil; $i<size($dirent); $i++)
+{
+  $doc_id = "Select id from name = $dirent[$i] and parent_id = $doc_id";
+}
+couchdb_read($doc_id);
+}}}
+
+하위 문서를 찾기 위한 의사코드
+{{{#!plain
+$doc_id = get_current_doc_id(); 
+for($item = sql("Select id from parent_id = $doc_id"))
+{
+  echo "$item['title'] $item[''] ...";
+}
+}}}
+
+기능 구현 자체는 문제될게 없는데, 문서의 깊이가 깊어질 수록 질의 횟수도 늘어나는게 기분이 그닥 좋지 않다. 깊이가 6번이면, 최대 6번 질의해야 하는데.. 나중에 해결하련다.!! 
+
+=== 유저 ===
+모니위키는 유저의 정보를 파일에 저장한다. "아이디:(단방향으로 인크립트된)패스워드"다. 유저의 정보 역시 CouchDB에 저장하기로 했다. 
+{{{#!plain
+{
+  "id":"유저 아이디",
+  "pw":"유저 패스워드",
+  "avatar":"유저 프로필 사진",
+  "mail":"유저메일",
+  "type":"유저 타입, 그냥 관리자와 일반 유저로 나누련다."
+}
+}}}
+  * oAuth도 지원하면 좋겠는데, 그건 나중에 생각하기로 했다.
+  * 권한을 넣을지 말지는 역시 나중에 고민
+
+== couchdb class ==
+[http://wiki.apache.org/couchdb/Getting_started_with_PHP Getting started with PHP]에 보면 CouchDBResponse, CouchDBRequest라는 저수준의 php를 위한 couchdb class가 있는데.. 얘들을 사용하기로 했다. 새로 만들기 귀찮고, 복잡한 것은(다른 말로 기능이 많은) 머리아파서다. 
+
+== 위키문서 작업 ==
+=== 위키문서를 저장하기 위한 데이터베이스 스키마 ===
+{{{#!plain
+{
+  "author":"저자",
+  "name":"위키페이지 이름",
+  "title":"제목",
+  "body":"문서 내용",
+  "posteddate":"저장일",  // 형식 : 2014-15-06UTC14:58:50165 
+  "parent":"부모 문서의 ID",
+  "comment":"주로 문서 수정 내역을 저장",
+  "tag":"당장은 쓰지 않는다"
+}
+}}}
+
+=== wikiDB, WikiPage 클래스 리팩토링 ===
+모니위키의 핵심 클래스는 WikiDB와 WikiPage라는 클래스가 되겠다. 위키문서를 읽고, 검색하고, 저장하고, 편집하고 하는 일을 한다. 데이터베이스를 관리하는 클래스라고 할 수 있겠다. 차이점이라면 흔히 알고 있는 DBMS가 아니고 파일이라는 점.
+
+헌데, 파일을 기반으로 만든 클래스라서 couchdb와 같은 데이터베이스 시스템과는 좀 컨셉이 맞지 않는다는 문제가 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1_aAF3QRZxdDIOi8Y7URPeJINadSYKibwNqIjQtbertQ/pub?w=451&amp;h=216">
+}}}
+
+대략 이러하다. CRUD가 하나의 클래스에 통합돼있지 않고, 쪼개져 있다. 파일기반일 경우 파일관련 API를 이용할테니, 이렇게 쪼개져 있어도 별 상관은 없긴하다. 하지만 데이터베이스 시스템일 경우에는 문제가 된다. 데이터베이스 읽기는 A 클래스에서, 쓰기는 B 클래스에서 하는 것 자체가 이상한 일이니까.   
+
+해서 리펙토링을 하기로 했는데, WikiDB에서 위키문서 조작과 관련된 모든 메서드를 밀어 넣기로 했다.  WikiPage는 어떻게 할까 ? WikiPage는 캐쉬, 버전 관리등 몇개 CRUD와는 그닥 상관 없는 일을 하기는 하는데.. 캐쉬 시스템은 따로 가기로 했고, 버전관리도 couchdb의 그것을 사용할 거라서. 그냥 버릴 생각이다. 
+
+=== Cache 시스템 변경 ===
+모니위키는 자체 cache 시스템을 가지고 있다. Cache 시스템 기능 자체를 빼버리기로 했다. 모니위키의 캐시시스템은 다른 기능들과 마찬가지로 파일기반인데, scale-out 하려 할때 관리 이슈가 생긴다. 나중에 필요할 경우 독립적인 cache 시스템을 구축하는게 낫겠다 싶었다.
+
+파일 시스템으로 구축하는 것도 방법이긴 하다. (REDIS 같은 걸로 구축하려면, 시스템이 쓸데없이 복잡해지는 기분이라서). 파일로 구축을 하면, scale-out된 위키 서버 갯수만큼 캐쉬 파일이 만들어져서 효율성이 좀 떨어지는 문제가 있는데, 귀찮지만 REDIS등으로 구축을 할지, 효율이 좀 떨어지지만 파일기반으로 할지는 나중에 고민해 보련다.
+
+Cache를 이용한 모든 코드를 제거했다.
+
+=== 문서 저장 ===
+WikiDB->savePage메서드를 이용해서 문서를 저장한다. 파일에 저장하는 걸 couchdb로 저장하도록 변경했다. 페이지를 읽어올 때, Cache를 참고하도록 돼 있는데, '''Cache 시스템을 변경'''하면서 더 이상 Cache를 참고하지 않도록 했다. 
+
+=== 문서 편집 흐름 ===
+'''FrontPage'''를 이용해서 테스트했다. 문서를 저장하기 까지의 일반적인 흐름은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1vfc7ruqCNC4jDG81F_8xFl_xIJ7SfRO4syNEPQK5mkk/pub?w=810&amp;h=225" width=567 height=157>
+}}}
+  1. 유저가 페이지를 요청한다.
+  1. get_raw_body로 문서를 읽는다.
+     * 그전에 문서를 찾아야 겠는데, '''name'''을 key로 couchdb에서 검색한다.
+     * 문서를 찾지못했다면 "문서 추가", 문서를 찾았다면, "문서 수정"이 되겠다. 문서를 수정할 경우 "_id(문서아이디)"와 "_rev(문서 버전)"를 명시한다. 별다른 옵션이 없다면 최신 버전의 문서를 수정하게 된다. 
+  1. 문서를 수정하고 submit 한다. 문서 수정이기 때문에 수정할 문서의 id와 rev를 함께 넘겨야 한다. 
+  1. 문서의 id와 rev를 이용해서 문서를 수정한다. id는 그대로고 rev가 다른 새로운 버전의 문서가 만들어진다. 
+여기까지 하면 문서 만들기와 문서 수정까지의 개발이 끝난다. 물론 버전관리, diff 연산과 같은 기능을 뺀, 최소한의 기능이다.
+

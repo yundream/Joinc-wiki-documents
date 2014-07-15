@@ -1,0 +1,514 @@
+head	1.17;
+access;
+symbols;
+locks
+	root:1.17; strict;
+comment	@# @;
+
+
+1.17
+date	2014.07.05.14.50.04;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2014.07.05.05.49.36;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2014.07.04.08.21.58;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.07.04.08.16.32;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.07.04.07.15.30;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.07.01.02.45.44;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.06.30.15.59.24;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.06.30.14.00.43;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.06.30.07.58.15;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.06.30.07.57.23;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.06.30.02.59.50;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.06.30.02.29.43;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.06.29.13.09.44;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.06.29.09.52.08;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.06.29.03.25.09;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.06.29.02.01.16;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.06.28.03.02.31;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2foAuth
+@
+
+
+1.17
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title 직접 구현해 보자. oAuth1.0
+
+<!> 미완성
+[[TableOfContents]]
+== 소개 ==
+처음에는 oAuth2 만 살펴보려고 했다. 새로 개발하는 서비스들은 대부분 oAuth2 우선이고, 기존에 oAuth1부터 시작했던 서비스들도 oAuth2로 무게중심을 옮겨가는 와중이니, 굳이 oAuth1을 살펴볼 필요는 없으리라고 생각을 했다.
+
+하지만 oAuth1와 oAuth2를 동시에 지원해야 할 일이 생겨서, (귀찮지만)굳이 oAuth1도 살펴보기로 했다.  
+
+목적은 '''살펴보는게'''아니다. 실제 나름대로의 서비스 시나리오를 만들고, oAuth1 스펙에 따라서 개발을 하는게 목적이다.
+
+== oAuth1 인증 서비스 개발 ==
+=== 개발환경 ===
+언제나 그렇듯이 virtualbox로 가상 환경을 만들어서 개발과 테스트를 진행한다. 테스트에는 호스트 운영체제까지 포함해서 총 3개의 운영체제가 동원된다. 
+  1. 호스트 운영체제 : 클라이언트 브라우저를 이용해서 테스트를 수행한다. 
+  1. Consumer OS : Consumer를 위한 게스트 운영체제 
+  1. Service Provider OS : Service Provider이다. 시나리오에 따라서 여러가지 서비스를 제공한다. 
+
+=== 서비스 개요 ===
+Service Provider는 '''포인트 적립'''서비스를 제공한다. Service Provider 서비스에 가입한 유저는 온라인 상에서 현금처럼 사용할 수 있는 '''포인트'''를 관리하고 있다. 이 서비스 도메인의 이름은 '''point.com'''이다.  
+
+예전에 point.com은 오로지 자신들이 제공하는 사이트에서만 포인트를 적립하거나 소모할 수 있도록 했다. point.com의 개발자(영업인?)는 여기 저기 제휴할만한 상품들을 물색해서, 자신들의 사이트에 상품들을 밀어 넣었다.    
+
+서비스는 나름 흥했지만 곧 정채기를 맞이한다. 제휴상품들을 하나하나 찾아서 등록하는 것에는 한계가 있었기 때문이다.
+
+여러가지 아이디어를 고민하던 중, point.com의 서비스를 이용하기를 원하는 고객이 직접 자신들의 서비스를 만들어서 이용할 수 있도록 하기로 했다. 굳이 point.com에 입주를 하지 않더라도, 자신의 도메인으로 일종의 point.com 분점을 운영할 수 있도록 했다.    
+
+이를 위해서 oAuth1를 도입하기로 했다. 서비스 구성은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Hu42eZGprvmSY9O4pPFQQetNiKnUwUqyi_SN2aw4ajw/pub?w=586&amp;h=379">
+}}}
+ 1. Point.com은 point를 포함한 유저정보를 가지고 있다. 
+ 1. Consumer-1은 ebook을 판매하는 온라인 사이트다.  
+ 1. Consumer-2는 온라인 게임 판매 사이트다.
+
+자 이제 point.com의 cash point를 이용해서 ebook을 판매하길 원하는 consumer-1이 등장 했다. Consumer-1은 point.com으로 부터 '''consumer key'''와 '''consumer secret'''를 받는 것으로 증명을 끝냈다. 
+
+=== 서비스 과정으로 알아보는 oAuth 프로세스 ===
+여기에는 총 3명의 배우가 등장한다.
+  1. 유저 : 포인트를 이용해서 물건을 구매하려고 한다. 이 유저는 point.com에 가입해 있고, 50만점의 포인트를 가지고 있다.
+  1. ebook.joinc.co.kr : consumer다. 최근 point.com의 유저층을 ebook.joinc.co.kr에 끌어들이기로 했다. 
+  1. point.com : point 서비스를 제공한다. 다양한 사이트에서 포인트를 소모할 수 있도록 oAuth1.0a 시스템을 구축했다.   
+프로세스를 그려보자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/185nTM1Wg-suGM8j9WZSKJGqetyFC61uRPG0HCzsdVx8/pub?w=717&amp;h=555">
+}}}
+
+Consumer 등록. point.com에 있는 자원을 사용하려는 ebook은 우선 consumer로 등록을 해야 한다.  
+  1. 먼저 ebook.joinc.com은 point.com에 consumer로 등록 요청을 한다.
+  1. point.com은 consumer key와 consumer secret를 발급한다.
+이제 유저 서비스 과정을 살펴보자.
+  1. ebook 사이트(서버)에 연결을 한다.  
+  1. ebook 서버는 point 서버에 oauth_token 발급 요청을 한다. point는 consumer key와 secret를 이용해서 consumer를 확인한다. 
+  1. point 서버가 consumer의 요청을 확인했다면, oauth_token을 발급한다. 
+  1. 여기까지.. '''point.com과 제휴를 맺은 ebook으로 부터 요청이 왔다'''는 것을 확인할 수 있다. oauth_token는 이를 증명하기 위한 증명서다.
+  1. 유저는 이 증명서(oauth_token)을 가지고, point 서비스에 접근한다. point 서버에 있는 적립 포인트를 ebook에서 사용하기 위해서 꺼내 쓰기 위해서가 목적이다. 
+  1. 그럴려면, point 서버에서 유저 인증을 받아야 한다. 이미 Login 상태라면 건너 뛸거고, 그렇지 않다면 Login 과정을 수행한다. 
+  1. 로그인을 끝냈다면, point 서버는 ebook 서비스를 사용할 건지(허가할 건지)를 묻는다. 
+  1. Yes 하면, point 서버는 oauth_token과 oauth_verifier를 유저에게 전달한다.     
+  1. 유저는 oauth_token과 oauth_verifier값을 가지고 ebook 서버에 접근한다. 
+  1. ebook 서버는 oauth_token과 oauth_verifier를 이용해서, point.com에 access token을 요청한다. 서비스 유저가 point.com에 접근하기 위한 증명서라고 보면 되겠다. 
+  1. point.com은 oauth_token과 oauth_verifier를 이용해서, 자신이 발생한 oauth token이라는 걸 확인할 수 있다. 이제 access token을 ebook 서버에 발급한다. 
+  1. 이후 유저는 point.com에 있는 자신의 적립 point를 이용해서 ebook을 구매할 수 있다. 
+
+== oAuth1.0 개발 과정 ==
+Service provider인 point.com을 개발한다. Cash point 관리 시스템을 개발하는게 목적이 아니다. 어디까지나 oAuth1의 과정을 살펴보는게 목적이므로 cash point 시스템은 아주아주 간단하게 개발한다.
+
+Ruby Sinatra로 개발하기로 했다. PHP로 해볼까 라는 생각을 하기도 했었는데, 개인적으로 ruby에 관심을 가지고 공부하는 중이라서 sinatra를 선택했다. Sinatra, Thin, sequel, mysql 기반으로 구성했다. Sinatra 설치 문서는 [wiki:Site/Ruby/sinatra/UbuntuInstall 우분투 리눅스에 sinatra 설치하기]를 참고하자.  
+
+Consumer인 ebook.joinc.co.kr은 PHP로 만들기로 했다.  
+
+=== UI 흐름 ===
+유저가 consumer 사이트에 접근해서, sing up 한 다음 서비스를 사용하기 까지의 과정을 UI로 그렸다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1XQ625eLvVzLV52I5GKo2FLyKQ-jIHpI7PH0jcuT9a28/pub?w=1294&amp;h=760" width=905 height=532>
+}}}
+  1. ebook.joinc.com에 접근
+  1. 로그인 창이 뜬다. 
+  1. Point.com 으로 로그인을 선택한다.
+  1. Point.com에서 제공하는 sign up 페이지로 이동. 로그인을 한다.
+      * Point.com은 유저에게 '''ebook.joinc.com''' 서비스를 위해서 개인정보를 제공할지를 유저에게 묻는다. 보통 '''서비스 허가''' 라고 한다. 
+      * 이래저래 개인정보가 오고가니, 약관도 동의해야 할 거다. 
+  1. 로그인 성공하면 ebook.joinc.com으로 redirect 한다. 
+      * ebook.joinc.com은 access token을 이용해서, 유저의 email 정보와 포인트정보를 가져온다. 
+      * access token을 받았다는 것은 유저를 인증했다는 거다. ebook.joinc.com은 이 유저에게 SESSION ID를 발급한다. ebook.joinc.com은 SESSION ID를 이용해서 인증을 끝낸 유저인지 확인할 수 있다.  
+  1. ebook 쇼핑을 한다.
+      * 유저는 자신의 포인트를 소비해서 ebook을 구매한다. 
+      * ebook을 구매하면, point.com에서 제공하는 API를 이용해서 포인트를 차감해야 한다.
+물론 쇼핑카드 같은건 구현하지 않을 거다.
+
+=== Model ===
+Service provider 측의 유저 모델이다. 귀찮은 관계로 point까지, user 테이블에 전부 밀어 넣었다. 그리고 테스트를 위한 유저를 하나 만들었다. 
+{{{#!plain
+# encoding: utf-8
+require 'sequel'
+DB = Sequel.mysql 'point', user:'root', password:'xxxxxxxx', host:'127.0.0.1'
+require_relative 'point'
+
+if !DB.table_exists? 'user'
+  DB.create_table :user do
+    primary_key :id
+    String :name, :null=>false
+    String :password, :null=>false
+    Int :point
+  end
+  DB[:user].insert(:name=>'yundream', :password:'1111', :point:500000)
+end
+}}}
+
+아래는 Consumer를 관리하기 위한 모델이다. consumer의 이름과 consumer에 발급하는 consumer_key, consumer_secret 3개의 필드로 구성했다. 테스트를 위한 consumer를 하나 등록했다. 
+{{{#!plain
+if !DB.table_exists? 'consumer'
+  DB.create_table :consumer do
+    primary_key :id
+    String :name, :null=>false
+    String :key, :null=>false
+    String :secret, :null=>false
+  end
+  DB[:consumer].insert(:name=>'ebook.joinc.com', :key=>'49c9d4e968599628c471ef', :secret=>'8808537ce8efdf8db0aa1a78168c7d7e')
+end
+}}}
+
+=== Request token ===
+oAuth1에서 consumer는 타사의 서비스를 대행해서 판매하는 일을 한다. 타사의 서비스를 대행하려면, 서비스를 대행할 수 있는 권한이 필요하다. consumer는 '''request token'''을 이용해서, 자신이 (서비스를 대행할)권한을 가지고 있음을 증명한다.  
+
+Consumer에 대한 증명을 담은 증명서 즉, request token은 서비스 제공자(Service provider)가 발행한 '''consumer_key'''로 얻을 수 있다. Request token을 얻기 위해 service provider에 보내는 정보들은 다음과 같다. 
+||값                      ||설명                                             ||
+||oauth_consumer_key      ||Consumer에게 발생하는 key.                       ||
+||oauth_signature_method  ||signature를 만들기 위한 방법                     ||
+||oauth_signature         ||                                                 ||
+||oauth_timestamp         ||요청을 보낸 시간                                 ||
+||oauth_nonce             ||                                                 ||
+||oauth_version           ||사용하는 oAuth 버전                              ||
+||oauth_callback          ||유저에게 돌려줄 collback URL                     ||
+||Additional parameters   ||Service provider이 필요할 경우 추가할 수 있다.   ||
+
+Consumer로 부터 Request token 발급요청을 받은 service provider는 아래의 정보를 포함한 Request Token을 발급한다.   
+||값                         ||설명             ||
+||oauth_token                ||Request token    ||
+||oauth_token_secret         ||Secret token     ||
+||oauth_callback_confirmed   ||                 ||
+||Addtional parameters       ||                 ||
+
+이 과정은 다음과 같이 묘사할 수 있다.
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1tCLOedOatqLRpkwit3gsZyjrCUtTS4tsspKcpBLW2DQ/pub?w=723&amp;h=299">
+}}}
+
+Request token을 발급하기 위한 provider 코드는 다음과 같다.
+{{{#!plain
+
+}}}
+코드는 간단하다. consumer key와 signature만 비교하면 된다. 일반적으로 signature는 consumer의 요청 파라메터들을 수집한 다음 '''oauth_signature_method'''에 명시한 방법으로 서명을 만든다. 주로 RFC2014에 정의된 '''HMAC-SHA1'''을 사용한다. 테스트가 목적이라서 간단하게 PLAINTEXT 방식을 사용하기로 했다.
+
+==== 코드 ====
+Consumer측 그러니까 ebook.joinc.co.kr는 php로 만들었다. point.com으로 부터 발급받은 consumer key와 consumer secret를 설정했다. 
+{{{#!plain
+# cat config.php
+$oauth_signature_method="PLAINTEXT"
+$oauth_consumer_key = "49c9d4e968599628c471ef";
+$oauth_signature = "8808537ce8efdf8db0aa1a78168c7d7e";
+$oauth_callback = "http://point.com/";
+$oauth_timestamp = "";
+}}}
+
+
+=== Service Provider 구현 ===
+
+== 참고 ==
+  * http://oauth.net/
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d67 1
+a67 1
+== oAuth Provider - point.com 개발 ==
+d72 22
+d95 1
+a95 1
+유저 모델이다. 이것 저것 귀찮아서 point까지, user 테이블에 밀어 넣었다. 그리고 테스트를 위한 유저를 하나 만들었다. 
+d113 1
+a113 1
+Consumer를 관리하기 위한 모델을 만들었다. consumer의 이름과 consumer에 발급하는 consumer_key, consumer_secret 3개의 필드로 구성했다. 테스트를 위한 consumer를 하나 등록했다. 
+d152 2
+a153 3
+=== Consumer 구현 ===
+==== UI 흐름 ====
+유저가 consumer 사이트에 접근해서, sing up 한 다음 서비스를 사용하기 까지의 과정을 UI로 그렸다. 
+a154 2
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1XQ625eLvVzLV52I5GKo2FLyKQ-jIHpI7PH0jcuT9a28/pub?w=1294&amp;h=760" width=905 height=532>
+d156 1
+a156 13
+  1. ebook.joinc.com에 접근
+  1. 로그인 창이 뜬다. 
+  1. Point.com 으로 로그인을 선택한다.
+  1. Point.com에서 제공하는 sign up 페이지로 이동. 로그인을 한다.
+      * Point.com은 유저에게 '''ebook.joinc.com''' 서비스를 위해서 개인정보를 제공할지를 유저에게 묻는다. 보통 '''서비스 허가''' 라고 한다. 
+      * 이래저래 개인정보가 오고가니, 약관도 동의해야 할 거다. 
+  1. 로그인 성공하면 ebook.joinc.com으로 redirect 한다. 
+      * ebook.joinc.com은 access token을 이용해서, 유저의 email 정보와 포인트정보를 가져온다. 
+      * access token을 받았다는 것은 유저를 인증했다는 거다. ebook.joinc.com은 이 유저에게 SESSION ID를 발급한다. ebook.joinc.com은 SESSION ID를 이용해서 인증을 끝낸 유저인지 확인할 수 있다.  
+  1. ebook 쇼핑을 한다.
+      * 유저는 자신의 포인트를 소비해서 ebook을 구매한다. 
+      * ebook을 구매하면, point.com에서 제공하는 API를 이용해서 포인트를 차감해야 한다.
+물론 쇼핑카드 같은건 구현하지 않을 거다.
+@
+
+
+1.15
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d152 1
+a152 1
+Consumer측 그러니까 ebook.joinc.co.kr는 php로 만들었다.
+d154 6
+d162 1
+@
+
+
+1.14
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a129 1
+
+d156 2
+@
+
+
+1.13
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d142 2
+d146 1
+d153 1
+a153 1
+Consumer측 그러니까 ebook.joinc.co.kr는 php로 만들었다. ebook.joinc.co.kr의 동작을 UI흐름으로 그려보았다. 
+@
+
+
+1.12
+log
+@182.212.44.139;;yundream;;
+@
+text
+@d1 1
+a1 1
+#title oAuth1.0
+d130 23
+a152 2
+==== Consumer측 코드 ====
+Consumer측 그러니까 ebook.joinc.co.kr는 php로 만들었다. 
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d109 1
+a109 1
+||oauth_consumer_key      ||Consumer에게 발생하는 key.                       || 
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d46 20
+a132 1
+
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d39 8
+d80 1
+a80 1
+  DB[:consumer].insert(:name=>'ebook.joinc.com', :key=>'9ecb6d1c', :secret=>'8808537ce8efdf8db0aa1a78168c7d7e')
+d105 8
+a112 1
+== Consumer 개발 ==
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d98 3
+a100 1
+=== ===
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 2
+d39 1
+a39 1
+=== Service Provider - point.com 개발 ===
+d44 2
+a45 2
+==== User Model ====
+유저 모델이다. 이것 저것 귀찮아서 point까지, user 테이블에 밀어 넣었다.   
+d52 8
+a59 5
+DB.create_table :user do
+        primary_key :id
+        String :name, :null=>false
+        String :password, :null=>false
+        Int :point
+d63 33
+d97 2
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d40 17
+a56 1
+Ruby Sinatra로 개발하기로 했다. 
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 1
+a4 1
+처음에는 oAuth2 만 살펴보려고 했다. 새로 개발하는 서비스는 oAuth2 우선이고, 기존에 oAuth1부터 시작했던 서비스들도 oAuth2로 무게중심을 옮겨가는 와중이니, 굳이 oAuth1을 살펴볼 필요는 없으리라고 생각을 했다.
+d6 1
+a6 1
+하지만 oAuth1와 oAuth2를 동시에 지원해야 할 일이 생겨서, 굳이 oAuth1도 살펴보기로 했다.  
+d28 15
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a10 3
+=== 서비스 개요 ===
+
+
+d16 12
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d10 4
+a13 1
+== oAuth1 서비스 개발 ==
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d12 4
+a15 1
+
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 9
+@

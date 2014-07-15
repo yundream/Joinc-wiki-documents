@@ -1,0 +1,74 @@
+#title PECL : PHP 확장 저장소
+
+[[TableOfContents]]
+== PECL ==
+PECL(PHP Extension Community Library)는 PHP 확장 저장소 시스템이다. '''PEAR''' 과 매우 비슷하다. 차이점이라면 
+  * PEAR은 재사용 가능한 PHP 컴포넌트들을 관리/배포하는 시스템인 반면 
+  * PECL은 (주로 C언어로 개발한) 컴파일된 PHP 확장을 관리/배포하는 시스템  
+이다.
+
+== Solr PHP 확장 설치 ==
+PHP 기반 웹 서비스에 Solr 검색엔진을 붙이는 개인 프로젝트를 진행했다. Solr는 거의 모든 기능을 REST API 형태로 제공하기 때문에, 약간의 날코딩--노가다--으로 검색서비스를 붙일 수 있다. 하지만 매번 날코딩하기 귀찮아서, 이미 잘 만들어진 바퀴가 있는지를 검색했다.
+
+검색해보니 PECL로 Solr 확장을 설치해서 사용할 수 있다는 거다. 하여 할 수 없이? PECL을 학습하게 됐다. Solr 확장을 설치하려다 보니 PECL을 익히게 된셈이다. '''눈 앞에 닥치면 찾아서 체화'''하는 학습으로, 내가 매우 선호하는 방식이다.(그냥 공부를 목적으로 공부하는 것은 광속으로 까먹더라)
+
+=== 환경 ===
+  * 운영체제 : Ubuntu 14.04가 설치된 개인 데스크탑
+  * PHP : php 5.5.9[[FootNote(PHP 5.2.11이상에서 PECL을 사용할 수 있다.)]]  
+
+=== pear 설치 ===
+pecl은 php-pear패키지에 포함되있다. 
+{{{#!plain
+# apt-get install php-pear
+}}}
+
+확장 설치방법
+{{{#!plain
+# pecl install extname
+}}}
+
+php5-dev를 설치한다. 확장은 C 컴파일 때문에, php5의 헤더파일이 필수인 경우가 많다. 
+{{{#!plain
+# apt-get install php5-dev
+}}}
+
+curl을 위한 헤더파일이 필요하다. 
+{{{#!plain
+# libcurl4-gnutls-dev
+}}}
+
+xml 헤더파일도 필요 하다.
+{{{#!plain
+# apt-get install libxml2-dev
+}}}
+
+=== solr 확장 설치 ===
+pecl을 이용해서 solr를 설치한 후, 공유 라이브러리가 만들어졌는지 확인한다.
+{{{#!plain
+# pecl install solr
+# ls /usr/lib/php5/20121212/
+json.so  opcache.so  pdo.so  readline.so  solr.so
+}}}
+
+이제 solr.ini 파일을 만든다. 
+{{{#!plain
+# cat /etc/php5/mods-available/solr.ini
+extension=solr.so
+}}}
+
+나는 nginx와 php5-fpm으로 설치했다. php5-fpm의 conf.d디렉토리 밑에 위에 만들어둔 solr.ini를 링크했다.  
+{{{#!plain
+# cd /etc/php5/fpm/conf.d
+# ln -s ../../mods-available/solr.ini ./
+# ls -al
+합계 8
+drwxr-xr-x 2 root root 4096  7월 15 23:49 .
+drwxr-xr-x 4 root root 4096  7월 15 23:48 ..
+lrwxrwxrwx 1 root root   32  7월 10 22:17 05-opcache.ini -> ../../mods-available/opcache.ini
+lrwxrwxrwx 1 root root   28  7월 10 22:17 10-pdo.ini -> ../../mods-available/pdo.ini
+lrwxrwxrwx 1 root root   29  7월 10 22:17 20-json.ini -> ../../mods-available/json.ini
+lrwxrwxrwx 1 root root   33  7월 10 22:17 20-readline.ini -> ../../mods-available/readline.ini
+lrwxrwxrwx 1 root root   29  7월 15 23:49 solr.ini -> ../../mods-available/solr.ini
+}}}
+php-fpm을 다시 실행하자. phpinfo() 결과에 solr 정보가 나오면 설치 성공  
+

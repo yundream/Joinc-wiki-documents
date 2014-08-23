@@ -1,0 +1,263 @@
+#title PHP 권장 코딩 스타일 가이드
+
+[[TableOfContents]]
+== 코딩 스타일 가이드 ==
+Framework Interop Group에서 PSR-0, PSR-1, PSR-2라는 권장 스타일 가이드를 제시했다. 이러한 스타일로 프로그래밍을 하면 좋겠다라는 규칙을 담고 있는데, Drupal, Zend, Symfony, CakePHP, phpBB, AWS SDK, FuelPHP, Lithium등이 이 스타일을 따르고 있다.  
+
+어디까지나 권장 스타일 가이드이다. 따라서 반드시 따라야할 필요도 이유도 없다. 가능하면 위의 스타일을 따르면서, 개발 환경에 따라서 다른 규칙과 조합해서 사용하면 된다. 목적은 (자신을 포함)다른 개발자들도 코드를 쉽게 읽고 사용할 수 있으며, 서드파티 라이브러리를 연동에 일관성을 유지하도록 하는데 있다. 
+
+== PSR-0 ==
+PSR-0은 autoloader의 상호운용성을 위해서 반드시 지켜야할 사항들을 명시하고 있다. 
+=== 필수 요소 ===
+ * Fully-qualified 네임스페이스와 클래스는 반드시 '''\<Vender Name>\<Namespace>\<Class Name>'''을 따라야 한다.
+ * 각 네임스페이스는 여러 개의 sub 네임스페이스를 가질 수 있다.
+ * 각 네임스페이스는 파일시스템으로 부터 로딩될 때 '''DIRECTORY_SEPARATOR'''로 변환된다. 
+ * 클래스 이름에 사용되는 각 '''_'''문자는 '''DIRECTORY_SEPARATOR'''로 변환된다. 네임스페이스에서 '''_'''는 특별한 의미가 없다.
+ * 네임 스페이스와 클래스 이름은 파일시스템에서 로딩될 때, 확장자로 '''.php'''를 붙인다. 
+ * 벤더, 네임스페이스, 클래스 이름은 영문 대소문자를 사용할 수 있다. 
+
+=== 예제 ===
+ * \Doctrine\Common\IsolatedClassLoader => /path/to/project/lib/vendor/Doctrine/Common/IsolatedClassLoader.php 
+ * \Symfony\Core\Request => /path/to/project/lib/vendor/Symfony/Core/Request.php 
+ * \Zend\Acl => /path/to/project/lib/vendor/Zend/Acl.php 
+ * \Zend\Mail\Message => /path/to/project/lib/vendor/Zend/Mail/Message.php  
+=== 네임스페이스와 클래스 이름에서의 언더바 ===
+ * \namespace\package\Class_Name => /path/to/project/lib/vendor/namespace/package/Class/Name.php 
+ * \namespace\package_name\Class_Name => /path/to/project/lib/vendor/namespace/package_name/Class/Name.php 
+
+=== 구현 예제 ===
+PSR-0 표준을 따를 경우 autoloader의 일반적인 구현예제다.
+{{{#!plain
+<?php
+function autoload($className)
+{
+    $className = ltrim($className, '\\');
+    $fileName  = '';
+    $namespace = '';
+    if ($lastNsPos = strrpos($className, '\\')) {
+        $namespace = substr($className, 0, $lastNsPos);
+        $className = substr($className, $lastNsPos + 1);
+        $fileName  = str_replace('\\', DIRECTORY_SEPARATOR, $namespace) . DIRECTORY_SEPARATOR;
+    }
+    $fileName .= str_replace('_', DIRECTORY_SEPARATOR, $className) . '.php';
+
+    require $fileName;
+}
+}}}
+
+테스트 결과
+{{#!plain
+autoload('joinc\stl\queue') => require 'joinc/stl/queue.php';
+autoload('joinc\date\class_ctime') => require 'joinc/date/class/ctime.php';
+}}}
+
+이건 간단한 구현이고, PSR-0을 제대로 만족하는 loader는 [https://gist.github.com/jwage/221634 SplClassLoader.php]를 참고하기 바란다.
+
+== PSR-1 Basic coding standard ==
+PSR-1은 공유하는 PHP 코드들간에, 높은 수준의 기술적 상호 운용성을 보장하기 위해서 필요한 표준 코딩 요소들을 제안한다.  
+
+각 제안 요소들은  "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" 키워드를 이용해서 분류를 하고 있다. 예컨데 "MUST"가 붙은 요소들은 반드시 지켜야 하는 것들이고, "OPTIONAL"은 선택사항이다. 키워드들에 대한 자세한 내용은 [http://www.ietf.org/rfc/rfc2119.txt rfc2119]를 참고하자. 
+
+=== Overview ===
+  * 파일은 반드시(MUST)<?php 와 <?= 태그로 시작해야 한다.
+  * 파일은 BOM(Byte order Mark)없이 UTF-8만 사용해야 한다.   
+  * 네임스페이스와 클래스는 반드시 PSR-0과 PSR-4의 "autoloading" 규칙을 따라야 한다. 
+  * 클래스 이름은 반드시 '''Studly caps'''를 따라야 한다. 
+  * 매서드 이름은 반드시 '''camelCase'''를 따라야 한다.  
+
+=== 파일 ===
+==== PHP 태그 ====
+PHP 코드는 '''<?php ?>''' 태그나 혹은 '''<?= ?>'''를 이용해야 한다. 다른 태그를 사용하면 안된다. <?php 는 일반적인 긴(long) 코드를 배치하기 위해서 사용하고 <?= 는 sort-echo(단순 echo문)을 배치하기 위해서 사용한다.  
+{{{#!plain
+<?php
+for(i=0; i< 100; i++) {
+// ....
+}
+?>
+<?= "Hello World"?>
+}}}
+==== 문자 인코딩 ====
+BOM(Byte order mark)없는 UTF-8을 사용한다. 
+
+BOM은 인코딩된 문서의 첫 머리에 사용하는데, 정확한 인코딩 방식을 알려주는 역할을 한다. 사용할 수 있는 BOM 목록은 다음과 같다.
+||인코딩 방식             ||BOM                 ||
+||UTF-8                   || EF BB BF           ||
+||UTF-16 Big Endian       || FE FF              ||
+||UTF-16 Little Endian    || FF FE              ||
+||UTF-32 Big Endian       || 00 00 FE FF        ||
+||UTF-32 Little Endian    || FF FE 00 00        ||
+그냥 UTF-8만 사용하는 걸로 통일 하자. 
+
+==== 사이드 이펙트 ====
+사이드 이펙트는 음.. 너무 광범위 하다. 사실상 제한이 없는데, 예를들어 출력을 만들거나, '''require''', '''include'''등 (fopen등을 이용)외부 서비스를 호출하거나, init 설정 변경, 전역/static 변수의 수정 등 모든 작업에서 사이드 이펙트가 발생할 수 있다. 하지만 '''가능한 사이드 이펙트가 발생하지 않는''' 코딩 스타일은 제시할 수 있다.  
+
+아래는 여러 사이드 이펙트를 포함한 소스코드다.
+{{{#!plain
+<?php
+// side effect: init 설정 변경 
+ini_set('error_reporting', E_ALL);
+
+// side effect: 파일 로딩 
+include "file.php";
+
+// side effect: 출력 만들기 
+echo "<html>\n";
+
+// 함수선언 
+function foo()
+{
+    // function body
+}
+?>
+}}}
+
+사이드 이펙트를 제거한 코드다.
+{{{#!plain
+<?php
+// declaration
+function foo()
+{
+    // function body
+}
+
+// conditional declaration is *not* a side effect
+if (! function_exists('bar')) {
+    function bar()
+    {
+        // function body
+    }
+}
+}}}
+
+=== 네임스페이스와 클래스 이름 ===
+네임스페이스와 클래스 이름은 PSR-0과 PSR-4 규격에 따라서 "autoloading"을 지원하도록 만들어야 한다. 
+
+이는 각 클래스 이름이 파일에 대응하며, 네임스페이스는 최소한 1 레벨 이상의 깊이를 가져야 함을 의미한다.(Top 레벨은 벤더 이름이다.)
+
+클래스 이름은 반드시 '''StudlyCaps'''형식을 따라야 한다.
+
+PHP 5.3 이후의 코드들은 반드시 네임스페이스 규칙을 따라야 한다.
+{{{#!plain
+<?php
+// PHP 5.3 이후
+namespace Vendor\Model;
+
+class Foo
+{
+}
+?>
+}}}
+
+PHP 5.2이하에서 만들어진 코드라면 클래스 이름앞에 '''Vendor_'''를 표기한다. 
+{{{#!plain
+<?
+// PHP 5.2 이하
+class Vendor_Model_Foo
+{
+}
+?>
+}}}
+=== 클래스 상수, Properties, 메서드 ===
+==== 상수 ====
+클래스 상수는 반드시 대문자와 언더바로만 선언해야 한다.
+{{{#!plain
+<?php
+namespace Vendor\Model;
+
+class Foo {
+  const VERSION = '1.0';
+  const DATE_APPROVED = '20120-06-01';
+}
+}}}
+==== Properties ====
+Properties(멤버변수)에 대해서는 '''$StudlyCaps''', '''$camelCase''', '''$under_score''' 중 어느 것을 사용해도 상관없다. 무엇이든 합리적인 범위안에서 일관성있게 사용하면 된다.
+
+==== 메서드 ====
+메서드 이름은 반드시 '''camelCase()'''를 따른다.
+
+== PSR-2 General Coding style ==
+일반적인 Coding Style Guide로 PSR-1을 기본으로 추가적인 요구사항들을 가이드 한다.
+
+=== Overview ===
+ * 코드는 반드시 PSR-1을 따라야 한다.
+ * 코드 들여쓰기(indenting)은 반드시 4개의 스페이스 문자를 사용한다.
+ * 라인의 길이는 80을 권장(SHOULD)한다.    
+ * '''namespace''' 다음에는 반드시 하나의 공백라인을 추가해야 한다. 
+ * '''use''' 다음에는 반드시 하나의 공백라인을 추가해야 한다.
+ * 클래스에서 braces({})는 반드시 다음 줄에 추가한다. 
+ * 메서드에서 braces는 반드시 다음 줄에 추가한다. 
+ * 모든 메서드와 propertis에 반드시 visibility를 선언해야 한다. 
+ * abstract와 final은 반드시 visibility 전에 선언해야 한다.
+ * static는 반드시 visibility 다음에 사용해야 한다.
+==== 예제 ====
+{{{#!plain
+<?php
+namespace Vendor\Package;
+
+use FooInterface;
+use BarClass as Bar;
+use OtherVendor\OtherPackage\BazClass;
+
+class Foo extends Bar implements FooInterface
+{
+    public function sampleFunction($a, $b = null)
+    {
+        if ($a === $b) {
+            bar();
+        } elseif ($a > $b) {
+            $foo->bar($arg1);
+        } else {
+            BazClass::bar($arg2, $arg3);
+        }
+    }
+
+    final public static function bar()
+    {
+        // method body
+    }
+}
+}}}
+=== General ===
+==== 기본 코딩 규칙 ====
+코드는 반드시 PSR-1의 기본 규칙을 따라야 한다.
+==== 파일 ====
+ * 모든 PHP 파일은 반드시 UNIX LF(linefeed)으로 끝맺어야 한다. 
+ * 모든 PHP 파일은 반드시 한줄의 공백줄로 끝맺어야 한다. 
+ * The closing ?> tag MUST be omitted from files containing only PHP.
+
+==== 줄 ====
+ * 줄 길이에 hard limit를 줄 필요는 없다.
+ * Soft limit는 반드시 120자다. 
+ * 줄 길이는 80자를 넘지 않는 것을 권장한다.
+ * There MUST NOT be trailing whitespace at the end of non-blank lines. 
+ * Blank lines MAY be added to improve readability and to indicate related blocks of code.
+ * 한 줄에 하나 이상의 statement를 두지 않는다. 한 줄 아끼려고 가독성 해치지 말라. 
+
+==== Indenting ====
+ * Indent는 반드시 4개의 스페이스 문자를 이용한다. 탭을 사용하지 말라. 
+
+==== 키워드와 True/False/Null ====
+ * PHP의 키워드는 반드시 '''소문자'''를 사용한다.
+ * '''true''', '''false''', '''null'''은 반드시 소문자여야 한다.
+
+=== Namespace and Use Declarations ===
+=== 클래스, properties, 메서드 ===
+==== Extends and Implements ====
+==== Properties ==== 
+==== Methods ====
+==== Method Arguments ====
+
+=== 제어문 ===
+==== if, elseif, else ====
+==== switch, case ====
+==== while, do while ====
+==== for ====
+==== foreach ====
+==== try, catch ====
+
+=== 클로저 ===
+=== Conclusion ===
+
+== PSR-3 Logger interface ==
+
+== PSR-4 Autoloader ==

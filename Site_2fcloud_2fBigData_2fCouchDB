@@ -1,51 +1,24 @@
 #title couchdb
 
 [[TableOfContents]]
-== 왜 CouchDB 를 ==
+== CouchDB ==
+=== 갑자기 왜 CouchDB를 시작하느냐 하면 ===
 Moniwiki를 사용한지 어언 10년째. 위키 시스템을 만들어볼까라는 생각이 들었다. 생각만하다가 포기할 확률이 99%쯤되긴 하는데, 어쨋든 wiki를 만들면 어떤 도구를 이용해야 하나 라는 생각부터 하기 시작했다. 대략 내린 결론은 다음과 같다.
   * '''CouchDB'''. [wiki:Site/cloud/automation Chef]하다가 접한 놈이다. '''문서 지향 데이터베이스'''라는데 혹했다. wiki도 문서관리 시스템이니 뭔가 죽이 잘 맞지 않을까라는 생각에서. 대략 couchdb를 살펴보니 '''문서 버전 관리'''기능을 가지고 있다. 이거야 말로 내가 원하는 건데, 잘됐다 싶었다. Moniwiki는 '''RCS'''로 문서 버전을 관리하는데, 깔끔하지 않은 느낌이다.   
   * '''Moniwiki'''를 기반으로 하자 : 바닥부터 새로 만들필요가 있나. 이미 있는 소프트웨어 잘 이용하자. Monwiki의 위키엔진을 그대로 사용하기로 했다. 위키페이지를 파일이 아닌 couchdb에 저장하고, 꺼내면 될일이다. 
 
-이리 하여, CouchDB를 배우게 됐으니.. 
+이리 하여, CouchDB를 배우게 됐다. 관련 내용들을 채워 나갈 생각이다. 
 
-== CouchDB 소개 ==
-Couchdb는 원본 문서의 내용을 수정하면, 원본 문서의 내용을 덮어쓰는게 아니고 새로운 버전 번호를 가지는 새로운 문서가 하나 만들어진다. GIT이나 SVN과 같은 MVCC(Multi-Version Concurrency Control)방식으로 문서를 관리한다. 따라서 문서에 대한 읽기/쓰기 잠금이 필요없다. 대신 하나의 문서에서 여러 버전의 문서가 파생될 수 있으므로, 애플리케이션 영역에서 문서를 병합(merge)하기 위한 장치가 필요하다. 
+== CouchDB Tutorial ==
+ * [wiki:Site/cloud/BigData/CouchDB/Tutorial Couchdb Tutorial]참고
+== CouchDB Definitive Guide ==
+Moniwiki를 CouchDB 버전으로 만들면서, 틈틈이 [http://guide.couchdb.org/ CouchDB Definitive Guide]도 번역하기로 했다.
 
-{{{#!html
-<img src="https://docs.google.com/drawings/d/10tOz4wpap5UlztHmuX0S2nDiZhjeIIgzujNDGO2Tb3A/pub?w=420&amp;h=297">
-}}}
-
-CouchDB는 미리 정의된 쿼리를 실행할 수 있는 환경 특히 버전관리가 중요한 곳에 적당한 NoSQL 툴이다. 구체적으로는 CMS, CRM 등이다. 
-
-=== 주요 기능 ===
-==== Document storage ====
-CouchDB는 데이터를 '''document(문서)'''단위로 저장한다. 문서는 key/value로 이루어진 JSON형태로 저장이 된다. 값(value)에는 문자열, 숫자, 날자, 배열, 리스트등이 들어갈 수 있다. CoucdDB에서 모든 문서는 유일한 id(unique id)를 가지며, schema free다.
-
-==== ACID Semantics ====
-다른 데이터베이스 처럼 ACID(Atomicity, Consistency, Isolation, Durability)를 제공한다. CouchDB는 MVCC를 이용해서 ACID를 구현했다. 즉 읽기와 쓰기에서 충돌없이 문서를 처리할 수 있다.
-
-==== Map/Reduce View와 색인 ====
-CouchDB는 View와 색인과 같은 애플리케이션 서비스 기능을 제장하고 있다. CouchDB는 map/reduce를 수행해서 view 결과를 만들 수 있는 javascript 함수를 지제공한다. 또한 문서의 추가, 삭제, 업데이트시 색인을 유지할 수 있다. 
-
-==== 분산 구조와 리플리케이션 ====
-CouchDB는 [wiki:man/12/replication bi-direction replication][[FootNote(Master-Master replication이라고도 부른다.)]]을 지원한다. off-line 상태에서도 리플리케이션을 유지할 수 있는데, 이는 비동기적으로 문서를 동기화 할 수 있음을 의미한다. 비동기적인 문서 동기화는 구현하고자 하는 서비스의 특성에 따라 단점이 될 수도 있겠는데, CouchDB는 애초에 MVCC 모델을 따르기 때문에 단점이라고 할 수 없을 것이다.
-
-==== Eventual Consitency ====
-CouchDB는 eventual consitency를 이용해서 가용성과 partition tolerance[[FootNote(분할내성. 메시지 전달이 실패하거나 시스템의 일부가 망가져도 시스템이 계속 작동하는 걸 보장하는 특성)]]을 보장한다.  
-
-==== REST API ====
-[wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]의 POST, GET, PUT, DELETE를 이용하는 [wiki:man/12/rest REST API]를 제공한다. REST API를 이용해서 문서에 대한 CRUD(Create, Read, Update, Delete) 작업을 수행할 수 있다. 
-
-==== Offline 작업 지원 ====
-CouchDB는 리플리카를 오프라인에서 유지할 수 있다. 예를들어 스마트기기등에서 원본을 동기화 한 다음에, 오프라인에서 작업을 하고 (온라인 상태가 되면)나중에 동기화를 할 수 있다. 
-
-== CouchDB 관련 문서들 ==
- * [wiki:Site/cloud/BigData/CouchDB/EventualConsistency CouchDB Eventual Consistency 개요]
- * [wiki:Site/cloud/BigData/CouchDB/Tutorial CouchDB tutorial]
- * [wiki:Site/cloud/BigData/CouchDB/CoreAPI CouchDB Core API 참고]
- * [wiki:Site/cloud/BigData/CouchDB/View CouchDB View 소개]
-== 참고 ==
-  * http://www.linux-mag.com/id/7597/
-  * [http://kkovacs.eu/cassandra-vs-mongodb-vs-couchdb-vs-redis NoSQL 특징 비교] 
-== 히스토리 ==
-  * 작성일 : [[Date(2013-02-03T15:02:38)]]
+=== CouchDB에 대해서 ===
+  1. [wiki:Site/cloud/BigData/CouchDB/WhyCouchDB Couchdb를 선택해야 할 이유] 
+  1. [wiki:Site/cloud/BigData/CouchDB/EventualConsistency Eventual Consistency]
+  1. CouchDB 시작하기
+  1. [wiki:Site/cloud/BigData/CouchDB/CoreAPI Core API]
+=== CouchDB와 함께 개발을 ===
+=== 예제 패르리케이션 개발 ===
+=== CouchDB 전개 ===

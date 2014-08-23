@@ -1,0 +1,514 @@
+#title golang 시작하기
+
+[[TableOfContents]]
+== 들어가기 전에 ==
+이 문서의 모든 내용은 우분투 리눅스 14.04를 기준으로 한다. 왜 우분투냐 하면, 그냥 내가 개발과 데스크탑 환경으로 우분투를 사용하고 있기 때문이다. 다른 운영체제를 사용한다면 이 문서는 참고하기에 적당하지 않을 수도 있겠다.
+
+== golang 설치 ==
+우분투는 거의 모든 소프트웨어 패키지를 구비하고 있는 것으로 유명하다. 당연히 golang 패키지도 지원해서 [wiki:Site/Linux/Documents/UbuntuPackageManagement apt-get]으로 간단히 설치할 수 있다. 하지만 안타깝게도 14.04에서 사용할 수 있는 golang 버전은 1.2.1이다. ([[Date(2014-08-14T16:38:39)]])현재 go 최신버전은 1.3.2 다. 1.2.1 버전을 사용하기에는 뒷통수가 근질거려서 최신버전을 다운로드 해서 설치하기로 했다. --다운로드 해서 설치한다고 해도, 이미 빌드된 걸 압축만 푸는 거라서 별다른 어려움이 있는 것도 아니다.-- 
+
+go는 http://golang.org/dl/ 에서 "go1.3.1.linux-amd64.tar.gz"을 다운로드 했다. 설치 디렉토리는 /usr/local
+{{{#!plain
+# mv go1.3.1.linux-amd64.tar.gz /usr/local
+# cd /usr/local
+# tar -xvzf go1.3.1.linux-amd64.tar.gz
+}}}
+
+go개발을 위한 환경설정을 했다.
+{{{#!plain
+# cat /home/yundream/.profile
+export PATH=$PATH:/usr/local/go/bin
+.....
+
+# source /home/yundream/.profile
+# go version
+go version go1.3.1 linux/amd64
+}}}
+설치 끝..
+
+== 에디터는 vim ==
+내 주력 에디터는 [wiki:moniwiki/wiki.php/Site/Vim vim] 이다. go 프로그래밍 환경을 위해서 vim-go를 설치하기로 했다. 
+=== vim-go ===
+vim-go를 많이들 사용하고 있는 것 같다. go 언어를 위한 syntax highlighting, '''gocode'''를 이용한 자동완성, gofmt를 이용한 자동 포멧팅, '''godoc'''를 이용한 go 언어 도움말. GoRUN, GoBuild등의 명령을 이용해서 vim 에디팅 환경에서 코드 실행 및 컴파일 등등 go 소프트웨어 개발을 위해 필요한 필수 기능들을 가지고 있다. 
+
+먼저 vim 패키지 매니저를 설치했다. 보통 Vundle 혹은 [https://github.com/tpope/vim-pathogen pathogen]을 사용하는데, 나는 pathogen을 사용하고 있다. pathogen을 설치하지 않았다면, 아래와 같이 설치하자. 
+{{{#!plain
+# mkdir -p ~/.vim/autoload ~/.vim/bundle
+# cd ~/.vim/autoload
+# curl -LSso pathogen.vim https://tpo.pe/pathogen.vim
+}}}
+
+.vimrc 파일을 수정한다. 
+{{{#!plain
+# cat ~/.vimrc
+execute pathogen#infect()
+syntax on
+filetype plugin indent on
+}}}
+
+이제 vim-go를 설치하자.
+{{{#!plain
+# cd ~/.vim/bundle
+# git clone https://github.com/fatih/vim-go.git
+}}}
+
+vim-go를 사용하려면 작업공간(workspace)를 설정해줘야 한다. 환경변수 GOPATH를 설정하면 된다. 나는 "/home/yundream/golang"으로 했다. GOAPTH는 .profile에 넣어 두자. 
+{{{#!plain
+# export GOPATH=$HOME/golang 
+# mkdir $HOME/golang
+}}}
+
+현재 환경변수 정보는 다음과 같다. 
+{{{#!plain
+# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin
+# echo $GOPATH
+/home/yundream/golang
+}}}
+
+Mercurial[[FootNote(Git 같은 버전관리 시스템이다. google 얘들이 Mercurial을 사용하는 바람에 필요하다)]]을 설치한다.
+{{{#!plain
+# apt-get install mercurial
+}}}
+
+vim을 실행하면, 자동으로 vim-go에 필요한 패키지를 설치한다.
+{{{#!plain
+# vim
+vim-go: gocode not found. Installing github.com/nsf/gocode to folder /home/yundream/.vim-go/
+vim-go: goimports not found. Installing code.google.com/p/go.tools/cmd/goimports to folder /home/yundream/.vim-go/
+vim-go: godef not found. Installing code.google.com/p/rog-go/exp/cmd/godef to folder /home/yundream/.vim-go/
+vim-go: oracle not found. Installing code.google.com/p/go.tools/cmd/oracle to folder /home/yundream/.vim-go/
+vim-go: golint not found. Installing github.com/golang/lint/golint to folder /home/yundream/.vim-go/
+vim-go: errcheck not found. Installing github.com/kisielk/errcheck to folder /home/yundream/.vim-go/
+vim-go: gotags not found. Installing github.com/jstemmer/gotags to folder /home/yundream/.vim-go/
+계속하려면 엔터 혹은 명령을 입력하십시오
+}}}
+
+작업공간을 보면 몇 개의 디렉토리와 파일들을 확인할 수 있을 거다.
+{{{#!plain
+# ls $GOPATH
+pkg  src
+}}}
+
+=== vim-go를 이용한 개발 ===
+vim-go의 기능을 대강 훑어 보자.
+
+터미널로 빠지지 않고 go 코드를 실행할 수 있다. 
+{{{#!plain
+:GoRun
+}}}
+
+터미널로 빠지지 않고 go 코드를 build 할 수 있다.
+{{{#!plain
+:make
+:GoBuild
+}}}
+
+에러체크
+{{{#!plain
+:GoErrCheck
+}}}
+
+함수 혹은 키워드에 대한 도움말이 필요하다면, GoDoc를 이용한다.
+{{{#!plain
+:GoDoc 
+}}}
+
+변수에 대한 정의를 찾고 싶다면 GoDef 
+{{{#!plain
+:GoDef
+}}}
+
+=== 자동완성 ===
+자동완성을 하고 싶다면 YCM을 설치하자. YCM을 설치하기 위해서는 "python-dev", "cmake" 패키지가 필요하다. 먼저 설치한 후 진행하자. 
+{{{#!plain
+# cd ~/.vim/bundle
+# git clone https://github.com/Valloric/YouCompleteMe.git
+# cd YouCompleteMe
+# ./install.sh
+}}}
+
+반드시 설치해야 할 플러그인 중 하나다. 여기에 몇 개 플러그인 더 붙이면 IDE가 절대 부럽지 않다.
+
+https://lh5.googleusercontent.com/-n9eUbylZw50/U_C_wglq1aI/AAAAAAAAEQI/IsIWi6MYrdc/s640/golang-2.png
+
+=== Tagbar 설치 ===
+역시 필수 플러그인이다. ctag을 기반으로 하는 플러그인이므로 먼저 ctag를 설치해야 한다.
+{{{#!plain
+# apt-get install ctags
+}}}
+
+tagbar를 설치한다.
+{{{#!plain
+# cd ~/.vim/bundle
+# git clone https://github.com/majutsushi/tagbar.git
+}}}
+
+vim에서 tagbar를 사용하려면 ''':TagbarToggle'''를 입력해야 한다. 귀찮아서 <F8>로 맵핑했다.
+{{{#!plain
+# cat .vimrc
+......
+nmap <F8> :TagbarToggle<CR>
+}}}
+
+설치후 적용 화면
+
+https://lh5.googleusercontent.com/-xO-ZcWBjqfQ/U_NybrcP-FI/AAAAAAAAEQ8/VjcKCUsrIE0/s640/golang-3.png
+
+멋지다.
+
+=== 파일 브라우저 nerdtree 설치 ===
+{{{#!plain
+# go ~/.vim/bundle
+# git clone https://github.com/scrooloose/nerdtree.git 
+}}}
+편하게 사용하기 위해서 <Ctrl+n>으로 맵핑했다.
+{{{#!plain
+# cat ~/.vimrc
+......
+<C-n> :NERDTreeToggle<CR>
+}}}
+
+https://lh6.googleusercontent.com/-yfhTJc0-xMc/U_N0PxZXmEI/AAAAAAAAERE/2n5LUOmtQGw/s640/golang-4.png
+
+좋구나..
+== 첫 프로그램 개발 ==
+=== Hello World ===
+HelloWorld 프로그램을 만들기로 했다. 프로그램 개발을 위한 작업디렉토리 Go/src/helloworld를 만들었다.
+{{{#!plain
+# mkdir Go/src/helloworld
+# cd Go/src/helloworld
+}}}
+
+hello.go 파일을 만들었다. 
+{{{#!plain
+package main
+
+import "fmt"
+        
+func main() {
+    fmt.Println("Hello World")
+}          
+}}}
+
+파일을 저장 한 다음, main.go를 실행했다. 
+{{{#!plain
+# go run hello.go
+Hello World
+}}}
+화면에 "Hello World"가 출력되면 성공.
+
+=== 코드 분석 ===
+코드를 분석해 보자. 첫줄은 패키지로 시작한다. 
+{{{#!plain
+package main
+}}}
+이 부분을 "package declaration"(패키지 선언)이라고 한다. 모든 go 프로그램은 반드시 패키지 선언으로 시작해야 한다. 패키지는 코드 재사용을 위해서 채택한 go언어의 고유한 기능이다. Go 프로그램은 "executables"(실행 가능한) 프로그램과 "libraries" 두 개 타입으로 구분할 수 있다. 실행가능한 프로그램은 터미널에서 명령을 내려서 직접 실행할 수 있는 프로그램을 의미한다. 라이브러리는 다른 프로그램에서 호출해서 사용할 수 있는 코드의 모음인데, 이 코드를 호출 할 때 패키지를 이용한다. 
+
+다음 줄이다.
+{{{#!plain
+import "fmt"
+}}}
+import는 다른 패키지로 부터 코드를 가져다 쓰기 원할 때 사용한다. "fmt"는 패키지 이름으로, 이 패키지에는 형식적인 입력과 출력을 위한 코드들을 포함하고 있다.
+
+{{{#!plain
+func main() {
+    fmt.Println("Hello World")
+}
+}}}
+
+Go 프로그램은 함수(function)를 기본단위로 구성된다. 모든 함수는 '''func''' 키워드로 시작하며, 그 뒤에 함수의 이름을 붙인다. 즉 위에 있는 코드는 "main 함수"를 보여주고 있다. main 함수는 특별한 함수로, 실행가능한 프로그램을 만들기를 원한다면 반드시 있어야 한다.    
+
+{{{#!plain
+fmt.Println("Hello World")
+}}}
+이 코드는 3개의 부분으로 이루어져 있다. 첫번째 구성요소인 '''fmt'''는 패키지 이름으로, '''fmt''' 패키지에 있는 '''Println''' 코드를 호출하고 있다. 세번째 구성요소는 fmt.Println 코드에 넘길 매개변수다.
+
+이 프로그램에서 뭔가 실제로 일을 하는 녀석은 "Println" 함수로, 화면에 문자를 출력하는 일을 한다. 이 함수에 대해서 자세한 정보를 보고 싶을 건데, 이럴 때는 godoc를 이용하면 된다.  
+{{{#!plain
+# godoc fmt Println
+func Println(a ...interface{}) (n int, err error)
+    Println formats using the default formats for its operands and writes to
+    standard output. Spaces are always added between operands and a newline
+    is appended. It returns the number of bytes written and any write error
+    encountered.
+}}}
+
+vim-go를 설치했다면, :GoDoc 으로 vim 상에서 바로 도움말을 볼 수 있다. 
+
+https://lh5.googleusercontent.com/-KmWLfQCNTU8/U-zlXTtTuXI/AAAAAAAAEP4/2t1gQBQKtTM/s400/golang-1.png
+
+프로그을 빌드하자.
+{{{#!plain
+# go build hello.go
+}}}
+
+프로그램을 빌드하면, "hello"라는 실행파일이 만들어 진다.  
+{{{#!plain
+# ./hello
+Hello World
+}}}
+
+== 코드 개발 구조 ==
+=== 작업공간 - Workspace ===
+여기까지 진행했다면 환경 변수 '''GOPATH'''과 이에 따른 작업공간까지 만들어졌을 거다. 
+{{{#!plain
+# echo $GOPATH
+/home/yundream/golang
+}}}
+
+작업공간에 들어가 보면 3개의 디렉토리가 보일거다. 
+  * src : 패키지로 구성되는 go 소스 파일들이 있다.  
+  * pkg : 패키지 객체 파일(확장자가 .a)들이 있다.   
+  * bin : 실행파일들이 있다. 
+디렉토리 구조는 대략 다음과 같을 거다.
+{{{#!plain
+.
+├── bin                                    # 실행파일이 있는 디렉토리
+├── pkg                                    
+│   └── linux_amd64
+│       ├── code.google.com
+│       │   └── p
+│       │       ├── go.tools
+│       │       │   ├── astutil.a          # 패키지 객체
+│       │       │   ├── container
+│       │       │   │   └── intsets.a
+│       ├── github.com
+│       │   ├── golang
+│       │   │   └── lint.a
+│       │   └── kisielk
+│       │       ├── errcheck
+│       │       │   └── lib.a
+│       │       └── gotool.a
+│       └── honnef.co
+│           └── go
+│               └── importer.a
+└── src
+    ├── code.google.com
+    │   └── p
+    │       └── go.tools
+    │           └── cmd
+    │               ├── benchcmp
+    │               │   ├── benchcmp.go
+    │               │   ├── compare.go
+    │               │   ├── compare_test.go
+    │               │   ├── doc.go
+    │               │   ├── parse.go
+    │               │   └── parse_test.go
+    │               ├── cover
+    │               │   ├── cover.go
+    │               │   ├── cover_test.go
+    │               │   ├── doc.go
+    │               │   ├── func.go
+    │               │   ├── html.go
+    │               │   └── testdata
+    │               │       ├── main.go
+    │               │       └── test.go
+    │               ├── lenses.go
+    │               └── values.go
+    └── github.com                    # git repository
+        └── nsf
+            └── gocode
+}}}
+
+=== Package paths ===
+Package path에는 "fmt" "net/http"와 같은 표준 라이브러리 패키지들이 있다. 자신의 패키지를 개발한다면, 표준라이브러리와 향후 추가될 패키지들과의 충돌을 염두에 두고 경로를 선택해야 한다. 
+
+만약 소스코드를 위한 저장소를 가지고 있다면, 소스 저장소의 경로를 기본 경로로 지정할 수 있다. Github를 사용하고 있다면 "github.com/user"를 기본경로로 지정할 수 있다.
+
+=== Hello world 구조 리펙토링 ===
+앞서 개발했던 Hello world 프로그램을 go 프로그램 개발 구조에 맞추어 재 작성하기로 했다. 기본 경로는 github.com/yundream/hello로 했다.
+
+{{{#!plain
+# mkdir -p $GOPATH/src/github.com/yundream/hello
+}}}
+
+hello.go는 다음과 같다.
+{{{#!plain
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    fmt.Println("Hello World")
+}
+
+}}}
+
+'''install'''을 매개변수로 hello.go를 컴파일 해보자.
+{{{#!plain
+# go install
+}}}
+
+컴파일이 끝난 실행파일은 $GOPATH/bin 밑에 복사된다. 실행해보자.(실행전에 PATH 환경변수에 $GOPATH/bin을 추가해야 한다.) 
+{{{#!plain
+# hello
+Hello World
+}}}
+
+만약 git을 이용해서 소스코드를 관리하고 있다면, 개발한 코드를 저장소에 옮겨서 개발할 수 있다. github에 hello 저장소를 만들었다고 가정하고 진행한다.   
+{{{#!plain
+# cd $GOPATH/src/github.com/yundream/hello
+# git init
+# git add hello.go 
+# git commit -m "initial commit"
+# git remote add origin git@github.com:yundream/hello.git
+# git push -u origin master
+Counting objects: 4, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (4/4), 351 bytes | 0 bytes/s, done.
+Total 4 (delta 0), reused 0 (delta 0)
+To git@github.com:yundream/hello.git
+ * [new branch]      master -> master
+}}}
+
+=== 첫번째 라이브러리 개발 ===
+첫번째 라이브러리를 개발했다. 역시 github를 기본 경로로 했다. 패키지의 이름은 newmath다. 
+{{{#!plain
+# mkdir $GOPATH/src/github.com/yundream/newmath
+}}}
+
+sqrt.go 코드를 만들었다.
+{{{#!plain
+package newmath
+
+func Sqrt(x float64) float64 {
+    z := 1.0
+    for i := 0; i < 1000; i++ {
+        z -= (z*z - x) / (2 * z)
+    }
+    return z
+}
+}}}
+
+build를 해봤다.
+{{{#!plain
+# go build
+# echo $?
+0
+}}}
+
+빌드는 성공적으로 끝낸 것 같은데, 아무런 파일도 만들어지지 않는다. 이런 패키지의 경우에는 반드시 install 옵션으로 컴파일해야 한다. install 로 컴파일 하면, 작업공간의 "pkg" 디렉토리에 object file이 만들어진다.   
+{{{#!plain
+# go install
+# cd $GOPATH/pkg/linux_amd64/github.com/yundream
+# ls
+newmath.a
+}}}
+
+newmath 패키지를 사용하도록 hello.go 코드를 수정했다.
+{{{#!plain
+import (
+    "fmt"
+    "github.com/yundream/newmath"
+)
+
+func main() {
+    fmt.Println("Hello World. Sqrt(2)=", newmath.Sqrt(2))
+}
+}}}
+
+install로 컴파일 하면 $GOLANG/bin 밑에 실행파일이 만들어진다. 
+{{{#!plain
+# cd $GOPATH/src/github.com/yundream/hello
+# go install
+# cd $GOPATH/bin
+# ./hello
+Hello World. Sqrt(2)= 1.414213562373095
+}}}
+
+지금까지 만들어진 파일들의 경로를 추적해봤다.
+{{{#!plain
+.
+├── bin
+│   └── hello 
+├── pkg                                    
+│   └── linux_amd64
+│       └── github.com
+│             └── yundream 
+│               └── newmath.a 
+└── src 
+     └── github.com
+            ├── yundream 
+            │      └── hello 
+            │        └── hello.go
+            └── newmath 
+                   └── sqrt.go 
+}}}
+bin 디렉토리 밑에 install한 hello 실행파일이 보인다. pkg 밑에 newmath.a 파일이 만들어진 걸 확인할 수 있다. pkg디렉토리 구성을 보면 linux_amd64가 있는데, 이 부분은 크로스 컴파일시 사용한다. 디렉토리 이름은 시스템의 운영체제와 아키텍처를 반영한다.
+
+=== 테스트 ===
+테스트 프레임워크를 포함하는 최신 언어들의 영향을 받아서인지, go 언어 역시 경량의 test 프레임워크를 제공한다. 프레임워크는 test 옵션을 이용해서 사용할 수 있다. 
+
+테스트 파일은 파일뒤에 _test.go를 붙이면 된다. newmath.Sqrt에 대한 테스트 파일을 만들어봤다. 테스트 파일은 $GOPATH/src/github.com/yundream/newmath/sqrt_test.go 으로 코드는 다음과 같다.
+{{{#!plain
+package newmath
+
+import "testing"                 # testing 패키지를 임포트 해야 한다.
+
+func TestSqrt(t *testing.T) {    # 테스트 함수는 Test로 시작해야 한다.
+    const in, out = 4, 2
+
+    # 테스트 코드 
+    if x := Sqrt(in); x != out {
+        t.Errorf("Sqrt(%v) = %v, want %v", in, x, out)
+    }
+}
+}}}
+
+go test로 테스트해보자.
+{{{#!plain
+# go test
+PASS
+ok      github.com/yundream/newmath     0.001s
+}}}
+테스트 프레임워크에 대한 자세한 내용은 [http://golang.org/pkg/testing/ testing package documentation]문서를 살펴보자. 나중에 시간이 되면 살펴봐야 겠다.
+
+=== 리모트 패키지 ===
+Git이나 Mercurial과 같은 코드 관리 시스템으로 부터 패키지 소스코드를 가져올 수 있다. 예를들어 구글은 hello 라는 go 언어 테스트용 패키지를 제공한다. 저장소 경로는 code.google.com/p/go.example인데, go get으로 가져올 수 있다. 
+
+{{{#!plain
+# go get code.google.com/p/go.example/hello
+# $GOPATH/bin/hello
+Hello, world.  Sqrt(2) = 1.414213562373095
+}}}
+
+go get을 수행한 후, 디렉토리는 다음과 같았다.
+{{{#!plain
+.
+├── bin
+│   └── hello 
+├── pkg                                    
+│   └── linux_amd64
+│       ├── github.com
+│       │     └── yundream 
+│       │           └── newmath.a 
+│       │        
+│       └── code.google.com       
+│             └── p 
+│                 └── go.example 
+│                       └── newmath.a 
+│                
+└── src 
+     ├── code.google.com 
+     │       └── p 
+     │           └── go.example 
+     │                  ├── hello 
+     │                  └── newmath 
+     └── github.com
+            ├── yundream 
+            │      └── hello 
+            │        └── hello.go
+            └── newmath 
+                   └── sqrt.go 
+}}}
+
+go get을 이용하는 대신 import를 이용하는 방법도 있다.
+{{{#!plain
+import "code.google.com/p/go.example/newmath"
+}}}
+go get을 이용할 경우 작업 컴퓨터가 바뀔때마다 go get으로 환경을 맞춰줘야 하는데, import를 이용하면 작업 컴퓨터에 상관없이 패키지를 사용할 수 있다는 장점이 있다. 3rd-party 패키지를 사용하는 가장 좋은 방법이다. [http://godoc.org/ godoc.org]와 [https://code.google.com/p/go-wiki/wiki/Projects Go wiki]에서 다양한 패키지들을 찾을 수 있다.
+

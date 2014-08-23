@@ -1,0 +1,186 @@
+#title php namespace
+
+[[TableOfContents]]
+== 네임스페이스 ==
+php는 방대한 양의 라이브러리, 클래스, 함수들을 가지고 있다. 이들을 효과적으로 관리하고 배포하기 위해서 네임스페이스를 이용한다. 네임스페이스는 디렉토리로 관리하는 도메인 같은 걸로 이해하면 되겠다. 유닉스 파일 시스템으로 개념을 설명할 수 있다. '''/home/yundream'''과 '''/home/other'''에 foo.txt라는 파일이 있다고 가정해 보자. foo.txt라는 이름만으로는 누가 만든 파일인지를 알 수가 없다. 하지만 "/home/yundream/foo.txt"로 표기를 하면, yundream이 만든 파일임을 알 수 있다. 이것을 프로그래밍 영역으로 확장한게 네임스페이스다.   
+
+PHP 5.3 버전 부터 네임스페이스를 지원한다.
+
+PHP에서 네임스페이스는 클래스나 함수같은 재사용 가능한 코드를 사용할 때 발생할 수 있는 두 가지 문제를 해결하기 위해서 사용한다.  
+  1. 당신이 직접 만든 코드와 서드파티 코드간에 클래스/함수/상수간의 충돌을 막기 위해서
+  1. 재사용 가능한 코드를 만들 때, '''Extra Long Name(엄청나게 긴 이름)'''을 가진 클래스,함수,상수 이름에 대한 별칭 혹은 짧은 이름을 설계하기 위해서 
+
+2번을 예로 들어보자. 네임스페이스가 나오기 전에는 긴 함수/클래스 이름으로 자신의 도메인을 나타내야 했다. 예를들어 워드프레스(WordPress)의 경우 모든 함수나 클래스 이름에 'WP_'가 붙는다. Zend 프레임워크의 경우 "Zend_Search_Lucene_Analysis_Analyzer_common_Text_CaseInsensitive"와 같은 엽기적으로 기다란 클래스 명을 사용해야 한다. 
+
+== 네임스페이스의 사용 ==
+=== 네임스페이스 정의 ===
+PHP 파일의 가장 윗줄에 '''namespace''' 키워드를 이용해서 네임스페이스를 정의할 수 있다.
+{{{#!plain
+<?php
+// Joinc라는 이름으로 네임스페이스를 정의했다.
+namespace Joinc;
+}}}
+네임스페이스 영역에 있는 모든 코드들은 Joinc 네임스페이스에 포함된다. 
+
+백슬래쉬(\)를 이용해서 서브 네임스페이스를 정의 할 수 있다.
+  * Joinc\Database\MySQL
+  * Joinc\Search\Lucene\Indexer
+  * Joinc\Search\Lucene\Seacher
+
+=== 네임스페이스 호출 ===
+'''Joinc\Mylib'''라는 이름으로 네임스페이스를 만들었다. 파일 이름은 lib.php다.
+{{{#!plain
+<?php
+// Joinc에서 사용하기 위한 공통 라이브러리를 위한 네임스페이스
+namespace Joinc\Mylib
+
+const LIB_VERSION='1.0' 
+
+function Version() {
+  return LIB_VERSION;
+}
+
+class Hello{
+  function Hello($name) {
+    return "Hello $name!!!";
+  }
+}
+}}}
+
+다음과 같이 사용할 수 있다.
+{{{#!plain
+<?php
+header('Content-type: text/plain');
+require_once('lib.php');
+
+echo \Joinc\Mylib\LIB_VERSION;
+$obj = new \Joinc\Mylib\Hello;
+}}}
+=== 같은 네임스페이스에서 작업하기 ===
+테스트를 위해서 joinc.php와 my.php 두개의 라이브러리 파일을 만들었다.  
+
+joinc.php
+{{{#!plain
+<?php
+namespace joinc\lib;
+class Foo {
+  function Hello() {
+    echo "Hello World : ",__NAMESPACE__;
+  }
+}
+function myfunction() {
+  echo "My Function : ", __NAMESPACE__;
+}
+?>
+}}}
+
+my.php
+{{{#!plain
+<?php
+namespace my\lib;
+class Foo {
+  function Hello() {
+    echo "Hello World : ",__NAMESPACE__;
+  }
+}
+function myfunction() {
+  echo "My Function : ", __NAMESPACE__;
+}
+?>
+}}}
+
+두개의 라이브러리 파일을 모두 include 했다면, my\lib\Foo 처럼 네임스페이스를 명시해줘야 한다. 그래야지만 어느 네임스페이스의 클래스를 호출할지 알 수 있기 때문이다. 
+
+만약 "my\lib" 네임스페이스만 사용한다면, 사용할 네임스페이스를 선언하는 것으로 풀 네임스페이스를 명시하지 않아도 사용할 수 있다.
+{{{#!plain
+namespace joinc\lib;
+require "my.php";
+require "joinc.php";
+
+$app = new Foo;
+}}}
+결과
+{{{#!plain
+Hello World : joinc\lib
+}}}
+
+중간에 작업 네임스페이스를 변경하는 것도 가능하다.
+{{{#!plain
+namespace joinc\lib;
+require "my.php";
+require "joinc.php";
+
+$app = new Foo;
+$app->Hello();
+echo "<br/>";
+
+namespace my\lib;
+$app = new Foo;
+$app->Hello();
+}}}
+
+결과
+{{{#!plain
+Hello World : joinc\lib
+Hello World : my\lib
+}}}
+
+=== 네임스페이스 import 및 별칭 이용하기 ===
+use를 이용해서 namespace를 import하거나 namespace에 대한 별칭을 이용할 수 있다.
+
+joinc\lib를 import 했다.
+{{{#!plain
+require "my.php";
+require "joinc.php";
+
+use joinc\lib;
+
+$app = new lib\Foo;
+$app->Hello();
+echo "<br/>";
+}}}
+
+joinc\lib의 별칭을 jc로 했다.
+{{{#!plain
+require "my.php";
+require "joinc.php";
+
+use joinc\lib as jc; 
+
+$app = new jc\Foo;
+$app->Hello();
+echo "<br/>";
+}}}
+
+joinc\lib\Foo의 full qualified name에 대한 별칭을 myfunc로 했다. 
+{{{#!plain
+use joinc\lib\Foo as myfunc;
+
+$app = new myfunc;
+$app->Hello();
+}}}
+
+=== Global 함수 사용하기 ===
+특수한 목적에 사용하기 위해서 "Joinc\lib\fopen" 함수를 만들었다. namespace를 joinc\lib로 선언하면 이후 fopen를 사용하면 joinc\lib\fopen을 호출할 것이다. 하지만 (php에서 제공하는)글로벌 fopen을 사용해야 할 때가 있을 거다. 글로벌 함수를 사용하고 싶다면, 함수앞에 "\"를 붙여주면 된다. 
+
+{{{#!plain
+namespace joinc\lib;
+function fopen($fname, $mode) {
+  echo "Function name : ",__FUNCTION__;
+}
+}}}
+
+{{{#!plain
+namespace joinc\lib;
+require "joinc.php";
+
+fopen("test.txt", "r");
+\fopen("test.php", "r");
+}}}
+== 네임스페이스 명명 규칙 ==
+[wiki:man/12/php/PSR PSR 참고]
+
+== 참고 ==
+ * [http://www.phpk.org/archives/321 네임스페이스]
+ * [http://www.sitepoint.com/php-namespaces-import-alias-resolution/ PHP 네임스페이스, 임포트, 별칭]
+ * [http://www.sitepoint.com/how-to-use-php-namespaces-part-3-keywords-and-autoloading/ PHP 네임스페이스 키워드와 autoloading]

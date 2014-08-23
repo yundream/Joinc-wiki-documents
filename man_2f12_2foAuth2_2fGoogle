@@ -1,0 +1,338 @@
+#title Google OAuth 인증을 이용한 애플리케이션 개발
+
+[[TableOfContents]]
+== Google oAuth2.0 애플리케이션 개발 ==
+=== 소개 ===
+Google oAuth 인증을 실제 웹 서비스에 붙이면서 oAuth를 익혀보려 한다. 이걸 체화라고 하던가. 어떤 기술을 체화하는데, 가장 좋은 방법은 몸 으로 뛰고 부딛쳐 보는 거다. 다른 말로 삽질. 요즘엔 삽질 같은거 왜 하니라는 분위기던데, 반복되는 삽질이야 말로 기술을 체화하는 가장 확실하면서, 가장 효율적이면서 동시에 유일한 방법이라고 생각한다.
+
+== 테스트 환경 만들기 ==
+=== 환경 ===
+  * 우분투 리눅스 14.04
+  * 웹서버 : [wiki:man/12/Nginx NginX] + PHP-FPM
+  * 인프라 : [wiki:Site/cloud/AWS AWS] EC2. Free tier를 계약하면, 1년 무료로 사용할 수 있다. 계산해 보니, 한달에 10불 정도로 5000원 정도하는 국내 가상화 서비스에 비해서 좀 비싼 것 같기는 하다. 그래도 1년 뒤에는 AWS로 넘어갈 것 같다. 일단 개발자 입장에서 AWS console을 둘러보는 것만으로 배울게 넘쳐나기 때문에, 공부하는 차원에서라도 AWS를 써야 할 것 같다. 
+  * 서버 이름 : mytest.joinc.co.kr
+=== 인증 Type ===
+웹 애플리케이션에 특화된 OAuth1.0과 달리 OAuth2.0은 다양한 종류의 애플리케이션을 지원 할 수 있다. 구글은 4가지 타입의 인증방식을 지원한다. 
+  1. Web server application : 일반적인 웹 애플리케이션을 위한 인증방식. '''오늘 테스트할 인증 방식'''이다. 
+  1. Installed application : PC, 모바일, 타블랫 등에 설치되는 애플리케이션을 위한 인증 방식
+  1. Client-side (JavaScript)application : 브라우저에서 실행되는 자바스크립트 형식의 인증 방식이다.
+  1. Applications on limited-input devices : 게임 콘솔, 비디오 카메라, 프린터등 입출력 인터페이스가 제한적인 디바이스를 위한 인증방식이다. IoT 환경에서 쓸만한 방법인 것 같다.     
+
+=== SSL 사설 인증서 만들기 ===
+oAuth2.0는 '''HTTPS''' 위에서 작동한다. 테스트에 사용할 건데, 공인인증서를 설치하는 건 도를 넘는 짓이라서, 사설 인증서로 대신하기로 했다. 사설 인증서를 만드는게 목적은 아니니, 자세한 설명 없이 대충 만들고 넘어간다. 사설인증서는 거들 뿐이다.
+
+==== 개인키 생성 ====
+먼저 개인키를 만든다.
+{{{#!plain
+# openssl genrsa -des3 -out mytest.joinc.co.kr.key 2048
+Generating RSA private key, 2048 bit long modulus
+..............................................................................................................................................................................+++
+.......................................................................................+++
+e is 65537 (0x10001)
+Enter pass phrase for ssl.key: 
+Verifying - Enter pass phrase for ssl.key: 
+}}}
+개인키를 만들기 위해서는 반드시 패스워드를 입력해야 한다. 
+
+개인키에서 패스워드를 삭제했다.
+{{{#!plain
+# openssl rsa -in mytest.joinc.co.kr.key -out mytest.joinc.co.kr.key.nopass
+Enter pass phrase for ssl.key: 위에서 입력한 패스워드 입력 
+writing RSA key
+
+# cp mytest.joinc.co.kr.key.nopass mytest.joinc.co.kr.key
+}}}
+
+==== CSR 만들기 ====
+CSR(인증요청서 Certificate Signing Request)를 만들자.
+{{{#!plain
+# openssl req -new -key mytest.joinc.co.kr.key -out mytest.joinc.co.kr.csr
+Enter pass phrase for ssl.key:
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+....
+....
+....
+}}}
+
+==== 사설 인증서 만들기 ====
+{{{#!plain
+# openssl x509 -req -days 36500 -in mytest.joinc.co.kr.csr -signkey mytest.joinc.co.kr.key -out mytest.joinc.co.kr.crt
+Signature ok
+subject=/C=KR/ST=Seoul/L=Seocho/O=Joinc/OU=Joinc/CN=mytest.joinc.co.kr/emailAddress=yundream@gmail.com
+Getting Private key
+}}}
+
+==== Nginx SSL 설정 ====
+위에서 만든 mytest.joinc.co.kr.key와 mytest.joinc.co.kr.crt를 /etc/nginx/ssl 밑으로 옮겼다. 다음은 nginx 설정 파일 
+{{{#!plain
+# PHP-FPM Local bind 주소
+upstream serverpool {
+    server localhost:8000;
+}
+
+# HTTP 설정
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server ipv6only=on;
+    # 생략
+}
+
+server {
+    listen 443 ssl;
+
+    root /var/www/mytest;
+    index index.html index.htm index.php;
+
+    server_name mytest.joinc.co.kr;
+
+    ssl_certificate     /etc/nginx/ssl/mytest.joinc.co.kr.crt;
+    ssl_certificate_key /etc/nginx/ssl/mytest.joinc.co.kr.key;
+    ssl_protocols       SSLv3 TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+}
+}}}
+
+=== 구글에 mytest 애플리케이션 등록 ===
+구글 OAuth를 사용하기 위해서는 구글에 애플리케이션을 등록해야 한다.
+
+먼저 [https://console.developers.google.com google developers console]에서 Project를 만든다. 테스트를 위해서 mytest라는 프로젝트를 만들었다. Developer Console에서 '''APIS & AUTH''' > '''Credentials'''를 선택한다. 
+
+'''Create new Client ID'''를 클릭하면, '''APPLICATION TYPE'''를 선택하는 창이 뜬다. 웹 애플리케이션으로 테스트 할 거라서 Web application을 선택했다.'''AUTHORIZED JAVASCRIPT ORIGINS'''와 '''AUTHORIZED REDIRECT URI'''를 설정한다. 각각 https://mytest.joinc.co.kr 와 https://mytest.joinc.co.kr/ouath2callback 로 설정했다.
+
+https://lh5.googleusercontent.com/--g0B50_dDgs/U9-pNdFwGGI/AAAAAAAAENI/VJIl4xaBwMI/s640/google_oauth_03.png
+
+잠시 후 CLIENT ID, CLIENT SECRET등 필요한 정보가 만들어진다. JSON 파일로 다운로드해서 적당한 위치에 저장해 두자.
+
+https://lh3.googleusercontent.com/-1NZclpCQRKA/U9-pNZlqfPI/AAAAAAAAENQ/r9PJfvGNdW0/s640/google_oauth_04.png
+
+=== 인증 프로세스 ===
+구글 인증 프로세스는 다음과 같다. 
+
+https://developers.google.com/accounts/images/webflow.png
+
+||YourApp             ||구글 서버에 접근하는 App(클라이언트 + 웹 서버)다.                ||
+||Google Servers      ||구글 OAuth 서버.                                                 ||
+||User                ||YurApp을 이용하는 유저                                           ||
+  1. 구글 자원을 사용하기 위해서 "Request token"을 요청한다. Request token이 없다면, 인증 과정을 거쳐야 한다. 
+  1. YourApp은 Google sign in 페이지로 접근한다. 
+  1. Sign in을 끝내면, YourApp에 Authorization code가 발급된다.
+  1. YourApp은r Authorization code로 "Exchange code for token"과정을 수행한다. 토큰을 요청하는 과정이다.
+  1. 구글은 YourApp에 토큰을 발행한다. 
+  1. 이후 유저는 YourApp을 이용해서 구글 API를 호출할 수 있다.
+
+감이 좀 안와서, 시나리오를 하나 만들어봤다. rent.com 이라는 자동차를 대여하는 회사가 있다. rent.com에 가입한 유저는 가맹점이 있는 도시라면, 어느 곳이라도 상관없이 대여를 할 수 있다. 유저는 아래의 과정을 거쳐서 자동차를 대여할 수 있다. 
+  1. rent.com에 가입을 한다. 
+  1. 대여할 수 있는 차종을 선택한다.(권한)  
+  1. 증명서를 발급 받는다.
+  1. 이 증명서를 가맹점에 제출하는 것으로 자동차를 대여할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1NYnix-maamXsHBXfOryX1n3xxennCZsKr6kbD_MZMsM/pub?w=874&amp;h=259" width="611" height="181">
+}}}
+  1. 유저는 rent.com 회원증을 가지고 있다. 2개의 차종에 대한 권한을 행사할 수 있다.
+  1. 지방출장을 떠난 유저. 도착지에서 차량 대여를 위해서 가맹점 데스크 직원에게 회원증을 제출한다.
+  1. 데스크 직원은 올바른 회원증인지, 그리고 어떤 권한을 가지고 있는지를 Rent.com에 확인 요청한다. 
+  1. Rent.com은 회원증을 확인하고, 2개의 차종에 대한 권한을 가지고 있음을 증명하는 증명서를 전송한다.
+  1. Rent.com은 유저에게 대여증을 발급한다. 
+  1. 유저는 대여증을 이용해서 차량을 대여한다. 
+  1. 권한을 검사한다. 권한을 가지지 않은 차종에 대해서 대여를 요청하면 거절 크리.
+대략 이러하다. OAuth라는 것도 오프라인에서 이미 사용하던 모델을 인터넷으로 확장시킨 거네.
+
+=== 인증 UI 프로세스 ===
+Google OAuth를 이용한 인증 프로세스를 그려보자. 대략 다음과 같을 것이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1BCkUeTBgqvGhj0kOzc11kmiz0rTaPBgXB5SJ9KzI2J8/pub?w=1113&amp;h=477" width="780" height="340">
+}}}
+
+ 1. 대부분의 서비스들이 비슷한 유형의 로그인 인터페이스를 제공할 거다. 한쪽 구석에 서비스가 지원하는 인증수단 목록들이 있고, 다른 한쪽 구석에 서비스 회원가입을 위한 인터페이스가 있다.   
+ 1. "Sign in with Google" 을 클릭하면, 두 개의 흐름으로 분기된다. 
+     1. 구글 로그인을 하지 않았을 경우, Google sign in 페이지로 리다이렉트 한다.   
+     1. 이미 구글 로그인을 했다면, "서비스 허가" 페이지로 리다이렉트 된다.  
+ 1. 서비스 허가 페이지로 넘어간다. 유저는 서비스를 위해서 인증정보와 함께, (이메일이나 프로파일 혹은 유저의 동영상 등)자원의 사용을 허가할지를 판단한다. 
+ 1. 사용을 허락하면, 다시 mytest 사이트로 리다이렉트 된다. 이때 인증과 허가가 끝났다는 정보를 담고 있는 토큰을 함께 넘기는데, mytest는 이 토큰을 이용해서 구글로 부터 인증된 유저인지 확인하고, 원하는 정보를 가져올 수 있다. 
+
+== 본격 테스트 ==
+== 테스트의 목적과 범위 ==
+나는 mytest.joinc.co.kr이란 VOD 웹 서비스를 만들거다. 로그인한 사용자의 경우 영화에 대한 평가, 찜, 구매하는 등의 서비스를 이용할 수 있다.
+
+서비스를 하려 하니, "유저 베이스"가 앞을 가로 막는다. 유저 베이스 제로인 상황에서 어느 세월에 회원을 가입받고 앉아 있을 건가. 그리고 요즘 유저들 회원 가입 같은거 굉장히 싫어 한다. 해서 OAuth를 이용 구글의 유저베이스를 "빌려 사용"하기로 했다. mytest 회원 가입 페이지는 옵션.  
+
+그리고 OAuth의 사용범위는 "인증 까지만"이다. Mytest는 자체적으로 VOD 인프라를 구축해서 서비스 한다. 구글의 자원을 서비스하는 건 아니다. 구글을 통해서 인증했다는 것만 확인할 수 있으면 된다.
+
+== 로그인 페이지 만들기 ==
+구글로 부터 받은 애플리케이션 정보는 다음과 같다. 
+{{{#!plain
+{
+   "web" : {
+      "auth_uri" : "https://accounts.google.com/o/oauth2/auth",
+      "redirect_uris" : [
+         "https://mytest.joinc.co.kr/oauth2callback.php"
+      ],
+      "client_id" : "xxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+      "client_secret" : "xxxxxxxxxxxxxxxx_DU_p-EPL",
+      "client_email" : "xxxxxxxxxxxx@developer.gserviceaccount.com",                
+      "token_uri" : "https://accounts.google.com/o/oauth2/token",
+      "auth_provider_x509_cert_url" : "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url" : "https://www.googleapis.com/robot/v1/metadata/x509/xxxxxxxxxxxxxxxxxxx@developer.gserviceaccount.com",
+      "javascript_origins" : [
+         "https://mytest.joinc.co.kr"
+      ]
+   }
+}
+}}}
+중요한 정보들은 다음과 같다.
+  * client_id : mytest에 대한 client id
+  * client_secret : client id를 증명하는 client_scret. client_id와 client_scret를 이용해서, mytest 서비스를 증명할 수 있다.
+  * redirect_uris : Authorization code와 token을 받는 endpoint uri 
+
+이 정보들을 이용해서 Authorization code를 만들기 위한 코드를 개발 했다.  
+{{{#!plain
+<?php
+# 구글 sign in 페이지로 보내기 위한 uri다. 
+# 구글에서 발급받은 애플리케이션 정보를 이용해서 만들면 된다. 
+$uri="https://accounts.google.com/o/oauth2/auth?".
+    "scope=email%20profile&".
+    "state=%2Fprofile&".
+    "redirect_uri=https%3A%2F%2Fmytest.joinc.co.kr%2Foauth2callback.php&".
+    "response_type=code&".
+    "client_id=xxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com&".
+    "approval_prompt=force";
+?>
+<!-- 
+mytest 회원 로그인을 위한 입력 인터페이스
+유저 로그인 시스템을 구축하진 않을거다. 
+그냥 인터페이스 테스트 목적이다. 
+-->
+<input type=text size=20 placeholder="ID"><br />
+<input type=text size=20 placeholder="Password"><br />
+<input type=submit value="회원 로그인">
+
+<!-- 구글 로그인 사용자를 위한 google sign in 링크 -->
+<a href="<?=$uri?>">구글로 로그인</a>
+}}}
+||https://accounts.google.com/o/oauth2/auth        ||Google OAuth endpoint                                                  ||
+||scope                                            ||어떤 자원에 접근할 건지 명시한다. 유저 email과 profile만 접근하겠다.   ||
+||redirect_uri                                     ||mytest 등록시 설정한 callback uri                                      ||
+||response_type                                    ||Authorization code를 받겠다는 의미다.                                  ||
+||approval_prompt                                  ||인증이 끝났을 경우에도 "허락"과정을 거치게 할 건지, force는 무조건 거치게 한다. 일반적으로는 "auto"를 사용하는데, 테스트를 위해서 force를 설정했다.     ||
+
+대략 다음과 같은 페이지를 만들었다.
+
+https://lh6.googleusercontent.com/-YVVXwrSEzA0/U-TvqRC0ByI/AAAAAAAAEO4/6fzN8ndwxJ0/s800/google_oauth_06.png
+
+이제 "구글로 로그인"을 클릭했다.(테스트를 위해서 미리 구글 로그아웃을 했다.) 링크는 http://accounts.google.com/o/oauth2/auth 로 연결된다. 아직 인증이 안됐으니, '''Google 계정으로 로그인'''페이지를 띄운다.
+
+https://lh5.googleusercontent.com/-4nGwMuVkohE/U-T0iTAfcQI/AAAAAAAAEPE/h3YdB3ZUE5I/s400/google_oauth_07.png
+
+로그인을 하면, 서비스 허가 페이지로 넘어간다. mytest 서비스는 유저의 email과 profile 정보를 요청하고 있는데, 이를 허용할 것인지를 유저에게 묻는다.    
+
+https://lh4.googleusercontent.com/-JcQ2YLeM550/U-T1fiX5EsI/AAAAAAAAEPM/E5UeYx7bUCc/s640/google_oauth_08.png
+
+허락을 클릭하면, 구글 oauth 서버는 callbak URL인  https://mytest.joinc.co.kr/ouath2callback.php 를 호출한다. 이때 "인증된 유저가 mytest 서비스를 허가한 정보"를 담고 있는 '''Authorization code'''가 넘어온다.
+
+oauth2callback.php 코드에서 Authorization code 값을 확인했다. 
+{{{#!plain
+print_r($_GET);
+# Array ( [state] => /profile [code] => 4/k-jIedafxxxxxxxxOg3gKr3.ea03emCooXBdaK_BAOPQDXXXXXX) 
+}}}
+
+=== Access 토큰과 Refresh 토큰 요청 ===
+이제 Authorization code를 이용해서 Access 토큰과 Refresh 토큰을 요청한다. 대략 아래와 같은 코드를 만들었다. 
+
+{{{#!plain
+# 유저는 콜백 URI를 호출하면서, 구글 서버로 부터 받은 authorization code를 GET으로 넘긴다. 
+$code = $_GET['code'];
+
+# Authorization code와 client id/secret를 이용해서 
+# 토큰 발급 요청을 만든다. 
+$postdata="code={$code}&". 
+    "client_id={$client_id}&".
+    "client_secret={$client_secret}&".
+    "redirect_uri={$redirect_uri}&".
+    "grant_type=authorization_code";
+
+$opts = array('http' =>
+    array(
+        'method'  => 'POST',
+        'header'  => 'Content-type: application/x-www-form-urlencoded',
+        'content' => $postdata
+    )
+);
+
+# Google oAuth endpoint로 요청한다.
+$context  = stream_context_create($opts);
+$response = file_get_contents('https://accounts.google.com/o/oauth2/token', false,$context);
+}}}
+
+응답으로 아래와 같은 JSON 데이터를 리턴한다.
+{{{#!plain
+  "access_token" : "ya29.XAxxxxxxxxxxxxxxxxxxxxxxxxxxLLJCMZUSU-XXXXXXXXXXXX",
+  "token_type" : "Bearer",
+  "expires_in" : 3600,
+  "id_token" : "XXXXXXXXXXXXXX...."
+}}}
+  * access_token : 이 access_token을 이용해서, 유저가 허가한 구글 정보에 접근할 수 있다.  
+  * token_type : Access_token의 타입. Bearer과 MAC 두 가지 타입을 지원한다.
+  * expires_in : access token 유요 시간.
+  * id_token : JWT(JSON Web Token). 유저에 대한 각종 정보가 들어있다.
+
+서버는 access_token을 저장해 두고 있다가 구글 정보에 접근이 필요할 경우 사용하면 된다.
+=== 유저 확인 및 세션 발급 ===
+유저 정보들은 id_token에 들어 있다. id_token의 값은 나름대로의 방식으로 인코딩됐다. [https://github.com/luciferous/jwt Google JWT PHP 라이브러리]를 이용해서 디코딩할 수 있다.
+
+디코딩 한 결과다.
+{{{#!plain
+    [iss] => accounts.google.com
+    [id] => 10070000000000000000
+    [sub] => 100700000000000000000
+    [azp] => 271xxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+    [email] => yundream@gmail.com
+    [at_hash] => Rxxxxxxxxxxxxxxxxxxxxx
+    [email_verified] => 1
+    [aud] => 271xxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+    [token_hash] => Rxxxxxxxxxxxxxxxxxxx
+    [verified_email] => 1
+    [cid] => 2xxxxxxxxxxxxxxxx.apps.googleusercontent.com
+    [iat] => 1400000000
+    [exp] => 1400000000
+}}}
+유저의 email을 확인할 수 있다.
+
+access token과 유저 email을 확인했으니, 유저에 대한 인증은 끝난 거라고 볼 수 있겠다. 이제 유저 email과 access token을 저장하는 데이터 베이스를 만들고 session id를 할당, 유저 브라우저와 세션을 맺으면 된다. 이후 유저는 이 세션을 이용해서 서비스를 이용하면 된다. 
+
+유저 인증 정보를 관리하기 위해서는 3개의 테이블이 있으면 될거다.
+  1. User 테이블 : OAuth 인증을 마친 유저의 email과 profile 정보, 인증 Provider등을 이용해서 유저 테이블을 만들 수 있다. 
+  1. Session 테이블 : 세션 아이디, (세션을 만든)유저 아이디, access token 등의 정보가 들어간다. 
+  1. Provider 테이블 : 지원하는 프로바이더가 늘어날 수 있으니, 이에 대비한다. 
+
+=== 유저 세션 유지및 만료 프로세스 ===
+다음은 세션 관리 프로세스다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1jlz-Lrg_26z5lrzm06gwTIbPPB8VWUv3J4B7nSsupAM/pub?w=510&amp;h=345">
+}}}
+ 1. OAuth 과정을 끝내고 "토큰"을 발행했다. 
+ 1. 이 토큰을 이용해서 유저를 가입하고 세션을 만든다.
+ 1. 이후 유저와는 이 세션을 이용해서 통신한다.
+이 프로세스는 처음 구글 인증을 받은 후에는 더 이상 구글과 통신하지 않는다. 유저는 mytest 서비스와 맺은 세션만 가지고 mytest의 서비스를 이용한다. 이런 모델이 가능한 이유는 "구글 인증 정보를 세션을 만드는 용도로만" 사용했기 때문이다.
+
+만약 세션이 만료 됐다면, OAuth 인증 프로세스를 거쳐서 Access token을 새로 발급받고 새로운 세션을 만들면 된다.
+
+== 구글에서 허가한 앱 관리 ==
+구글은 OAuth 프로바이더로 모든 등록한 애플리케이션을 관리한다. Mytest 서비스도 마찬가지다. 유저가 mytsest 서비스를 허가한 정보는 [https://www.google.com/settings/security?ref=home 구글 계정권한 설정 페이지]에서 확인할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1jk2Fz7Y1IKL1LKOLbQU0gHntukWWPt0ZmGbE_klrqDo/pub?w=974&amp;h=508" width="681" height="355">
+}}}
+
+유저는 이 페이지에서 등록된 앱의 목록과 앱이 어떤 권한을 가지고 있는지를 확인하고, 앱을 삭제할 수 있다.
+
+== 참고 ==
+ * [https://developers.google.com/accounts/docs/OAuth2?hl=ko Google OAuth2 개발 문서] 
+ * [https://developers.google.com/accounts/docs/OAuth2WebServer?hl=ko Google OAuth2.0 for Web Server Applications]

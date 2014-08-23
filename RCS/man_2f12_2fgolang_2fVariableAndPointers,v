@@ -1,0 +1,732 @@
+head	1.15;
+access;
+symbols;
+locks
+	root:1.15; strict;
+comment	@# @;
+
+
+1.15
+date	2014.08.23.07.35.40;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.08.23.06.37.53;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.08.23.06.37.15;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.08.23.06.36.41;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.08.23.06.36.12;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.08.23.06.35.42;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.08.23.03.23.12;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.08.23.02.47.37;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.08.22.23.57.21;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.08.22.16.45.11;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.08.20.15.07.06;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.08.20.15.06.27;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.08.20.15.04.14;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.08.20.15.03.06;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.08.19.15.40.52;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2fVariableAndPointers
+@
+
+
+1.15
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title 데이터 타입과 변수 
+
+[[TableOfContents]]
+== 데이터 타입과 메모리 ==
+프로그램을 실행하기 위해서는 반드시 처리할 데이터를 저장하기 위한 메모리를 확보해야 한다. 에를 들어 두개의 숫자를 더하기를 원한다면 이들 숫자를 저장하기 위한 메모리가 있어야 한다. 메모리는 마구 쓸 수 있는게 아니라서, 프로그래머는 매번 메모리 공간을 할당(memory allocate)해야 한다. 메모리 할당은 매우 귀찮은 작업일 수 있는데(C 언어 경험이 있다면, 얼마나 귀찮은 작업인지 이해할 터이다.), GO는 쉽게 메모리를 사용할 수 있도록 도와준다. 
+
+{{{#!plain
+package main
+
+import "fmt"
+import "unsafe"
+
+func main() {
+    i := 5
+    var j int
+    fmt.Println("i is : ", i)
+    fmt.Println("j is : ", j)
+    fmt.Printf("Size i : %d byte\n", unsafe.Sizeof(i))
+    fmt.Printf("Size j : %d byte\n", unsafe.Sizeof(j))
+}
+}}}
+
+{{{#!plain
+i is : 5
+j is : 0
+Size i : 8 byte
+Size j : 8 byte
+}}}
+Go는 변수 i의 값을 저장하기 위한 적당한 공간을 알아서 할당한다. 이 경우 interger를 위한 공간을 할당할 것이다. 8byte의 공간을 할당한 걸 확인할 수 있다. '''j'''의 경우에 어떤 값도 할당하지 않았는데, 이 경우 '''zero-value'''가 할당 된다. zero-value는 데이터 타입에 따라서 적당한 값이 결정된다. 숫자형 데이터 타입일 경우 0이 할당된다. 
+
+== 데이타 타입 ==
+Hello world 예제를 보자.
+{{{#!plain
+func main() {
+    fmt.Println("Hello World")
+}  
+}}}
+코드에서 '''Hello World'''는 string 타입의 데이터다. 데이터 타입은 값의 형태에 따라서 몇 가지로 분류할 수 있다. Go는 데이터 타입을 검사해서, 그에 적당한 저장공간을 만들고 연산을 한다. 
+
+철학자는 타입(유형)와 토큰(token)을 분리한다. 여기에 각각 "백구 복돌이 순돌이"의 이름을 가진 세 마리의 개가 있다. 백구, 복돌이, 순돌이는 각각이 하나의 토큰이다. 즉 3개의 토큰이 있는건데, 토큰이 3개이지만 "개"라는 하나의 타입만 가지고 있다. 
+
+'''토큰'''은 어떤 유형에 포함되는 '''멤버''' 혹은 유형으로 부터 실제 구현된 '''Instance'''로 설명할 수 있다. 나는 백구, 복돌이, 순돌이 서로 다른 토큰이지만 '''개'''라는 유형을 공유한다는 사실에서, 이들이 네 개의 다리와 털, 뾰족한 귀, 흔드는 꼬리, 인간을 잘 따르는 성질을 가지고 있다는 걸 유추할 수 있다. 프로그래밍 언어도 유사한 방식으로 작동한다. '''Hello World'''는 토큰 '''string'''는 타입으로 모든 스트링은 길이를 가지고 있는 문자의 모음(문자열)이라는 것을 알 수 있다.
+
+수학에서는 '''set'''이라고 부르는 것이 있다. '''R'''(실수), '''N'''(자연수)가 그것이다. 이러한 세트의 구성원은 세트의 다른 구성원과 동일한 특성을 공유한다. 자연수를 예로 들면, a + (b + c) = (a + b) + c 와 a x (b x c) = (a x b) x c와 가은 일반적인 규칙이 동일하게 적용된다.
+
+Go는 정적 타입(statically type) 프로그래밍 언어다. 이는 변수를 사용하기 위해서는 변수에 맞는 타입을 지정해야 하고, 이 타입은 변하지 않는 다는 것을 의미한다. 모든 변수에 타입을 지정해야 하기 때문에 귀찮아 보일 수 있겠다. Go는 컴파일 시간에 타입을 검사하기 때문에, (경험이 충분하지 않다면) 잘못된 타입을 교정하는데 많은 시간을 보낼 수도 있다. 그러나 실행전에 이루어지는 타입 검사는 실행시 발행할 수 있는 문제점을 미연에 막을 수 있도록 도와준다.  
+
+=== 숫자 ===
+Go는 여러 종류의 숫자형 데이터를 지원한다. 숫자형 데이터는 interger과 floating-point 두 부류로 나눌 수 있다.
+==== Integers ====
+Integer은 수학에의 정수다. 즉 소숫점이 없는 음의 정수(-1, -2 ...)와 0 양의 정수(1, 2, 3)를 다루기 위한 데이터 타입이다.
+
+Go의 Interger 타입은 '''uint8''', '''unit16''', '''uint32''', '''uint64''', '''int8''', '''int16''', '''int32''', '''int64'''가 있다. 8, 16, 32는 타입이 사용할 수 있는 공간이다. '''uint'''는 "Unsigned intger"이다. '''int'''는 "signed ingeger'''이다. Unsigned integer는 0을 포함한 양의 정수를 의미한다. Unsigned integer와 signed int 형의 구분은 signed bit를 사용하는지에 따라서 달라진다. Signed int의 경우, 가장 앞의 비트 하나를 signed 확인을 위해서 사용한다. 따라서 음의 정수를 다룰 수 있는 대신 양의 정수는 (signed int에 비해서) 1/2 크기 만큼 다룰 수 있다. Signed와 Unsigned에 대한 내용은 [wiki:Site/C/Documents/CprogramingForLinuxEnv/Ch5_Data_Bit C에서의 데이터 다루기]문서를 참고하자. 
+
+추가적으로 '''byte'''라는 데이터타입이 있다.  '''uint8'''와 같은 크기로 말그대로 8bit 크기의 데이터를 저장할 수 있다. byte는 컴퓨터가 다루는 기본 데이터 타입이기 때문에, 다른 모든 종류의 데이터를 표현할 수 있다는 장점이 있다. 실제 byte는 다른 타입의 데이터를 사용하기 위해서 주로 사용한다. (C의 void * 데이터 타입을 생각하면 되겠다.)  
+
+uint와 int, uintptr의 데이터 타입은 머신 종속적(machine dependent)이다. '''x86_64'''일 경우 8byte(64bit)의 크기를 가진다.  
+{{{#!plain
+# cat size.go
+import (
+    "fmt"
+    "unsafe"
+)
+
+func main() {
+    var b byte
+    var i int
+    var i8 int8
+    var i16 int16
+    var i32 int32
+    var i64 int64
+    var uptr uintptr
+
+    fmt.Println("int   : ", unsafe.Sizeof(i))
+    fmt.Println("int8  : ", unsafe.Sizeof(i8))
+    fmt.Println("int16 : ", unsafe.Sizeof(i16))
+    fmt.Println("int32 : ", unsafe.Sizeof(i32))
+    fmt.Println("int64 : ", unsafe.Sizeof(i64))
+
+    fmt.Println("Byte  : ", unsafe.Sizeof(b))
+    fmt.Println("Byte  : ", unsafe.Sizeof(uptr))
+}
+}}}
+
+내 리눅스 박스에서 실행한 결과다.
+{{{#!plain
+# uname -a
+Linux home 3.13.0-34-generic #60-Ubuntu SMP Wed Aug 13 15:45:27 UTC 2014 x86_64 x86_64 x86_64 GNU/Linux
+
+# go run size.go 
+int   :  8
+int8  :  1
+int16 :  2
+int32 :  4
+int64 :  8
+Byte  :  1
+Byte  :  8
+}}}
+
+일반적으로 integer 형 데이터를 다룰 경우 '''int'''를 주로 사용한다.
+==== Floating Point Number ====
+Floating point 숫자(이하 부동 소수점)는 소숫점을 포함한 실수(1.234, 123.4, 0.0001234, 1234000).    
+  * 부동 소수점 타입은 정확하지 않다. 때때로 숫자만을 이용해서 표현하는 것은 불가능 하다. '''1.01 - 0.99'''의 결과가 0.02라는 건 명확하다. 간단한 산수 문제다. 그러나 go에서 연산을 해보면 '''0.020000000000000018'''이 출력 된다. 기대한 값에 근접하긴 하지만 정확히 같은 숫자는 아니다.
+  * 부동 소수점 숫자는 integer 처럼 32, 64bit 크기를 선택할 수 있다. 공간이 커지면 그만큼 정밀한 값을 얻을 수 있다. 
+  * 숫자외의 값들도 몇 개 표현할 수 있다. "Not a Number"('''NaN''')가 대표적인 표현이다. 0/0 연산을 하면 NaN을 볼 수 있다. 기타 +,- 무한대가 있다. 
+
+Go는 '''float32'''와 '''float64'''두개의 부동 소수점 타입을 제공한다. 이외에 '''complex64'''와 '''complex128'''이 있다. complex64는 float32 실수와 복소수까지 포함한다. 
+
+==== 예제 ====
+{{{#!plain
+func main() {
+    a := 0.0
+    b := 0.0
+    fmt.Printf("0 / 0 = %f\n", a/b)
+} 
+}}}
+
+실행 결과
+{{{#!plain
+# go run main.go
+0 / 0 = NaN
+}}}
+
+
+=== Strings ===
+String은 문자열을 저장하기 위해서 사용한다. "Hello world" 혹은 'Hello world'처럼 더블 쿼터와 싱글 쿼터를 이용해서 사용할 수 있다. 더블 쿼터와 싱글쿼터의 esacape 문자(special escape sequence)처리에서 차이가 있다. 더블쿼터를 사용하면 '''\n''', '''\t'''등의 문자를 각각 carriage return과 탭문자로 변환해서 표시한다.  
+
+String는 len("Hello World"), "Hello World"[1] 같은 함수들을 제공한다. "Hello World"[1]은 문자열을 배열로 접근, 2번째 문자를 가져온다. "Hello "+"World"와 같은 문자열 연산도 할 수 있다. 
+{{{#!plain
+func main() {
+    fmt.Println(len("Hello World"))
+    fmt.Println("Hello World"[1])
+    fmt.Println("Hello" + " World")
+}
+}}}
+  * len은 공백문자를 포함한 문자열의 길이를 반환한다. 
+  * '''[1]'''을 하면 '''e'''대신 101이 출력된다. 101은 e 에대한 [wiki:man/12/ascII ASCII] 값이다. 101이 출력되는 이유는 문자의 데이터 타입이 byte이기 때문이다. 바이트는 integer 타입이다.     
+  * go는 string에 사용된 + 연산자에 대해서는 문자열을 연결하는 연산을 한다. 
+
+=== Boolean ===
+Boolean 값은 1비트 크기의 integer 타입으로 '''true'''와 '''false'''(혹은 on, off)의 값을 표현할 수 있다. Go는 3개의 불리언 연산을 지원한다. 
+{{{#!plain
+&& : and
+|| : or
+!  : not
+}}}
+
+불리언 연산 예제 프로그램이다.
+{{{#!plain
+func main() {
+    fmt.Println(true && true)
+    fmt.Println(true && false)
+    fmt.Println(true || true)
+    fmt.Println(true || false)
+    fmt.Println(!true)
+}
+}}}
+
+실행 결과
+{{{#!plain
+# go run main.go 
+true
+false
+true
+true
+false
+}}}
+
+
+=== Zero value ===
+각 데이터 타입은 타입에 맞는 zero-value를 가지고 있다.
+{{{#!plain
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    var i int
+    fmt.Println("Default int is : i", i)
+
+    var s string
+    fmt.Println("Default string is : ", s)
+
+    var f float64
+    fmt.Println("Default float64 is : ", f)
+
+    var arInt [3]int
+    fmt.Println("Default int array is : ", arInt)
+
+    var c complex64
+    fmt.Println("Default complex64 is : ", c)
+}
+}}}
+
+{{{#!plain
+Default int is : i 0
+Default string is :  
+Default float64 is :  0
+Default int array is :  [0 0 0]
+Default complex64 is :  (0+0i)
+}}}
+
+== 변수 ==
+변수는 값을 저장하기 위해서 사용하는 메모리 공간이다. 메모리값을 그대로 사용하는 것은 (컴퓨터 입장에서는 문제가 없겠지만)사람이 사용하기에는 애로사항이 꽃이 필 노릇이니, '''변수명'''을 대신 사용한다. 기본적으로 '''변수와 흐름 제어(control flow)'''를 알면, 프로그램을 만들 수 있다. 단순하지만 중요한 개념이라고 할 수 있겠다. 
+
+아래 코드를 보자.
+{{{#!plain
+package main
+
+import "fmt"
+
+func main() {
+    var x string = "Hello world"
+    fmt.Println(x)
+}
+}}}
+이전에 다루었던 "Hello World" 프로그램과 비슷해 보이지만 차이가 있다. Println 함수의 매개변수로 문자열을 직접 입력하는 대신에, 변수'''x'''를 사용하고 있다. Go에서 변수를 선언하기 위해서는 '''var''' 키워드를(variable의 줄임말이겠지) 사용한다. 그 다음에 변수명(여기에서는 x)이 오고 다음 변수명의 타입(string)이 온다. 마지막으로 대입연산자를 이용해서 변수에 값("Hello World")를 할당한다.
+
+C,C++,Java 등 변수 타입이 필요한 언어를 사용해 본 경험이 있다면, 변수 선언이 좀 다르다는 것을 눈치챘을 것이다. 예컨데, Java 라면 대략 다음과 같이 변수를 선언하고 값을 할당 했을 것이다.   
+{{{#!plain
+String x = "Hello world" 
+}}}
+C나 C++도 "변수타입 변수명 = 값"의 구조를 가진다. 반면 go는 "변수명 변수타입 = 값"의 구조를 가진다. 헷갈릴 수 있는 부분이다. 이렇게 좀 특이하게 만든 이유는 "인간의 언어의 흐름"을 따라가도록 설계 했기 때문이라고 한다. "변수 x는 스트링 타입이다. 여기에 Hello world를 할당한다" 이런 식이다. 함수도 이런 특이한 구성을 따르는데, 아래 예제를 보자.
+{{{#!plain
+func sum(a int, b int) int {
+
+}
+}}}
+특이하게 보일 텐데, 인간 언어 구조를 따라가자면 "함수 sum는 매개 변수 2개를 받아서 처리하고, 그 결과로 int형 값을 리턴한다"가 될 것이다. 나름대로 인간적이라고 생각할 수 있다. 뭐 그래도 생소하긴 하겠지만, 익숙해져야만 한다. 
+
+선언만 하고 나중에 할당할 수도 있다.
+{{{#!plain
+var x string 
+x = "Hello world"
+}}}
+
+재할당 할 수도 있다.
+{{{#!plain
+var x string
+x = "Hello world"
+fmt.Println(x)
+x = "My name is yundream"
+fmt.Println(x)
+}}}
+
+변수 선언과 할당을 간단하게 줄일 수도 있다.
+{{{#!plain
+x := "Hello World"
+}}}
+'''='''앞에 ''':'''가 있으면 컴파일 시, 문맥을 판단해서 데이터 타입을 결정한다. 즉 "Hello World"는 string 타입이므로 컴파일 할 때, string을 저장하기 위한 메모리 공간을 할당하고 여기에 변수명을 붙여준다. '''var x string = "Hello World"'''와 동일하다. 
+
+다른 모든 타입의 변수에 동일하게 응용할 수 있다.
+{{{#!plain
+x := 5
+fmt.Println(x)
+}}}
+
+여러 변수를 초기화해야 한다면 ()를 사용하자.
+{{{#!plain
+var (
+    home   = os.Getenv("HOME")
+    user   = os.Getenv("USER")
+    gopath = os.Getenv("GOPATH")
+)
+}}}
+
+== 상수 ==
+Go는 상수를 지원한다. 상수는 값을 변경할 수 없는 변수로 '''var'''키워드 대신 '''const'''키워드를 이용하면 된다.
+{{{#!plain
+func main() {
+    const x string = "Hello World"
+    fmt.Println(x)
+}
+}}}
+
+상수에 값을 재 할당하면 에러가 발생한다.
+{{{#!plain
+const x string = "Hello World"
+x = "Some other string"
+}}}
+
+{{{#!plain
+.\main.go:7: cannot assign to x
+}}}
+
+상수는 enum과 함께 사용하는 경우가 많다. 
+{{{#!plain
+const (
+    Sunday     = 0 
+    Monday     = 1
+    Tuesday    = 2
+    Wednesday  = 3
+    Thursday   = 4
+    Friday     = 5
+    Saturday   = 6
+)
+}}}
+
+iota를 이용하면 더 쉽게 enum 상수를 정의할 수 있다.  
+{[{#!plain
+const (
+    Sunday = iota
+    Monday
+    Tuesday
+    Wednesday
+    Thursday
+    Friday
+    Saturday
+)
+}}}
+iota는 상수 정의시 항상 0으로 초기화 된다.  그리고 다음 줄에서 1씩 증가 한다. 다음은 iota의 좀 더 쓸만한 응용이다. 
+{{{#!plain
+type ByteSize float64
+
+func main() {
+    const (
+        _           = iota
+        KB ByteSize = 1 << (10 * iota)
+        MB
+        GB
+        TB
+        PB
+        EB
+        ZB
+        YB
+    )
+    fmt.Printf("%32.f\n", KB)
+    fmt.Printf("%32.f\n", MB)
+    fmt.Printf("%32.f\n", PB)
+}
+}}}
+
+== Scope ==
+Go 프로그램은 여러 영역으로 나뉜다. 어느 영역에 변수가 선언되느냐에 따라서 변수를 사용할 수 있는 영역이 결정된다.
+{{{#!plain
+package main
+import "fmt"
+
+var x string = "Hello world"
+
+func main() {
+    fmt.Println(x)
+    hello()
+}
+
+func hello() {
+    fmt.Println(x)
+}
+}}}
+변수 '''x'''는 main 함수와 hello 함수 모두에서 사용할 수 있다.
+
+코드를 약간 수정해 보자.
+{{{#!plain
+func main() {
+    var x string = "Hello World"
+    fmt.Println(x)
+}
+
+func f() {
+    fmt.Println(x)
+}
+}}}
+
+코드를 실행하면 에러가 발생한다. 
+{{{#!plain
+.\main.go:11: undefined: x
+}}}
+
+변수 '''x'''는 main 함수 영역(scope)에서만 유효하기 때문으로, main과 다른 영역에 있는 함수 '''f'''를 변수 '''x'''를 사용할 수 없다. go 언어에서 영역은 '''{''', '''}'''으로 결정된다. 변수는 기본적으로 가장 가까운 '''{}''' 블럭과 그 내부에 있는 블럭에서 사용할 수 있으며 바깥 블럭에서는 사용할 수 없다. 
+
+
+== 예제 프로그램 ==
+표준입력으로 숫자를 입력 받아서 * 2 연산을 한 다음 표준출력하는 프로그램이다. 테스트해보자.
+{{{#!plain
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Print("Enter a number :")
+    var input float64
+    fmt.Scanf("%f", &input)
+
+    output := input * 2
+
+    fmt.Println(output)
+}
+}}}
+
+== Pointer ==
+Golang에도 포인터가 있다. 주소를 가리키는 그 포인터 맞다. 함수로 매개변수를 전달할 경우, 매개변수는 함수로 복사가 된다.  
+{{{#!plain
+import "fmt"
+
+func zero(x int) {
+    x = 0
+}
+
+func main() {
+    x := 5
+    zero(x)
+    fmt.Println(x)  // x는 여전히 5다.
+}
+}}}
+예제에서 사용한 '''zero'''함수는 매개변수의 값을 0으로 하는게 목적이지만, main함수의 x를 수정하는 건 아니다. x의 값을 복사할 다른 메모리를 할당하고 여기에 있는 값을 0으로 했을 뿐이다. 원본의 값을 0으로 바꾸는 가장 쉬운 방법은 포인터를 이용하는 거다.  
+{{{#!plain
+func zero(xPtr *int) {
+    *xPtr = 0
+}
+
+func main() {
+    x := 5
+    zero(&x)
+    fmt.Println(x)
+}
+}}}
+포인터는 변수의 값이 아닌, 변수의 값이 저장된 메모리의 위치를 가리킨다. 예제에서 zero의 매개변수로 '''x *int'''를 넘기고 있는데, 값이 아닌 메모리의 주소를 받겠다는 의미다. main 함수는 주소연산자(&)를 이용해서, x의 주소 값을 넘겼다. 결과적으로 zero 함수는 x의 메모리 주소가 가리키는 영역에 0을 입력하게 된다.
+=== * 와 & 연산자 ===
+Go는 포인터 연산을 위해서 '''*'''와 '''&'''연산자를 사용한다.
+
+'''*'''는 포인터 값을 '''dereference'''하기 위해서 사용한다. Dereference는 포인터가 가리키는 메모리의 값을 가져오기 위해서 사용한다. '''*xPtr = 0'''은 xPtr이 가리키는 메모리 영역에 0을 대입하겠다는 의미다. 만약 '''xPtr = 0'''을 하게 되면, *int에 대해서 int 값을 대입을 시도하는게 되서 에러가 발생한다.
+{{{#!plain
+func zero(xPtr *int) {
+    xPtr = 0
+}
+}}}
+컴파일을 시도하면
+{{{#!plain
+./pointer.go:6: cannot use 0 (type int) as type *int in assignment
+}}}
+데이터 타입이 다르다는 에러가 발생한다.
+
+'''&'''연산자는 변수의 주소를 찾는 일을 한다. '''&x'''는 *int를 (x가 int형이니)반환한다. 
+
+=== new ===
+'''new'''함수를 이용해서 포인터를 얻는 방법도 있다.  
+{{{#!plain
+func one(xPtr *int) {
+    *xPtr = 1
+}
+
+func main() {
+    xPtr := new(int)
+    one(xPtr)
+    fmt.Println(*xPtr)
+}
+}}}
+'''new'''함수는 매개변수로 데이터 타입을 받으며, 데이터 타입에 해당하는 값을 저장할 수 있는 메모리를 만든 다음 메모리를 가리키는 포인터를 반환한다.  
+
+다른 언어에서 '''new'''를 이용한 경험이 있는 개발자라면, new로 할당한 메모리를 delete 하지 않아서 발생할 수 있는 메모리 누스에 대해서 관심이 있을 것이다. go는 할당한 메모리를 더 이상 사용하지 않을 때, 정리주는 garbage collect 기능을 제공한다. 앞으로도 포인터는 자주 나올거다. 그때 그때 살펴보도록 하겠다.
+== 참고 ==
+ * http://www.golang-book.com/4/index.htm
+ * http://www.golang-book.com/3/index.htm
+ * http://golang.org/doc/effective_go.html
+ * http://blog.denevell.org/golang-constants-enums.html
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d102 22
+d142 5
+a146 3
+ * && : and
+ * || : or
+ * !  : not
+a170 1
+
+d455 1
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d120 3
+a122 3
+||&&   ||and     ||
+||\||  ||or      ||
+||!    ||not     ||
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d121 1
+a121 1
+||!|!!|!   ||or      ||
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d121 1
+a121 1
+||||   ||or      ||
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d1 1
+a1 1
+#title 메모리, 변수 그리고 포인터 
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d99 2
+d106 42
+a147 2
+일반적으로 integer 형 데이터를 다룰 경우 '''int'''를 주로 사용한다.
+== Zero value ==
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d53 1
+a53 1
+Go의 Interger 타입은 '''uint8''', '''unit16''', '''uint32''', '''uint64''', '''int8''', '''int16''', '''int32''', '''int64'''가 있다. 8, 16, 32는 타입이 사용할 수 있는 공간이다. '''uint'''는 "Unsigned intger"이다. '''int'''는 "signed ingeger'''이다. Unsigned integer ...
+d55 50
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d31 25
+a55 1
+== Primitive types ==
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d281 1
+a281 1
+=== * 와 & 연산자 ====
+d313 1
+a313 2
+다른 언어에서 '''new'''를 이용한 경험이 있는 개발자라면, new로 할당한 메모리를 delete 하지 않아서 발생할 수 있는 메모리 누스에 대해서 관심이 있을 것이다. go는 할당한 메모리를 더 이상 사용하지 않을 때, 정리주는 garbage collect 기능을 제공한다. 
+
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a3 1
+
+d253 62
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d256 2
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 2
+a5 2
+== 메모리, 변수 그리고 포인터 ==
+=== 메모리 ===
+d32 2
+a33 2
+=== Primitive types의 기본 값 ===
+각 데이터 타입이 가지는 zero-value를 확인했다.
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a67 1
+=== 초기화 ===
+d131 1
+a131 1
+=== 상수 ===
+d197 1
+a197 1
+=== Scope ===
+d236 1
+a236 1
+=== 예제 프로그램 ===
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d5 1
+d66 191
+@

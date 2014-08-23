@@ -1,0 +1,94 @@
+#title PHP Solr 테스트 
+
+[[TableOfContents]]
+== PECL Solr 확장 설치 == 
+=== 환경 ===
+ * 우분투 리눅스 14.04
+ * PHP Version 5.5.9 
+
+=== SOLR 설치 ===
+[wiki:Site/Search/Document/Solr Solr로 검색서비스 만들기 참고]
+
+=== SOLR 확장 설치 ===
+PECL 사용은 [wiki:man/12/php/pecl pecl 설치]문서를 참고한다.  
+
+Solr 확장을 패키지 하기 위해서 몇개 패키지들을 추가 설치해야 한다. 먼저 php5-dev를 설치한다.
+{{{#!plain
+# apt-get install php5-dev
+}}}
+
+curl을 위한 헤더파일이 필요하다. 
+{{{#!plain
+# apt-get libcurl4-gnutls-dev
+}}}
+
+xml 헤더파일도 필요 하다.
+{{{#!plain
+# apt-get install libxml2-dev
+}}}
+
+pecl을 이용해서 solr를 설치한 후, 공유 라이브러리가 만들어졌는지 확인한다.
+{{{#!plain
+# pecl install solr
+# ls /usr/lib/php5/20121212/
+json.so  opcache.so  pdo.so  readline.so  solr.so
+}}}
+
+이제 solr.ini 파일을 만든다. 
+{{{#!plain
+# cat /etc/php5/mods-available/solr.ini
+extension=solr.so
+}}}
+
+나는 nginx와 php5-fpm으로 설치했다. php5-fpm의 conf.d디렉토리 밑에 위에 만들어둔 solr.ini를 링크했다.  
+{{{#!plain
+# cd /etc/php5/fpm/conf.d
+# ln -s ../../mods-available/solr.ini ./
+# ls -al
+합계 8
+drwxr-xr-x 2 root root 4096  7월 15 23:49 .
+drwxr-xr-x 4 root root 4096  7월 15 23:48 ..
+lrwxrwxrwx 1 root root   32  7월 10 22:17 05-opcache.ini -> ../../mods-available/opcache.ini
+lrwxrwxrwx 1 root root   28  7월 10 22:17 10-pdo.ini -> ../../mods-available/pdo.ini
+lrwxrwxrwx 1 root root   29  7월 10 22:17 20-json.ini -> ../../mods-available/json.ini
+lrwxrwxrwx 1 root root   33  7월 10 22:17 20-readline.ini -> ../../mods-available/readline.ini
+lrwxrwxrwx 1 root root   29  7월 15 23:49 solr.ini -> ../../mods-available/solr.ini
+}}}
+php-fpm을 다시 실행하자. phpinfo() 결과에 solr 정보가 나오면 설치 성공  
+
+https://lh3.googleusercontent.com/-XJ5cCZWTpqg/U9ppjMbcwQI/AAAAAAAAEMk/E-MnZAnXSwc/s640/phpsec1.png
+
+== 테스트 ==
+=== 간단 테스트 ===
+Solr 확장이 제대로 작동하는지 간단히 테스트했다.
+{{{#!plain
+// 아직 solr security 설정은 하지 않았다.
+$options = array
+(
+    'hostname' => 'localhost',
+    'login'    => '',
+    'password' => '',
+    'port'     => '8983',
+);
+
+// solr 클라이언트 객체를 만들었다.
+$client = new SolrClient($options);
+
+// 서버가 응답하는지 확인하기 위해서 ping 메서드를 호출했다.
+try {
+    $client->ping();
+} catch (Exception $e) {
+    echo 'Exception : ', $e->getMessage();
+} finally {
+}
+
+// 데이터를 입력. 
+$doc = new SolrInputDocument();
+$doc->addField('id', 12345);
+$doc->addField('name', 'Solr, The Enterprise Search Server');
+$doc->addField('cat', 'electronics');
+$doc->addField('cat', 'joinc card');
+$doc->addField('price', 140000);
+
+$updateResponse = $client->addDocument($doc);
+}}}

@@ -1,0 +1,208 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2014.08.25.15.59.14;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.08.25.15.54.29;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.08.25.15.48.09;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.08.25.15.46.03;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.08.25.14.47.09;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.08.25.14.30.19;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fRuby_2fVim
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Vim-eclim 으로 루비 개발 환경 만들기
+
+[[TableOfContents]]
+== Ruby와 Vim ==
+내 주력 에디터는 vim이다. 사실상 vim이외에 다른 에디터는 사용하지 않는다고 보면 되겠다. 단순하고 어디에서나 실행되는게 맘에 든다. 개발을 위해서 사용하는 플러그인은 다음과 같다. 
+  * [https://github.com/tpope/vim-pathogen pathogen] : vim 플러그인을 관리해주는 플러그인이다.
+  * [https://github.com/Valloric/YouCompleteMe YCM] : 자동완성 플러그인이다. 플러그인의 꽃이라고 할 수 있겠다. 
+  * [https://github.com/majutsushi/tagbar Tagbar] : 소스코드 파일을 태깅하고 브라우징하게 도와준다. Ctag 기반이다. 
+  * https://github.com/scrooloose/nerdtree.git Nerdtree] : 파일 브라우저다. 
+이들 모두를 설치한 vim 화면이다. golang 프로그래밍 화면을 갭춰했다. 
+
+https://lh3.googleusercontent.com/-DarKLkJhebM/U_s9UP-3_HI/AAAAAAAAERo/r8d-cSlTzpE/s640/golang-5.png
+
+== 설치 환경 ==
+아래 환경에서 설치했다.
+ * 우분투 리눅스 14.04
+ * Vim 7.4.52
+ * ctags 
+ * eclipse(4.4.0) Luna 
+
+=== Vim 기본 플러그인 설치 ===
+패키지 관리 플러그인으로 pathogen을 사용했다. 아래 처럼 설치하면 된다. 
+{{{#!plain
+# mkdir -p ~/.vim/autoload ~/.vim/bundle
+# cd ~/.vim/autoload
+# curl -LSso pathogen.vim https://tpo.pe/pathogen.vim
+}}}
+
+.vimrc 파일 수정
+{{{#!plain
+# cat ~/.vimrc
+execute pathogen#infect()
+syntax on
+filetype plugin indent on
+}}}
+
+자동완성 프로그인인 YCM을 설치했다. YCM을 설치하려면 "python-dev", "cmake"가 필요하다. 먼저 설치해 두자.
+{{{#!plain
+# cd ~/.vim/bundle
+# git clone https://github.com/Valloric/YouCompleteMe.git
+# cd YouCompleteMe
+# ./install.sh
+}}}
+
+YCM에 대한 내용은 [wiki:man/12/golang/Start go 언어 시작하기] 문서에 좀 더 자세히 나와 있다.(VIM YCM 설정 문서를 따로 정리해야 겠네. 쩝.)
+== Ruby 자동완성 == 
+YCM은 3rd-party 형태로 지원 언어를 확장할 수 있는 일종의 플렛폼 시스템이다. 
+
+YCM에서 루비언어를 지원하게 하려면  Eclim을 설치해야 한다. Eclim은 이클립스 기반의 프로그램으로 먼저 이클립스를 설치해야 한다.. Eclim은 2.2.x 이상 이클립스는 4.4.0(Luna) 이상이 필요하다.. (2014년 8월)현재 이들의 버전은 Eclim 2.4.0 이클립스 4.4.0이다.
+
+이클립스를 설치 한다. apt-get으로 설치할 경우 3.8이 설치가 된다. 이 버전에서는 Eclim을 설치할 수가 없다. 해서 직접 다운로드해서 설치하기로 했다. [https://www.eclipse.org/downloads Eclipse download 페이지]에서 4.4 버전을 다운로드 했다.  
+{{{#!plain
+# tar -xvzf eclipse-standard-luna-R-linux-gtk-x86_64.tar.gz
+}}}
+
+[http://eclim.org/ eclim 사이트]에서 eclim_2.4.0.jar 을 다운로드 한 후 설치했다. 
+{{{#!plain
+# java -jar eclim_2.4.0.jar
+}}}
+
+Eclim 설정 화면이 뜨는 구나. 설치에 필요한 정보들을 출력한다.
+
+https://lh4.googleusercontent.com/-_zVizQ0p3FU/U_tGcxOpQyI/AAAAAAAAER0/yIYSNxZ-mHU/s400/eclim01.png
+
+vim파일 디렉토리를 설정하고
+
+https://lh6.googleusercontent.com/-B6KXQxieBCA/U_tGeUCpc-I/AAAAAAAAESA/i7uhAxemZOs/s400/eclim02.png
+
+eclipse 설치 디렉토리도 알려주고
+
+https://lh6.googleusercontent.com/-JRB3BHKd_bE/U_tGfBKq1vI/AAAAAAAAESE/PvcevLk5B14/s400/eclim03.png
+
+지원할 언어를 설정한다. Android도 보이고, C/C++, Ruby, php, Python 다 있구나.  
+
+https://lh6.googleusercontent.com/-yuV7Wd-5IKc/U_tGge7hk8I/AAAAAAAAESY/JEZbem-rIpI/s400/eclim05.png
+
+설치하는데 시간이 좀 걸린다. 설치를 끝내고 이클릭스 디렉토리에 가면 '''eclimd'''파일이 보일 거다. elim은 클라이언트-서버 모델로 작동한다. eclimd를 실행하자. 
+{{{#!plain
+# cd $ECLIPSE_HOME
+# ./eclimd
+}}}
+
+.vimrc에 아래 내용을 포함해야 한다.
+{{{#!plain
+let g:EclimCompletionMethod = 'omnifunc'
+}}}
+
+vim을 실행하고 ruby 프로그래밍을 위한 프로젝트 디렉토리를 만든다. 난 ruby 프로젝트를 위해서 $HOME/projects/ruby 디렉토리를 만들었다.
+{{{#!plain
+:ProjectCreate /home/yundream/projects/ruby -n ruby
+}}}
+
+이제 ruby 프로젝트 디렉토리에서 ruby 코딩을 하면, 자동완성 기능을 사용할 수 있다. 아래는 완성한 개발 환경
+
+https://lh5.googleusercontent.com/-9dM6GF3sHZQ/U_tJG-k-_yI/AAAAAAAAESk/4RVgorzZ0ss/s640/eclim07.png
+
+좋구나. 이렇게 된거, android, php 쪽도 좀 살펴보고 Eclim도 제대로 조사해 봐야 겠다. 
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d45 1
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d21 24
+d46 1
+a46 1
+YCM은 다양한 언어를 지원하지만, Ruby와 PHP의 경우 추가적인 작업이 필요하다. 
+d48 1
+a48 1
+Ruby언어의 경우 Eclim와 이클립스가 필요하다. Eclim은 2.2.x 이상 이클립스는 4.4.0(Luna) 이상이 필요하다.. (2014년 8월)현재 이들의 버전은 Eclim 2.4.0 이클립스 4.4.0이다.
+d50 1
+a50 1
+먼저 이클립스를 설치해야 한다. apt-get으로 설치할 경우 3.8이 설치가 된다. 이 버전에서는 Eclim을 설치할 수가 없다. 해서 직접 다운로드해서 설치하기로 했다. [https://www.eclipse.org/downloads Eclipse download 페이지]에서 4.4 버전을 다운로드 했다.  
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d15 1
+d18 2
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d69 1
+a69 1
+좋구나. 이렇게 된거, android, php 쪽도 좀 살펴봐야 겠다.
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d32 17
+a48 1
+이제 이클릭스 디렉토리에 가면 '''eclimd'''파일이 보일 거다. elim은 클라이언트-서버 모델로 작동한다. eclimd를 실행하자. 
+d67 2
+@

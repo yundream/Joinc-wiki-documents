@@ -1,0 +1,590 @@
+head	1.10;
+access;
+symbols;
+locks
+	root:1.10; strict;
+comment	@# @;
+
+
+1.10
+date	2014.09.11.04.59.49;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.09.09.05.25.14;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.09.08.02.02.55;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.09.07.11.42.34;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.09.06.06.53.13;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.09.06.06.52.58;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.09.06.03.58.32;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.08.30.17.48.01;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.08.30.16.29.40;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.08.25.06.30.11;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2fOOP
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Go를 이용한 객체지향 프로그램 개발
+
+[[TableOfContents]]
+== Go 객체지향 프로그래밍 ==
+Go 언어는 클래스와 객체를 가지고 있지 않다. 클래스와 객체를 가지고 있지 않아도 객체지향 프로그래밍 언어라고 할 수 있을까 ? "객체지향"은 일종의 소프트웨어 개발 방법론으로 언어의 종류와는 상관없다. 예컨데, 대표적인 절차지향 언어라는 C 언어로도 객체지향적인 프로그래밍이 가능하다. C로 구현한 GUI 툴킷인 GTK의 경우 객체지향적인 방식으로 개발됐다. 단 언어가 얼마나 자연스럽게 객체지향적 프로그래밍이 가능하도록 지원하느냐 라는 관점에서 본다면, 할 이야기가 좀 있을 거다.
+
+Go 언어도 비슷한 관점에서 볼 수 있을 것 같다. Go 언어는 전형적인 객체지향 언어의 형태에는 맞지 않는 부누이 있지만, 다른 방식으로 객체지향을 위한 기본적인 기능의 대부분을 제공한다.  
+ * Interfaces를 이용한 다형성(polymorphism) 지원  
+ * Export를 이용한 Namespace의 지원
+ * automatic message delegation via embedding
+ * methods on any type we define, with no boxing or unboxing
+
+Go는 상속을 지원하지 않기 때문에 "is - a relationship"을 이용해서 우회해서 (비슷하게) 구현할 수 있다. Go언어로 상속을 구현하려면 '''composition'''이라는 객체지향 디자인을 이용해야 한다. 이런 식으로 우회하는게 올바른 객체지향 개발 방법이라고 볼 수 있느냐라는 의견이 있을 것 같다. 이 의견에 대한 답은 다음과 같다. 
+
+"클래스 상속은 옵션이다. 모든 문제는 하나 이상의 풀이 방법을 가지고 있다." - [http://www.poodr.com/ Sandi Metz] 
+
+=== 메서드와 인터페이스 ===
+==== 메서드 ====
+Go는 클래스가 없지만 메서드를 구조체에 붙이는 것으로 클래스가 하는 일을 할 수 있다. 구조체에 메서드를 붙이는 방식으로 클래스를 구현하는 또 다른 언어로 C가 있다. 인터페이스라는게 없는 대신에 함수 포인터를 사용한다는 차이가 있다.
+
+인터페이스의 사용방법
+{{{#!plain
+func (method receiver) funcName() returnValue 
+}}}
+
+Method receiver를 이용해서 "structure"와 structure의 데이터를 처리할 "메서드"를 연결할 수 있다. 
+
+예제 프로그램 - 1
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+type Vertex struct {
+    X, Y float64
+}
+
+func (v *Vertex) Abs() float64 {
+    return math.Sqrt(v.X*v.X + v.Y*v.Y)
+}
+
+func main() {
+    v := &Vertex{3, 4}
+    fmt.Println(v.Abs())
+}
+}}}
+아래와 같은 그림으로 묘사할 수 있겠다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1k9ujusvgBij8NW1LFE6q5XW1lSPzAxm2XBQCpcKXF2M/pub?w=480&amp;h=128">
+}}}
+
+자.. 이제 나누기 메서드를 추가해보자.
+{{{#!plain
+func (v *Vertex) Max() float64 {
+    return math.Max(v.X, v.Y)
+}
+
+func main() {
+    v := &Vertex{3, 4}
+    fmt.Println(v.Abs())
+    fmt.Println(v.Max())
+}
+}}}
+
+이렇게 묘사할 수 있겠다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1rIbXOP5q1FVcZxPS8RugqmBdxqUD58lyUGMlPezku6U/pub?w=470&amp;h=124">
+}}}
+
+포인터를 메서드 리시버로 설정할 수도 있다. 포인터를 이용하는 이유는 다음과 같다. 
+  1. 각 메서드를 호출 할 때, 데이터 복사를 방지하고  
+  1. 포인터로 넘어온 값을 변경할 수 있다. 
+포인터 메서드를 테스트하기 위한 예제 코드다.
+{{{#!plain
+import "fmt"
+
+type entity float32
+
+func (e entity) inc() {
+    e++
+}
+
+func (e entity) echo() {
+    fmt.Println(e)
+}
+
+func main() {
+    var e entity = 3
+    e.inc()
+    e.echo()
+    e.inc()
+    e.echo()
+
+}
+}}}
+실행 결과
+{{{#!plain
+$ go run main.go 
+3
+3
+}}}
+원하는 결과는 4, 5여야 겠는데, 매번 값이 복사되기 때문에 그냥 3이 출력된다. 포인터를 이용해서 제대로 작동하게 만들었다.
+{{{#!plain
+func (e *entity) inc() {
+    *e++
+}
+
+func (e *entity) echo() {
+    fmt.Println(*e)
+}
+
+func main() {
+    var e entity = 3
+    e.inc()
+    e.echo()
+    e.inc()
+    e.echo()
+
+}
+}}}
+
+==== 인터페이스 ====
+형태만 만들어 둔 다음, 필요에 따라서 실 구현을 하는 객체지향의 기법으로, C++, Java, C#의 인터페이스와 비슷한 개념이다.  
+
+면적을 구하는 함수를 만든다고 가정해보자. 이 함수는 길이와 관련된 한 두개의 매개변수가 필요할 거다. 이 함수의 이름은 Area()로 하자. 헌데, Area()함수의 구현은 면적을 구하는 대상에 따라서 달라진다. 가장 손쉬운 구현은 삼각형과 사각형, 원 각각의 Area()를 구현하는 거다. circle.Area(), triangular.Area(), rectangle.Area() 이런식이 되겠다.  객체지향에서는 인터페이스를 만들고 실제 구현은 상속체에서 구현하는 방식을 이용한다. C++ 예제다. 
+{{{#!plain
+#include <iostream>
+
+using namespace std;
+
+class Shape {
+    protected:
+        int width;
+        int height;
+    public:
+        virtual int Area() = 0;
+        void setWidth(int w) {
+            width=w;
+        }
+        void setHeight(int h)
+        {
+            height=h;
+        }
+};
+
+class Rectangle: public Shape {
+    public :
+        int Area() {
+            return (width * height);
+        }
+};
+
+class Triange: public Shape {
+    public :
+        int Area() {
+            return (width * height)/2;
+        }
+};
+
+int main(void) {
+    Rectangle Rect;
+    Triange Tri;
+
+    Rect.setWidth(5);
+    Rect.setHeight(7);
+
+    cout << "Total Rectangle area " << Rect.Area() << endl;
+
+    Tri.setWidth(5);
+    Tri.setHeight(7);
+
+    cout << "Total Triangle area " << Tri.Area() << endl;
+
+    return 0;
+}
+}}}
+
+Shape 프로그램을 golang 버전으로 만들어 보자. go에서는 interface를 이용해서 메서드를 추상화 할 수 있다. C++과 마찬가지로 추상화된 메서드의 집합이라고 보면 되겠다. 이 코드에서 인터페이스로 만들 메서드는 Area다.  
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+type Shaper interface {
+    Area() int
+}
+
+type Rectangle struct {
+    width, height int
+}
+
+type Triangle struct {
+    width, height int
+}
+
+type Circle struct {
+    radius float64
+}
+
+func (r Rectangle) Area() int {
+    return r.width * r.height
+}
+
+func (r Triangle) Area() int {
+    return (r.width * r.height) / 2
+}
+
+func (r Circle) Area() float64 {
+    return (r.radius * r.radius) * math.Pi
+}
+
+func main() {
+    r := Rectangle{3, 5}
+    t := Triangle{3, 6}
+    c := Circle{10.0}
+    fmt.Println("Area of the Rectangle ", r.Area())
+    fmt.Println("Area of the Triangle ", t.Area())
+    fmt.Println("Area of the Circle", c.Area())
+
+    s := Shaper(r)
+    fmt.Println("Area of the Spape r is ", s.Area())
+}
+}}}
+
+실행 결과
+{{{#!plain
+Area of the Rectangle  15
+Area of the Triangle  9
+Area of the Circle 314.1592653589793
+Area of the Spape r is  15
+}}}
+
+
+=== Composite OOP 디자인 ===
+자전거 대여점을 운영한다고 가정해 보자. 자전거는 spare 파트를 가지고 있는데, 자전거의 종류에 따라서 spare 파트도 다르게 구성해야 한다. 이 문제를 해결 하기 위한 가장 널리 알려진 방법 중 하나는 "클래스 상속"을 이용하는 거다. '''Bicycl'''라는 이름의 base 클래스를 만들고, 이 클래스로 부터 상속된 '''MountainBike'''와 '''RoadBike'''를 만들면 된다. 나는 클래스 상속 대신에 composition을 이용해서 구현할 거다.    
+
+{{{#!plain
+<img src="https://docs.google.com/drawings/d/1r9plYRUnlFVmxIG6hqVJL0TrAZEvic9mTR1r9rNPBdA/pub?w=923&amp;h=623">
+}}}
+
+==== 패키지 ====
+{{{#!plain
+package main
+import "fmt"
+}}}
+패키지는 이름공간(namespace)을 구성하기 위해서 사용한다. main() 함수는 main 패키지에 포함된다. fmt 패키지는 형식화된 입출력을 위한 함수들을 제공한다.  
+
+==== Types ====
+{{{#!plain
+type Part struct {
+  Name          string
+  Description   string
+  NeedsSpare    bool
+}
+}}}
+자전거를 구성할 파트의 구성요소 저장할 타입을 정의했다. C의 구조체와 비슷하다.
+  * Name : 파트의 이름
+  * Description : 파트에 대한 설명
+  * NeedsSpare : Spare에 포함할지 
+
+{{{#!plain
+type Parts []Part
+}}}
+하나 이상의 파트로 구성해야 하므로 Part의 배열로 이루어진 Parts 타입을 만들었다. 
+
+==== 메서드 ==== 
+이제 spare 메서드를 만들자. 이 spare 메서드는 유저정의 데이터 타입인 Parts를 조작한다. 
+{{{#!plain
+func (parts Parts) Spares() (spares Parts) {
+    for _, part := range parts {
+        if part.NeedsSpare {
+            spares = append(spares, part)
+        }
+    }
+    return spares
+}
+}}}
+리시버 메서드를 이용해서, Parts에 Spare() 메서드를 연결했다. 이제 Spares 메서드를 이용해서 Parts 스트럭처를 조작할 수 있게 됐다. 
+
+==== Embedding ====
+{{{#!plain
+type Bicycle struct {
+    Size string
+    Parts
+}
+}}}
+자전거는 Size와 Parts로 구성된다. 자전거를 대여 할 때의 기준은 Size와 Parts가 되며, 각 파트별로 Spare를 준비할지를 결정한다. 이제 Bicycle 스트럭처로 새로운 타입의 자전거를 하나 만들면, Parts에 연결된 Spares()메서드를 이용할 수 있게 된다. 
+
+==== Composite ====
+자전거 타입별로 파트를 구성해 보자. 
+{{{#!plain
+var (
+    RoadBikeParts = Parts{
+        {"chain", "10-speed", true},
+        {"tire_size", "23", true},
+        {"tape_color", "red", true},
+    }
+    MountainBikeParts = Parts{
+        {"chain", "10-speed", true},
+        {"tire_size", "21", true},
+        {"front_shock", "Manitou", false},
+        {"rear_shock", "Fox", true},
+    }
+    RecumbentBikeParts = Parts{
+        {"chain", "9-speed", true},
+        {"tire_size", "28", true},
+        {"flag", "tall and orange", true},
+    }
+)
+}}}
+
+실제 구현은 다음과 같다.
+{{{#!plain
+func main() {
+    roadBike := Bicycle{Size: "L", Parts: RoadBikeParts}
+    mountainBike := Bicycle{Size: "L", Parts: MountainBikeParts}
+    recumbentBike := Bicycle{Size: "L", Parts: RecumbentBikeParts}
+}}}
+  1. roadBike(일반 자전거), mountainBike(산악 자전가), recumbentbike(누워서 타는 자전거)를 만들었다.
+  1. 각 자전거 별로, 다른 parts를 가지고 있다. 
+  1. Parts 구조체는 Spares() 메서드와 연결돼 있다.
+
+지금까지의 내용을 집대성한 완성된 코드다.
+{{{#!plain
+package main
+
+import (
+    "fmt"
+)
+
+// 자전거의 Part
+type Part struct {
+    Name        string
+    Description string
+    NeedsSpare  bool
+}
+
+type Parts []Part
+
+// Part와 연결된 Spares 메서드
+// NeedsSpare가 true인 part들을 반환한다.
+func (parts Parts) Spares() (spares Parts) {
+    for _, part := range parts {
+        if part.NeedsSpare {
+            spares = append(spares, part)
+        }
+    }
+    return spares
+}
+
+// 자전거 구조체. 클래스라고 보면 되겠다.
+// 크기와 파트로 분류할 수 있다.
+type Bicycle struct {
+    Size string
+    Parts
+}
+
+// 자전거 타입별 파트를 정의했다.
+var (
+    RoadBikeParts = Parts{
+        {"chain", "10-speed", true},
+        {"tire_size", "23", true},
+        {"tape_color", "red", true},
+    }
+    MountainBikeParts = Parts{
+        {"chain", "10-speed", true},
+        {"tire_size", "21", true},
+        {"front_shock", "Manitou", false},
+        {"rear_shock", "Fox", true},
+    }
+    RecumbentBikeParts = Parts{
+        {"chain", "9-speed", true},
+        {"tire_size", "28", true},
+        {"flag", "tall and orange", true},
+    }
+)
+
+func main() {
+    roadBike := Bicycle{Size: "L", Parts: RoadBikeParts}
+    mountainBike := Bicycle{Size: "L", Parts: MountainBikeParts}
+    recumbentBikee := Bicycle{Size: "L", Parts: RecumbentBikeParts}
+
+    roadBike.Spares()
+    fmt.Println(roadBike)
+    fmt.Println(mountainBike)
+    fmt.Println(recumbentBikee)
+}
+}}}
+==== 정리 ====
+지금까지의 내용을 그림으로 묘사했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1r9plYRUnlFVmxIG6hqVJL0TrAZEvic9mTR1r9rNPBdA/pub?w=693&amp;h=344" width="485" height="240">
+}}}
+
+클래스는 사물의 순수한 원형으로, "Bycycle"이 되겠다 . 이 하나 뿐인 원형으로 부터 파생되는 객체가 "mountainBike", "roadbike"등 수많은 자전거들이다. 이들 자전거들은 parts로 구성되고, Spare()메서드를 이용해서 parts를 조작한다.  
+ 1. 사물의 원형으로 부터 파생
+ 1. 각각의 객체는 사물을 구성하는 속성을 가진다.
+ 1. 각각의 객체는 속성을 제어하는 메서드를 가진다. 
+OOP의 기본적인 요소들을 모두 충족한다. 단 일반적인 객체지향 언어에서 사용하는 클래스와는 그 차이가 좀 보일 거다. OOP 언어에서의 클래스는 클래스 타입안에 속성(데이터)와 메서드를 모두 내장한다. 하지만 golang은 속성과 메서드를 별개의 구성요소(composition)으로 하고 이들을 조립하는 방식으로 객체지향을 구현한다.  
+
+== 참고 ==
+ * [http://golangtutorials.blogspot.kr/2011/06/structs-in-go-instead-of-classes-in.html Structs in go instead of classes in]
+ * [http://nathany.com/good/ Go Object Oriented Design]
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d320 1
+d325 64
+d390 12
+d403 7
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d132 1
+d134 47
+d183 16
+d200 43
+a242 1
+=== Composition 예제 ===
+d286 1
+a286 1
+객체지향 프로그래밍 언어의 경우 보통은 메서드와 함수를 서로 분리하지만, go는 그런거 없다. receiver를 제외하고는 차이가 없다.
+d291 1
+a291 1
+    Type string
+d295 1
+a295 1
+자전거는 Type과 Parts로 구성된다. 
+d297 29
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d128 6
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d75 51
+a125 1
+좀 더 써봐야 알겠지만 C의 함수포인터 보다는 훨 나은 것 같다.
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d16 63
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d19 4
+d38 4
+a41 1
+자전거를 구성할 파트의 타입을 정의했다. C의 구조체와 비슷하다.
+d49 12
+d62 8
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d17 26
+a42 1
+자전거 대여점을 운영한다고 가정해 보자. 자전거는 spare 파트를 가지고 있는데,   
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 15
+@

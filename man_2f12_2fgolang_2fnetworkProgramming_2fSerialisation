@@ -1,0 +1,834 @@
+#title Data serialisation
+
+[[TableOfContents]]
+== 데이터 직렬화 ==
+Serialisation을 번혁하면 직렬화니, 데이터 직렬화라고 하는게 맞는 것 같긴하다. 머리에 잘 들어오지 않는게 문제지. 국어 사전을 봐도, 데이터 직렬화라는 용어에서 얻을 수 있는 정보는 없다. 
+
+데이터 직렬화에 대해서 이렇게 정의 하고 있다. 컴퓨터 과학에서 직렬화라는 것은 메모리 버퍼, 파일, 혹은 네트워크를 통해서 전송되고 저장하는 데이터를 이용할 수 있는 상태로 재 구성하는 것을 의미한다. 그닥 직관적이지 않은 용어인데, 그림으로 그러보면 이해가 쉽다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1OP2TLGYP0DLolFhQ3yxeeJ6S7MYi3iLOKg-e_kN9nKU/pub?w=919&amp;h=124" width="634" height="86">
+}}}
+
+A 컴퓨터에서 구조체 데이터를 인터넷 너머에 있는 B 컴퓨터로 보낸다고 가정해 보자. 네트워크에서 데이터는 연속된 바이트의 흐름일 뿐이다. 따라서 구조체를 바이트 배열로 만들어야 하는데, 이를 직렬화 라고 한다. 직선으로 쭉 나열한다 라는 의미로 보면 되겠다. 직렬화된 데이터를 받은 측에서는 사용하기 위해서 다시 구조체로 만들어야 한다. 이를 역직렬화 라고 한다.   
+
+데이터를 직렬화 하고 역직렬화 하려면,  데이터 포맷을 알고 있어야 한다. 그래서 JSON, XML, YAML과 같은 문서 포맷이 주로 직렬화의 대상이 된다.
+
+네트워크에서 서버와 클라이언트가 데이터를 주고받을 때, 이 데이터는 고도로 구조화 된다. 이 구조화된 데이터를 이용하려면 직렬화가 필요하다. 여기에서는 직렬화를 이용하는 일련의 방법과 go 언어에서 지원하는 직렬화 관련 API들을 살펴볼 것이다. 
+
+== 네트워크에서 데이터 직렬화 ==
+클라이언트와 서버는 서비스를 이용하기 위해서 메시지를 교환해야 한다. TCP와 UDP는 메시지 교환을 위한 전송 메커니즘을 제공한다. 메시지를 주고 받는 프로세스들은 메시지를 해석할 수 있도록 약속된 프로토콜에 따라서 메시지를 만든다. 
+
+네트워크를 가로지르는 메시지들은 단순한 바이트의 나열일 뿐으로, 이것만 가지고는 어떤 의미도 찾아낼 수 없다. 메시지를 이용하기 위한 다양한 방법들을 다음장(애플리케이션 프로토콜)에서 고민할 것이다. 여기에서는 전송 메시지의 단위 구성요소들을 살펴보는데 집중할 것이다. 
+
+프로그램은 현재의 프로그램 상태정보를 저장하기 위해서 복잡한 데이터 구조를 구축한다. 클라이언트나 서버 프로그램은 네트워크 너머에 있는 원격 프로그램이 동일한 데이터 구조체를 가지고 있을거라고 가정을 하고 통신을 한다. 예컨데, 애플리케이션 자신의 주소공간에 있는 데이터를 외부로 복사하는 것으로 생각하는 거다. 
+
+프로그래밍 언어들은 대략 다음과 같은 데이터 구조들을 지원한다.
+  * 레코드/구조체
+  * 가변(variant) 레코드
+  * 고정 혹은 가변 배열
+  * 고정 혹은 가변 문자열
+  * 테이블 : 배열의 배열 (혹은 배열의 레코드) 
+  * non-linear 구조체
+     * 링크드리스트
+     * 바이너리 트리
+     * 객체
+IP나 TCP/UDP는 이러한 데이터 타입을 전혀 모른다. 연속된 바이트의 흐름으로 볼 뿐이다. 따라서 응용 프로그램들은 바이트 흐름을 판독에 적합한 데이터로 '''직렬화'''하고, 반대로 바이트의 흐름으로 만들어 주는 '''비직렬화''' 작업을 수행해야 한다. 이 두 작업을 '''marshalling'''와 '''unmarshalling'''라고 한다. 
+
+예를들어 가변 길이의 문자열을 저장하는 두개의 칼럼을 가진 데이터를 보낸다고 가정해 보자.
+||fred     ||programmer     ||
+||liping   ||analyst        ||
+||sureerat ||manager        ||
+
+이 데이터는 다양한 방식으로 보낼 수 있을 거다. 다음과 같이 구조화 할 수 있을 거다. 
+{{{#!plain
+ 3                // 3rows
+ 2                // 2 columns
+ 4 fred           // 4 char string,col 1
+ 10 programmer    // 10 char string,col 2
+ 6 liping         // 6 char string, col 1
+ 7 analyst        // 7 char string, col 2
+ 8 sureerat       // 8 char string, col 1
+ 7 manager        // 7 char string, col 2
+}}}
+저렇게 구조화 하지 않으면 네트워크 상에서는 "fredprogrammerlipinganalyst" 이딴식으로 데이터가 흐를 거고, 받은 쪽에서는 데이터를 사용할 수 없을 거다.   
+
+구조화는 다양하게 할 수 있다. 동일한 데이터를 다른 방식으로 구조화 했다.
+{{{#!plain
+3\0
+2\0
+fred\0        
+programmer\0
+liping\0
+analyst\0
+sureerat\0
+manager\0
+}}}
+문자열의 길이를 지정하는 대신, '\0'를 구분자로 사용하고 있다.
+
+혹은 아래처럼 아래 길이를 고정하는 방법도 있다. 첫번째 칼럼은 8로 두번째 칼럼은 10으로 고정했다. 패딩 값으로 \0을 사용        
+{{{#!plain
+fred\0\0\0\0
+programmer
+liping\0\0
+analyst\0\0\0
+sureerat
+manager\0\0\0
+}}}
+
+어떤 방법을 사용하더라도 상관없다. '''"약속만 돼 있다면"'''  
+
+== Mutual agreement ==
+지금까지 데이터 직렬화 문제를 대략 살펴봤다. 간단한 예제를 살펴봤지만, 실제 사항은 훨씬 더 복잡하다. 위에서 다루었던 예제로 '''marshalling'''문제를 좀 더 깊이 살펴보자. 
+{{{#!plain
+3 
+2
+4 fred
+10 programmer
+6 liping
+7 analyst
+8 sureerat
+7 manager
+}}}
+많은 질문이 발생한다. 
+
+얼마나 많은 행이 테이블에 추가 돌 수 있는가 ? 즉 정수의 크기를 어떻게 설정해야 하나. 255미만이라면 단일 바이트면 되겠지만, 그 이상이면 더큰 정수타입이 필요할 것이다. 문자열도 마찬가지다. 이들 문자는 어떤 문자열에 속할 것인가 ? 7비트 ASCII ? 16비트 유니코드 ? 
+
+위의 직렬화는 "암시적" 다른 말로 불투명 하다. 만약 위의 정보만으로 marshalling 할 경우, 직렬화된 데이터를 unmarshalling 하기 위한 아무런 정보도 얻을 수 없다. unmarshalling 하는 측은 데이터가 어떤 방식으로 직렬화가 됐는지를 명확히, 하나도 빠짐없이 알고 있어야 한다. 예를들어 row의 갯수를 8 비트 integer로 marshalling했는데, 16 비트 integer로 unmarshalling을 하면, 3과 2를 함께 읽어 버릴 것이다. 결국 수신 프로그램은 데이터를 제대로 해석할 수 없게 된다. 
+
+== self-describing data ==
+자기 '''서술적인 데이터'''(Self-describing data)는 자기 자신을 설명할 수 있는 데이터를 말한다. 지금까지 다뤘던 예제 테이블을 자기 서술적으로 만들었다. 
+{{{#!plain
+table
+   uint8 3
+   uint 2
+string
+   uint8 4
+   []byte fred
+string
+   uint8 10 
+   []byte programmer
+string
+   uint8 6 
+   []byte liping
+string
+   uint8 7 
+   []byte analyst
+string
+   uint8 8 
+   []byte sureerat
+string
+   uint8 7
+   []byte manager
+}}}
+물론 이건 어디까지나 설명을 위한 예제로 실제는 이렇게 장황하게 사용하지는 않는다. 보통은 작은 크기의 마커를 사용할 거다. 예를들어 "uint8"대신 0x01을 사용하는 식이다. 중요한 건 '''marshaller'''의 기본 원리는 직렬화된 데이터 안에, 데이터에 대한 정보를 넣는다는 거다. 데이터를 수신하는 소프트웨어의 '''unmarshaller'''는 데이터 생성 규칙을 알고 있을 것이며, 데이터를 재구성할 수 있다.
+
+== ASN.1 ==
+ASN.1(Abstract Syntax Notation One)는 통신산업을 위해서 1984년에 설계됐다. ASN.1은 복잡한 표준으로 go는 "ans1"패키지에서 구현하고 있다. 이 패키지는 복잡한 데이터구조를 직렬화 하기 위한 기능을 가지고 있다. X.509와 같은 인증서 인코딩등에 사용한다. 
+
+asn.1 패키지는 marshal과 unmarshal 두개의 함수를 제공한다.
+{{{#!plain
+func Marshal(val interface{}) ([]byte, os.Error)
+func Unmarshal(val interface{}, b []byte) (rest []byte, err os.Error)
+}}}
+Marshal 함수는 매개변수의 값을 byte 배열로 직렬화 하고, Unmarshal은 unmarshal하는 일을 한다. 매개변수로 '''interface'''를 사용하고 있다. (인터페이스에 대한 내용은 [wiki:man/12/golang/OOP 여기]를 참고하자.) 
+
+{{{#!plain
+package main
+
+import (
+    "encoding/asn1"
+    "fmt"
+    "os"
+)
+
+func main() {
+    mdata, err := asn1.Marshal(13)
+    checkError(err)
+
+    var n int
+    _, err1 := asn1.Unmarshal(mdata, &n)
+    checkError(err1)
+    fmt.Println("After Marshal/unmarshal: ", n)
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error : %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+unmarshalled 값은 (당연히) 13이다. 위에서는 단순한 데이터를 이용했는데, 더 복잡한 데이터를 관리하기 위해서 ASN.1에서 지원하는 데이터 구조를 살펴보려 한다.
+
+직력화를 사용하기 위해서는 어떤 데이터를 지원하는지 그리고 어떤 데이터를 지원하지 않는지를 확인할 필요가 있다. ASN.1을 사용 할 때도, 만들려는 응용 프로그램이 사용하려는 데이터가 지원 가능한 데이터인지를 먼저 확인해야 한다. ASN.1에서 지원하는 데이터 유형은 http://www.obj-sys.com/asn1tutorial/node4.html 에서 살펴볼 수 있다. 요약하자면
+  * BOOLEAN : 0과 1 두 개의 상태를 가지는 값 
+  * INTEGER : Integer 값들 
+  * BIT STRING : 임의의 길이를 가지는 이진 데이터
+  * OCTET STRING : 8의 배수의 길이를 가지는 이진 데이터  
+  * NULL : Indicate effective absence of a sequence element 
+  * OBJECT INENTIFIER : 객체의 이름 정보  
+  * REAL : Model real variable values
+  * ENUMERATED : 3개 이상의 상태 값을 가진 데이터(2개면 BOOLEAN이 되겠다.) 
+  * CHARACTER STRING : 문자 데이터 
+문자(Character strings)는 다음과 같은 데이터를 기술할 수 있다.  
+  * NumericString : 0,1,2,3,4,5,6,7,8,9 과 공백문자(space)
+  * PrintableString : 영문 대/소문자, 숫자, 공백문자, +, -, 콤마(,), -, 콜론, ', = 등등 프린트 가능한 문자들. 
+  * TeletexString (T61String) : CCITT의 [http://en.wikipedia.org/wiki/ITU_T.61 ITU_T.62] Teletex 문자 셋과 공백문자, delete 문자들 
+  * VideotexString : CCITT에서 정의한 T.100, T.101 Videotex 문자 
+  * VisibleString : ASCII 문자들과 공백문자 
+  * IA5String : International Alphabet 5 
+구조체들
+  * SEQUENCE
+  * SEQUENCE OF
+  * SET
+  * SET OF
+  * CHOICE
+  * SELECTION
+  * ANY
+
+Go는 위에 있는 모든 데이터들을 지원하지는 않는다. Go의 asn1 패키지에서 지원하는 것들은 다음과 같다. 
+  * ASN.1 INTEGER : int 혹은 int64
+  * ASN.1 BIT STRING 
+  * ASN.1 OCTET STRING : [ ]byte
+  * ASN.1 OBJECT INDENTIFIER
+  * ASN.1 ENUMERATED
+  * ASN.1 UTCTIME : go의 *time.Time 값
+  * ASN.1 PrintableString 혹은 IA5String : string 
+  * ASN.1 SEQUENCE OF 혹은 SET OF : Go의 slice 데이터들
+  * ASN.1 SEQUENCE 혹은 SET 
+Go언어로 ASN.1을 이용해서 데이터를 전송 할 때는 "한계"가 있다는 걸 알아야 한다.(Go뿐만 아니라 다른 언어들도 마찬가지다.) 예를들어 ASN.1는 정수데이터에 길이 제한이 없다. 하지만 go는 단지 signed 64-bit interger 데이터만 사용할 수 있다. 다시 말해서 Go는 signed와 unsigned를 구분하지만 ASN.1은 구분하지 않는다. uint64데이터를 전송할 경우 실패하게 된다. 
+
+다음은 문자열을 변환하는 예제다.
+{{{#!plain
+func main() {
+    s := "Hello"
+    mdata, err := asn1.Marshal(s)
+
+    fmt.Println(mdata)
+    checkError(err)
+
+    var newstr string
+    _, err1 := asn1.Unmarshal(mdata, &newstr)
+    checkError(err1)
+    fmt.Println("After Marshal/unmarshal: ", newstr)
+}
+}}}
+
+실행 결과
+{{{#!plain
+# go run asn.go 
+[19 5 72 101 108 108 111]
+After Marshal/unmarshal:  Hello
+}}}
+Marshal, unmarshal 결과가 "Hello"로 같은 것은 당연한 결과다. 그전에 Marshal한 값을 Println 한 걸 한번 분석해 보자. 이 값을 분석하려면 두 가지 테이블에 대한 정보를 가지고 있으면 된다. 첫번째 테이블은 [http://www.obj-sys.com/asn1tutorial/node124.html ASN.1 Listing of Universal Tags] 이고 두 번째 테이블은 [wiki:man/12/ascII ASCII 테이블] 이다. 이 두 개의 테이블을 이용해서 분석해보자. 
+  * 19 : asn.1 태그테이블을 보면 19는 "PrintableString"다. Marshal한 데이터가 문자열 임을 알려주고 있다.  
+  * 5 : NULL 이다. ASN.1 태그와 데이터를 구분하기 위해서 사용한다.  
+  * 72 101 108 108 111 : ASCII 테이블을 보면 "Hellow"에 대응하는 값이라는 걸 알 수 있다.
+
+시간정보를 전송하는 예제 프로그램이다.
+{{{#!plain
+func main() {
+    t := time.Now()
+    mdata, err := asn1.Marshal(t)
+                      
+    checkError(err)   
+    fmt.Println("Marshal Time : ", t.Local())
+
+    var newtime = new(time.Time)
+    _, err1 := asn1.Unmarshal(mdata, newtime)
+    fmt.Println("Unmarshal Time : ", newtime.Local())
+
+    checkError(err1)
+}
+}}}
+
+{{{#!plain
+$ go run asn.go 
+[23 17 49 52 48 57 49 49 50 51 49 56 48 50 43 48 57 48 48]
+Marshal Time :  2014-09-11 23:18:02.767838174 +0900 KST
+Unmarshal Time :  2014-09-11 23:18:02 +0900 KST
+}}}
+
+네트워크 상에서 asn.1을 이용하는 예제 프로그램을 만들어보자. Daytime 서버/클라이언트를 asn.1 버전으로 만들었다.  
+
+Daytime Server
+{{{#!plain
+package main
+
+import (
+	"encoding/asn1"
+	"fmt"
+	"net"
+	"os"
+	"time"
+)
+
+func main() {
+
+	service := ":1200"
+	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
+	checkError(err)
+
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	checkError(err)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+
+		daytime := time.Now()
+		// Ignore return network errors.
+		mdata, _ := asn1.Marshal(daytime)
+		conn.Write(mdata)
+		conn.Close() // we're finished
+	}
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+
+daytime client
+{{{#!plain
+package main
+
+import (
+	"bytes"
+	"encoding/asn1"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"time"
+)
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprintf(os.Stderr, "Usage: %s host:port", os.Args[0])
+		os.Exit(1)
+	}
+	service := os.Args[1]
+
+	conn, err := net.Dial("tcp", service)
+	checkError(err)
+
+	result, err := readFully(conn)
+	checkError(err)
+
+	var newtime time.Time
+	_, err1 := asn1.Unmarshal(result, &newtime)
+	checkError(err1)
+
+	fmt.Println("After marshal/unmarshal: ", newtime.String())
+
+	os.Exit(0)
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func readFully(conn net.Conn) ([]byte, error) {
+	defer conn.Close()
+
+	result := bytes.NewBuffer(nil)
+	var buf [512]byte
+	for {
+		n, err := conn.Read(buf[0:])
+		result.Write(buf[0:n])
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+	}
+	return result.Bytes(), nil
+}
+}}}
+클라이언트 프로그램은 "localhost:1200" 주소로 연결하면 된다. 클라이언트는 서버로 부터 ASN.1형식으로 Marshaling된 데이터를 읽어서 Unmarshaling한 후 그 값을 출력한다. 
+{{{#!plain
+# go run daytime_client.go 127.0.0.1:1200
+2014-09-12 00:31:06 +0900 KST
+}}}
+
+== JSON ==
+JSON(JavaScript Object Nottion)은 "속성-값" 형식의 데이터를 전송하기 위한 오픈 표준 포맷이다. 인간이 읽을 수 있는 텍스트 기반의 데이터다. 비슷한 용도로 사용할 수 있는 XML 보다 단순하고 가볍고, 읽기 쉽다는 장점이 있다. 지금은 많은 애플리케이션, 특히 웹 기반 애플리케이션에서 널리 사용하고 있다. 
+
+JSON 객체는 배열과 basic values 타입이 있다. Basic value는 string, 숫자, 불리언 값, 널 값을 포함한다. 배열은 array, vector, lists등으로 표현되는 연속된 일련의 값으로 콤마(,)를 구분자로 사용한다. 배열은 [ ]으로 감싼다.
+
+아래는 JSON 배열 객체 예제다.
+{{{#!plain
+[
+   {Name: fred, Occupation: programmer},
+   {Name: liping, Occupation: analyst},
+   {Name: sureerat, Occupation: manager}
+]
+}}}
+
+JSON은 Date, string, 숫자를 구분하지 않는 단순한 언어인데, 그럼에도 불구하고 유용하게 사용할 수 있다. 데이터가 텍스트 기반이기 때문에, (문자열 처리에 약간의 오버헤드가 있기는 하지만)사람이 쉽게 사용할 수 있다.
+
+JSON 패키지는 marshalling을 위해서 아래에 있는 데이터 유형에 대한 인코딩 방법들을 제공한다.
+  * Boolean 값은 JSON boolean으로 인코딩
+  * Floating point와 integer 값은 JSON 숫자로 인코딩
+  * String은 JSON string으로 인코딩 
+  * 배열과 slice 값은 JSON 배열로 인코딩 
+  * Struct는 JSON 객체로 인코딩. 스트럭처의 필드 이름이 JSON 오브젝트의 key가 된다. 이때 필드 이름은 소문자로 변환된다. 
+  * Channel, complex와 function values 등은 JSON 인코딩되지 않는다. 
+
+Structure를 JSON 으로 인코딩하는 예제 코드 
+{{{#!plain
+package main
+    
+import (
+    "encoding/json"
+    "fmt"
+    "os"     
+)   
+
+// 개인 정보를 저장하기 위한 구조체
+type Person struct {
+    Name     Name
+    Birthday int32
+    Email    []Email
+    Marrage  bool
+}   
+
+// 성과 이름으로 구성된다.
+type Name struct {
+    Family   string
+    Personal string
+}
+
+// 이메일 정보 
+type Email struct {
+    Kind    string
+    Address string
+}       
+            
+func main() {
+    person := Person{
+        Name:     Name{Family: "Newmarch", Personal: "Jan"},
+        Birthday: 19741001,
+        Marrage:  true,
+        Email: []Email{Email{Kind: "home", Address: "jan@newmarch.name"},
+            Email{Kind: "work", Address: "j.newmarch@boxhill.edu.au"}},
+        }
+    saveJson("person.json", person)
+}
+
+// Person 구조체를 JSON 파일로 저장한다.
+func saveJson(fileName string, key interface{}) {      
+    outFile, err := os.Create(fileName)
+    checkError(err)
+    encoder := json.NewEncoder(outFile)
+    err = encoder.Encode(key)
+    checkError(err)
+    outFile.Close()
+}  
+      
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }    
+}        
+}}}
+
+코드 실행 후 만들어진 JSON 파일을 살펴보자. 
+{{{#!plain
+# cat person.json | json_pp 
+{
+   "Email" : [
+      {
+         "Address" : "jan@newmarch.name",
+         "Kind" : "home"
+      },
+      {
+         "Kind" : "work",
+         "Address" : "j.newmarch@boxhill.edu.au"
+      }
+   ],
+   "Marrage" : true,
+   "Birthday" : 19741001,
+   "Name" : {
+      "Personal" : "Jan",
+      "Family" : "Newmarch"
+   }
+}
+}}}
+
+이제 person.json을 읽어서 사용하는 프로그램을 만들었다.
+{{{#!plain
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+)
+
+type Name struct {
+    Family   string
+    Personal string
+}
+
+type Email struct {
+    Kind    string
+    Address string
+}
+
+type Person struct {
+    Name     Name
+    Birthday int32
+    Email    []Email
+    Marrage  bool
+}
+
+func (p Person) String() string {
+    s := p.Name.Personal + " " + p.Name.Family
+    s += fmt.Sprintf("\nBirthday Type : %T", p.Birthday)
+    s += "\nMarrage : "
+    if p.Marrage {
+        s += "O"
+    } else {
+        s += "X"
+    }
+    for _, v := range p.Email {
+        s += "\n" + v.Kind + ":" + v.Address
+    }
+    return s
+}
+
+func main() {
+    var person Person
+    loadJSON("person.json", &person)
+
+    fmt.Println("Person", person.String())
+}
+
+func loadJSON(fileName string, key interface{}) {
+    inFile, err := os.Open(fileName)
+    checkError(err)
+    decoder := json.NewDecoder(inFile)
+    err = decoder.Decode(key)
+    checkError(err)
+    inFile.Close()
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+실행 결과
+{{{#!plain
+Person Jan Newmarch
+Birthday Type : int32
+Marrage : O
+home:jan@newmarch.name
+work:j.newmarch@boxhill.edu.au
+}}}
+데이터 타입까지 정확히 디코딩된다.
+
+아마도 json 패키지의 '''Marshal'''과 '''Unmarshal''' 메서드도 많이 사용할 것이다. 이들 함수를 이용한 간단한 예제다.
+{{{#!plain
+package main
+
+import "encoding/json"
+import "fmt"
+
+type Email struct {
+    Kind    string
+    Address string
+}
+
+type Name struct {
+    Family   string
+    Personal string
+}
+
+type Person struct {
+    Name     Name
+    Birthday int32
+    Email    []Email
+    Marrage  bool
+}
+
+func main() {
+    person := Person{
+        Name:     Name{Family: "Newmarch", Personal: "Jan"},
+        Birthday: 19741001,
+        Marrage:  true,
+        Email: []Email{Email{Kind: "home", Address: "jan@newmarch.name"},
+            Email{Kind: "work", Address: "j.newmarch@boxhill.edu.au"}},
+        }
+
+    boolA, _ := json.Marshal(person)
+
+    // map으로 Unmarshal 했다.
+    var dat map[string]interface{}
+    json.Unmarshal(boolA, &dat)
+    fmt.Println(dat["Marrage"])
+
+    // Person 구조체로 Unmarshal 했다.
+    var newPerson Person
+    json.Unmarshal(boolA, &newPerson)
+    fmt.Println(newPerson.Birthday)
+}
+}}}
+
+
+=== JSON 클라이언트 & 서버 프로그램 ===
+Person 프로그램의 네트워크 버전이다. 서버와 클라이언트로 구성된다. 클라이언트가 Person 데이터를 전송하면, 서버는 이 정보를 읽어서 출력하고 다시 클라이언트에 전송한다. 구조체를 전송하는 echo 서비스라고 보면 되겠다. 
+
+Person 클라이언트 프로그램
+{{{#!plain
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "net"
+    "os"
+)
+
+type Name struct {
+    Family   string
+    Personal string
+}
+
+type Email struct {
+    Kind    string
+    Address string
+}
+
+type Person struct {
+    Name     Name
+    Birtyday int32
+    Email    []Email
+    Marrage  bool
+}
+
+func (p Person) String() string {
+    s := p.Name.Personal + " " + p.Name.Family
+    if p.Marrage {
+        s += "\nMarrage : O"
+    } else {
+        s += "\nMarrage : X"
+    }
+    for _, v := range p.Email {
+        s += "\n" + v.Kind + ":" + v.Address
+    }
+    return s
+}
+
+func main() {
+    person := Person{
+        Name: Name{Family: "Newmarch", Personal: "Jan"},
+        Email: []Email{Email{Kind: "home", Address: "jan@newmarch.name"},
+            Email{Kind: "work", Address: "j.newmarch@boxhill.edu.au"}},
+        }
+    if len(os.Args) != 2 {
+        fmt.Fprintf(os.Stderr, "Usage: ", os.Args[0], "host:post")
+        os.Exit(1)
+    }
+
+    service := os.Args[1]
+
+    conn, err := net.Dial("tcp", service)
+    checkError(err)
+
+    encoder := json.NewEncoder(conn)
+    decoder := json.NewDecoder(conn)
+
+    encoder.Encode(person)
+
+    var newPerson Person
+    decoder.Decode(&newPerson)
+    fmt.Println(newPerson.String())
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+Person 서버 프로그램
+{{{#!plain
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "net"
+    "os"
+)
+
+type Name struct {
+    Family   string
+    Personal string
+}
+
+type Email struct {
+    Kind    string
+    Address string
+}
+
+type Person struct {
+    Name     Name
+    Birtyday int32
+    Email    []Email
+    Marrage  bool
+}
+
+func (p Person) String() string {
+    s := p.Name.Personal + " " + p.Name.Family
+    if p.Marrage {
+        s += "\nMarrage : O"
+    } else {
+        s += "\nMarrage : X"
+    }
+    for _, v := range p.Email {
+        s += "\n" + v.Kind + ":" + v.Address
+    }
+    return s
+}
+
+func main() {
+    service := ":1200"
+    tcpAddr, err := net.ResolveTCPAddr("tcp", service)
+    checkError(err)
+            
+    listener, err := net.ListenTCP("tcp", tcpAddr)
+    checkError(err)
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            continue
+        }
+    
+        encoder := json.NewEncoder(conn)
+        decoder := json.NewDecoder(conn)
+    
+        var person Person
+        decoder.Decode(&person)
+        fmt.Println(person.String())
+        encoder.Encode(person)
+        conn.Close()
+    }
+}   
+
+func checkError(err error) {
+    if err != nil { 
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }   
+}   
+}}}
+
+== Gob 패키지 ==
+Go는 '''Gob'''라는 직렬화를 위한 패키지를 제공한다. Gob는 Go 언어만을 위한 직렬화 방식으로 다른 언어에서는 사용할 수는 없다. Gob를 이용하면 채널과 함수 인터페이스를 제외한 모든 데이터 유형을 직렬화 할 수 있다. 즉 모든 integers, string, 불리언, 구조체 배열과 슬라이스 들이다. 
+
+원문에는 gob를 이용한 직렬화를 꽤 자세히 설명하고 있지만, 나는 Gob가 있다는 것 만을 언급하고 그냥 넘어갈 거다. 네트워크에서의 데이터 교환에서 가장 중요한 요소는 상호운용성 이다. 상호운용성이 중요한 시스템에서 특정 언어, 제품에 종속적인 방식을 사용하는 것은 사용하지 않는게 좋다. 
+
+Gob를 사용하는 대신 JSON을 사용하라. Gob를 JSON과 비교하자면
+  * 사용방법은 거의 동일하다. 
+  * 인간이 읽을 수 있는 데이터 타입이 아닌, 컴퓨터가 읽기에 적합한 데이터 타입이다. JSON 보다 빠르게 처리할 수 있다.
+  * 하지만 상호운용성이 떨어진다. 
+우선은 JSON을 사용하자. 더 이상 최적화할 만한 요소가 없을 때 gob, [https://github.com/vmihailenco/msgpack msgpack] 를 고려해 봄직하다. 프로젝트 시작 시점에서 오버 엔지니어링은 하지 말라.
+
+== Base64 인코딩 ==
+8비트 데이터를 전송하기도 쉽지 않던 시절이 있었다. 네트워크 매질의 상태가 썩 좋질 않아서 시리얼 라인에 일상적으로 잡음이 끼던 그 시절이다. 엔지니어들은 패리티 비트(Parity bit)를 둬서 이 문제를 해결했다. 데이터 전송을 위해서 7bit를 사용하고, 남는 하나의 비트를 패리티 비트로 사용하는 방식이다. 예를 들어 짝수 패리티(even parity)방식에서는 데이터를 이루는 전체 비트의 갯수가 짝수가 되도록 패리티를 조정한다. 7비트의 "0010110"이라는 데이터를 전송한다고 가정해보자. 1의 갯수가 홀수이기 때문에 패리티 값을 1로 해서 "10010110"으로 전송한다. 데이터를 받은 측에서는 패리티 비트를 다시 계산함으로써 데이터 오류 발생 여부를 알 수 있다. 
+
+ASCII는 7-bit 문자 셋이다. "패리티 체크를 간단하게"하기 위한 요구 사항이 반영된 결과다. 바이너리 데이터는 8bit를 모두 사용하는데, 이 데이터를 7bit ASCII로 변환하면 좀 더 안전한 데이터 전송이 가능할 것이다.
+
+HTTP에서 바이너리 데이터를 전송 할 경우에도 종종 ASCII 코드로 변환한다. 이렇게 하면, 8비티의 데이터가 화면에 미치는 영향에 대한 우려 없이, 데이터 읽기 프로그램을 만들 수 있다.
+
+ASCII는 127개의 문자셋을 가지고 있는데, 이중 64개의 문자셋을 이용해서 데이터를 인코딩하는 방식을 '''base64'''라고 한다. '''64진법'''이란 이야기인데, 64진법을 이용한 이유는 화면에 표시되는 ASCII 문자들을 표현할 수 있는 가장 큰 진법이기 때문이다. 
+
+Base64는 전자메일, HTTP 기반 요청에서 주로 사용한다. 
+
+Go는 Base64 인코딩과 디코딩을 위한 두 개의 함수를 제공한다.
+{{{#!plain
+func NewEncoder(enc *Encoding, w io.Writer) io.WriteCloser
+func NewDecoder(enc *Encoding, r io.Reader) io.Reader
+}}}
+
+예제 프로그램
+{{{#!plain
+package main
+
+import (
+    "bytes"
+    "encoding/base64" 
+    "fmt"
+)
+
+func main() {
+    eightBitData := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+    bb := &bytes.Buffer{}
+    encoder := base64.NewEncoder(base64.StdEncoding, bb)
+    encoder.Write(eightBitData)
+    encoder.Close()
+    fmt.Println(bb)
+
+    dbuf := make([]byte, 12)
+    decoder := base64.NewDecoder(base64.StdEncoding, bb)
+    decoder.Read(dbuf)
+    
+    for _, ch := range dbuf {
+        fmt.Print(ch)
+    }
+}
+}}}
+
+표준 입력을 base64 인코딩 해서 출력하는 프로그램이다.
+{{{#!plain
+package main
+
+import (
+    "encoding/base64"
+    "fmt"
+    "io/ioutil"
+    "os"
+)
+
+func main() {
+    bytes, err := ioutil.ReadAll(os.Stdin)
+    checkError(err)
+
+    size := len(bytes) * 2
+    dbuf := make([]byte, size)
+    base64.StdEncoding.Encode(dbuf, bytes)
+    fmt.Println(string(dbuf))
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+{{{#!plain
+# echo "Hello world" | go run base64.go
+aGVsbG8gd29ybGQuIE9LCg==
+}}}

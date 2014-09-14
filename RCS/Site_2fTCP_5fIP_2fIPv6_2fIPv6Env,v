@@ -1,4 +1,28 @@
-#title IPv6환경 만들기
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.09.05.11.30.55;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fTCP_5fIP_2fIPv6_2fIPv6Env
+@
+
+
+1.1
+log
+@1.232.55.245;;Anonymous;;
+@
+text
+@#title IPv6환경 만들기
 
 [[TableOfContents]]
 == 리눅스에 IPv6 환경 만들기 ==
@@ -50,15 +74,15 @@ IPv6 는 주소를 위해서 128비트 를 사용한다. 이것을 계산해보�
 현재 커널이 IPv6 가 활성화된 상태로 운용되고 있는지 확인해보고 싶다면 다음 파일들이 존재하는 지 확인해 보면된다.
 
 {{{#!plain
-[root@localhost net]# ls *6*
+[root@@localhost net]# ls *6*
 if_inet6  ip6_flowlabel  raw6       snmp6      tcp6
 igmp6     ipv6_route     rt6_stats  sockstat6  udp6
 }}}
 			
 만약 위의 파일들이 없다면, 현재 커널은 IPv6 가 비활성화된 상태로 운영되고 있음을 뜻한다. 이럴경우 IPv6 를 활성화 시켜줘야 하는데, 간단하게 ipv6 모듈을 적재함으로써 IPv6 기능을 활성화 시켜줄수 있다.
 {{{#!plain
-[root@localhost net]# modprobe ipv6
-[root@localhost net]# lsmod
+[root@@localhost net]# modprobe ipv6
+[root@@localhost net]# lsmod
 Module                  Size  Used by    Tainted: P  
 ipv6                  140416  -1 
 sb                      7968   0  (autoclean)
@@ -68,7 +92,7 @@ sb_lib                 34624   0  (autoclean) [sb]
 			
 modprobe 를 이용해서 ipv6 모듈을 올리고 lsmod 를 통해서 모듈이 성공적으로 적재되었음을 확인하라. 만약 ipv6 모듈이 없어서 모듈적재에 실패했다면, 자신의 커널버젼과 동일한 커널쏘쓰를 얻어서 ipv6 모듈을 컴파일 시킨후 적재해야 할것이다. 자신의 커널 버젼은 uname(1) 를 통해서 확인할수 있다.
 {{{#!plain
-[root@localhost net]# uname -a
+[root@@localhost net]# uname -a
 Linux localhost 2.4.13-1hl #1 2001. 11. 04. (일) 04:04:58 KST i686 unknown
 }}}
 			
@@ -96,7 +120,7 @@ ifconfig 명령으로 IPv6 를 지원하는지 확인해 보도록 하자.
 ifconfig 와 같은 기본적인 네트웍도구들은 대부분 IPv4와 IPv6 모두의 환경을 지원하도록 프로그래밍 되어있다. ipv6 모듈을 성공적으로 올렸다면 ifconfig 를 통해서 정말로 ipv6 주소가 할당되어 있는지 한번 확인을 해보도록 하자.
 
 {{{#!plain
-yundream@yundream-desktop:~$ ifconfig
+yundream@@yundream-desktop:~$ ifconfig
 eth0      Link encap:Ethernet  HWaddr 00:19:d1:e7:c5:8b  
           inet addr:172.20.71.184  Bcast:172.20.71.255  Mask:255.255.255.0
           inet6 addr: fe80::219:d1ff:fee7:c58b/64 Scope:Link
@@ -123,23 +147,23 @@ lo        Link encap:Local Loopback
 그렇다면 ifconfig 를 이용해서 자동으로 부여되는 IPv6 대신에 수동으로 IPv6 의 주소를 할당하고 결과를 확인해 보도록 하자
 
 {{{#!plain
-[root@localhost net]# ifconfig eth0 inet6 add 3ffe:ffff:0:f101::1/64
-[root@localhost net]# ifconfig eth0 | grep inet6
+[root@@localhost net]# ifconfig eth0 inet6 add 3ffe:ffff:0:f101::1/64
+[root@@localhost net]# ifconfig eth0 | grep inet6
           inet6 addr: 3ffe:ffff:0:f101::1/64 Scope:Global
           inet6 addr: fe80::250:bfff:fe2c:7bb2/10 Scope:Link
 }}}
 				
 IPv6주소가 할당 된 걸 확인할 수 있다. 필요없는 주소에 대한 삭제는 add 대신 del 을 이용하면 된다.
 {{{#!plain
-[root@localhost net]# ifconfig eth0 inet6 del 3ffe:ffff:0:f101::1/64
-[root@localhost net]# ifconfig eth0 | grep inet6
+[root@@localhost net]# ifconfig eth0 inet6 del 3ffe:ffff:0:f101::1/64
+[root@@localhost net]# ifconfig eth0 | grep inet6
           inet6 addr: fe80::250:bfff:fe2c:7bb2/10 Scope:Link
 }}}
 
 ==== ping을 이용한 네트워크 환경 테스트 ====
 보통 네트워크 테스트를 하기위해서 가장 자주.. 그리고 가장 유용하게 사용하는 도구는 뭐니뭐니 해도 ping(:12) 일것이다. 이 ping 는 ICMP(:12) 를 사용하는 것으로 ICMP 가 비록 IP와 동일한 레이어에서 사용되는 프로토콜이긴 하지만, 라우팅을 위해서 IP(:12)를 사용하게 된다. 우리가 IPv4 환경에서 사용하는 ping 은 당연히 IPv4 에 최적화된것으로 IPv6 환경에서는 사용할수 없도록 되어있다. 다행히(당연히) IPv6 환경에서 네트웍환경을 테스트 할수있는 "ping6" 라는 ICMP 체크 프로그램이 존재한다. 참고로 IPv6 에서는 ICMP 프로토콜을 사용하지 않고 IPv6에 최적화된 ICMP6 프로토콜을 사용한다.
 {{{#!plain
-[root@localhost net]# ping6 
+[root@@localhost net]# ping6 
 Usage: ping6 [-LRUdfnqrvV] [-c count] [-i interval] [-w wait]
         [-p pattern] [-s packetsize] [-t ttl] [-I interface address]
         [-T timestamp option] [-F flow label] [-P traffic class] host
@@ -147,12 +171,12 @@ Usage: ping6 [-LRUdfnqrvV] [-c count] [-i interval] [-w wait]
 				
 ping6를 이용해서 루프백 주소와 eth0 인터페이스 주소를 해보도록 하자.
 {{{#!plain
-[root@localhost net]# ping6 ::1
+[root@@localhost net]# ping6 ::1
 PING ::1(::1) from ::1 : 56 data bytes
 64 bytes from ::1: icmp_seq=0 hops=64 time=65 usec
 64 bytes from ::1: icmp_seq=1 hops=64 time=53 usec
 
-[root@localhost net]# ping6 -I eth0 fe80::250:bfff:fe2c:7bb2
+[root@@localhost net]# ping6 -I eth0 fe80::250:bfff:fe2c:7bb2
 PING fe80::250:bfff:fe2c:7bb2(fe80::250:bfff:fe2c:7bb2) from ::1 eth0: 56 data bytes
 64 bytes from fe80::250:bfff:fe2c:7bb2: icmp_seq=0 hops=64 time=65 usec
 64 bytes from fe80::250:bfff:fe2c:7bb2: icmp_seq=1 hops=64 time=60 usec
@@ -178,7 +202,7 @@ BSD 소켓 API를 이용해서 통신을 할때도, 이러한 특성이 반영�
 ==== route ====
 route 는 IP 라우팅 테이블을 편집하기 위해서 사용하는 네트워크관리 툴이며, 다른 기본적인 네트워크관련 툴들과 마찬가지로 IPv4 와 IPv6 모두를 지원한다. 기본적으로 아무런 옵션이 없이 route 명령을 사용하게 될경우 IPv4 를 기준으로 라우팅 테이블 내용을 보여준다.
 {{{#!plain
-[root@localhost root]# route 
+[root@@localhost root]# route 
 Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 210.205.210.0   *               255.255.255.0   U     0      0        0 eth0
@@ -191,7 +215,7 @@ default         210.205.210.1   0.0.0.0         UG    0      0        0 eth0
 그럼 이제 IPv6 라우팅 테이블 설정내용을 알아보도록 하자.
 
 {{{#!plain
-[root@localhost root]# route -A inet6
+[root@@localhost root]# route -A inet6
 Kernel IPv6 routing table
 Destination                   Next Hop       Flags Metric Ref    Use Iface
 ::1/128                       ::             U     0      0        0 lo      
@@ -203,8 +227,8 @@ ff00::/8                      ::             UA    256    0        0 eth0
 				
 ::1 은 루프백주소라는걸 이미 알고 있을것이다. fe80::/10은 link-local 을 위한 라우트 인터페이스이며, ff00::/8 은 멀티캐스트(multicast) 를 위한 라우트 인터페이스 이다. 마지막 ::/0 은 자동으로 설정된 디폴트 라우트 주소값이다. 만약에 새로운 게이트웨이를 추가하고자 한다면 다음과 같이 하면 될것이다.
 {{{#!plain
-[root@localhost root]# route -A inet6 add 2000::/3 gw 3ffe:ffff:0:f101::1
-[root@localhost root]# route -A inet6
+[root@@localhost root]# route -A inet6 add 2000::/3 gw 3ffe:ffff:0:f101::1
+[root@@localhost root]# route -A inet6
 Kernel IPv6 routing table
 Destination    Next Hop              Flags Metric Ref    Use Iface
 ::1/128        ::                    U     0      0        0 lo      
@@ -225,14 +249,14 @@ tcpdump 는 네트워크 트래픽을 덤프하기 위한 어플리케이션으�
 테스트는 "리눅스 1" 에서 "리눅스 2" 로 ping6 를 이용해서 ICMP6 요청을 보내고, 이 과정을 tcpdump 로 확인하는 방식으로 이루어진다.
 
 {{{#!plain
-[root@localhost /root]# ping6 -I eth0 fe80::2d0:b7ff:fe89:2e17
+[root@@localhost /root]# ping6 -I eth0 fe80::2d0:b7ff:fe89:2e17
 PING fe80::2d0:b7ff:fe89:2e17(fe80::2d0:b7ff:fe89:2e17) from fe80::2e0:29ff:fe5d:5c89 eth0: 56 data bytes
 Warning: time of day goes back, taking countermeasures.
 64 bytes from fe80::2d0:b7ff:fe89:2e17: icmp_seq=0 hops=64 time=850 usec
 64 bytes from fe80::2d0:b7ff:fe89:2e17: icmp_seq=1 hops=64 time=503 usec
 ....
 				
-[root@localhost /home]# tcpdump ipv6
+[root@@localhost /home]# tcpdump ipv6
 Kernel filter, protocol ALL, TURBO mode (575 frames), datagram packet socket
 tcpdump: listening on all devices
 13:17:07.769057 eth0 > 0:0:0:0:0:0 0:e0:29:5d:5c:89 ipv6 86: 
@@ -257,3 +281,4 @@ PING phineas(phineas) from fe80::221:97ff:feed:ef01 eth0: 56 data bytes
 === 결론 ===
 이상 간단하게 리눅스 OS 에서의 IPv6 환경을 구축하는 방법과 이 환경을 제어하고 테스트하기 위한 몇가지 IPv6 기반 네트웍 어플리케이션을 사용하는 방법에 대해서 알아보았다. 이 내용들은 실제 IPv6 의 프로토콜 레벨에서의 학습과 프로그래밍을 위한 Socket Layer 에서의 프로그래밍 테스트를 위한 기본환경을 구축하는데에 이용할수 있을것이다.
 
+@

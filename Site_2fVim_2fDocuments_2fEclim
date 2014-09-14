@@ -1,0 +1,211 @@
+#title Eclim을 이용한 Android 개발 환경 구축
+
+[[TableOfContents]]
+== Eclim + vim ==
+[wiki:Site/Vim Vim]으로 이클립스처럼 Java와 안드로이드 애플리케이션을 개발할 수 있었으면, 하는 생각을 했다. 그냥 이클립스를 사용하면 그만인 걸 굳이 쓸데 없는 고민을 한다고 생각할 수 있겠는데, 글쎄 vim을 버리기가 힘들더라. 버리지 못하는 이유는 아마도 vim의 가벼움 때문일 거다. vim은 내 뜻 대로 움직인다는 느낌이 드는데, 이클립스는 도구가 나를 쓴다는 느낌이 든다. 너무 크고, 너무 무겁다. 안드로이드 프로그래밍을 하지 않은 이유도 50% 정도는 에디터 때문일 거다(나머지 50%는 귀차니즘).
+
+그러다가 최근 eclim을 만났다. Vim으로 최적의 ruby 개발환경을 만들어 보려고, YCM(Vim의 자동완성 플랫폼 쯤 되겠다)을 살펴보다가 찾아낸 녀석이다. YCM은 정말 굉장한 녀석인데, 이놈이 글쎄 안타깝게도 Ruby는 제대로 지원을 못한다는 거다. 그래 YCM대신에 써보라고 알려준게 eclim이다. 
+
+Eclim은 vim에서 이클립스 개발 환경을 꾸밀 수 있게 지원해 주는 녀석이다. 대략 다음과 같은 기능을 지원한다.  
+  * 코드 자동완성
+  * searching
+  * 코드 validation 검사
+  * Class constructor 생성 
+  * log4j xml 파일 검사
+  * Java 정규표현 테스트
+  * 패키지, 클래스, 필드, 메서드를 위한 javadoc 생성
+  * Junit 테스트를 위한 stub 메서드 생성
+  * Delegate 메서드 생성
+  * 자동 코드 점검 (파일을 저장 할 때, 에러와 경고 부분을 vim 화면에 표시해준다.) 
+  * 자바 빈 getter, setter 생성
+  * Java 소스, 자바 문서 검색
+그리고.. ... .. Android 개발도 지원한다. 뭐 자바니까 안드로이드 개발이야 딸려나오는 거라고 생각할 수도 있겠는데. 프로젝트 구조 까지 깔끔하게 만들어 준다. 요약 하자면 "vim의 장점을 누리면서도 이클립스의 기능을 다 사용할 수 있다."가 되겠다. 
+
+== Eclim 설치 환경 ==
+Eclim 설치 환경이다.
+ * 운영체제 : 우분투 리눅스 14.04
+ * 시스템 아키텍처 : Intel Core i5 x86_64
+ * Openjdk7
+ * Vim 7.4.52
+ * VIM Plugin : 현재 설치돼 있는 vim 플러그인이다.
+   * [http://majutsushi.github.io/tagbar/ tagbar] : Ctag를 이용 클래스, 메서드를 네비게이션 할 수 있도록 도와주는 플러그인. Vim 개발자에게는 필수 플러그인.  
+   * [wiki:Site/Vim/Documents/Tip/ConqueTerm 터미널 사용 플러그인]
+
+== 이클립스 설치 ==
+Eclim은 이클립스 기반으로 작동한다. 반드시 이클립스를 설치해야 한다. apt-get으로 설치할 경우 이클립스 3.8 버전이 설치되는데, eclim을 사용하기 위해서는 4.4.0(Runa) 버전이 필요하다. 하여, 직접 다운로드 받아서 설치하기로 했다. [https://www.eclipse.org/downloads/ eclipse.org]에서 ([[Date(2014-08-26T16:58:53)]])현재 최신 버전인 '''Eclipse Standard 4.4'''를 다운로드 했다. 
+
+설치 디렉토리는 $HOME/eclipse, '''PATH'''에 eclipse를 등록했다. 
+{{{#!plain
+# cat ~/.profile
+PATH=$PATH:$HOME/eclipse
+}}}
+
+== Android SDK 설치 ==
+[http://developer.android.com/sdk/index.html android 개발자 사이트]에서 android sdk를 다운로드 받아서 설치했다.
+{{{#!plain
+# http://dl.google.com/android/android-sdk_r23.0.2-linux.tgz
+}}}
+
+설치 디렉토리는 음.. 그냥 이클립스 설치 디렉토리로 했다.
+{{{#!plain
+# tar -xvzf android-sdk_r23.0.2-linux.tgz 
+# mv android-sdk-linux $HOME/android-sdks
+}}}
+
+자 압축을 풀었으니, 이제 설치
+{{{#!plain
+# cd $HOME/eclipse/android-sdk/tools
+# ./android
+}}}
+실행하면 Android SDK manager 창이 뜬다.  
+
+https://lh4.googleusercontent.com/-ecvE2FO0uoY/U_ykD3Y4K_I/AAAAAAAAES0/6v0O4ZY20Dk/s400/android01.png
+
+android 툴들 실행을 위해서 PATH에 등록
+{{{#!plain
+# cat ~/.profile
+ANDROID_HOME=$HOME/android-sdks
+PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools
+}}}
+
+만약 '''adb'''를 실행했는데, "adb: error while loading shared libraries: libstdc++.so.6: wrong ELF class: ELFCLASS6"이런 에러가 발생하다면, 아래 두 개 패키지를 설치하자. 
+{{{#!plain
+# apt-get install lib32ncurses5 lib32stdc++6
+}}}
+
+테스트
+{{{#!plain
+# adb version
+Android Debug Bridge version 1.0.31
+}}}
+
+== Genymotion 설치 ==
+Android sdk와 묶어서 나오는 기본 안드로이드 애뮬레이터 쓰다가 속터져 죽을 뻔했다. 그래 genymotion을 설치하기로 했다. 요놈은 애뮬레이터가 virtualbox 기반으로 올라온다. 빠르고 좋다. 뭔가 제대로 쓰려면 돈을 내야 하는 것 같은데, 일단은 free를 사용하고, 나중에 본격적으로 안드로이드 앱을 개발할 날이 온다면, 구매를 고려해봐야 겠다.
+
+[http://www.genymotion.com/ Genymotion 사이트]에서 '''Linux Debian 64 bits v2.2.2'''를 다운로드했다. 
+{{{#!plain
+# chmod +x genymotion-2.2.2_x64_debian.bin 
+# /genymotion-2.2.2_x64_debian.bin 
+
+Installing to folder [/home/yundream/genymotion]. Are you sure [y/n] ? y
+
+- Trying to find VirtualBox toolset .................... OK (Valid version of VirtualBox found: 4.3.10_Ubuntur93012)
+- Extracting files ..................................... OK (Extract into: [/home/yundream/genymotion])
+
+Installation done successfully.
+
+You can now use these tools from [/home/yundream/genymotion]:
+ - genymotion
+ - genymotion-shell
+}}}
+
+genymotion을 실행한다. virtual device를 설치해야 하는데, 로그인해야 한다.
+
+https://lh3.googleusercontent.com/-PCNMc56RnLM/U_y0NTDRiCI/AAAAAAAAEUs/PtUj0r2aSnE/s400/android02.png
+
+애뮬레이션할 virtual device를 설치하면 된다.
+
+https://lh5.googleusercontent.com/-OIaablPMtZs/U_y0NWov9OI/AAAAAAAAEUs/xGRDCmUhnMY/s400/android03.png
+
+테스트 용으로 '''Google Nexus 4-4.4.2-API 19''' 를 설치했다. API 버전 19는 잘 기억해 놓자. 이것 때문에 삽질을 좀 했다.
+
+https://lh4.googleusercontent.com/-YDc8NxBGJlY/U_y0NSAGQ4I/AAAAAAAAEUs/EkuOFzAI1cA/s400/android04.png
+
+이것으로 Genymotion 설치 끝. 한 10배쯤은 빨리 뜨는 것 같다. 굳 잡.
+
+https://lh4.googleusercontent.com/-JAjvpWCMUWg/U_y0OOJjrnI/AAAAAAAAEUs/jpt9D3Njr5U/s400/android05.png
+
+== eclim 설치 ==
+[http://eclim.org/ eclim 사이트]에서 다운로드 하면 된다. 나는 eclim_2.4.0.jar를 다운로드했다. 자 설치 시작
+{{{#!plain
+# java -jar eclim_2.4.0.jar
+}}}
+
+Eclim 설정 화면이 뜨는 구나. 설치에 필요한 정보들을 출력한다.
+
+https://lh4.googleusercontent.com/-_zVizQ0p3FU/U_tGcxOpQyI/AAAAAAAAER0/yIYSNxZ-mHU/s400/eclim01.png
+
+vim파일 디렉토리를 설정하고
+
+https://lh6.googleusercontent.com/-B6KXQxieBCA/U_tGeUCpc-I/AAAAAAAAESA/i7uhAxemZOs/s400/eclim02.png
+
+eclipse 설치 디렉토리도 알려주고
+
+https://lh6.googleusercontent.com/-JRB3BHKd_bE/U_tGfBKq1vI/AAAAAAAAESE/PvcevLk5B14/s400/eclim03.png
+
+지원할 언어를 설정한다. Android도 보이고, C/C++, Ruby, php, Python 다 있구나.  
+
+https://lh6.googleusercontent.com/-yuV7Wd-5IKc/U_tGge7hk8I/AAAAAAAAESY/JEZbem-rIpI/s400/eclim05.png
+
+설치하는데 시간이 좀 걸린다. 설치를 끝내고 이클릭스 디렉토리에 가면 '''eclimd'''파일이 보일 거다. elim은 클라이언트-서버 모델로 작동한다. eclimd를 실행하자. 
+{{{#!plain
+# cd $ECLIPSE_HOME
+# ./eclimd
+}}}
+
+== vim 설정 ==
+{{{#!plain
+# cat .vimrc
+.....
+.....
+let g:EclimCompletionMethod = 'omnifunc'
+}}}
+
+== Hello World 안드로이드 앱을 만들어보자 꾸나 ==
+이제 hello World 안드로이드 앱을 만들어보자. 안드로이드 프로젝트를 위한 디렉토리는 "$HOME/projects/android"로 했다. 
+{{{#!plain
+# mkdir $HOME/projects/android
+# cd $HOME/projects/android
+}}}
+
+vim을 실행한 후 ''':ProjectCreate''' 를 이용해서 '''HelloWorld'''라는 이름의 android 프로젝트를 만든다.
+{{{#!plain
+:ProjectCreate HelloWorld -n android
+}}}
+
+명령을 내리면 대화식으로 프로젝트에 대한 설정사항을 물어온다. 
+
+https://lh4.googleusercontent.com/-QlFTMLxmB2o/U_y0OVmmL8I/AAAAAAAAEUs/9lYsjxZHIco/s400/android06.png
+
+프로젝트를 만들었다면 ''':ProjectList''' 로 만들어진 프로젝트를 확인
+{{{#!plain
+~
+~
+HelloWorld -  open  - /home/yundream/projects/android/HelloWorld                                                   
+cpp        -  open  - /home/yundream/projects/cpp
+계속하려면 엔터 혹은 명령을 입력하십시오
+}}}
+
+''':ProjectTree HelloWorld'''로 프로젝트 네비게이션 창을 열어서 HelloWorld 프로그래밍을 시작했다. 대량 아래와 같은 모습이 만들어진다.   
+
+https://lh6.googleusercontent.com/-xZGTspsR6Q8/U_zBXZBItwI/AAAAAAAAEVs/M2bXRWIRy-0/s400/android13.png
+
+Hello world 코딩은 알아서 하고..
+
+'''AndroidManifest.xml'''파일을 수정한다.
+{{{#!plain
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.joinc.helloworld"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-sdk android:minSdkVersion="20" />
+}}}
+minSdkVersion이 20일건데, 이걸 virtual device의 sdk 버전인 19로 맞춘다.
+
+이제 apk 파일 만들자. 
+{{{#!plain
+# android update project -p HelloWorld
+# ant debug 
+}}}
+혹은 vim에서 ''':make debug''' 명령을 이용해도 된다.
+
+Genymotion으로 virtual device 띄운다음 apk 파일을 드래그 앤 드롭하면 된다.
+
+https://lh5.googleusercontent.com/-egsDrH0u7Sk/U_y87Uk_19I/AAAAAAAAEVc/pOoPi67P2hM/s400/android11.png
+
+== eclim 주요 명령 ==
+ * [http://eclim.org/vim/core/project.html Eclipse Project Management] : 이클립스 프로젝트 관리
+ * [http://eclim.org/vim/core/eclim.html Eclim Manage / Config] : Eclim 관리 및 설정
+

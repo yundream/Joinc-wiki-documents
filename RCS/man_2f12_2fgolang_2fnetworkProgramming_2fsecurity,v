@@ -1,0 +1,727 @@
+head	1.7;
+access;
+symbols;
+locks
+	root:1.7; strict;
+comment	@# @;
+
+
+1.7
+date	2014.09.30.04.58.17;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.09.29.16.54.44;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.09.29.15.49.21;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.09.28.04.17.38;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.09.27.06.57.07;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.09.27.05.22.32;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.09.27.02.29.10;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2fnetworkProgramming_2fsecurity
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title 보안
+
+[[TableOfContents]]
+== 소개 ==
+인터넷은 군사적인 공격에 견딜 수 있는 시스템을 구축하는 걸 목표로 설계를 했다. 이때의 공격은 외부에서 이루어지는 것으로 내부 네트워크는 신뢰 관계에 있는 것으로 가정을 했다. 그 시절의 인터넷은 어차피 허가 받은 조직(혹은 사람)만 접속할 수 있었으니, 내부 네트워크에서 발생할 수 있는 공격은 크게 신경쓸 필요가 없었다. 하지만 시대가 바뀌어서 인터넷은 "공공 접속 네트워크" 그러니까 아무나 접속할 수 있는 네트워가 됐다. 안전하지 않은 네트워크가 된거다.  
+
+이제 애플리케이션은 "적대적인 상황에 놓여있다고 가정하고" 이 상황에서 "제대로" 작동하기 위한 기능들을 가져야만 한다. "제대로"란 프로그램의 기능적인 측면 뿐만 아니라, 합법적인 사용자의 확인, 개인의 정보 보호와 데이터의 무결성과 데이터에 대한 접근 보장을 의미한다. 
+
+이는 애플리케이션을 만드는 과정이 더욱 복잡해 질 수 있음을 의미한다. 응용 프로그램을 안전(secure)하게 만들기 위해서는 복잡하고 미묘한 컴퓨팅 문제들을 해결해야 한다. 때때로 개발자가 직접 이러한 문제를 해결하기 위해서 자신만의 암호화 라이브러리들을 만들어서 사용하곤 하는데, 이는 거의 반드시 실패한다. 이는 보안 알고리즘을 얼마나 견고하게 만들 수 있느냐 하는 기술적인 문제만 포함하고 있는게 아니다. 예컨데, 울트라 킹 강력한 보안 알고리즘을 적용한 웹 서버를 만들었다고 하더라도, 웨 브라우저가 이를 지원하지 못하면 아무짝에도 쓸모가 없다. 인터넷에서 사용하는 기술들은 기본적으로 "확장성과 범용성"을 보장해야 한다. 이러하니 직접 만들어서 사용할 생각을 하기 전에 보안 전문가들에 의해서 디자인 된 공용 라이브러리를 사용하도록 하자. 
+
+== ISO Security architecture ==
+ISO OSI(open systems interconnect) 7 레이어 모델은 아래와 같이 묘사할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/15qUamKZgG8lHjq2_rKNtFIDSRasvw9Bvd4KIcXlrj5c/pub?w=689&amp;h=456">
+}}}
+
+이 문서에서는 잘 알려진 OSI 7 모델에 더해서 ISO Security 아키텍처링 모델인 ISO 7498-2를 살펴볼 것이다. 
+
+=== Function and levels ===
+보안 시스템 구현을 위해서 필요한 기본 요소들이다.
+  * Authentication - 신원 증명(proof of identity)  
+  * Data integrity - 데이터훼손 방지 
+  * Cofidentiality - 데이터의 타인 노출 방지   
+  * Notarization/signature - 공증과 서명
+  * Access control - 접근 제어
+  * Assurance/availability - 보증, 가용성
+
+위의 요소의 구현을 위한 OSI 스택별 요구사항들이다.
+||보안 요소                             ||설명                                         ||OSI 스택         ||
+||Peer entity authentication            ||상대방에 대한 인증                           ||3, 4, 7          ||
+||Data origin authentication            ||데이터 자체에 대한 인증                      ||3, 4, 7          ||
+||Access control service                ||접근 제어                                    ||3, 4, 7          ||
+||Connection confidentiality            ||연결에 대한 기밀성                           ||1,2,3,4,6,7      ||
+||Selective field confidentiality       ||특정 데이터 영역에 대한 기밀성               ||6,7              ||
+||Traffic flow confidentiality          ||트래픽 흐름에 대한 관찰 불허                 ||1,3,7            ||
+||Connection integrity with recovery    ||데이터 변경, 삽입, 삭제, replay 감지와 복구  ||4, 7             ||
+||connection integrity without recovery ||위 요소와 동일하다. 복구가 제외된다.         ||4, 7             ||
+||Non-repudiation at origin             ||전송인의 부인 방지                           ||7                ||
+||Non-repudiation at receipt            ||수령인의 부인 방지                           ||7                ||
+
+각 요구사항 구현을 위한 세부 기술들이다.
+  * Peer entity authentication 
+     * encryption : 암호화
+	 * digital signature : 전자 서명
+	 * authentication exchange : 인증서 교환 
+  * Data origin authentication
+     * 암호화 
+	 * 전자 서명
+  * Access control service
+     * 접근 제어 목록 유지
+	 * 패스워드
+	 * capabilities lists 
+	 * labels
+  * Connection confidentiality
+     * 암호화
+	 * Routing control 
+  * Connectionless confidelity 
+     * 암호화
+	 * Routing control
+  * Selective field confidelity 
+     * 암호화
+  * Traffic flow confidelity 
+     * 암호화
+	 * traffic padding 
+	 * Routing control
+  * Connection integrity with recovery
+     * 암호화
+	 * Data integrity
+  * Connection integrity without recovery  
+     * 암호화
+     * Data integrity
+  * Connection integrity selective field 
+     * 암호화
+     * Data integrity
+  * Connectionless integrity
+     * 암호화
+	 * 전자 서명
+     * Data integrity
+  * connectionless integrity selective field 
+     * 암호화
+	 * 전자서명
+	 * Data integrity
+  * Non-repudiation at origin
+     * 전자 서명
+	 * Data integrity
+	 * notarisation(공증인에 의한 인증) 
+  * Non-repudiation of receipt
+     * 전자 서명
+	 * Data integrity
+	 * notarisation
+
+== 데이터 무결성 ==
+데이터 무결성을 위해서는 전송 혹은 수신한 데이터가 위조되지 않았음을 확인할 수 있는 테스트 수단이 필요하다. 일반적으로 데이터로 부터 일련의 바이트를 추출해서 비교하는 것으로 수행된다. 이 프로세스를 해싱(hasing)이라고 부르고 해싱 결과 만들어진 바이트 값을 해시(hash) 혹은 해시 값(hash value)라고 한다. 
+
+원래의 해시 알고리즘은 데이터의 모든 바이트를 축약하는 것이다. 데이터를 받은 쪽에서는 동일한 해시 알고리즘으로 데이터에 대한 해시 값을 알아낸 다음, 원본 해시 값을 비교하는 것으로 데이터 변조 여부를 검사할 수 있다. 하지만 데이터 축약이기 때문에, 낮은 확률로 다른 데이터에 대해서 같은 해시 값이 나올 수도 있다. 이를 테면 "10,000"원의 결제가 "1,000,000" 결제로 둔갑 할 수도 있다.
+
+해싱 알고리즘은 동일한 해시 값을 가지는 바이트 스트림을 발견하는 걸 매우 어렵게 만드는 것으로 보안성을 강화한다. 해시 값의 예상을 어렵게 하면, 그만큼 공격자의 데이터 수정이 어렵게 된다. 보안 연구자들은 지속적으로 깨기 어려운 해시 알고리즘을 고안하고 테스트하고 있다. 이 결과 몇 가지 강력한 것으로 여겨지는 해싱 알고리즘 시리즈를 개발했다. 
+
+Go는 MD4, MD5, RIPEMD-160, SHA1, SHA224, SHA256, SHA384, SHA512등과 같은 주요 해싱 알고리즘을 지원한다. 
+
+md5 해싱 예제.
+{{{#!plain
+package main
+
+import (
+    "crypto/md5"
+    "fmt"
+)
+
+func main() {
+    hash := md5.New()
+    bytes := []byte("Hello world\n")
+    hash.Write(bytes)
+    hashValue := hash.Sum(nil)
+    hashSize := hash.Size()
+
+    fmt.Println(hashSize)
+    for n := 0; n < hashSize; n += 4 {
+        var val uint32
+        val = uint32(hashValue[n])<<24 +
+            uint32(hashValue[1])<<16 +
+            uint32(hashValue[2])<<8 +
+            uint32(hashValue[3])
+        fmt.Printf("%x ", val)
+    }
+    fmt.Println()
+}
+}}}
+실행결과
+{{{#!plain
+f0ef7081 e1ef7081 eef7081 b4ef7081 
+}}}
+
+== Symmetric key encryption ==
+암호화 방법은 크게 두 가지로 분류할 수 있다. 첫 번째는 하나의 키를 이용해서 "암호화 와 복호화"를 수행하는 방식이다. 이 경우 데이터를 주고 받는 양쪽이 동일한 키를 가지고 있어야 한다. 이를 symmetric key encryption(대칭키 암호화)라고 한다. 이 방식의 가장 큰 이슈는 어떻게 안전하게 키를 전송하느냐인데, 여기에서는 다루지 않을 것이다.  
+
+해시와 마찬가지로 많은 암호화 알고리즘이 있다. 암호화는 결국 자원과의 싸움이다. 강력한 암호화 알고리즘을 사용하면, 안전한 데이터 전송이 가능하겠지만 그만큼 비용이 증가할 것이다. 결국 서비스 수준에 맞는 적당한 알고리즘을 선택해서 사용해야 한다. Go는 '''Blowfish'''와 '''DES'''등의 대칭키 알고리즘을 지원한다. 
+
+{{{#!plain
+
+/* Blowfish
+ */
+
+package main
+
+import (
+	"bytes"
+	"code.google.com/p/go.crypto/blowfish"
+	"fmt"
+)
+
+func main() {
+	key := []byte("my key")
+	cipher, err := blowfish.NewCipher(key)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	src := []byte("hello\n\n\n")
+	var enc [512]byte
+
+	cipher.Encrypt(enc[0:], src)
+
+	var decrypt [8]byte
+	cipher.Decrypt(decrypt[0:], enc[0:])
+	result := bytes.NewBuffer(nil)
+	result.Write(decrypt[0:8])
+	fmt.Println(string(result.Bytes()))
+}
+}}}
+blowfish는 go 내장 패키지가 아니다. get을 이용해서 다운로드 하자.    
+{{{#!plain
+# go get code.google.com/p/go.crypto/blowfish
+}}}
+
+== Public key encryption ==
+공개 키 암호화(Public key encryption)은 암호화와 복호화를 위한 별도의 키가 필요하다. 암호화를 위한 키는 '''public key'''로 모든 사람에게 공개된다. 클라이언트는 서버로 부터 받은 public key로 데이터를 암호화 해서 안전하게 서버로 전송할 수 있다. 서버는 '''private key'''를 이용해서 데이터를 복호화 하는데, 이 키는 오직 서버만 가지고 있다. 따라서 중간에 암호화된 데이터를 가로챈다고 하더라도 복호화 할 수 없게 된다.   
+
+Go는 다양한 공개 키 암호화 방식을 지원한다. RSA 는 그 중 하나다.
+{{{#!plain
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/gob"
+	"encoding/pem"
+	"fmt"
+	"os"
+)
+
+func main() {
+	reader := rand.Reader
+	bitSize := 512
+	key, err := rsa.GenerateKey(reader, bitSize)
+	checkError(err)
+
+	fmt.Println("Private key primes", key.Primes[0].String(), key.Primes[1].String())
+	fmt.Println("Private key exponent", key.D.String())
+
+	publicKey := key.PublicKey
+	fmt.Println("Public key modulus", publicKey.N.String())
+	fmt.Println("Public key exponent", publicKey.E)
+
+	saveGobKey("private.key", key)
+	saveGobKey("public.key", publicKey)
+
+	savePEMKey("private.pem", key)
+}
+
+func saveGobKey(fileName string, key interface{}) {
+	outFile, err := os.Create(fileName)
+	checkError(err)
+	encoder := gob.NewEncoder(outFile)
+	err = encoder.Encode(key)
+	checkError(err)
+	outFile.Close()
+}
+
+func savePEMKey(fileName string, key *rsa.PrivateKey) {
+
+	outFile, err := os.Create(fileName)
+	checkError(err)
+
+	var privateKey = &pem.Block{Type: "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key)}
+
+	pem.Encode(outFile, privateKey)
+
+	outFile.Close()
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+
+아래는 key 들을 읽어오는 코드다.
+{{{#!plain
+
+package main
+
+import (
+	"crypto/rsa"
+	"encoding/gob"
+	"fmt"
+	"os"
+)
+
+func main() {
+	var key rsa.PrivateKey
+	loadKey("private.key", &key)
+
+	fmt.Println("Private key primes", key.Primes[0].String(), key.Primes[1].String())
+	fmt.Println("Private key exponent", key.D.String())
+
+	var publicKey rsa.PublicKey
+	loadKey("public.key", &publicKey)
+
+	fmt.Println("Public key modulus", publicKey.N.String())
+	fmt.Println("Public key exponent", publicKey.E)
+}
+
+func loadKey(fileName string, key interface{}) {
+	inFile, err := os.Open(fileName)
+	checkError(err)
+	decoder := gob.NewDecoder(inFile)
+	err = decoder.Decode(key)
+	checkError(err)
+	inFile.Close()
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+이 코드들은 잘 작동하지만 뭘 어디에 어떻게 사용하라는 건지 알 수가 없다. RSA 공개키는 ssh에서 널리 사용하는데, ssh 로그인 용도로 테스트를 한번 해봐야 겠다. (이건 준비 되는데로)   
+
+== X.509 certificates ==
+X.509는 공개키 알고리즘에 인증서 소유자의 이름과 지역정보, 승인 메커니즘을 포함한 PKI(Public key Infrastructure) 기반의 프레임워크다. 이 프레임워크는 특히 웹 클라이언트(브라우저가) 웹 서버의 신원을 확인하기 위한 용도로 널리 사용한다. '''HTTPS'''를 이용하는 서비스들을 생각하면 된다. 
+
+아래 프로그램은 self-signed X.509 인증서 파일인 '''.cer'''를 만들기 위한 코드다. 인터넷 상에서 서버의 신원을 확인하기 위해서는 신원 인증을 위한 제 3의 기관에서 제공한 X.509 인증서가 필요하지만, 테스트 용으로 사용할 거니 그냥 self-signed(사설) 인증서를 만들었다.
+{{{#!plain
+# 프로그램이름 x509.go
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/gob"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"os"
+	"time"
+)
+
+func main() {
+	random := rand.Reader
+
+	var key rsa.PrivateKey
+	loadKey("private.key", &key)
+
+	now := time.Now()
+	then := now.Add(60 * 60 * 24 * 365 * 1000 * 1000 * 1000) // one year
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "yundream",
+			Organization: []string{"joinc"},
+		},
+		//	NotBefore: time.Unix(now, 0).UTC(),
+		//	NotAfter:  time.Unix(now+60*60*24*365, 0).UTC(),
+		NotBefore: now,
+		NotAfter:  then,
+
+		SubjectKeyId: []byte{1, 2, 3, 4},
+		KeyUsage:     x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+
+		BasicConstraintsValid: true,
+		IsCA:     true,
+		DNSNames: []string{"test.joinc.co.kr", "localhost"},
+	}
+	derBytes, err := x509.CreateCertificate(random, &template,
+		&template, &key.PublicKey, &key)
+	checkError(err)
+
+	certCerFile, err := os.Create("test.joinc.co.kr.cer")
+	checkError(err)
+	certCerFile.Write(derBytes)
+	certCerFile.Close()
+
+	certPEMFile, err := os.Create("test.joinc.co.kr.pem")
+	checkError(err)
+	pem.Encode(certPEMFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	certPEMFile.Close()
+
+	keyPEMFile, err := os.Create("private.pem")
+	checkError(err)
+	pem.Encode(keyPEMFile, &pem.Block{Type: "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(&key)})
+	keyPEMFile.Close()
+}
+
+func loadKey(fileName string, key interface{}) {
+	inFile, err := os.Open(fileName)
+	checkError(err)
+	decoder := gob.NewDecoder(inFile)
+	err = decoder.Decode(key)
+	checkError(err)
+	inFile.Close()
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+3개의 파일이 만들어진다.
+
+'''test.joinc.co.kr.cer'''
+
+인증서 파일이다. 확장자 '''.cer'''은 이 파일이 CER 암호화된 인증서임을 알려준다.
+
+'''test.joinc.co.kr.pem'''
+
+.cer 파일을 Base64 인코딩한 인증서다.  "-----BEGIN CERTIFICATE-----"와 "-----END CERTIFICATE-----" 가운데, base64 인코딩된 .cer 파일 내용이 들어간다.  
+
+openssl을 이용하면 인증서의 상세 내역을 출력할 수 있다. 
+{{{#!plain
+# openssl x509 -in test.joinc.co.kr.pem -text
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1 (0x1)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: O=joinc, CN=yundream
+        Validity
+            Not Before: Sep 28 12:18:55 2014 GMT
+            Not After : Sep 28 12:18:55 2015 GMT
+        Subject: O=joinc, CN=yundream
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (512 bit)
+                Modulus:
+                    00:c1:39:de:bc:bc:e3:f1:8d:c2:ae:5b:ce:8c:05:
+                    d2:78:ee:e1:64:16:c7:a3:bc:a0:9b:92:00:91:0f:
+                    ce:64:46:9f:f4:49:fc:8e:03:6c:12:e1:42:a6:13:
+                    95:ec:fe:19:eb:9c:6b:c7:67:62:92:63:14:3e:4e:
+                    95:f1:77:f9:13
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature, Key Encipherment, Certificate Sign
+            X509v3 Basic Constraints: critical
+                CA:TRUE
+            X509v3 Subject Key Identifier: 
+                01:02:03:04
+            X509v3 Authority Key Identifier: 
+                keyid:01:02:03:04
+
+            X509v3 Subject Alternative Name: 
+                DNS:test.joinc.co.kr, DNS:localhost
+    Signature Algorithm: sha256WithRSAEncryption
+         76:0d:29:ec:36:5b:2d:7a:07:4a:96:00:bf:0e:db:2e:9c:29:
+         1c:5f:7d:71:a1:fc:15:72:2d:d5:9e:94:b9:f0:33:07:5e:50:
+         50:a5:ed:75:b0:6a:92:6c:c0:6b:03:72:96:a8:cd:2b:ad:a9:
+         26:ce:df:2c:53:2f:99:4b:bb:f3
+-----BEGIN CERTIFICATE-----
+MIIBnjCCAUqgAwIBAgIBATALBgkqhkiG9w0BAQswIzEOMAwGA1UEChMFam9pbmMx
+ETAPBgNVBAMTCHl1bmRyZWFtMB4XDTE0MDkyODEyMTg1NVoXDTE1MDkyODEyMTg1
+NVowIzEOMAwGA1UEChMFam9pbmMxETAPBgNVBAMTCHl1bmRyZWFtMFwwDQYJKoZI
+hvcNAQEBBQADSwAwSAJBAME53ry84/GNwq5bzowF0nju4WQWx6O8oJuSAJEPzmRG
+n/RJ/I4DbBLhQqYTlez+Geuca8dnYpJjFD5OlfF3+RMCAwEAAaNrMGkwDgYDVR0P
+AQH/BAQDAgCkMA8GA1UdEwEB/wQFMAMBAf8wDQYDVR0OBAYEBAECAwQwDwYDVR0j
+BAgwBoAEAQIDBDAmBgNVHREEHzAdghB0ZXN0LmpvaW5jLmNvLmtygglsb2NhbGhv
+c3QwCwYJKoZIhvcNAQELA0EAdg0p7DZbLXoHSpYAvw7bLpwpHF99caH8FXIt1Z6U
+ufAzB15QUKXtdbBqkmzAawNylqjNK62pJs7fLFMvmUu78w==
+-----END CERTIFICATE-----
+}}}
+x509.go 파일의 내용들로 구성된 인증서를 확인할 수 있다. 
+
+'''private.pem'''
+
+데이터 복호화를 위해서 사용하는 private key
+
+만들어진 인증서 정보를 읽는 코드다.
+{{{#!plain
+package main
+
+import (
+    "crypto/x509"
+    "fmt"
+    "os"
+)
+
+func main() {
+    certCerFile, err := os.Open("test.joinc.co.kr.cer")
+    checkError(err)
+    derBytes := make([]byte, 1000) // bigger than the file
+    count, err := certCerFile.Read(derBytes)
+    checkError(err)
+    certCerFile.Close()
+
+    // trim the bytes to actual length in call
+    cert, err := x509.ParseCertificate(derBytes[0:count])
+    checkError(err)
+
+    fmt.Printf("Name %s\n", cert.Subject.CommonName)
+    fmt.Printf("Not before %s\n", cert.NotBefore.String())
+    fmt.Printf("Not after %s\n", cert.NotAfter.String())
+
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Println("Fatal error ", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+실행 결과
+{{{#!plain
+# go run x509certread.go
+Name yundream
+Not before 2014-09-28 12:18:55 +0000 UTC
+Not after 2015-09-28 12:18:55 +0000 UTC
+}}}
+
+== TLS ==
+인터넷상에서 사용하는 프로토콜은 누구나 사용할 수 있는 공개된 표준이어야 한다. 암호화/복호화 알고리즘도 표준을 만들필요가 있다. 해서 만들어진게 SSL(Secure Socket Layer)이고, 이게 표준화 되면서 TLS(Transport Layer Security)로 이름이 바뀌었다.    
+
+TLS는 X.509 인증서를 이용해서 클라이언트와 서버가 협상과정을 거친다. 협상과정이 완료되면 클라이언트는 공개키를 이용해서 암호화를 하고, 서버는 개인키(private key)를 이용해서 복호화 하게 된다. TLS 협상과정은 흔히 TLS handshake 과정으로 표현되기도 하는데, 5번 정도의 패킷 교환이 진행된다. 협상과정은 상당히 느리게 진행되는데, 일단 협상이 끝나고 나면 비교적 빠른 private key 매커니즘이 작동한다.
+
+서버 프로그램 예제다. 
+{{{#!plain
+package main
+
+import (
+	"crypto/rand"
+	"crypto/tls"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"time"
+)
+
+func main() {
+	cert, err := tls.LoadX509KeyPair("test.joinc.co.kr.pem", "private.pem")
+	checkError(err)
+
+	// 하나 이상의 인증서를 올릴 수 있다.
+	config := tls.Config{Certificates: []tls.Certificate{cert}}
+
+	now := time.Now()
+	config.Time = func() time.Time { return now }
+	config.Rand = rand.Reader
+
+	service := ":1200"
+
+	listener, err := tls.Listen("tcp", service, &config)
+	checkError(err)
+	fmt.Println("Listening")
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Accept error :", err.Error())
+			continue
+		}
+		fmt.Println("Accepted")
+		go handleClient(conn)
+	}
+}
+
+func handleClient(conn net.Conn) {
+	defer conn.Close()
+
+	var buf [512]byte
+	for {
+		fmt.Println("Tryping to read")
+		n, err := conn.Read(buf[0:])
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Socket Close")
+				return
+			}
+			fmt.Println("Read error ", err.Error())
+		}
+		_, err2 := conn.Write(buf[0:n])
+		if err2 != nil {
+			return
+		}
+	}
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal Error : %s\n", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+
+tls 클라이언트 예제
+{{{#!plain
+package main
+
+import (
+	"crypto/tls"
+	"fmt"
+	"os"
+)
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ", os.Args[0], "host:port")
+		os.Exit(1)
+	}
+	service := os.Args[1]
+
+    // InsecureSkipVerity를 true로 해야 한다.
+    // 그렇지 않으면 "x509: invalid signature" 에러를 출력한다.
+	tlc := &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         "test.joinc.co.kr",
+	}
+	conn, err := tls.Dial("tcp", service, tlc)
+	checkError(err)
+
+	for n := 0; n < 10; n++ {
+		fmt.Println("Writing...")
+		conn.Write([]byte("Hello " + string(n+48)))
+
+		var buf [512]byte
+		n, err := conn.Read(buf[0:])
+		checkError(err)
+
+		fmt.Println(string(buf[0:n]))
+	}
+	os.Exit(0)
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d5 1
+a5 1
+인터넷은 군사적인 공격에 견딜 수 있는 시스템으로 설계를 했다. 하지만 그건 외부의 공격에 대한 것으로 내부 네트워크는 신뢰 관계에 있는 것으로 가정을 했다. 그 시절의 인터넷은 어차피 허가 받은 조직(혹은 사람)만 접속할 수 있었으니, 내부 네트워크에서 발생할 수 있는 공격은 크게 신경쓸 필요가 없었다. 하지만 시대가 바뀌어서 인터넷은 "공공 접속 네트워크" 그러니까 아무나 접속할 수 있는 네트워가 됐다. 안전하지 않은 네트워크가 된거다.  
+d602 1
+a603 1
+}}}
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d487 3
+d491 113
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d181 59
+d241 247
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d178 4
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d135 43
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d21 1
+a21 1
+보안 시스템 구현을 위해서 필요한 기본 기능들이다.
+d25 110
+a134 3
+  * Notarization/signature
+  * Access control
+  * Assurance/availability
+@

@@ -1,10 +1,40 @@
-head	1.4;
+head	1.10;
 access;
 symbols;
 locks
-	root:1.4; strict;
+	root:1.10; strict;
 comment	@# @;
 
+
+1.10
+date	2014.09.23.15.00.50;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.09.20.17.13.46;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.09.20.17.01.06;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.09.18.16.05.28;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.09.18.15.43.06;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.09.15.08.42.07;	author root;	state Exp;
+branches;
+next	1.4;
 
 1.4
 date	2014.06.07.12.33.41;	author root;	state Exp;
@@ -32,7 +62,7 @@ desc
 @
 
 
-1.4
+1.10
 log
 @119.64.102.68;;yundream;;
 @
@@ -40,6 +70,7 @@ text
 @#title MQTT 
 
 <!> 미완성
+[[TableOfContents]]
 == MQTT ==
 MQTT는 경량의 Publish/Subscribe(Pub/Sub) 메시징 프로토콜이다. M2M(machine-to-machine)와 IoT(Internet of things)에서 사용하는 걸 목적으로 하는 만큼, 낮은 전력으로도 사용할 수 있도록 설계됐다.
 
@@ -59,15 +90,18 @@ Pub와 Sub는 토픽을 기준으로 작동한다. 토픽은 슬래시(/)를 이
 <img src="https://docs.google.com/drawings/d/1qN-CtcvdojhgnfX2ONynNhPGHDvln5iPbZlOEh2dbPE/pub?w=734&amp;h=291" width=513 height=203> 
 }}}
 
+IoT 환경에서의 사용을 예로 들었다. 센서를 가진 기기들이 수집한 센서 정보를 publish 하면, 게이트웨이가 가져가는 식으로 활용 할 수 있겠다. 좀 더 크게 그림을 그려보자면, 로컬에서 수집한 센서 정보를 중앙 서버에 보내서 분석하는 구조도 생각해 볼 수 있겠다. IoT 환경에서의 MQTT 활용은 문서 후반에서 따로 살펴보겠다.
 
 == Mosquitto ==
 모스키토(Mosquitto)는 (2014년 6월 현재)MQTT 프로토콜 3.1을 구현한 BSD 라이센스 기반의 오픈소스 메시지 브로커다. 나는 모스키토를 이용해서 PUB,SUB,Broker 테스트를 진행하기로 했다.
+
+모스키토는 서버/클라이언트 모델을 따른다. 메시지 브로커가 서버역할을 하는데, Pub 채널을 유지하는 일을 한다. 클라이언트는 메시지 브로커에 붙어서 메시지를 교환하는데, '''pub'''과 '''sub'''역할을 모두 할 수 있다.  
 === 테스트 환경 ===
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1RKsCp_LfXW7xjoUiMnXaUPLdzQM28I-GVqQZXmhKaNY/pub?w=504&amp;h=395">
 }}}
   * VirtualBox를 이용해서 PUB, SUB, Broker를 위한 3개의 게스트 운영체제를 실행했다. 호스트 이름은 각각 pub.local, sub.local, broker.local 이다.
-  * 게스트 운영체제 : 우분투 리눅스 13.10으로 통일
+  * 게스트 운영체제 : 우분투 리눅스 14.04로 통일
 === Mosquitto 브로커 설치 ===
 {{{#!plain
 broker.local # apt-get install mosquitto 
@@ -79,11 +113,313 @@ tcp        0      0 0.0.0.0:1883            0.0.0.0:*               LISTEN      
 tcp6       0      0 :::1883                 :::*                    LISTEN      1512/mosquitto  
 }}}
 
+=== Mosquitto 클라이언트 설치 ===
+모스키토 클라이언트 프로그램을 설치했다.
+{{{#!plain
+# apt-get install mosquitto-clients
+}}}
 
-== 참고 ==
+=== Pub/Sub 테스트 ===
+hello/world 토픽을 subscribing 한다.  
+{{{#!plain
+# mosquitto_sub -d -t hello/world
+Received CONNACK
+Received SUBACK
+Subscribed (mid: 1): 0
+}}}
+
+hello/world토픽에 Publishing을 했다.
+{{{#!plain
+# mosquitto_pub -d -t hello/world -m "Hello World"
+Received CONNACK
+Sending PUBLISH (d0, q0, r0, m1, 'hello/world', ... (11 bytes))
+}}}
+Sub 클라이언트는 "Hello World"를 전송 받는다.
+
+modquitto_sub를 하나 더 실행 한다음 "Hello World"를 publishing 해보자. 토픽에 subscribing한 모든 클라이언트에 메시지가 전달되는 걸 확인할 수 있다. 
+
+== Chatting 프로그램 ==
+MQTT를 이용한 Pub/Sub 테스트는 끝냈으니, 이제 좀 그럴 듯한 서비스를 만들어봐야 겠다. MQTT를 이용한 chatting 프로그램을 개발할려고 한다. 이 chatting 프로그램은 아래의 기능을 지원한다.
+  * 채팅방 생성 : 채팅방을 Topic으로 하면 된다. Topic을 늘리는 것으로 여러 개의 채팅방을 운용할 수도 있을 거다. 채팅방을 임의로 만들게 하는 건 귀찮으니.. 그냥 "chat/public", "chat/private" 두개의 채팅방만 만들기로 했다. 
+ * 채팅방 Join : 원래는 채팅방 목록을 확인해서 Join해야겠으나 귀찮으니, chat/public, chat/private 모두를 sub 하는 걸로 join을 대신하겠다. 유저는 nickname을 만들어서 두개의 topic에서 메시지를 받아본다. 
+채팅 클라이언트 프로그램은 Sub와 Pub를 모두 해야 하니 멀티 쓰레드로 작동해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1_KlS0GuVUCfa-kDYPs4T4iaUo8lAUHlbWzPSTsZyRg8/pub?w=860&amp;h=329">
+}}}
+  1. MQTT 브로커로는 앞서 다룬 모스키토를 사용했다.
+  1. 쓰레드 하나는 Sub 전용이다. 토픽으로 받은 정보를 화면에 출력한다. 
+     * chat/public : 공개 채널의 메시지를 받기 위해서 사용한다.
+     * chat/public/nickname : 자신의 nicname 토픽에 메시지를 받기 위함.
+  1. 쓰레드 하나는 Pub 전용이다. 표준입력을 토픽에 publishing 한다.
+     * chat/public : 공개 채널에 publishing 한다. 
+	 * chat/public/other : 특정 유저에게 publishing 하기 위해서 사용한다.  
+=== 개발 환경 ===
+ * 우분투 리눅스 14.04
+ * Ruby 1.9.3 
+ * mqtt broker : mosquitto 
+mqtt 모듈은 설치해야 겠다.
+{{{#!plain
+# gem install mqtt
+}}}
+지원하는 메시지 타입이다.
+  * 공개 메시지 : message
+  * 개인 메시지 : /priv nickname message
+  * 채팅방 나가기 : /quit message
+curses 혹은 Tk, GTk, Qt등을 사용하면 예쁜 인터페이스를 만들 수 있겠으나 귀찮아서 생략
+{{{#!plain
+require 'rubygems'
+require 'mqtt'
+require 'readline'            
+
+# nickname 설정    
+nickname=ARGV[0]              
+
+# localhost에서 테스트 했다.
+mqtt = MQTT::Client.new('localhost')
+
+mqtt.connect do |client|
+    client.subscribe('chat/public')
+    client.subscribe("chat/private/#{nickname}")
+    enter_msg = "#{nickname} enter room!!"
+    client.publish 'chat/public', enter_msg
+
+    # Publish Thread
+    Thread.new do
+        while message = Readline.readline("", true)
+            case message
+            when /^\/priv\s*(\w*)\s*(.*)/       # 개인 메시지
+                client.publish "chat/private/#{$1}", "<#{nickname}> : #{$2}"
+            when /^\/quit\s*(.*)/               # 나가기 
+                client.publish 'chat/public', "#{nickname} has quit (#{$1})"
+                exit 1
+            else                                # 공개 메시지
+                client.publish 'chat/public', "#{nickname} : #{message}"
+            end
+        end
+    end
+
+    loop do
+        topic, message = client.get    
+        print message,"\n"
+    end
+end
+}}}
+
+== IoT와 MQTT ==
+네트워크 영역으로 볼때, IoT는 크게 로컬 네트워크와 광역 네트워크로 나눌 수 있을거다. 로컬 네트워크는 예컨데, 홈 AP(access Point)에 묶여있는 네트워크가 되겠다. 같은 로컬 네트워크에 있는 디바이스들은 중앙서버등에 연결할 필요 없이, 주변에 있는 디바이스들과 데이터를 주고 받을 수 있다. 만약 원격에서 디바이스를 제어하기 원한다면, 중앙에 있는 IoT 인프라에 연결을 해야 할 것이다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1DEpTe1q2ZwRmpXqd68VMbr7Jp50HweRuupsjl4XZUCA/pub?w=1050&amp;h=481" width="735" height="336">
+}}}
+
+네트워크 영역별로 데이터 통신 특성이 다른 관계로, 각각의 경우에 MQTT를 어떻게 응용할 수 있을지를 고민해 보려 한다.
+
+=== 로컬 네트워크에서의 MQTT ===
+로컬 네트워크는 "Discovery 가능한 영역"이다. 보통 멀티캐스트 채널을 이용해서, 주변에 있는 디바이스에 자신을 advertise 하거나 반대로 주변에 있는 디바이스를 찾을 수 있다. Discovery가 끝난 후, 데이터를 주고 받을 거다.   
+
+로컬 네트워크에서 데이터 교환은 단순한 메시지 교환과 (멀티미디어 데이터와 같은)컨텐츠 교환으로 나눌 수 있을 거다. 기기 종류에 따라서 교환하는 데이터의 종류에 차이가 있을 수 있다. 조명이나 커피포트, 온도계, 에어컨 등은 단순 메시지를 교환할 테고, TV, 오디오, 스피커, CCTV등은 컨텐츠 교환이 필요하다. 기기에 따라서 데이터 통신 방법을 다르게 할 필요가 있다.  
+
+==== 단순 메시지 교환 ====
+제어 메시지를 보내고, 센서 정보를 받는 종류의 기기들은 MQTT 만으로 데이터 통신이 가능할 거다. 아마도 소형의 기기들일 수 있으므로 zigbee와 같은 non-TCP/IP기반의 프로토콜 사용도 고려해야 한다. 이 경우 MQTT-SN(MQTT for Sensor Networks)의 사용을 고려해야 할 것이다. 모스키토 같은 MQTT 브로커들이 MQTT-SN을 지원하고 있으니, 구성에 문제는 없을 거다. 
+
+MQTT(MQTT-SN)를 이용한 구성 시나리오다.  
+
+{{{#!html
+https://docs.google.com/drawings/d/1V8MyGdPstTY33xHRAX20Ke8iAyJAMOf7ix34_W4tDC4/pub?w=636&h=266
+}}}
+ * 온도계는 /sensor/temperature 에 온도를 Puslish 한다. 온도가 변할 때만 puslish 하면 될 거다. 
+ * 스마트폰은 /sensor/temperature 를 subscribe 한다.  
+
+
+
+
+=== 광역 네트워크 ===
+
+== 예제 프로그램 ==
 
   * http://mosquitto.org/man/mqtt-7.html
   * http://madalanarayana.wordpress.com/2014/03/25/learnings-on-publish-subscribe-mqtt-mosquitto/
+
+== 참고 ==
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d24 1
+d29 1
+d35 1
+a35 1
+  * 게스트 운영체제 : 우분투 리눅스 14.07로 통일
+d81 1
+a139 55
+=== go 버전 ===
+미완성 코드임
+{{{#!plain
+package main
+
+import (
+    "flag"
+    "fmt"
+    "net"
+    "os"
+
+    "code.google.com/p/jra-go/mqtt"
+    proto "github.com/huin/mqtt"
+)
+
+var host = flag.String("host", "localhost:1883", "hostname of broker")
+var id = flag.String("id", "", "client id")
+var user = flag.String("user", "", "username")
+var pass = flag.String("pass", "", "password")
+var dump = flag.Bool("dump", false, "dump messages?")
+
+func main() {
+    fmt.Println(*host)
+    flag.Parse()
+    if flag.NArg() < 1 {
+        fmt.Fprintln(os.Stderr, "usage: sub topic [topic topic...]")
+        return
+    }
+    conn, err := net.Dial("tcp", *host)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "dial: ", err)
+        return
+    }
+    cc := mqtt.NewClientConn(conn)
+    cc.Dump = *dump
+    cc.ClientId = *id
+    tq := make([]proto.TopicQos, flag.NArg())
+    for i := 0; i < flag.NArg(); i++ {
+        tq[i].Topic = flag.Arg(i)
+        tq[i].Qos = proto.QosAtMostOnce
+    }
+    if err := cc.Connect(*user, *pass); err != nil {
+        fmt.Fprintf(os.Stderr, "connect: %v\n", err)
+        os.Exit(1)
+    }
+    fmt.Println("Connected with client id ", cc.ClientId)
+    cc.Subscribe(tq)
+    for m := range cc.Incoming {
+        fmt.Print(m.TopicName, "\t")
+        m.Payload.WritePayload(os.Stdout)
+        fmt.Println("\tr: ", m.Header.Retain)
+    }
+}
+}}}
+
+d149 1
+a149 1
+=== 로컬 네트워크 ===
+d152 16
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a84 1
+
+d93 4
+a96 1
+
+d119 1
+a119 1
+            when /^\/priv\s*(\w*)\s*(.*)/      
+d121 1
+a121 1
+            when /^\/quit\s*(.*)/              
+d124 1
+a124 1
+            else
+d137 2
+a138 14
+== IoT와 MQTT ==
+네트워크 영역으로 볼때, IoT는 크게 로컬 네트워크와 광역 네트워크로 나눌 수 있을거다. 로컬 네트워크는 예컨데, 홈 AP(access Point)에 묶여있는 네트워크가 되겠다. 같은 로컬 네트워크에 있는 디바이스들은 중앙서버등에 연결할 필요 없이, 주변에 있는 디바이스들과 데이터를 주고 받을 수 있다. 만약 원격에서 디바이스를 제어하기 원한다면, 중앙에 있는 IoT 인프라에 연결을 해야 할 것이다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1DEpTe1q2ZwRmpXqd68VMbr7Jp50HweRuupsjl4XZUCA/pub?w=1050&amp;h=481" width="735" height="336">
+}}}
+
+네트워크 영역별로 데이터 통신 특성이 다른 관계로, 각각의 경우에 MQTT를 어떻게 응용할 수 있을지를 고민해 보려 한다.
+=== 로컬 네트워크 ===
+로컬 네트워크는 "Discovery 가능한 영역"이다. 보통 멀티캐스트 채널을 이용해서, 주변에 있는 디바이스에 자신을 advertise 하거나 반대로 주변에 있는 디바이스를 찾을 수 있다.   
+
+=== 광역 네트워크 ===
+
+== 예제 프로그램 ==
+d192 16
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d73 1
+a73 1
+ * 채팅방 Join : 원래는 채팅방 목록을 확인해서 Join해야겠으나 귀찮으니, chat/public, chat/private 모두를 sub 하는 걸로 join을 대신하겠다. 
+d79 3
+d83 2
+a84 1
+  1. 쓰레드 하나는 Sub 전용이다. 토픽으로 받은 정보를 화면에 출력한다. 
+d86 8
+a93 2
+=== 개발 ===
+Ruby로 개발하기로 했다.
+d95 39
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d77 1
+a77 1
+https://docs.google.com/drawings/d/1_KlS0GuVUCfa-kDYPs4T4iaUo8lAUHlbWzPSTsZyRg8/pub?w=860&h=329
+d81 1
+d86 12
+a97 1
+== 참고 ==
+d155 2
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+a3 1
+<!> 미완성
+d26 1
+d32 1
+a32 1
+  * 게스트 운영체제 : 우분투 리눅스 13.10으로 통일
+d44 40
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d43 11
+d55 43
+a97 1
+== 참고 ==
 @
 
 

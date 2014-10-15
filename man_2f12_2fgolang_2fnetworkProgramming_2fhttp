@@ -1,5 +1,7 @@
-#title HTTP
+#title Go HTTP
 
+<!> 미완성
+[[TableOfContents]]
 == HTTP 소개 ==
 WWW(World wide web)은 수억명의 유저가 접근하는(그리고 역시 수억의 컴퓨터가 붙어있는) 가장 큰 분산 시스템다. WWW 서비스 중 가장 성공한 서비스는 HTTP 기반의 웹 서비스일 것이다. 유저는 웹 브라우저라고 부르는 웹 클라이언트 프로그램을 이용해서 웹 서버에 접근해서 서비스를 요청한다. 
 
@@ -8,10 +10,481 @@ WWW(World wide web)은 수억명의 유저가 접근하는(그리고 역시 수�
 이번 장에서는 HTTP를 간단히 살펴보고 Go를 이용해서 HTTP 클라이언트/서버 프로그램을 만들어 볼 것이다.
 
 == HTTP 살펴보기 ==
+HTTP에 대한 자세한 내용은 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]문서를 참고하자. 여기에서는 요약하는 정도로 넘어간다. 
 === URL과 리소스 ===
 인터넷에 유저가 접근하는 목적은 "자원을 찾아서 사용하기" 위함이다. 자원(resource)에 접근하기 위해서는 2가지 요소가 필요하다. 
   1. 인터넷 상에서 컴퓨터의 위치 : IP 주소로 인터넷상에서 컴퓨터의 위치를 찾을 수 있다.  
   1. 컴퓨터내에서 자원의 위치 : 컴퓨터는 특정한 위치에 자원을 (보통 파일의 형태로)저장하고 있다. '''URL'''을 이용해서 컴퓨터안에서 자원의 위치를 기술할 수 있다. 
 자원이란 HTML 문서, 이미지, 영상파일 등을 의미한다. 혹은 데이터베이스로 부터 동적으로 만들어진 객체일 수도 있다. 
 
+유저 에이전트는 인터넷 주소와 URL을 이용해서 서버를 찾아서 자원을 요청하면, 서버는 그 자원을 반환한다. 클라이언트는 자원을 다운로드하거나 화면에 표현하는 등의 일을 한다. 예를들어 HTML 파일이라면, 화면에 표현을, 음악파일이라면 다운로드해서 로컬 디스크에 저장한다.
 
+=== HTTP의 특성 ===
+HTTP는 '''stateless''', '''connectionlesss''', '''reliable'''한 프로토콜이다. 
+
+'''Stateless''' 하다는 것은 상태를 저장하지 않는 다는 의미로, 각각의 요청은 서로 독립적이다. 예를 들어 클라이언트가 서버에 바로 앞전 요청으로 로그인을 성공했다고 하더라도, 서버는 이번 요청이 로그인 성공한 건지 아닌지 알 방법이 없다. 하지만 상업적인 용도로 쓰기 위해서는 상태저장이 반드시 필요하기 때문에, 쿠키(cookie)를 이용하는 것으로 상태정보를 교환할 수 있다. (여기에서는 쿠키를 자세히 다루지 않을 것이다.) 
+
+'''Connectionless'''하다는 것은 서버와 클라이언트가 서로 연결을 맺지 않는 다는 의미다. 클라이언트가 요청을 하고, 서버가 요청에 대해서 응답을 끝내면, 서버와 클라이언트간 연결이 끊어진다. 다음 요청을 위해서는 새로운 연결을 맺어야 한다. 요청이 매우 많은 서버의 경우 빠른 시간에 응답을 끝내서, TCP 연결을 빠르게 해제해야 한다. 
+
+=== HTTP 버전 === 
+HTTP는 3개의 버전이 있다.  
+  * Version 0.9 : 완전히 사용하지 않는다.  
+  * Version 1.0 : 거의 사용하지 않는다. 
+  * Version 1.1 : 현재 사용 버전
+
+==== HTTP 1.0의 구성 ====
+HTTP0.9는 사용하지 않으니 건너 뛴다. 1.0을 건너뛰지 않는 이유는 HTTP 1.0이 HTTP의 기본적인 골격을 만든 버전이기 때문이다. HTTP1.1은 1.0을 기반으로 몇 가지 기능이 추가된 버전이다. 실제 HTTP 1.0이 거의 사용하지 않는 버전임에도 불구하고 이런 역사적인 이유 때문에, 거의 모든 웹 서버와 클라이언트가 1.0을 지원한다.   
+
+HTTP 요청 포맷은 다음과 같다.
+{{{#!plain
+Request = Simple-Request | Full-Request
+
+Simple-Request = "GET" SP Request-URI CRLF
+
+Full-Request = Request-Line
+		*(General-Header
+		| Request-Header
+		| Entity-Header)
+		CRLF
+		[Entity-Body]
+}}}
+요청은 simple-request와 full-request가 있는데, 지금에 와서는 simple-request는 생각할 필요가 없다. 모든 요청은 full-request라고 생각하자. 
+
+Full-Request의 첫째 줄에는 '''Request-Line'''이 온다. Request-Line의 형식은 다음과 같다.
+{{{#!plain
+Request-Line = Method SP Request-URI SP HTTP-Version CRLF
+}}}
+
+Method는 요청 방식으로 "GET", "HEAD", "POST"중 하나를 사용할 수 있다. '''Request-URI'''는 URI 주소 '''HTTP-Version'''은 사용하는 HTTP 버전이다. 아래는 Request-Line의 실제 사용 예다. 
+{{{#!plain
+GET http://www.joinc.co.kr/index.html HTTP/1.0
+}}}
+
+응답 포맷은 다음과 같다.
+{{{#!plain
+Response = Simple-Response | Full-Response
+
+Simple-Response = [Entity-Body]
+
+Full-Response = Status-Line
+		*(General-Header 
+		| Response-Header
+		| Entity-Header)
+		CRLF
+		[Entity-Body]
+}}}
+
+Status-Line 형식은 아래와 같다. 
+{{{#!plain
+Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+}}}
+
+{{{#!plain
+HTTP/1.0 200 OK
+}}}
+
+에러코드는 아래와 같다.
+{{{#!plain
+Status-Code =	  "200" ; OK
+		| "201" ; Created
+		| "202" ; Accepted
+		| "204" ; No Content
+		| "301" ; Moved permanently
+		| "302" ; Moved temporarily
+		| "304" ; Not modified
+		| "400" ; Bad request
+		| "401" ; Unauthorised
+		| "403" ; Forbidden
+		| "404" ; Not found
+		| "500" ; Internal server error
+		| "501" ; Not implemented
+		| "502" ; Bad gateway
+		| "503" | Service unavailable
+		| extension-code
+}}}
+
+Entity-Header는 부가적인 정보를 전송하기 위해서 사용한다. 아래와 같은 Entity-Body가 있다. 
+{{{#!plain
+Entity-Header =	Allow
+		| Content-Encoding
+		| Content-Length
+		| Content-Type
+		| Expires
+		| Last-Modified
+		| extension-header
+}}}
+
+실제 응답 예제다.
+{{{#!plain
+HTTP/1.1 200 OK
+Date: Fri, 29 Aug 2003 00:59:56 GMT
+Server: Apache/2.0.40 (Unix)
+Accept-Ranges: bytes
+Content-Length: 1595
+Connection: close
+Content-Type: text/html; charset=ISO-8859-1
+}}}
+
+==== HTTP 1.1의 구성 ====
+HTTP1.1은 HTTP1.0을 기본으로 하고 있으며, HTTP 1.0의 많은 문제점들을 수정했다. 기능상의 많은 개선이 있지만 덕분에 복잡해 졌다.    
+
+Request-Line은 아래와 같다. 버전이 1.1인 걸 제외하면 1.0과 차이가 없다.
+{{{#!plain
+GET http://www.w3.org/index.html HTTP/1.1
+}}}
+
+HTTP1.0에 비해서 달라진 점들은 다음과 같다.
+  * '''TRACE''', '''CONNECT'''와 같은 메서드가 추가됐다. 
+  * Virtual hosts를 위한 hostname identification  
+  * content negotiation : 자원은 언어나 미디어 타입등에 대한 표현 정보를 가질 수 있다. 예를들어 클라이언트는 가능하면 불어로 응답을 주되, 불어가 안된다면 영어로 응답을 달라고 서버와 협상할 수 있다. 
+  * Psersistent connections을 지원한다. : 하나의 연결에서 하나 이상의 요청을 보낼 수 있다. TCP 오버헤드를 줄일 수 있다.    
+  * Chunked transfers : 응답 데이터의 크기를 알 수 없는 경우에는 '''content-length'''대신, chunked transfer를 이용할 수 있다.   
+  * proxy support
+  * byte ranges : 리소스의 특정 범위의 데이터를 요청할 수 있다. 어디에 써먹을 수 있을지는 잘 모르겠다. 
+
+== Simple user-agents ==
+유저 에이전트는 아래와 같은 응답 데이터를 받을 것이다.
+{{{#!plain
+type Response struct {
+    Status     string // 200 OK 같은 응답 코드 
+    StatusCode int    // 200 응답 코드 
+    Proto      string // 응답 프로토콜 : HTTP/1.0
+    ProtoMajor int    // 프로토콜의 메이저 버전 
+    ProtoMinor int    // 프로토콜의 마이너 버전 
+
+    RequestMethod string //"HEAD", "CONNECT", "GET"등의 요청 메서드
+
+    Header map[string]string
+
+    Body io.ReadCloser
+
+    ContentLength int64
+
+    TransferEncoding []string
+
+    Close bool
+    Trailer map[string]string
+}
+}}}
+
+HTTP1.1에서 지원하는 메서드들 중 "HEAD"가 있다. 이 메서드로 요청을 받은 서버는 HTTP 서버의 정보를 반환한다. Go 언어에서는 Head 함수를 이용해서 "HEAD"요청을 보낼 수 있다. HEAD 요청을 보내는 간단한 유저 에이전트 프로그램을 이용해서, 서버 응답 메시지를 분석해 보려 한다.     
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+)
+
+func main() {
+    if len(os.Args) != 2 {
+        fmt.Println("Usage: ", os.Args[0], "host:port")
+        os.Exit(1)
+    }
+    url := os.Args[1]
+
+    response, err := http.Head(url)
+    checkError(err)
+
+    fmt.Println(response.Status)
+    for k, v := range response.Header {
+        fmt.Println(k+":", v)
+    }
+    os.Exit(0)
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error : %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+www.joinc.co.kr을 대상으로 테스트를 수행했다.
+{{{#!plain
+# go run head.go http://www.joinc.co.kr
+200 OK
+Server: [Apache/2.2.14 (Ubuntu)]
+Last-Modified: [Fri, 22 Jun 2012 06:58:22 GMT]
+Etag: ["c43e-76-4c30a286a7f80"]
+Accept-Ranges: [bytes]
+Content-Length: [118]
+Vary: [Accept-Encoding]
+Content-Type: [text/html]
+Date: [Sun, 12 Oct 2014 12:54:42 GMT]
+}}}
+서버측에는 어떤 요청이 도착했는지 확인해 보기로 했다. www.joinc.co.kr 사이트는 아파치 웹서버를 이용한다. tail로 access.log를 확인했다.
+{{{#!plain
+1.33.32.12 - - [12/Oct/2014:21:56:45 +0900] "HEAD / HTTP/1.1" 200 256 "-" "Go 1.1 package http"
+}}}
+
+유저 에이전트를 개발한다면, Get이나 Post메서드를 주로 사용한다. Get 메서드를 이용해서 자원을 요청할 수 있다. 
+{{{#!plain
+func Get(url string) (r *Response, finalURL string, err os.Error)
+}}}
+
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "net/http/httputil"
+    "os"
+)
+
+func main() {
+    if len(os.Args) != 2 {
+        fmt.Fprintln(os.Stderr, "Usage: ", os.Args[0], "host:port")
+        os.Exit(1)
+    }
+
+    url := os.Args[1]
+
+    response, err := http.Get(url)
+    checkError(err)
+
+    if response.StatusCode != 200 {
+        fmt.Println(response.Status)
+        os.Exit(1)
+    }
+    b, _ := httputil.DumpResponse(response, false)
+    fmt.Printf(string(b))
+
+    var buf [1024]byte
+    reader := response.Body
+    for {
+        n, err := reader.Read(buf[0:])
+        checkError(err)
+        fmt.Print(string(buf[0:n]))
+    }
+    os.Exit(0)
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error : %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+== Configuring HTTP Requests ==
+Go는 HTTP 유저 에이전트를 위한 저수준(lower-level) 인터페이스를 제공한다. 저수준 인터페이스를 사용하면, 정밀한 요청제어가 가능하지만, 제대로된 요청을 만들기 위해서는 더 많은 지식을 가지고 있어야 한다. 
+
+유저 요청을 제어하기 위해서는 '''Request''' type을 사용한다. 아래는 Go 문서에서 제공하는 Request type이다. 원문은 [http://golang.org/pkg/net/http/#Request 여기]에서 확인. 영문주석은 한글로 번역했다. 
+{{{#!plain
+type Request struct {
+    Method     string // GET, POST, PUT 등의 HTTP 메서드
+    RawURL     string // 요청을 위한 raw URL 정보 
+    URL        *URL   // 파싱된 URL 
+    Proto      string // 프로토콜과 버전 "HTTP/1.0"
+    ProtoMajor int    // 1
+    ProtoMinor int    // 0
+
+
+    // 헤더정보는 필드이름과 값으로 구성된 맵으로 저장한다. 
+    // 만약 헤더 정보가 아래와 같다면 
+    //
+    //	accept-encoding: gzip, deflate
+    //	Accept-Language: en-us
+    //	Connection: keep-alive
+    //
+    //  아래와 같은 맵으로 설정할 수 있다. 
+    //
+    //	Header = map[string]string{
+    //		"Accept-Encoding": "gzip, deflate",
+    //		"Accept-Language": "en-us",
+    //		"Connection": "keep-alive",
+    //	}
+    // HTTP의 헤더이름은 대소문자를 구분하지 않는다.
+    // 요청 파서는 "콜론"을 구분자로 필드이름을 분리해 낸다. 
+    // 그후 필드의 첫글자와 하이픈(-)다음에 오는 첫글자를 대문자로 변환하고
+    // 나머지는 소문자로 변환한다.
+    Header map[string]string
+
+    // 메시지 바디(body) 
+    Body io.ReadCloser
+
+    // ContentLength는 컨텐츠의 길이를 저장한다.
+    // 길이를 알 수 없을 때는 -1을 설정한다.
+    // 값이 0보다 클 경우, Body에서 길이만큼을 읽는다. 
+    ContentLength int64
+
+    // TransferEncoding lists the transfer encodings from outermost to innermost.
+    // An empty list denotes the "identity" encoding.
+    TransferEncoding []string
+
+    // 요청에 대한 응답후 연결을 끊을 것인지
+    Close bool
+
+    // 요청 호스트의 이름을 설정한다.
+    // 설정 값은 "Host:" 헤더 값을 설정하는데 사용한다.
+    // 웹 서버가 하나 이상의 도메인으로 서비스 할때,
+    // 도메인을 특정하기 위해서 사용한다.
+    Host string
+
+    // 어느 사이트를 통해서 방문했는지를 남기기 위해서 사용한다. 
+
+    // referer는 referrer의 오타인데, RFC 1945에 실수로 referer로 쓴 이후로
+    // 그냥 referer로 쓰게 됐다. 
+    Referer string
+
+    // 요청을 보내는 유저 에이전트 이름을 적는다.
+    // Mozill/5.0, Chrome/37.0.2049.0 등으로 사용한다.
+    // 서버측에서는 브라우저 접속 통계를 만들거나
+    // 브라우저별로 처리를 분기 하기 위한 목적으로 사용할 수 있다.
+    UserAgent string
+
+    // 파싱된 From을 보내기 위해서 사용한다. 
+    Form map[string][]string
+
+    // Trailer maps trailer keys to values.  Like for Header, if the
+    // response has multiple trailer lines with the same key, they will be
+    // concatenated, delimited by commas.
+    Trailer map[string]string
+}
+}}}
+
+요청 정보는 다양한 방식으로 설정할 수 있다. 그냥 간단히 요청만 하고 싶다면, 굳이 필드들을 일일이 설정할 필요는 없다. 많은 경우 아래와 같은 간단한 요청으로도 충분하다. 
+{{{#!plain
+request, err := http.NewRequest("GET", url.String(), nil)
+}}}
+
+필드 값을 추가하고 싶다면, request 에서 제공하는 Add 메서드를 이용한다. 
+{{{#!plain
+request.Header.Add("Accept-Charset", "UTF-8;q=1, ISO-8859-1;q=0")
+}}}
+
+응답 메시지는 '''Content-Type'''를 포함할 수 있는데, '''text/HTML''', '''application/JSON'''과 같은 컨텐츠의 타입을 명시한다. 클라이언트는 Content-Type를 보고, 컨텐츠 처리 방법을 결정할 수 있다. 컨텐츠가 문자셋(charset) 상태를 가질 경우, '''text/html; charset=UTF-8'''등 문자셋 정보도 보낼 수 있다. 만약 charset이 설정되어있지 않으면 ISO8859-1인 것으로 가정한다. 
+
+== Client 객체 ==
+HTTP 기반의 유저 에이전트를 만드는 가장 간단한 방법은 '''Client''' 객체를 만드는 거다. 이 객체는 여러개의 요청을 관리할 수 있으며, 서버와의 TCP 연결이 살아있는지 등을 관리할 수 있다. 
+
+간단한 유저 에이전트 프로그램이다.
+{{{#!plain
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+)
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ", os.Args[0], "http://host:port/page")
+		os.Exit(1)
+	}
+
+	url, err := url.Parse(os.Args[1])
+	checkError(err)
+
+	client := &http.Client{}
+
+	request, err := http.NewRequest("GET", url.String(), nil)
+
+	request.Header.Add("Accept-Charset", "UTF-8;q=1, ISO-8859-1;q=0")
+	checkError(err)
+
+	response, err := client.Do(request)
+	if response.StatusCode != 200 {
+		fmt.Println(response.Status)
+		os.Exit(1)
+	}
+	chSet := getCharset(response)
+	fmt.Printf("charset %s\n", chSet)
+	if chSet != "UTF-8" {
+		fmt.Println("Cannot handle", chSet)
+		os.Exit(1)
+	}
+
+	var buf [512]byte
+	reader := response.Body
+	fmt.Println("Get Body")
+	for {
+		n, err := reader.Read(buf[0:])
+		if n == 0 {
+			break
+		}
+		checkError(err)
+		fmt.Print(string(buf[0:n]))
+	}
+	os.Exit(0)
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error : %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func getCharset(response *http.Response) string {
+	contentType := response.Header.Get("Content-Type")
+	if contentType == "" {
+		return "UTF-8"
+	}
+	idx := strings.Index(contentType, "charset:")
+	if idx == -1 {
+		return "UTF-8"
+	}
+	return strings.Trim(contentType[idx:], " ")
+}
+}}}
+
+테스트
+{{{#!plain
+# go run http_client.go http://www.joinc.co.kr
+charset UTF-8
+Get Body
+<head>
+<meta http-equiv="refresh" content="0;URL=http://www.joinc.co.kr/modules/moniwiki/wiki.php/FrontPage">
+</head>
+}}}
+
+요청 정보도 확인해 보기로 했다. 리눅스의 nc(Netcat)를 이용해서 read 전용의 간단한 서버를 만들었다. 
+{{{#!plain
+# nc -l 8000
+}}}
+
+http_client를 이용해서 localhost:8000으로 요청을 전송했다.
+{{{#!plain
+# go run http_client.go http://localhost:8000
+}}}
+
+아래와 같은 요청을 확인할 수 있었다.
+{{{#!plain
+GET / HTTP/1.1
+Host: localhost:8000
+User-Agent: Go 1.1 package http
+Accept-Charset: UTF-8;q=1, ISO-8859-1;q=0
+Accept-Encoding: gzip
+
+}}}
+  * GET 방식으로 / 를 요청했다. HTTP 1.1 버전을 사용하고 있다.
+  * Host 정보를 보여주고 있다. 서버가 Virtual host를 지원한다면, 호스트 정보를 보고 서비스를 분기할 수 있다.
+  * Go언어로 만들어진 유저 에이전트 임을 확인할 수 있다. 
+  * 처리할 수 있는 문자셋을 명시하고 있다.   
+  * gzip 압축을 처리할 수 있다는 것을 서버에게 알려주고 있다. 압축통신을 지원하는 서버라면, 컨텐츠를 압축하는 것으로 트래픽을 줄일 수 있을 거다.[[FootNote(압축을 하면 트래픽을 절약할 수 있지만 CPU 자원을 소비한다. 요즘은 CPU를 더 소비하는것을 선호한다.)]]  
+
+사용자 정의 헤더를 추가해서 테스트해 보자. http_client 프로그램을 수정했다.
+{{{#!plain
+    request.Header.Add("Accept-Charset", "UTF-8;q=1, ISO-8859-1;q=0")
+    request.Header.Add("My-Header", "Hello World")   # 사용자 헤더를 추가했다. 
+}}}
+
+테스트 결과.
+{{{#!plain
+# nc -l 8000
+GET / HTTP/1.1
+Host: localhost:8000
+User-Agent: Go 1.1 package http
+Accept-Charset: UTF-8;q=1, ISO-8859-1;q=0
+My-Header: Hello World
+Accept-Encoding: gzip
+}}}

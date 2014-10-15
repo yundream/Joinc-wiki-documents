@@ -1,0 +1,281 @@
+#title Ruby on rails 시작 
+
+문서 작성 : [[Date(2014-10-09T07:35:26)]]
+[[TableOfContents]]
+== 설치 ==
+깨끗한 상태에서 설치하려고, virtualbox로 우분투 리눅스 14.04를 설치했다.
+
+먼저 ruby를 설치한다. 현재 최신버전은 2.1.1인데, 우분투 공식 저장소에는 2.0이 올라와 있다. 이왕 시작한 거 최신버전으로 설치하기로 했다.
+{{{#!plain
+# apt-get install python-software-properties
+# apt-add-repository ppa:brightbox/ruby-ng
+# apt-get update
+# apt-get install ruby2.1
+# apt-get install ruby2.1-dev
+# apt-get install nodejs
+# apt-get install libsqlite3-dev 
+# apt-get install make
+# ruby --version
+ruby 2.1.2p95 (2014-05-08 revision 45877) [x86_64-linux-gnu]
+# gem --version
+2.2.2
+}}}
+
+node.js도 설치했는데, 설치하지 않을 경우 앱 실행시 "autodetect: Could not find a JavaScript runtime." 에러를 만난다. 왜 node가 필요한지 확인 중이다. 
+
+이제 레일즈를 설치하자. 몇 가지 레일즈 설치방법이 있다고 하는데, 제일 쉽다는 rubygem을 이용한 설치를 선택했다. 
+{{{#!plain
+# gem install rails
+# rails --version
+Rails 4.1.6
+}}}
+
+== 웹 애플리케이션 만들기 ==
+나는 웹 애플리케이션 개발로 소프트에 영역에 발을 들였다. 웹 애플리케이션 개발 언어로 선택한 것이 PHP로, 이때가 1999년이었다. PHP가 막 3.0 버전이 나왔던 것으로 기억한다(워낙 오래전 일이라 기억이 가물가물하다 15년전 일이다.).   
+
+PHP로 웹 애플리케이션을 개발 할 때도, 나름대로의 구조를 잡기 마련이다. 예컨데, 아래와 같다. PHP 프레임워크를 이용한다면, 프레임워크에서 만들어주는 구조를 그대로 사용할 거다. 
+{{{#!plain
+.
+├── config
+├── controllers
+│   └── helpers
+├── data
+│   ├── cache
+│   ├── indexes
+│   ├── locales
+│   ├── logs
+│   ├── sessions
+│   └── uploads
+├── libs
+├── public
+│   ├── css
+│   ├── images
+│   └── js
+└── views
+    ├── filters
+    ├── helpers
+    └── scripts
+}}}
+개인이 만들건 프레임워크에게 맡기건 가장 먼저하는 일은 "애플리케이션의 구조"를 만드는 거다. 레일즈로 프로젝트를 시작하는 것도 마찬가지라서 가장 먼저 "애플리케이션 구조"를 만드는 일을 한다. 프레임워크들은 각각 고유한 구조를 가지고 있으며, 이 구조는 모든 프로젝트에 동일하게 적용된다. 따라서 같은 프레임워크를 사용하는 개발자는 구조에 신경쓸 필요 없이, 애플리케션 개발이 가능하다. 유지,보수도 편해지고  
+
+myapp이라는 rails 웹 앱을 만들었다.
+{{{#!plain
+# cd /var/www
+# rails new myapp
+}}}
+
+웹 앱 실행
+{{{#!plain
+# cd /var/www/myapp
+# bin/rails server
+=> Booting WEBrick
+=> Rails 4.1.6 application starting in development on http://0.0.0.0:3000
+=> Run `rails server -h` for more startup options
+=> Notice: server is listening on all interfaces (0.0.0.0). Consider using 127.0.0.1 (--binding option)
+=> Ctrl-C to shutdown server
+[2014-10-09 15:07:47] INFO  WEBrick 1.3.1
+[2014-10-09 15:07:47] INFO  ruby 2.1.2 (2014-05-08) [x86_64-linux-gnu]
+[2014-10-09 15:07:47] INFO  WEBrick::HTTPServer#start: pid=6676 port=3000
+}}}
+실행 완료. 간단하네.. 웹 서버로 '''WEBric'''이 올라온다. 나중에 thin이나 apache로 바꿔봐야지. 테스트도 성공
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1DcFHfqF888FC484M9ysbRuQKpIvkB448shQaaLkrKRY/pub?w=862&amp;h=621" width="603" height="434">
+}}}
+
+=== 레일즈 애플리케이션 구조 ===
+레일즈 애플리케이션 구조를 살펴보기로 했다.
+{{{#!plain
+.
+├── app
+│   ├── assets
+│   ├── controllers
+│   ├── helpers
+│   ├── mailers
+│   ├── models
+│   └── views
+├── bin
+├── config
+├── db
+├── lib
+├── log
+├── public
+├── test
+├── tmp
+└── vendor
+}}}
+ * app : 애플리케이션의 구성요소들이 들어간다. 뷰, 헬퍼, 컨트롤러, 모델등의 코드가 여기에 들어간다. 
+ * app/controllers : 컨트롤러 클래스들이 놓이는 공간. 유저의 요청을 처리한다.    
+ * app/models : 애플리케이션이 데이터베이스에 저장된 데이터를 위한 모델과 클래스가 위치한다. 
+ * app/view : 애플리케이션의 실행 결과를 HTML 문서로 만들기 위한 템플릿(template)파일들이 있다. 
+ * config : 애플리케이션에서 사용하는 데이터베이스의 설정파일(database.yml), 레일스의 환경설정(environment.rb), 웹 요청을 경로를 처리하기 위한 routes.rb 등 설정파일이 위치 한다.  
+ * db : 일반적으로 레일즈 응용 프로그램들은 관계형 데이터베이스를 사용한다. 데이터베이스 생성 스크립트, 저장소등을 관리한다.      
+ * doc : 루비는 RubyDoc이라고 부르는 문서생성 프레임워크를 가지고 있다. 코드의 주석과 코드를 이용해서 RubyDoc 문서를 만든다. 이렇게 만들어진 문서를 보관하는 디렉토리다.  
+ * lib : 외부에서 제공하는 라이브러리등 명시적으로 관리하지 않는 라이브러리를 저장한다.
+ * log : 레일즈는 다양한 에러로그들을 관리한다. 이들 로그가 저장되는 디렉토리다. 
+ * public : Javascript 파일(public/javascripts), 이미지 파일(public/images), css(public/stylesheets) 그리고 HTML(public) 파일등 웹 서비스에서 사용하는 정적인 파일들을 저장한다. 
+ * test : 테스트를 위한 mocks, unit test, fixture 등을 관리한다.
+ * tmp : 레일즈가 임시로 생성하는 파일들을 관리한다. 
+ * bin : 레일즈를 실행하고 관리하기 위한 실행파일들이 있다. 
+ * RakeFile : 리눅스의 Makefile의 루비버전이라고 생각하면 된다. 레일즈 코드의 빌딩, 패키징, 테스트를 위한 정보가 있다. 
+
+=== Hello world로 레일즈 구조 살펴보기 ===
+'''Hello world''' 앱을 만들어 보기로 했다. 레일즈는 MVC 모델을 따르니, 모델, 콘트롤, 뷰를 만들어야 한다. Hello world 앱의 경우에는 데이터베이스를 필요로 하지 않으니 "컨트롤"과 "뷰"만 만들면 된다. 
+
+Sinatra는 손 코딩으로 라우터 파일을 수정하고, view 파일을 만들어줘야 했는데, 레일즈는 프로그램을 이용해서 컨트롤과 뷰를 만들 수 있었다. 풀 스택 프레임워크의 위엄.
+{{{#!plain
+# bin/rails generate controller hello index
+      create  app/controllers/hello_controller.rb
+       route  get 'hello/index'
+      invoke  erb
+      create    app/views/hello
+      create    app/views/hello/index.html.erb
+      invoke  test_unit
+      create    test/controllers/hello_controller_test.rb
+      invoke  helper
+      create    app/helpers/hello_helper.rb
+      invoke    test_unit
+      create      test/helpers/hello_helper_test.rb
+      invoke  assets
+      invoke    coffee
+      create      app/assets/javascripts/hello.js.coffee
+      invoke    scss
+      create      app/assets/stylesheets/hello.css.scss
+}}}
+만들어진 파일들의 용도를 분석해 보자.
+
+유저는 URI로 요청을 한다. URI를 받을 경우 어떤 컨트롤러로 보낼 것인지 '''경로(route)'''를 설정한다. 유저가 "hello/index"를 요청하면, hello_controller.rb 컨트롤러를 호출한다.  
+
+Route 파일은 '''config/routes.rb'''다. 현재 설정은 다음과 같다.
+{{{#!plain
+# cat config/routes.rb
+Rails.application.routes.draw do
+  get 'hello/index'
+}}}
+
+현재 등록된 routes 정보를 확인해 보자.
+{{{#!plain
+# bin/rake routes
+Warning: Running `gem pristine --all` to regenerate your installed gemspecs (and deleting then reinstalling your bundle if you use bundle --path) will improve the startup performance of Spring.
+     Prefix Verb URI Pattern            Controller#Action
+hello_index GET  /hello/index(.:format) hello#index
+}}}
+
+컨트롤러 파일은 app/controllers/hello_controller.rb 다.   
+{{{#!plain
+class HelloController < ApplicationController
+  def index
+  end
+end
+}}}
+아직은 아무런 코드도 없다. 유저 요청은 controller에서 처리한 다음에, view로 넘긴다. hello_controller.rb에 대한 view 파일은 app/views/hello/index.html.erb 이다. 루비는 view를 만들기 위한 기본 템플릿 엔진으로 '''[wiki:Site/Ruby/ERB ERB]'''를 사용한다.
+
+'''Hello world'''를 출력하도록 view 파일을 수정했다.
+{{{#!plain
+# cat app/views/hello/index.html.erb
+<h1>Hello World</h1>
+<p>Find me in app/views/hello/index.html.erb</p>
+}}}
+
+curl을 이용해서 hello world 애플리케이션을 테스트 했다.
+{{{#!plain
+# curl 192.168.56.101:3000/hello/index
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Myapp</title>
+  <link data-turbolinks-track="true" href="/assets/hello.css?body=1" media="all" rel="stylesheet" />
+<link data-turbolinks-track="true" href="/assets/application.css?body=1" media="all" rel="stylesheet" />
+  <script data-turbolinks-track="true" src="/assets/jquery.js?body=1"></script>
+<script data-turbolinks-track="true" src="/assets/jquery_ujs.js?body=1"></script>
+<script data-turbolinks-track="true" src="/assets/turbolinks.js?body=1"></script>
+<script data-turbolinks-track="true" src="/assets/hello.js?body=1"></script>
+<script data-turbolinks-track="true" src="/assets/application.js?body=1"></script>
+  <meta content="authenticity_token" name="csrf-param" />
+<meta content="2v7mzi8lTLssZ+7a+0ELxLxiDN4xXe5AkEMq5Rz4tk0=" name="csrf-token" />
+</head>
+<body>
+
+<h1>Hello World</h1>
+<p>Find me in app/views/hello/index.html.erb</p>
+
+</body>
+</html>
+}}}
+index.html.erb에 있는 내용이외에 다른 데이터들이 있다. header와 footer 정도가 될 것 같다. 이들 파일은 app/assets 밑에 있는데, 레일즈는 assets아래의 파일들을 읽어서 자동으로 header 데이터를 만든다.
+
+이렇게 해서, 성공적으로 Hello world 애플리케이션을 만들었다. 그리고 아주 간단하게 나마 레일즈의 주요 구성요소들을 확인했다. 이제 각각의 구성요소들을 좀더 자세히 살펴보려고 한다.(음.. 모델을 빼먹었는데, 데이터베이스와 함께 살펴 봐야 겠다.)
+
+== Routes ==
+레일즈에서 라우터(경로설정)은 라우터라는 말 그대로 유저의 요청 URL을 읽어서, 적당한 컨트롤러로 요청을 전달하는 일을 한다. 페이지 단위로 유저 요청을 설정하는 대신, 라우터에서 모아서 처리하기 때문에 유저의 요청 & 컨트롤러 & 뷰를 통합관리할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1WDNXdGNwYIrrHKLV6s5nb5Ng1Mz21nPQyDNBul-RBtc/pub?w=738&amp;h=181">
+}}}
+
+=== Routing 시스템 개요 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/137ZN0u08UdH3NtPFrCH4eho2yXQ5EHrJI_Wtqxxb_Oc/pub?w=559&amp;h=582">
+}}}
+
+라우팅은 클라이언트(웹 브라우저)로 부터의 요청을 중계하는 관문의 역할을 하는 시스템이다. 클라이언트의 요청은 레일즈 라우팅 시스템으로 넘어가는데, 요청을 받은 라우팅 시스템은 아래의 사항을 결정한다.   
+   * 요청을 어떤 컨트롤러로 보내야 하는가 
+   * 컨트롤러에서 어떤 메서드를 호출해야 하는가. 
+   * 메서드에 어떤 매개변수를 넘겨야 하는가.
+라우팅 시스템이 특정 컨트롤러를 호출을 위한 올바른 URL요청을 받으면, 매개변수와 함께 메서드를 호출한다. 컨트롤러는 유저의 요청을 처리하고 그 결과는 컨트롤러에 연결된 view를 이용 클라이언트에 결과를 전송한다. 시스템을 단순화 하기는 했지만 라우팅 시스템의 중요성을 확인할 수는 있을 것이다.  
+
+=== Routes 다루기 ===
+Routes는 '''routes.rb'''에서 관리 한다. routes 예제다.
+{{{#!plain
+Rails.application.routes.draw do                                                        
+    root to: 'hello#index'
+    get 'hello/index'
+end
+}}}
+  * root는 "root"라우팅을 위해서 사용한다. 유저가 사이트 주소만 입력했을 경우, 보내는 페이지로 "/index.html" 쯤 된다. "to:"를 이용해서 'hello/index'를 호출하도록 설정했다. '''to:'''에서 #은 /로 사용된다.
+  * GET hellp/index 에 대한 라우팅 설정이다.  
+
+그럼 '''user'''라는 이름을 가지는 라우터를 추가해 보자. 라우터는 연결되는 컨트롤러와 뷰를 모두 가지고 있어야 제대로 작동을 하므로, 컨트롤러와 뷰까지 만들도록 하겠다. 라우터를 설계하기 위해서 라우터의 사양을 정리했다. 
+  * 유저가 GET 메서드로 /usr/<id>를 호출하면, id에 대한 정보를 출력한다. 
+
+router.rb를 수정한다.
+{{{#!plain
+Rails.application.routes.draw do                                                        
+    root to: 'hello#index'
+    get 'hello/index'
+    get "user/:id", to: 'user#show'
+end
+}}}
+
+컨트롤러를 만든다. 
+{{{#!plain
+# cat app/controllers/user_controller.rb
+class UserController < ApplicationController
+    def show
+        @id=params[:id]    
+    end
+end
+}}}
+
+마지막으로 view를 만들었다.
+{{{#!plain
+# cat app/views/user/show.html.erb
+<h1>User#show</h1>
+<p>My ID: <%=@id%></p>
+}}}
+
+curl로 테스트했다. 
+{{{#!plain
+$ curl http://localhost:3000/user/17
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+
+<h1>User#show</h1>
+<p>My ID: 17</p>
+
+</body>
+</html>
+}}}

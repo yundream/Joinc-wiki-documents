@@ -1,0 +1,909 @@
+head	1.15;
+access;
+symbols;
+locks
+	root:1.15; strict;
+comment	@# @;
+
+
+1.15
+date	2014.10.08.07.48.19;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.10.06.14.21.06;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.10.06.12.36.06;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.10.06.05.13.19;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.10.06.03.32.02;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.10.05.15.51.39;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.10.05.15.41.50;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.10.05.14.52.41;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.10.05.14.08.54;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.10.05.04.24.06;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.10.05.02.00.21;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.10.05.00.09.26;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.10.03.11.35.10;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.10.01.15.49.07;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.10.01.15.17.55;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fMQTT_2fMultiChat
+@
+
+
+1.15
+log
+@121.50.20.41;;yundream;;
+@
+text
+@#title MQTT를 이용한 Push 서비스 개발
+
+[[TableOfContents]]
+== 소개 ==
+[wiki:man/12/MQTT/Tutorial MQTT 소개]에서 MQTT 설치와 함께, 간단한 채팅 애플리케이션을 만들었다. 한발 더 나아가 MQTT기반의 푸쉬(push) 서비스를 기획해 보려한다. 개발이 아니고 기획이라고 하는 이유는, 푸쉬 서비스에 대한 기본 적인 얼개와 대략적인 프로토타이핑 정도까지를 개발 범위로 하고 있기 때문이다. 완전한 푸쉬 소프트웨어를 만들진 않을 거다.
+
+푸쉬 서비스를 기획하는 이유는 다음과 같다.
+  1. MQTT가 IoT에서의 메시징 프로토콜로 각광을 받고 있다. 정말 그런지 가능성을 확인해 본다.
+  1. IoT 환경에서 디바이스와 유저, 유저와 유저가 효과적으로 메시지를 주고 받을 수 있는 솔류션을 찾아보고 싶다. 
+
+== Push 서비스 개발 ==
+=== 개발 환경 ===
+  * 우분투 리눅스 server 14.04
+  * Mosquitto MQTT Broker
+  * [wiki:Site/Ruby Ruby] : MQTT 클라이언트를 만들기 위한 언어 
+
+=== Push 서비스 환경 구성 ===
+내가 생각하고 있는 메시징 환경이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/19ibdg5V00yn77MExdSKOuOwFEJqx_Quq81rsWMak1fk/pub?w=748&amp;h=238">
+}}}
+  * 요청과 응답채널을 분리한다. : 요청을 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]로 하려고 한다. HTTP는 훌륭한 툴들도 많고 개발 방법들도 잘 정리되어있다. 분산 처리가 용이해서 대용량 시스템 구성이 쉽다는 것도 장점이다. 반면 응답을 동기화하기에는 좀 애매모호하다는 단점이 있다. websocket을 이용하거나 long polling을 이용하는 방법도 있겠는데, HTTP의 장점에 흠집을 내는 격이라서 사용하기가 망설여진다. 하여, HTTP는 요청에만 사용하고 응답은 따로 분리하기로 했다. 이런 모델들 요즘엔 많이 찾아볼 수 있다.   
+  * 응답 채널을 MQTT로 한다. : 유저가 인증을 끝내고 IoT 인프라에 접속하면, 메시지 Push를 위한 private topic을 만든다. 기기에서 발생한 메시지는 IoT 인프라로 Publish하고, 이걸 유저가 subscribe하는 방식이다. 실제 구현에서는 MQTT broker 앞에 MQTT Proxy등을 놓는 등의 장치가 필요하다.
+
+응답 채널을 MQTT로 할 경우 몇 가지 응용을 할 수 있다.
+  * Topic을 만들어서, 여러 유저(혹은 기기가) subscribe 하게 한다. .. 하나의 토픽에 여러 유저 혹은 디바이스가 PUB/SUB 하게 하면 된다.
+  * 운영 상의 이유로 여러 유저에게 메시지를 보내야 할 수도 있다. 이를 위해서 몇 개의 Public 채널을 만들 수도 있다. 앱 업데이트 Topic, CS Topic, (동의한 유저를 대상으로 하는) 이벤트 Topic 등이 그것이다. 
+
+메시지 전송은 HTTP, 수신은 MQTT로 하는 구성이다.
+=== 시스템 구성 ===
+IoT Push 서비스의 구성이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1ZRWbKSq7IS61LFwp85GLpstl44z78uMK5Xk6mom7vM0/pub?w=585&amp;h=254">
+}}}
+
+'''Client'''
+Ruby MQTT 클라이언트로 테스트 한다. 
+
+'''API Server'''
+유저와 토픽을 관리하며, 메시지를 전송하는 일을 한다. 인증과 권한 정보는 MQTT Proxy와 공유할 수 있어야 한다. 
+
+'''MQTT Proxy'''
+Client는 MQTT Proxy와 연결을 한다. MQTT Proxy는 유저의 요청을 한 번 필터링해서 MQTT 브로커토 전달한다. 프락시는 인증된 유저인지, 권한을 가진 Topic에 SUB 요청을 하는지 등을 확인해야 한다.  
+
+'''MQTT broker'''
+Pub/Sub 메시지를 관리하는 고유의 일을 한다. 인증, 권한등의 관리는 MQTT 프락시에 일임한다.
+
+=== Push 프로세스 ===
+유저인증에서 MQTT Proxy에 연결해서, Push 서비스를 받기 까지의 프로세스다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1li0uUOxs2DqY6mBhg8qnQpaUk9f8DSf2krPtSqz3KoI/pub?w=670&amp;h=437">
+}}}
+  1. Client는 API Server에 인증을 요청한다.
+  1. 인증성공하면 session을 발행한다. 
+  1. Client가 Push 서비스를 받기 원한다면, MQTT Proxy에 연결 요청한다. 
+  1. 연결 후 첫 번째 메시지로 인증확인을 위한 Auth request 메시지를 Publish 한다. 
+     * 인증을 위한 전용의 '''Auth Topic'''을 만든다. '''/service/auth/<user_session>''' 정도면 되겠다.
+  1. Auth request 메시지를 받은 프락시 서버는 API Server에 세션이 올바른지 확인 요청을 한다. Session validation check 과정이 되겠다. 
+     * 실패하면 연결을 끊는다. 실패 메시지는 '''Auth Topic'''로 전송하면 되겠다. 
+  1. 연결 성공하면 메시지 topic에 subscribe를 요청한다. 
+  1. 프락시 서버는 subscribe 요청이 올바른지 확인 후 요청을 MQTT 브로커로 넘긴다.    
+
+== 구현 ==
+컨셉만 구현 할 거다. 애플리케이션 프로토콜도 만들어야 하고, 데이터 베이스 시스템도 준비해야 겠으나 건너뛴다. 컨셉 검증용이라고 보면 되겠다.
+=== MQTT Proxy 구현 ===
+Push 시스템의 핵심이라고 할 수 있는 MQTT proxy 서버에 대해서 알아보겠다. MQTT 프락시는 클라이언트와 MQTT 브로커 사이의 메시지를 연산하는 일종의 미들웨어 시스템이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1muooOWwu0vyk3nby0WQdgsvOW4tK7Rsrrnda6Ewa3nY/pub?w=537&amp;h=283">
+}}}
+  1. Proxy의 bind port는 5000이다.
+  1. 브로커의 서비스 포트는 1883(MQTT 기본 포트)이다.
+
+Ruby mqtt 모듈에 있는 Proxy 클래스를 이용해서 구현했다. 설명은 주석으로 대신한다.
+{{{#!plain
+require 'rubygems'
+require 'mqtt'
+require 'pp'
+
+# MQTT::Packet에 get 메서드 추가
+# topic, payload(유저 메시지)
+class MQTT::Packet
+    def topic 
+        return @@topic
+    end
+    def payload
+        return @@payload
+    end
+end
+
+# MQTT::Proxy의 process_packets 메서드 재 정의
+# 원래의 process_packets 는 packet만 넘겨주는데, 이 걸로는  
+# 이 packet에 어떤 클라이언트의 것인지 확인할 수 없다.
+# 해서 클라이언트를 구분할 수 있는 값(소켓 객체의 id)을 추가로 넘기게 했다.
+class MQTT::Proxy
+  def process_packets(client_socket,server_socket)
+    loop do
+      selected = IO.select([client_socket,server_socket], nil, nil, @@select_timeout)
+      if selected.nil?
+        # Timeout
+        raise "Timeout in select"
+      else
+        if selected[0].include?(client_socket)
+          packet = MQTT::Packet.read(client_socket)
+          packet = @@client_filter.call(packet, client_socket.object_id) unless @@client_filter.nil?
+          # packet이 nil 이라면 인증 오류인 걸로 한다.          
+          if packet.nil?
+            raise "Authorization Error"
+          else
+            server_socket.write(packet)
+          end
+        elsif selected[0].include?(server_socket)
+          packet = MQTT::Packet.read(server_socket)
+          packet = @@server_filter.call(packet) unless @@server_filter.nil?
+          unless packet.nil?
+            client_socket.write(packet)
+          end
+        else
+            logger.error "Problem with select: socket is neither server or client"
+        end
+      end
+    end
+  end
+end
+
+class MQTTProxy
+    attr_reader :proxy
+    attr_reader :session_info
+    attr_reader :logger
+    def initialize(args)
+        @@proxy=MQTT::Proxy.new args
+        @@session_info = Hash.new
+
+        @@logger = args[:logger]
+        if @@logger.nil?
+            @@logger = Logger.new(STDOUT)
+            @@logger.level = Logger::INFO
+        end
+    end
+
+    # 유저 세션을 검사한다. 
+    # 귀찮아서 123456이면 성공인 걸로 했다.
+    def validationSession? session 
+        # session을 가져오기 위한 연산이 들어간다.
+        puts "Check #{session == "123456"}"
+        return session == "123456"
+    end
+
+    def run
+        # 클라이언트 요청을 읽어서 분석한다. 
+        # MQTT::Proxy에서 읽은 클라이언트의 MQTT 패킷과 id를 매개변수로 연산을 한다.
+        # id는 현재 유저 세션을 가리키는 key로 socket의 object_id를 이용했다.
+        @@proxy.client_filter = lambda { |packet, id|
+            # connect 한 후 첫번째 메시지에 대해서 세션을 검사한다.
+            if @@session_info.has_key?(id)
+                if @@session_info[id] == 0
+                    return nil if !validationSession? packet.payload
+                    logger.info "MQTT::Proxy User authentication success"
+                end
+                @@session_info[id] += 1 
+                @@session_info['topic'] = "/user/#{id}"
+            else
+                @@session_info[id] = 0
+            end
+            return packet
+        }
+
+        # server filter
+        @@proxy.server_filter = lambda { |packet|
+            #puts "From server: #{packet.inspect}"
+            return packet
+        }
+        @@proxy.run
+    end
+end
+
+proxy = MQTTProxy.new(
+    :local_host => '0.0.0.0',
+    :local_port => 5000,
+    :server_host => 'test.mosquitto.org',
+    :server_port => 1883
+)
+proxy.run
+}}}
+
+=== MQTT Client 구현 ===
+클라이언트 프로그램이다. 
+{{{#!plain
+# name : client.rb
+require 'rubygems'
+require 'mqtt'
+require 'readline'
+
+class MqttClient
+    attr_reader :server_host
+    attr_reader :server_port
+    attr_reader :server
+    attr_reader :logger
+    attr_reader :client_session
+    attr_reader :nickname
+
+    def initialize(args={})
+        @@server_host = args[:server_host] 
+        @@server_port = args[:server_port] 
+        @@nickname = args[:nickname] 
+        @@server = nil
+
+        @@logger = args[:logger]
+        if @@logger.nil?
+            @@logger = Logger.new(STDOUT)
+            @@logger.level = Logger::INFO
+        end
+    end
+
+    # Login 메서드 
+    # 123456을 하드 코딩했다.
+    def login session 
+        @@server.publish "service/auth", session
+    end
+
+    def pub topic, message
+        @@server.publish topic, message 
+    end
+    def sub topic
+        puts @@server.get topic
+    end
+
+    def run
+        begin
+            @@server = MQTT::Client.connect(
+                :host => @@server_host, 
+                :port => @@server_port
+            )
+        rescue Exception=>  exp
+            puts "Error"
+        end
+        # User Auth 
+        login "123456"
+
+        # Publish Thread
+        Thread.new do
+            while message = Readline.readline("", true)
+                pub "/private/123456", "#{@@nickname} -> #{message}"
+            end
+        end
+
+        # Subscribe
+        loop do
+            sub "/private/123456"
+        end
+    end
+end
+
+nickname = ARGV[0] 
+
+client = MqttClient.new( 
+    server_host: "localhost",
+    server_port: 5000,
+    client_session: "123456",
+    nickname: nickname)
+
+client.run
+}}}
+ * 클라이언트를 띄우면 server/auth topic로 session 값(123456)을 보내는 것으로 인증을 성공하고, /private/123456 Topic에 subscribe 한다. 
+ * 또 다른 클라이언트를 적당한 nickname으로 띄운 다음 메시지를 전송하면, 최초 클라이언트로 메시지가 push 되는 걸 확인할 수 있다.
+
+=== 평가 ===
+지금까지의 프로토타이핑 결과를 토대로 MQTT를 이용한 Push 서비스 개발 가능성을 평가했다.
+  * MQTT proxy를 이용해서, 유저와 서버의 MQTT 메시지를 연산하는 방식으로 인증, 보안, 필터링 등 Push 서비스를 위한 필요한 기능을 개발할 수 있다.     
+  * Proxy 방식은 개발이 단순하다는 장점이 있다. 반면 성능의 희생이 있을 수 있다. 성능이 중요한 경우 MQTT 브로커를 직접 개발해도 될 것이다. 내가 구현한다면, 우선 프락시 방식으로 개발할 거다. 그 후 굳이 필요하다면 MQTT 브로커를 직접 만드는 방식을 선택할 거다.
+
+== 현실적인 설계 ==
+지금까지의 코드는 기능 검증 수준이었다. 실제 프로젝트에서 사용하고자 할때, 고려해야할 설계 요소들을 고민해 보려한다. 
+
+=== 좀더 현실적인 설계 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/15GzSuoXPE1FRHHQpgLCnXjvttNgCVkCYdHPxqThRVg0/pub?w=935&amp;h=457" width="654" height="319">
+}}}
+
+[wiki:Site/cloud/AWS AWS] 인프라를 기준으로 그림을 그렸다.
+
+[wiki:Site/cloud/AWS/ELB ELB]를 이용해서 가용성과 확장성을 보장받을 수 있다. MQTT Proxy와 MQTT Broker는 서로 다른 인스턴스로 분리할 수도 있겠는데, 여기에서는 그냥 하나의 인스턴스에 두는 걸로 구성했다. 
+
+[wiki:Site/IOT IoT] 인프라는 여기에서 다루기에는 범위가 너무 넓어서, 그냥 블랙박스로 표현했다. 이미 구축된 IoT Infra에 MQTT 인터페이스를 붙인 걸로 생각하면 되겠다. IoT 인프라는 언젠가 기회가 되면 따로 고민해볼 생각이다. 
+
+이 구성은 여러 디바이스가 하나의 유저에게 publish 할 경우 깔끔하게 작동할 거다. 하지만 두 명 이상의 유저에게 publish 할 경우 고민이 좀 필요하다. 먼저 하나의 유저에게 publish 하는 경우다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1oK5NijqcSrRGp8AVEA9zxSpAbAZCi5Z5PQ0_srHbYjU/pub?w=580&amp;h=205">
+}}}
+
+유저의 private topic는 MQTT Instance group의 여러 인스턴스 중 하나만 가지고 있고, 디바이스에서 발생한 메시지는 간단한 연산으로 해당 MQTT instance에 전송할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17VlUAvRnaGC7Hb8ZL7l2Y4v5TMV2Z89bzWj7nAHFYTU/pub?w=640&amp;h=246">
+}}}
+
+=== 그룹 메시지 Push ===
+그렇다 그룹 기능이다. 유저 그룹과 디바이스가 통신을 할 수 있고, 유저 그룹내에서 유저끼리의 통신도 가능하다. 디바이스 자리에 유저를 두면 된다. 메시지를 topic을 가진 인스턴스 갯수 만큼 복사하는 방법도 있는데, 간단하기는 하지만 비효율적이다. 효율적인 방법을 좀 찾아보자. 
+
+음.. 그룹 topic를 따로 만드는 방법을 생각할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/18U7NsRP-MCCvOrQToaF0F8JOcigZ-Fa0U-xtkzK9sWU/pub?w=654&amp;h=442">
+}}}
+
+이 방안은 구성이 단순하다는 장점이 있는데, 가입한 그룹이 많아지면 유지해야 하는 소켓이 함께 늘어나는 단점이 있다. 단점을 어떻게 해결할까 ? 
+
+'''클라이언트가 가지는 부담이다.''' 서버가 부담을 가지고 가는 것 보다는 클라이언트에게 부담을 주는게 낫겠지 ? 라고 맘편하게 생각하고 무시하는 것도 방법이다. 여기에 더해서 유저가 가입할 수 있는 그룹 topic의 총 갯수를 제한하는 방법도 함께 사용할 수있겠다. SNS 서비스라면 문제가 되겠지만 타협도 가능할 것이다. 하지만 기분이 좋지 않은 건 어쩔 수 없다. 소켓이 늘어나면, 모바일 기기의 전원 소비도 늘어날 거다. Ping 패킷 주기가 10초에 소켓이 50개라면 0.2초마다 패킷을 전송해야 한다. 무시할 수 없는 데이터다. 
+
+이 방식의 단점을 제거하거나 회피하기 위한 방법을 생각해 보자.
+  1. 소켓 줄이기 : 그룹이 소수의 인스턴스에 몰아 넣을 수 있다면 좋겠는데.. 글쎄.. 이건 방법이 떠오르지 않는다. 
+  1. Ping 패킷 주기 줄이기 : 클라이언트 집단이 Ping 패킷을 보내고 있으므로 현재 전체 서버 상황을 알수 있으며, 그중 내가 속한 그룹을 서비스하는 서버들의 상태를 알 수 있다. 한번의 Ping 패킷으로 여러 서버의 상태 정보를 확인할 수 있으므로 ping 요청을 줄일 수 있다.
+
+클라이언트가 할 일을 서버에서 대신 수행하는 방법도 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1wGFuZt07kotdRJwuuRBL2XmfUPslAQAj6wy4kr8Ot9s/pub?w=921&amp;h=445" width="644" height="311">
+}}}
+
+유저는 private topic에만 붙어있으면, 알아서 그룹 메시지를 척척 배달해 준다. 클라이언트 입장에서는 깔끔하지만, 서버는 더러워진다. 
+
+Private topic 인스턴스가 MQTT Client가 되고 Group topic 인스턴스가 MQTT broker 이 되면, 유저 앞단에 '''ELB''' 구성이 가능하다. 각각의 서버 군을 어떻게 효과적으로 관리할 것인지가 주요 이슈가 되겠다. 주키퍼를 이용하던지 혹은 어떤 걸 이용하던지 간에, 관리 솔류션 도입이 필요하다. 주키퍼는 따로 다루어야 하겠다. 
+
+/group 토픽을 관리하기 위한 별도의 인스턴스를 뒀는데, 이들 인스턴스가 하는 일을 publisher에 맡기는 방법도 있다. Pubisher가 그룹에 있는 모든 유저를 검사해서 pub하는 식이다. 
+
+일단 몇 개의 인스턴스들만으로 그림을 그려봤다. 딱히 구성에 문제는 없는 것 같은데, 이 정도 그림으로는 인스턴스가 수백에서 수천으로 넘어갔을 때 제대로 작동할 지를 예상하기 힘들다. 하나 이상의 subnet으로 구성될 경우, 지역을 넘나들 경우를 상정해서 그림을 그려봐야 할 것 같다. 
+
+=== 고가용성 ===
+서비스, topic, 메시지 3개의 영역에 대한 고가용성을 확보해야 한다. 
+
+==== 서비스 고가용성 ====
+ELB로 가용성을 확보한다. ELB의 Keep alive time은 최대 3600초인데, 그보다 짧은 주기로 MQTT Ping를 교환하기 때문에 연결성에 문제가 생길 만한 부분은 없다.
+
+==== Topic 과 메시지 고가용성 ====
+현재 구성은 하나의 채널이 하나의 인스턴스에 있는 구조다. 따라서 채널을 물고 있는 인스턴스가 맛이가면, 채널도 함께 증발해 버린다. 채널이 증발하면, 클라이언트는 다음 MQTT ping 주기에 채널이 문제가 있는 것을 확인하고 재 연결을 시도한다. 재 연결을 시도하면, ELB 그룹에 있는 MQTT 인스턴스 중 하나가 Topic을 제공해 준다. '''Single point''' 취약점을 가지고 있기는 하지만, 빠르게 장애극복(failover)이 가능하다는 점에서 ELB 구성하는 정도로 Topic 고가용성은 충분히 만족 한다고 생각한다. 
+
+위의 방식은 시스템을 단순화 할 수 있다는 장점이 있지만, Broker에 있던 메시지에 대해서는 이게 클라이언트까지 전달이 됐는지를 보장할 수 없다. 어떤 데이터의 누락도 허용하지 않는 시스템을 계획 한다면 MQTT의 QoS 설정으로 해결할 수 있다. MQTT는 3단계의 QoS 수준을 제공한다. 
+  * QoS 0: 메시지는 한번만 전달하며, 전달 여부를 확인하지 않는다. 이 레벨에서는 메시지가 모두에게 전달되거나 혹은 모두에게 전달이 안되거나 하는 식으로 작동한다. Fire and forget(쏘고 잊어버리기) 모드라고 부르기도 한다. 당연하지만 "빠르게 전달"된다.
+  * QoS 1: 메시지는 반드시 한번 이상 전달된다. 한번 이상이라는 것에 주의해야 한다. 메시지의 핸드셰이킹을 엄밀하게 추적하지 않기 때문에, 메시지가 두 개 이상 전달 될 수 있다. 브로커에서의 중복전송을 막을 수는 없고, 클라이언트에서 중복전송 메시지를 처리해야 한다. 메시지 id 같은 걸 두는 식으로 처리 가능하다. 가장 무난한 모드다. 
+  * QoS 2: 항상 정확히 한번만 전송된다. QoS 1의 중복전송 문제도 없다. 이를 위해서 핸드셰이킹 과정은 엄밀하게 추적되며, 당연히 느리다.
+
+== 정리 ==
+=== 왜 MQTT 인가 ===
+메시징 프로토콜로 XMPP가 있다. 유저와 유저가 메시지를 주고 받는다면 자원이 빵빵한 모바일기기를 이용할 테니, XMPP의 (상대적인 무거움)이 크게 문제되지는 않을 거다. 하지만 그 대상이 device의 경우에는 열악한 환경(저전력, 직비와 같은 noip)을 고려해야 한다. 가트너는 스마트폰,태블릿,PC를 제외한 IoT기기가 260억대로 늘어날 것으로 예측하고 있다. IoT의 특성상 많은 기기들이 noip환경에서 IP gateway를 경유해서 인터넷에 붙을 거라고 가정하면, 연결 기기 갯수는 더욱 늘어날 거다. 전력문제를 고민할 수 밖에 없다.  
+
+=== IoT 메시징을 위한 주요 프로토콜들 ===
+MQTT, AMQP, HTTP 대략 3개의 프로토콜들이 중요하게 사용될 것 같다.(MQTT와 비교해서 CoAP도 언급되는 것 같은데, 이건 더 살펴봐야 겠다.)
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1NX0sDLm-upXIdUKpAOMSvjpZQB7daIiMek3n4Jf9Gs4/pub?w=702&amp;h=396">
+}}}
+
+== 참고 ==
+  * [https://github.com/njh/ruby-mqtt Ruby MQTT]
+  * [http://helloworld.naver.com/helloworld/textyle/1846 Facebook 메신저와 MQTT]
+  * [http://mosquitto.org/ 오픈소스 MQTT 브로커 Mosquitto]
+  * [http://en.wikipedia.org/wiki/MQTT MQTT - wikipedia] 
+  * [http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html MQTT version 3.1.1]
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d324 1
+a324 1
+유저는 private topic에만 붙어있으면, 알아서 그룹 메시지를 척척 배달해 준다. 클라이언트 입장에서는 깔끔하지만, 서버는 더러워진다. Private topic 인스턴스가 MQTT Client가 되고 Group topic 인스턴스가 MQTT broker 이 되면, 유저 앞단에 '''ELB''' 구성이 가능하다. 각각의 서버 군을 어떻게 효과적으로 관리할 것인지가 주요 이슈가 되겠다. 주키퍼를 이용하던지 혹은 어떤 걸 이용하던지 간에, 관리 솔류션 도입이 필요하다. 주키퍼는 따로 다루어야 하겠다. 
+d326 5
+a330 1
+일단 몇 개의 인스턴스들만으로 그림을 그려봤을 적에는 구성에 문제가 없을 같지만, 이 정도 그림으로는 인스턴스가 수백에서 수천으로 넘어갔을 때 제대로 작동할 지를 예상하기는 힘들다. 규모를 키워서 그림을 그려봐야 할 것 같다. 이건 따로 고민을 해봐야 겠다.
+d347 9
+a355 1
+MQTT를 이용한 Push 서비스는 "Local"과 "Remote"두 개 영역으로 나눌 수 있다. 여기에서는 Remote 영역만 고민했다. 언젠가 Local 영역에 대한 것도 정리를 해야 겠다. 
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d315 2
+d318 9
+@
+
+
+1.12
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d301 4
+a304 1
+그렇다 그룹 기능이다. 유저 그룹과 디바이스가 통신을 할 수 있고, 유저 그룹내에서 유저끼리의 통신도 가능하다. 디바이스 자리에 유저를 두면 된다. 메시지를 topic을 가진 인스턴스 갯수 만큼 복사하는 방법도 있는데, 간단하기는 하지만 비효율적이다. 효율적으로 작동하게 하려면 그룹을 만들어야 할 것이다. 아래와 같이.. 
+d307 1
+a307 1
+<img src="https://docs.google.com/drawings/d/1tqbZBUQdp4iJEvqOSnJOCbPXutDzpjrFCqPE1tV0zJU/pub?w=580&amp;h=207">
+d310 1
+a310 1
+그룹 Topic를 하나 만들면 된다. 유저와 디바이스가 모두 참여하는 채팅 룸 같은 거라고 생각하면 되겠다. 그룹의 관리는 MQTT Proxy 혹은 API 서버를 이용하면 된다. 그룹을 관리하려면, 그룹 생성, 유저 추가/삭제, 권한 같은 이런 저런 기능들이 추가되는데, MQTT Proxy에서 처리하게 하는 것은 너무 번거롭다. 그냥 API 서버를 이용하자.
+d312 1
+a312 1
+위의 방식은 ELB로 로드 밸런싱 하기 때문에, '''유저가 붙어야 할 인스턴스에 붙을 수 없다는 문제'''가 발생한다. ELB를 그대로 둘거라면, 결국 여러 인스턴스에 topic이 만들어 진다. 간단한 해결 방법은 "group"을 위한 인프라를 따로 구성하는 거다. 이 인프라는 ELB 대신, group별로 요청을 분산하는 분산서버로 구성이 될 것이다.   
+d314 1
+a314 3
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Sb2cD-TobZAIMQeyhoCPYlisDoUHbEihCCK1LJIL64Y/pub?w=589&amp;h=293">
+}}}
+@
+
+
+1.11
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d309 2
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d267 7
+a273 1
+ * 클라이언트를 띄우면 server/auth topic로 session 값(123456)을 보내는 것으로 인증을 성공하고, /private/123456 Topic에 subscribe 한다. * 또 다른 클라이언트를 적당한 nickname으로 띄운 다음 메시지를 전송하면, 최초 클라이언트로 메시지가 push 되는 걸 확인할 수 있다.
+d301 1
+a301 1
+그렇다 그룹이다. 유저 그룹과 디바이스가 통신을 할 수 있고, 유저 그룹내에서 유저끼리의 통신도 가능하다. 디바이스 자리에 유저를 두면 된다. 메시지를 topic을 가진 인스턴스 갯수 만큼 복사하는 방법도 있는데, 간단하기는 하지만 비효율적이다. 효율적으로 작동하게 하려면 그룹을 만들어야 할 것이다. 아래와 같이.. 
+d307 1
+a307 1
+그룹 Topic를 하나 만들면 된다. 유저와 디바이스가 모두 참여하는 채팅 룸 같은 거라고 생각하면 되겠다. 그룹의 관리는 MQTT Proxy 혹은 API 서버를 이용하면 되겠다. 그룹을 관리하려면, 그룹 생성, 유저 추가/삭제, 권한 같은 이런 저런 기능들이 추가되는데, MQTT Proxy에서 처리하게 하는 것은 너무 번거롭다고 생각한다. 그냥 API 서버를 이용하는게 깔끔하겠다.  
+d318 1
+a318 1
+ELB로 가용성을 확보한다. ELB의 Keep alive time은 최대 3600초인데다가 그보다 짧은 주기로 MQTT Ping를 교환하기 때문에 연결성에 문제가 생길 만한 부분은 없다.
+d327 10
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d86 6
+a91 6
+	def topic 
+		return @@topic
+	end
+	def payload
+		return @@payload
+	end
+d111 2
+a112 2
+			raise "Authorization Error"
+		  else
+d122 1
+a122 1
+			logger.error "Problem with select: socket is neither server or client"
+d130 13
+a142 13
+	attr_reader :proxy
+	attr_reader :session_info
+	attr_reader :logger
+	def initialize(args)
+		@@proxy=MQTT::Proxy.new args
+		@@session_info = Hash.new
+
+		@@logger = args[:logger]
+		if @@logger.nil?
+			@@logger = Logger.new(STDOUT)
+			@@logger.level = Logger::INFO
+		end
+	end
+d146 5
+a150 5
+	def validationSession? session 
+		# session을 가져오기 위한 연산이 들어간다.
+		puts "Check #{session == "123456"}"
+		return session == "123456"
+	end
+d152 2
+a153 2
+	def run
+		# 클라이언트 요청을 읽어서 분석한다. 
+d156 1
+a156 1
+		@@proxy.client_filter = lambda { |packet, id|
+d158 20
+a177 20
+			if @@session_info.has_key?(id)
+				if @@session_info[id] == 0
+					return nil if !validationSession? packet.payload
+					logger.info "MQTT::Proxy User authentication success"
+				end
+				@@session_info[id] += 1 
+				@@session_info['topic'] = "/user/#{id}"
+			else
+				@@session_info[id] = 0
+			end
+			return packet
+		}
+
+		# server filter
+		@@proxy.server_filter = lambda { |packet|
+			#puts "From server: #{packet.inspect}"
+			return packet
+		}
+		@@proxy.run
+	end
+d181 4
+a184 4
+	:local_host => '0.0.0.0',
+	:local_port => 5000,
+	:server_host => 'test.mosquitto.org',
+	:server_port => 1883
+d198 57
+a254 57
+	attr_reader :server_host
+	attr_reader :server_port
+	attr_reader :server
+	attr_reader :logger
+	attr_reader :client_session
+	attr_reader :nickname
+
+	def initialize(args={})
+		@@server_host = args[:server_host] 
+		@@server_port = args[:server_port] 
+		@@nickname = args[:nickname] 
+		@@server = nil
+
+		@@logger = args[:logger]
+		if @@logger.nil?
+			@@logger = Logger.new(STDOUT)
+			@@logger.level = Logger::INFO
+		end
+	end
+
+	# Login 메서드 
+	# 123456을 하드 코딩했다.
+	def login session 
+		@@server.publish "service/auth", session
+	end
+
+	def pub topic, message
+		@@server.publish topic, message 
+	end
+	def sub topic
+		puts @@server.get topic
+	end
+
+	def run
+		begin
+			@@server = MQTT::Client.connect(
+				:host => @@server_host, 
+				:port => @@server_port
+			)
+		rescue Exception=>  exp
+			puts "Error"
+		end
+		# User Auth 
+		login "123456"
+
+		# Publish Thread
+		Thread.new do
+			while message = Readline.readline("", true)
+				pub "/private/123456", "#{@@nickname} -> #{message}"
+			end
+		end
+
+		# Subscribe
+		loop do
+			sub "/private/123456"
+		end
+	end
+d260 4
+a263 4
+	server_host: "localhost",
+	server_port: 5000,
+	client_session: "123456",
+	nickname: nickname)
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d311 2
+a312 1
+<!> 미완성
+d314 7
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a10 1
+
+a11 1
+
+a16 8
+=== 기능 ===
+푸쉬 서비스가 가져야할 기본 적인 기능들이다.
+||기능                    || 구현  ||기능 설명                                                                           ||
+||유저 인증               || O     ||ID/Password 기반으로 유저 인증을 한다.                                              ||
+||Topic 생성              || O     ||인증이 끝난 유저는 Topic을 만들 수 있다.                                            ||
+||Topic 목록 확인         || O     ||유저는 참여할 Topic을 찾기 위해서, 목록을 확인할 수 있다.                           ||
+||Topic 참여              || O     ||유저는 Topic에 참여해서 푸시 서비스를 받을 수 있다.                                 ||
+
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d1 1
+a1 1
+#title MQTT Chating   
+d17 1
+a17 2
+  * Ruby : MQTT 클라이언트를 만들기 위한 언어 
+  * API Server : REST API를 제공한다. Ruby sinatra로 만들려 한다. 
+d33 1
+a33 1
+  * 요청과 응답채널을 분리한다. : 요청을 HTTP로 하려고 한다. HTTP는 훌륭한 툴들도 많고 개발 방법들도 잘 정리되어있다. 분산 처리가 용이해서 대용량 시스템 구성이 쉽다는 것도 장점이다. 반면 응답을 동기화하기에는 좀 애매모호하다는 단점이 있다. websocket을 이용하거나 long polling을 이용하는 방법도 있겠는데, HTTP의 장점에 흠집을 내는 격이라서 사용하기가 망설여진다. 하여, HTTP는 요청에만 사용하고 응답은 따로 분리하기로 했다. 이런 모델들 요즘엔 많이 찾아볼 수 있다.   
+d196 108
+d305 10
+a314 1
+proxy.run
+d318 4
+a321 2
+=== MQTT Client 구현 ===
+=== API 서버 구현 ===
+a322 2
+== 과제 ==
+=== 확장성 ===
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a75 1
+     * subscribe가 올바른지 확인하지 않을 경우 다른 유저의 topic을 sbscribe 할 수 있다. 물론 session 값은 예상하기 힘든 값으로 만들테니, brute force 공격이 아니라면 때려맞추는건 불가능 하다고 볼 수 있다. 따라서 brute force를 예방하는 장치만 둬도 상관 없다고 볼 수도 있다. 
+d78 1
+d80 9
+a88 1
+Ruby의 MQTT::Proxy를 이용하면 되겠다.
+d94 2
+d97 39
+a135 5
+    def topic
+        return @@topic
+    end
+    def payload
+        return @@payload
+d137 52
+d191 5
+a195 5
+proxy = MQTT::Proxy.new(
+    :local_host => '0.0.0.0',    # Proxy 서버의 bind 서브넷
+    :local_port => 5000,         # Proxy 서버의 bind 포트
+    :server_host => 'localhost', # 백엔드 MQTT 서버 IP
+    :server_port => 1883         # 백엔드 MQTT 서버의 포트
+a197 9
+proxy.client_filter = lambda { |packet|
+    puts packet.topic
+    puts packet.payload
+    return packet
+}
+proxy.server_filter = lambda { |packet|
+    #puts "From server: #{packet.inspect}"
+    return packet
+}
+d200 1
+a200 1
+client_filter와 server_filter에서 topic과 payload만 잘 처리하면 된다. 
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d41 3
+a43 1
+메시지 전송은 HTTP, 수신은 MQTT로 하는 구성이다. 
+a44 1
+==== 대화 구성 ====
+d46 1
+a46 1
+<img src="https://docs.google.com/drawings/d/1q2q-Vlzt1At72GgJXp2dARU49v6g6YNC8UUd2giBIoc/pub?w=663&amp;h=254">
+a47 6
+브로커는 두 개의 TOPIC 군을 관리한다. 
+  1. Public TOPIC 군 
+    * /room/<name> 형식으로 만들어진다. 
+  1. Private TOPIC 군
+    * 귓속말 채널이다. /private/<userName> 형식으로 만들어진다. 
+    * 이름이 userName인 유저는 /private/<userName> 채널에 subscribe 하는 것으로 귓속말을 받을 수 있다. 귓속말을 보내고 싶은 유저는 귓속말을 받을 유저의 private topic에 publish 하면 된다. 
+d49 15
+a63 1
+==== 시스템 구성 ====
+d65 1
+a65 1
+<img src="https://docs.google.com/drawings/d/1ZRWbKSq7IS61LFwp85GLpstl44z78uMK5Xk6mom7vM0/pub?w=585&amp;h=254">
+d67 11
+a77 4
+  1. Client : Ruby MQTT Client  
+  1. API Server : MQTT broker는 borker의 기능만 가지고 있다. 인증, 권한, Room 및 유저 정보등의 서비스 기능은 API Server에서 제공한다.
+  1. MQTT broker : 모스키토를 이용한다.  
+  1. MQTT Proxy : 클라이언트의 MQTT 데이터를 처리 한 후, MQTT broker로 전송한다.  
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d5 1
+a5 1
+[wiki:man/12/MQTT/Tutorial MQTT 소개]에서 MQTT 설치와 함께, 간단한 채팅 애플리케이션을 만들었다. 좀 더 그럴듯한 채팅 프로그램을 만들어 보려고 한다. 삽질을 하는 이유는 IoT 환경에서, 디바이스의 sensor 데이터나 응답 메시지를 유저 App 까지 보내는 Push 서버를 만들기 위한 "아이디어"를 얻기 위함이다.
+d7 3
+a9 1
+내가 생각하는 구성은 대략 다음과 같다.
+a10 5
+{{{#!html
+<img src="https://docs.google.com/drawings/d/19ibdg5V00yn77MExdSKOuOwFEJqx_Quq81rsWMak1fk/pub?w=748&amp;h=238">
+}}}
+  * 요청과 응답채널을 분리한다. : 요청을 HTTP로 하려고 한다. HTTP는 훌륭한 툴들도 많고 개발 방법론들도 잘 정리되어있는 데다가, 요청을 분산 처리하기 쉽다는 장점이 있다. 반면 응답을 동기화하기에는 좀 애매모호하다는 단점이 있다. websocket을 이용하거나 long polling을 이용하는 방법도 있겠는데, HTTP의 장점에 흠집을 내는 겪이라서 사용하기가 싫다. 하여, HTTP는 요청에만 사용하고 응답은 따로 분리하기로 했다. 이런 모델들 요즘엔 많이 찾아볼 수 있다.   
+  * 응답 채널을 MQTT로 한다. : 유저가 인증을 끝내고 IoT 인프라에 접속하면, 메시지 Push를 위한 private topic을 만든다. 기기에서 발생한 메시지는 IoT 인프라로 Publish하고, 이걸 유저가 subscribe하는 방식이다. 실제 구현에서는 MQTT broker 앞에 MQTT Proxy등을 놓는 등, 2-3개 정도의 장치가 더 필요하겠지만, 자세한 구성은 여기서 다루지 않으련다.
+d12 1
+a12 3
+응답 채널을 MQTT로 할 경우 몇 가지 응용을 할 수 있다.  
+  * Room 을 만들어서, 여러 유저(혹은 기기가) subscribe 하게 한다.
+  * 운영 상의 이유로 여러 유저에게 메시지를 보내야 할 수도 있다. 이를 위해서 몇 개의 Public 채널을 만들 수도 있다. 앱 업데이트 Topic, CS Topic, (동의한 유저를 대상으로 하는) 이벤트 Topic 등이 그것이다. 
+a13 3
+Chatting room과 유사하다.   
+
+== Multi room 채팅 서비스 개발 ==
+d19 1
+d21 19
+a39 7
+제대로 하려면 인증, 권한, 확장 가능한 구조 설계 등 할게 많다. 할게 얼마나 많은지는 문서의 마지막에 다음 프로젝트를 예고 할 때, 언급하기로 한다. 지금은 채팅 룸을 통한 메시지 교환 기능 테스트에만 집중한다. 아래 기능의 구현 방안은 설계에서 다루고, 여기에서는 기능만 설명한다. 
+||기능            || 구현  ||기능 설명                                                                           ||
+||유저 인증       || O     ||ID/Password 기반으로 유저 인증을 한다.                                              ||
+||Room 생성       || O     ||인증이 끝난 유저는 채팅방을 만들 수 있다. 채팅방을 만드는건 API server가 수행한다.  ||
+||Room 목록 확인  || O     ||유저는 참여할 Room을 찾기 위해서, 목록을 확인할 수 있다.                            ||
+||Room 참여       || O     ||유저는 Room에 참여해서 대화를 나눌 수 있다.                                         ||
+||강퇴            || ?     ||시스템 관리자는 특정 Room에서 유저를 쫓아낼 수 있다.                                ||
+d41 1
+a41 1
+마지막 "강퇴" 기능은 모스키토 만으로는 구현하기는 힘들다. 이 기능을 구현하는 가장 쉬운 방법은 (아마도)모스키토 브로커 앞에 MQTT Proxy를 두는 방법일 게다. 재미있는 주제이긴 한데, 굳이 이 정도 수준의 프로그램에서 프락시를 둘 필요가 있나라는 생각이 들어서 해볼까 말까 고민중이다. 쉽게 할 수 있을 것 같으면 구현하고, 아니면 대충 넘어갈 생각이다. 
+a42 1
+=== 구성 및 설계 ===
+d48 2
+a49 3
+  1. Room TOPIC 군 
+    * 대화방이다. /room/<name> 형식으로 만들어진다. 
+    * 참여한 유저는 sub와 pub를 모두 할 수 있다.
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d29 8
+a36 5
+  * 유저 인증 : ID/Password 기반으로 유저 인증을 한다.
+  * Room 생성 : 인증이 끝난 유저는 채팅방을 만들 수 있다. 채팅방을 만드는건 API server가 수행한다.   
+  * Room 목록 확인 : 유저는 참여할 Room을 찾기 위해서, 목록을 확인할 수 있다. 
+  * Room 참여 : 유저는 Room에 참여해서 대화를 나눌 수 있다. 
+  * 강퇴 기능 : 시스템 관리자는 특정 Room에서 유저를 쫓아낼 수 있다. 
+d43 1
+a43 2
+
+브로커는 두 개의 TOPIC 군을 가진다. 
+d52 7
+a58 1
+
+a59 1
+=== API 서버 구현 ===
+d61 35
+d97 1
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d36 14
+@

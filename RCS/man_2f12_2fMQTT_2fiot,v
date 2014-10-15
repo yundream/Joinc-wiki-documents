@@ -1,0 +1,55 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.10.01.07.42.18;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fMQTT_2fiot
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title IoT에서의 MQTT 
+
+<!> 미완성
+== IoT와 MQTT ==
+네트워크 영역으로 볼때, IoT는 크게 로컬 네트워크와 광역 네트워크로 나눌 수 있을거다. 로컬 네트워크는 예컨데, 홈 AP(access Point)에 묶여있는 네트워크가 되겠다. 같은 로컬 네트워크에 있는 디바이스들은 중앙서버등에 연결할 필요 없이, 주변에 있는 디바이스들과 데이터를 주고 받을 수 있다. 만약 원격에서 디바이스를 제어하기 원한다면, 중앙에 있는 IoT 인프라에 연결을 해야 할 것이다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1DEpTe1q2ZwRmpXqd68VMbr7Jp50HweRuupsjl4XZUCA/pub?w=1050&amp;h=481" width="735" height="336">
+}}}
+
+네트워크 영역별로 데이터 통신 특성이 다른 관계로, 각각의 경우에 MQTT를 어떻게 응용할 수 있을지를 고민해 보려 한다.
+
+=== 로컬 네트워크에서의 MQTT ===
+로컬 네트워크는 "Discovery 가능한 영역"이다. 보통 멀티캐스트 채널을 이용해서, 주변에 있는 디바이스에 자신을 advertise 하거나 반대로 주변에 있는 디바이스를 찾을 수 있다. Discovery가 끝난 후, 데이터를 주고 받을 거다.   
+
+로컬 네트워크에서 데이터 교환은 단순한 메시지 교환과 (멀티미디어 데이터와 같은)컨텐츠 교환으로 나눌 수 있을 거다. 기기 종류에 따라서 교환하는 데이터의 종류에 차이가 있을 수 있다. 조명이나 커피포트, 온도계, 에어컨 등은 단순 메시지를 교환할 테고, TV, 오디오, 스피커, CCTV등은 컨텐츠 교환이 필요하다. 기기에 따라서 데이터 통신 방법을 다르게 할 필요가 있다.  
+
+==== 단순 메시지 교환 ====
+제어 메시지를 보내고, 센서 정보를 받는 종류의 기기들은 MQTT 만으로 데이터 통신이 가능할 거다. 아마도 소형의 기기들일 수 있으므로 zigbee와 같은 non-TCP/IP기반의 프로토콜 사용도 고려해야 한다. 이 경우 MQTT-SN(MQTT for Sensor Networks)의 사용을 고려해야 할 것이다. 모스키토 같은 MQTT 브로커들이 MQTT-SN을 지원하고 있으니, 구성에 문제는 없을 거다. 
+
+MQTT(MQTT-SN)를 이용한 구성 시나리오다.  
+
+{{{#!html
+https://docs.google.com/drawings/d/1V8MyGdPstTY33xHRAX20Ke8iAyJAMOf7ix34_W4tDC4/pub?w=636&h=266
+}}}
+ * 온도계는 /sensor/temperature 에 온도를 Puslish 한다. 온도가 변할 때만 puslish 하면 될 거다. 
+ * 스마트폰은 /sensor/temperature 를 subscribe 한다.  
+
+
+=== 광역 네트워크 ===
+@

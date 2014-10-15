@@ -1,0 +1,143 @@
+#title MQTT 소개
+
+[[TableOfContents]]
+== MQTT ==
+MQTT는 경량의 Publish/Subscribe(Pub/Sub) 메시징 프로토콜이다. M2M(machine-to-machine)와 IoT(Internet of things)에서 사용하는 걸 목적으로 하는 만큼, 낮은 전력으로도 사용할 수 있도록 설계됐다.
+
+=== Publish/Subscribe ===
+MQTT 프로토콜은 메시지를 '''발행(publishing)''' 하고, 관심 있는 주제를 '''구독(subscribe)''' 하는 것을 기본 원칙으로 한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17LKdzxE9KiDXsfCMNCuR4DRStxeBaqnTL3b_zX3376g/pub?w=585&amp;h=255">
+}}}
+
+Publisher과 Subscriber은 모두 '''Broker 서버'''에 대한 클라이언트로 작동한다. Publisher는 토픽을 발행하기 위한 목적으로 Subscriber은 토픽을 구독하기 위한 목적으로 Broker 서버에 연결한다. 하나 이상의 Pub와 Sub가 브로커에 연결해서 토픽을 발행 하거나 구독할 수 있다. 또한 다수의 클라이언트가 하나의 주제를 구독할 수도 있다. 
+
+=== 토픽 ===
+Pub와 Sub는 토픽을 기준으로 작동한다. 토픽은 슬래시(/)를 이용해서 계층적 구조를 가지는데, 주제들을 파일 시스템 형식으로 나눌 수 있어서 좀 더 효율적인 관리가 가능하다. 예를들어 컴퓨터의 다양한 상태를 측정하는 센서가 있다고 다음과 같이 구성할 수 있을 것이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1qN-CtcvdojhgnfX2ONynNhPGHDvln5iPbZlOEh2dbPE/pub?w=734&amp;h=291" width=513 height=203> 
+}}}
+
+IoT 환경에서의 사용을 예로 들었다. 센서를 가진 기기들이 수집한 센서 정보를 publish 하면, 게이트웨이가 가져가는 식으로 활용 할 수 있겠다. 좀 더 크게 그림을 그려보자면, 로컬에서 수집한 센서 정보를 중앙 서버에 보내서 분석하는 구조도 생각해 볼 수 있겠다. IoT 환경에서의 MQTT 활용은 문서 후반에서 따로 살펴보겠다.
+
+== Mosquitto ==
+모스키토(Mosquitto)는 (2014년 6월 현재)MQTT 프로토콜 3.1을 구현한 BSD 라이센스 기반의 오픈소스 메시지 브로커다. 나는 모스키토를 이용해서 PUB,SUB,Broker 테스트를 진행하기로 했다.
+
+모스키토는 서버/클라이언트 모델을 따른다. 메시지 브로커가 서버역할을 하는데, Pub 채널을 유지하는 일을 한다. 클라이언트는 메시지 브로커에 붙어서 메시지를 교환하는데, '''pub'''과 '''sub'''역할을 모두 할 수 있다.  
+=== 테스트 환경 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1RKsCp_LfXW7xjoUiMnXaUPLdzQM28I-GVqQZXmhKaNY/pub?w=504&amp;h=395">
+}}}
+  * VirtualBox를 이용해서 PUB, SUB, Broker를 위한 3개의 게스트 운영체제를 실행했다. 호스트 이름은 각각 pub.local, sub.local, broker.local 이다.
+  * 게스트 운영체제 : 우분투 리눅스 14.04로 통일
+=== Mosquitto 브로커 설치 ===
+{{{#!plain
+broker.local # apt-get install mosquitto 
+}}}
+설치가 끝나면 바로 bind 된다.
+{{{#!plain
+broker.local # netstat -nap | grep mosquitto
+tcp        0      0 0.0.0.0:1883            0.0.0.0:*               LISTEN      1512/mosquitto  
+tcp6       0      0 :::1883                 :::*                    LISTEN      1512/mosquitto  
+}}}
+
+=== Mosquitto 클라이언트 설치 ===
+모스키토 클라이언트 프로그램을 설치했다.
+{{{#!plain
+# apt-get install mosquitto-clients
+}}}
+
+=== Pub/Sub 테스트 ===
+hello/world 토픽을 subscribing 한다.  
+{{{#!plain
+# mosquitto_sub -d -t hello/world
+Received CONNACK
+Received SUBACK
+Subscribed (mid: 1): 0
+}}}
+
+hello/world토픽에 Publishing을 했다.
+{{{#!plain
+# mosquitto_pub -d -t hello/world -m "Hello World"
+Received CONNACK
+Sending PUBLISH (d0, q0, r0, m1, 'hello/world', ... (11 bytes))
+}}}
+Sub 클라이언트는 "Hello World"를 전송 받는다.
+
+modquitto_sub를 하나 더 실행 한다음 "Hello World"를 publishing 해보자. 토픽에 subscribing한 모든 클라이언트에 메시지가 전달되는 걸 확인할 수 있다. 
+
+== Chatting 프로그램 ==
+MQTT를 이용한 Pub/Sub 테스트는 끝냈으니, 이제 좀 그럴 듯한 서비스를 만들어봐야 겠다. MQTT를 이용한 chatting 프로그램을 개발할려고 한다. 이 chatting 프로그램은 아래의 기능을 지원한다.
+  * 채팅방 생성 : 채팅방을 Topic으로 하면 된다. Topic을 늘리는 것으로 여러 개의 채팅방을 운용할 수도 있을 거다. 채팅방을 임의로 만들게 하는 건 귀찮으니.. 그냥 "chat/public", "chat/private" 두개의 채팅방만 만들기로 했다. 
+ * 채팅방 Join : 원래는 채팅방 목록을 확인해서 Join해야겠으나 귀찮으니, chat/public, chat/private 모두를 sub 하는 걸로 join을 대신하겠다. 유저는 nickname을 만들어서 두개의 topic에서 메시지를 받아본다. 
+채팅 클라이언트 프로그램은 Sub와 Pub를 모두 해야 하니 멀티 쓰레드로 작동해야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1_KlS0GuVUCfa-kDYPs4T4iaUo8lAUHlbWzPSTsZyRg8/pub?w=860&amp;h=329">
+}}}
+  1. MQTT 브로커로는 앞서 다룬 모스키토를 사용했다.
+  1. 쓰레드 하나는 Sub 전용이다. 토픽으로 받은 정보를 화면에 출력한다. 
+     * chat/public : 공개 채널의 메시지를 받기 위해서 사용한다.
+     * chat/public/nickname : 자신의 nicname 토픽에 메시지를 받기 위함.
+  1. 쓰레드 하나는 Pub 전용이다. 표준입력을 토픽에 publishing 한다.
+     * chat/public : 공개 채널에 publishing 한다. 
+	 * chat/public/other : 특정 유저에게 publishing 하기 위해서 사용한다.  
+=== 개발 환경 ===
+ * 우분투 리눅스 14.04
+ * Ruby 1.9.3 
+ * mqtt broker : mosquitto 
+mqtt 모듈은 설치해야 겠다.
+{{{#!plain
+# gem install mqtt
+}}}
+지원하는 메시지 타입이다.
+  * 공개 메시지 : message
+  * 개인 메시지 : /priv nickname message
+  * 채팅방 나가기 : /quit message
+curses 혹은 Tk, GTk, Qt등을 사용하면 예쁜 인터페이스를 만들 수 있겠으나 귀찮아서 생략
+{{{#!plain
+require 'rubygems'
+require 'mqtt'
+require 'readline'            
+
+# nickname 설정    
+nickname=ARGV[0]              
+
+# localhost에서 테스트 했다.
+mqtt = MQTT::Client.new('localhost')
+
+mqtt.connect do |client|
+    client.subscribe('chat/public')
+    client.subscribe("chat/private/#{nickname}")
+    enter_msg = "#{nickname} enter room!!"
+    client.publish 'chat/public', enter_msg
+
+    # Publish Thread
+    Thread.new do
+        while message = Readline.readline("", true)
+            case message
+            when /^\/priv\s*(\w*)\s*(.*)/       # 개인 메시지
+                client.publish "chat/private/#{$1}", "<#{nickname}> : #{$2}"
+            when /^\/quit\s*(.*)/               # 나가기 
+                client.publish 'chat/public', "#{nickname} has quit (#{$1})"
+                exit 1
+            else                                # 공개 메시지
+                client.publish 'chat/public', "#{nickname} : #{message}"
+            end
+        end
+    end
+
+    loop do
+        topic, message = client.get    
+        print message,"\n"
+    end
+end
+}}}
+
+
+== 예제 프로그램 ==
+
+  * http://mosquitto.org/man/mqtt-7.html
+  * http://madalanarayana.wordpress.com/2014/03/25/learnings-on-publish-subscribe-mqtt-mosquitto/

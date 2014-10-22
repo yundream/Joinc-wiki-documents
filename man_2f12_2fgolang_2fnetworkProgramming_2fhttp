@@ -1,39 +1,39 @@
 #title Go HTTP
 
-<!> 미완성
 [[TableOfContents]]
 == HTTP 소개 ==
-WWW(World wide web)은 수억명의 유저가 접근하는(그리고 역시 수억의 컴퓨터가 붙어있는) 가장 큰 분산 시스템다. WWW 서비스 중 가장 성공한 서비스는 HTTP 기반의 웹 서비스일 것이다. 유저는 웹 브라우저라고 부르는 웹 클라이언트 프로그램을 이용해서 웹 서버에 접근해서 서비스를 요청한다. 
+WWW(World wide web)은 수억명의 유저가 접근하는 (그리고 역시 수억의 컴퓨터가 연결하는) 가장 큰 분산 시스템다. 그리고 그 중 가장 성공한 서비스는 HTTP 기반의 웹 서비스일 것이다. 웹 브라우저라고 부르는 웹 클라이언트 프로그램을 이용해서 서핑이라는 행위를 하는 정보의 바다 말이다. 현재 HTTP(Hyper-Text Transport Protocol)의 최신 버전은 1.1로 거의 모든 서버와 클라이언트들이 사용하는 버전이다.
 
-웹은 HTTP(Hyper-Text Transport Protocol)위에 구성되는 서비스로 TCP를 기반으로 하고 있다. (2014년 9월)현재 HTTP의 가장 최신버전은 1.1로, 대부분의 웹 서버와 웹 클라이언트가 지원하고 있다.  
-
-이번 장에서는 HTTP를 간단히 살펴보고 Go를 이용해서 HTTP 클라이언트/서버 프로그램을 만들어 볼 것이다.
+이번 장에서는 HTTP를 개략적으로 살펴보고, HTTP를 지원하는 Go의 프로그래밍 도구들에 대해서 살펴 볼 것이다. 
 
 == HTTP 살펴보기 ==
 HTTP에 대한 자세한 내용은 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP]문서를 참고하자. 여기에서는 요약하는 정도로 넘어간다. 
 === URL과 리소스 ===
-인터넷에 유저가 접근하는 목적은 "자원을 찾아서 사용하기" 위함이다. 자원(resource)에 접근하기 위해서는 2가지 요소가 필요하다. 
+인터넷에 유저가 접근하는 목적은 "자원을 찾아서 사용하기" 위함이다. 자원(resource)에 접근하기 위해서는 2가지 정보가 필요하다. 
   1. 인터넷 상에서 컴퓨터의 위치 : IP 주소로 인터넷상에서 컴퓨터의 위치를 찾을 수 있다.  
   1. 컴퓨터내에서 자원의 위치 : 컴퓨터는 특정한 위치에 자원을 (보통 파일의 형태로)저장하고 있다. '''URL'''을 이용해서 컴퓨터안에서 자원의 위치를 기술할 수 있다. 
-자원이란 HTML 문서, 이미지, 영상파일 등을 의미한다. 혹은 데이터베이스로 부터 동적으로 만들어진 객체일 수도 있다. 
 
-유저 에이전트는 인터넷 주소와 URL을 이용해서 서버를 찾아서 자원을 요청하면, 서버는 그 자원을 반환한다. 클라이언트는 자원을 다운로드하거나 화면에 표현하는 등의 일을 한다. 예를들어 HTML 파일이라면, 화면에 표현을, 음악파일이라면 다운로드해서 로컬 디스크에 저장한다.
+여기에서 자원이란 HTML 문서, 이미지, 영상파일과 데이터베이스로 부터 동적으로 만들어진 객체 등 서버에서 접근할 수 있는 모든 것을 의미한다.  
+
+유저 에이전트는 인터넷 주소와 URL을 이용해서 서버를 찾아서 자원을 요청하면, 서버는 그 자원을 반환한다. 클라이언트는 자원을 다운로드하거나 화면에 표현하는 등의 일을 한다. 예를들어 HTML 파일이라면 화면에 표현하고 음악파일이라면 다운로드해서 로컬 디스크에 저장할 것이다.
 
 === HTTP의 특성 ===
 HTTP는 '''stateless''', '''connectionlesss''', '''reliable'''한 프로토콜이다. 
 
-'''Stateless''' 하다는 것은 상태를 저장하지 않는 다는 의미로, 각각의 요청은 서로 독립적이다. 예를 들어 클라이언트가 서버에 바로 앞전 요청으로 로그인을 성공했다고 하더라도, 서버는 이번 요청이 로그인 성공한 건지 아닌지 알 방법이 없다. 하지만 상업적인 용도로 쓰기 위해서는 상태저장이 반드시 필요하기 때문에, 쿠키(cookie)를 이용하는 것으로 상태정보를 교환할 수 있다. (여기에서는 쿠키를 자세히 다루지 않을 것이다.) 
+'''Stateless''' 하다는 것은 상태를 저장하지 않는다는 의미로, 각각의 요청을 서로 독립적으로 처리한다. 예를 들어 클라이언트가 서버에 바로 앞전 요청으로 로그인을 성공했다고 하더라도, 서버는 이번 요청이 로그인 성공한 건지 아닌지 알 방법이 없다. 
 
-'''Connectionless'''하다는 것은 서버와 클라이언트가 서로 연결을 맺지 않는 다는 의미다. 클라이언트가 요청을 하고, 서버가 요청에 대해서 응답을 끝내면, 서버와 클라이언트간 연결이 끊어진다. 다음 요청을 위해서는 새로운 연결을 맺어야 한다. 요청이 매우 많은 서버의 경우 빠른 시간에 응답을 끝내서, TCP 연결을 빠르게 해제해야 한다. 
+하지만 상업적인 용도로 쓰기 위해서는 상태저장이 반드시 필요하기 때문에, 쿠키(cookie)를 이용해서 상태정보를 저장한다. (여기에서는 쿠키를 자세히 다루지 않을 것이다.) 
+
+'''Connectionless'''하다는 것은 서버와 클라이언트가 서로 연결을 맺지 않는 다는 의미다. 클라이언트가 요청을 하고, 서버가 요청에 대해서 응답을 끝내면, 서버와 클라이언트간 연결이 끊어진다. 다음 요청을 위해서는 새로운 연결을 맺어야 한다. 요청이 매우 많은 서버의 경우 빠른 시간에 응답을 끝내서, TCP 연결을 빠르게 해제할 필요가 있다. 클라이언트와 서버와의 연결을 유지하는데에도 자원이 소모되기 때문이다.      
 
 === HTTP 버전 === 
-HTTP는 3개의 버전이 있다.  
+HTTP는 3개의 버전이 있다.
   * Version 0.9 : 완전히 사용하지 않는다.  
   * Version 1.0 : 거의 사용하지 않는다. 
   * Version 1.1 : 현재 사용 버전
 
 ==== HTTP 1.0의 구성 ====
-HTTP0.9는 사용하지 않으니 건너 뛴다. 1.0을 건너뛰지 않는 이유는 HTTP 1.0이 HTTP의 기본적인 골격을 만든 버전이기 때문이다. HTTP1.1은 1.0을 기반으로 몇 가지 기능이 추가된 버전이다. 실제 HTTP 1.0이 거의 사용하지 않는 버전임에도 불구하고 이런 역사적인 이유 때문에, 거의 모든 웹 서버와 클라이언트가 1.0을 지원한다.   
+HTTP0.9는 사용하지 않으니 건너 뛴다. 1.0을 건너뛰지 않는 이유는 HTTP 1.0이 HTTP의 기본적인 골격을 만든 버전이기 때문이다. HTTP1.1은 1.0을 기반으로 몇 가지 기능이 추가된 버전이다. 실제 HTTP 1.0이 거의 사용하지 않는 버전임에도 불구하고 이런 역사적/기술적인 이유로, 대부분의 웹 서버와 클라이언트가 1.0을 지원한다.   
 
 HTTP 요청 포맷은 다음과 같다.
 {{{#!plain
@@ -48,9 +48,9 @@ Full-Request = Request-Line
 		CRLF
 		[Entity-Body]
 }}}
-요청은 simple-request와 full-request가 있는데, 지금에 와서는 simple-request는 생각할 필요가 없다. 모든 요청은 full-request라고 생각하자. 
+요청은 simple-request와 full-request가 있는데, 지금에 와서는 simple-request는 생각할 필요가 없다. 모든 요청은 full-request라고 생각하자.
 
-Full-Request의 첫째 줄에는 '''Request-Line'''이 온다. Request-Line의 형식은 다음과 같다.
+Full-Request의 첫째 줄에는 '''Request-Line'''이 온다. 유저의 요청방법과 요청한 자원의 위치가 들어가는 영역이다. Request-Line의 형식은 다음과 같다.
 {{{#!plain
 Request-Line = Method SP Request-URI SP HTTP-Version CRLF
 }}}
@@ -488,3 +488,331 @@ Accept-Charset: UTF-8;q=1, ISO-8859-1;q=0
 My-Header: Hello World
 Accept-Encoding: gzip
 }}}
+
+== Proxy ==
+=== 간단한 Proxy ===
+HTTP 1.1은 Proxy를 허용한다. GET 요청을 Proxy로 만들기 위해서는 "Host" 필드에 target의 호스트 이름을 설정하면 된다. 이걸로 끝이다. 
+{{{#!plain
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"os"
+)
+
+func main() {
+	if len(os.Args) != 3 {
+		fmt.Println("Usage: ", os.Args[0], "http://proxy-host:port http://host:port/page")
+		os.Exit(1)
+	}
+	proxyString := os.Args[1]
+	proxyURL, err := url.Parse(proxyString)
+	checkError(err)
+	rawURL := os.Args[2]
+	url, err := url.Parse(rawURL)
+	checkError(err)
+
+	transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	client := &http.Client{Transport: transport}
+
+	request, err := http.NewRequest("GET", url.String(), nil)
+
+	dump, _ := httputil.DumpRequest(request, false)
+	fmt.Println(string(dump))
+
+	response, err := client.Do(request)
+
+	checkError(err)
+	fmt.Println("Read ok")
+
+	if response.Status != "200 OK" {
+		fmt.Println(response.Status)
+		os.Exit(2)
+	}
+	fmt.Println("Reponse ok")
+
+	var buf [512]byte
+	reader := response.Body
+	for {
+		n, err := reader.Read(buf[0:])
+		if err != nil {
+			os.Exit(0)
+		}
+		fmt.Print(string(buf[0:n]))
+	}
+
+	os.Exit(0)
+}
+
+func checkError(err error) {
+	if err != nil {
+		if err == io.EOF {
+			return
+		}
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+Proxy 서버가 testproxy.com:8000 이고 Target host가 google.com 이라면, 아래와 같이 테스트 하면 된다.
+{{{#!plain
+# go run ProxyGet.go http://XYZ.com:8080/ http://www.google.com
+}}}
+
+nc를 이용해서 실제 proxy 요청 형식을 살펴보기로 했다. 
+{{{#!plain
+# go run ProxyGet.go http://localhost:8000 http://www.joinc.co.kr
+
+# nc -l 8000
+GET http://www.joinc.co.kr/ HTTP/1.1
+Host: www.joinc.co.kr
+User-Agent: Go 1.1 package http
+Accept-Encoding: gzip
+
+}}}
+Host가 Target host로 설정된 걸 확인할 수 있다.
+
+이 프로그램을 테스트 하려면 '''forward proxy'''를 지원하는 서버가 있어야 한다. 직접 테스트 해야 직성이 풀리겠다면, nginx로 proxy 서버를 구축해 보자. 나는 개인 리눅스 박스에 아래와 같은 설정으로 forward proxy를 만들어서 테스트를 수행했다. 
+{{{#!plain
+# cat /etc/nginx/sites-enabled/default
+server {
+        listen       8000;
+
+        location / {
+            resolver 8.8.8.8;
+            proxy_pass http://$http_host$uri$is_args$args;
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+}
+}}}
+
+테스트 결과
+{{{#!plain
+# go run http_proxy.go http://localhost:8000 http://www.joinc.co.kr
+GET / HTTP/1.1
+Host: www.joinc.co.kr
+
+Read ok
+Reponse ok
+<head>
+<meta http-equiv="refresh" content="0;URL=http://www.joinc.co.kr/modules/moniwiki/wiki.php/FrontPage">
+</head>
+}}}
+
+=== Proxy 인증 ===
+어떤 proxy 서버들은 아이디/패스워드 기반의 인증을 요구한다. 사용하는 인증 방식은 '''HTTP Basic authentication'''으로 아이디와 패스워드를 "userid:password" 형태로 만들어서 base64 인코딩 한 후 proxy 서버에 전달한다.   
+{{{#!plain
+
+package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"os"
+)
+
+const auth = "yundream:mypassword"
+
+func main() {
+	if len(os.Args) != 3 {
+		fmt.Println("Usage: ", os.Args[0], "http://proxy-host:port http://host:port/page")
+		os.Exit(1)
+	}
+	proxy := os.Args[1]
+	proxyURL, err := url.Parse(proxy)
+	checkError(err)
+	rawURL := os.Args[2]
+	url, err := url.Parse(rawURL)
+	checkError(err)
+
+	// encode the auth
+	basic := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+
+	transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	client := &http.Client{Transport: transport}
+
+	request, err := http.NewRequest("GET", url.String(), nil)
+
+	request.Header.Add("Proxy-Authorization", basic)
+	dump, _ := httputil.DumpRequest(request, false)
+	fmt.Println(string(dump))
+
+	// send the request
+	response, err := client.Do(request)
+
+	checkError(err)
+	fmt.Println("Read ok")
+
+	if response.Status != "200 OK" {
+		fmt.Println(response.Status)
+		os.Exit(2)
+	}
+	fmt.Println("Reponse ok")
+
+	var buf [512]byte
+	reader := response.Body
+	for {
+		n, err := reader.Read(buf[0:])
+		if err != nil {
+			os.Exit(0)
+		}
+		fmt.Print(string(buf[0:n]))
+	}
+
+	os.Exit(0)
+}
+
+func checkError(err error) {
+	if err != nil {
+		if err == io.EOF {
+			return
+		}
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+}
+}}}
+
+nc로 요청 패킷을 덤프 떳다.
+{{{#!plain
+ nc -l 8000
+GET http://www.joinc.co.kr/ HTTP/1.1
+Host: www.joinc.co.kr
+User-Agent: Go 1.1 package http
+Proxy-Authorization: Basic eXVuZHJlYW06bXlwYXNzd29yZA==
+Accept-Encoding: gzip
+
+}}}
+Proxy-Authorization 필드에 아이디/패스워드 값이 들어간 걸 확인할 수 있다.
+
+== HTTPS  연결 ==
+HTTPS 평문으로 통신하는 HTTP의 취약점을 개선하기 위해서 사용하며, '''[wiki:man/12/golang/networkProgramming/security#s-7 TLS]'''를 적용해서 송/수신 데이터를 암호화 한다. '''HTTPS'''라고 부르며, '''http://url'''대신에 '''https://url'''을 사용한다.
+
+클라이언트가 서버에 연결하면, 데이터 전송전에 '''SSL handshake'''과정을 거친다. 클라이언트와 서버는 SSL의 버전을 확인하고, 클라이언트가 지원하는 cipher를 확인 하는등의 과정을 거쳐서 SSL 연결을 맺는다. 추가적으로 클라이언트는 서버의 인증서가 올바른(valid)지를 체크한다.  
+
+인증서가 올바른지를 체크하는 건 중요한데, 인증서의 사용기간이 만료되었거나 공인하지 않는 사설인증서(self-signed)를 사용하는 경우도 있기 때문이다. 웹브라우저의 경우 https 서버의 인증서가 valid 하지 않으면 "Get me out of here!"와 같은 경고 메시지를 출력하고, "그럼에도 불구하고 접속 할 것인지"를 묻는다.(분명 위험하다고 경고했으니, 이후 일어나는 문제는 니가 책임져라!!) 
+
+== Server ==
+지금까지 클라이언트 프로그램만 만들었는데, 서버 프로그램도 만들어 보자. 파일을 업로드하는 간단한 프로그램이다. 
+
+Go의 '''FileServer'''메서드를 이용하면, 간단하게 파일 서버를 만들 수 있다. 이 메서드는 매개변수로 파일을 관리할 "root 디렉토리"를 필요로 한다. 루트 디렉토르는 URL 상의 "/"와 일치한다. 
+{{{#!plain
+package main
+                               
+import (
+    "fmt"
+    "net/http"                 
+    "os"                       
+) 
+  
+func main() {                  
+    fileServer := http.FileServer(http.Dir("/var/www/file"))
+  
+    err := http.ListenAndServe(":8000", fileServer)
+    checkError(err)            
+} 
+  
+func checkError(err error) {   
+    if err != nil {            
+        fmt.Println("Fatal Error", err.Error())
+        os.Exit(1)             
+    }
+} 
+}}}
+
+/var/www/file 밑에 test.txt 파일을 하나 만든 다음 테스트를 진행했다.
+{{{#!plain
+# curl -I http://localhost:8000/test.txt
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 0
+Content-Type: text/plain; charset=utf-8
+Last-Modified: Sat, 18 Oct 2014 01:10:53 GMT
+Date: Sat, 18 Oct 2014 01:41:52 GMT
+
+# curl -I http://localhost:8000/error.txt
+HTTP/1.1 404 Not Found
+Content-Type: text/plain; charset=utf-8
+Date: Sat, 18 Oct 2014 01:42:11 GMT
+Content-Length: 19
+
+}}}
+
+요청한 파일이 있는지 확인해서 200 OK와 404 Not Found를 반환한다.
+=== Handler function ===
+위에서 만든 프로그램은 작동은 하지만(파일이 있는지 없는지 정도만 확인해줄 뿐) URL 핸들러는 구현하지 않았다. Handle 메서드를 이용해서 요청에 대한 기능을 만들 수 있다. 
+{{{#!plain
+func Handle(pattern string, handler Handler)
+func HandleFunc(pattern string, handler func(*Conn, *Request))
+}}}
+
+handlePrintEnv와 handleHello 두개의 URL 핸들러를 추가해서 다듬었다. handlePrintEnv는 운영체제의 환경변수 정보를 출력한다. handleHello는 "Hello World"를 출력한다.  
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+)
+
+func main() {
+    fileServer := http.FileServer(http.Dir("/var/www/file"))
+
+    http.Handle("/", fileServer)
+    http.HandleFunc("/printenv", handlePrintEnv)
+    http.HandleFunc("/hello", handleHello)
+
+    err := http.ListenAndServe(":8000", nil)
+    checkError(err)
+}
+
+func handleHello(writer http.ResponseWriter, req *http.Request) {
+    writer.Write([]byte("Hello World\n"))
+}
+func handlePrintEnv(writer http.ResponseWriter, req *http.Request) {
+    env := os.Environ()
+    writer.Write([]byte("<h1>Environment</h1>\n<pre>"))
+    for _, v := range env {
+        writer.Write([]byte(v + "\n"))
+    }
+    writer.Write([]byte("</pre>"))
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Println("Fatal Error", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+curl로 테스트
+{{{#!plain
+# curl http://localhost:8000/hello
+Hello World
+
+# curl http://localhost:8000/
+<h1>Environment</h1>
+<pre>XDG_VTNR=7
+SSH_AGENT_PID=1647
+XDG_SESSION_ID=c2
+KDE_MULTIHEAD=false
+SELINUX_INIT=YES
+SESSION=kde-plasma
+GPG_AGENT_INFO=/tmp/gpg-56PNFN/S.gpg-agent:1644:1
+.....
+}}}
+이 코드는 잘 정의된(well-formed) HTML 문서를 전송하지는 않는다. 테스트니까 그러려니 하고 넘어가자. 

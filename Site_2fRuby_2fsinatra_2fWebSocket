@@ -95,15 +95,20 @@ require 'sinatra-websocket'
 require 'erubis'
 
 set :sockets, []
-get "/" do
-    @title = "Welcome to MyApp"
-    session[:id] = "yundream"
-    haml :main
+
+# Login 페이지 만들기 귀찮아서, 그냥 URL 파라메터로 처리했다.
+# /login?id=yundream
+get "/login" do
+    @title = "Welcome to MyChat"
+    @id = params[:id]
+    session[:id] = @id 
+    erb :login
 end
 
-get "/id" do
-    @title = "Welcome #{session[:id]}"
-    haml :main
+# 유저 채팅 페이지
+# 유저 채팅 화면은 index.erb에 있다.
+get "/main" do
+   erb :index
 end
 
 get '/chat' do
@@ -149,7 +154,7 @@ end
           return function(msg){ el.innerHTML = msg + '<br />' + el.innerHTML; }
         }(document.getElementById('msgs'));
 
-        var ws       = new WebSocket('ws://' + window.location.host + window.location.pathname);
+        var ws       = new WebSocket('ws://' + window.location.host + '/chat');
         ws.onopen    = function()  { show('websocket opened'); };
         ws.onclose   = function()  { show('websocket closed'); }
         ws.onmessage = function(m) { show('websocket message: ' +  m.data); };

@@ -1,0 +1,198 @@
+#title Ruby Method chain
+
+== Method chain ==
+=== 소개 ===
+메서드 체인은 여러 개의 메서드를 연결해서 호출하는 기술로, 코드의 관리와 가독성을 높여주는 편리한 기술이다. A, B, C 3개의 메서드를 따로 호출하는 대신 A().B().C()와 같은 호출을 가능하게 하는 기술이다. 최신언어들 대부분이 지원한다. 
+
+어떤 작업을 끝내기 위해서 A, B, C 3개의 메서드를 호출해야 한다고 가정해 보자. 일반적인 코딩 스타일은 아래와 같다.    {{{#!plain
+A();
+B();
+C();
+}}}
+깔끔하지 않다. 만약 이 작업이 다른 여러개의 코드에서 반복등장한다면, 유지보수하기도 어려워진다. 가장 간단한 해결 방법은 위 코드를 포함한 다른 메서드를 만드는 방법이다. 
+{{{#!plain
+Job() {
+A()
+B()
+C()
+}
+}}}
+하지만 B와 C 메서드가 일반적인 메서드라서, 다른 작업에도 쓰이는 경우가 생길 수 있다. F();B();C(), F();B() 이런식이다. 이 경우 코드 관리가 힘들어질 수 있다. 메서드 체인을 이용하면 F().B().C(), F().B()로 표현할 수 있다.  
+
+메서드 체인은 JavaScript에서 일상적으로 사용하는 기술이다. 아래는 메서드 체인을 사용한 코드와 그렇지 않은 코드를 포함하고 있다.
+{{{#!plain
+// my-div의 CSS를 변경한다.
+
+// 메서드 체인을 사용하지 않은 코드
+var $div = $('#my-div');
+
+$div.css('background', 'blue');
+$div.height(100);
+$div.fadeIn(200);
+
+
+// 같은 일을 메서드 체인을 이용해서 구현했다.
+$('#my-div').css('background', 'blue').height(100).fadeIn(200);
+
+// 가독성을 높이기 여러 줄로 쓸 수 있다.
+$('#my-div')
+  .css('background', 'blue')
+  .height(100)
+  .fadeIn(200);
+}}}
+
+Go 언어로 메서드 체인을 구현한 예제
+{{{#!plain
+package main
+
+import "fmt"
+
+type Css struct {
+    height int
+    width  int
+    color  string
+}
+
+func (v *Css) Height(arg int) *Css {
+    v.height = arg
+    return v
+}
+
+func (v *Css) Width(arg int) *Css {
+    v.width = arg
+    return v
+}
+
+func (v *Css) Color(arg string) *Css {
+    v.color = arg
+    return v
+}
+
+func (v *Css) Print() {
+    fmt.Printf("<div style=\"color=%s;height=%d;width=%d\">\n", 
+        v.color, v.height, v.width)
+}
+
+func main() {
+    css := Css{height: 200, width: 200, color: "white"}
+    css.Height(100).Color("red").Print()
+    css.Height(150).Width(500).Color("Yellow").Print()
+}
+}}}
+
+== Ruby 언어에서의 메서드 체인 ==
+유저 정보를 관리하기 위한 Personal 클래스를 만들었다. 이 클래스에 있는 몇 개 메서드를 이용해서 메서드 체인에 대해서 알아보려 한다. 
+{{{#!plain
+class Personal
+    @name = nil
+    @age
+    @email = nil
+    def name(value)
+        @name = value
+    end
+
+    def age(value)
+        @age = value
+    end
+
+    def next
+        return @age + 12
+    end
+
+    def email(value)
+        @email = value
+    end
+
+    # 입력 정보를 바탕으로
+    # 명함을 출력한다.
+    def card
+        card = <<eos
+# Personal Card
+===================
+Name  : #{@name}
+Age   : #{@age}
+Email : #{@email}
+-------------------
+eos
+    end
+end
+}}}
+=== 메서드 레벨 체인 ===
+{{{#!plain
+personal = Personal.new
+personal.age(25).name('yundream')
+}}}
+위 코드를 실행하면 아래와 같은 에러를 만날 수 있다.
+{{{#!plain
+personal.rb:36:in `<main>': undefined method `name' for 25:Fixnum (NoMethodError)
+}}}
+메서드는 값을 반환한다. 따라서 루비는 위의 코드를 '''25.name('yundream')'''로 해석하는데, 루비의 Integer객체는 name 메서드가 없으니 메서드를 찾을 수 없다는 에러를 출력하게 된다. 아래 코드를 실행해보자. 
+{{{#!plain
+personal = Personal.new
+personal.age(25).next
+}}}
+25.next가 실행되는데, next는 Integer에 정의된 메서드이니 성공적으로 실행된다.
+
+답이 나왔다. Value가 아닌 자신을 반환하면 된다.   
+{{{#!plain
+class Personal
+    @name = nil
+    @age
+    @email = nil
+    def name(value)
+        @name = value
+        self
+    end
+
+    def age(value)
+        @age = value
+        self
+    end
+
+    def next
+        return @age + 12
+        self
+    end
+
+    def email(value)
+        @email = value
+        self
+    end
+    def card
+        card = <<eos
+# Personal Card
+===============================
+ Name  : #{@name}
+ Age   : #{@age}
+ Email : #{@email}
+-------------------------------
+eos
+    end
+end
+
+p = Personal.new
+
+p.age(25).name('yundream').email('yundream@gmail.com').card
+p.age(25).next
+}}}
+
+실행 결과
+{{{#!plain
+# Personal Card
+===============================
+ Name  : yundream
+ Age   : 25
+ Email : yundream@gmail.com
+-------------------------------
+
+37
+}}}
+잘 작동한다. card 메서드는 값을 반환해야 하므로 self 키워드를 사용하지 않았다. 
+
+
+=== 클래스 레벨 체인 ===
+
+== 참고 ==
+  * http://en.wikipedia.org/wiki/Method_chaining
+  * http://schier.co/blog/2013/11/14/method-chaining-in-javascript.html
+  * http://www.sitepoint.com/a-guide-to-method-chaining/

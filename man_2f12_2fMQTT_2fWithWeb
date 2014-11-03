@@ -1,0 +1,232 @@
+#title 웹과 MQTT
+[[TableOfContents]]
+== 웹과 조합하려는 이유 ==
+[wiki:man/12/MQTT/Tutorial MQTT]에 관심을 가지는 이유는 (저전력/소규모)디바이스와 IoT 인프라간의 통신 프로토콜로의 가능성 때문이다. IoT 인프라는 소규모 디바이스 뿐만 아니라 PC, 타블렛, 모바일 기기와 같은 비교적 강력한 디바이스가 붙을 수 있다. 온갖 종류의 디바이스들과 애플리케이션들이 혼재한 공간이다. 현재 이 공간을 묶어주기 위해서 가장 일반적으로 사용하는 도구들은 '''HTTP, HTML, Javascript'''이다. 인터넷은 IoT의 한축이다. IoT 인프라 개발자로서 [MQTT와 인터넷(웹)을 묶는걸 고민할 수 밖에 없다.
+
+내가 생각하는 MQTT와 웹과의 연동방식은 다음과 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/16GRYXvrX_DEeXAVxVozo53M90AOYX3d2q_FaQspJ8SA/pub?w=773&amp;h=190">
+}}}
+  1. [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] : 입력과 출력을 분리 할 경우, 입력은 HTTP로 보낼 수 있다. 채팅 서비스를 예로 들자면, 메시지 입력은 HTTP 로 보
+  내고 응답은 MQTT로 받는 식이다.
+  1. [wiki:man/12/websocket WebSocket] : HTTP 기반의 애플리케이션을 위해서, MQTT 앞단에 [wiki:man/12/websocket websocket]을 둔다.
+  1. JavaScript : Javascript의 MQTT 라이브러리를 이용해서 직접 MQTT기반 통신을 할 수 있다.
+모바일 기기의 타입에 따라서 다양한 조합이 가능 할 것이다. HTTP + WebSocket, HTTP + Javascript, HTTP + MQTT Client(아마 하이브리드 앱이 될 것이다.), 입출력 모두에 MQTT를 이용하는 전용 앱등의 다양한 조합이 가능하다.  
+
+내가 관심을 가지고 있는 조합은 HTTP+WebSocket, HTTP+Javascript 조합으로, 이 두가지 모두를 테스트할 계획이다.
+
+== HTTP + WebSocket 조합 ==
+=== 테스트 환경 === 
+  * 운영체제 : 우분투 리눅스 14.04
+  * [wiki:Site/Ruby Ruby] 2.1.2 : 우분투 리눅스 14.04에 들어있는 루비는 버전 1.9.x다. 최근 레일즈 공부하면서 2.1.2로 업데이트 했다. 1.9로 테스트해도 문제 없을 거라 생각하는데, 이번 기회에 그냥 업데이트 하자. 
+    {{{#!plain
+# sudo apt-get install python-software-properties
+# sudo apt-add-repository ppa:brightbox/ruby-ng
+# sudo apt-get update
+# sudo apt-get install ruby2.1
+}}}
+  * [wiki:Site/Ruby/sinatra Sinatra 경량 웹 프레임워크]
+  * Thin
+=== 구성 및 시나리오 ===
+테스트 환경은 다음과 같이 구성했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1lfANK8-wv4cgofuFC3Abbd7_ogkXdCvDDLmAc7c9uYw/pub?w=710&amp;h=193">
+}}}
+  1. 테스트 클라이언트로 "Firefox 웹 브라우저"를 사용한다. Websocket을 깔끔하게 지원한다. 
+  1. Ruby Sinatra : Thin 웹서버 + Sinatra 조합으로 Push server를 구성했다. sinatra-websocket으로 websocket 서비스를 구현했다.
+  1. Ruby MQTT 라이브러리를 이용해서, MQTT Client를 개발했다. 
+  1. [wiki:Site/cloud/virtualbox VirtualBox]로 '''Sensor Device'''를 만들었다. 온도와 습도를 측정하는 디비이스다(물론 가상의 디바이스다. MQTT Client로 주기적으로 온도와 습도 정보를 MQTT 브로커에 Pub 하는 식으로 작동한다). MQTT 브로커로 '''mosquitto'''를 사용했다.
+
+MQTT Push Server는 인터넷으로 확장하면 IoT 인프라의 구성요소일 수 있겠고, 로컬 네트워크에 두면 "IoT 홈 게이트웨이"가 될 수 있을 거다. 여기에서는 IoT 홈게이트웨이로 가정한다. 
+
+테스트 시나리오는 다음과 같다.
+  1. Web Browser로 Push Server에 접근한다. 
+  1. 웹 서버는 유저 인터페이스를 출력하고, 유저 연결을 Websocket 으로 변환한다. 
+  1. Websocket은 Ruby-MQTT 라이브러리를 이용해서 MQTT-Broker에 sensor topic을 구독신청(subscribe)한다. 
+  1. 구독정보는 Websocket를 통해서 웹 브라우저로 전송하고, 웹 브라우저는 javascript를 이용해서 화면에 표시한다.  
+
+=== Thin + Sinatra 설치 ===
+[wkki:Site/Ruby/sinatra/UbuntuInstall Thin, Sinatra 설치 참고] : Monk를 이용해서 웹 애플리케이션 구조를 잡았다.
+
+=== websocket 설치 ===
+sinatra-websocket을 설치했다.
+{{{#!plain
+# gem install sinatra-websocket
+}}}
+
+=== Ruby mqtt gem 설치 ===
+{{{#!plain
+# gem install mqtt
+}}}
+EventMachine 기반의 em-mqtt도 있다. Thin 웹서버도 em 기반이기 때문에 em-mqtt와 궁합이 잘 맞을 것이다. 하지만 내가 사용하는 ruby 2.1.2에서는 em-mqtt가 제대로 실행되지 않았다. 검색해본 결과 Ruby 1.9.x 이상 버전에서는 잘 작동하지 않는 문제가 보고됐다고 한다. 해서 그냥 mqtt를 사용했다.      
+
+=== Sinatra Code ===
+아래는 시나트라 코드다. 설명은 주석으로 대신한다.
+{{{#!plain
+# encoding: utf-8
+require 'sinatra-websocket'
+require 'mqtt'
+require 'pp'
+require 'time'
+
+class MyApp < Sinatra::Application
+
+    # 유저 화면을 출력한다.
+    # index 페이지는 MQTT 서버 정보입력을 위한 UI와
+    # MQTT 서버로 부터의 Push 메시지를 출력하기 위한 UI가 있다. 
+    get "/" do
+        @title = "MQTT Push Test"
+        erb :index
+    end
+
+    # 유저가 Websocket을 사용하지 않고 /mqtt에 접근할 경우
+    # 에러페이지를 출력한다.
+    get "/error" do
+        erb :error
+    end
+
+    # index 페이지에서 MQTT 서버정보를 입력하고 submit 하면
+    # websocket 페이지로 프로토콜 change 한다.
+    # qos는 사용하지 않는다.(귀찮아서)
+    get "/mqtt" do
+        ip   = params[:ip]
+        port = params[:port]
+        qos  = params[:qos]
+        topic  = params[:topic]
+
+        # websocket 연결이 아니면 에러 페이지로 보낸다.
+        if !request.websocket?
+            erb :error
+        else
+            request.websocket do |ws|
+                ws.onopen do
+                    # MQTT 서버에 연결한 후 topic을 subscribe 한다.
+                    MQTT::Client.connect(:host=>ip, :port=>port) do | conn |
+                        conn.get(topic) do |topic, message|
+                            message = message.force_encoding("UTF-8")
+                            ws.send "{\"time\":\"#{Time.new.to_s}\",\"msg\":\"#{message}\"}"
+                        end
+                    end
+                end
+
+                ws.onmessage do |msg|
+                end
+
+                ws.onclose do
+                    puts "Web socket close"
+                end
+            end
+        end
+    end
+end
+}}}
+
+=== Index 페이지 ===
+Index 페이지는 "MQTT 서버 정보 입력을 위한 UI"와 Push 메시지를 받기 위한 websocket, 메시지를 출력하기 위한 인터페이스로 구성된다. 화면은 다음과 같다. 
+
+https://lh6.googleusercontent.com/-lLs1QGDyBHE/VEt-2OKeBmI/AAAAAAAAEcw/DEc7FUa1KzI/s800/mqtt_01.png
+
+유저 인터페이스는 foundation css 프레임워크[[FootNote(부트스트랩과 비슷한 녀석)]]와 과 jquery 조합으로 만들었다.
+{{{#!plain
+# cat index.erb
+<script>
+    function mqtt(ip, port, qos, topic) {
+        var ws = new WebSocket('ws://'+window.location.host+'/mqtt?ip='+ip+'&topic='+topic+'&port='+port)
+        ws.onopen = function() {};
+        ws.onclose = function() {};
+        ws.onmessage = function(m) {
+            addItem(JSON.parse(m.data))
+        };
+    }
+    function addItem(obj) {
+        $("#message").append(
+            '<li><span class="label">'+obj.time+'</span> '+obj.msg+'</li>'
+        )
+    }
+
+    $(document).ready(function() {
+        $("#submit").click(function(e) {
+            var ip = $("#ip").val()
+            var port = $("#port").val()
+            var qos = $("#qos").val()
+            var topic = $("#topic").val()
+            mqtt(ip, port, qos, topic)
+        });
+    });
+</script>
+<form>
+<div class="row">
+    <div class="large-12 columns">
+        <div class="large-2 columns">
+            <label>Host</label>
+                <input id="ip" type="text" name="ip" placeholder="127.0.0.1"/>
+            </label>
+        </div>
+        <div class="large-2 columns">
+            <label>Port</label>
+                <input id="port" type="text" name="port" placeholder="1833"/>
+            </label>
+        </div>
+        <div class="large-4 columns left">
+            <label>Topic</label>
+                <input id="topic" type="text" name="topic" placeholder="/sensor/temperature"/>
+            </label>
+        </div>
+        <div class="large-4 columns">
+            <label>QoS</label>
+                <input type="radio" id="qos" name="qos" value="0" checked><label>0</label>
+                <input type="radio" id="qos" name="qos" value="1"><label>1</label>
+                <input type="radio" id="qos" name="qos" value="2"><label>2</label>
+            </label>
+        </div>
+    </div>
+    <div class="large-12 columns">
+        <div class="large-4 columns">
+            <input id="submit" type="button" class="button tiny" value="연결">
+        </div>
+    </div>
+</div>
+</form>
+
+<div class="row">
+    <div class="large-12 columns">
+        <div class="large-12 columns">
+            <div class="panel">
+                <ul class="no-bullet" id="message">
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+}}}
+
+== 테스트 ==
+=== 테스트 코드 다운로드 ===
+작동하는 완전한 코드를 github에 올렸다.
+  * https://github.com/yundream/MqttPush
+
+=== Push 서버 실행 ===
+Push 서버를 실행한다. 
+{{{#!plain
+# thin --threaded -R config.ru start
+}}}
+반드시 --threaded 옵션을 이용해서 '''스레드 모드로 실행''' 해야 한다. 앞서 언급했듯이, thin은 기본적으로 EM 모드로 작동한다. 유저 요청을 비동기로 처리할 거라면, 서버의 다른 모든 입출력로 비동기 모드로 작동해야한다. 예제의 경우 mqtt.get 호출 부분에서 블럭돼 버린다. 하나의 유저만 처리할 수 있다는 이야기. 비동기 방식의 em-mqtt를 사용하면 되겠지만, 현재 버전의 루비에서는 제대로 작동을 하지 않아서, 굳이 스레드 모드로 실행 했다. 
+
+=== Pub 테스트 === 
+mosquitto_pub 클라이언트로 테스트 했다.
+{{{#!plain
+# mosquitto_pub -h 192.168.56.101 -d -t /sensor/message -m "Hello World"
+}}}
+
+== 기타 하고 싶은 것들 ==
+=== Javascript MQTT ===
+JavaScript MQTT 클라이언트를 이용해서 MQTT 서버에 직접 Sub/Pub 하는 것도 테스트 해볼만 하다. 테스트는 그냥 재미로 하면 되겠는데, 실제 서비스에 사용할 거라면 고려해야 할 점들이 있다.   
+  1. 실 서비스의 경우 유저 인증, 데이터 베이스 연동과 같은 다른 많은 작업들이 필요할 수도 있다. 단순히 Sub/Pub 할거라면 모르겠지만, 복잡한 데이터 처리 로직이 들어갈 경우 MQTT에 직접 붙는 것은 좋은 방법은 아니다.  
+
+=== 비동기 구현 ===
+비동기 구현을 해봐야 겠다. mqtt 모듈을 비동기로 구현하는게 이슈다. em-mqtt를 기다리거나 직접 구현하는 방법이 있겠다. 시나트라의 경우에도 Sinatra::Synchrony를 이용해서 모든 영역을 비동기로 구축해보고 싶다.
+
+=== IoT 환경에서의 MQTT ===
+[wiki:man/12/MQTT/iot IoT 환경에서 MQTT의 활용]에 대한 내 생각을 정리해봐야 겠다.

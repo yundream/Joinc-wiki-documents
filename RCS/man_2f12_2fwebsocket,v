@@ -1,10 +1,25 @@
-head	1.20;
+head	1.23;
 access;
 symbols;
 locks
-	root:1.20; strict;
+	root:1.23; strict;
 comment	@# @;
 
+
+1.23
+date	2014.10.31.02.33.27;	author root;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2014.10.31.02.06.46;	author root;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2014.10.31.02.01.11;	author root;	state Exp;
+branches;
+next	1.20;
 
 1.20
 date	2013.12.05.14.20.52;	author root;	state Exp;
@@ -112,9 +127,9 @@ desc
 @
 
 
-1.20
+1.23
 log
-@128.134.217.152;;yundream;;
+@1.214.223.250;;yundream;;
 @
 text
 @#title websocket
@@ -124,23 +139,29 @@ text
 === HTTP의 단점 ===
 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 프로토콜의 가장 큰 장점중 하나는 "견고하면서도 간단하다"는 점이다. 프로토콜은 인간이 쉽게 이해할 수 있는 영문 알파벳으로 이루어지며, 필수 헤더 10개 정도면 애플리케이션의 제작이 가능하다. 게다가 '''인터넷 역사상 가장 성공적인 프로토콜'''이기도 하다. 즉시 사용할 수 있는 엄청난 수의 서버/클라이언트 애플리케이션들과 역시 엄청난 수의 (게다가 품질도 뛰어난)라이브러리들을 가지고 있다.
 
-HTTP의 단점은 연결을 유지하지 않는 다는 점이다. 기본적으로 하나의 요청을 보내면, 응답을 받고 연결을 끊는 식으로 작동한다. 10번의 요청을 보내려면, 10번 연결을 맺고 끊는 과정을 거쳐야 한다. 게다가 모든 요청에 헤더파일이 중복해서 들어간다. 비효율적일 수 밖에 없다[[FootNote(TCP는 연결을 위해서 3번의 패킷교환이 필요하며, 완전한 종료를 위해서 4번의 패킷교환이 이루어져야 한다. 여기에는 상당히 많은 비용이 들어간다.)]].
+HTTP는 연결을 유지하지 않는 특성으로 효율에 문제를 가지고 있다. HTTP는 하나의 요청을 보내면, 응답을 받고 연결을 끊는 식으로 작동한다. 10번의 요청을 보내려면, 10번 연결을 맺고 끊는 과정을 거쳐야 한다. 게다가 모든 요청에 헤더파일이 중복해서 들어간다. 비효율적일 수 밖에 없다[[FootNote(TCP는 연결을 위해서 3번의 패킷교환이 필요하며, 완전한 종료를 위해서 4번의 패킷교환이 이루어져야 한다. 여기에는 상당히 많은 비용이 들어간다.)]].
 
-또 다른 문제는 "실시간 상호작용 성"이 떨어진다는 점이다. 예컨데, HTTP를 기반으로 채팅서버를 구현하려면 애로사항이 꽃핀다. Polling, Long Polling등과 같은 방법들을 이용해야 하는데, 효율적이지도 않고 깔끔하지도 않다. 
+또 다른 문제는 "실시간 상호작용 성"이 떨어진다는 점이다. 예컨데, HTTP를 기반으로 채팅서버를 구현하려면 응답을 기다릴 수 없기 때문에 애로사항이 꽃핀다. Polling, Long Polling등과 같은 방법들을 이용해야 하는데, 효율적이지도 않고 깔끔하지도 않은 억지 구현이다. 
 
 === Websocket 개요 ===
-[wiki:man/12/TCP TCP]와 마찬가지로 웹소켓은 full-duplex 통신[[FootNote(전 이중통신이라고 부른다. 수신과 송신을 동시에 처리할 수 있는 통신 방식을 의미한다.)]]을 지원한다. TCP와 다른 점이라면, bytes 스트림을 사용하지 않고 오로지 UTF8 포멧의 메시지 스트림만 이용한다는 점이다. 
+웹소켓은 full-duplex 통신[[FootNote(전 이중통신이라고 부른다. 수신과 송신을 동시에 처리할 수 있는 통신 방식을 의미한다.)]]을 지원한다. 일반 소켓 통신과 다른 점이라면 bytes 스트림을 사용하지 않고 오로지 '''UTF8 포멧의 메시지 스트림'''만 허용 한다는 점이다. 
 
 웹 소켓이 나오기전에는 Comet 채널을 이용해서 full-duplex 통신을 구현했지만, TCP 연결과정(Threeway handshake)에서의 오버헤드와 HTTP 오버헤드 때문에 비효율적이었다. 웹소켓은 HTTP를 기반으로 하면서도 HTTP의 문제점을 해결하는 것을 목표로 하고 있다. 
 
 === 브라우저 지원 ===
-웹소켓은 2011년 [http://tools.ietf.org/html/rfc6455 RFC 6455]에 의해서 표준화 됐으며 웹소켓 API들은 W3C에 의해서 표준으로 채택됐다. 이후 브라우저들에서 지원하기 시작했다. 지금은 PC 브라우저들 뿐만 아니라 모바일 브라우저에서도 지원하고 있다. 조만간 거의 모든 브라우저들이 웹소켓을 지원할 것으로 기대된다. 
+웹소켓은 2011년 [http://tools.ietf.org/html/rfc6455 RFC 6455]에 의해서 표준화 됐으며, 웹소켓 API들은 W3C에 의해서 표준으로 채택됐다. 이후 브라우저들에서 지원하기 시작했다. 지금은 PC 브라우저들 뿐만 아니라 모바일 브라우저에서도 지원하고 있다. 
 
 https://lh3.googleusercontent.com/-d5L35-NO55o/UmUkmCOVTXI/AAAAAAAADVc/QSjtD0U9Uns/s640/websocket02.png
 
 출처 : http://caniuse.com/
 
-최신 브라우저의 대부분이 웹소켓을 지원하는 것 같다 그런데 안드로이드 브라우저가 웹 소켓을 지원하지 않는 건 좀 의외다. HTML5는 구글이 열심히 밀고 있지 않던가. ?
+거의 모든 최신 브라우저의 웹소켓을 지원하고 있다. 그런데 안드로이드 브라우저가 웹 소켓을 지원하지 않는 건 의외다. HTML5는 구글이 열심히 밀고 있지 않던가 ?. (그냥 크롬브라우저 쓰자)
+
+대한민국에서는 (데스크탑 기반으로)웹 소켓기반 서비스를 만들기는 당분간 쉽지 않을 것이다. 국내의 많은 사이트들이 IE를 기준으로 최적화 됐기 때문이다. 아니 IE로 최적화 된 것 자체는 문제는 아니다. HTML, CSS, Javascript를 이용해서 사이트를 구성했다면, 화면이 좀 깨질 수는 있지만 접근 자체에 문제가 생기는 건 아니다. 진짜 문제는 상당수의 공공 사이트와 금융결제 사이트가 구형의 IE를 기준으로 만들어진 ActiveX 기술을 사용하고 있다는 점이다. 
+
+그리고 IE 버전별로 ActiveX의 지원에 차이가 발생한다. IE 6을 기준으로 만든 ActiveX는 다른 버전에서 제대로 작동하지 않을 확률이 대단히 높다.!!! 기본적으로 ActiveX는 웹 브라우저에서 윈도우 실행파일을 실행하는 것으로, IE 버전과는 상관이 없는 기술이다. 하지만 보안상의 이유로(사이트 방문했더니, 실행파일을 다운로드 해서 로컬에서 실행해 버린다. 심각한 보안 위협이 될 수 있다.) IE 상위 버전으로 갈 수록 기능을 제한하기 때문에 서로 호환이 되지 않는다. 
+
+정부와 금융기관이 예전 버전과 호환되는 ActiveX 코드로 도배를 해놨다면, 울며 겨자 먹기로 구버전의 IE를 사용할 수 밖에 없다.(최신 버전 IE로 업그레이드 했다가 "지원하지 않는 브라우저입니다" 메시지를 받고, 다운그레이드 했던 경험 가지고 있을 거다.) 
 
 === 웹소켓 프로토콜 ===
 웹소켓은 HTTP를 기반으로 하지만 HTTP 프로토콜과는 전혀 다른 프로토콜이다. HTTP를 기반으로 한다는 것의 의미는 '''웹소켓 연결을 맺는 과정에 HTTP가 개입'''한다는 의미다. Handshake 과정이 성공적으로 끝나면, HTTP를 웹소켓 프로토콜로 바꾸는 '''protocol switching'''과정을 진행한다. 이제 웹소켓을 위한 새로운 소켓이 만들어지고, 이 소켓을 이용해서 통신을 한다. 이때 사용하는 프로토콜은 '''ws'''와 '''wss'''프로토콜이다. 
@@ -149,9 +170,10 @@ https://lh3.googleusercontent.com/-d5L35-NO55o/UmUkmCOVTXI/AAAAAAAADVc/QSjtD0U9U
 
 웹소켓을 호출할 때는 "ws://"를 사용한다. 예를 들자면 "ws://localhost/chat"와 같이 사용한다.
 
+
 웹소켓 통신에 사용하는 데이터는 '''UTF8'''인코딩을 따르며, 0x00과 0xff 사이에 데이터를 실어보낸다.  
 ==== 웹소켓 Handshake 과정 ====
-웹소켓 Handshake 과정, 즉 웹소켓을 초기화하기 위한 과정은 HTTP로 진행된다. 아래 그림은 웹소켓 handshake가 이루어지는 과정을 보여준다.
+웹소켓 Handshake 과정, 즉 웹소켓을 초기화하기 위한 과정이다. 아래 그림은 웹소켓 handshake가 이루어지는 과정을 보여준다.
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/14n0nLH5NZWNNHRgFUpg0KHbXGEK-RX2npA-AnzG3sl4/pub?w=460&amp;h=410">
@@ -168,7 +190,7 @@ Sec-WebSocket-Protocol: chat
 Sec-WebSocket-Version: 13
 Origin: http://example.com
 }}}
-HTTP기반의 TCP 연결을 websocket 기반으로 upgrade하겠다고 요청한다.
+HTTP기반의 연결을 websocket 기반으로 upgrade하겠다고 요청한다.
 
 웹소켓을 지원하는 웹서버의 응답이다.
 {{{#!plain
@@ -224,7 +246,7 @@ Chating message 2
 대략 아래와 같은 과정을 밟아야 할 거다. 깔끔하지 않다.
 
 {{{#!html
-<img src="https://docs.google.com/drawings/d/1EhkoVnM-02dfTkeLFDUBrQq62AAUQTQ3zpJxfn5jNn8/pub?w=473&amp;h=219">
+<img src="https://docs.google.com/drawings/d/1EhkoVnM-02dfTkeLFDUBrQq62AAUQTQ3zpJxfn5jNn8/pub?w=946&amp;h=437">
 }}}
 
 ==== socket.io ====
@@ -302,7 +324,6 @@ Upgrade: WebSocket
 Connection: Upgrade
 WebSocket-Origin: http://localhost:3000
 WebSocket-Location: ws://echo.websocket.org/chat
-
 }}}
 
 == 참고 ==
@@ -314,6 +335,60 @@ WebSocket-Location: ws://echo.websocket.org/chat
  * [http://www.thenerdary.net/post/24889968081/debugging-websockets-with-curl CURL을 이용한 웹소켓 테스트]
  * [http://www.infoq.com/news/2012/02/websockets-rest 웹소켓 vs REST]
  * [http://stackoverflow.com/questions/5195452/websockets-vs-server-sent-events-eventsource 웹소켓 vs server send events]
+@
+
+
+1.22
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d26 5
+a30 1
+IE는 10이상 버전에서 지원을 한다.  
+@
+
+
+1.21
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d8 1
+a8 1
+HTTP의 단점은 연결을 유지하지 않는 다는 점이다. 기본적으로 하나의 요청을 보내면, 응답을 받고 연결을 끊는 식으로 작동한다. 10번의 요청을 보내려면, 10번 연결을 맺고 끊는 과정을 거쳐야 한다. 게다가 모든 요청에 헤더파일이 중복해서 들어간다. 비효율적일 수 밖에 없다[[FootNote(TCP는 연결을 위해서 3번의 패킷교환이 필요하며, 완전한 종료를 위해서 4번의 패킷교환이 이루어져야 한다. 여기에는 상당히 많은 비용이 들어간다.)]].
+d10 1
+a10 1
+또 다른 문제는 "실시간 상호작용 성"이 떨어진다는 점이다. 예컨데, HTTP를 기반으로 채팅서버를 구현하려면 애로사항이 꽃핀다. Polling, Long Polling등과 같은 방법들을 이용해야 하는데, 효율적이지도 않고 깔끔하지도 않다. 
+d35 1
+d38 1
+a38 1
+웹소켓 Handshake 과정, 즉 웹소켓을 초기화하기 위한 과정은 HTTP로 진행된다. 아래 그림은 웹소켓 handshake가 이루어지는 과정을 보여준다.
+d55 1
+a55 1
+HTTP기반의 TCP 연결을 websocket 기반으로 upgrade하겠다고 요청한다.
+a188 1
+
+@
+
+
+1.20
+log
+@128.134.217.152;;yundream;;
+@
+text
+@d13 1
+a13 1
+[wiki:man/12/TCP TCP]와 마찬가지로 웹소켓은 full-duplex 통신[[FootNote(전 이중통신이라고 부른다. 수신과 송신을 동시에 처리할 수 있는 통신 방식을 의미한다.)]]을 지원한다. TCP와 다른 점이라면, bytes 스트림을 사용하지 않고 오로지 UTF8 포멧의 메시지 스트림만 이용한다는 점이다. 
+d18 1
+a18 1
+웹소켓은 2011년 [http://tools.ietf.org/html/rfc6455 RFC 6455]에 의해서 표준화 됐으며 웹소켓 API들은 W3C에 의해서 표준으로 채택됐다. 이후 브라우저들에서 지원하기 시작했다. 지금은 PC 브라우저들 뿐만 아니라 모바일 브라우저에서도 지원하고 있다. 조만간 거의 모든 브라우저들이 웹소켓을 지원할 것으로 기대된다. 
+d24 3
+a26 1
+최신 브라우저의 대부분이 웹소켓을 지원하는 것 같다 그런데 안드로이드 브라우저가 웹 소켓을 지원하지 않는 건 좀 의외다. HTML5는 구글이 열심히 밀고 있지 않던가. ?
+d110 1
+a110 1
+<img src="https://docs.google.com/drawings/d/1EhkoVnM-02dfTkeLFDUBrQq62AAUQTQ3zpJxfn5jNn8/pub?w=473&amp;h=219">
 @
 
 

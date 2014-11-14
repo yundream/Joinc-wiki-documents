@@ -1,0 +1,128 @@
+#title MQTT Cluster 구성
+
+[[TableOfContents]]
+{{{#!html
+<div class="row">
+<div class="large-4 columns">
+<div class="progress alert round"><span class="meter" style="60%">&nbsp;완성 60%</span></div>
+</div>
+</div>
+}}}
+== MQTT Cluster ==
+MQTT Cluster를 구성하는 목적은 아래와 같다. 
+  1. 대량의 메시지 처리 : 수백/수천만의 MQTT 클라이언트 요청을 처리할 수 있어야 한다. 당장 만들겠다는 것은 아니고, 목표는 그렇게 잡아보자는 이야기다. 꿈의 크기야 뭐 제한이 없으니까. 
+  1. 고가용성 : 안정적으로 서비스 할 수 있어야 한다. 서버 구성요소 중 하나 이상에 문제가 생기더라도, 서비스 제공이 가능해야 한다.   
+  1. 확장성 : Cluster에 노드를 추가하는 것으로 간단하게 서비스를 확장할 수 있어야 한다. 
+
+=== 프로젝트 소개 ===
+먼저 MQTT Cluster 시스템을 설계한다. 설계한 클러스터를 실제 환경에서 테스트할 수는 없겠지만, 프로토타이핑으로 기능적인 수준에서의 검증은 하려고 한다. 프로토타이핑 환경은 아래와 같이 구성한다. 
+  1. 가상환경 : VirtualBox를 이용해서 가상환경을 만들어서 테스트 한다.  
+  1. 설치 인프라 : 가상환경에서 테스트하지만, 운용은 AWS 인프라를 이용하는 걸 가정하고 설계한다. AWS의 ELB, Autoscaling기능을 이용하기 위함이다.
+  1. 우분투 리눅스 : 테스트 운영체제는 우분투 리눅스 14.04로 한다. 
+  1. MQTT 브로커 : Mosquitto MQTT 브로커를 사용한다.
+  1. MQTT Proxy : 모스키토 앞단에 Proxy를 두고, 클라이언트 연결을 처리한다. 미들웨어로 작동한다. 
+  1. REDIS : 데이터들의 저장소
+
+그냥 만들면 재미 없으니까 서비스를 만들면서 '''MQTT Cluster'''를 구현하려고 한다. 서비스는 (가장 무난한) 멀티 클라이언트 메시징 시스템이다. 서비스의 기능은 다음과 같다.
+  1. Private channel을 가진다. Private channel을 이용해서 단일 유저에게 메시지를 보낼 수 있다. 
+  1. Group channel을 가진다. 한 명 이상의 유저가 참여하는 Topic이다. 뉴스라면 구독 서비스가 되겠고, 채팅이라면 채팅방 서비스가 되겠다. 
+  1. 개인 메시지 함 : 유저가 연결하지 않은 경우, 유저 수신 메시지를 임시 저장하기 위한 서비스 
+
+== 설계 ==
+=== 시스템 구성 ===
+시스템은 대략 다음과 같이 구성한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1T-EWLsSE80THwMQpTTlXnrxUe8mgqe8pEZ5M0b94-M0/pub?w=673&amp;h=411">
+}}}
+
+Node-1, Node-2는 유저의 Private channel(MQTT Topic)을 유지한다. Private channel로 보낸 메시지는 "Global message proc(이하 GMP)"로 보낸다. Global message proc는 이 메시지를 Message Queue에 적재한다. 이때, 유저 연결 테이블을 확인해서 유저가 어느 Node에 있는지를 찾아낸다. Node ID를 찾았다면, Node ID를 Key로 REDIS 에 밀어 넣는다. 
+
+User ID를 Key로 하지 않는 이유는 User ID를 key로 할 경우, 각 노드는 User ID의 갯수만큼 list에 접근을 해야 하는 문제가 있기 때문이다. Node ID로 하면, 한번에 자신의 데이터를 읽을 수 있다. 
+
+메시지 전송시점에  메시지 수신자가 연결하지 않았을 수도 있다. 이 경우 GMP는 유저 메시지 함에 메시지를 보내면 된다. 메시지 함은 User ID가 Key인 REDIS List로 관리한다. 새로 연결한 유저는 메시지 함에 읽지 않는 메시지가 있는지를 확인하는 과정을 거친다. GMP가 메시지함에 메시지를 쓰는 걸 끝내기 전에, 유저 가 연결을 끝내버릴 수도 있다. 이 경우, 유저는 다음 연결 전까지는 메시지함의 메시지를 확인할 수 없게 된다. 해결 방법을 고민해 보자면
+  * 새로 연결한 유저는 수초 정도 후에, 메시지 함을 한번 읽도록 코드를 만든다. 
+  * 메시지함을 읽는 초기 간격을 너무 길게 하면 메시지 반응성이 떨어지고, 너무 짧게하면, 메시지 함에 늦게 도착하는 경우가 생길 수 있다. 1초, 10초, 1분 이렇게 3번 정도 다른 간격으로 읽게하면 문제를 해결할 수 있다.
+
+=== Group Table ===
+라우팅 테이블의 데이터 구조는 대략 아래와 같을 것이다.
+{{{#!plain
+Group Table
+  - Group A : {user-1, user-2, user-3}  
+  - Group B : {user-1, user-4, user-5}
+}}}
+
+=== Message Queue ===
+REDIS로 구축한다. Node ID를 Key로 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1s1WlTOtBOaas1UZyn1qLAh-ZRzt0HfhtUE5p1i2_C88/pub?w=491&amp;h=352">
+}}}
+
+=== 메시지 함 ===
+유저가 받지 못한 메시지를 임시 저장하기 위한 공간이다. 유저가 연결하면 먼저 메시지함의 메시지를 처리하도록 한다. 역시 REDIS로 구성한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1km7_A5PI7xvSrIYVDpKtYMFQ5mBLnxKQBfZIE8vTdSM/pub?w=514&amp;h=350">
+}}}
+
+자료 타입으로 리스트(List)를 선택했다. User의 ID를 Key로 하고, 메시지는 '''LPUSH'''로 밀어 넣는다. 이렇게 구성하는 이유는 다음과 같다. 
+  * User ID를 Key로 List를 만든다. 직관적이다.
+  * 유저가 메시지를 소비하지 않을 경우 List에 계속 데이터가 쌓일 거다. 무한대로 쌓아둘 수는 없으니 크기에 제한을 둬야 하는데, LPUSH와 LTRIM 조합으로 하면, 리스트 크기를 관리하기가 쉽다. 예를들어 최근 1000개의 메시지만 남기고, 오래된 메시지는 삭제(혹은 다른 데이터베이스에 저장)하는 식의 구현이 가능하다. 
+
+=== 메시지 흐름 ===
+메시지 흐름을 자세히 그려보았다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1S5xPtuMvE6h8Sg0U4XkCm5ki1PfD3OnXYqWGtvwPwJY/pub?w=933&amp;h=518">
+}}}
+  * MQTT Client는 '''Private topic'''만 가진다. 이 Private topic으로 모든 메시지를 받도록 구성한다. 예컨데, 그룹 메시지도 private topic "그룹타입의 메시지 형태"로 보낸다. 
+  * 메시지는 Msg Sender로 보낸다.  
+  * Msg Sender은 Global Message Proc로 보낸다.  
+  * Global Message Proc는 private message인지, Group message인지를 확인해서 처리한다.
+    * private message라면, user_id를 key로 하는 REDIS list에 밀어 넣는다.
+    * group message라면, 유저 목록을 찾아서 user_id 갯수 만큼 REDIS list에 밀어 넣는다.
+  * 각 Node에 있는 Message proc는 메시지를 읽어서 수신 유저의 topic에 PUB 한다. 
+
+== 클러스터 관리 ==
+스케일링을 위해서 새로운 노드가 클러스터에 추가될 수 있다. 관리상의 이유로 노드를 뺄 수도 있고, 문제가 생겨서 노드가 빠질 수도 있다. 클러스터 관리를 위해서 준비해야 할 것들을 고민해보려 한다. 
+
+=== 오류 허용 ===
+클러스터는 오류를 허용하는 시스템이다. 오류 허용 하지 않을려고 아둥바둥 하지 않겠다는 의미. 현재의 구성이 오류를 허용하는 구성인지를 살펴보자.
+
+MQTT Broker가 뻗는 경우를 생각해 보자. 브로커가 그냥 시원하게 뻗어버리면, 모든 클라이언트의 연결이 끊길 테다. 그리고 이들은 LB에 의해서 다른 브로커 노드로 붙게 되니, 문제될게 없다. 유저가 연결이 끊겨있는 동안 수신한 메시지는 메시지 함에 쌓일테니 역시 문제 없다. 
+
+REDIS 클러스터는 여기에서는 다루지 않는다.
+
+== 구현 ==
+=== 시스템 구성 ===
+테스트가 목적이다. 따라서 최소한으로 구성한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1wmeJ0ZQKN_-FVhzEZYxS3w4asfpxfuJMCcV8oJInM90/pub?w=587&amp;h=203">
+}}}
+
+=== MQTTT FrontEnd ===
+MQTT Frontend는 3개 부분으로 구성된다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1s9DkjeTCx_xHBIxBgrKUgqLzM87ixfssYWvNqte57No/pub?w=552&amp;h=212">
+}}}
+  * MQTT Proxy : 클라이언트 연결을 처리한다. 클라이언트가 연결하면, 연결 정보를 REDIS DB 에 기록한다.   
+  * MQTT Broker : Mosquitto를 사용한다.
+  * Message sender : MQTT Broker로 부터 메시지를 수신해서 '''GMP'''로 전송한다. MQTT를 IPC로 사용한다. 
+  * Message Proc : REDIS 서버에서 메시지를 가져온다. 가져온 메시지는 유저 private channel로 분배한다. 
+
+=== Mosquitto MQTT Broker 설치 === 
+[wiki:man/12/MQTT/Tutorial MQTT Tutorial 참고]
+
+=== REDIS 설치 ===
+[wiki:man/12/REDIS/IntroDataType REDIS 설치와 기본 데이터타입들 참고]
+
+=== MQTT Proxy ===
+메시지는  Node ID를 Key로해서 각 노드가 가져가는 방식이다. 이를 위해서 GMP가 참조할 수 있는 {:User ID => Node ID} 테이블을 만들어야 한다. 유저 연결 요청을 받은 Proxy는 Node ID와 User ID를 '''REDIS''' 테이블에 저장한다. 
+
+Proxy 코드다.
+
+=== Message sender 개발 ===
+Ruby로 개발한다. 이 프로그램은 '''/message''' 토픽에 대해서 sub를 요청한다.

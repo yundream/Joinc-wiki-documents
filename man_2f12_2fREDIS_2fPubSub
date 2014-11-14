@@ -1,0 +1,168 @@
+#title Redis Pub/Sub
+
+[[TableOfContents]]
+== Pub/Sub ==
+REDIS는 '''다양한 데이터 타입을 지원하는 메시지 큐'''로 알려져 있다. 그런 REDIS가 Pub/Sub를 지원한다. Pub/Sub는 메시지큐와는 특성이 다르다. Pub/Sub 시스템에서는 채널에 구독 신청을 한 모든 subscriber에게 메시지를 전달한다. 메시지를 "던지는" 시스템이기 때문에, 메시지를 보관하지도 않는다. 메시지 큐 본연의 목적과는 좀 다른 기능이라고 할 수 있겠다.  
+
+'''SUBSCRIBE''' 명령을 이용해서 채널을 구독할 수 있다. 매개변수로 채널 이름이 들어간다. 하나 이상의 채널에 대한 구독도 가능하다. 
+{{{#!plain
+> SUBSCRIBE test qa
+}}}
+
+'''PUBLISH''' 명령을 이용해서 채널에 메시지를 발행할 수 있다.  
+{{{#!plain
+> PUBLISH test
+}}}
+
+=== Push 메시지 데이터 형식 ===
+Push 메시지는 3개의 요소들로 구성된 "배열값"을 전송한다.  
+ 1. Push 메시지 타입 : 어떤 종류의 메시지인지 알려준다. "subscribe", "message", "unsubscribe" 3가지 타입의 메시지가 있다. 
+    * subscribe : 채널을 성공적으로 subscribe 했다.
+    * message : 채널로 부터 전송된 일반 메시지  
+    * unsubscribe : 채널을 성공적으로 unsubscribe 했다.
+ 1. Channel name : Subscribe한 채널 이름 
+ 1. Message : 전송된 메시지 
+
+최초 Subscribe 했을 때의 메시지다. 
+{{{#!plain
+> SUBSCRIBE mytopic
+Reading messages... (press Ctrl-C to quit)
+1) "subscribe"
+2) "mytopic"
+3) (integer) 1
+}}}
+
+"Hello world" 메시지를 publish 했다.
+{{{#!plain
+> PUBLISH mytopic "Hello world"
+(integer) 1
+}}}
+
+Subscribe측 메시지 정보다.
+{{{#!plain
+> SUBSCRIBE mytopic
+1) "message"
+2) "mytopic"
+3) "Hello world"
+}}}
+mytopic에서 "Hello world"메시지가 도착했음을 알 수 있다.
+
+=== Database & Scope ===
+PUB/SUB은 Database와 상관없이 작동한다. 15번 db에서 PUB를 한 메시지를 1번 db에서도 받아볼 수 있다.
+
+5번 데이터베이스에서 "Hello world"를 publish했다. 
+{{{#!plain
+> select 5
+OK
+[5]> PUBLISH mytopic "Hello world"
+(integer) 1
+}}}
+
+2번 데이터베이스에 있는 클라이언트도 subscribe 할 수 있다.
+{{{#!plain
+> select 2
+OK
+[2]> SUBSCRIBE mytopic
+1) "message"
+2) "mytopic"
+3) "Hello world"
+}}}
+
+=== 패턴매칭 subscribe ===
+채널이름에 패턴매칭을 지원한다. "news."에서 발행하는 모든 메시지를 sub 하고 싶다면 아래와 같이 채널이름을 설정하면 된다.
+{{{#!plain
+> PSUBSCRIBE news.*
+}}}
+
+== 프로그래밍 ==
+개발 환경은 다음과 같다.
+  * 언어 : Ruby 2.1.2p95
+  * 운영체제 : 우분투 리눅스 14.10
+redis gem을 설치하자
+{{{#!plain
+# gem install redis
+}}}
+
+=== PUB 프로그램  ===
+Channel에 Publish하는 간단한 프로그램이다. 
+{{{#!plain
+# cat pub.rb
+require 'redis'
+require 'json'
+
+class Publisher
+    @name = nil
+    @channel = nil
+    @redis = nil
+
+    def initialize args
+        @name =args[:name]
+        @channel = args[:channel]
+        @redis = Redis.new(:host=>"192.168.57.2")
+    end
+
+    def run
+        data = {"user"=>@name}
+        loop do
+            print "> "
+            msg = STDIN.gets
+            @redis.publish @channel, data.merge("msg"=>msg.strip).to_json
+        end
+    end
+
+end
+
+name = ARGV[0]
+channel = ARGV[1]
+puts "Name : #{name}"
+puts "channel : #{channel}"
+pub = Publisher.new({:name=>name, :channel=>channel})
+pub.run
+}}}
+프로그램은 "name"과 "channel"이름을 매개변수로 받는다.
+{{{#!plain
+# ruby pub.rb yundream chatting 
+Name : yundream
+channel : chatting
+> Hello world
+>
+}}}
+
+redis-cli의 MONITOR 명령으로 확인을 했다.
+{{{#!plain
+# redis-cli -h 192.168.57.2
+> MONITOR 
+1415955481.013326 [0 192.168.57.1:37574] "publish" "chatting" "{\"user\":\"yundream\",\"msg\":\"Hello world\"}"
+}}}
+
+=== SUB 프로그램  ===
+{{{#!plain
+require 'rubygems'
+require 'redis'
+require 'json'
+
+class Subscriber
+    @channel = nil
+    @redis = nil
+    def initialize args
+        @channel = args[:channel]
+        @redis = Redis.new(:host=>"192.168.57.2")
+    end
+    def run
+        @redis.subscribe(@channel) do |on|
+            on.message do |channel, msg|
+                data = JSON.parse(msg)
+                puts "##{channel} #{data['user']} : #{data['msg']}"
+            end
+        end
+    end
+end
+
+channel = ARGV[0]
+puts "channel : #{channel}"
+sub = Subscriber.new({:channel=>channel})
+sub.run
+}}}
+
+== 응용 ==
+=== 트윗 ===

@@ -1,0 +1,652 @@
+head	1.7;
+access;
+symbols;
+locks
+	root:1.7; strict;
+comment	@# @;
+
+
+1.7
+date	2014.11.09.14.35.20;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.11.09.14.34.45;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.11.09.14.34.12;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.11.09.14.33.40;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.11.09.10.51.54;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.11.09.04.05.51;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.11.08.06.07.08;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2fnetworkProgramming_2fxml
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title XML
+
+XML(Extensible Markup Language)은 데이터 구조의 저장과 직렬화를 위해서 사용하는 텍스트 기반의 마크업 언어다. XML은 문서의 내용을 나타내는데 강점을 보이지만, 인터넷 등에서 임의의 자료구조를 정의하기 위한 용도로도 널리 사용하고 있다.
+[[TableOfContents]]
+== 소개 ==
+XML은 복잡한 데이터 구조를 저장하고 재현하기 위해서 널리 사용하고 있는 데이터 저장 형식이다. XML은 DocBook이나 XHTML, MathML, CML과 같은 다른 마크업 언어를 개발하기 위한 용도로 사용한다. 웹 서비스에서는 SOAP 메시지의 인코딩과 WSDL(Web Service Description Language)을 기술하기 위해 사용한다.
+
+XML의 가장 단순한 용도는 텍스트 문서에서 데이터 구조체를 기술하기 위한 "태그"를 만들기 위해서 사용한다. 각각의 태그는 속성(attribute)과 값(value)을 가진다. 아래는 개인 정보 데이터를 기술하기 위한 XML 문서 예제다.
+{{{#!plain
+<addressBook>
+  <card>
+    <name>John Smith</name>
+    <email type="personal">js@@example.com</email>
+  </card>
+  <card>
+    <name>Fred Bloggs</name>
+    <email type="work">fb@@example.net</email>
+  </card>
+</addressBook>
+}}}
+
+addressBook, card, email 등이 태그다. 이 태그를 이용해서, 값(Jjoh Smith, js@@example.com)이 어떤 의미를 가지는 값인지를 알 수 있다. type은 속성인데, "personal"과 "work"를 속성값으로 사용하고 있다. <email type="personal">jan@@newmarch.name</email>에서 우리는 값이 개인적으로 사용하는 이메일 주소임을 알 수 있다. XML은 텍스트로 구성되기 때문에, 별도의 해석 과정이 없이도, 어떤 정보를 기술하고 있는지를 직관적으로 알 수 있다. 위 XML은 (누가봐도) 주소정보를 저장하고 있다는 걸 직관 
+
+XML 문서를 기술하기 위한 몇 가지 스키마들이 있다. 여기에서는 아주 간략하게 설명하고 넘어간다.  
+  * DTD(Document Type Definition)은 문서의 구조 자체(문서 원형)를 기술하기 위해서 사용한다. 문서들은 계층적인 구조를 가지게 마련인데, 이들 요소간의 계층 구조가 어떤지, 그리고 요소의 내용으로 무엇이 올지를 정의한다.  
+  * XML schema는 문서에 사용하는 데이터의 타입을 기술하기 위해서 사용한다.   
+  * RELAX NG는 위 두 목적을 모두 달성하기 위해서 사용한다.
+DTD예제다.
+{{{#!plain
+<?xml version="1.0"?>
+<!DOCTYPE note [
+<!ELEMENT note (to,from,heading,body)>
+<!ELEMENT to (#PCDATA)>
+<!ELEMENT from (#PCDATA)>
+<!ELEMENT heading (#PCDATA)>
+<!ELEMENT body (#PCDATA)>
+]>
+}}}
+  * DOCTYPE : 이 문서의 타입은 note다. 
+  * ELEMENT note : note는 to, from, heading, body의 요소들로 구성된다.
+  * ELEMENT to (#PCDATA) : to 요소는 문자데이터를 사용할 수 있다. 
+XML 개발자는 이 DTD 문서를 이용해서, "note" 애플리케이션에서 어떤식으로 데이터를 저장하고 읽어야 할지를 알 수 있다. 아래는 note DTD를 따르는 XML 문서다. 
+{{{#!plain
+<note>
+  <to>Tove</to>
+  <from>Jani</from>
+  <heading>Reminder</heading>
+  <body>Don't forget me this weekend!</body>
+</note>
+}}}
+
+아래는 "note"를 위한 XML schema 예제다. 
+{{{#!plain
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<xs:element name="note">
+  <xs:complexType>
+    <xs:sequence>
+      <xs:element name="to" type="xs:string"/>
+      <xs:element name="from" type="xs:string"/>
+      <xs:element name="heading" type="xs:string"/>
+      <xs:element name="body" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:element>
+</xs:schema>
+}}}
+to, from, heading, body는 string 타입의 데이터를 사용할 수 있음을 알 수 있다.
+
+XML의 다양한 구성요소와 기술들은 그 자체로 독립된 소프트웨어 엔지니어 분야다. 여기에서는 이정도로 설명하고, Go에서 XML 문서의 파싱싱과 작성하는 방법을 다루도록 하겠다. 
+
+== XML 파싱 ==
+Go에서는 '''NewParser'''를 이용해서 XML parser를 만든다. 이 파서는 매개변수로 넘어오는 '''io.Reader'''를 이용해서 데이터를 읽고, 읽은 데이터를 파싱한 결과를 반환한다. 파서의 가장 중요한 메서드는 Token으로, 입력 스트림으로 부터 "다음 토큰"을 반환한다. 토큰의 타입으로 '''StartElement, EndElement, CharData, Comment, ProcInst, Directive'''이 있다. 
+
+'''StartElement'''는 두 개의 필드를 가지고 있다.
+{{{#!plain
+type StartElement struct {
+    Name Name      # 요소의 이름
+    Attr []Attr    # 속성
+}
+
+type Name struct {
+    Space, Local string
+}
+
+# 속성은 "이름"과 "값"을 가지고 있다.
+type Attr struct {
+    Name Name
+    Value string
+}
+}}}
+
+'''EndElement'''는 이름만 가지고 있다.
+{{{#!plain
+type EndElement struct {
+    Name Name
+}
+}}}
+
+'''CharData'''는 요소가 가지고 있는 (문자열)데이터다.
+{{{#!plain
+type CharData []byte
+}}}
+
+'''Comment'''
+{{{#!plain
+type Comment []byte
+}}}
+
+'''ProcInst'''는 XML 문서에 있는 "<?target inst?>"형식을 처리한다.
+{{{#!plain
+type ProcInst struct {
+    Target string
+    Inst []byte
+}
+}}}
+
+아래는 XML문서를 처리하는 예제 프로그램이다.
+{{{#!plain
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+    "io/ioutil"
+    "os"
+    "strings"
+)
+
+func main() {
+    if len(os.Args) != 2 {
+        fmt.Println("Usage: ", os.Args[1], "file")
+        os.Exit(1)
+    }
+
+    file := os.Args[1]
+    bytes, err := ioutil.ReadFile(file)
+    checkError(err)
+    r := strings.NewReader(string(bytes))
+    parser := xml.NewDecoder(r)
+    depth := 0
+    for {
+        token, err := parser.Token()
+        if err != nil {
+            break
+        }
+        switch t := token.(type) {
+        case xml.StartElement:
+            elmt := xml.StartElement(t)
+            name := elmt.Name.Local
+            printElmt(name, depth)
+            depth++
+        case xml.EndElement:
+            depth--
+            elmt := xml.EndElement(t)
+            name := elmt.Name.Local
+            printElmt(name, depth)
+        case xml.CharData:
+            bytes := xml.CharData(t)
+            printElmt("\""+string([]byte(bytes))+"\"", depth)
+        case xml.Comment:
+            printElmt("Comment", depth)
+        case xml.ProcInst:
+
+            printElmt("ProcInst", depth)
+        case xml.Directive:
+            printElmt("Directive", depth)
+        default:
+            fmt.Println("Unknown")
+        }
+    }
+}
+
+func printElmt(s string, depth int) {
+    for n := 0; n < depth; n++ {
+        fmt.Print("   ")
+    }
+    fmt.Println(s)
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+아래의 XML 문서를 파싱했다.
+{{{#!plain
+<?xml version="1.0"?>
+<person>
+    <name>
+        <family>Newmarch</family>
+        <personal>Ja </personal>
+    </name>
+    <email type="personal">jan@@newmarch.name</email>
+    <email type="work">j.newmarch@@boxhill.edu.au</email>
+</person>
+
+# go run xml.go person.xml
+ProcInst
+person
+  "
+  "
+  name
+    "
+    "
+    family
+      " Newmarch "
+    family
+    "
+    "
+    personal
+      " Jan "
+    personal
+    "
+  "
+  name
+  "
+  "
+  email
+    "
+    jan@@newmarch.name
+  "
+  email
+  "
+  "
+  email
+    "
+    j.newmarch@@boxhill.edu.au
+  "
+  email
+  "
+"
+person
+"
+"
+}}}
+
+== Unmarshalling XML == 
+Go '''Unmarshal'''함수를 이용하면 XML 데이터를 Go 데이터 구조체로 unmarshal 할 수 있다. 복잡한 XML 정보를 단순하게 사용할 수 있는 장점이 있지만, 단순화 한만큼 XML이 가진 정보를 완전히 unmarshalling 할 수는 없다.       
+
+아래의 XML 문서를 가지고 unmarshalling을 테스트해 보자.
+{{{#!plain
+<person>
+  <name>
+    <family> Newmarch </family>
+    <personal> Jan </personal>
+  </name>
+  <email type="personal">
+    jan@@newmarch.name
+  </email>
+  <email type="work">
+    j.newmarch@@boxhill.edu.au
+  </email>
+</person>
+}}}
+
+GO 데이터로 unmarshalling 하기 위해서, XML 데이터에 맵핑되는 Go struct를 만들었다.
+{{{#!plain
+type Person struct {
+    Name Name
+    Email []Email
+}
+
+type Name struct {
+    Family string
+    Personal string
+}
+
+type Email struct {
+    Type string
+    Address string
+}
+}}}
+이걸 XML unmarshalling 하려면 몇 가지 해야 할 일이 있다. 
+  1. Unmarshalling을 위해서 Go reflection 패키지를 이용한다. 이때 사용하는 필드의 이름은 매핑되는 XML 요소이름과 일치해야 한다. 주의할 점은 반드시 대문자로 시작해야 한다는 점. 예를 들어 XML의 name 요소에 대응하는 필드명은 '''Name'''로 해야 한다. 그리고 필드가 XML의 어느 요소와 맵핑할지를 태깅해줘야 한다. 이 규칙에 맞게 '''Person''' 구조체를 변경했다. 
+   {{{#!plain
+type Person struct {
+    Name Name `xml:"name"`
+    Email []Email `xml:"email"` 
+}
+}}}
+  1. XML 문서는 계층적이며, 단 하나의 루트 요소로 부터 시작한다. 모든 요소들은 루트 엘리먼트로 부터 파생된다. 따라서 unmarshalling을 위해서는 이 요소가 어떤 루트로 부터 파생된 건지를 알아야 한다. '''XMLName''' 필드를 이용해서 '''Person'''의 루트 엘리먼트를 알려줘야 한다. 
+    {{{#!plain
+type Person struct {
+    XMLName Name `xml:"person"`
+    Name Name `xml:"name"`
+    Email []Email `xml:"email"` 
+}
+}}}
+  1. 하위 요소들에 대해서 위의 작업을 반복한다.  
+  1. 요소가 속성을 가지고 있을 수 있다. 속성은 속성의 "이름", "값"으로 구성된다. Unmarshalling을 위해서는 "값"의 타입을 알고 있어야 하므로 결국 "이름", "값", "값의 타입" 3가지가 필요하다. 예제의 경우 Email의 속성을 위해서 Type 필드를 만들고 '''type,attr'''을 이용해서 type이름을 가진 속성을 저장하기 위한 필드임을 정의 했다. 
+  1. 속성이 없이 값만 가지고 있는 요소의 경우에는, 값의 데이터 타입과 요소의 이름만 정의하면 된다.
+  1. 요소가 속성과 값을 모두 가지는 경우에는 값을 매핑하기 위한 필드를 반드시 정의해야만 한다. "Email"이 속성과 값을 가지고 있는 경우인데, ",chardata" 태그를 이용해서, 이 요소가 문자열 데이터가 있다는 것을 알려주고 있다.  
+
+XML 문서를 unmarshal 하는 완성된 예제코드다.
+{{{#!plain
+/* Unmarshal
+ */
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+    "os"
+    //"strings"
+)
+
+type Person struct {
+    XMLName Name    `xml:"person"`
+    Myname  Name    `xml:"myname"`
+    Email   []Email `xml:"email"`
+}
+
+type Name struct {
+    Family   string `xml:"family"`
+    Personal string `xml:"personal"`
+}
+
+type Email struct {
+    Type    string `xml:"type,attr"`
+    Address string `xml:",chardata"`
+}
+
+func main() {
+    str := `<?xml version="1.0" encoding="utf-8"?>
+    <person>
+    <myname>
+    <family> Newmarch </family>
+    <personal> Jan </personal>
+    </myname>
+    <email type="personal">
+    jan@@newmarch.name
+    </email>
+    <email type="work">
+    j.newmarch@@boxhill.edu.au
+    </email>
+    </person>`
+
+    var person Person
+
+    err := xml.Unmarshal([]byte(str), &person)
+    checkError(err)
+
+    // now use the person structure e.g.
+    fmt.Println("Family name: \"" + person.Myname.Family + "\"")
+    fmt.Println("Second email address: \"" + person.Email[1].Address + "\"")
+    fmt.Println("Second email address type : \"" + person.Email[1].Type + "\"")
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Println("Fatal error ", err.Error())
+        os.Exit(1)
+    }
+}
+}}}
+
+== Marshalling XML ==
+xml 패키지의 marshalling 메서드를 이용하면 된겠다.
+{{{#!plain
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+)
+
+type person struct {
+    Name     string
+    Starsign string
+}
+
+func main() {
+    p := &person{"John Smith", "Capricorn"}
+    b, _ := xml.MarshalIndent(p, "", "   ")
+    fmt.Println(string(b))
+}
+}}}
+
+{{{#!plain
+<person>
+   <Name>John Smith</Name>
+   <Starsign>Capricorn</Starsign>
+</person>
+}}}
+
+== XHTML ==
+HTML은 XML 문법을 따르지는 않는다. 예를 들어 '''br'''과 같은 태그는 닫는 태그없이 사용하는 걸 허용한다. 좋게 말하자면 유연한 사용이 가능한거고, 나쁘게 말하자면 명확하지 않은 게 되겠다. 명확하지 않다는 것은 구현이 서로 다를 수도 있다는 것을 의미한다. XHTML은 HTML과 동등한 표현 능력을 가지면서, HTML 보다 엄격한 문법을 가진다. XHTML의 문서는 XML문서 규격을 엄격하게 따르기 때문에, XML 라이브러리를 이용한 자동화된 처리가 가능하다.  
+
+XHTML에서는 '''img'''와 '''br'''과 같은 태그도 반드시 닫혀야 한다. 시작 태그에 "/"를 추가하는 것으로, 빈 태그를 닫을 수 있다. br의 경우 <br />, img의 경우 <img />와 같이 사용해야 한다.  
+
+== HTML ==
+HTML 문서가 XML 규격을 따르지는 않지만, XML 패키지를 이용해서 HTML 문서를 제어할 수 있다. 
+
+== 정리 ==
+Go는 XML을 위한 기본적인 지원만하고 있을 뿐이다. 아직은 XML Schema나 Relax NG와 같은 언어를 지원하지는 않는다. 
+
+== 참고 ==
+  * http://www.w3schools.com/schema/
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d124 5
+a128 5
+	"encoding/xml"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+d132 41
+a172 41
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ", os.Args[1], "file")
+		os.Exit(1)
+	}
+
+	file := os.Args[1]
+	bytes, err := ioutil.ReadFile(file)
+	checkError(err)
+	r := strings.NewReader(string(bytes))
+	parser := xml.NewDecoder(r)
+	depth := 0
+	for {
+		token, err := parser.Token()
+		if err != nil {
+			break
+		}
+		switch t := token.(type) {
+		case xml.StartElement:
+			elmt := xml.StartElement(t)
+			name := elmt.Name.Local
+			printElmt(name, depth)
+			depth++
+		case xml.EndElement:
+			depth--
+			elmt := xml.EndElement(t)
+			name := elmt.Name.Local
+			printElmt(name, depth)
+		case xml.CharData:
+			bytes := xml.CharData(t)
+			printElmt("\""+string([]byte(bytes))+"\"", depth)
+		case xml.Comment:
+			printElmt("Comment", depth)
+		case xml.ProcInst:
+
+			printElmt("ProcInst", depth)
+		case xml.Directive:
+			printElmt("Directive", depth)
+		default:
+			fmt.Println("Unknown")
+		}
+	}
+d176 4
+a179 4
+	for n := 0; n < depth; n++ {
+		fmt.Print("   ")
+	}
+	fmt.Println(s)
+d183 4
+a186 4
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error %s", err.Error())
+		os.Exit(1)
+	}
+d194 6
+a199 6
+	<name>
+		<family>Newmarch</family>
+		<personal>Ja </personal>
+	</name>
+	<email type="personal">jan@@newmarch.name</email>
+	<email type="work">j.newmarch@@boxhill.edu.au</email>
+d306 4
+a309 4
+	"encoding/xml"
+	"fmt"
+	"os"
+	//"strings"
+d313 3
+a315 3
+	XMLName Name    `xml:"person"`
+	Myname  Name    `xml:"myname"`
+	Email   []Email `xml:"email"`
+d319 2
+a320 2
+	Family   string `xml:"family"`
+	Personal string `xml:"personal"`
+d324 2
+a325 2
+	Type    string `xml:"type,attr"`
+	Address string `xml:",chardata"`
+d329 23
+a351 23
+	str := `<?xml version="1.0" encoding="utf-8"?>
+	<person>
+	<myname>
+	<family> Newmarch </family>
+	<personal> Jan </personal>
+	</myname>
+	<email type="personal">
+	jan@@newmarch.name
+	</email>
+	<email type="work">
+	j.newmarch@@boxhill.edu.au
+	</email>
+	</person>`
+
+	var person Person
+
+	err := xml.Unmarshal([]byte(str), &person)
+	checkError(err)
+
+	// now use the person structure e.g.
+	fmt.Println("Family name: \"" + person.Myname.Family + "\"")
+	fmt.Println("Second email address: \"" + person.Email[1].Address + "\"")
+	fmt.Println("Second email address type : \"" + person.Email[1].Type + "\"")
+d355 4
+a358 4
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 2
+a4 2
+XML(Extensible Markup Language)은 데이터 구조의 저장과 직렬화를 위해서 사용하는 텍스트 기반의 마크업 언어다. XML은 문서의 내용을 나타내는데 강점을 보이지만, 인터넷 등에서 임의의 자료구조를 정의하기 위한 용도로도 널리 사용하고 있다. 
+[[TableOfConents]]
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 1
+a4 1
+
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d279 122
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d74 1
+a74 1
+Go에서는 '''NewParser'''를 이용해서 XML parser를 만든다. 이 파서는 매개변수로 넘어오는 '''io.Reader'''를 이용해서 데이터를 읽고, 읽은 데이터를 파싱한 결과를 반환한다. 
+d76 203
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d10 10
+a19 11
+<person>
+  <name>
+     <family>Newmarch</family>
+  </name>
+  <email type="personal">
+    jan@@newmarch.name
+  </email>
+  <email type="work">
+    j.newmarch@@boxhi.edu.au
+  </email>
+</person>
+d21 58
+@

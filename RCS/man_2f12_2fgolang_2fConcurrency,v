@@ -1,10 +1,15 @@
-head	1.1;
+head	1.2;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.2; strict;
 comment	@# @;
 
+
+1.2
+date	2014.11.09.16.01.29;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2014.10.19.09.11.46;	author root;	state Exp;
@@ -17,7 +22,7 @@ desc
 @
 
 
-1.1
+1.2
 log
 @119.64.102.68;;yundream;;
 @
@@ -25,36 +30,99 @@ text
 @#title Concurrency
 
 == 동시성 ==
+
 === Goroutines ===
 개념적으로 고루틴(Gorutines)은 thread, coroutines, processes 등과 혼동될 수 있다. 용어에 따른 개념의 혼란을 피하기 위해서 "고루틴"이라는 새로운 용어를 만들었다고 한다. 실제 사용하다보면, 멀티 스레드, 멀티 프로세스 등과 비슷하면서도 해석과 사용에 미묘한 차이가 있음을 알 수 있다. 
 
-고루틴은 동일한 주소공간의 코드를 동시에 실행하는 기능이다. 아래의 코드를 보자.    
+고루틴은 동일한 주소공간의 코드를 동시에 실행하는 기능이다. 고루틴은 '''go''' 키워드를 이용해서 만들 수 있다. 아래의 코드를 보자.  
+{{{#!plain
+import (
+    "fmt"
+)
+
+func f(n int) {
+    for i := 0; i < 10; i++ {
+        fmt.Println(n, ":", i)
+    }
+}
+func main() {
+    go f(0)
+    var input string
+    fmt.Scanln(&input)
+}
+}}}
+이 프로그램은 두 개의 고루틴으로 구성된다. 첫번째 고루틴은 min 함수 그 자신이다. 두 번째 고루틴은 '''go f(0)'''을 호출 할 때 만들어진다. 일반적으로 우리가 함수를 호출하면, 호출한 함수에 있는 모든 코드를 실행하고 리턴 값을 받아야 다음 줄(코드)로 넘어간다. 고루틴은 리턴 값을 받지 않고 즉, 함수가 완료되는 걸 기다리지 않고 즉시 다음 줄로 넘어간다. 예제 코드에서 Scanln 함수를 호출한 이유다. Scanln 함수가 없다면, '''f()''' 함수가 끝나기 전에 main() 함수가 끝나버릴 거다. Thread와 유사함을 알 수 있다. 
+
+고루틴은 그게 몇 개든지 간단하게 만들 수 있다. 10개의 고루틴을 만들어보자.
+{{{#!plain
+func main() {
+    for i := 0; i < 10; i++ {
+        go f(0)
+    }
+    var input string
+    fmt.Scanln(&input)
+}
+}}}
+그런데 f 함수가 너무 빨리 끝나버려서, 실제 고루틴이 제대로 작동하는지를 확인할수가 없다. '''time.Sleep'''함수와 '''rand.Intn'''을 이용해서, 테스트하기 쉬운 코드를 만들었다.
 {{{#!plain
 package main
 
 import (
     "fmt"
     "time"
+    "math/rand"
 )
 
-func loop(num int) {
+func f(n int) {
     for i := 0; i < 10; i++ {
-        fmt.Println(num, ":", i)
-        time.Sleep(1)
+        fmt.Println(n, ":", i)
+        amt := time.Duration(rand.Intn(250))
+        time.Sleep(time.Millisecond * amt)
     }
 }
-
 func main() {
     for i := 0; i < 10; i++ {
-        go loop(i)
+        go f(i)
     }
     var input string
     fmt.Scanln(&input)
 }
 }}}
+'''f''' 함수는 각각 0에서 10까지의 숫자를 출력하고, 0에서 250ms를 sleep 한다. 고루틴이 독립적으로 실행되는 걸 명확히 확인할 수 있을 것이다. 
 
+== Channels ==
+고루틴은 기본적으로 독립적으로 작동하는 프로그램이라고 볼 수 있다. 위의 예제에서 '''f''' 고루틴은 서로에 대해서 완전히 무관심하다. 하지만 많은 경우 고루틴끼리 (마치 스레드가 그런 것처럼)통신을 해야 하는 경우가 있다. 고루틴은 채널(channel)을 이용해서 정보를 주고 받을 수 있다.  
+
+
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 1
+d8 30
+a37 1
+고루틴은 동일한 주소공간의 코드를 동시에 실행하는 기능이다. 아래의 코드를 보자.    
+d44 1
+d47 1
+a47 1
+func loop(num int) {
+d49 3
+a51 2
+        fmt.Println(num, ":", i)
+        time.Sleep(1)
+a53 1
+
+d56 1
+a56 1
+        go loop(i)
+d62 4
+a66 1
 loop라는 하나의 주소공간에 있는 코드를 go(고루틴 생성 키워드)를 이용해서 10개를 동시에 실행했다. 코드를 실행해보면, 고루틴은 "결과를 기다리지 않고" 동시에(concurrently) 실행되는 걸 확인할 수 있다. 하나의 주소공간에 있는 코드를 결과를 기다리지 않고 동시에 수행한다는 점에서 "thread"와 유사함을 알 수 있다. 
-
+a67 2
 === Channels ===
 위의 예제에서 고루틴은 서로 독립적으로 계산을 수행했다.  
 @

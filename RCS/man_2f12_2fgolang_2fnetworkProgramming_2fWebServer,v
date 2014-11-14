@@ -1,10 +1,20 @@
-head	1.1;
+head	1.3;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.3; strict;
 comment	@# @;
 
+
+1.3
+date	2014.11.06.15.39.01;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.11.06.14.54.38;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2014.11.03.15.12.18;	author root;	state Exp;
@@ -17,20 +27,98 @@ desc
 @
 
 
-1.1
+1.3
 log
 @119.64.102.68;;yundream;;
 @
 text
 @#title Go network programming - Complete web server
+[[TableOfContents]]
 
+== 장 소개 ==
 앞서 다루었던 HTTP 챕터의 연장이다. 이번 장에서는 go 언어를 이용해서 완전히 작동하는 웹 서버를 만들 것이다. 원문에서는 중국어 flash card(단어장)를 서비스하는 예제를 제공하고 있는데, 예제로 하기에는 좀 직관적이지 않다는 생각이 들었다. 그래서 단어장 서비스 대신에, 유저 정보를 관리하는 "유저 정보 데이터 베이스" 서비스를 만들기로 했다.  
+
+단순히 코드만 설명하는 것에 머무르지 않고, 실제 배포하는 것을 가정해서 완전한 소프트웨어 구조를 만들려고 한다. 이를 위해서 1. 개발을 위한 완전한 디렉토리 구조를 설계 한다. 2. 설계하고 개발하는 코드들은 github에 올려서 다른 팀에서 협업할 수 있도록 한다.   
 
 == 웹 서비스 소개 ==
 나는 유저 정보를 관리하는 웹 서비스를 만들 것이다. 이 서비스는 "유저 등록", "유저 검색", "유저 삭제", "유저 목록 확인", "유저 정보 수정" 등의 기능을 가지고 있다. 유저 정보는 유저명을 이름으로 하는 JSON 포멧의 파일로 저장 한다(데이터베이스에 저장하는 것도 괜찮겠는데, 쓸데없이 복잡해지는 것 같아서). 
 
 유저 정보는 HTML 형태로 변환해서 출력할 건데, 이때 템플릿을 이용한다. 그리고 유저 UI를 꾸미기 위해서 이미지와 CSS 같은 static file 서비스 할 계획이다. 
 
-== Static page ==
+== 웹 애플리케이션 구조 ==
+웹 애플리케이션을 만들 때, 가장 먼저하는 일은 애플리케이션 구조를 만드는거다. 나는 아래와 같은 구조를 만들었다. 웹 애플리케이션의 이름은 '''simpleweb'''으로 정했다.
+{{{#!plain
+simpleweb
+.
+├── app
+├── data 
+├── html
+├── lib
+│    └── database
+└── public
+    ├── css
+    └── js
+}}}
+  * html : HTML 템플릿 파일들이 놓인다. app은 유저의 요청을 읽어서 처리하고, 템플릿을 이용해서 응답 메시지를 만들어서 전송한다.  
+  * public : static 파일들이 위치한다. js에는 자바스크립트 파일이, css에는 '''style sheet'''파일들이 저장된다. 
+ * app : 유저 요청을 처리하는 go 파일이 위치한다. app 이름은 simpleweb.go다. 
+ * data : 유저 데이터가 저장된다.
+ * lib : 라이브러리 파일들을 저장한다. 
 
+== GitHub ==
+애플리케이션 구조를 만든다음 simpleweb 프로젝트를 위해서 GitHub에 코드 저장소를 만들고, 프로젝트를 밀어넣었다. 저장소의 주소는 https://github.com/yundream/simpleweb 이다. 퍼블릭 저장소로 누구나 사용할 수 있다.(아직 개발 중이다.) 
+
+== 유저 데이터 == 
+simpleweb에서 사용할 유저 데이터베이스를 설계한다. 유저 데이터는 JSON 형식으로 하나의 파일로 저장된다. 파일의 이름은 "name" 필드의 값으로 한다. 
+{{{#!plain
+{
+  "name": "user_name",
+  "address":"청담 123-12",
+  "city": "서울",
+  "blog": "http://myblog.com",
+  "email": "user_name@@mail.com",
+}
+}}}
+
+=== 템플릿 파일 ===
+아래는 유저의 정보를 보여주는 템플릿 파일이다.
+{{{#!plain
+<html>
+	<body>
+	<ul class="vcard">
+		<li class="fn">{{.Name}}</li>
+		<li class="street-address">{{.Address}}</li>
+		<li class="locality">{{.City}}</li>
+		<li><span class="state">{{.Blog}}</li>
+		<li class="email"><a href="#">{{.Email}}</a></li>
+	</ul>
+	</body>
+</html>
+}}}
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+d4 1
+d7 2
+d22 2
+d32 4
+a63 1
+
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d10 44
+a53 1
+== Static page ==
 @

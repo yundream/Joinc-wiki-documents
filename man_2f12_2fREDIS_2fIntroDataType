@@ -1,0 +1,438 @@
+#title REDIS 소개, 설치, 데이터 타입 테스트
+[[TableOfContents]]
+== REDIS 소개 ==
+REDIS는 BSD 라이센스 기반의 '''Key-value 캐쉬 & Store''' 소프트웨어다. String, hash, lists, sets, sorted set, bitmap, hyperloglogs 등 다양한 데이터 구조를 저장할 수 있기 때문에, '''data structure server'''라고 부르기도 한다. 
+
+메모리에 데이터를 쓰는 '''In memory 데이터베이스''' 그리고 NoSQL 데이터베이스로 분류된다. 데이터에 대한 읽기와 쓰기가 많은 서비스에 사용 할 수 있다. Memcached와 비슷한 스팩을 가지고 있는데, 다양한 유형의 데이터를 지원한다는게 장점이다.
+
+일단 REDIS를 빠르게 설치하고, 몇몇 기능들을 테스트 한 다음에 곧바로 응용 프로그램을 만들어 볼 것이다.
+
+== REDIS 설치 및 테스트 == 
+=== 환경 ===
+설치 및 테스트 환경은 다음과 같다.
+  * 가상환경 : VirtualBox를 이용한다.
+  * Ubuntu 14.04
+테스트를 위해서 두 대의 머신을 준비했다.
+  * Redis-server : Redis server가 설치된다.
+  * Redis-client : Redis client가 설치된다.
+
+=== Redis 서버 설치 ===
+{{{#!plain
+# apt-get install redis-server
+# ps -ef | grep redis
+redis     1743     1  0 15:56 ?        00:00:01 /usr/bin/redis-server 127.0.0.1:6379       
+}}}
+127.0.0.1:6379에 bind 됐다. 원격에서 테스트하기 위해서 bind 정보를 변경하고 restart 했다. 
+{{{#!plain
+# cat /etc/redis/redis.conf
+.....
+bind 0.0.0.0
+
+# /etc/init.d/redis-server restart
+Stopping redis-server: redis-server.
+Starting redis-server: redis-server.
+
+# netstat -nap | grep 6379
+tcp        0      0 0.0.0.0:6379            0.0.0.0:*               LISTEN      1811/redis-server 0
+}}}
+
+설치한 Redis의 버전이다.
+{{{#!plain
+# redis-server --version
+Redis server v=2.8.13 sha=00000000:0 malloc=jemalloc-3.6.0 bits=64 build=cee0f9a49c3c27aa
+}}}
+
+=== Redis 클라이언트 설치 ===
+Redis-server를 테스트하기 위해서, redis-client에 redis 클라이언트 프로그램을 설치했다. 
+{{{#!plain
+# apt-get install redis-tools
+}}}
+
+서버 연결 테스트
+{{{#!plain
+# redis-cli -h 192.168.57.2 ping
+PONG
+}}}
+성공 !!!. 시작이 절반인데, 연결 테스트까지 했으니 75%는 끝난거라고 봐야 겠네.
+
+== Redis 자료구조 테스트 ==
+Redis-cli를 이용해서 자료구조를 테스트 한다.
+{{{#!plain
+# redis-cli -h 1972.168.57.2
+>
+}}}
+
+=== Strings ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1ukuWmV42NFwPQKjKGBbJkjtPuKSBvnovRuEjugJIzcg/pub?w=480&amp;h=122">
+}}}
+
+키에 대한 값으로 문자열(string)를 저장한다. 단순한 타입으로, redis를 사용한다고 하면 가장 먼저 고려해볼만한 타입이다. JSON, XML등 문자열로 된 데이터들을 저장할 수 있다. 웹 서비스를 한다면, HTML 문서의 전체 혹은 일부분을 캐쉬하기 위해서 사용할 수 있다. 
+{{{#!plain
+> set mykey myvalue
+OK
+> get mykey
+"myvalue"
+}}}
+'''SET'''을 이용해서 값을 저장하고, '''GET'''을 이용해서 값을 가져올 수 있다. 이미 있는 key에 대해서 값을 설정하면, 값을 덮어쓴다.
+
+특이한 점은 string이라고 해서 문자열만 저장하는게 아니고, 바이너리(binary) 데이터도 저장할 수 있다는 거다(그냥 바이너리 데이터를 저장할 수 있습니다 하면 좋았을 것을) png이미지를 저장하고, 읽는 테스트를 해봤다.
+{{{#!plain
+# cat test.png | redis-cli -h 192.168.57.2 -x set myimage
+OK
+# redis-cli -h 192.168.57.2 get myimage > ok.png
+}}}
+
+Atomic increment 같은 연산도 가능하다.
+{{{#!plain
+> set counter 1000
+OK
+> INCR counter 
+(integer) 1001
+> INCR counter
+(integer) 1002
+> INCRBY counter 50
+(integer) 1052
+}}}
+
+'''MSET'''과 '''MGET'''을 이용해서 한 번에 여러 개의 key, value를 저장하고 읽을 수 있다. 
+{{{#!plain
+> MSET key1 "Hello" key2 "world"
+OK
+> get key1
+"Hello"
+> get key2
+"world"
+> mget key1 key2
+1) "Hello"
+2) "world"
+}}}
+
+=== 리스트 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1kMeTIv6lyNdbDxGCvRgQPCeAdq9yX4lpMozUiW7YIxY/pub?w=478&amp;h=336">
+}}}
+
+'''LPUSH'''를 이용해서 리스트의 맨 앞(왼쪽-left)에, '''RPUSH'''를 이용해서 리스트의 맨 뒤에 값을 밀어넣을 수 있다. '''LRANGE'''로 일정 범위의 값을 읽을 수 있다. 
+{{{#!plain
+> rpush mylist A
+(integer) 1
+> rpush mylist B
+(integer) 2
+> lrange mylist 0 -1
+1) "A"
+2) "B"
+> lpush mylist first
+(integer) 3
+> lrange mylist 0 -1
+1) "first"
+2) "A"
+3) "B"
+}}}
+
+'''LRANGE'''는 시작과 끝을 위한 두 개의 index 값이 필요하다. 인덱스가 마이너스(-)이면, 리스트의 끝(오른쪽)을 기준으로 인덱스 값을 메긴다. 오른쪽 끝의 인덱스는 -1이다. 따라서 "0 -1"은 0번째 부터 마지막 까지의 범위를 의미한다. 
+
+한번에 여러개의 값을 저장할 수도 있다.
+{{{#!plain
+> rpush mylist 1 2 3 4 5 "foo bar"
+(integer) 9
+> lrange mylist 0 -1
+1) "first"
+2) "A"
+3) "B"
+4) "1"
+5) "2"
+6) "3"
+7) "4"
+8) "5"
+9) "foo bar"
+}}}
+
+'''pop'''은 Redis list에서 가장 중요한 연산일 것이다. 이 연산은 리스트에서 값을 읽는게, 아니라 꺼낸다. 읽으면서 지운다라고 생각하면 되겠다.   
+{{{#!plain
+> rpush mylist a b c
+(integer) 3
+> rpop mylist
+"c"
+> rpop mylist
+"b"
+> rpop mylist
+"a"
+}}}
+3개의 값을 모두 꺼냈다. 비어있는 리스트에 대해서 pop을 하면 "nil"을 반환한다.
+{{{#!plain
+> rpop yourlist
+(nil)
+}}}
+
+==== Capped Lists ====
+소셜 네트워크 메시지 서비스혹은 로그 경우 마지막에 저장된 값만 필요한 경우가 많다. ''LTRIM'''을 이용해서 특정 영역의 값만 남기고 나머지는 삭제할 수가 있다.  
+{{{#!plain
+> rpush mylist 1 2 3 4 5
+(integer) 5
+> ltrim mylist 0 2
+OK
+> lrange mylist 0 -1
+1) "1"
+2) "2"
+3) "3"
+}}}
+ltirm을 이용해서 인덱스 0에서 2사이의 값만 남기고, 삭제해버렸다. 일반적인 경우에는 처음 값이 아닌, 마지막  값을 남기는게 더 유용할 것이다. 이런 류의 서비스를 위해서는 '''LPUSH'''와 '''LTRIM'''을 사용하면 된다. 
+{{{#!plain
+LPUSH myliste <값들>
+LTRIM mylist 0 99 
+}}}
+이렇게 하면 최근 100개의 값만 유지할 수 있다.   
+
+==== Blocking operation on lists ====
+REDIS는 list 데이터 타입에 대해서 Blocking operation을 지원한다.
+
+list로 부터 값을 꺼내기(POP)위한 가장 방법은 주기적으로 rpop를 호출하는 것이다. 이 방식은 주기를 조절하는게 애매모호하기 때문에 그다지 좋아 보이지 않는다. POP을 호출하는 시점에 읽을 데이터가 없다면, 읽을 데이터가 준비될 때까지 blocking 되는게 깔끔해 보인다. 한번의 호출로 데이터를 읽을 수 있기 때문이다.
+
+'''BRPOP'''과 '''BLPOP''' 명령을 이용하면, blocking 작업이 가능하다. 이들 명령을 호출하면, 데이터가 없을 경우 데이터가 준비될 때까지 block된다. 물론 block 시간 설정도 가능하다. 
+{{{#!plain
+> brpop tasks 5
+}}}
+
+rpush로 데이터를 밀어 넣어보자.
+{{{#!plain
+> rpush tasks 1 2 3
+(integer) 3
+}}}
+
+실행 결과 결과
+{{{#!plain
+> brpop tasks 5
+1) "tasks"
+2) "3"
+(3.50s)
+}}}
+
+하나 이상의 리스트로 부터 가져오는 것도 가능하다.
+{{{#!plain
+> BRPOP list1 list2 5
+}}}
+
+그런데, Range로 가져올 수가 없어서 brpop만 사용하기에는 좀 애매모호하다. 예를들어 list에 한번에 10개의 값을 밀어 넣었을 경우, brpop를 10번을 연속 호출하게 된다. 이 문제는 brpop로 값을 가져온 후에, lrange 0, -1등을 호출하는 식으로 해결해야 할 것 같다. 혹은 결과를 모아서 하나의 리스트에 보내는 식의 소프트웨어 방법을 적용할 수 있을거다.
+
+=== Hash ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1QiwjtKGaLhL419O7hmGH03Q7LTkaSVPXWJFoSyYZ5Es/pub?w=432&amp;h=250">
+}}}
+
+Hash는 값으로 field&value의 쌍으로 이루어진 테이블을 저장할 수 있는 데이터 타입이다. 
+{{{#!plain
+> hmset user:1000 username yundream birthyear 1997 verified 1
+OK
+> hget user:1000
+(error) ERR wrong number of arguments for 'hget' command
+> hget user:1000 username
+"yundream"
+> hgetall user:1000
+1) "username"
+2) "yundream"
+3) "birthyear"
+4) "1997"
+5) "verified"
+6) "1"
+}}}
+
+=== Set ===
+Set은 정렬되지 않은 string의 집합이다. '''SADD''' 명령을 이용해서 set에 새로운 값을 추가할 수 있다. 
+{{{#!plain
+> sadd myset 1 2 3
+(integer) 0
+> smembers myset
+1) "1"
+2) "2"
+3) "3"
+}}}
+'''SISMEMBER'''명령으로 값이 set에 있는지 확인할 수 있다. 
+{{{#!plain
+> SISMEMBER myset 3
+(integer) 1
+> SISMEMBER myset 30
+(integer) 0
+}}}
+
+=== Sorted Set ===
+Set과 hash를 섞은 데이터 타입이라고 보면 되겠다. Set과 마찬가지로 키는 유니크하며, 키로 정렬된다. 유명한 해커들의 이름과 태어난 해를 Sorted set 으로 저장했다. 
+{{{#!plain
+$ redis-cli -h 192.168.56.5                                                                           
+> zadd hackers 1940 "Alan Kay"
+(integer) 1                                                                                                               
+> zadd hackers 1957 "Sophie Wilson"
+(integer) 1                                                                                                               
+>  zadd hackers 1953 "Richard Stallman"
+(integer) 1
+> zadd hackers 1949 "Anita Borg"
+(integer) 1
+> zadd hackers 1965 "Yukihiro Matsumoto"
+(integer) 1
+> zadd hackers 1914 "Hedy Lamarr"
+(integer) 1
+> zadd hackers 1916 "Claude Shannon"
+(integer) 1
+> zadd hackers 1969 "Linus Torvalds"
+(integer) 1
+> zadd hackers 1912 "Alan Turing"
+(integer) 1
+}}}
+'''ZADD'''의 사용법은 SADD와 비슷하다. 정렬에 사용 할 '''score''' 매개변수가 하나 더 추가된다는 것만 다르다. 이제 값을 가져 오면 '''score'''를 키로 정렬된 결과를 받아볼 수 있다. Sorted set은 값을 입력 할 때, 정렬이 되기 때문에, '''O(long(N))'''의 시간 복잡도를 가진다.
+{{{#!plain
+> ZRANGE hackers 0 -1
+1) "Alan Turing"
+2) "Hedy Lamarr"
+3) "Claude Shannon"
+4) "Alan Kay"
+5) "Anita Borg"
+6) "Richard Stallman"
+7) "Sophie Wilson"
+8) "Yukihiro Matsumoto"
+9) "Linus Torvalds"
+}}}
+리누즈 토발즈가 제일 어리군.
+
+역순으로 가져올 수도 있다.
+{{{#!plain
+> ZREVRANGE hackers 0 -1
+1) "Linus Torvalds"
+2) "Yukihiro Matsumoto"
+3) "Sophie Wilson"
+4) "Richard Stallman"
+5) "Anita Borg"
+6) "Alan Kay"
+7) "Claude Shannon"
+8) "Hedy Lamarr"
+9) "Alan Turing"
+}}}
+
+'''WITHSCORES'''옵션으로 score 값도 함께 읽을 수 있다.
+{{{#!plain
+> ZREVRANGE hackers 0 -1 withscores
+ 1) "Linus Torvalds"
+ 2) "1969"
+ 3) "Yukihiro Matsumoto"
+ 4) "1965"
+ 5) "Sophie Wilson"
+ 6) "1957"
+ 7) "Richard Stallman"
+ 8) "1953"
+ 9) "Anita Borg"
+10) "1949"
+11) "Alan Kay"
+12) "1940"
+13) "Claude Shannon"
+14) "1916"
+15) "Hedy Lamarr"
+16) "1914"
+17) "Alan Turing"
+18) "1912"
+}}}
+==== Operation on ranges ====
+Sorted set은 범위 검색을 위한 몇 가지 툴을 제공한다. '''ZRANGEBYSCORE''' 명령을 이용해서 1950년까지 태어난 해커들을 검색했다.
+{{{#!plain
+> ZRANGEBYSCORE hackers -inf 1950 withscores
+ 1) "Alan Turing"
+ 2) "1912"
+ 3) "Hedy Lamarr"
+ 4) "1914"
+ 5) "Claude Shannon"
+ 6) "1916"
+ 7) "Alan Kay"
+ 8) "1940"
+ 9) "Anita Borg"
+10) "1949"
+}}}
+1940년에서 1960년 사이에 태어난 해커들이 몇 명인지 알아보자.
+{{{#!plain
+> ZREMRANGEBYSCORE hackers 1940 1960
+(integer) 4
+}}}
+
+==== Lexicographical scores ====
+Redis 2.8에 '''lexicographical scores'''가 추가됐다. score가 같을 경우, 값을 비교해서 정렬한다. 비교 함수로 C의 memcmp 함수를 사용한다.   
+{{{#!plain
+> zadd hackers 0 "Alan Kay" 0 "Sophie Wilson" 0 "Richard Stallman" 0
+  "Anita Borg" 0 "Yukihiro Matsumoto" 0 "Hedy Lamarr" 0 "Claude Shannon"
+  0 "Linus Torvalds" 0 "Alan Turing"
+}}}
+
+score가 같기 때문에, 값을 비교해서 정렬한다.
+{{{#!plain
+> zrange hackers 0 -1
+1) "Alan Kay"
+2) "Alan Turing"
+3) "Anita Borg"
+4) "Claude Shannon"
+5) "Hedy Lamarr"
+6) "Linus Torvalds"
+7) "Richard Stallman"
+8) "Sophie Wilson"
+9) "Yukihiro Matsumoto"
+}}}
+
+
+=== Bitmaps ===
+독립적인 데이터 타입이라고 하기에는 좀 애매모호 하다. 바이너리 데이터에 대한 bit 연산 기능이라고 봐야 겠다. '''setbit''' 로 bit를 설정할 수 있고, getbit로 bit 설정 여부(1인지)를 확인할 수 있다.  
+
+Bitmap의 가장 큰 장점은 '''0과 1의 상태를 가지는 아이템'''들을 대단히 효율적으로 저장하고, 읽을 수 있다는데 있다. 하루 동안의 유니크 방문자를 계산해야 한다고 가장해보자. 유저가 방문할 때, 유저 아이디에 해당하는 bit 값을 1로 만들어 주는 걸로 간단하게 유저의 방문여부를 알 수 있다. 이때 필요한 메모리는 단지 1bit이기 때문에 512MB의 메모리로 40억(512 * 1024 * 1024 * 8)의 유저의 방문정보를 기록할 수 있다.
+
+{{{#!plain
+> setbit visitor 10 1    # 10번 유저 방문
+> setbit visitor 1000 1  # 1000번 유저 방문
+> setbit visitor 101 1   # 101번
+> setbit visitor 16
+> getbit visitor 16      # 16번 고객 방문 여부
+(integer) 1
+> getbit visitor 15      # 15번 고객 방문 여부
+(integer) 0
+> bitcount visitor       # 방문 유저 수 
+(integer) 4
+}}}
+
+=== HyperLogLogs ===
+어떤 데이터셋에서 집합에서 유일한 원소의 갯수를 검사하기 위해서 사용하는 알고리즘이다. 세익스피어 전집에서 unique한 단어의 갯수를 계산하려면 매우 큰 메모리가 필요할 것이다. HyperLogLogs를 이용하면 약간의 오차를(대략 1billion에 대해서 2% 정도) 허용하는 대신 매우 작은 메모리로 유니크한 원소의 갯수를 검사할 수 있다. 셰액스 피어의 전집에 나오는 유일한 영어 단어 개수를 세는 것으로 비교하자면, HashSet을 이용할 경우 10,4447,016 크기의 메모리가 필요한 반면, HyperLogLogs는 512바이트가 필요하다. 물론 Hashet의 오차는 0%, HyperLogLogs는 3%의 오차가 발생한다.
+
+{{{#!plain
+> PFADD hll foo bar zap
+(integer) 1
+> PFADD hll zap zap zap
+(integer) 0
+> PFADD hll foo bar
+(integer) 0
+> PFCOUNT hll
+(integer) 3
+}}}
+
+SADD등을 이용해서 새로운 값을 추가 할 때마다, PFADD를 이용해서 unique 요소를 연산하는 식의 응용이 가능하겠다.
+
+== Redis 프로그래밍 테스트 ==
+Ruby로 테스트 한다. Redis gem을 설치했다. 
+{{{#!plain
+# gem install redis
+}}}
+
+{{{#!plain
+require "redis"
+
+redis = Redis.new(:host=>'192.168.56.5', :port=>6379, :db=15)
+# 혹은
+redis = Redis.new(:url =>"redis://:password@192.168.56.6:6379/15")
+# Unix domain socket을 사용한다면 
+redis = Redis.new(:path => "/tmp/redis.sock")
+}}}
+
+String 값을 저장하는 간단한 예제
+{{{#!plain
+require 'redis'
+
+redis = Redis.new(:host=>'192.168.56.5', :port=>6379, :db => 15)
+redis.set 'mykey', 'hello world'
+puts redis.get('mykey')
+}}}
+
+== 참고 ==
+  * [http://pt.slideshare.net/Byungwook/redis-data-modeling-examples Redis를 이용한 데이터 모델링]
+  * [http://helloworld.naver.com/helloworld/textyle/711301 HyperLogLogs]
+  * [http://blog.getspool.com/2011/11/29/fast-easy-realtime-metrics-using-redis-bitmaps fast easy realtime metrics using redis bitmaps]

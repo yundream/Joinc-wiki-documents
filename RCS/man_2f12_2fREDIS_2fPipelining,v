@@ -1,0 +1,307 @@
+head	1.10;
+access;
+symbols;
+locks
+	root:1.10; strict;
+comment	@# @;
+
+
+1.10
+date	2014.11.14.02.24.17;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.11.14.02.09.06;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.11.14.02.08.25;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.11.14.02.06.26;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.11.14.02.06.00;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.11.14.02.05.07;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.11.14.02.04.42;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.11.14.02.04.09;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.11.14.02.03.19;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.11.13.16.22.25;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fREDIS_2fPipelining
+@
+
+
+1.10
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title Pipelining
+[[TableOfContents]]
+== Request/Response Protocols과 RTT ==
+Redis는 클라이언트-서버 모델을 따르는 TCP 서버로 요청/응답 프로토콜을 사용하고 있다. 이는 요청의 처리를 완료하기 위해서 아래의 과정을 따른다는 것을 의미한다.
+ * 클라이언트가 서버로 요청을 보낸다. 서버는 소켓으로 부터 요청 데이터를 읽는다. 서버는 데이터를 처리해서 응답을 보낼 준비를 한다. 일반적으로 이 과정은 blocking이 된다.  
+ * 서버 프로세스는 응답을 보낸다. 그리고 다음 요청을 받는다.  
+예를 들어 4개의 명령을 보낸다면, 아래와 같은 순서로 처리된다.
+ * ''Client'' : INCR X
+ * ''Server'' : 1
+ * ''Client'' : INCR X
+ * ''Server'' : 2
+ * ''Client'' : INCR X
+ * ''Server'' : 3
+ * ''Client'' : INCR X
+ * ''Server'' : 4
+
+클라이언트와 서버는 네트워크로 연결돼 있다. 따라서 연결 거리와 환경에 따라서 데이터가 왕복하는데 시간이 걸린다. 루프백 인터페이스로 연결된 경우에는 매우 빠를테고, 인터넷으로 연결된 경우에는 매우 느릴 거다. 네트워크로 연결된 서버와 클라이언트간에 데이터를 보내고 그에 대한 응답을 받는데 걸리는 시간을 '''RTT(Rount Trip Time)'''이라고 부른다.   
+
+RTT가 서비스 성능에 어떤 영향을 주는지는 쉽게 계산할 수 있다. RTT가 250msec인 환경이 있다고 가정해보자. 만약 초당 10만번의 요청이 들어올 경우 프로세스는 고작 4개의 요청만 처리할 수 있을 거다. 서비스가 거의 불가능한 수준일건데, 다행이 이 문제를 처리할 방법이 있다. 
+
+== Redis Pipelining ==
+파이프라이닝 이라고 하니까 뭔가 복잡해 보이는데, 그냥 "요청 모아보내기"라고 생각하면 된다. 요청 보내고 응답받고 하는 걸 4번 하는 대신에 4개의 명령을 모아서 요청 한번으로 끝내는 거다.  
+
+위의 '''INCR'''를 파이프라이닝을 통해서 보낸다면 아래와 같이 될거다.
+ * ''Client'' : INCR X
+ * ''Client'' : INCR X
+ * ''Client'' : INCR X
+ * ''Client'' : INCR X
+ * ''Server'' : 1
+ * ''Server'' : 2
+ * ''Server'' : 3
+ * ''Server'' : 4
+
+파이프라이닝을 하면, 요청과 응답의 횟수를 줄여서 RTT 문제를 회피할 수 있다. 대신, 응답도 모아서 보내기 때문에 응답을 저장하기 위해서 더 많은 메모리가 필요하다. 따라서 RTT와 메모리 비용을 감안해서 합리적인 요청수를 산정할 필요가 있다.  
+
+== 벤치마크 ==
+벤치마크 테스트를 진행했다. 테스트 환경은 다음과 같다.
+  * REDIS 서버 : VirtualBox Guest 운영체제, Ubuntu 14.10. Redis server 2.8.13 
+  * 벤치마크 테스트 호스트 : VirtualBox Host 운영체제 , Ubuntu 14.10
+  * 언어 : Ruby 2.1.3 + redis-rb client
+=== Local 테스트 ===
+{{{#!plain
+require 'rubygems'
+require 'redis'
+
+def bench(descr)
+    start = Time.now
+    yield
+    puts "#{descr} #{Time.now - start} seconds"
+end
+
+def without_pipelining
+    r = Redis.new(:host=>'192.168.56.5', :port=>6379, :db => 15)
+    10000.times {
+        r.ping
+    }
+end
+
+def with_pipelining
+    r = Redis.new(:host=>'192.168.56.5', :port=>6379, :db => 15)
+    r.pipelined {
+        10000.times {
+            r.ping
+        }
+    }
+end
+
+bench("without_pipelining") {
+    without_pipelining
+}
+bench("with_pipelining") {
+    with_pipelining
+}
+}}}
+
+테스트 결과다. 20배 이상 차이가 난다.
+{{{#!plain
+without_pipelining 1.085070063 seconds
+with_pipelining 0.05181293 seconds
+}}}
+
+=== Remote 테스트 ===
+원격(인터넷)에서도 테스트를 진행했다. 개인적으로 사용하고 있는 AWS 인스턴스(AWS Free tier)를 Redis 서버로 했다. 서버의 사양은 다음과 같다.
+{{{#!plain
+# cat /etc/issue
+Ubuntu 14.04.1 LTS \n \l
+# redis-server --version
+Redis server v=2.8.4 sha=00000000:0 malloc=jemalloc-3.4.1 bits=64 build=a44a05d76f06a5d9
+# cat /proc/cpuinfo 
+processor       : 0
+vendor_id       : GenuineIntel
+cpu family      : 6
+model           : 62
+model name      : Intel(R) Xeon(R) CPU E5-2670 v2 @@ 2.50GHz
+stepping        : 4
+microcode       : 0x417
+cpu MHz         : 2500.098
+cache size      : 25600 KB
+....
+# free
+             total       used       free     shared    buffers     cached
+             Mem:       1016280     851480     164800      27636     148624     352992
+}}}
+프리티어 인스턴스라서 스펙이 구리긴 하지만, 성능측적이 목적이 아니니까 별 상관은 없겠다. 요청을  10, 50, 100, 200, 500으로 늘려가면서 테스트 했다.
+{{{#!html
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["corechart"]});
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = google.visualization.arrayToDataTable([
+          ['요청횟수', 'None Pipeline', 'Pipeline'],
+          ['10',  0.8788,      0.2684],
+          ['50',  3.4092,      0.2753],
+          ['100',  7.8913,     0.3044],
+          ['200',  15.1667,    0.3037],
+          ['500',   49.1035,     0.3170]
+        ]);
+
+        var options = {
+          title: 'Pipelining 비교 테스트'
+        };
+
+        var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+
+        chart.draw(data, options);
+      }
+   </script>
+   <div id="chart_div" style="width: 600px; height: 300px;"></div>
+}}}
+인터넷은 기본 RTT 값이 크기 때문에, 요청이 많아질 수록 격차도 커짐을 알 수 있다.    
+== Pipelining VS Scripting ==
+REDIS 2.6 이상 버전에서는 '''Redis scripting'''기능을 이용할 수 있다. 서버에 스크립트를 밀어넣어서 실행하는 것으로, 파이프라이닝 보다 더 효과적인 데이터 운용이 가능하다. 이 방식의 가장 큰 장점은 네트워크 레이턴시의 영향을 최소한 받으면서, 데이터를 읽고 쓸수 있다는데 있다.
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d131 1
+a131 1
+인터넷은 RTT가 크기 때문에, 요청이 많아질 수록 격차도 커짐을 알 수 있다.    
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d104 1
+a104 1
+프리티어 인스턴스라서 스펙이 구리긴 하지만, 성능측적이 목적이 아니니까 별 상관은 없겠다.
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d117 1
+a117 1
+          ['50',   49.1035,     0.3170]
+d131 1
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d129 1
+a129 1
+   <div id="chart_div" style="width: 500px; height: 300px;"></div>
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a104 1
+
+d129 1
+a129 1
+   <div id="chart_div" style="width: 700px; height: 400px;"></div>
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d117 1
+a117 1
+          ['200',  15.1667,    0.3037]
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d129 2
+a130 4
+  <body>
+    <div id="chart_div" style="width: 700px; height: 400px;"></div>
+  </body>
+
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d129 4
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d41 1
+a41 1
+=== 테스트 ===
+d82 48
+@

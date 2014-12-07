@@ -1,0 +1,139 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2014.11.20.03.37.42;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.11.20.02.25.00;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fREDIS_2fCommands_2fINCR
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title INCR key
+[[TableOfContents]]
+=== INCR key ===
+  * 1.0.0 이상에서 사용 가능
+  * 시간 복잡도 : O(1)
+Key 값을 1 증가시킨다. 만약 key가 없다면, 값이 0인 key를 만든 후 INCR 연산을 한다. 값이 더하기 연산을 할 수 없는 타입(string)인 경우 에러를 반환한다. 저장 가능한 타입의 크기는 '''64 bit signed integers'''다. 
+
+=== 반환 값 ===
+1 더하기 연산이 끝난 현재의 (Interger)값
+
+=== 예제 ===
+{{{#!plain
+>  SET mykey "10"
+OK
+>  INCR mykey
+(integer) 11
+>  GET mykey
+"11"
+}}}
+
+=== 사용 패턴 ===
+'''Atomic increment operations'''에 유용하게 사용할 수 있다. 유저의 방문과 같은 어떤 작업이 끝난 후에 INCR 명령을 전송하면 된다. 일, 주, 월, 년 별로 key를 만드는 식으로 페이지 방문 통계 툴을 개발할 수 있다. 
+  * INCR과 EXPIRE를 조합해서 '''최근 방문한 N개의 페이지'''를 추적할 수 있다. 
+  * DECR과 INCRBY와 같은 다른 atomic increment/decrement 명령을 이용해서 유저의 행동에 대한 값을 관리할 수 있다. 온라인 게임에서 유저의 각 속성에 대한 값들을 생각하면 된다. 예를 들어 월드오프워크래프트의 캐릭터들은 여러 진영에 대한 평판 시스템을 가지고 있다. 특정 진영에 도움을 주는 행위를 하면 평판이 올라가고 이에 따른 보상이 주어지는 시스템이다. 잡 퀘스트 완료시  +10, 정예 퀘스트 완료시 +50, 적대적인 행위 A에 대해서 -10, 적대적인 행위 B에 대해서 -20 이런 연산이 가능하다.  
+  * GETSET을 이용해서 현재 값을 가져오고 count를 0으로 설정하는 작업을 atomic하게 할 수 있다.
+
+=== Rate limiter ===
+'''Rate limiter'''작업의 수행 속조를 조절하기 위해서 사용하는 패턴으로 '''OpenAPI에 대한 호출 횟수 제한'''등에 사용할 수 있다. 이 패턴을 이용해서 IP 주소별로 초당 요청횟수를 10으로 제한하는 코드를 구현해 보자. 
+
+==== Rate limiter - 1 ====
+{{{#!plain
+FUNCTION LIMIT_API_CALL(ip)
+ts = CURRENT_UNIX_TIME()
+keyname = ip+":"+ts
+current = GET(keyname)
+IF current != NULL AND current > 10 THEN
+    ERROR "too many requests per second"
+ELSE
+    MULTI
+        INCR(keyname,1)
+        EXPIRE(keyname,10)
+    EXEC
+    PERFORM_API_CALL()
+END
+}}}
+모든 IP에 대해서 각 초 단위로 key를 만든다. 값은 INCR로 증가하게 만들어 놨으니, 1초안에 이루어진 요청은 '''IP:time'''의 값으로 카운팅 된다. 만약 1초안에 10번 이상 카운팅이 되면 '''current != NILL current > 10''' 조건에 의해서, 요청이 거부된다. Key는 EXPIRE 명령을 이용해서 10초 동안만 살아있게 만들었다. MULTI & EXEC 를 INCR 명령과 EXPIRE 명령이 하나의 트랜잭션에서 일어나도록 했다.  
+
+==== Rate limiter - 2 ====
+위 코드를 더 간단하게 만들었다.
+{{{#!plain
+FUNCTION LIMIT_API_CALL(ip):
+current = GET(ip)
+IF current != NULL AND current > 10 THEN
+    ERROR "too many requests per second"
+ELSE
+    value = INCR(ip)
+    IF value == 1 THEN
+        EXPIRE(value,1)
+    END
+    PERFORM_API_CALL()
+END
+}}}
+key로 IP만을 사용하고, 만료 시간을 1초로 설정했다. 이 코드는 조건 경쟁(race condition)에 의해서 API 누수가 발생할 수 있다. INCR으로 값을 증가하는 건 아토믹한데, 값을 읽는 과정의 아토믹은 보장하기 안기 때문인 것 같다. INCR로 값이 1이 됐는데, 값을 읽기 전에 INCR이 수행되서 값이 2가 될 수도 있다는 것. 이렇게되면 value == 1을 결코 만족할 수 없게 되므로, 이 키는 쓰레기로 남게 된다.  
+
+Lua 스크립트를 이용해서 이 문제를 해결할 수 있다.
+{{{#!plain
+local current
+current = redis.call("incr",KEYS[1])
+if tonumber(current) == 1 then
+    redis.call("expire",KEYS[1],1)
+end
+}}}
+
+스크립트 대신 redis 리스트를 이용하는 방법도 있다. IP를 key로 하는 리스트를 만들고, 요청을 key의 멤버로 push 한다. 리스트의 길이가 10을 초과하면, 요청을 거부하는 식으로 작동한다.
+{{{#!plain
+FUNCTION LIMIT_API_CALL(ip)
+current = LLEN(ip)
+IF current > 10 THEN
+    ERROR "too many requests per second"
+ELSE
+    IF EXISTS(ip) == FALSE
+        MULTI
+            RPUSH(ip,ip)
+            EXPIRE(ip,1)
+        EXEC
+    ELSE
+        RPUSHX(ip,ip)
+    END
+    PERFORM_API_CALL()
+END
+}}}
+'''RPUSHX'''는 키가 있을 때, 값을 밀어 넣는다.
+
+이 코드도 조건 경쟁이 발생하긴 한다. EXITS가 FALSE가 떨어져서 MULTI & EXEC 트랜잭션을 수행하려고 하는데, 다른 클라이언트가 먼저 수행할 수 있기 때문이다. 이 경우 EXPIRE가 새로 설정되면서, 한 두개 정도의 카운팅 누수가 생길 수 있는데 뭐.. 이 정도는 문제라고 할 수 없겠다.
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d63 32
+a94 2
+key로 IP만을 사용하고, 만료 시간을 1초로 설정했다. 이 코드는 조건 경쟁(race condition)에 의해서 API 누수가 발생할 수 있다.
+...
+@

@@ -1,96 +1,56 @@
 #title revel - Go 기반의 웹 프레임워크
+== 소개 ==
+요즘 go 언어를 공부 중이다. 딱히 어디에 써 먹어야 겠다는 목적없이 재미삼아 한번 건드려 봤는데, 정말 재미있어서 공부 중이다. "단순하다"라는 점에 끌린 것 같다. 음.. 너무 기능이 없는데다가 너무 구닥다리다 라는 평가가 있기는 하다. 예컨데 go는 1. 클래스도 없다. 2. 예외처리도 없다 3. 그렇다고 요즘 유행하는 함수형 언어도 아니다. 4. Generic 타입도 없다  5. assertion도 없다 뭐 이렇다. 없는게 엄청 많다. 하지만 (go 개발자의 말대로) 개인의 머리 하나에 언어의 모든 스펙을 넣을 수 있을 정도로 '''단순하다'''. 이것 만으로도 사용할 이유가 있다. 게다가 충분히 빠르다. 
 
-== 환경 == 
-이미 [wiki:man/12/golang/Start go 개발 환경]을 만든 것으로 가정한다. 
-  * 우분투 리눅스 14.04
-  * go 1.3.1 
+이렇게 go 언어를 공부하는 중에, 웹 애플리케이션 서버 쪽에 괌심이 있어서 웹 애플리케이션 성능 지표를 찾아봤더랬다. 그랬더니, go 언어를 기반으로 하고 있는 [http://www.techempower.com/benchmarks/#section=data-r9&hw=ec2&test=json revel의 성능이 상당히 좋게] 나왔다. 이렇게 된거 revel을 해보기로 했다.
 
-== 설치 ==
-{{{#!plain
-# go get github.com/revel/revel
+== 기능 ==
+{{{#!html
+<div class="row">
+	<div class="large-4 columns">
+	<h3>Hot Code Reload</h3>
+	편집하고, 저장하고, 리플레쉬 하면 된다. 수정한 코드와 템플릿은 즉시 적용되서 확인할 수 있다. 코드가 컴파일 되지 않는다면 <a href="#" data-reveal-id="myModal">helpful description</a>으로 문제점을 짚어준다. 런타임 코드 <a href="#" data-reveal-id="panic">패닉</a>이 발생해도 즉시 찾을 수 있다. 
+	</div>
+	<div class="large-4 columns">
+	<h3>편리한</h3>
+	Revel은 라우팅, 매개변수 parsing, validation, 세션/flash, 템플릿, 캐쉬, Job running, 프레임워크 테스트, 국제화 등 웹 애플리케이션 개발을 필요한 주요한 기능들을 갖추고 있다. 
+	</div>
+	<div class="large-4 columns">
+	<h3>고성능</h3>
+	Go는 매우 성능이 좋은 언어며, Go를 기반으로 한 Revel 역시 <a href="#" data-reveal-id="perf">뛰어난 성능</a>을 보장한다. 성능이 중요한 요소라면 Revel을 고려해보자. 
+	</div>
+</div>
+<div id="myModal" class="reveal-modal" data-reveal>
+<img src="https://lh5.googleusercontent.com/-q05XtmWVPd0/VGtHqPpbJiI/AAAAAAAAEf8/Yc0GdB5Ri7s/w778-h601-no/CompilationError.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+<div id="panic" class="reveal-modal" data-reveal>
+<img src="https://lh4.googleusercontent.com/-fe0WXsrMvXg/VGtIr-OxpMI/AAAAAAAAEgs/MSHXfChejaU/w799-h600-no/Panic.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+<div id="perf" class="reveal-modal" data-reveal>
+<img src="https://lh4.googleusercontent.com/--oIxdOhYG9M/VGtKwLqnSaI/AAAAAAAAEhI/Z1hz1OojG_0/w852-h483-no/go_revel_04.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
 }}}
 
-revel cli 툴이 설치된다.
-{{{#!plain
-# revel help
-~
-~ revel! http://revel.github.io
-~
-usage: revel command [arguments]
-
-The commands are:
-
-    new         create a skeleton Revel application
-    run         run a Revel application
-    build       build a Revel application (e.g. for deployment)
-    package     package a Revel application (e.g. for deployment)
-    clean       clean a Revel application's temp files
-    test        run all tests from the command-line
-
-Use "revel help [command]" for more information.
+== 프레임워크 디자인 ==
+{{{#!html
+<div class="row">
+	<div class="large-4 columns">
+	<h3>Synchronous</h3>
+	Revel은 Go HTTP 서버를 기반으로 만들어졌으며, 클라이언트 요청마다 goroutine를 실행한다. Goroutine은 간단하게 사용할 수 있으며, callback 때문에 골치아파 할 필요도 없다.    
+	</div>
+	<div class="large-4 columns">
+	<h3>Stateless</h3>
+	Revel은 stateless로 작동한다. Stateless는 상태를 서로 공유할 필요가 없기 때문에 확장에 유리한 구조다. 세션데이터, 유저 쿠키, 캐쉬와 같은 데이터 공유가 필요하다면, memcached 클러스터나 redis data structure store를 사용할 수 있다. 
+	</div>
+	<div class="large-4 columns">
+	<h3>Modular</h3>
+	Revel is built around composable middleware called filters, which implement nearly all request-processing functionality. Developers have the freedom to replace the default filters with custom implementations (e.g. a custom router).
+	</div>
+</div>
 }}}
 
-== Hello go 개발 ==
-{{{#!plain
-# echo $GOPATH
-/home/yundream/golang
-
-# revel new hello_go
-~
-~ revel! http://revel.github.io
-~
-Your application is ready:
-   /home/yundream/golang/src/hello_go
-
-You can run it with:
-   revel run hello_go
-}}}
-
-{{{#!plain
-# revel run hello_go
-~
-~ revel! http://revel.github.io
-~
-INFO  2014/10/14 21:27:55 revel.go:320: Loaded module static
-INFO  2014/10/14 21:27:55 revel.go:320: Loaded module testrunner
-INFO  2014/10/14 21:27:55 run.go:57: Running hello_go (hello_go) in dev mode
-INFO  2014/10/14 21:27:55 harness.go:165: Listening on :9000
-}}}
-=== revel 웹 애플리케이션 구조 ===
-{{{#!plain
-.
-├── app
-│   ├── controllers
-│   │   └── app.go
-│   ├── init.go
-│   ├── routes
-│   │   └── routes.go
-│   ├── tmp
-│   │   └── main.go
-│   └── views
-│       ├── App
-│       │   └── Index.html
-│       ├── debug.html
-│       ├── errors
-│       │   ├── 404.html
-│       │   └── 500.html
-│       ├── flash.html
-│       ├── footer.html
-│       └── header.html
-├── conf
-│   ├── app.conf
-│   └── routes
-├── messages                                                                                                           
-│   └── sample.en                                                                                                      
-├── public                                                                                                             
-│   ├── css                                                                                                            
-│   │   └── bootstrap.css                                                                                              
-│   ├── img                                                                                                            
-│   │   ├── favicon.png                                                                                                
-│   │   ├── glyphicons-halflings-white.png                                                                             
-│   │   └── glyphicons-halflings.png
-│   └── js
-│       └── jquery-1.9.1.min.js
-└── tests
-    └── apptest.go
-}}}
+== 문서 ==
+  * [wiki:man/12/golang/revel/tutorial revel tutorial] : Revel 설치에서 기본적인 응용까지

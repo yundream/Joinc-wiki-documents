@@ -1,0 +1,398 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2014.11.19.04.49.52;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.11.19.04.47.56;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.11.18.15.17.31;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.11.18.14.51.47;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.11.17.16.19.54;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.11.17.15.57.39;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2frevel_2ftutorial
+@
+
+
+1.6
+log
+@112.150.165.136;;yundream;;
+@
+text
+@#title revel - Tutorial
+[[TableOfContents]]
+== 환경 == 
+이미 [wiki:man/12/golang/Start go 개발 환경]을 만든 것으로 가정한다. 
+  * 우분투 리눅스 14.04
+  * go 1.3.1 
+
+== 설치 ==
+{{{#!plain
+# go get github.com/revel/revel
+}}}
+
+revel cli 툴이 설치된다.
+{{{#!plain
+# revel help
+~
+~ revel! http://revel.github.io
+~
+usage: revel command [arguments]
+
+The commands are:
+
+    new         create a skeleton Revel application
+    run         run a Revel application
+    build       build a Revel application (e.g. for deployment)
+    package     package a Revel application (e.g. for deployment)
+    clean       clean a Revel application's temp files
+    test        run all tests from the command-line
+
+Use "revel help [command]" for more information.
+}}}
+
+== revel 웹 애플리케이션 생성 ==
+run 명령을 이용해서 web 애플리케이션을 만들 수 있다. 
+{{{#!plain
+# echo $GOPATH
+/home/yundream/golang
+# revel new hello_go
+~
+~ revel! http://revel.github.io
+~
+Your application is ready:
+   /home/yundream/golang/src/hello_go
+
+You can run it with:
+   revel run hello_go
+}}}
+
+만들어진 web 애플리케이션을 실행해 보자.
+{{{#!plain
+# revel run hello_go
+~
+~ revel! http://revel.github.io
+~
+INFO  2014/10/14 21:27:55 revel.go:320: Loaded module static
+INFO  2014/10/14 21:27:55 revel.go:320: Loaded module testrunner
+INFO  2014/10/14 21:27:55 run.go:57: Running hello_go (hello_go) in dev mode
+INFO  2014/10/14 21:27:55 harness.go:165: Listening on :9000
+}}}
+웹 브라우저를 이용해서 localhost:9000에 접근했다. 
+
+https://lh3.googleusercontent.com/-Guq4-WEhF0E/VGoHjeXv6EI/AAAAAAAAEdo/O8C02u7Q59c/w729-h470-no/go_revel_01.png
+
+이렇게 뜨면 성공
+=== revel 웹 애플리케이션 구조 ===
+본격적으로 웹 애플리케이션을 개발하기 전에 구조를 살펴보기로 했다.
+{{{#!plain
+.
+├── app
+│   ├── controllers
+│   │   └── app.go
+│   ├── init.go
+│   ├── routes
+│   │   └── routes.go
+│   ├── tmp
+│   │   └── main.go
+│   └── views
+│       ├── App
+│       │   └── Index.html
+│       ├── debug.html
+│       ├── errors
+│       │   ├── 404.html
+│       │   └── 500.html
+│       ├── flash.html
+│       ├── footer.html
+│       └── header.html
+├── conf
+│   ├── app.conf
+│   └── routes
+├── messages                                                                                                           
+│   └── sample.en                                                                                                      
+├── public                                                                                                             
+│   ├── css                                                                                                            
+│   │   └── bootstrap.css                                                                                              
+│   ├── img                                                                                                            
+│   │   ├── favicon.png                                                                                                
+│   │   ├── glyphicons-halflings-white.png                                                                             
+│   │   └── glyphicons-halflings.png
+│   └── js
+│       └── jquery-1.9.1.min.js
+└── tests
+    └── apptest.go
+}}}
+==== app/ 디렉토리 ====
+'''app''' 디렉토리는 웹 애플리케이션의 소스코드와 템플릿 파일들을 가지고 있다.
+  * app/controllers : 컨트롤러 코드가 위치한다.
+  * app/models
+  * app/views : 템플릿 파일들이 위치한다.
+revel은 '''app/'''밑에 있는 파일들이 변경되는 지를 검사한다. 만약 파일이 변경된다면, 애플리케이션을 리빌드 한다. 반면 '''app/'''바깥쪽에 있는 파일들은 변경여부를 검사하지 않는다. 만약 웹 애플리케이션이 app/ 바깥쪽에 있는 파일의 영향을 받는다면, 개발자가 직접 recompile를 해야 한다. 
+
+'''views''' 디렉토리밑에는 템플릿(Template)파일들이 있다. 메서드 이름과 같은 이름으로 템플릿 파일을 만들면 된다.
+
+== revel web 애플리케이션 개발 ==
+앞서 hello_go 라는 간단한 웹 애플리케이션을 만들었다. 여기에서는 어떻게 유저의 요청을 제어할 수 있는지를 알아볼 것이다. 
+=== Routes ===
+Ruby on Rails, Django등의 웹 애플리케이션 프레임워크를 다뤄본 경험이 있다면, routes는 익숙한 개념일 거다. Routes는 유저의 요청을 어느 방향(파일)로 보낼지를 결정하기 위해서 사용한다. 이 파일은 '''conf/routes'''에 있다. Root(localhost:9000/) 요청에 대한 라우트 값을 살펴보자.
+{{{#!plain
+GET     /                                       App.Index
+}}}
+이 설정은 유저가 루트를 요청하면, '''App''' 컨트롤러의 '''Index''' 메서드를 호출하라는 의미다.
+
+=== Acions ===
+유저가 "/"를 호출하면 revel은 conf/routes의 정보를 읽어서 "app/controllers/app.go"에 있는 Index() 메서드를 호출한다. 코드를 보자. 
+{{{#!plain
+package controllers
+
+import "github.com/revel/revel"
+
+type App struct {
+    *revel.Controller
+}
+
+func (c App) Index() revel.Result {
+    return c.Render()
+}
+}}}
+모든 컨트롤러들은 반드시 '''*revel.Controller''' 구조체를 포함하고 있어야 한다. 그리고 처리 결과로 '''revel.Result'''를 반환한다. 
+
+Revel 컨트롤러는 요청을 처리하기 위한 유용한 메서드들을 제공한다. 예를들어서 '''Render()'''메서드는 템플릿 파일을 찾아서 응답코드(200 OK)와 함께 HTML 파일을 만들어서 출력한다. 
+
+=== Template ===
+모든 템플릿은 '''app/views''' 디렉토리에 있다. 템플릿 이름을 명시하지 않을 경우, revel은 action의 이름과 일치하는 템플릿을 찾는다. hello_go의 경우에는 app/views/App/Index.html파일을 찾아서 렌더링 한다. 템플릿 파일은 [wiki:man/12/golang/networkProgramming/template GO Template 포맷]으로 작성한다.  
+{{{#!plain
+{{set . "title" "Home"}}
+{{template "header.html" .}}
+
+<header class="hero-unit" style="background-color:#A9F16C">
+  <div class="container">
+    <div class="row">
+      <div class="hero-text">
+        <h1>Hello go</h1>
+        <p></p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="row">
+    <div class="span6">
+      {{template "flash.html" .}}
+    </div>
+  </div>
+</div>
+
+{{template "footer.html" .}}
+}}}
+  1. title 변수를 설정했다. 
+  1. '''header.html'''템플릿을 호출했다. title 변수는 이 템플릿에서 사용한다. 
+  1. 환영 메시지를 출력한다.
+  1. flash.html 템플릿을 출력한다. Flashed 메시지를 보여주기 위해서 사용한다. 
+  1. footer.html 템플릿을 출력한다.
+header.html 파일을 열어보면, 대략 아래와 같은 코드를 확인할 수 있을 거다.
+{{{#!plain
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <title>{{.title}}</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link rel="stylesheet" type="text/css" href="/public/css/bootstrap.css">
+    <link rel="shortcut icon" type="image/png" href="/public/img/favicon.png">
+    <script src="/public/js/jquery-1.9.1.min.js" type="text/javascript" charset="utf-8"></script>
+    {{range .moreStyles}}
+      <link rel="stylesheet" type="text/css" href="/public/{{.}}">
+    {{end}}
+    {{range .moreScripts}}
+      <script src="/public/{{.}}" type="text/javascript" charset="utf-8"></script>
+    {{end}}
+  </head>
+  <body>
+}}}
+'''title''' 변수가 설정되는 코드가 보인다. 그 밖에 웹 디자인을 도와주기 위한 bootstrap css와 jquery 등을 include하고 있는 걸 확인할 수 있다.   
+
+=== Hot-reload ===
+웹 애플리케이션 서버를 띄운 후 '''Index.html'''파일을 수정해 보자. 
+{{{#!plain
+<h1>Hello go</h1>
+}}}
+을
+{{{#!plain
+<h1>Hello World!!</h1>
+}}}
+으로 변경해 보자.
+
+브라우저를 리플레쉬(refresh)하면, 변경된 내용이 즉시 반영되는 걸 확인할 수 잇을 것이다. Revel은 template 파일이 변경되는 걸 검사해서 리플레쉬하는 기능을 가지고 있다. 
+
+템플릿파일은 동적으로 갱신이 된다고 치고, 코드의 변경내용도 갱신되는지 확인해 보자. '''app/controllers/app.go'''의 코드를 (에러가 발생하도록)바꿨다.
+{{{#!plain
+return c.Render()
+}}}
+을 
+{{{#!plain
+return c.Renderx()
+}}}
+이제 브라우저를 다시 리프레쉬 해보자. 아래와 같은 디버깅 메시지를 확인할 수 있을 거다.
+
+https://lh6.googleusercontent.com/-nUcBU1YGQhQ/VGoW9T9UWrI/AAAAAAAAEe0/_hutn5W6GcE/w729-h388-no/go_revel_02.png
+
+이제 템플릿을 수정해 보자. '''app/controllers/app.go'''를 아래와 같이 수정한다.
+{{{#!plain
+greeting := "Aloha World"
+return c.Render(greeting)
+}}}
+Index.html도 수정했다.
+{{{#!plain
+<h1>{{.greeting}}</h1>
+}}}
+
+https://lh4.googleusercontent.com/-MaFs1EeqKLs/VGoZTeqmb_I/AAAAAAAAEfQ/LhDbc9yz2UE/w729-h544-no/go_revel_03.png
+
+== Hello world App ==
+Hello world 애플리케이션을 만들어 보자. 이 애플리케이션은 '''HTML form'''을 이용해서 유저 입력을 받고, 그 결과를 출력하는 약간 더 복잡한 일을 한다. 
+
+'''app/views/App/Index.html''' 템플릿의 내용을 수정한다. 
+{{{#!plain
+<!-- 앞 부분 생략 -->
+  <div class="span6">
+    {{template "flash.html" .}}
+    <form action="/App/Hello" method="GET">
+       <input type="text" name="myName" /><br/>
+       <input type="submit" value="Say hello!" />
+    </form>
+  </div>
+<!-- 뒷 부분도 생략 -->
+}}}
+
+브라우저로 보는 화면은 아래와 같다.
+
+https://lh3.googleusercontent.com/-hC8d2vYkhs0/VGtYIgmXLhI/AAAAAAAAEik/_5X4aVEaUOA/w653-h377-no/go_revel_05.png
+
+값(나는 yundream을 입력했다.)을 입력하고 submit 버튼을 클릭하면, Page Not Found 에러가 떨어질 거다.
+
+https://lh3.googleusercontent.com/-UhPAt2jN4b8/VGta8hYTWYI/AAAAAAAAEjI/APfLyAGkdVQ/w772-h427-no/go_revel_06.png
+
+'''app/controllers/app.go'''에 Hello 메서드를 추가하자. 
+{{{#!plain
+func (c App) Hello(myName string) revel.Result {
+    return c.Render(myName)
+}
+}}}
+GET 방식으로 넘어온 '''myName'''을 Hello 메서드 매개변수로 넘긴걸 확인할 수 있다. 이제 myName을 출력하기 위한 템플릿을 만든다. 메서드 이름이 Hello 이니, (기본)템플릿 이름은 Hello.html이다. 
+{{{#!plain
+{{set . "title" "Home"}}
+{{template "header.html" .}}
+
+<h1>Hello {{.myName}}</h1>
+<a href="/">Back to form</a>
+
+{{template "footer.html" .}}
+}}}
+
+페이지를 리프레시 하면, 제대로된 HTML 문서를 확인할 수 있다.
+
+https://lh5.googleusercontent.com/-54e5VHMR2OU/VGtdlah_O0I/AAAAAAAAEj4/UJ02hxu9ce8/w817-h471-no/go_revel_07.png
+
+마지막으로 매개변수에 대한 validation 체크를 해보자. 나는 매개변수 myName에 대해서 "반드시 값이 설정돼 있어야 할 것", "3자 이상일것", "16자 미만일 것" 3가지 조건을 검사하기로 했다. Revel 에서 제공하는 validation module를 이용하면, 간단하게 검사할 수 있다. 아래와 같이 '''app/controlers/app.go'''를 수정했다.  
+{{{#!plain
+func (c App) Hello(myName string) revel.Result {
+    c.Validation.Required(myName).Message("Your name is required!")
+    c.Validation.MinSize(myName, 3).Message("Your name is not long enough!")
+    c.Validation.MaxSize(myName, 16).Message("Your name is too long!")
+  
+    if c.Validation.HasErrors() {  
+        c.Validation.Keep()   
+        c.FlashParams()       
+        return c.Redirect(App.Index)   
+    }
+    return c.Render(myName)
+}
+}}}
+
+== 정리 ==
+프로토타이핑 외에 웹 프레임워크를 사용해 본적은 없고, 사용했던 웹 프레임워크도 경량 프레임워크(Sinatra) 정도다. 아직은 어느 정도의 생산성을 보장해 줄지를 예상하기에는 아직 경험과 정보가 부족하지만, 지금까지의 느낌을 정리한다.
+  1. 아직 1.0 버전이 아니다. 1.0 final 단계라고 하니, 조만간 1.0 버전이 나오지 않을까 싶다. Revel 사이트에 들어 갔더니 "거의 완성 단계지만 여전히 많은 부분이 녀경되고 있다. 손을 더러히고 싶지 않다면, 지금 프로젝트에 적용하지는 말라"라고 경고하고 있다.
+  1. Ruby on Rails, Play와 구조적으로 매우 유사하다. 이들 프레임워크를 사용한 경험이 있다면, 쉽게 적응할 수 있다. (Sinatra로 다룬 나도 쉽게 적응할 수 있었다. 사실 Sinatra도 Monk와 함께 사용하면서 Rails와 비슷한 구조로 개발했지만...) 
+  1. 템플릿 뿐만 아니라 Code까지 (서버 리스타트 없이)변경 내용을 즉시 확인할 수 있어서 편하다. 
+앞으로 꾸준히 해봐야 겠다.
+@
+
+
+1.5
+log
+@112.150.165.136;;yundream;;
+@
+text
+@d111 2
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d290 7
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d274 16
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d227 1
+d230 42
+d273 1
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d1 2
+a2 2
+#title revel - Go 기반의 웹 프레임워크
+
+@

@@ -1,0 +1,40 @@
+#title BITCOUNT key [start end]
+
+=== BITCOUNT ===
+{{{#!plain
+BITCOUNT key [start end]
+}}}
+ * 2.6.0 부터 지원 
+ * 시간 복잡도 : O(N)
+문자열(string)에서 bit의 숫자를 카운팅한다. 카운터로 널리 사용한다. 이 연산은 문자열에 포함도니 모든 바이트들을 조사한다. 추가적으로 특정 범위의 바이트 조사도 가능하다.   
+
+=== 반환 값 ===
+비트의 값이 1로 설정된 갯수
+
+=== 예제 ===
+{{{#!plain
+> setbit visitor:20141224 1 1
+(integer) 0
+> setbit visitor:20141224 10 1
+(integer) 0
+> setbit visitor:20141224 100 1
+(integer) 0
+> setbit visitor:20141224 111 1
+(integer) 0
+> setbit visitor:20141224 1110001 1
+(integer) 0
+> BITCOUNT visitor:20141224
+(integer) 5
+}}}
+2014년 12월 24일 고객 방문을 카운팅하는 예제다. '''Value'''는 고객의 ID로, ID가 1,2,4,7,113인 고객의 방문기록(Unique vistor이다)을 담고 있다. BITCOUNT는 5다.
+
+=== 사용패턴 ===
+비트맵(bitmap)은 많은 수의 특정 정보(0과 1로 표현할 수 있는 상태정보)를 적은 공간에 담기 위해서 사용 할 수 있다. 웹 애플리케이션에서 유저의 방문 기록을 남기는게 대표적인 예다. 
+
+위 예제는 사이트에 대한 UV를 측정하고 있는데, 유저별로 비트맵을 작성하는 식으로 유저의 방문 통계를 만들 수 있다. 첫번째 날은 0 두번째 날은 1 이런식이다. 아래 예제는 20140101부터의 '''USER_ID'''유저의 방문기록을 담고 있다. 1/2, 1/3일 방문 했음을 알 수 있다.   
+{{{#!plain
+> setbit visitor:20140101:USER_ID 0 0
+> setbit visitor:20140101:USER_ID 1 1 
+> setbit visitor:20140101:USER_ID 2 1
+> setbit visitor:20140101:USER_ID 3 0
+}}}

@@ -1,122 +1,6 @@
-head	1.7;
-access;
-symbols;
-locks
-	root:1.7; strict;
-comment	@# @;
-
-
-1.7
-date	2014.12.22.14.51.11;	author root;	state Exp;
-branches;
-next	1.6;
-
-1.6
-date	2014.12.13.04.14.45;	author root;	state Exp;
-branches;
-next	1.5;
-
-1.5
-date	2014.12.08.06.56.26;	author root;	state Exp;
-branches;
-next	1.4;
-
-1.4
-date	2014.12.07.16.12.21;	author root;	state Exp;
-branches;
-next	1.3;
-
-1.3
-date	2014.12.05.09.49.14;	author root;	state Exp;
-branches;
-next	1.2;
-
-1.2
-date	2014.12.05.01.59.22;	author root;	state Exp;
-branches;
-next	1.1;
-
-1.1
-date	2014.12.03.08.44.49;	author root;	state Exp;
-branches;
-next	;
-
-
-desc
-@./data/text/man_2f12_2fzookeeper
-@
-
-
-1.7
-log
-@119.64.102.68;;yundream;;
-@
-text
-@#title Zookeeper
+#title Zookeeper Watcher 개발
 [[TableOfContents]]
-== Zookeeper == 
-'''Apache Zookeeper'''는 대규모의 분산시스템 관리를 도와주는 애플리케이션이다. 분산 설정 서비스, 서비스 동기화, 이름 관리(naming registry)등의 기능을 이용해서 분산시스템을 관리한다. Hadoop의 서브 프로젝트로 시작했는데, (2104년 12월)지금은 top-level 프로젝트다.
-
-예전부터 관심은 가지고 있었으나 분산처리 시스템 관리를 할 필요가 없어서, 잊어버리고 있었다. 최근 MQTT Cluster 구성과 관련된 고민을 하면서, 주키퍼를 공부하기로 마음 먹었다.
-
-=== Distributed Coordination Service for Distributed Application === 
-분산 애플리케이션을 위한 분산 관리(코디네이터)시스템으로 정의 할 수 있다. 주키퍼를 이용해서 응용 프로그램의 동기화, 구성관리, 설정관리와 그룹 과 네이밍을 쉽게 관리할 수 있다.
-
-=== 서비스 구성 ===
-주키퍼 서비스의 구성은 아래와 같다.
-
-{{{#!html
-<img src="https://docs.google.com/drawings/d/1GQRFpCmjfQGfX4dYBEBoBPl3nyXY2jT1HuVBJk4Cctg/pub?w=850&amp;h=283">
-}}}
-
-주키퍼는 대용량의 분산 시스템을 관리하는 것을 목적으로 하고 있다. 시스템을 관리하는 녀석이 뻗어버리면 안되니, 주키퍼 서비스 자체도 클러스터를 구성을 한다. 클러스터는 최소 3개 이상의 서버로 구성을 해야 한다. 주키퍼 클러스터를 구성하는 서버들은 데이터가 정확히 동기화 되야 하는데, 여러 이유로 데이터가 어긋날 수 있다. 이 경우 과반 투표를 해서 데이터를 서로 동기화를 해야 하는데, 결과를 정확히 하기 위해서(동수 투표가 나오지 않도록 하기 위해서) 홀수로 구성한다.    
-
-서버 클라이언트 모델을 따른다. 관리하는 노드들에는 주키퍼 클라이언트가 설치되서 주키퍼 서버에 연결을 한다. 클라이언트와 서버는 TCP로 연결되며, 이 통신회선을 통해서 요청과 응답, watch events, heaert beats 정보들을 주고 받으면서 클러스터의 형상을 관리한다. 서버와의 연결이 끊기면, 다른 서버로 연결한다. 
-
-=== 데이터 모델 ===
-주키퍼는 표준파일 시스템과 같은 네임 공간(name space)를 이용해서 클러스터 정보를 계층화 한다.
-
-{{{#!html
-<img src="https://docs.google.com/drawings/d/1hn6paf1nng0SlpakzvXcGrvLHffI4G-4hc8skqZFtE8/pub?w=492&amp;h=341">
-}}}
-
-주키퍼의 네임스페이스를 구성하는 노드들(파일 시스템에서의 디렉토리나 파일)을 '''znode'''라고 부른다. znode에는 상태, 설정, 위치 정보등 코디네이션을 위한 정보들을 가지고 있다. znode에 저장되는 데이터들은 버전관리를 한다.
-
-주키퍼는 '''watch''' 개념을 지원한다. 클라이언트는 znode의 watch로 설정할 수 있다. watch는 znode의 정보가 변경되면, 이 정보를 클라이언트에 전송한다. 이번에 써먹을 기능이다. 
-
-=== 주요 API ===
-주키퍼는 아주 간단한 프로그래밍 인터페이스를 제공한다. 
- * create : 트리에 노드를 추가한다. 
- * delete : 노드를 삭제한다.
- * exists : 노드가 있는지 검사한다.
- * get data : 노드 데이터를 읽는다.
- * set data : 노드에 데이터를 쓴다.
- * get children : 노드의 child 노드를 읽는다. 
- * sync : waits for data to be propagated
-== 활용 ==
- * [wiki:man/12/zookeeper/Watcher Zookeeper Watcher를 이용한 데이터 공유]
- * [wiki:man/12/zookeeper/ChefPush Zookeeper를 이용한 Chef Push 구현]
-@
-
-
-1.6
-log
-@119.64.102.68;;yundream;;
-@
-text
-@d44 1
-@
-
-
-1.5
-log
-@1.214.223.250;;yundream;;
-@
-text
-@a41 1
-
-d43 1
-a43 175
+== Zookeeper를 이용한 데이터 공유 ==
 === 사용 목적  ===
 [wiki:man/12/MQTT/Cluster MQTT Cluser]의 구성을 고민하고 있다. MQTT Cluster를 구성하는 각 노드들은 다른 노드들과 서로 독립적이기 때문에, 엄격한 노드관리가 필요하지는 않다. 해서 굳이 주키퍼와 같은 소프트웨어의 도움없이, Zabbix를 이용해서 클러스터를 관리하는 걸로 설계를 했다. 자빅스로 클러스터를 구성하는 노드를 모니터링 하다가 이상이 생기면, 삭제하고 이 정보를 REDIS에 저장하는 방식이다. 
 
@@ -148,6 +32,10 @@ Init 제어를 위해서 zookeeperd를 설치했다.
 }}}
 
 === 주키퍼 클러스터 설정 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1u-Kch20VTVZIxSJbAfd-a8XjxW-E0jNgN6iBwPdLqVM/pub?w=479&amp;h=274">
+}}}
+
 주키퍼의 가용성을 위해서 3개의 주키퍼 서버로 만들어진 클러스터를 설정하기로 했다. /etc/zookeeper/conf/zoo.conf 파일을 수정한다.
 {{{#!plain
 server.1=172.17.0.4:2888:3888
@@ -241,7 +129,7 @@ if zk.exists('/mqtt'):
 else:
     zk.create('/mqtt')
 
-@@zk.ChildrenWatch("/mqtt")
+@zk.ChildrenWatch("/mqtt")
 def watch_children(children, func=my_func):
     print children
 
@@ -292,98 +180,3 @@ zk.stop()
   1. Node에 문제가 생기면, 문제의 노드를 Zookeeper에서 삭제한다.  
      * 우선 ELB에서 노드를 제외해서, 노드로 요청이 가지 않도록 한다.
 문제의 노드는 더이상 메시지를 처리하지 않지만 여전히 작동 중이기 때문에, 문제의 원인을 찾는 활동을 계속할 수 있다. 
-@
-
-
-1.4
-log
-@119.64.102.68;;yundream;;
-@
-text
-@d4 1
-a4 1
-'''Apache Zookeeper'''는 대규모의 분산시스템 관리를 위한 애플리케이션이다. 분산 설정 서비스, 서비스 동기화, 이름 관리(naming registry)등의 기능을 이용해서 분산시스템을 관리한다. Hadoop의 서브 프로젝트로 시작했는데, 지금은 top-level 프로젝트다.
-d6 1
-a6 1
-예전부터 관심은 가지고 있었으나 분산처리 시스템 관리에 대한 필요가 없어서, 잊어버리고 있었다. 최근 MQTT Cluster 구성과 관련된 고민을 하면서, 주키퍼를 공부하기로 마음 먹었다.
-d18 1
-a18 1
-주키퍼는 대용량의 분산 시스템을 관리하는 것을 목적으로 하고 있다. 시스템을 관리하는 녀석이 뻗어버리면 안되니, 주키퍼 서비스 자체도 클러스터 구성을 한다. 클러스터는 최소 3개 이상의 서버로 구성을 해야 한다. 주키퍼 클러스터를 구성하는 서버들은 데이터가 정확히 동기화 되야 하는데, 여러 이유로 데이터가 어긋날 수 있다. 이 때는 과반 투표를 해서 데이터를 서로 동기화를 해야 하는데, 투표결과를 정확히 하기 위해서 홀수로 구성을 한다.    
-d23 1
-a23 1
-주키퍼는 표준파일 시스템과 같은 네임 공간(name space)를 이용해서 클러스터 정보를 계층화 한다. 
-d31 1
-a31 1
-주키퍼는 '''watch''' 개념을 지원한다. 클라이언트는 znode의 watch로 설정할 수 있다. watch는 znode의 정보가 변경되면, 이 정보를 클라이언트에 전송한다.
-a34 1
-
-d45 3
-a47 1
-[wiki:man/12/MQTT/Cluster MQTT Cluser]의 구성을 고민하고 있다. MQTT Cluster를 구성하는 각 노드들은 다른 노드들과 서로 독립적이기 때문에, 엄격한 노드관리가 필요하지는 않다. 해서 굳이 주키퍼와 같은 소프트웨어의 도움없이, Zabbix를 이용해서 클러스터를 관리하는 걸로 설계를 했다.
-d49 1
-a49 1
-관리하는데 별 문제는 없는 것 같은데, Zabbix가 '''single point failuer'''상태인게 거슬린다. HA 구성을 해야 하는데, 귀찮아서 주키퍼를 도입하기로 했다. 
-d51 2
-a52 2
-  1. 문제가 생기면, 노드 상태정보를 조작하는 프로세스에 callback를 보낸다. 
-  1. 노드 상태정보를 관리하는 프로세스는 REDIS BitMap 테이블을 정리해서, 문제의 노드를 이용하지 않도록 조치를 취한다.
-d130 1
-a130 1
-GMP가 작동중인 노드의 목록을 공유하는게 목적이다.
-d138 1
-a138 3
-(Java 언어를 이용하지 않기 때문에)Python Kazoo를 이용하기로 했다.
-
-[https://kazoo.readthedocs.org/en/latest/ Kazoo] 모듈을 설치했다. 나는 apt-get으로 설치했다.
-@
-
-
-1.3
-log
-@1.214.223.250;;yundream;;
-@
-text
-@a1 1
-<!>미완성
-d206 14
-@
-
-
-1.2
-log
-@1.214.223.250;;yundream;;
-@
-text
-@d2 1
-a2 1
-
-d8 1
-d126 75
-d202 5
-@
-
-
-1.1
-log
-@1.214.223.250;;yundream;;
-@
-text
-@a2 1
-<!> 미완성
-d36 7
-a42 14
-create
-  트리에 노드를 추가한다. 
-delete
-  노드를 삭제한다.
-exists
-  노드가 있는지 검사한다.
-get data
-  노드 데이터를 읽는다.
-set data
-  노드에 데이터를 쓴다.
-get children
-  노드의 child 노드를 읽는다. 
-sync 
-  waits for data to be propagated
-@

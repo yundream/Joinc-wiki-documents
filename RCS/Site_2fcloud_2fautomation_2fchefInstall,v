@@ -1,10 +1,45 @@
-head	1.10;
+head	1.17;
 access;
 symbols;
 locks
-	root:1.10; strict;
+	root:1.17; strict;
 comment	@# @;
 
+
+1.17
+date	2014.12.22.11.31.40;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2014.12.22.11.31.06;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2014.12.16.05.30.07;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.12.16.04.14.09;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.12.16.03.39.20;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.12.15.15.29.00;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.12.15.10.15.49;	author root;	state Exp;
+branches;
+next	1.10;
 
 1.10
 date	2014.03.09.03.27.06;	author root;	state Exp;
@@ -62,7 +97,7 @@ desc
 @
 
 
-1.10
+1.17
 log
 @119.64.102.68;;yundream;;
 @
@@ -70,6 +105,14 @@ text
 @#title chef install
 
 [[tableofcontents]]
+== 소개 ==
+현재 ([[Date(2014-12-16T05:30:07)]])Chef의 최신 버전은 12다. 이 문서는 원래 chef 10을 기준으로 하고 있었는데, 이번 기회에 12버전을 기준으로 다시 작성하기로 했다. 12 버전으로 작성하면서, 이전 chef를 업그레이드 하는 작업도 동시에 했다.    
+
+결론 부터 이야기 하자면 이렇다.
+  1. Chef는 Chef os를 지향하고 있다. 패키지 크기만 400M가 넘는 굉장히 큰 소프트웨어가 됐다. 지나치게 시스템이 복잡해진다는 느낌든다.   
+  1. 거대해진 만큼 다양한 기능들이 추가됐다. 특히 관리 기능이 강화됐다. 예전에는 [wiki:Site/cloud/automation/chefknife knife]로 삽질했던 것들의 대부분을 웹 콘솔에서 끝낼 수 있다.
+  1. 난 거대하고 복잡한 시스템에 대한 거부감을 가지고 있다. 일단 설치를 하고 나면 잘 돌아간다고 하지만, 거대할 수록 제대로 설치하기가 쉽지 않기 때문이다. 아주 다행히도, 두어번의 시행착오를 겪는 정도로 쉽게 설치할 수 있었다. 
+
 == Chef 구성 ==
 Chef를 설치하기 전에 Chef로 어떻게 형상관리가 이루어지는지 간단하게 정리하고 넘어가야 할 것 같다. 
 
@@ -84,7 +127,355 @@ Chef는 크게 3개 영역으로 구성된다.
 
 이 문서는 이 3개의 영역을 어떻게 구축하는지에 대한 정보를 담고 있다.
 
+== Chef Server Install ==
+=== 설치하기 전에 ===
+Chef는 원래 다양한 애플리케이션의 구성이었지만, 그 구성이 더 복잡해지고 거대해졌다. 리눅스 패키지의 크기만 해도 400M가 넘어간다. 데이터베이스 시스템, 검색 서비스, 웹 서비스, 메시지 큐, 로드밸런싱, HA, REDIS 등의 서비스가 녹아있는 '''All in one''' 서비스다. Chef OS라고 불러도 되겠다. 
+
+규모가 커진만큼 시스템 자원도 많이 먹는다. 예전에 했던대로 512M 메모리를 할당한 인스턴스에 설치하다가 메모리가 부족 때문에 실패했다. 1024M로 늘리니까 제대로 설치가 되더라. 단순한 걸 좋아하는 나로서는 반갑지 않은 변화이긴 한데, 뭐 이미 chef를 사용하고 있으니 어쩔 수 없다. 관리 기능이 편해졌겠지라는 것에 위안을 삼고 설치를 진행했다. 
+
+=== 설치 환경 ===
+ * 운영체제 : 우분투 리눅스 14.10에 설치 했다. 
+ * [wiki:Site/cloud/virtualbox Virtualbox] : chef server가 워낙에 다양한 패키지로 이루어져있어서, 이미 설치된 패키지들과 충돌이 날 수도있으니 깔끔한 운영체제에 설치하도록 한다.
+ * 인스턴스 기본 설정 값 : chef server가 설치된 운영체제의 기본 값이다.
+    * IP : 192.168.56.2 
+    * hostname : chef.yundream.com  
+
+=== standalone install ===
+Chef의 최신 패키지는 http://downloads.chef.io/chef-server/ 에서 다운로드 할 수 있다. Redhat Enterprise Linux와 Ubuntu Linux를 다운로드 할 수 있다. 14.04용 패키지를 다운로드 했다. Chef는 3가지 인스톨 타입이 있는데, 비교적 단순한 '''standalone'''으로 설치하기로 했다. 
+{{{#!plain
+# dpkg -i chef-server-core_12.0.0-1_amd64.deb 
+}}}
+
+'''chef-server-ctl'''이라는 관리 콘솔 프로그램이 설치된다. chef 서비스를 재 설정하자. 
+{{{#!plain
+# chef-server-ctl reconfigure
+}}}
+
+어드민 유저를 만든다.
+{{{#!plain
+# chef-server-ctl user-create user_name first_name last_name email password --filename FILE_NAME
+}}}
+
+이 명령을 실행하면 자동으로 RSA private key를 만든다. '''--filename'''옵션으로 RSA private key를 파일로 저장할 수 있다. 나는 yundream이라는 이름의 어드민 계정을 만들었다. 
+{{{#!plain
+# chef-server-ctl user-create yundream yun dream yundream@@gmail.com 123456 --filename yundream.key
+}}}
+
+유저가 만들어졌는지 확인
+{{{#!plain
+# chef-server-ctl user-list
+pivotal
+yundream
+}}}
+
+조직(organization)을 만들었다.
+{{{#!plain
+# chef-server-ctl org-create short_name full_organization_name --association_user user_name --filename FILE_NAME
+}}}
+명령을 실행하면 RSA private key를 만든다. '''--filename'''옵션을 이용해서 파일로 저장했다.
+{{{#!plain
+# chef-server-ctl org-create joinc joinc.co.kr --association_user yundream --filename joinc.key
+}}}
+
+chef-server-ctl은 관리자를 위한 다양한 기능을 포함하고 있는데, 그 중 외부 패키지를 설치하기 위한 '''install''' 기능을 가지고 있다. 이 명령을 이용해서 http://packagecloud.io 에 있는 패키지들을 다운로드해서 설치할 수 있다. 1. chef Manage, 2. Chef Push Jobs, 3. Chef Replication, 4. Reporting 등의 패키지를 다운로드 할 수 있다. 이중 Chef Manager를 설치했다. 이 패키지는 data bags, attributes, run-lists, roles, environments, cookbook 관리를 위한 웹 인터페이를 제공한다. 필수 패키지라고 할 수 있겠다. 
+{{{#!plain
+# chef-server-ctl install opscode-manage
+}}}
+하고 나서
+{{{#!plain
+# opscode-manage-ctl reconfigure
+}}}
+마지막으로
+{{{#!plain
+# chef-server-ctl reconfigure
+}}}
+하면 된다. 웹 브라우저를 이용해서 접근해 보자. 웹 기반의 관리자 콘솔을 확인할 수 있을 거다. user-create로 만들었던 유저(yundream)으로 로그인 하면 된다.
+
+https://lh5.googleusercontent.com/-DgtlaAK5BEk/VI72M2mXEOI/AAAAAAAAEnI/rp-2Ae9HHXU/s640/chef_01.png
+
+opscode-reporting 패키지도 설치하자. 이 패키지를 설치해야 opscode-manage에 있는 reporting 기능을 이용할 수 있다. 
+{{{#!plain
+# chef-server-ctl install opscode-reporting
+# opscode-reporting-ctl reconfigure
+# chef-server-ctl reconfigure
+}}}
+
+=== 유저 생성 ===
+이 문서의 목적은 chef server를 설치하고 knife를 이용해서 chef 데이터를 관리하는 것 까지다. Chef server에 접근해서 데이터 작업을 하려면, chef에 클라이언트로 등록해야 한다. 앞서 설치한 웹 콘설에서 클라이언트를 관리할 수 있다. 클라이언트를 만들어 보자. 웹 콘설에 로그인 한 후 '''Policy > Clients > Create'''를 선택한다. 아래와 같은 클라인터 입력창이 뜬다. 
+
+https://lh3.googleusercontent.com/-GOgivZd3zMo/VI76QmYGNRI/AAAAAAAAEnc/CD-XCegamDQ/s640/chef_04.png
+
+클라이언트 이름을 입력하면, 인증에 사용할 RSA Private key를 만들어준다. Private key는 서버에 저장되지 않으니, 작업 PC에 파일형태로 저장을 해야 한다.
+
+이제 웹 콘솔에 방금 추가한 yundream-chef 유저가 보일 거다. 예전버전(chef 10)에서는 knife를 이용해서 콘솔에서 클라이언트 작업을 했는데, 웹 만으로 유저 생성/삭제, 퍼미션 관리, Reset key등등을 몽땅 할 수 있다. 간단히 사용할 수 있을 것 같다.  
+
+== Chef workstation 설정 ==
+Chef workstation은 chef 개발자의 작업 PC라고 보면된다. 개발자는 workstation에 접속해서(로컬 PC일 수도 있고, 원격에 있는 작업 환경일 수도 있겠다.) chef를 조작할 수 있다. 
+
+=== knife 설정 ===
+Workstation에서의 거의 모든 작업은 '''knife'''라는 chef 툴을 이용해서 수행한다. knife로 할 수 있는 일들은 다음과 같다.   
+  * Cookbook의 생성,삭제,수정 
+  * Data Bags의 생성, 삭제, 수정
+  * Chef Node의 등록, 삭제, 수정
+  * Role의 등록, 삭제, 수정  
+한 마디로 요약하자면 '''knife를 이용해서 모든 일을 다 할 수 있다'''
+
+Workstation으로 내 리눅스 박스를 이용하기로 했다. 깔끔한 진행을 위해서 '''workstation'''이라는 리눅스 계정을 하나 만들었다.
+{{{#!plain
+# adduser workstation
+# sudo su - workstation
+}}}
+
+knife는 chef 자원에 접근해야 하기 때문에, 먼저 chef client를 등록해야 한다. 이전에 등록한 '''yundream''' 을 그대로 사용하기로 했다. '''yundream'''이라는 계정을 인증하기 위해서는 유저가 해당 조직(organizations)에 속해있는 지를 확인하기 위한 '''key'''와 유저 자신을 증명하기 위한 '''key'''두 개가 필요하다.
+
+유저 자신을 증명하기 위한 RSA key는 '''yundream.pem'''이라는 이름으로 만들어진 걸 사용한다. 다음 '''joinc'''에 대한 RSA private key를 만들어야 한다. 웹 콘솔의 '''Administration > Organizations > Reset Validation Key'''명령을 이용해서 만들 수 있다. '''join-validator.pem'''으로 저장하자.  
+
+이제 knife 설정 파일을 만들어야 한다. 예전에는(chef 10 버전때) '''knife configure'''를 이용해서 대화식으로 만드는 방법을 사용했는데, 웹 콘솔에서도 설정파일을 다운로드 받을 수 있다. '''Administration > Organization > Generate Knife Config'''를 이용해서 설정 파일을 다운로드 하자.
+
+지금까지의 작업으로 3개의 파일이 준비됐을 거다. 확인해 보자.
+  1. knife.rb 
+  1. yundream.pem
+  1. join-validator.pem
+자 이제 이들 파일을 저장하기 위한 .chef 디렉토리를 만들어서 위 3개의 파일을 모두 옮기자.
+{{{#!plain
+# mkdir .chef
+# mv knife.rb yundream.pem join-validator.pem .chef
+}}}
+
+knife.rb 파일 설정을 확인해보자. 나는 current_dir을 변경했다. 
+{{{#!plain
+current_dir = "#{ENV['HOME']}/.chef"
+log_level                :info
+log_location             STDOUT
+node_name                "yundream"
+client_key               "#{current_dir}/yundream.pem"
+validation_client_name   "join-validator"
+validation_key           "#{current_dir}/join-validator.pem"
+chef_server_url          "https://192.168.56.2/organizations/join"
+cache_type               'BasicFile'
+cache_options( :path => "#{ENV['HOME']}/.chef/checksums" )
+cookbook_path            ["#{current_dir}/../cookbooks"]
+}}}
+  * current_dir : $HOME 정도로 바꾸는게 편할 거다. 
+  * client_key : 웹 콘솔에서 다운로드 받은 RSA private key 파일
+  * validation_key : chef_server_url 에 대한 접근을 확인하기 위한 RSA private key 파일 
+  * chef_server_url : API를 호출할 chef server url 
+knife가 제대로 작동하는지 테스트 해보자. 
+{{{#!plain
+# knife user list 
+yundream
+}}}
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d158 1
+a158 2
+  * chef_server_url : API를 호출할 chef server url   
+
+@
+
+
+1.15
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d5 1
+a5 1
+처음 chef를 이용해서 인프라를 관리 할 때의 버전이 10이었고, 이 문서도 chef 10을 기준으로 하고 있다. 일단 구축한 다음에는 chef 버전은 신경끄고, 쿡북과 레시피 관리만 하면서 살아왔다. 어느덧 두번의 메이저 업데이트로 ([[Date(2014-12-16T05:30:07)]])현재 12 버전이 올라왔다. 잘 돌아는 가고 있지만, 메이저 버전과의 차이를 계속 벌이는 건 좋은 생각이 아닌 것 같아서. chef 12를 살펴보기로 했다. 가능하면 마이그레이션하는 것 까지를 목표로 한다. 
+d9 2
+a10 1
+  1. 거대해진 만큼 다양한 기능들이 추가됐다. 특히 관리 기능이 강화됐다. 예전에는 knife로 삽질했던 것들의 대부분을 웹 콘솔에서 끝낼 수 있다.
+d34 1
+a34 1
+ * Virtualbox : chef server가 워낙에 다양한 패키지로 이루어져있어서, 이미 설치된 패키지들과 충돌이 날 수도있으니 깔끔한 운영체제에 설치하도록 한다.
+a159 1
+
+@
+
+
+1.14
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a2 1
+<!> 이 문서를 만들 때 chef 버전이 10 이었다. 현재([[Date(2014-12-15T10:15:49)]]) 버전은 12로 설치에 많은 변화가 있다. 현재 버전에 맞춰 문서를 다시 만들기로 했다. 적응하는데, 시간이 좀 걸릴 것 같다. 
+d4 7
+a164 106
+성공 !!!
+
+== chef client 설정 ==
+=== 첫번째 cookbook 만들기 ===
+첫번째 cookbook을 만들어 보자. cookbook의 이름은 '''HelloWorld'''로 /tmp 디렉토리 밑에 '''HelloWorld.txt'''파일을 만든다. chef server에서 knife를 이용해서 cookbook을 만든다. cookbook을 만들기 위해서는 attributes, recipes, templates 등 다양한 요소들을 알고 있어야 하는데, 여기에서는 이들을 설명하지 않을 것이다.
+{{{#!plain
+# knife cookbook create HelloWorld
+** Creating cookbook HelloWorld
+** Creating README for cookbook: HelloWorld
+** Creating metadata for cookbook: HelloWorld
+}}}
+/var/chef/cookbooks 디렉토리 밑에 HelloWorld 디렉토리가 만들어진걸 확인할 수 있을 것이다. 
+
+HelloWorld/attributes/HelloWorld.rb 문서를 만든다. cookbook에서 사용할 속성들을 정의 한다. 
+{{{#!plain
+# message라는 변수를 정의했다는 정도로 이해하고 넘어가자.
+default['message']="Hello world!!"
+}}}
+
+HelloWorld/recipes/default.rb를 수정하자.
+{{{#!plain
+# HelloWorld.txt.erb라는 template 파일을 이용해서
+# /tmp/HelloWorld.txt 파일을 만들겠다는 의미다. 
+template "/tmp/HelloWorld.txt" do
+        source "HelloWorld.txt.erb"
+        variables :message => node['message']
+        action :create
+end
+}}}
+
+템플릿 파일을 만들 차례다. HelloWorld/template/default/HelloWorld.txt.erb 파일을 만든다.
+{{{#!plain
+My Message is : <%= @@message %>
+}}}
+
+만든 cookbook를 업로드 한다. 
+{{{#!plain
+# knife cookbook upload -a -o ./
+Uploading HelloWorld             [0.0.1]
+upload complete
+}}}
+이제 chef client는 HelloWorld cookbook을 이용할 수 있게 됐다. 그러나 아무 chef client나 이 cookbook을 이용할 수 있는 건 아니다. chef server에 등록한 node만이 이 cookbook을 사용할 수 있다. chef-client.yundream.com node가 HelloWorld를 사용할 수 있도록 하자. 
+{{{#!plain
+# knife node run_list add chef-client.yundream.com 'recipe[HelloWorld]'
+run_list:  recipe[HelloWorld]
+# knife node show chef-client.yundream.com -r
+run_list:  recipe[HelloWorld]
+}}}
+
+chef client에서 chef-client를 실행해 보자.
+{{{#!plain
+# chef-client 
+[Wed, 15 Feb 2012 00:14:16 +0900] INFO: *** Chef 0.10.6 ***
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Run List is [recipe[HelloWorld]]
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Run List expands to [HelloWorld]
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Starting Chef Run for chef-client.yundream.com
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Running start handlers
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Start handlers complete.
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Loading cookbooks [HelloWorld]
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Storing updated cookbooks/HelloWorld/recipes/default.rb in the cache.
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Processing template[/tmp/HelloWorld.txt] action create (HelloWorld::default line 10)
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: template[/tmp/HelloWorld.txt] updated content
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Chef Run complete in 0.316655 seconds
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Running report handlers
+[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Report handlers complete
+}}}
+설정이 업데이트되었다는 메시지를 확인할 수 있다.
+{{{#!plain
+# cat /tmp/HelloWorld.txt 
+My Message is : Hello world!!
+}}}
+원했던데로 /tmp/HelloWorld.txt 파일이 만들어졌다.
+
+== chef server 초기화 ==
+chef는 상당히 많은 소프트웨어 패키지의 조합이다. 특히 rabbitmq-server 라든가 couchdb같은 경우에는 데이터를 관리하기 때문에, 패키지를 삭제한 후에도 정보파일이 여전히 남아 있다. 이 상태에서 chef server를 설치하면, 이전 정보와 꼬이게 된다. 따라서 패키지를 삭제하고, 파일까지 추적해서 삭제해야 한다. 
+
+삭제 패키지 목록
+  1. rubygem-chef-*  
+  1. couchdb 
+  1. rabbitmq-server
+삭제 파일 목록
+  1. /var/lib/couchdb
+  1. /var/lib/rabbitmq
+
+
+== 앞으로 할일 ==
+  1. chef 관리 
+  1. mysql replication을 위한 coookbook 만들어 보기
+  1. dhcp 서버 구축을 위한 cookbook 만들어 보기
+  1. chef 개발 환경 고민해보기
+     * svn, git 등과 연동해서
+== 용어 정리 ==
+  1. Knife : chef의 커멘드라인 API 툴 
+  1. Cookbooks : chef의 코드 배포단위 
+  1. Roles : 
+  1. Data Bags : 
+
+== 관련글 ==
+  1. http://blog.afistfulofservers.net/post/2011/03/16/a-brief-chef-tutorial-from-concentrate/
+
+== 문서 히스토리 ==
+  1. 2012년 2월 13일 작성 
+  1. 수정
+     * [[Date(2012-11-08T09:10:04)]] : chef client 등록 과정 수정 
+[[tag(chef,cloud)]]
+[[category(50)]]
+@
+
+
+1.13
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d134 1
+a134 1
+knife.rb파일이 제대로 설정됬는지 확인해 보자.
+d136 1
+a136 1
+current_dir = File.dirname(__FILE__)
+d148 5
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d20 5
+d47 1
+d52 1
+d59 1
+d92 1
+a92 1
+=== 유저 관리 ===
+d102 54
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d21 5
+a25 1
+우분투 리눅스 14.10에 설치 했다. chef server가 워낙에 다양한 패키지로 이루어져있어서, 이미 설치된 패키지들과 충돌이 날 수도있으니 깔끔한 운영체제에 설치하도록 한다. 나는 virtualbox를 이용했다. 
+d27 2
+a28 2
 == chef install ==
+Chef의 최신 패키지는 http://downloads.chef.io/chef-server/ 에서 다운로드 할 수 있다. Redhat Enterprise Linux와 Ubuntu Linux를 다운로드 할 수 있다. 14.04용 패키지를 다운로드 했다. 
+d30 1
+a30 1
+# dpkg -i  
+d33 60
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+d19 4
+d24 1
+a24 48
 클라우드의 가장 큰 이슈 중의 하나가 "어떻게 설정을 자동화할수 있을까?"이다. 예컨데 automatic. 몇 가지 automatic 툴들이 있는 것 같은데, chef를 선택했다. 이유는 딴거 없고, 회사에서 쓰고 있기 때문.
 
 처음엔 그냥 만들어져 있는 chef 코드만 분석해도 시스템을 이해할 수 있겠거니라고 생각했는데, 역시 프로그램은 직접 설치해서 실행도 해보고 예제 만들어서 테스트도 해봐야 머리속에 정리가 되는 것 같다. 해서 간단하게나마 직접 설치해 보기로 했다. 여기에는 chef 설치와 관련된 최소한의 내용만 포함한다. 
@@ -133,7 +524,8 @@ setup script를 실행한다.
  * RabbitMQ : 5672
  * Chef Solr : 8983 
 설치 후 init.d에 등록된다.
-{{{#!plain
+d26 1
+a26 52
 # /etc/init.dchef-server restart|stop|start
 }}}
 
@@ -186,9 +578,8 @@ solr_heap_size  "256M"
 umask 0022
 
 Mixlib::Log::Formatter.show_time = false
-}}}
-
-== Chef workstation 설정 ==
+d30 1
+a30 104
 === 개요 ===
 개발자는 Chef workstation에서 chef 코드를 개발한다. '''ruby DSL'''로 개발을 하며, chef에서 제공하는 knife를 이용해서 코드와 인프라 관리를 한다. 코드를 만드는 걸 제외하면, 실제 chef 시스템의 관리는 전적으로 knife를 통해서 이루어진다. Chef workstation 설정이라는 것은 결국 개발자 PC에서 chef knife를 운용할 수 있는 환경을 만드는 거라고 보면 된다. 
 
@@ -293,109 +684,6 @@ chef server에서 knife로 node 정보를 확인해 보자.
 chef-client.yundream.com 
 }}}
 
-=== 첫번째 cookbook 만들기 ===
-첫번째 cookbook을 만들어 보자. cookbook의 이름은 '''HelloWorld'''로 /tmp 디렉토리 밑에 '''HelloWorld.txt'''파일을 만든다. chef server에서 knife를 이용해서 cookbook을 만든다. cookbook을 만들기 위해서는 attributes, recipes, templates 등 다양한 요소들을 알고 있어야 하는데, 여기에서는 이들을 설명하지 않을 것이다.
-{{{#!plain
-# knife cookbook create HelloWorld
-** Creating cookbook HelloWorld
-** Creating README for cookbook: HelloWorld
-** Creating metadata for cookbook: HelloWorld
-}}}
-/var/chef/cookbooks 디렉토리 밑에 HelloWorld 디렉토리가 만들어진걸 확인할 수 있을 것이다. 
-
-HelloWorld/attributes/HelloWorld.rb 문서를 만든다. cookbook에서 사용할 속성들을 정의 한다. 
-{{{#!plain
-# message라는 변수를 정의했다는 정도로 이해하고 넘어가자.
-default['message']="Hello world!!"
-}}}
-
-HelloWorld/recipes/default.rb를 수정하자.
-{{{#!plain
-# HelloWorld.txt.erb라는 template 파일을 이용해서
-# /tmp/HelloWorld.txt 파일을 만들겠다는 의미다. 
-template "/tmp/HelloWorld.txt" do
-        source "HelloWorld.txt.erb"
-        variables :message => node['message']
-        action :create
-end
-}}}
-
-템플릿 파일을 만들 차례다. HelloWorld/template/default/HelloWorld.txt.erb 파일을 만든다.
-{{{#!plain
-My Message is : <%= @@message %>
-}}}
-
-만든 cookbook를 업로드 한다. 
-{{{#!plain
-# knife cookbook upload -a -o ./
-Uploading HelloWorld             [0.0.1]
-upload complete
-}}}
-이제 chef client는 HelloWorld cookbook을 이용할 수 있게 됐다. 그러나 아무 chef client나 이 cookbook을 이용할 수 있는 건 아니다. chef server에 등록한 node만이 이 cookbook을 사용할 수 있다. chef-client.yundream.com node가 HelloWorld를 사용할 수 있도록 하자. 
-{{{#!plain
-# knife node run_list add chef-client.yundream.com 'recipe[HelloWorld]'
-run_list:  recipe[HelloWorld]
-# knife node show chef-client.yundream.com -r
-run_list:  recipe[HelloWorld]
-}}}
-
-chef client에서 chef-client를 실행해 보자.
-{{{#!plain
-# chef-client 
-[Wed, 15 Feb 2012 00:14:16 +0900] INFO: *** Chef 0.10.6 ***
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Run List is [recipe[HelloWorld]]
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Run List expands to [HelloWorld]
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Starting Chef Run for chef-client.yundream.com
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Running start handlers
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Start handlers complete.
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Loading cookbooks [HelloWorld]
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Storing updated cookbooks/HelloWorld/recipes/default.rb in the cache.
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Processing template[/tmp/HelloWorld.txt] action create (HelloWorld::default line 10)
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: template[/tmp/HelloWorld.txt] updated content
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Chef Run complete in 0.316655 seconds
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Running report handlers
-[Wed, 15 Feb 2012 00:14:17 +0900] INFO: Report handlers complete
-}}}
-설정이 업데이트되었다는 메시지를 확인할 수 있다.
-{{{#!plain
-# cat /tmp/HelloWorld.txt 
-My Message is : Hello world!!
-}}}
-원했던데로 /tmp/HelloWorld.txt 파일이 만들어졌다.
-
-== chef server 초기화 ==
-chef는 상당히 많은 소프트웨어 패키지의 조합이다. 특히 rabbitmq-server 라든가 couchdb같은 경우에는 데이터를 관리하기 때문에, 패키지를 삭제한 후에도 정보파일이 여전히 남아 있다. 이 상태에서 chef server를 설치하면, 이전 정보와 꼬이게 된다. 따라서 패키지를 삭제하고, 파일까지 추적해서 삭제해야 한다. 
-
-삭제 패키지 목록
-  1. rubygem-chef-*  
-  1. couchdb 
-  1. rabbitmq-server
-삭제 파일 목록
-  1. /var/lib/couchdb
-  1. /var/lib/rabbitmq
-
-
-== 앞으로 할일 ==
-  1. chef 관리 
-  1. mysql replication을 위한 coookbook 만들어 보기
-  1. dhcp 서버 구축을 위한 cookbook 만들어 보기
-  1. chef 개발 환경 고민해보기
-     * svn, git 등과 연동해서
-== 용어 정리 ==
-  1. Knife : chef의 커멘드라인 API 툴 
-  1. Cookbooks : chef의 코드 배포단위 
-  1. Roles : 
-  1. Data Bags : 
-
-== 관련글 ==
-  1. http://blog.afistfulofservers.net/post/2011/03/16/a-brief-chef-tutorial-from-concentrate/
-
-== 문서 히스토리 ==
-  1. 2012년 2월 13일 작성 
-  1. 수정
-     * [[Date(2012-11-08T09:10:04)]] : chef client 등록 과정 수정 
-[[tag(chef,cloud)]]
-[[category(50)]]
 @
 
 

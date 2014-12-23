@@ -1,0 +1,81 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.12.22.14.13.51;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fREDIS_2fCommands_2fBLPOP
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title BLPOP key [key ...] timeout
+== BLPOP ==
+  * 2.0.0이후 버전에서 사용 
+  * 시간 복잡도 : O(1)
+BLPOP는 LPOP의 블록킹(blocking) 버전이다. LPOP는 리스트에 데이터가 없으면 즉시 '''nil'''을 반환한다. 메시지큐로 REDIS를 사용하는 애플리케이션에서 LPOP를 사용하면, 리스트에 데이터가 있는지를 검사하면서 루프를 돌게 된다.  
+
+BLPOP를 호출하면, 최소한 하나의 데이터가 준비될 때 까지, 블록킹된다. 그러다가 데이터가 준비되면, 명령 수행 끝내고 pop한 데이터를 반환한다. 루프를 돌면서 busy wait 상태에 있을 필요가 없다. 특히 메시지 큐 구현에 유리하다.    
+
+key로는 POP요청을 수행할 리스트의 이름을 사용한다. 하나 이상의 리스트에 대해서 POP요청을 할 수 있다. 마지막 매개변수로 '''timeout'''을 설정할 수 없다. timeout 시간동안 데이터가 준비되지 않으면 '''nil'''을 반환한다. timeout 값을 0으로 하면 무한정 기다린다.
+{{{#!plain
+BLPOP list1 list2 list3 0
+}}}
+
+클라이언트가 두 개 이상의 key에 대해서 BLPOP 연산을 수행할 수 있다. 만약 두 개 이상의 key에 대해서 데이터가 준비되면, 앞에 있는 하나의 key만 반환한다. 예를들어 '''BLPOP key1 key2 key3 key 4'''를 수행하고 key2와 key4에 데이터가 준비됐다면, key2만 반환한다. 한 번더 BLPOP를 수행해야지 key4 값을 가져올 수 있을 것이라고 생각할 수 있겠지만, 그 사이에 key1과 key2에 데이터가 준비된다면, 역시 뒤로 밀릴 것이다. 재수 없으면 오랜 시간 밀릴 수 있다. 주의해서 사용해야 한다.  
+
+두 개 이상의 클라이언트가 하나의 키에 대해서 BLPOP 연산을 수행할 수 있다. 데이터를 얻어서 unblock 하고, 다시 BLPOP를 호출할 경우 가장 낮은 priority를 가진다. 클라이언트에 적절히 데이터가 분산된다는 의미다. 
+
+LPUSH를 이용해서 두 개 이상의 데이터를 밀어 넣을 수 있다. REDIS 2.6이상 버전의 경우 리스트에는 c, b, a로 쌓이고, BLPOP를 수행하면 c를 가져오게 된다. 2.4 미만버전이라면 a를 먼저 가져오게 된다.  
+
+== 예제 ==
+{{{#!plain
+> del list1 list2
+(integer) 0
+> RPUSH list1 a b c
+(integer) 3
+> BLPOP list1 list2 0
+1) "list1"
+2) "a"
+> BLPOP list1 list2 0
+1) "list1"
+2) "b"
+> BLPOP list1 list2 0
+1) "list1"
+2) "c"
+}}}
+
+== 응용 패턴 : Event notification ==
+Redis SET 데이터를 기다리는 클라이언트가 있다고 가정해 보자. 이 클라이언트는 무한 루프를 돌면서 '''SPOP'''연산을 수행 할건데, SPOP는 블록킹 연산을 지원하지 않는다. BRPOP를 조합하면 블록킹 모드로 작동하도록 만들 수 있다.  
+
+클라이언트의 의사코드다.
+{{{#!plain
+LOOP forever
+    WHILE SPOP(key) returns elements
+        ... elements에 대한 연산을 한다 ...
+    END
+    BRPOP helper_key
+END
+}}}
+
+서버측 의사코드다.
+{{{#!plain
+MULTI
+SADD key element
+LPUSH helper_key x
+EXEC
+}}}
+@

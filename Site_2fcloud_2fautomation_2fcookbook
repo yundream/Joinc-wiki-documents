@@ -1,0 +1,225 @@
+#title Hello World Cookbook 만들기
+[[TableOfContents]]
+== 소개 ==
+Node에 Chef client를 설치한후 '''/tmp''' 디렉토리에 "hello.txt"파일을 만드는 Cookbook을 만들려고 한다. hello.txt는 "hello world"라는 간단한 텍스트가 적혀있다. 아래의 것들을 정리하려고 한다. 
+  * Chef client 등록 방법
+  * Chef client의 작동 메커니즘
+  * Cookbook과 레시피 코딩 
+  * 리소스([wiki:Site/cloud/automation/chefresource resource])의 사용 방법 
+  * 개발한 Cookbook의 Upload  
+이 문서의 내용은 workstation 개발 환경 설정을 끝냈다고 가정하고 있다. 아직 개발 환경을 만들지 못했다면 [wiki:Site/cloud/automation/chefInstall Chef server install]문서를 참고해서 chef 개발 환경 설정을 끝내도록 하자. 
+
+=== 개발 환경 ===
+  * Chef Server 버전 12 
+  * [wiki:Site/cloud/virtualbox VirtualBox] 
+  * 노드 운영체제 : 우분투 리눅스 14.10. VirtualBox Guest 운영체제 
+  * Workstation : 우분투 리눅스 14.10. VirtualBox Host 운영체제. 내 노트북 PC 운영체제다. 테스트를 위해서 workstation 이라는 리눅스 계정을 하나 만들었다. 
+
+Workstation 환경을 제대로 만들었다면. 아래와 같은 파일들이 있을 거다.
+{{{#!plain
+$HOME --+--- cookbooks
+        |
+        +-- .chef --+-- validator.pem
+                    |
+                    +-- knife.rb
+                    |
+                    +-- user-key.pem
+}}}
+ * cookbooks : knife.rb에 설정된 cookbook들이 저장되는 디렉토리 
+ * .chef : [wiki:Site/cloud/automation/chefknife knife] & chef client 정보들이 저장된 디렉토리
+=== 루비 프로그래밍 ===
+Chef의 모든 코드는 루비로 작성이 된다. 따라서 기본적인 루비 코딩능력이 필요하다. 그렇다고 대단한 프로그래밍 능력이 필요한 건아니다. Chef는 '''시스템 관리의  코드화'''라는 특화된 소프트웨어로, 코드 역시 '''시스템 관리'''영역으로 제한된다. python, c, java, c++ 기타 다른 어떤 언어든지 경험만 가지고 있다면, 왠만한 코드는 눈으로 다 이해할 수 있다. 
+
+=== Cookbook 만들기 ===
+Recipes는 단위 실행 요소로 chef의 가장 기본이 되는 객체다. 그냥 간단히 '''루비 코드'''라고 생각하면 된다. chef client는 이 recipes를 다운로드 해서 코드를 실행한다. cookbook은 recipes를 저장하는 컨테이너다. cookbook이라는 이름에서 알 수 있드시 cookbook은 하나 이상의 recipes를 가질 수 있다. 여기에서는 하나의 레시피를 가지는 cookbook을 만든다. 
+
+knife를 이용해서 HelloWorld 쿡북을 만들자. 
+{{{#!plain
+# knife cookbook create HelloWorld
+** Creating cookbook HelloWorld
+** Creating README for cookbook: HelloWorld
+** Creating CHANGELOG for cookbook: HelloWorld
+** Creating metadata for cookbook: HelloWorld
+}}}
+cookbook 디렉토리 밑에 '''HelloWorld''' 디렉토리가 만들어져 있는 걸 확인할 수 있을 것이다. HelloWorld 디렉토리의 구조를 확인해 보자.   
+{{{#!plain
+└── HelloWorld
+    ├── CHANGELOG.md
+    ├── README.md
+    ├── attributes
+    ├── definitions
+    ├── files
+    │   └── default
+    ├── libraries
+    ├── metadata.rb
+    ├── providers
+    ├── recipes
+    │   └── default.rb
+    ├── resources
+    └── templates
+        └── default
+}}}
+
+attributes/HelloWorld.rb 문서를 만들자. attributes에는 쿡북에서 사용할 속성들을 정의한다. 변수를 정의하는 영역이라고 보면 되겠다.   
+{{{#!plain
+default['message']='Hello World!!'
+}}}
+
+recipes/default.rb 파일을 수정해서 레시피 코드를 만들었다.
+{{{#!plain
+# Ruby의 erb 템플릿 엔진을 이용해서, 파일을 만든다. 
+# 템플릿 파일의 이름은 HelloWorld.txt.erb 이고 
+# 출력 파일은 /tmp/HelloWorld.txt 이다.
+template "/tmp/HelloWorld.txt" do
+    source "HelloWorld.txt.erb"
+    variables :message => node['message']
+    action :create
+end
+}}}
+'''template'''는 chef에서 제공하는 여러 resource 중 하나로, ruby의 erb 템플릿엔진을 이용해서 파일을 만들도록 도와준다.  모든 resource는 template 리소스와 비슷하게 사용할 수 있다. 일종의 재사용 가능한 함수이기 때문에 대부분 주요 파라미터값을 설정하는 것으로 간단하게 사용할 수 있다.     
+
+이제 erb 템플릿 파일을 만들자. 템플릿 파일의 위치는 template/default/HelloWorld.txt.erb다. 
+{{{#!plain
+My Message is : <%= @message %>
+}}}
+
+Workstation에서 작업한 cookbook을 chef server에 업로드하자.
+{{{#!plain
+# cd ./cookbooks
+# knife cookbook upload -a -o ./
+Uploading HelloWorld   [0.1.0]
+Uploaded all cookbooks.
+}}}
+
+knife를 이용해서 cookbook 목록을 확인해 보자.
+{{{#!plain
+# knife cookbook list
+HelloWorld   0.1.0
+}}}
+
+=== Chef client 설치와 Cookbook 실행 ===
+이제 HelloWorld cookbook을 chef node에 적용해보기로 하자. 테스트를 위해서 우분투 리눅스 14.10 기반의 virtualbox 인스턴스를 하나 만들었다. 이 인스턴스의 호스트 이름은 chef-node-1.joinc.co.kr 로 설정했다. 
+
+현재 chef-node-1은 chef client가 설치되지 않은 깨끗한 운영체제다. chef client 실행환경을 만드는 방법은 크게 두가지가 있다. 
+
+chef 노드의 호스트 이름은 chef-node-1.joinc.co.kr 이다. 확인하고 진행하자. 
+{{{#!plain
+# hostname 
+chef-node-01.joinc.co.kr
+}}}
+==== Bootstrap를 이용한 chef client 설치 ====
+'''knife bootstrap'''를 이용해서 설치할 수 있다. 이 방법은 chef node에 대한 SSH 접근 권한이 있을 때 사용할 수 있다.   
+
+knife bootstrap은 bootstrap 명령을 내리는 시점에서 chef node에 chef client 실행 환경을 알아서 설정해 준다.  
+{{{#!plain
+# knife bootstrap chef-node-1.joinc.co.kr -x yundream -P password --sudo
+}}}
+이렇게 하면 SSH로 chef-node-1 호스트에 접근해서 chef client를 설치하고, chef server에 대한 노드 등록까지를 한번에 끝내준다.
+
+Node가 잘 등록됐는지 확인해 보자.
+{{{#!plain
+# knife  node list
+chef-node-1.joinc.co.kr
+}}}
+show 명령으로 노드의 자세한 정보를 확인할 수 있다.
+{{{#!plain
+Node Name:   chef-node-1.joinc.co.kr
+Environment: _default
+FQDN:        chef-node-1.joinc.co.kr
+IP:          192.168.56.10
+Run List:
+Roles:       
+Recipes:
+Platform:    ubuntu 14.10
+Tags:        
+}}}
+아직 HellWorld 레시피가 등록되지 않았다.
+
+knife를 이용해서 레시피를 등록해 보자.
+{{{#!plain
+# knife node edit chef-node-1.joinc.co.kr
+}}}
+아래와 같은 node 편집창이 뜬다.
+{{{#!plain
+{
+  "name": "chef-node-1.joinc.co.kr",
+  "chef_environment": "_default",
+  "normal": {
+    "tags": [
+
+    ]
+  },
+  "run_list": [
+    "recipe[HelloWorld]"
+  ]
+}
+}}}
+run_list에 HelloWorld 레시피를 추가하고 저장하면 된다. 이제 chef-node-1에서 chef-client를 실행하면 /tmp/HelloWorld.txt 파일이 만들어진걸 확인할 수 있을 거다. 
+
+Booststrap으로 만들어진 파일을 보면, 어떤 경로로 chef-client가 설치되는지를 확인할 수 있다. 설정파일들은 /etc/chef 디렉토리에서 찾을 수 있다.  
+{{{#!plain
+# ls /etc/chef
+client.pem  client.rb  first-boot.json  validation.pem
+}}}
+  * validation.pem : Validation.pem으로 chef 서버에 인증을 한다. 인증이 성공하면 client.pem을 다운로드 받는 다. 이후 client.pem을 이용해서 레시피를 다운로드 할 수 있다.  
+  * client.rb : chef server에 대한 연결정보등이 있다. 
+  * first-boot.json : bootstrap 마지막 단계에서 chef client를 실행해서 chef server에 등록한다. 이때 사용할 정보다.
+first-boot.json 파일을 열어보면, 레시피가 없음을 알 수 있다. 말그대로 노드를 chef server에 등록만 한다.  
+
+==== chef client 직접 설치 ====
+[wiki:Site/cloud/AWS AWS]와 같은 클라우드 환경에서 인스턴스를 띄울 경우, 혹은 네트워크가 격리된 데이터센터에서 인스턴스를 프로비저닝 할 경우 bootstrap는 적당한 방법이 아닐 수 있다. Bootstrap은 1. SSH로 접근한 다음 2. www.opscode.com에서 인스톨 파일을 다운로드해서 실행하는 방식으로 chef client 환경을 설정한다. 이런 격리된 네트워크에서는 SSH로의 접근이 불가능 할 수도 있고, 인스턴스에서 인터넷으로 나갈 수 없을 수도 있다. 이런 환경에서는 chef client를 직접 설치하는 방법을 사용해야 한다. 
+
+chef-client를 설치한 다음 pem 파일 복사하고, 설정파일 만들어야 한다. chef-client를 설치하자. 
+{{{#!plain
+# apt-get install chef-client
+}}}
+validation.pem 파일을 복사하고, client.rb 설정파일을 만들어야 하는데.. 괜히 노가다 뛰지 말고 bootstrap으로 만든 client.rb와 validation.pem을 가져다가 사용하자. 지금쯤 /etc/chef 디렉토리 밑에 validation.pem과 client.rb 파일이 있을 거다.
+
+이제 chef-client를 실행하면, validation.pem을 이용해서 chef client로 등록하면 된다. 성공적으로 등록되면, client.pem 파일이 만들어진 걸 확인할 수 있을 거다.
+
+하지만 이렇게 등록하면, '''HelloWorld''' 레시피를 실행할 수가 없다. knife를 이용해서 레시피를 등록 한 뒤, chef-client를 다시 실행해줘야 하는데, 노가다다. first-boot.json을 수정하자. 
+{{{#!plain
+{"run_list":["recipe[HelloWorld]"]}
+}}}
+그리고 -j 옵션을 이용해서 chef client를 실행하면 된다. -j 옵션은 파일로 부터 Node의 어트리뷰트를 읽어오기 위해서 사용한다.
+{{{#!plain
+# chef client -j first-boot.json
+Starting Chef Client, version 11.8.2
+Creating a new client identity for chef-node-01.joinc.co.kr using the validator key.
+resolving cookbooks for run list: ["HelloWorld"]
+Synchronizing Cookbooks:
+  - HelloWorld
+Compiling Cookbooks...
+Converging 1 resources
+Recipe: HelloWorld::default
+  * template[/tmp/HelloWorld.txt] action create
+    - create new file /tmp/HelloWorld.txt
+    - update content in file /tmp/HelloWorld.txt from none to 3f08a4
+        --- /tmp/HelloWorld.txt 2014-12-17 17:29:56.856657181 +0900
+        +++ /tmp/chef-rendered-template20141217-2520-45g7se     2014-12-17 17:29:56.856657181 +0900
+        @@ -1 +1,2 @@
+        +My message is : Hello World!!
+
+Chef Client finished, 1 resources updated
+}}}
+노드와 클라이언트의 등록정보를 확인해 보자.
+{{{#!plain
+# knife node list
+chef-node-01.joinc.co.kr
+
+# knife client list
+chef-node-01.joinc.co.kr
+join-validator
+yundream-chef
+}}}
+
+=== AWS에서의 프로비저닝 방안 ===
+난 AWS에서 자동으로 인스턴스를 프로비저닝하는게 목적이라서 bootstrap을 사용하지 않고, 직접 chef-client가 설치된 인스턴스를 실행하는 방식으로 프로비저닝을 한다.
+
+프로비저닝 과정은 다음과 같다.
+  1. chef-clent가 설치된 AWS AMI 이미지를 만든다.   
+     * AWS AMI 이미지는 client.rb와 validation.pem을 가지고 있다. 
+  1. AWS API를 이용해서 인스턴스를 생성한다. 인스턴스의 hostname과 인스턴스가 실행해야할 레시피 이름은 user data 형식으로 인스턴스에 전달한다. 
+  1. 인스턴스가 실행되면 AWS user data로 부터 hostname값을 읽어서 node의 hostname을 설정한다.
+  1. AWs user data로 부터 레시피 값을 읽어서, first-boot.json파일을 만든다.
+  1. chef-client -j first-boot.json을 수행한다. 

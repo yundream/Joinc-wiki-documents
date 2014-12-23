@@ -4,23 +4,11 @@
 == chef ==
 chef는 infrastructure를 자동화 하기 위한 프레임워크다. 전체 시스템 형상을 코드화 하고, 코드를 자동으로 수행함으로써 손쉽게 시스템을 운영, 유지, 확장, 복제할 수 있도록 도와준다. 
 
-=== chef로 하는 것들 ===
-chef는 컴퓨팅 리소스를 '''provisioning'''하고, '''설정을 관리'''하고 이 것들을 '''통합'''하는 일을 한다.
+시스템 인프라도 정보의 조합이다. 시스템/네트워크 관리자는 인프라를 체계적으로 정리할 수 있다는 것을 알고 있다. 체계적으로 정리할 수 있다는 것은 이를 '''코드'''화 할 수 있다는 의미다. '''Chef'''는 인프라 정보를 코드화 할 수 있다는데 착안해서 만든 '''인프라 관리'''소프트웨어다. chef는  인프라를 구성하는 데이터들을 '''변수'''에 저장하고, 프로비저닝 하고 설치하는 과정을 '''코드''' 해서 관리한다. 프로그램이라는게 별건가 '''변수 + 코드'''다. 
 
-{{{#!html
-<img src="https://docs.google.com/drawings/pub?id=1lxWhs2pF8x0xA26Tz4Lkw5hjo0j8wmbqG9qXrYsWLtY&amp;w=1003&amp;h=481">
-}}}
+코드화를 하는 이유는 프로그램을 이용해서 데이터를 관리하는 이유와 동일하다. Chef를 이용하면, 인프라의 자동화를 위해서 필요한 정보를 '''recipes'''라는 '''재사용'''가능 한 코드로 정의 할 수 있다. 예를 들어서 웹 서버와 데이터베이스, 로드밸런서로 구성된 웹 서비스가 있다면, 이들을 recipes로 만들수 있다. 재사용 가능한 프로그램이라고 생각하자. 
 
-==== provisioning ====
-Chef는 RESTfule API 혹은 knife의 CLI를 이용해서, 시스템을 프로비저닝 할 수 있다. 베어메탈 호스트의 경우 Chef는 리눅스의 kickstart나 solaris의 jumpstart 혹은 AIX의 NIM과 같은 일을 한다. 가상화 환경의 경우 chef는 libvirt와 XEN, KVM, VMware API를 이용해서 프로비저닝 할 수 있다.      
-
-클라우드의 경우 chef는 AWS나 vCloud의 cloud API를 직접 호출하는 방식으로 프로비저닝 한다. 또한 Java의 jclouds나 ruby의 fog등의 클라우드 소프트웨어와도 통합할 수 있다.   
-
-==== 설정 관리 ====
-chef는 설정관리를 위한 모든 기능을 제공한다. Role과 recipes에는 서버가 어떻게 설정돼야 하는지에 대한 설정 정보와 설정 정보의 수행을 위한 코드를 가지고 있다. 예컨데 mysql, apache, hadoop을 위한 설정을 관리할 수 있다. 단시 설정만을 관리할 뿐만 아니라, 패키지를 검사해서 설치하고, 실행하고, 중단할 수도 있다.   
-
-==== 시스템 통합 ====
-Chef의 최종 목적은 인프라를 자동으로 구성하고 이를 통합하는 것이다. Chef의 가장 강력한 점 중에 하나는 설정 로직으로 부터 설정 데이터가 분리돼 있다는 점이다. 설정 데이터는 NoSQL형태로 바로 동적으로 색인되어서 저장되며, search API를 이용해서 인프라 정보를 즉시 확인해서 설정로직에 적용할 수 있다. 다른말로 Chef recipes는 데이터를 기반으로 시스템과 서버들을 통합할 수 있다. 예를 들어 웹서버는 search api를 이용해서 database와 memcache 서버들을 찾을 수 있으며, 자동으로 웹 서버 설정에 반영 이들을 서로 묶을 수 있다.  
+레시피는 리소스(resource)라고 부르는 블록으로 만들어진다. 리소스는 유저관리, 파일, 템플릿, 패키지 설치와 같은 인프라를 관리하기 위해서 필요한 기능들의 모음이다. 일종의 함수인 셈이다. Chef에는 유용한 많은 수의 리소스를 가지고 있으며, 자신만의 리소스를 만들어서 사용할 수도 있다. 
 
 === chef 구조 ===
 chef는 '''server & client'''모델을 따르는 프레임워크로 '''chef server''', '''workstations''', '''node''' 로 구성된다.
@@ -28,15 +16,19 @@ chef는 '''server & client'''모델을 따르는 프레임워크로 '''chef serv
 {{{#!html
 <img src="https://docs.google.com/drawings/pub?id=1_fvo_dFcqZIJntmAD5NH-QPMYnl84nUTKYKdIHO5CdM&amp;w=751&amp;h=393">
 }}}
-  1. Chef Server :
-    Chef Server는 인프라 (설정)정보 코드를 저장하기 위한 '''Chef 코드 저장소'''를 가지고 있다. 모든 chef 코드는 chef server에 집중해서 관리한다. chef server는 REST API를 이용해서 접근할 수 있다. 추가적으로 WebUI를 이용해서 인프라스트럭쳐를 관리할 수도 있다. 데이터는 [wiki:Site/cloud/BigData/CouchDB couchdb]로 관리를 하며, [wiki:Site/Search/Document/Solr solr]을 이용해서 검색 서비스를 제공한다.  
-  1. Node :
-    인프라를 구성하는 단위 시스템으로 chef client가 설치된다. Bearmetal 혹은 VM 환경일 수 있다. 노드는 chef-client 프로그램을 실행해서 chef server로 부터 '''run list'''를 가져와서 설정을 변경하고 패키지를 설치하고 애플리케이션을 실행한다. 노드는 클라이언트라고 부르기도 한다.
-  1. Workstation :
-    Chef server는 (자동화를 위한)데이터와 로직을 가지고 있다. 데이터와 로직은 knife를 이용해서 개발을 하는데, knife가 설치된 서버를 workstation이라고 한다. 즉 chef 개발 노드라고 할 수 있다. chef 개발자는 workstation에 설치된 knife를 이용해서 데이터와 코드를 개발하고 이 정보를 chef server에 upload 한다.
+=== Chef Server ===
+Chef 서버는 레시피와 다른 설정 데이터를 저장하는 중앙 저장소다. Chef로 관리하기 원하는 '''노드(node)'''에는 Chef 클라이언트가 설치되는데, Chef 클라이언트가 chef 서버로 부터 레시피와 설정 데이터를 가져와서 실행하는 방식으로 작동한다. 
 
+Chef Server는 인프라 (설정)정보 코드를 저장하기 위한 '''Chef 코드 저장소'''를 가지고 있다. 모든 chef 코드는 chef server에 집중해서 관리한다. chef server는 REST API를 이용해서 접근할 수 있다. 추가적으로 WebUI를 이용해서 인프라스트럭쳐를 관리할 수도 있다. 데이터는 [wiki:Site/cloud/BigData/CouchDB couchdb]로 관리를 하며, [wiki:Site/Search/Document/Solr solr]을 이용해서 검색 서비스를 제공한다.  
+
+=== Chef Client ===
+Chef로 관리하려는 노드에는 chef client가 설치된다. 노드는 물리적인 서버나 인스턴스가 될 수 있다. Chef 클라이언트는 주기적으로 Chef 서버에 연결해서, 최신의 레시피를 확인하고 레시피 코드를 실행한다. 
+
+=== Workstation ===
+개발자는 Chef server에 접근할 수 있는 권한을 획득 한뒤, 노드 관리, 레시피 개발과 같은 DevOps 업무를 수행하게 된다.  이 작업이 이루어지는 노드(개인 PC 혹은 인스턴스)를 Workstation이라고 한다. 개발자는 knife와 웹 콘솔을 이용해서 이들 작업을 수행한다.  
 
 == Chef 구성요소들 ==
+Chef의 구성요소들을 간단히 정리한다. 이들은 모든 문서에 공통적으로 나오는 대표 용어들이기도 하니, 숙지해 두면 도움이 될거다.-- 자동으로 기억되긴 한다. --
 === Nodes, Run List ===
 노드는 chef client가 설치되는 호스트 컴퓨터다. 노드 자동화는 데이터인 attributes와 로직을 담고 있는 '''run list'''에 의해서 이루어진다. Attributes는 노드의 속성 값들이 저장된다. 노드 변수라고 생각하면 이해가 쉽다.
 
@@ -61,9 +53,4 @@ Recipe는 cookbook의 구성요소로 설정 로직을 담고 있는 코드다. 
 리소스는 멀티 플랫폼을 지향한다. 예를 들어 '''package'''리소스를 이용하면 패키지를 설치할 수 있는데, apt, yum, BSD ports등의 플렛폼에 맞는 패키징 시스템을 사용한다. 
 
 === data bags ===
-data bags는 chef server에 저장되는 key - value 형식의 데이터다. data bags의 데이터는 모든 cookbook에서 전역변수처럼 사용할 수 있다. 인프라스트럭쳐 전체에서 사용되는 데이터를 저장하기 위해서 사용한다. 
-
-== 히스토리 ==
-  * 작성 : [[Date(2012-12-16T14:00:52)]]
-  * 수정
-     * [[Date(2013-02-05T04:16:18)]] : 링크 추가
+data bags는 chef server에 저장되는 key - value 형식의 데이터다. data bags의 데이터는 모든 cookbook에서 전역변수처럼 사용할 수 있다. 인프라스트럭쳐 전체에서 사용되는 데이터를 저장하기 위해서 사용한다. JSON 형태로 사용한다. 

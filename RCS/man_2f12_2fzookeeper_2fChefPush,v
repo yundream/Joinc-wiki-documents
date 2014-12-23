@@ -1,0 +1,404 @@
+head	1.12;
+access;
+symbols;
+locks
+	root:1.12; strict;
+comment	@# @;
+
+
+1.12
+date	2014.12.20.16.34.13;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.12.20.01.49.53;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.12.19.16.16.30;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.12.19.15.51.54;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2014.12.19.15.51.37;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2014.12.19.12.37.46;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2014.12.19.11.36.20;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2014.12.17.15.34.36;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2014.12.15.08.52.11;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2014.12.15.05.54.33;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2014.12.14.11.40.56;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2014.12.13.05.37.40;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fzookeeper_2fChefPush
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Zookeeper를 이용한 Chef Push 서버 만들기
+[[TableOfContents]]
+== 소개 ==
+이 문서는 chef과 zookeeper에 대한 경험이 있다고 가정하고 썼다. 대단한 경험이 있어야 하는 건 아니고, chef는 설치 후 hello world cookbook을 만들 수 있는 정도, zookeeper는 기본 개념과 설치를 할 수 있는 정도면 된다. [wiki:man/12/zookeeper/Watcher Zookeeper를 이용한 Watcher 서비스], [wiki:Site/cloud/automation/chefInstall Chef Install] 문서를 참고하자.
+
+== Chef client 수행의 문제점들  == 
+Chef를 이용해서 AWS기반의 인프라를 관리하고 있다. 관리 프로세스는 대략 아래와 같다(단순화 했다.).
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1mh-WUAQ_omwCcYjNyH-xerf8cIAQqF6c7zr-g2lKgTE/pub?w=683&amp;h=262">
+}}}
+ 1. 인스턴스가 실행된다.
+ 1. Cloud-init가 [wiki:nam/12/hostname hostname]을 설정한다.
+ 1. Cloud-init는 Chef client를 실행한다. 
+ 1. Chef client는 hostname을 노드이름으로 chef server에 연결한다.  
+ 1. Chef 서버로 부터 레시피를 읽어와서 실행한다.  
+최초로 인스턴스가 전개될 때의 레시피 실행은 문제가 없다. 하지만 중간에 레시피를 밀어넣어야 하는 경우 어려움이 있다. 해결방법이 없는 건 아니다.
+
+Cron에 등록해서 주기적으로 chef client를 수행하는 방법이 있다. 간단하긴 하지만, 레시피가 변경되지 않았다면 코드가 실행되지 않도록 해야 하기 때문에 '''버전 관리'''가 필요하고, 수행 결과를 바로 확인할 수 없다는 문제가 있다. 그다지 추천할 만한 방법은 아니다.
+
+knife - ssh를 이용한 방법도 있다. chef 실행 계정으로 노드에 직접 접근해서 chef client를 실행하는 방법이다. Cron 보다는 깔끔하게 작동한다. 원하는 때만 수행할 수 있고 결과도 직접 확인할 수 있기 때문이다. 마음에 들지 않는 점은 ssh를 이용한다는 점이다. [wiki:man/12/tcpwrapper TCP Wrapper], iptables등을 이용해서 엄격하게 접근을 통제하면 되겠지만, 뒷통수가 근질근질 하다. 원격 프로토콜에 대한 보안 규칙은 '''용도를 명확히'''하는데 있다. ssh는 범용 프로토톨로 '''용도를 제한하라'''라는 원칙에 어긋난다. 
+
+== Zookeeper를 이용한 chef 레시피 실행 관리 ==
+하여 Zookeeper를 이용해서 chef 레시피 실행을 관리하기로 했다. 버전관리가 아닌 실행 관리다. 운영체제와 애플리케이션 설정 초기화 과정과 업데이트 과정을 분리하려고 한다. 
+
+처음 인스턴스를 전개 할 때의 프로세스는 이미 정리했으니 넘어가고, 운영 중 레시피의 실행에 대한 생각을 그림으로 정리한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/15hN3t5lRsvVSBbO3iJVnNCpuYR_2NEqHQQJ7KNkKfwU/pub?w=827&amp;h=270">
+}}}
+
+  1. 인스턴스는 watcher client로 주키퍼 서버에 노드를 등록하고, data watcher를 실행한다.  
+  1. 관리자가 zookeeper에 접근해서 작업할 노드의 data를 변경한다. "레시피를 업로드해서 실행하라"라는 정보를 담은 데이터겠다. 
+  1. 해당 노드의 watcher는 데이터를 get 해서, 명령을 분석한 다음 chef-client를 실행한다. 
+chef client는 명령으로 전달된 레시피만 다운로드 해야 한다. chef client를 실행 할 때 매개변수로 레시피를 명시하는 방법과 json 파일로 명시하는 방법이 있다. json 파일을 이용해서 업로드 하는 방법은 [http://code.chrisroberts.org/blog/2012/05/09/cooking-up-partial-run-lists-with-chef/ Cooking up partial run list with chef]문서를 참고하자.
+
+== 구현 ==
+실제 구현을 해보기로 했다. 그렇다고 실제 환경에서의 구현은 아니고, 프로토타이핑 수준의 구현이다. 
+=== 프로토타이핑 환경 ===
+프로토타이핑 환경은 아래와 같다.
+  * 운영체제 : 우분투 리눅스에서 docker를 이용해서 테스트 한다. ubuntu 14.10 server 이미지를 사용했다. 
+  * Zookeeper 클러스터 구축 : 3개의 클러스터를 구축한다. 
+  * chef client node : 하나의 chef node를 이용해서 테스트한다. chef client와 zookeeper watcher client가 설치된다.
+  * chef server : chef server를 설치한다. 그동안 chef 쪽에 신경끄고 있었는데, 이 번기회에 다시 한번 훑어봐야 겠다.
+
+=== 프로토타이핑 시나리오 ===
+Chef client node(이하 chef node)는 '''recipe_a, recipe_b, recipe_c 3'''개의 레시피를 가진다. 처음 chef node가 전개될 때에는 3개의 node가 모두 실행된다. 그러다가 중간에 recipe_c의 설정을 변경한다. 관리자는 zookeeper에 설정 변경 내용을 set하면, chef-node가 recipe_c 레시피를 실행한다.    
+
+=== Zookeeper 클러스터 구성 ===
+[wiki:man/12/zookeeper/Watcher Zookeeper를 이용한 Watcher 서비스] 문서를 참고한다. 나는 이전에 만들어 뒀던 docker image가 있어서 재활용했다.
+
+=== Chef Server 구성 ===
+VirtualBox 인스턴스를 하나 만들어서 chef server를 설치했다. Chef server는 [wiki:Site/cloud/automation/chefInstall 여기를 참고]해서 설치했다. 
+
+=== 최종 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/16O129Rp7ELrqb_PRwA5_YWzoCkC9Ebqr1I0lNm5xYzg/pub?w=804&amp;h=324">
+}}}
+
+그러하다. 몽땅 virtualbox 위에서 돌리기로 했다.
+
+=== Cookbook 개발 ===
+cookbook_a, cookbook_b, cookbook_c 3개의 cookbook을 만들기로 했다.  원하는 cookbook만 따로 실행할 수 있느냐를 확인하는 게 목적이지, 멋진 cookbook을 만드는게 목적은 아니다. 각각의 cookbook은 /tmp 디렉토리 밑에 cookbook_a.txt, cookbook_b.txt, cookbook_c.txt 파일을 만드는 아주 간단한 일을 한다. 
+
+cookbook_a를 만들고
+{{{#!plain
+# knife cookbook create cookbook_a 
+** Creating cookbook cookbook_a
+** Creating README for cookbook: cookbook_a
+** Creating CHANGELOG for cookbook: cookbook_a
+** Creating metadata for cookbook: cookbook_a
+}}}
+
+recipe를 만든다.
+{{{#!plain
+# cat cookbook_a/recipes/default.rb
+file "/tmp/cookbook_a.txt" do
+    content "cookbook a\n"
+    mode '644'
+    action :create
+end
+}}}
+/tmp/cookbook_a.txt 파일을 만들고 파일에 "cookbook a\n"을 쓴다. cookbook_b와 cookbook_c는 파일 이름과 내용만 달리해서 동일한 방식으로 만든다. 3개의 cookbook을 업로드 한다.
+{{{#!plain
+# knife cookbook upload -o ./ cookbook_a cookbook_b cookbook_c
+Uploading cookbook_a     [0.1.0]
+Uploading cookbook_b     [0.1.0]
+Uploading cookbook_c     [0.1.0]
+Uploaded 3 cookbooks.
+}}}
+
+=== Chef Node에 cookbook 적용 ===
+Chef Node에 cookbook을 적용한다. 3개의 쿡북을 포함한 /etc/chef/first-boot.json 파일을 만든 다음 노드를 등록했다. 
+{{{#!plain
+# hostname
+chef-node-1.joinc.co.kr
+# cat first-boot.json
+{"run_list":["recipe[cookbook_a]","recipe[cookbook_b]","recipe[cookbook_b]"]}
+# chef-client -j first-boot.json
+}}}
+
+=== Chef Cookbook Push Test 하기 ===
+Chef Node를 Zookeeper에 등록하기로 했다. 아래와 같은 znode 구성을 가진다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/11SpIRXwItyRpiJ1HbgNNxrU6Dcnf2b5l6DIQQjdYFSE/pub?w=258&amp;h=186">
+}}}
+
+Chef Node에 아래와 같은 watcher 코드를 만들었다. 순전히 테스트를 위한 코드다. 데이터를 올바르게 입력했다고 가정하고 만들었다. 
+{{{#!plain
+from kazoo.client import KazooClient
+import socket
+import time
+import os
+import sys
+
+# Zookeeper 서버에 연결한다.
+zk = KazooClient(hosts='192.168.56.3')
+zk.start()
+
+# Zookeeper에 znode로 등록한다. 
+# hostname이 chef-node-01.joinc.co.kr이니
+# /node/chef-node-01.joinc.co.kr이 될테다.
+znode = '/node/'+socket.gethostname();
+zk.ensure_path(znode)
+
+# znode를 datawatch로 설정한다.
+@@zk.DataWatch(znode, allow_missing_node=True)
+def watch_node(data, stat):
+    # 데이터에 아무런 문자가 없다면, 무시한다. 
+    if data == '':
+        print "None"
+    # 데이터가 있다면, 파일로 저장하고 chef-client를 수행한다.   
+    else:
+        print("Version: %s, data: %s" % (stat.version, data))
+        f = open("/tmp/job.json", 'w')
+        f.write(data)
+        f.close()
+        os.system('chef-client -j /tmp/job.json')
+        # 서버의 데이터를 읽어서 실행했으니, 공백문자로 만든다.
+        # 클라이언트가 쓴 데이터에 대해서도 watcher가 작동 한다. 
+        # 그래서 위에 if 문이 들어간거다.
+        zk.set(znode, '')
+while True:
+    time.sleep(5)
+zk.stop()
+}}}
+
+이제, Cookbook upload 요청을 보내는 테스트 프로그램을 만들었다. 
+{{{#!plain
+from kazoo.client import KazooClient
+
+zk = KazooClient(hosts='192.168.56.3')
+zk.start()
+zk.set('/node/chef-node-1.joinc.co.kr', '{"run_list":["recipe[cookbook_c]"]}')
+zk.stop()
+}}}
+이 프로그램을 실행하면 /node/chef-node-1.joinc.co.kr znode에 run_list 데이터를 설정한다. 프로그램을 실행하면 chef node의 watcher이 작동하는 걸 확인할 수 있다. 
+{{{#!plain
+Version: 211, data: {"run_list":["recipe[cookbook_c]"]}
+Starting Chef Client, version 11.8.2
+resolving cookbooks for run list: ["cookbook_c"]
+Synchronizing Cookbooks:
+  - cookbook_c
+Compiling Cookbooks...
+Converging 1 resources
+Recipe: cookbook_c::default
+  * file[/tmp/cookbook_c.txt] action create
+    - update content in file /tmp/cookbook_c.txt from a86ce2 to a6531c
+        --- /tmp/cookbook_c.txt 2014-12-20 00:49:27.886816153 +0900
+        +++ /tmp/.cookbook_c.txt20141220-1801-1hrjxfu   2014-12-20 00:56:01.246823481 +0900
+        @@@@ -1,2 +1,2 @@@@
+        -cookbook c
+        +cookbook c-new
+
+Chef Client finished, 1 resources updated
+None
+}}}
+쿡북 cookbook_c만 실행되는 걸 확인할 수 있다.
+
+== 결론 ==
+간단한 테스트 코드를 만들어서 개념을 검증했다. 좀 다듬으면 잘 작동할 것 같다.  
+
+단지 원하는 cookbook을 push 하기 위한 용도로 zookeeper 클러스트를 설치하는 건, 낭비라고 생각할 수도 있겠다. cookbook push는 zookeeper과 chef를 조합했을 때 응용할 수 있는 여러 기능 중 하나일 뿐이다. 어떤 응용이 가능할 지 생각해보자. 
+
+전체 형상을 쉽게 구조화 할 수 있다. 시스템 인프라는 계층적 구조를 가지기 마련이다. 이 계층적인 구조를 시각화 해서 보여주는 것은 관리에 매우 중요한 요소다. chef의 datbag을 이용해서 구성할 수도 있겠지만, 굉장히 어렵다. Zookeeper 노드를 계층적으로 관리하기 때문에 시각화 하기가 매우 쉽다. 
+
+Zabbix와 같은 모니터링 도구와 연동할 수 있을 것이다. Zabbix는 이벤트를 email, sms, jira등 다양한 방식으로 통지하기 위한 외부 script 개발을 허용한다. Znode로 이벤트 정보를 보내는 zookeeper client를 개발하면, 웹 화면등으로 즉시 확인할 수 있을 거다.
+
+Cookbook push외에, 현재 시스템의 구성정보, 시스템 상태, 소프트웨어 구성, 각종 보안 설정을 요청하는 기능도 만들 수 있을 거다.
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d4 1
+a4 1
+이 문서는 chef과 zookeeper에 대한 경험이 있다고 가정하고 썼다. 대단한 경험이 있어야 하는 건 아니고, chef는 설치 후 hello world cookbook을 만들 수 있는 정도, zookeeper는 기본 개념과 설치를 할 수 있는 정도면 된다. [wiki:man/12/zookeeper/Watcher Zookeeper를 이용한 Watcher 서비스], [wiki:Site/cloud/automation/chefInstall] 문서를 참고하자.
+d21 1
+a21 1
+knife - ssh를 이용한 방법도 있다. chef 실행 계정으로 노드에 직접 접근해서 chef client를 실행하는 방법이다. Cron 보다는 깔끔하게 작동한다. 원하는 때만 수행할 수 있고 결과도 직접 확인할 수 있기 때문이다. 마음에 들지 않는 점은 ssh를 이용한다는 점이다. TCP Wrapper, iptables등을 이용해서 엄격하게 접근을 통제하면 되겠지만, 뒷통수가 근질근질 하다. 원격 프로토콜에 대한 보안 규칙은 '''용도를 명확히'''하는데 있다. ssh는 범용 프로토톨로 '''용도를 제한하라'''라는 원칙에 어긋난다. 
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 3
+d13 1
+a13 1
+ 1. Cloud-init가 hostname을 설정한다.
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d106 7
+d114 74
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d102 1
+a102 1
+{{{#!plain
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d99 1
+a99 1
+=== Chef Node를 Zookeeper에 등록하기 ===
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d88 19
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d41 2
+a42 1
+  * chef server : chef server를 설치한다. 그동안 chef 쪽에 신경끄고 있었는데, 이 번기회에 다시 한번 훑어봐야 겠다.  
+d45 1
+d50 31
+a80 1
+내 데스크탑 리눅스 박스에 설치 했다. Yum으로 쉽게 설치할 수 있는 centos를 사용했었는데, docker에 centos image가 없어서(왜 없는 거지?) 직접 패키지를 [https://downloads.chef.io/chef-server/ubuntu 다운로드]해서 설치했다. (지금은 CentOS에 대한 설치 문서만 있는데, 우분투도 추가해야 겠다.)
+d82 5
+a86 3
+# wget https://web-dl.packagecloud.io/chef/stable/packages/ubuntu/trusty/chef-server-core_12.0.0-1_amd64.deb
+# dpkg -i chef-server-core_12.0.0-1_amd64.deb
+# chef-server-ctl reconfigure
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d33 21
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d21 12
+a32 1
+하여 Zookeeper를 이용해서 chef 레시피 실행을 관리하기로 했다. 버전관리가 아닌 실행 관리다. 운영체제와 애플리케이션 설정 초기화 과정과 업데이트 과정을 분리하려고 한다.
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d13 1
+a13 1
+ 1. Cherf 서버로 부터 레시피를 읽어와서 실행한다.  
+d16 1
+a16 1
+Cron에 등록해서 주기적으로 chef client를 수행하는 방법이 있다. 간단하긴 하지만, 레시피가 변경되지 않았다면 코드가 실행되지 않도록 해야 하기 때문에 '''버전 관리'''가 필요하고, 수행 결과를 바로 확인할 수 없다는 문제가 있다. 그다지 추천할 만한 방법이 아니다.    
+d18 1
+d20 2
+@

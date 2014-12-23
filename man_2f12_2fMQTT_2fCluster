@@ -1,5 +1,4 @@
 #title MQTT Cluster 구성
-<!> 아직은 좀 더 정리해야 함.
 [[TableOfContents]]
 == MQTT Cluster ==
 MQTT Cluster를 구성하는 목적은 아래와 같다. 
@@ -69,7 +68,11 @@ REDIS BitMap으로 구현한다. 클라이언트의 연결 상태(0 or 1)을 저
     * private message라면, user_id를 key로 하는 REDIS list에 밀어 넣는다.
     * group message라면, 유저 목록을 찾아서 user_id 갯수 만큼 REDIS list에 밀어 넣는다.
   * 각 Node에 있는 Message proc는 메시지를 읽어서 수신 유저의 topic에 PUB 한다. 
+REDIS Message Queue는 '''BLPOP'''를 이용하면 블럭킹 모드에서 데이터를 꺼낼 수 있다. 여기에서는 Message queue를 이용해서 메시지를 분배하고 있는데, HTTP로 분배하는 방법을 고려할 수도 있다. 장/단점이 있는데
+  1. Message Queue는 HTTP 보다 효율적으로 작동한다. 반면에 MQTT Node가 뻗어버릴 경우 Message Queue에 있는 메시지를 처리하기가 까다롭다는 단점이 있다.
+  1. HTTP는 Message Queue보다 느리게 작동할 거다. 하지만 동기방식이기 때문에, 에러처리가 명확하다는 장점이 있다. 메시지를 수신할 MQTT 노드가 뻗었다면, 메시지 함에 넣기만 하면 된다. 
 
+장/단점을 적어 놓고 보니, Message Queue 보다는 HTTP로 Message proc에 직접 쏴주는 방식이 낫겠다는 생각이 든다.
 == MQTT 클러스터 관리 ==
 === 모니터링 소프트웨어를 이용한 간단한 구성 ===
 나는 간단한 시스템을 만들기를 원한다. 클러스터의 노드를 관리하기 위해서 어떤 새로운 자료구조를 유지하는 소프트웨어를 설치하는 등의 복잡함을 피하고 싶다.
@@ -119,4 +122,10 @@ Healthcheck는 Zabbix 같은 범용 모니터링 툴로도 충분할 것 같다.
 식으로 처리한다.
 
 === Zookeeper를 이용한 관리 ===
-Zookeeper watch를 이용한 관리 방안을 고민한다. 주키퍼에 대한 학습을 한 후 정리한다.
+[wiki:man/12/zookeeper Zookeeper]에 MQTT Node를 등록해서 관리한다. 대략 구성은 다음과 같을 거다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1088XMEB7YTrE2E6HW5y4ca-qg4KkMYaeF0tq1M3sR6g/pub?w=453&amp;h=271">
+}}}
+
+Zookeeper로 MQTT Node 정보를 관리한다. Global Message Proc는 메시지를 전송하기 전에 Node가 살아있는지를 확인한다. Zookeeper은 3대 이상으로 클러스터를 구성할 수 있을 테니, 가용성 문제도 함께 해결할 수 있다. 다른 삽질 하는 것 보다 Zookeeper로 관리하는게 나은 것 같다. 

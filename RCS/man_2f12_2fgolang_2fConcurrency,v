@@ -1,10 +1,45 @@
-head	1.8;
+head	1.15;
 access;
 symbols;
 locks
-	root:1.8; strict;
+	root:1.15; strict;
 comment	@# @;
 
+
+1.15
+date	2014.12.11.12.37.00;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2014.12.10.01.58.35;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2014.12.10.01.56.38;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.12.09.01.55.51;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.12.08.15.35.05;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.12.08.09.05.10;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.12.08.01.15.30;	author root;	state Exp;
+branches;
+next	1.8;
 
 1.8
 date	2014.12.07.15.44.33;	author root;	state Exp;
@@ -52,18 +87,18 @@ desc
 @
 
 
-1.8
+1.15
 log
 @119.64.102.68;;yundream;;
 @
 text
-@#title Concurrency
+@#title Go - Concurrency
 [[TableOfContents]]
 == 동시성 ==
 === Goroutines ===
-개념적으로 고루틴(Gorutines)은 thread, coroutines, processes 등과 혼동될 수 있다. 용어에 따른 개념의 혼란을 피하기 위해서 "고루틴"이라는 새로운 용어를 만들었다고 한다. 실제 사용하다보면, 멀티 스레드, 멀티 프로세스 등과 비슷하면서도 해석과 사용에 미묘한 차이가 있음을 알 수 있다. 
+개념적으로 고루틴(Gorutines)은 thread, coroutines, processes 등과 혼동될 수 있다. 용어에 따른 개념의 혼란을 피하기 위해서 "고루틴"이라는 새로운 용어를 만들었다고 한다. 실제 사용하다보면, 멀티 스레드, 멀티 프로세스 등과 비슷하면서도 해석과 사용에 미묘한 차이가 있음을 알 수 있다. 고루틴을 여러개 실행해 보면, 스레드 처럼 작동하지 않는다는 걸 알 수 있습니다. 수십개의 고루틴을 실행해도 단지 몇개의 스레드만 확인할 수 있다.
 
-고루틴은 동일한 주소공간의 코드를 동시에 실행하는 기능이다. 고루틴은 '''go''' 키워드를 이용해서 만들 수 있다. 아래의 코드를 보자.  
+고루틴은 '''go''' 키워드를 이용해서 만들 수 있다. 아래의 코드를 보자.  
 {{{#!plain
 import (
     "fmt"
@@ -349,7 +384,7 @@ func main() {
 }
 }}}
 sq의 sq 적용
-{{[#!plain
+{{{#!plain
 func main() {
     for n := range sq(sq(gen(2, 3))) {
         fmt.Println(n)
@@ -357,10 +392,7 @@ func main() {
 }
 }}}
 ==== Fan-out, fan-in ====
-하나의 채널에서 다수의(multiple) 함수가 (채널이 닫힐 때까지)메시지를 읽어서 처리하는 방식을 '''fan-out'''방식이라고 한다. 이 방식은 다수의 워커(worker)에서 Job을 분산처리하기 위한 목적으로 사용한다.  
-
-하나의 함수가 다수의 프로세스와 입력으로 부터 하나의 채널을 이용해서 데이터를 읽어서 처리하는 방식을 '''fan-in'''이라고 한다. 
-
+하나의 채널에서 다수의(multiple) 함수가 (채널이 닫힐 때까지)메시지를 읽어서 처리하는 방식을 '''fan-out'''방식이라고 한다. 이 방식은 다수의 워커(worker)에서 Job을 분산처리하기 위한 목적으로 사용한다.  하나의 채널을 이용해서 다수의 고루틴으로 부터 데이터를 읽어서 처리하는 방식을 '''fan-in'''이라고 한다. 
 
 위의 예제 프로그램을 두 개의 '''sq'''함수가 하나의 채널을 이용해서 처리하는 '''fan-out'''방식으로 바꿔보자. 
 {{{#!plain
@@ -414,7 +446,7 @@ func main() {
   * 입력 채널로 부터 데이터를 읽는 stage는 채널이 닫힐 때까지 작업을 수행한다.  
 이 방식은 입력과 출력이 모두 제대로 처리된다고 가정하면 아주 깔끔하게 작동할 것이다.
 
-하지만 실제 파이프라인에서는 각 스테이지의 이상 작동이나 혹은 다른 필요로, 다음 스테이지로 값을 넘기지 않는(혹은 못하는) 경우가 생길 수 있다. 이 경우 도착하지 않는 값을 무한히 기다리는 함수가 생길 수 있는데, 메모리 누수로 이어지기 때문에 정리를 해줘야 한다. 
+하지만 실제 파이프라인에서는 각 스테이지의 이상 작동이나 혹은 다른 필요로, 다음 스테이지로 값을 넘기지 않는(혹은 못하는) 경우가 생길 수 있다. 이 경우 도착하지 않는 값을 무한히 기다리는 함수가 생길 수 있는데, 메모리 누수로 이어지기 때문에 정리를 해줘야 한다. 고루틴에 대해서는 가비지콜렉터가 작동하지 않는다
 
 아래의 코드를 보자.
 {{{#!plain
@@ -425,9 +457,693 @@ return
 // 따라서 첫번째 고루틴은 hung 상태가 됨.
 }}}
 
+채널마다 고루틴이 만들어지는게 문제이니, 새로운 고루틴이 만들어지지 않도록 코드를 만들면 된다. Buffered channel을 이용하자.   
+{{{#!plain
+func gen(nums ...int) <-chan int {
+    out := make(chan int, len(nums))
+    for _, n := range nums {
+        out <- n
+    }
+    close(out)
+    return out
+}
+}}}
+
+merge한수는 채널의 크기를 1로 잡아도 된다.
+{{{#!plain
+func merge(cs ...<-chan int) <-chan int {
+    var wg sync.WaitGroup
+    out := make(chan int, 1) 
+    // ......
+}}}
+작동은 하겠지만 프로그램내에 "blocked groutine"이 생성되므로 좋은 코드라고 할 수 없다. 
+
+=== Explicit cancellation ===
+상위 stage의 고루틴을 "명시적(explicit)"으로 취소하는게 가장 확실한 방법이다. 
+{{{#!plain
+package main
+
+import "fmt"
+import "sync"
+
+func sq(done <-chan int, in <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        defer close(out)
+        for n := range in {
+            select {
+            case out <- n * n:
+            case <-done:
+                return
+            }
+        }
+    }()
+    return out
+}
+func gen(done <-chan int, nums ...int) <-chan int {
+    out := make(chan int)
+    go func() {
+        defer close(out)
+        for _, n := range nums {
+            select {
+            case out <- n:
+            case <-done:
+                return
+            }
+        }
+        //close(out)
+    }()
+    return out
+}
+
+func merge(done <-chan int, cs ...<-chan int) <-chan int {
+    var wg sync.WaitGroup
+    out := make(chan int)
+
+    output := func(c <-chan int) {
+        defer wg.Done()
+        for n := range c {
+            select {
+            case out <- n:
+            case <-done:
+                fmt.Println("cancel")
+                return
+            }
+        }
+    }
+
+    wg.Add(len(cs))
+    for _, c := range cs {
+        go output(c)
+    }
+
+    go func() {
+        wg.Wait()
+        close(out)
+    }()
+    return out
+}
+
+func main() {
+    done := make(chan int)
+    defer close(done)
+
+    in := gen(done, 2, 3)
+
+    c1 := sq(done, in)
+    c2 := sq(done, in)
+
+    out := merge(done, c1, c2)
+    fmt.Println(<-out)
+}
+}}}
+
+== 예제 : MD5 해쉬 ==
+여러개의 파일에서 MD5 해쉬 값을 추출하는 프로그램을 만들어보자.
+=== 단순한 예제 ===
+MD5는 메시지 축약 알고리즘으로 파일의 checksum 데이터등을 만들 때 사용한다. 리눅스에서는 md5sum 명령을 이용해서 파일에 대한 md5 메시지를 만들 수 있다.     
+{{{#!plain
+# md5sum *.go
+c0fcdeb08426acc1644c165bd40b5aa7  ping.go
+8a5567eaf2b1061017f9b2d4213f05ea  rsa.go
+fc4405283c30ad0c06e198949b50d601  struct.go
+}}}
+md5sum과 비슷한 일을 하는 프로그램을 만들려고 한다. 이 프로그램의 이름은 serial.go로 파일이름 대신 디렉토리 이름을 받아서, 디렉토리에 있는 모든 파일들에 대해서 md5 알고리즘을 적용한다. 적용한 결과는 정렬(sort)해서 출력한다. 
+{{{#!plain
+# go run serial.go .
+8a5567eaf2b1061017f9b2d4213f05ea  rsa.go
+c0fcdeb08426acc1644c165bd40b5aa7  ping.go
+fc4405283c30ad0c06e198949b50d601  struct.go
+}}}
+
+아래는 완전한 코드
+{{{#!plain
+package main
+
+import (
+    "crypto/md5"
+    "fmt"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+    "sort"
+)
+
+func main() {
+    // 디렉토리 밑에 있는 모든 파일들에 대해서 MD5 연산을 한다.
+    m, err := MD5All(os.Args[1])
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    var paths []string
+    for path := range m {
+        paths = append(paths, path)
+    }
+    sort.Strings(paths)
+    for _, path := range paths {
+        fmt.Printf("%x %s\n", m[path], path)
+    }
+}
+
+// 디렉토리에 있는 파일들을 모두 읽어서 MD5 연산을 하고
+// 그 결과를 map 자료형으로 반환한다.
+func MD5All(root string) (map[string][md5.Size]byte, error) {
+    m := make(map[string][md5.Size]byte)
+    err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        if !info.Mode().IsRegular() {
+            return nil
+        }
+        data, err := ioutil.ReadFile(path)
+        if err != nil {
+            return err
+        }
+        m[path] = md5.Sum(data)
+        return nil
+    })
+    if err != nil {
+        return nil, err
+    }
+    return m, nil
+}
+}}}
+테스트
+
+=== 복잡한 예제 : Parallel digestion ===
+parallel.go는 MD5All을 두 개의 stage로 나누고 파이프라인으로 연결했다. 첫번째 state는 sumFile로 디렉토리에 있는 각각의 파일마다 고루틴을 만들어서 MD5 연산을 하고, 그 결과를 result struct 데이터 타입으로 채널로 전송한다. 
+{{{#!plain
+type result struct {
+    path string
+    sum [md5.size]byte
+    err error
+}
+}}}
+
+sumFile은 두 개의 채널을 반환한다. 첫번째는 result 이고 다른 하나는 에러를 반환하기 위해서 사용한다. 설명은 주석으로 대신한다.
+{{{#!plain
+func sumFiles(done <-chan struct{}, root string) (<-chan result, <-chan error) {
+    // 각각의 일반 파일들에 대해서 고루틴을 수행해서 MD5를 계산한 후 c 채널로 전송한다.
+    // 에러는 errc 채널로 전송한다.
+    c := make(chan result)
+    errc := make(chan error, 1)
+
+    // filepath.Walk를 이용해서 파일들을 MD5 연산을 한다.  
+    // 여기에서 블럭되면 안되므로 고루틴으로 작성한다. 
+    go func() {
+        var wg sync.WaitGroup
+        err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+            if err != nil {
+                return err
+            }
+            if !info.Mode().IsRegular() {
+                return nil
+            }
+            wg.Add(1)
+            // MD5 연산을 한다.
+            // 고루틴을 이용 여러 파일에 대해서 동시에 MD5 연산을 한다. 
+            go func() {
+                data, err := ioutil.ReadFile(path)
+                select {
+                case c <- result{path, md5.Sum(data), err}:
+                case <-done:
+                }
+                wg.Done()
+            }()
+            // Abort the walk if done is closed.
+            select {
+            case <-done:
+                return errors.New("walk canceled")
+            default:
+                return nil
+            }
+        })
+        // 고루틴들이 모두 끝나길 기다린다.
+        go func() {
+            wg.Wait()
+            close(c)
+        }()
+        errc <- err
+    }()
+    return c, errc
+}
+}}}
+
+MD5All은 c 채널로 부터 파일과 MD5 축약 값을 전송 받는다. 어떤 이유로 MD5All이 종료하면 '''defer'''를 이용해서, done을 닫는다. 
+{{{#!plain
+func MD5All(root string) (map[string][md5.Size]byte, error) {
+    // 채널 c와 errc로부터 메시지를 모두 받기전에 에러가 발생할 경우 
+    // done 채널을 닫는다.
+    done := make(chan struct{})
+    defer close(done)
+
+    c, errc := sumFiles(done, root)
+
+    m := make(map[string][md5.Size]byte)
+    for r := range c {
+        if r.err != nil {
+            return nil, r.err
+        }
+        m[r.path] = r.sum
+    }
+    if err := <-errc; err != nil {
+        return nil, err
+    }
+    return m, nil
+}
+}}}
+
+=== Bounded parallelism ===
+parallel.go는 각 파일에 대해서 고루틴을 실행한다. 멀티 코어 CPU 자원을 모두 활용하기 때문에 빠르게 작동할 거다. 하지만 디렉토리에 많은 수의 파일이 있을 경우, 메모리를 지나치게 많이 소모하는 등 오히려 비효율적으로 작동할 수도 있다.  
+
+그래서 동시에 수행할 수 있는 고루틴의 갯수를 제한하기로 했다. 이 프로그램의 이름은 '''bounded.go'''로 고정된 숫자의 고루틴을 만든다. 이 프로그램은 1. walk the tree, 2. read and digest the files, 3. collect the digest 3개의 스테이지로 구성된다. 
+  1. walkFiles : filepath.Walk 하면서, MD5 처리할 파일이름을 읽어서 채널로 전송한다.    
+  1. digester : 채널로 부터 파일을 읽어서 MD5 축약한다.
+  1. MD5All : digester를 정해진 갯수만큼만 실행한다.   
+{{{#!plain
+package main
+
+import (
+    "crypto/md5"
+    "errors"
+    "fmt"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+    "sort"
+    "sync"
+)
+
+type result struct {
+    path string
+    sum  [md5.Size]byte
+    err  error
+}
+
+// 디렉토리로 부터, 일반 파일을 읽어서 string channel로 보낸다.
+// 에러는 에러 채널로 보낸다.
+func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) {
+    paths := make(chan string)
+    errc := make(chan error, 1)
+    go func() { // HL
+        // 고루틴이 끝난 후에는 채널을 닫는다.
+        defer close(paths) // HL
+        errc <- filepath.Walk(root, func(path string, info os.FileInfo, err error) error { // HL
+            if err != nil {
+                return err
+            }
+            if !info.Mode().IsRegular() {
+                return nil
+            }
+            select {
+            case paths <- path: // HL
+            case <-done: // HL
+                return errors.New("walk canceled")
+            }
+            return nil
+        })
+    }()
+    return paths, errc
+}
+
+// 채널로 부터 읽은 파일의 내용을 MD5 축약한다.
+func digester(done <-chan struct{}, paths <-chan string, c chan<- result) {
+    for path := range paths { // HLpaths
+        data, err := ioutil.ReadFile(path)
+        select {
+        case c <- result{path, md5.Sum(data), err}:
+        case <-done:
+            return
+        }
+    }
+}
+
+func MD5All(root string) (map[string][md5.Size]byte, error) {
+    // MD5All closes the done channel when it returns; it may do so before
+    // receiving all the values from c and errc.
+    done := make(chan struct{})
+    defer close(done)
+
+    paths, errc := walkFiles(done, root)
+
+    // Start a fixed number of goroutines to read and digest files.
+    c := make(chan result) // HLc
+    var wg sync.WaitGroup
+    const numDigesters = 20
+    wg.Add(numDigesters)
+    for i := 0; i < numDigesters; i++ {
+        go func() {
+            digester(done, paths, c) // HLc
+            wg.Done()
+        }()
+    }
+    go func() {
+        wg.Wait()
+        close(c) // HLc
+    }()
+    // End of pipeline. OMIT
+
+    m := make(map[string][md5.Size]byte)
+    for r := range c {
+        if r.err != nil {
+            return nil, r.err
+        }
+        m[r.path] = r.sum
+    }
+    // Check whether the Walk failed.
+    if err := <-errc; err != nil { // HLerrc
+        return nil, err
+    }
+    return m, nil
+}
+
+func main() {
+    // Calculate the MD5 sum of all files under the specified directory,
+    // then print the results sorted by path name.
+    m, err := MD5All(os.Args[1])
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    var paths []string
+    for path := range m {
+        paths = append(paths, path)
+    }
+    sort.Strings(paths)
+    for _, path := range paths {
+        fmt.Printf("%x  %s\n", m[path], path)
+    }
+}
+}}}
+
 == 참고 ==
  * [http://www.golang-book.com/10/index.htm AN Introduction to Programming In GO - Concurrency]  
  * [http://blog.golang.org/pipelines Go Concurrency Patterns] 
+ * [https://talks.golang.org/2012/concurrency.slide Go Concurrency talk]
+@
+
+
+1.14
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d5 1
+a5 1
+개념적으로 고루틴(Gorutines)은 thread, coroutines, processes 등과 혼동될 수 있다. 용어에 따른 개념의 혼란을 피하기 위해서 "고루틴"이라는 새로운 용어를 만들었다고 한다. 실제 사용하다보면, 멀티 스레드, 멀티 프로세스 등과 비슷하면서도 해석과 사용에 미묘한 차이가 있음을 알 수 있다. 
+d7 1
+a7 1
+고루틴은 동일한 주소공간의 코드를 동시에 실행하는 기능이다. 고루틴은 '''go''' 키워드를 이용해서 만들 수 있다. 아래의 코드를 보자.  
+d301 1
+a301 4
+하나의 채널에서 다수의(multiple) 함수가 (채널이 닫힐 때까지)메시지를 읽어서 처리하는 방식을 '''fan-out'''방식이라고 한다. 이 방식은 다수의 워커(worker)에서 Job을 분산처리하기 위한 목적으로 사용한다.  
+
+하나의 함수가 다수의 프로세스와 입력으로 부터 하나의 채널을 이용해서 데이터를 읽어서 처리하는 방식을 '''fan-in'''이라고 한다. 
+
+@
+
+
+1.13
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d754 1
+@
+
+
+1.12
+log
+@121.50.20.41;;yundream;;
+@
+text
+@d399 12
+a410 12
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for n := range in {
+			select {
+			case out <- n * n:
+			case <-done:
+				return
+			}
+		}
+	}()
+	return out
+d413 13
+a425 13
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for _, n := range nums {
+			select {
+			case out <- n:
+			case <-done:
+				return
+			}
+		}
+		//close(out)
+	}()
+	return out
+d429 14
+a442 2
+	var wg sync.WaitGroup
+	out := make(chan int)
+d444 10
+a453 22
+	output := func(c <-chan int) {
+		defer wg.Done()
+		for n := range c {
+			select {
+			case out <- n:
+			case <-done:
+				fmt.Println("cancel")
+				return
+			}
+		}
+	}
+
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+d457 2
+a458 2
+	done := make(chan int)
+	defer close(done)
+d460 1
+a460 1
+	in := gen(done, 2, 3)
+d462 2
+a463 2
+	c1 := sq(done, in)
+	c2 := sq(done, in)
+d465 2
+a466 2
+	out := merge(done, c1, c2)
+	fmt.Println(<-out)
+d493 6
+a498 6
+	"crypto/md5"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sort"
+d503 14
+a516 14
+	m, err := MD5All(os.Args[1])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var paths []string
+	for path := range m {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		fmt.Printf("%x %s\n", m[path], path)
+	}
+d522 19
+a540 19
+	m := make(map[string][md5.Size]byte)
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		m[path] = md5.Sum(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+d639 8
+a646 8
+	"crypto/md5"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sort"
+	"sync"
+d650 3
+a652 3
+	path string
+	sum  [md5.Size]byte
+	err  error
+d658 3
+a660 3
+	paths := make(chan string)
+	errc := make(chan error, 1)
+	go func() { // HL
+d662 17
+a678 17
+		defer close(paths) // HL
+		errc <- filepath.Walk(root, func(path string, info os.FileInfo, err error) error { // HL
+			if err != nil {
+				return err
+			}
+			if !info.Mode().IsRegular() {
+				return nil
+			}
+			select {
+			case paths <- path: // HL
+			case <-done: // HL
+				return errors.New("walk canceled")
+			}
+			return nil
+		})
+	}()
+	return paths, errc
+d683 8
+a690 8
+	for path := range paths { // HLpaths
+		data, err := ioutil.ReadFile(path)
+		select {
+		case c <- result{path, md5.Sum(data), err}:
+		case <-done:
+			return
+		}
+	}
+d694 36
+a729 36
+	// MD5All closes the done channel when it returns; it may do so before
+	// receiving all the values from c and errc.
+	done := make(chan struct{})
+	defer close(done)
+
+	paths, errc := walkFiles(done, root)
+
+	// Start a fixed number of goroutines to read and digest files.
+	c := make(chan result) // HLc
+	var wg sync.WaitGroup
+	const numDigesters = 20
+	wg.Add(numDigesters)
+	for i := 0; i < numDigesters; i++ {
+		go func() {
+			digester(done, paths, c) // HLc
+			wg.Done()
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(c) // HLc
+	}()
+	// End of pipeline. OMIT
+
+	m := make(map[string][md5.Size]byte)
+	for r := range c {
+		if r.err != nil {
+			return nil, r.err
+		}
+		m[r.path] = r.sum
+	}
+	// Check whether the Walk failed.
+	if err := <-errc; err != nil { // HLerrc
+		return nil, err
+	}
+	return m, nil
+d733 15
+a747 15
+	// Calculate the MD5 sum of all files under the specified directory,
+	// then print the results sorted by path name.
+	m, err := MD5All(os.Args[1])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	var paths []string
+	for path := range m {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		fmt.Printf("%x  %s\n", m[path], path)
+	}
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d293 1
+a293 1
+{{[#!plain
+@
+
+
+1.10
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d473 277
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d358 1
+a358 1
+하지만 실제 파이프라인에서는 각 스테이지의 이상 작동이나 혹은 다른 필요로, 다음 스테이지로 값을 넘기지 않는(혹은 못하는) 경우가 생길 수 있다. 이 경우 도착하지 않는 값을 무한히 기다리는 함수가 생길 수 있는데, 메모리 누수로 이어지기 때문에 정리를 해줘야 한다. 
+d369 105
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d1 1
+a1 1
+#title Concurrency
 @
 
 

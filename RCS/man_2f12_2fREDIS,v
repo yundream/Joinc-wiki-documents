@@ -1,10 +1,65 @@
-head	1.8;
+head	1.19;
 access;
 symbols;
 locks
-	root:1.8; strict;
+	root:1.19; strict;
 comment	@# @;
 
+
+1.19
+date	2015.01.01.13.03.51;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2015.01.01.13.02.32;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2015.01.01.13.01.45;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2015.01.01.12.57.04;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2015.01.01.12.56.43;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2015.01.01.12.55.10;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2015.01.01.10.22.42;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2014.12.31.16.40.51;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2014.12.29.13.49.58;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2014.12.29.13.49.04;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2014.12.29.06.15.57;	author root;	state Exp;
+branches;
+next	1.8;
 
 1.8
 date	2014.11.19.11.59.04;	author root;	state Exp;
@@ -52,23 +107,256 @@ desc
 @
 
 
-1.8
+1.19
 log
 @119.64.102.68;;yundream;;
 @
 text
 @#title REDIS 
-
+[[TableOfContents]]
 == REDIS ==
-REDIS는 BSD 라이센스 기반의 '''Key-value 캐쉬/store''' 데이터베이스다. Memcached와 함께 자주 거론되는 NoSQL 데이터베이스다. 그동안 공부해볼까라는 생각을 하긴 했지만, 딱히 필요성을 가지지 못해서 내버려 두고 있었다. 재미있거나 써먹을 곳이 있지 않은데, 단지 공부하겠다라는 식으로의 접근은 하지않는 편이라서.(의무감으로 접근하면 보통 3일을 못 가는 성격이다. 
+Redis는 data structure server다. 오픈소스 기반이며 key/value 형식으로 데이터를 저장한다. 데이터는 메모리에 저장(in-memory) 덕분에 매우 빠르게 작동한다. [http://db-engines.com/en/ranking/key-value+store DB-Engines.com]에 따르면 가장 인기있는 key/value 데이터베이스다. 참고로 2위는 Memcached, 3위는 (AWS로 유명한)DynamoDB다. 
 
-그러던 중 [wiki:man/12/MQTT/Cluster MQTT Cluster 구성]을 테스트 하다가 '''REDIS'''를 사용하면 문제를 좀 더 쉽게 풀 수 있을 것 같아서, 급작스럽게 살펴보게 됐다. 오늘([[Date(2014-11-12T15:40:44)]])부터 시작.. 
+=== 지원언어 ===
+C, C++, C#, Clojure, Common Lisp, Dart, Erlang, Go, Haskell, Haxe, Io, Java, javascript(Node.js), Lua, Object-C, Perl, PHP, Python, R, Ruby, Scala, Smalltalk, Tcl 등의 언어에서 사용할 수 있다.
+
+=== 자료구조 ===
+String외에 List, Sets, Sorted set, Hashes 자료를 지원한다. 
+
+== Random Get 테스트 ==
+Key가 백만단위를 초과할 경우 키를 가져오는 성능이 어떨지 궁금해서 테스트를 수행했다. 테스트 환경은 아래와 같다. 
+  * REDIS 서버 : 우분투 리눅스 14.10 서버버전. VirtualBox로 실행했다. 1000만개의 key를 수용하려면 1.1G 정도의 메모리가 필요하다. 그러니 2G 이상의 메모리를 할당하자.
+  * REDIS 클라이언트 : Host 운영체제로 테스트 
+100만개와 1000만개 데이터에 대해서 테스트를 진행 했다. Key가 많아질 경우 입력에 많은 시간이 걸린다. 그래서 key를 파일로 만들어서 bulk 입력했다. 줄 구분자로 반드시 "\r\n"을 써야 한다.
+{{{#!plain
+File.open('1million.txt', 'w') do |f|
+    for i in (0..999999)
+        f.write "SET key:#{i} #{i}\r\n"
+    end
+end
+}}}
+
+Bulk 입력했다.
+{{{#!plain
+# cat 1million.txt | redis-cli -h 192.168.56.5 --pipe
+}}}
+
+Random 하게 100000개의 Key를 읽어서 걸린 시간을 측정하는 프로그램을 만들었다. 
+{{{#!plain
+require 'redis'
+require 'time'
+
+class Test
+    @@redis = nil
+    def initialize
+        @@redis = Redis.new(:host=>"192.168.56.5")
+    end
+    def run num
+        r = Random.new
+        for i in (0..num)
+            id = r.rand(0..1000000)
+            s = Time.now
+            @@redis.get "key:#{id}"
+            e = Time.now
+            puts "%8s\t%.6f " % [id, (e.to_f - s.to_f)]
+        end
+    end
+end
+
+test = Test.new
+test.run 100000
+}}}
+1000 레코드를 가진 데이터 파일이 만들어졌다. 랜덤하다 보니까 중복되는 것도 있을 텐데, 그건 무시한다.
+{{{#!plain
+   58033        0.000745                                                                                   
+  461187        0.000166                                                                                   
+  254008        0.000214                                                                                   
+  632646        0.000250                                                                                   
+  802061        0.000223                                                                                   
+  256017        0.000208                                                                                   
+  886816        0.000195                                                                                   
+  313491        0.000173                                                                                   
+  ....
+}}}
+이 데이터를 gnuplot를 이용해서 시각화 했다.
+{{{#!html
+<div class="row">
+	<div class="large-12 columns">
+		<div class="large-6 columns"> 
+			<a href="#" data-reveal-id="firstModal">
+			<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s400/redis_get.png">
+			</a>
+		</div>
+		<div class="large-6 columns"> 
+			<a href="#" data-reveal-id="secondModal">
+			<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s400/redis_10million.png">
+			</a>
+		</div>
+	</div>
+</div>
+<div id="firstModal" class="reveal-modal" data-reveal>
+<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s800/redis_get.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+
+<div id="secondModal" class="reveal-modal" data-reveal>
+<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s800/redis_10million.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+}}}
 
 == 문서 ==
  * [wiki:man/12/REDIS/IntroDataType Redis 설치 와 데이터 타입 테스트]
  * [wiki:man/12/REDIS/Pipelining Pipelining] 
  * [wiki:man/12/REDIS/PubSub Redis PUB/Sub 커뮤니케이션]
  * [wiki:man/12/REDIS/Commands REDIS Commands]
+ * [wiki:man/12/REDIS/DataModeling Redis 데이터 모델링 응용 예제] : 작업중
+@
+
+
+1.18
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d77 1
+d79 1
+d87 5
+@
+
+
+1.17
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d82 1
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d72 1
+d74 1
+d81 3
+@
+
+
+1.15
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a86 3
+
+== 모든 문서 ==
+[[subindex]]
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d12 1
+a12 1
+=== Random Get 테스트 ===
+a80 1
+
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d14 1
+a14 1
+  * REDIS 서버 : 우분투 리눅스 14.10 서버버전. VirtualBox로 실행
+d16 1
+a16 1
+100만개의 Key를 만든 다음
+d18 6
+a23 1
+require 'redis'
+d25 3
+a27 4
+r = Redis.new(:host=>"192.168.56.5")
+for i in (0..1000000) 
+    r.set "key:#{i}", i
+end
+d29 2
+a30 1
+Random 하게 Key를 읽어서 걸린 시간을 측정하는 프로그램을 만들었다. 10만번을 반복했다.
+d55 1
+a55 1
+10 레코드를 가진 데이터 파일이 만들어졌다. 랜덤하다 보니까 중복되는 것도 있을 텐데, 그건 무시한다.
+d67 1
+a67 1
+Gnuplot를 이용해서 데이터들을 시각화 했다. 어딘가 Key를 색인하고 있는게 분명하다. 자료를 찾아봐야 겠다. 
+d69 10
+a78 1
+<img src="https://docs.google.com/drawings/d/1d_lW2s7HszPCPMMoaop_1JgpFE1Qiydr6hRIqvLVV58/pub?w=643&amp;h=479">
+d81 1
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d12 55
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d17 1
+a17 1
+ * [wiki:man/12/REDIS/DataModeling Redis 데이터 모델링 응용 예제] : 지금 작업중인 내용
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d17 1
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d2 3
+d6 2
+a7 2
+== REDIS ==
+REDIS는 BSD 라이센스 기반의 '''Key-value 캐쉬/store''' 데이터베이스다. Memcached와 함께 자주 거론되는 NoSQL 데이터베이스다. 그동안 공부해볼까라는 생각을 하긴 했지만, 딱히 필요성을 가지지 못해서 내버려 두고 있었다. 재미있거나 써먹을 곳이 있지 않은데, 단지 공부하겠다라는 식으로의 접근은 하지않는 편이라서.(의무감으로 접근하면 보통 3일을 못 가는 성격이다. 
+d9 2
+a10 1
+그러던 중 [wiki:man/12/MQTT/Cluster MQTT Cluster 구성]을 테스트 하다가 '''REDIS'''를 사용하면 문제를 좀 더 쉽게 풀 수 있을 것 같아서, 급작스럽게 살펴보게 됐다. 오늘([[Date(2014-11-12T15:40:44)]])부터 시작.. 
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d13 3
 @
 
 

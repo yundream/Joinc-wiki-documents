@@ -1,0 +1,90 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2014.12.30.05.06.21;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fConsistentHashing
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title Consistent hashing
+[[TableOfContents]]
+== Consistent hashing ==
+아래 그림은 hashing(해싱)의 기본 개념을 묘사하고 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/18F4U2Jl7OsYo7QRdBUM3OlXNZA1kQPIMU0RIEo1yXZU/pub?w=439&amp;h=314">
+}}}
+
+해쉬 함수는 매우 큰 범위의 입력 데이터를 hash 함수를 이용해서, 고정된 크기의 디지털 데이터에 맵핑하기 위한 목적으로 사용한다. 어떤 해싱함수를 사용하느냐에 따라서 다양한 응용이 가능하다.
+
+Consistent hashing는 Values의 집합을 ''K'', 해쉬 테이블의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 동일한 해쉬값을 보장하는 해싱함수를 사용하는 기술을 의미한다.
+
+Conssitent hashing은 분산처리 시스템에서, 클라이언트 요청을 분산하기 위한 목적으로 널리 사용하고 있다. 아래와 같은 분산 시스템이 있다고 가정해 보자. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1a1ItR6SDsbMwb-RME_Pld6t-VuvP2FWI6JX0cxk0YuU/pub?w=634&amp;h=206">
+}}}
+
+Client Request는 Proxy를 거쳐서 노드로 분산된다. 노드가 클라이언트의 상태(state)를 저장해야 하는 경우 클라이언트 요청이 고정된 노드로 향하게 해야 한다. '''Client ID(IP등) % N'''으로 간단하게 목적 노드를 고정할 수 있을 거다.
+
+문제는 노드가 빠지거나 추가될 때 발생한다. 노드-2가 빠졌다고 가정을 해보자. Proxy는 Node-2를 제외한 나머지 노드로 분산을 해야 하는데, '''Client ID % N == 2'''인 요청을 어디로 보내야 할지 알 수 없게 된다.
+
+문제의 원인은 '''선택을 할 수 없다''는데 있다. 그러므로 선택을 할 수 있게 만들어주면 된다. 선택을 할 수 없는 이유는 등호(=)만 있기 때문이니 부등호(<, >)를 만들어 주면 된다. 여러 구간을 가진 슬롯을 만들어 주면 된다. 
+
+
+이렇게 해서 등장하는게 '''Hashring'''이다. 4개의 노드가 있을 때의 hashring은 아래와 같이 구성할 수 있을 거다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=441&amp;h=378">
+}}}
+
+1, 2, 3, 4는 노드다. 이전에는 각 노드 사이에 하나의 구간만 있었는데, 그 구간을 몇개로 나누었다. 이제 ''K''는 1.1, 2.3 와 같은 값으로 해싱이 된다. 이제 ''k''는 시계방향 쪽으로 가장 가까운 노드에서 처리한다. K=1.1은 노드-2가 K=2.3은 노드-3가 처리한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=467&amp;h=391">
+}}}
+
+2가 빠지는 경우를 생각해 보자. 노드-2에서 처리해야 했던 '''1.1 < K <= 3''' 는 모두 노드-3에서 처리하게 된다. 다른 노드들에서 처리하던 K는 변함이 없으므로 깔끔하게 해결할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1SWL75ZRuwCiGwUNWaXbuxyB29z3Llgr_ijTrtI71yt4/pub?w=467&amp;h=391">
+}}}
+
+위 모델은 노드에 문제가 생겼을 경우, 다른 노드에서 서비스를 계속하게 하는 효과는 있지만, '''1.1 < K <= 2''' 구간의 트래픽이 모두 노드-3으로 몰린다는 단점이 있다. 
+
+단점은 두 가지 방법으로 해결할 수 있다.
+  1. 빠르게 fail-over 한다.  
+  1. 문제가 발생한 2번 노드로 향하는 K에 대해서 한번 더 hashing 한다.   
+1번은 당연히 해야 하는 거니 2번 문제를 고민 하면 되겠다. K에 대한 해싱 결과가 전체 슬롯에 분배되는 해싱 알고리즘을 만들면 될테다. 알고리즘은 상황에 따라 달라질 테니 만드는 건 패스. 
+
+노드 추가도 비슷한 문제가 있다. ? 노드가 하나 추가됐다고 가정해 보자.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1bd0PNCKVSylBJ2SDLdYoHSd95rK_YU_7ei8X7mZEtqk/pub?w=467&amp;h=391">
+}}}
+
+결국 2로 가는 요청만 나누어서 처리하게 된다. 역시 해쉬를 한번 더 하는 걸로 문제를 해결할 수 있을 거다. 
+
+== 참고 문서 ==
+  * [https://github.com/twitter/twemproxy consistent hashing을 지원하는 경량 proxy]
+  * [http://www.stephenbroeker.com/2012/06/13/openstack-swift-storage-rings-explained/ OpenStack swift storage rings explained] 
+  * [http://www.mimul.com/pebble/default/2012/05/04/1336102052449.html Consistent Hashing] 
+  * [http://www.audioscrobbler.net/development/ketama/ ketama consistent hashing C 라이브러리]
+  * [https://charsyam.wordpress.com/2011/11/25/memcached-%EC%97%90%EC%84%9C%EC%9D%98-consistent-hashing/ memcached 에서의 consistent hashing]
+@

@@ -1,18 +1,498 @@
 #title REDIS 데이터 모델링 예제들
+[[TableOfContents]]
+== Message Box ==
+메신저 서비스를 개발하고 있다. 메시지를 보냈는데, 수신 대상이 연결하지 않은 상태일 수도 있다. 이 경우에 메시지는 '''메시지 함(Message Box)'''에 저장하기로 했다. 유저가 연결하면, 메시지 함에서 메시지를 읽어온다. 
 
-REDIS 활용 방안 정리. 일종의 Cookbook 느낌이 될 것 같다. 
-== Unique ID 생성 ==
-== Atomic Get and Delete ==
-== FIFO Queue ==
-== Simple social graph ==
-== Tag ==
-== Pub/Sub Communication ==
+메시지 함의 크기는 메시지에 대한 정책에 따라 달라질 수 있다. 나는 '''"모든 메시지는 중요하다."'''는 관점에서 기능을 구현하기로 했다. REDIS는 메모리 기반 데이터베이스이다. 무한정 REDIS에 데이터를 쌓을 수는 없는 노릇이다. 그래서 REDIS에는 '''최근 도착한 메시지 N개'''를 저장하고, 그 보다 오랜 메시지는 공간 제약이 없는 다른 영역(예컨데 RDBMS)에 저장하기로 했다. 
+
+Capped List는 REDIS의 LPUSH와 LTRIM 를 이용해서 구현하기로 했다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1CQBEpakm4pBQwk2FHRlkJGQ5tM_Wwb55pTiY0ZhM444/pub?w=368&amp;h=198">
+}}}
+
+LPUSH를 수행하면, 리스트의 크기를 반환한다. 반환값이 유저에게 허용한 메시지함 크기 보다 크면, TRIM 연산을 한다.
+{{{#!plain
+USER_MAX_MSGBOX_SIZE = 100 
+list_size = LPUSH message.box.user:1  message
+if (n = (list_size - USER_MAX_MSGBOX_SIZE)) > 0 
+    LRANGE message.box.user:1 -n -1   # TRIM하기전에 어딘가에 저장해야 한다.
+    LTRIM message.box.user:1 0 n 
+end
+}}}
+작동은 하겠는데, 일단 메시지 박스가 가득차고나면 메시지가 들어올 때마다 "가장 오래된 메시지 저장"->"LTRIM" 연산을 해야 하는 문제점이 있다. 이 문제는 메시지 함 크기에 버퍼를 두는 것으로 해결할 수 있겠다. 메시지 함 의 최대 크기기 100이라면 100 * 2 만큼 메시지를 받는다. 100 * 2가 가득 차면, "가장 오래된 100개의 메시지 저장"->"LTRIM" 하면 효율적으로 운용할 수 있겠다.
+
+Capped List 기능을 가진 Message Box의 전체 구성이다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17S66DWODkQ7KZjVg91OBpJ4nth1KvZ8GnhNvGV-LenA/pub?w=351&amp;h=267">
+}}}
+
+유저가 접근하면, 메시지 함에 있는 메시지를 전부 보여주고 TRIM을 수행한다. 메시지 함을 초과해서 다른 저장소에 저장된 메시지들은 '''더 보기''' 명령을 이용해서 네비게이션 할 수 있도록 하면 되겠다. 메시지는 휘발성 이므로 클라이언트에 전달된 메시지는 서버에서 무조건 삭제한다.  
+
+== Item 별 방문 카운트 ==
+item(상품)별 방문 카운트는 관리자에게는 웹 서비스 최적화를 위한 정보를 제공해 준다. 이 정보들을 꾸준히 저장하면, 고객의 동선과 구매 패턴을 파악하는 기초자료로 사용할 수 있다. 유저별로 page 방문 기록을 저장할 수도 있는데, 이 기록을 이용하면 유저의 기호를 기반으로 하는 추천 시스템 개발에 응용할 수 있을 것이다.
+
+{{{#!plain
+> INCR item:item-id 
+}}}
+이렇게 하면 item 단위로 count를 할 수 있을 테다. 하지만 이런 류의 데이터는 시계열(time series)이 되어야 쓸만한 정보를 뽑아낼 수 있다. 시계열 데이터를 다룰 때는, 시간 해상도를 결정해야 한다. 하루 단위로 데이터를 저장한다면, 주,월,분기(계절별),년 단위의 유용한 정보를 뽑을 수 있겠지만 "출,퇴근,업무시간,식시시간"등 시간대 별 통계를 얻기는 힘들다. 추천시스템을 만들 경우에도 시간정보가 있어야 정밀한 추천이 가능할 거다. 간단한 예로 통닭을 아침 9시에 추천하는 건 좀 이상하지 않겠는가 ?. 통닭은 좀 너무 예상하기 쉽다면. 음악은 어떤가 ? 아침에 일어나서 듣는 음악과 업무시간에 듣는 음악 저녁시간에 듣는 음악에도 장르별 차이를 예상할 수 있다. 
+
+일간 카운트 저장 예제다. 
+{{{#!plain
+> INCR item.item-0:20141225
+> INCR item.item-1:20141225
+> INCR item.item-2:20141225
+> INCR item.item-0:20141225
+}}}
+이 key들은 하루동안만 count가 되니, 해당 일이 지난 뒤에서는 파일기반 데이터베이스로 옮기면 되겠다. 
+
+해상도를 시간단위로 높인다고 가정해도, key 갯수가 * 24가 될 뿐 위의 방식과 달라질 것은 없다.
+{{{#!plain
+> INCR item.item-0:2014122511
+> INCR item.item-1:2014122511
+> INCR item.item-2:2014122512
+}}}
+
+Item 별 방문 카운트를 약간 응용해보자. A회사는 음악 서비스를 운영하고 있는데, 유저에게 음악을 추천하는 서비스를 만들기로 했다. 유저는 관심있는 음악 페이지를 방문한다고 가정할 수 있다. A사는 각 음악에 장르를 태깅한 다음, 유저가 방문할 때마다 장르에 대해서 카운팅을 하기로 했다. 어느 정도 데이터가 모이면, 이 데이터를 근거로 유저가 좋아할 만한 음악을 추천할 수 있을 거다(정밀한 추천 알고리즘을 돌리려면 다른 데이터들드 좀더 필요하겠지만, 단순화 하기로 했다.). 1부터 10까지 열개의 카테고리로 나눴다. 50은 유저 ID다.
+{{{#!plain
+> INCR user.category:50.0
+> INCR user.category:50.1
+> INCR user.category:50.1
+}}}
+하지만 이 방법이 괜찮을지 확신이 서질 않는다. 천만명의 Active한 유저를 관리해야 하면, key만 1억이다. 샤딩을 해서 키를 분산하는 방법도 있겠는데, 어쨋든 키가 많아지는게 불만이다. Key가 많아지면 색인 테이블의 크기가 커질테고 키가 많아질 수도록 성능은 점점 떨어질 것이다. 시간 복잡를 줄일 수 있는 방법을 찾아보기로 했다. 
+
+'''SETRANGE'''를 사용하기로 했다. User 마다 10byte의 고정된 공간을 제공하고, 이 공간에 count 하는 방식이다. 유저 ID는 고정된 integer 값이므로 유저의 카운트 정보가 저장된 위치(offset)을 구할 수 있다. 
+{{{#!plain
+OFFSET = USER_ID * 10 
+}}}
+이제 장르별로 key를 만들면 된다. 최대 1000명의 유저가 있다고 가정한다면, 1000 * 10 크기의 key를 만들면 된다. 
+{{{#!plain
+> SETRANGE music.category:0 music.category:0 10000 0 
+> SETRANGE music.category:1 music.category:0 10000 0 
+> SETRANGE music.category:2 music.category:0 10000 0 
+....
+}}}
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1fK6L6jZ-qQFiH6iPnz_BJTZYdH4ZUupmWa1cZFX22eM/pub?w=587&amp;h=226">
+}}}
+
+Ruby 프로그램을 이용해서 테스트를 해보기로 했다.
+{{{#!plain
+require 'redis'
+
+# 10자리 크기로 저장하기로 했다.
+# 10자리면 99억까지 저장이 가능하려나 ?
+FIELD_SIZE = 10
+
+class Counter
+    @redis = nil
+    def initialize
+        @redis = Redis.new(:host=>"192.168.57.2")
+    end
+
+    def incr args
+        offset = args[:user_id] * FIELD_SIZE
+        key = "music.category:#{args[:category]}"
+        count = @redis.getrange(key, offset, offset + FIELD_SIZE - 1)
+        @redis.setrange(key, offset, count.to_i+1)
+    end
+end
+
+user_id = 10
+counter = Counter.new
+counter.incr :user_id=>user_id, :category=>0
+}}}
+시간 복잡도가 O(1)이다. GET, SET 연산의 복잡도도 O(1)이니, 이 정도면 쓸만하지 싶다. string의 최대 크기는 512M 이고 유저 한명이 차지하는 공간이 10byte라면, key 하나에 5천만 정도의 유저 count를 저장할 수 있다.   
+
+== API 호출 제한 ==
+OpenAPI 서비스를 하다보면, 일정시간에 호출할 수 있는 최대 API 갯수에 제한을 걸어야 할 때가 있다. 
+
+간단하게 유저 ID와 날짜를 조합해서 key로 만들고, 이 Key 에 대해서 INCR 하는 방법이 있다. INCR 연산 후에 값(count)을 반환한다. 이 반환 값을 허용한 최대 크기와 비교하면 된다.
+{{{#!plain
+> INCR apicall.user01:20141212
+"1812"
+}}}
+일 단위로 카운팅을 하니, 사용하지 않는 키는 배치작업을 이용해서 주기적으로 삭제해야 한다는 귀찮음이 있다.  
+
+'''EXPIRE'''와 조합하는 것으로 이 문제를 해결 할 수 있다. EXPIRE한 key에 대해서 '''set''', '''getset'''을 적용하면, EXPIRE 값이 사라진다는 걸 알고 있을 것이다. INCL 연산 대해서는 EXPIRE가 사라지지 않는다.
+{{{#!plain
+require 'redis'
+
+class OpenAPIManager
+    @redis = nil
+    def initialize
+        @redis = Redis.new(:host=>"192.168.57.2")
+    end
+
+    # OpenAPI 호출 횟수를 초과했는지 검사한다.
+    def call? user_id
+        key = "apicall.#{user_id}:counter"
+        # 키가 없다면 생성하고 
+        # expire 시간을 설정한다. 
+        if !@redis.exists key
+            @redis.incr key
+            @redis.expire key, 3600 * 24
+        end
+        count = @redis.incr key
+        # 호출 가능 횟수를 초과하면, false를 반환한다. 
+        # 이제 이 유저는 API를 호출할 수 없다. 
+        # 남은 TTL 시간이 지나면 Key가 삭제되고, 유저는 
+        # 다시 api를 호출할 수 있게 된다.
+        if count.to_i > 10000
+            return false
+        end
+        ttl = @redis.ttl(key)
+        puts "key TTL : #{ttl}"
+        return true
+    end
+    def call name
+        puts "API CALL : #{name}"
+    end
+end
+
+apimgr = OpenAPIManager.new
+if apimgr.call? 2
+    apimgr.call "/test"
+else
+    puts "OpenAPI Call ERROR"
+end
+}}}
+문제 없이 작동할 거다. 하지만 카운팅 데이터에 따라서 자동으로 삭제할 필요가 있는지는 고민을 할 필요가 있다. 이런 류의 카운팅 정보는 어딘가에 저장해두고 분석할 필요가 있기 때문이다. 분석을 위해서 데이터를 남겨야 한다면, 첫 번째 방법을 사용해야 할 거다. 
+
+키가 많아지는 경우를 고민해야 할 수도 있겠는데, 일반적으로 "개발자 등록을 마친 유저"에 대해서 API 호출을 허용할 테니, 크게 걱정하지 않아도 될 것 같다.
+
+== Tag 검색 ==
+책 판매 사이트에 Tag 기반 검색을 추가하기로 했다. 아래와 같이 책 정보를 만들고, SADD 명령으로 tag 정보를 만들었다.  
+{{{#!plain
+> SET book:1 "{'title' : 'Diving into Python', 'author': 'Mark Pilgrim'}"
+> SET book:2 "{'title' : 'Programing Erlang', 'author': 'Joe Armstrong'}"
+> SET book:3 "{'title' : 'Programing in Haskell', 'author': 'Graham Hutton'}"
+
+> SADD tag:python 1
+> SADD tag:erlang 2
+> SADD tag:haskell 3
+> SADD tag:programming 1 2 3
+> SADD tag:computing 1 2 3
+> SADD tag:distributedcomputing 2
+> SADD tag:FP 2 3
+}}}
+REDIS는 SINTER(교집합), SUNION(합집합), SDIFF(차집합)의 집합연산 명령을 제공한다. 이들 명령을 이용해서 Tag 검색을 수행할 수 있다. 
+
+{{{#!plain
+require 'redis'
+redis = Redis.new(:host=>'192.168.56.5')
+
+# 0 results
+redis.sinter('tag:erlang', 'tag:haskell') do | book |
+end
+
+# 3 results
+redis.sinter('tag:programming', 'tag:computing').each do | book |
+    puts redis.get("book:#{book}")
+end
+
+# 2 result 
+redis.sunion('tag:erlang', 'tag:haskell').each do | book |
+    puts redis.get("book:#{book}")
+end
+
+# 2 result
+redis.sdiff('tag:programming', 'tag:haskell').each do | book |
+    puts redis.get("book:#{book}")
+end
+}}}
+
 == Log aggregation ==
+시스템에서 발생하는 로그들을 중앙에 저장해서 관리하려고 한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1c-duIQWeJKosr_9-Dr01ZUPLwsH8sZtcu6KvsmOU3JU/pub?w=474&amp;h=255">
+}}}
+
+각 노드는 LPUSH로 밀어 넣고, 처리하는 쪽(로컬 파일 혹은 데이터베이스에 쌓는)에서는 BRPOP로 꺼낸다. 
+{{{#!plain
+require 'redis'
+
+redis = Redis.new(:host=>'192.168.56.5', :port=>6379)
+loop do
+    item = redis.brpop('logging', 0)
+    puts item[1]
+end
+}}}
+
+REDIS PUB/SUB로도 구현할 수 있지 않을까 ? 라는 생각을 해봤지만 Subscribe가 뻗어버려서 메시지를 소비할 녀석이 없을 경우 메시지를 '''버려버리는''' 문제 때문에 사용하기 힘들 것 같다.  
+
+== Pub/Sub Communication ==
+Pub/Sub 시스템으로도 사용할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Y3PnSxEsGRk2puPktbM4bF-eeXDqy0sKI61cEnhRDSI/pub?w=495&amp;h=158">
+}}}
+{{{#!plain
+> SUBSCRIBE log
+> PUBLISH log Hellow 
+}}}
+PUB 메시지는 큐등에 쌓이지 않는다. Subscriber가 없다면, 메시지를 잃어 버릴 수 있다는 의미다. 따라서 PUB/SUB 시스템은 분실되도 큰 상관 없는 곳에 사용해야 한다. 예를 들어 서버 점검을 클라이언트에게 알려주기 위한 알람 용도로의 사용이다. WoW(World of warcraft)의 경우 서버 점검 1시간 전 10 분전 5분전에 알람 메시지를 줘서 유저가 미리 대비할 수 있게 한다. 
+
+== shopping cart 관리 ==
+쇼핑 카트를 관리해 보자. 이 서비스의 기능요소들은 아래와 같다. 
+  1. 유저는 쇼핑 카트를 만들 수 있다.
+  1. 쇼핑카트에는 하나 이상의 상품을 담을 수 있다.
+  1. 상품을 빼는 것도 가능하다. 
+  1. 상품은 하나 이상 담을 수 있다.  
+카트를 식별할 ID를 가져야 할 건데, 유저 ID로 만들기로 했다. 유저는 하나의 카트만 가질 수 있다는 제한이 걸리는데, 별 상관 없을 것 같다.
+
+카트에 담은 상품관리
+||UserID   ||ProductID          ||Qty         ||
+||1        ||28                 ||1           ||
+||1        ||372                ||2           ||
+||2        ||15                 ||1           ||
+||2        ||160                ||5           ||
+||2        ||201                ||7           ||
+
+UserID를 Key로 한 값에 ProductID:Qty 형식의 key/value의 리스트를 저장해야 한다. REDIS의 Hash를 이용하면 되겠다.     
+{{{#!html
+<img src="https://docs.google.com/drawings/d/12lPvqOn5y5mezTGdhkrR3eqlyq4z6qoT3lzdNNUary4/pub?w=358&amp;h=327">
+}}}
+
+카트 테이블 정보를 Redis에 밀어 넣었다.
+{{{#!plain
+> HSET cart.user:1  28 1
+> HSET cart.user:1  372 2
+> HSET cart.user:2  15 1
+> HSET cart.user:2  160 5
+> HSET cart.user:2  201 7
+}}}
+
+테스트
+{{{#!plain
+require 'redis'
+
+class ShoppingChart
+    @redis = nil
+    def initialize
+        @redis = Redis.new(:host=>'192.168.56.5', :port=>6379)
+    end
+    def allItem userid
+        puts "HGET ALL ITEM ===="
+        puts "%10s : %s" % ["Product","Qty"]
+        @redis.hgetall('cart.user:1').each  do | field, value |
+            puts "%10s : %s" % [field, value]
+        end
+    end
+    def removeItem userid, productId
+        @redis.hdel "cart.user:#{userid}", productId
+    end
+    def addItem userid, productId, qty
+        @redis.hset "cart.user:#{userid}", productId, qty
+    end
+end
+
+
+cart = ShoppingChart.new
+cart.allItem 1
+
+cart.removeItem 1, 28
+cart.allItem 1
+
+cart.addItem 1, 1280, 5
+cart.addItem 1, 1312, 2
+cart.allItem 1
+}}}
+웹 애플리케이션의 경우 유저 세션이 만료되는 시점을 알 수 없다. 다음번 방문했을 때, 이전 카트가 보인다거나 하는 문제도 있고, 메모리를 낭비하는 문제도 있으니, 카트 만료시간을 정해줘야 한다. 간단하게 EXPIRE를 이용해서 만료시간을 정하자. 카트 메서드를 호출 할 때마다, 만료시간을 재설정 하면 되겠다. 
+
+== Atomic Get and Delete ==
+GET과 DELETE를 원자적으로(atomically) 수행하고 싶다면, MULTI-EXEC 명령을 이용하면 되겠다. 
+{{{#!plain
+> SET toto 1
+> MULTI
+> GET toto
+QUEUED
+> DEL toto
+QUEUED
+> EXEC
+1) "1"
+2) (integer) 1
+}}}
+
+== Simple social graph ==
+친구의 친구의 친구의 친구의 친구.. 관계를 그래프로 표현하면 소셜 그래프라고 된다고 하더라. 이 관계는 follows와 followers, block의 리스트로 정의 할 수 있다. 아래와 같은 소셜 그래프를 REDIS에 저장해 보자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1EAcbcRXxGGVgbpgBOHOUXCk9vDXkaJU4zX6OA57Oucg/pub?w=252&amp;h=234">
+}}}
+
+유저  "1"을 중심으로 소셜 그래프를 만들었다. 화살표는 팔로잉의 방향이다. 1과 2 관계에서 2는 1의 팔로워다.(2는 1을 팔로잉 하고 있다.) 1과 3은 서로 팔로잉한 "친구" 관계다. 4와 5는 '''아는 사람''' 정도가 되겠다. 4는 아는 사람이 둘이고 5는 아는 사람이 한명이다. SET을 이용해서 데이터를 구성했다. 
+{{{#!plain
+# 1과 2의 관계
+> SADD user.follower:1 2
+> SADD user.following:2 1
+
+# 1과 3의 관계
+> SADD user.friend:1 3 
+> SADD user.friend:3 1 
+
+# 3과 4의 관계
+> SADD user.following:3 4
+> SADD user.follower:4 3
+
+# 2와 4의 관계
+> SADD user.following:2 4
+> SADD user.follower:4 2
+
+# 3과 5의 관계
+> SADD user.following:3 5
+> SADD user.follower:5 3
+}}}
+
+테스트 결과
+{{{#!plain
+# 유저 4의 팔로워
+> SMEMBERS user.follower:4
+1) "2"
+2) "3"
+
+# 유저 1의 팔로워
+> SMEMBERS user.follower:1
+1) "2"
+
+# 유저 1의 친구
+> SMEMBERS user.friend:1
+1) "3"
+
+# 유저 1이 유저 3을 방문 했을 때, 유저 3이 아는 유저를 추천
+# 팔로워, 팔로잉, 친구를 찾아서 추천하면 된다.  
+> MULTI
+> SMEMBERS user.follower:3
+QUEUED
+> SMEMBERS user.following:3
+QUEUED
+> SMEMBERS user.friend:3
+> EXEC
+1) (empty list or set)
+2) 1) "4"
+   2) "5"
+3) 1) "1"
+}}}
+
+이 데이터 모델은 유저간의 친밀도(weight - 가중치)를 알 수 없다는 문제가 있다. 소셜 네트워크 기반의 서비스를 하려면 유저간의 친밀도 값을 함께 가지고 있어야 한다. 가중치를 적용한 관계 그래프는 아래와 같을 것이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/13d4g6jBuFhQFWaqRjxeqrIMVLMCOsK7zYYUfe4LxuH0/pub?w=261&amp;h=302">
+}}}
+
+유저 1에게 다른 유저를 추천한다고 가정해 보자. 유력한 대상은 4, 5, 6 이다. 가중치가 없다면 무작위로 추천을 해야 겠지만, 가중치가 있다면 어떤 유저를 우선 추천해야 하는지 계산할 수 있을 거다.
+
+유저간 각 관계에는 숫자로 가중치가 있는데, 경로에 있는 가중치를 모두 더해서 값이 큰 녀석을 추천하는 알고리즘을 만들기로 했다. 친구의 경우 쌍방향인데, 이 값을 모두 더하기로 했다.(친한 친구의 아는 사람이라면 당연히 가중치가 더 높을 것이다.) 
+  * 1 에서 5 : (3 + 3) + 4 = 10   
+  * 1 에서 4 : 2 + 1 + ( 3 + 3 ) + 2 = 11.  4는 2와 3 모두가 알고 있다. 따라서 모든 경로의 값을 더해서 가중치를 높게 잡았다. 
+  * 1 에서 6 : 2 + 1 = 3  
+이 알고리즘에 따르면 4, 5, 6 순서로 추천을 하면 된다는 결과가 나왔다. 실제로는 경로를 구성하는 Hop의 갯수를 포함하는 알고리즘을 개발해야 겠지만, 여기에서는 그냥 단순한 알고리즘을 사용한다. (소셜 그래프에서 추천 알고리즘은 연구해 볼만한 가치가 있겠다.)
+
+이제 가중치를 어떻게 저장할 것이냐 하는 이슈가 있다. 가중치를 별도의 키로 저장하는 방법을 생각해 볼 수 있겠다. 유저 1을 중심으로 할 경우 아래와 같이 저장한다.
+{{{#!plain
+> SADD route.weight:1.2  2
+> SADD route.weight:1.3  6 
+> SADD route.weight:1.5  5 
+}}}
+간단하긴 하지만, 유저가 많아지고  관계가 촘촘해 질 수록 데이터의 양이 기하 급수적으로 늘어난 다는 단점이 있다. 그냥 관계 그래프를 만들 때, 값에 가중치를 포함하면 된다. 
+{{{#!plain
+# 1과 2의 관계
+> SADD user.follower:1 "[2, 2]"
+> SADD user.following:2 "[1, 2]"
+
+# 1과 3의 관계
+> SADD user.friend:1 "[3, 6]"
+> SADD user.friend:3 "[1, 6]"
+}}}
+
+소수점을 이용해서 가중치를 저장하는 방법도 있다.
+{{{#!plain
+# 1과 2의 관계
+> SADD user.follower:1 2.2
+> SADD user.following:2 1.2
+
+# 1과 3의 관계
+> SADD user.friend:1 3.6
+> SADD user.friend:3 1.6
+}}}
+가중치가 1을 넘지만 않게 조절한다면, 첫 번째 방법보다 효율적으로 동작할 거다. 가중치외에 다른 부가적인 정보를 넣고 싶다면 첫번째 방법을 사용하면 된다. 추천 알고리즘을 만드는 건 따로 고민을 하고, 여기에서는 이정도로 넘어가야 겠다.
+
+== FIFO Queue ==
+REDIS는 '''List''' 데이터타입을 지원한다. LPUSH와 RPOP를 이용해서 LIST 데이터에 대한 큐를 만들 수 있다.  
+
+{{{#!plain
+> LPUSH queue1 low
+(integer) 1
+> LPUSH queue1 medium
+(integer) 2
+> LPUSH queue1 high
+(integer) 3
+> RPOP queue1
+"low"
+> RPOP queue1
+"medium"
+> RPOP queue1
+"high"
+}}}
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1kJYWf9y3J0Dw92P8V3jTtvxX6ae7x3S5iRbYphWng_o/pub?w=546&amp;h=148">
+}}}
+
+REDIS는 RPUSH, LPUSH, LPOP, RPOP를 이용해서 데이터를 넣고 뺄 수 있다. 또한 '''blocking pop'''도 지원한다. 이들 연산의 시간 복잡도는 모두 O(1)로, 자료의 크기에 상관없이 동일하게 빠른 성능을 뽑아낼 수 있다. 
+{{{#!plain
+require 'redis'
+
+class Queue
+    @id
+    @key
+
+    def initialize
+        @redis = Redis.new(:host=>"192.168.56.5")
+        id = @redis.incr("queue_space")
+        @key = "queue:#{id}"
+    end
+
+    def push v
+        @redis.lpush(@key, v)
+    end
+
+    def pop
+        @redis.rpop(@key)
+    end
+
+    def key
+        @key
+    end
+end
+
+queue = Queue.new
+queue.push "Job 1"
+queue.push "Job 2"
+queue.push "Job 3"
+
+puts queue.pop
+puts queue.pop
+puts queue.pop
+}}}
+
 == Session Storage ==
-== Social Network ==
-== Site 방문 카운트 ==
-== 쇼핑 목록 관리 ==
-== 페이지별 View 카운트 ==
+HTTP 기반의 모든 웹 애플리케이션들은 '''session'''을 이용해서 상태를 관리한다. 세션정보는 데이터베이스 혹은 공유파일 시스템을 이용해서, 모든 웹(혹은 WAS)서버들이 공유해야 한다. REDIS를 이용해서 세션 저장소를 만들어 보려고 한다. 
+
+세션 저장소는 아래의 기능을 가지고 있어야 한다. 
+  1. Create : 세션을 만든다. 
+  1. Destroy : 세션을 삭제한다. 
+  1. Read : 세션에 저장된 정보를 읽는다.
+  1. Write : 세션에 데이터를 쓴다.  
+  1. Gc : 사용하지 않는 세션은 자동으로 정리해 줘야 한다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Dsyn4xdKnuZFuF6LEopk2eunw7kc_quvoGYcGbzqkGM/pub?w=414&amp;h=189">
+}}}
+
+
+
 == Auto Complete ==
 
 == 참고 ==
@@ -20,3 +500,4 @@ REDIS 활용 방안 정리. 일종의 Cookbook 느낌이 될 것 같다.
  * http://oldblog.antirez.com/post/autocomplete-with-redis.html  
  * http://www.slideshare.net/jinojjan/node-js-redis
  * http://www.slideshare.net/Byungwook/redis-data-modeling-examples
+ * http://openmymind.net/Data-Modeling-In-Redis/

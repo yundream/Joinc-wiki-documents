@@ -1,0 +1,96 @@
+#title REDIS 성능 테스트
+
+== GET 테스트 ==
+=== 목적 ===
+Key가 100만 단위로 늘어날 경우 성능에 미치는 영향을 테스트 했다.  
+
+=== 테스트 환경 ===
+테스트 환경은 다음과 같다.
+  * REDIS 서버 : 우분투 리눅스 14.10 Server. VirtualBox로 실행했다. 1000만개의 key를 수용하려면, 1.1G 이상의 메모리가 필요하다. 2G 이상의 메모리를 할당해야 한다. 
+  * REDIS 클라이언트 : Host 운영체제에 redis 클라이언트 프로그램을 설치했다.
+  * 언어 : Ruby를 이용했다.
+
+=== 테스트 ===
+100만개와 1000만개의 데이터로 테스트를 진행했다. Key를 입력하는 데도 시간이 꽤 걸리기 때문에, 파일을 만든다음 벌크(bulk)로 한번에 입력했다.  
+{{{#!plain
+File.open('1million.txt', 'w') do |f|
+    for i in (0..999999)
+        # 반드시 \r\n 이어야 한다.
+        f.write "SET key:#{i} #{i}\r\n"
+    end
+end
+}}}
+파일을 만든 후 bulk로 밀어 넣었다.
+{{{#!plain
+# cat 1million.txt | redis-cli -h 192.168.56.5 --pipe
+}}}
+
+이제 GET 테스트를 위한 프로그램을 만들 차례다. 이 프로그램은 랜덤하게 100,000개의 key를 읽어서 걸린 시간을 표준출력한다. 
+{{{#!plain
+require 'redis'
+require 'time'
+
+class Test
+    @redis = nil
+    def initialize
+        @redis = Redis.new(:host=>"192.168.56.5")
+    end
+    def run num
+        r = Random.new
+        for i in (0..num)
+            id = r.rand(0..1000000)
+            s = Time.now
+            @redis.get "key:#{id}"
+            e = Time.now
+            puts "%8s\t%.6f " % [id, (e.to_f - s.to_f)]
+        end
+    end
+end
+
+test = Test.new
+test.run 100000
+}}}
+100,000개의 레코드를 가진 결과 파일이 만들어졌다. 랜덤이다 보니 중복되는 key들도 있었을 텐데, 무시하기로 했다.
+{{{#!plain
+  # Key         # 걸린시간
+   58033        0.000745                                                                                   
+  461187        0.000166                                                                                   
+  254008        0.000214                                                                                   
+  632646        0.000250                                                                                   
+  802061        0.000223                                                                                   
+  256017        0.000208                                                                                   
+  886816        0.000195                                                                                   
+  313491        0.000173                                                                                   
+  ......
+}}}
+
+이 데이터를 gnuplot를 이용해서 시각화 했다.
+{{{#!html
+<div class="row">
+	<div class="large-12 columns">
+		<div class="large-6 columns"> 
+			<a href="#" data-reveal-id="firstModal">
+			<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s400/redis_get.png">
+			</a>
+		</div>
+		<div class="large-6 columns"> 
+			<a href="#" data-reveal-id="secondModal">
+			<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s400/redis_10million.png">
+			</a>
+		</div>
+	</div>
+</div>
+<div id="firstModal" class="reveal-modal" data-reveal>
+<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s800/redis_get.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+
+<div id="secondModal" class="reveal-modal" data-reveal>
+<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s800/redis_10million.png">
+<a class="close-reveal-modal">&#215;</a>
+</div>
+}}}
+왼쪽은 100만, 오른쪽이 1000만이다. key의 크기에 상관없이 성능은 일정함을 알 수 있다. 1억개에 대해서도 테스트해보고 싶었는데.. 메모리가 부족해서, 포기했다. 
+
+=== 성능 최적화 ===
+REDIS는 '''separate chaining hash table'''에 데이터를 저장한다. 따라서 시간 복잡도는 O(1 + n/k)가 된다. N은 key의 갯수, k는 버킷의 갯수다. key가 늘어나면 시간 복잡도도 커지는데, 버킷을 늘리는 것으로 성능을 최적화 할 수 있다. k를 잘 관리하면 거의 O(1)로 성능을 유지할 수 있을 것이다. 물론 공짜는 없다. 버킷을 늘린다는 것은 그 만큼 메모리를 쓰겠다는 이야기다. 공간을 희생해서 성능을 올리겠다는 이야기. 

@@ -1,0 +1,265 @@
+#title Protocol Buffer
+[[TableOfContents]]
+== Protocol Buffer ==
+Protocol Buffer(이하 PB)는 구글에서 개발한 직렬화 프로토콜이다. 구글 얘네들이 검색 색인 작업에 사용하려고 만들었다고 한다. 다양한 형태의 데이터를 대량으로 빠르게 직렬화&역직렬화 할 수 있다고 한다. 구글에서 다루는 데이터가 워낙에 다양하고 양도 많으니 당연한 요구사항 이었겠지.   
+
+== 선택한 이유 ==
+[wiki:man/12/JSON JSON]을 대체하기 위한 목적으로 사용하려 한다. JSON은 직관적이며, 읽고, 쓰기 편하다. 특히 웹 애플리케이션을 개발하기 위한 최적의 프로토콜이라 할 만하다. OpenAPI 서비스들의 대부분이 JSON을 문서형식으로 사용하고 있다. 반면 텍스트 기반이라서, 파싱하는데 비용이 상당히 많이 들고 데이터의 크기가 커진다는 단점이 있다. 
+
+이런 단점들이 웹 애플리케에서는 별 문제가 아닐 수 있지만, IoT 플랫폼에서는 문제가 될 수 있다. IoT의 경우 '''저전력 환경'''에서 작동하는 '''컴퓨팅 파워가 약한''' 기기들을 수용할 수 있어야 한다. IoT에서라면 만들어지는 메시지의 양이 대규모일 수 밖에 없으므로 빠르고 효율적으로 처리할 수 있는 프로토콜이 중요하다. 메시지의 크기를 30~40% 줄이는 것으로도 인프라의 효율을 크게 높일 수 있다. 정리하자면  
+  1. 기기들이 사용할 효율적인 직렬화 프로토콜  
+  1. 인프라에서 사용할 효율적인 직렬화 프로토콜
+이 필요하다. 내 최근 관심은 IoT 인프라 개발이다. 자연스럽게 효율적인 직렬화 프로토콜에 관심을 가지게 됐다. 
+
+PB 외에도 Thrift, Avro 등의 프로토콜들이 있다. 왜 하필 PB냐 하면, 귀에 많이 들려서다. (다른 녀석들과 성능이나 기능에 큰 차이가 있는 것도 아닌 것 같고, 그래서 선택했다. 즉 생각하기 귀찮아서..)
+
+== JSON과 XML, Protocol buf에 대한 일반적인 비교 ==
+JSON
+  * 인간이 읽고 쓸 수 있다. : 개발과 디버깅이 편하다.
+  * 스키마에 대한 정보 없이, 사용할 수 있다. 
+  * 웹 브라우저에서 사용하기 좋다.
+  * XML에 비해서 가볍다. 
+  * 딱히 표준이라 할 만한 것들이 없다.
+XML
+  * 인간이 읽고 쓸 수 있다. : JSON 보다는 복잡하긴 하지만..
+  * 스키마에 대한 정보 없이, 사용할 수 있다. 
+  * SOAP등의 표준이 있다.
+  * xsd, xslt, sax, dom 과 같은 좋은 툴들이 많다.
+  * JSON에 비해서 좀 장황하다. 
+Protocol
+  * 데이터 압축률이 좋다.
+  * 정보를 얻기 위해서는 스키마에 대한 정확한 지식이 필요하다.  
+  * 처리속도가 빠르다.
+  * 이진 데이터라서 사람의 눈으로 확인할 수 없다.
+개인적으로 최근 웹 애플리케이션 프로젝트에서 XML을 사용한 적이 없다. 인터넷에 공개되는 부분은 JSON, 내부처리는 PB 정도로 생각하고 있다. 
+
+== 성능 ==
+||                  ||Server CPU %     ||Avg. Client CPU %     ||Avg. Time        ||
+||REST - XML        ||12.00%           ||80.75%                ||05:27.45         ||
+||REST - JSON       ||20.00%           ||75.00%                ||04:44.83         ||
+||RMI               ||16.00%           ||46.50%                ||02:14.54         ||
+||Protocol Buffers  ||30.00%           ||37.75%                ||01:19.43         ||
+||Thrift - TBinary Protocol ||33.00%   ||21.00%                ||01:13.65         ||
+||Thrift - TCompactProtocol ||30.00%   ||22.50%                ||01:05.12         ||
+
+== PB 사용 프로젝트들 ==
+  * Google : 구글에서 만든 녀석이니까.
+  * ActiveMQ : 메시지 저장에 PB를 사용한다.
+  * Netty (Protobuf-rpc)
+  * Apache Camel
+
+== PB 지원 언어들 ==
+Java, C++, Python, Ruby, C, Go, Erlang, Javascript, Lua, Perl, PHP, R, Rust, Scala, Swift
+
+== 테스트 ==
+개인정보를 저장하고 읽는 간단한 애플리케이션을 만들어 보려 한다. Write 전용 프로그램이 개인정보를 PB로 직렬화 해서 파일로 저장하고, Read 전용 프로그램으로 파일의 내용을 읽어서 역직렬화 한 후 표준출력한다. Write 프로그램은 루비로, read 프로그램은 go 언어로 개발한다. 서로 다른 언어로 데이터 교환이 가능한지 살펴보기 위함이다. 소켓 통신 프로그램을 만들면 더 재미있을 것 같은데, 노가다 같아서..  
+
+=== 테스트 환경 ===
+  * Ubuntu Linux 14.10
+
+=== 루비 Write 프로그램 개발 ===
+루비용 PB 라이브러리를 설치했다.  
+{{{#!plain
+# gem install ruby_protobuf
+}}}
+
+먼저, PB 데이터 스키마를 만들어야 한다. 확장자는 '''.proto'''로 한다.
+{{{#!plain
+package tutorial;
+
+// Comment 
+message Person {
+  required string name = 1;
+  required int32 id = 2;
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    required string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phone = 4;
+
+  extensions 100 to 200;
+}
+
+extend Person {
+  optional int32 age = 100;
+}
+
+message AddressBook {
+  repeated Person person = 1;
+}
+}}}
+"//"는 주석
+
+메시지는 하나 이상의 필드로 구성이 된다. 각 필드는 고유의 번호와 이름, 데이터 타입을(integer, floating-point, string..) 가지고 있다. 그리고 '''required''', '''optional''', '''repeated'''를 명시할 수 있다. "required string name = 1"는 "string 데이터를 저장하는 name 필드가 있다. 이 필드는 반드시 사용해야 하며, 필드 번호는 1번이다"라는 의미다.   
+
+메시지는 계층적으로 구성될 수 있다. Person 메시지는 PhoneNumber 메시지를 포함하고 있다. repeated는 필드가 두 개 이상의 값을 가질 때, 즉 배열일 경우 사용한다. 반복해서 입력을 받겠다는 의미다. 
+
+때때로 메시지의 확장이 필요할 수도 있다. '''extensions'''를 이용하면 필드를 추가 확장 할 수 있다. 이때 확장을 위해서 사용할 필드의 버위를 지정할 수 있다. 예제 스키마에서는 100 ~ 200 필드를 추가 확장을 위해서 예약했는데, "age"를 필드 번호 100으로 추가 했다. 
+
+rprotoc를 이용해서 스키마를 컴파일 하자.
+{{{#!plain
+# rprotoc tutorial.proto 
+./personal.pb.rb writing...
+}}}
+스키마 내용으로 루비코드가 만들어진다. 코드의 내용이다.
+{{{#!plain
+require 'protobuf/message/message'
+require 'protobuf/message/enum'
+require 'protobuf/message/service'
+require 'protobuf/message/extend'
+
+module Tutorial
+  class Person < ::Protobuf::Message
+    defined_in __FILE__
+    required :string, :name, 1
+    required :int32, :id, 2
+    optional :string, :email, 3
+    class PhoneType < ::Protobuf::Enum
+      defined_in __FILE__
+      MOBILE = value(:MOBILE, 0)
+      HOME = value(:HOME, 1)
+      WORK = value(:WORK, 2)
+    end
+    class PhoneNumber < ::Protobuf::Message
+      defined_in __FILE__
+      required :string, :number, 1
+      optional :PhoneType, :type, 2, :default => :HOME
+    end
+    repeated :PhoneNumber, :phone, 4
+    extensions 100..200
+  end
+  class Person < ::Protobuf::Message
+    defined_in __FILE__
+    optional :int32, :age, 100, :extension => true
+  end
+  class AddressBook < ::Protobuf::Message
+    defined_in __FILE__
+    repeated :Person, :person, 1
+  end
+end
+}}}
+
+아래는 예제코드다. 표준입력으로 유저 정보를 입력 받아서 PB로 직렬화 한 후 파일로 저장한다. 
+{{{#!plain
+# PB 컴파일한 파일을 require 해야 한다.  
+# 원격의 다른 누군가와 함께 개발하기를 원한다면
+# 스키마 파일이나 컴파일된 루비 코드를 공유하면 된다. 
+# Git등을 이용해서 스키마 버전관리를 하면 된다.
+require './tutorial.pb'
+
+def prompt_for_address(person)
+    print 'Enter person ID number: '
+    person.id = STDIN.gets.strip.to_i
+    print 'Enter name: '
+    person.name = STDIN.gets.strip
+    print 'Enter email address (blakn for none): '
+    email = STDIN.gets.strip
+    person.email = email unless email.empty?
+
+    loop do
+        print 'Enter a phone number (or leave blank to finish):'
+        break if (number = STDIN.gets.strip).empty?
+
+        person.phone << Tutorial::Person::PhoneNumber.new
+        person.phone.last.number = number
+
+        print 'Is this a mobile, home, or work phone? '
+        person.phone.last.type =
+            case type = STDIN.gets.strip
+            when 'mobile'
+                Tutorial::Person::PhoneType::MOBILE
+            when 'home'
+                Tutorial::Person::PhoneType::HOME
+            when 'work'
+                Tutorial::Person::PhoneType::WORK
+            else
+                puts 'Unknown phone type; leaving as default value.'
+                nil
+            end
+    end
+end
+
+unless ARGV.size == 1
+    puts "Usage: #{$0} ADDRESS_BOOK_FILE"
+    exit
+end
+
+address_book = Tutorial::AddressBook.new
+address_book.parse_from_file ARGV[0] if File.exist? ARGV[0]
+address_book.person << Tutorial::Person.new
+prompt_for_address address_book.person.last
+address_book.serialize_to_file ARGV[0]
+}}}
+
+=== Go Read 프로그램 개발 ===
+apt-get을 이용해서 설치했다. protoc(PB 컴파일러)를 설치한다.
+{{{#!plain
+# apt-get install protobuf-compiler
+}}}
+
+proctoc는 go 뿐만 아니라, cpp, java, python 코드를 만들 수 있다. PB 스키마 파일을 컴파일 했다. 
+{{{#!plain
+# protoc --go_out=. tutorial.proto
+}}}
+tutorial.pb.go 파일을 확인할 수 있을 거다. 이 파일을 컴파일해서 패키지로 만들어야 한다. 패키지 이름은 "github.com/yundream/tutorial" 로 하기로 했다.
+{{{#!plain
+# go build github.com/yundream/tutorial 
+# go install
+}}}
+
+아래는 read 프로그램 코드다. 프로그램의 이름은 address_read.go로 했다.
+{{{#!plain
+package main
+
+import "code.google.com/p/goprotobuf/proto"
+import "github.com/yundream/tutorial"
+import "fmt"
+import "io"
+import "os"
+
+func ListPeople(address_book *tutorial.AddressBook) {
+    for _, person := range address_book.Person {
+        fmt.Println("Person ID: ", *person.Id)
+        fmt.Println("Person Name: ", *person.Name)
+        for _, phone := range person.Phone {
+            fmt.Printf("\tPhone NUM (%8s) : %s\n", *phone.Type, *phone.Number)
+        }
+    }
+}
+
+func main() {
+    address_book := &tutorial.AddressBook{}
+    file, err := os.Open(os.Args[1])
+    if err != nil {
+        fmt.Println(os.Args[1], ": File not found.")
+        os.Exit(1)
+    }
+    buffer := make([]byte, 1024)
+    io.ReadFull(file, buffer)
+    err = proto.Unmarshal(buffer, address_book)
+    ListPeople(address_book)
+}
+}}}
+
+Ruby write 프로그램으로 yundream.dat 파일을 만들고 address_read.go로 읽었다.
+{{{#!plain
+# go run address_read.go yundream.dat 
+Person ID:  1000
+Person Name:  yundream
+     Phone NUM (  MOBILE) : 010-111-1111
+     Phone NUM (    HOME) : 010-222-2222
+
+}}}
+
+== 참고 ==
+  * [http://www.slideshare.net/IgorAnishchenko/pb-vs-thrift-vs-avro PB vs thrift vs avro]
+  * 

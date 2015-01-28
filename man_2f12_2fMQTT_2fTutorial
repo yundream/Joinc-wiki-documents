@@ -1,11 +1,23 @@
 #title MQTT 소개
-
 [[TableOfContents]]
 == MQTT ==
-MQTT는 경량의 Publish/Subscribe(Pub/Sub) 메시징 프로토콜이다. M2M(machine-to-machine)와 IoT(Internet of things)에서 사용하는 걸 목적으로 하는 만큼, 낮은 전력으로도 사용할 수 있도록 설계됐다.
+MQTT는 경량의 Publish/Subscribe(Pub/Sub) 메시징 프로토콜이다. M2M(machine-to-machine)와 [wiki:Site/IOT IoT](Internet of things)에서 사용하는 걸 목적으로 하는 만큼, 낮은 전력으로도 사용할 수 있도록 설계됐다. 요즘 IoT 관련 일들을 하고 있는데, 저전력/소규모 디바이스를 위한 통신 프로토콜들을 연구하면서 자연스럽게 MQTT에 관심을 가지게 됐다. 
 
-요즘 IoT 관련 일들을 하고 있는데, 저전력/소규모 디바이스를 위한 통신 프로토콜들을 연구하면서 자연스럽게 MQTT에 관심을 가지게 됐다. 
+== 응용 분야 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17jmOyeJk_7FI7A8cyd37Dfx0i9mik0mP2dUxwrXDeU4/pub?w=863&amp;h=406">
+}}}
 
+MQTT는 저전력, 신뢰할 수 없는 네트워크, No TCP/IP 기반에서 운용할 수 있다는 장점이 있다. 덕분에 여러 영역으로의 응용이 가능하다. 
+===  센서(Sensor) 정보 수집 ===
+가전기기, 빌딩, 도시, 산업, 개인 등 다양한 영역에서의 센서정보를 수집할 수 있다. 네트워크로 구분하자면 LAN(가정/소규모 오피스), PAN(개인 네트워크), BAN, MAN 영역에서의 데이터 수집이 되겠다.
+
+([[Date(2015-01-08T06:15:43)]])현재 PAN영역에서 가장 관심있을 만한 센서 정보는 "헬스케어" 데이터가 되겠다. 지금 당장 서비스를 개발하기에는 센서장비의 품질 개선이 필요한 것 같다. 지금의 헬스케어 센서들은 "건강한 사람의 악세사리" 수준이고, 이 정도에서는 센서 품질을 그리 걱정할 필요가 없다. 하지만 질병에 따른 지속적인 건강관리를 위한 수준은 아닌 것 같다. 조만간 품질개선이 이루어질 거라고 보는데, 원격 진료를 위한 기초 데이터로 활용 할 수 있을 것이다. 
+
+=== 제어 ===
+센서로 부터 받은 데이터를 토대로 빌딩을 구성하는 기기들을 제어할 수 있다. 기기제어 역시 MQTT를 이용하면 된다. 이를 위해서는 각 기기에 MQTT broker를 설치하거나 혹은 중앙에 있는 MQTT broker에 bind할 수 있어야 한다.  
+
+== MQTT 특징 ==
 === Publish/Subscribe ===
 MQTT 프로토콜은 메시지를 '''발행(publishing)''' 하고, 관심 있는 주제를 '''구독(subscribe)''' 하는 것을 기본 원칙으로 한다.
 
@@ -31,17 +43,39 @@ MQTT는 메시지 버스 시스템이다. MQTT Broker가 메시지 버스를 만
 <img src="https://docs.google.com/drawings/d/1WP6-xqjbLIa89Gd0AYoXKc21JGelAwt0vbZo94Y2QLE/pub?w=716&amp;h=248">
 }}}
 
-== Mosquitto MQTT broker ==
+애플리케이션들은 Message Bus에 연결하고 관심있는 토픽(Topic)을 등록 해서 메시지를 구독(SUB)하거나 발행(PUB)한다.
+
+=== QoS ===
+MQTT는 3단계의 QoS(Quality of service)를 제공한다.
+  * 0 : 메시지는 한번만 전달하며, 전달여부를 확인하지 않는다. Fire and Forget 타입이다. 
+  * 1 : 메시지는 반드시 한번 이상 전달된다. 하지만 메시지의 핸드셰이킹 과정을 엄밀하게 추적하지 않기 때문에, 중복전송될 수도 있다.    
+  * 2 : 메시지는 한번만 전달된다. 메시지의 핸드셰이킹 과정을 추적한다. 높은 품질을 보장하지만 성능의 희생이 따른다. 
+서비스의 종류에 따라서 적당한 QoS 레벨을 선택해야 한다.
+
+No TCP/IP와 TCP/IP가 섞여있는 로컬 네트워크에서는 QoS 1, 2를 선택하는게 좋을 것 같다. 네트워크 구간을 신뢰할 수 없으며, 메시지 전송이 실패 했을 때, 메시지 박스에 저장하는 일을 하는 소프트웨어 시스템을 구축하기가 쉽지 않기 때문이다. 
+
+원격 네트워크에서는 0번이 좋을 것 같다. QoS 1이 적당할 것 같지만, 1이나 2를 선택할 경우 메시지 관리가 매우 힘들어진다. 예를들어 offline 모드에서의 메시징을 지원하기 위해서 메시지 박스 서비스를 제공한다고 가정해 보자. QoS 1로 설정을 하면, 다음 연결에 메시지를 보내기 위해서 자체 queue에 저장을 한다. 그러면 시스템 입장에서는 MQTT queue에 있는 메시지를 읽어야 하는데, 메시지 박스에서 읽어야 하는지를 판단해야 한다.   
+
+또한 클라이언트는 MQTT queue에 있는 메시지를 읽기 위해서 이전에 연결했던 MQTT에 연결을 해야 하는데, 이러한 요구사항은 [wiki:man/12/MQTT/Cluster 클러스터] 구성을 어렵게 한다. 설계 관점에서도 비슷한 일을 하는 두 개의 모듈을 두는 것은 좋지 않은 설계다. 그냥 QoS 레벨은 0으로 하고, 소프트웨어에서 QoS를 처리하는게 깔끔할 것 같다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1rdj5hhFJ1kj0eX0HFrUxJl60yY5osn339bKzx6Wi6fo/pub?w=691&amp;h=340">
+}}}
+
+== MQTT 브로커들 ==
+MQTT 서버라고 하지 않고 중개인(브로커)라고 하는 이유는 MQTT가 발행인과 구독자가 메시지를 주고 받을 수 있도록 다리를 놔주는 역할만을 하기 때문이다. 다른 기능들은 중개를 도와주는 부가 기능일 뿐이다. 다양한 종류의 브로커들이 있는데, [https://github.com/mqtt/mqtt.github.io/wiki/server-support 여기]에서 확인하자.
+
+내가 경험한 브로커들만 간단히 정리한다.
+=== Mosquitto MQTT broker ===
 모스키토(Mosquitto)는 (2014년 6월 현재)MQTT 프로토콜 3.1을 구현한 BSD 라이센스 기반의 오픈소스 메시지 브로커다. 나는 모스키토를 이용해서 PUB,SUB,Broker 테스트를 진행하기로 했다.
 
-모스키토는 서버/클라이언트 모델을 따른다. 메시지 브로커가 서버역할을 하는데, Pub 채널을 유지하는 일을 한다. 클라이언트는 메시지 브로커에 붙어서 메시지를 교환하는데, '''pub'''과 '''sub'''역할을 모두 할 수 있다.  
-=== 테스트 환경 ===
+==== 테스트 환경 ====
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1RKsCp_LfXW7xjoUiMnXaUPLdzQM28I-GVqQZXmhKaNY/pub?w=504&amp;h=395">
 }}}
   * VirtualBox를 이용해서 PUB, SUB, Broker를 위한 3개의 게스트 운영체제를 실행했다. 호스트 이름은 각각 pub.local, sub.local, broker.local 이다.
   * 게스트 운영체제 : 우분투 리눅스 14.04로 통일
-=== Mosquitto 브로커 설치 ===
+==== Mosquitto 브로커 설치 ====
 {{{#!plain
 broker.local # apt-get install mosquitto 
 }}}
@@ -52,13 +86,13 @@ tcp        0      0 0.0.0.0:1883            0.0.0.0:*               LISTEN      
 tcp6       0      0 :::1883                 :::*                    LISTEN      1512/mosquitto  
 }}}
 
-=== Mosquitto 클라이언트 설치 ===
+==== Mosquitto 클라이언트 설치 ====
 모스키토 클라이언트 프로그램을 설치했다.
 {{{#!plain
 # apt-get install mosquitto-clients
 }}}
 
-=== Pub/Sub 테스트 ===
+==== Pub/Sub 테스트 ====
 hello/world 토픽을 subscribing 한다.  
 {{{#!plain
 # mosquitto_sub -d -t hello/world
@@ -76,6 +110,37 @@ Sending PUBLISH (d0, q0, r0, m1, 'hello/world', ... (11 bytes))
 Sub 클라이언트는 "Hello World"를 전송 받는다.
 
 modquitto_sub를 하나 더 실행 한다음 "Hello World"를 publishing 해보자. 토픽에 subscribing한 모든 클라이언트에 메시지가 전달되는 걸 확인할 수 있다. 
+
+==== 장점과 단점 ====
+MQTT 전용 브로커로 매우 가벼우며, MQTT 브로커가 가져야 할 대부분의 기능을 충실히 지원한다는 장점이 있다. 소형기기에 올려서 사용하기에 적당하다.
+
+([[Date(2015-01-10T04:02:07)]])현재 최신 안정 버전 1.3.5는 아직 WebSocket을 지원하지 않는다. 1.4에서 지원하는데, 직접 빌드해서 사용해야 한다. 클러스터를 지원하지 않는 것도 단점이다. 대규모의 메시징 시스템을 구축하려면 노가다를 뛰어야 한다. 메시징 서비스 인프라에 고가용성은 필수 요소이기 때문에 중요한 문제가 될 수 있다. 
+
+=== RabbitMQ === 
+AMQP를 지원하는 메시지 큐 서버로 플러그인(Plug-in)방식으로 MQTT를 지원한다. AMQP를 이용한 범용 메시징 서버라서 좀 무겁기는 하지만 클러스터링을 지원하고 다양한 플러그인을 이용해서 기능을 확장할 수 있다. STOMP, 웹 소켓, HTTP(S)등 다양한 통신 프로토콜을 지원하기 때문에, 메시징 서버 인프라의 개발에 적합한 소프트웨어다.
+
+로컬 네트워크에서의 기기간 메시지 교환에는 가벼운 모스키토, 서버는 RabbitMQ로 구성하는게 좋을 것 같다.  
+==== MQTT Plugin 실행 ====
+RabbitMQ를 설치하면 20개 정도의 플러그인들도 함께 깔린다. rabbitmq-plugins를 이용해서 간단하게 mqtt를 올릴 수 있다.  
+{{{#!plain
+# rabbitmq-plugins enable rabbitmq_mqtt
+The following plugins have been enabled:
+   amqp_client
+     rabbitmq_mqtt
+     Plugin configuration has changed. Restart RabbitMQ for changes to take effect.
+}}}
+
+==== 장점과 단점 ====
+RabbitMQ는 범용 메시징 서버로 다양한 메시징 방식을 제공한다. AMQP, MQTT 프로토콜을 지원하며 HTTP(S), STOMP, 웹소켓, JSONRPC 등의 다양한 통신 방식을 지원한다. 클러스터링 기능도 가지고 있어서, 메시징 인프라 구성에 유리하다.  
+
+기능이 많다는 것은 무겁다는 의미다. 자원이 빈약한 소형기기에 사용하기에는 무리가 있다. 메시징 인프라 구축에는 RabbitMQ, 소형기기의 메시징 브로커로는 모스키토의 사용을 고려해 봄직하다.
+
+=== 메시징 서비스 인프라 제안 ===
+서비스 마다 달라질 수 있겠다. IoT를 기준으로 제안한다.
+
+서버 인프라는 가용성과 확장성이 유리한 RabbitMQ로 구축한다. 모스키토로도 구축할 수 있기는 하지만 노가다를 뛰어야 한다. 기타 보안, 인증, 다양한 프로토콜 지원, 플러그인 개발 등을 고려해보면 RabbitMQ를 선택해야 할 것 같다. 
+
+기기들은 모스키토를 이용한다. 가볍고 간단해서 소형기기에 집어 넣기에 적당하다.
 
 == Chatting 프로그램 ==
 MQTT를 이용한 Pub/Sub 테스트는 끝냈으니, 이제 좀 그럴 듯한 서비스를 만들어봐야 겠다. MQTT를 이용한 chatting 프로그램을 개발할려고 한다. 이 chatting 프로그램은 아래의 기능을 지원한다.
@@ -145,6 +210,9 @@ mqtt.connect do |client|
 end
 }}}
 
-== 예제 프로그램 ==
+== 참고 ==
   * http://mosquitto.org/man/mqtt-7.html
   * http://madalanarayana.wordpress.com/2014/03/25/learnings-on-publish-subscribe-mqtt-mosquitto/
+  * [https://www.facebook.com/notes/facebook-engineering/building-facebook-messenger/10150259350998920 Building FaceBook messenger] 
+  * [http://www.irse.org/knowledge/publicdocuments/3.09%20Wood%20-%20Message%20broker%20technology%20for%20flexible%20signalling%20control.pdf Message Broker Technology for flexible signalling control] 
+  * [https://github.com/mqtt/mqtt.github.io/wiki/server-support MQTT 브로커 기능 비교]

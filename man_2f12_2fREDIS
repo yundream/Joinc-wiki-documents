@@ -9,91 +9,10 @@ C, C++, C#, Clojure, Common Lisp, Dart, Erlang, Go, Haskell, Haxe, Io, Java, jav
 === 자료구조 ===
 String외에 List, Sets, Sorted set, Hashes 자료를 지원한다. 
 
-== Random Get 테스트 ==
-Key가 백만단위를 초과할 경우 키를 가져오는 성능이 어떨지 궁금해서 테스트를 수행했다. 테스트 환경은 아래와 같다. 
-  * REDIS 서버 : 우분투 리눅스 14.10 서버버전. VirtualBox로 실행했다. 1000만개의 key를 수용하려면 1.1G 정도의 메모리가 필요하다. 그러니 2G 이상의 메모리를 할당하자.
-  * REDIS 클라이언트 : Host 운영체제로 테스트 
-100만개와 1000만개 데이터에 대해서 테스트를 진행 했다. Key가 많아질 경우 입력에 많은 시간이 걸린다. 그래서 key를 파일로 만들어서 bulk 입력했다. 줄 구분자로 반드시 "\r\n"을 써야 한다.
-{{{#!plain
-File.open('1million.txt', 'w') do |f|
-    for i in (0..999999)
-        f.write "SET key:#{i} #{i}\r\n"
-    end
-end
-}}}
-
-Bulk 입력했다.
-{{{#!plain
-# cat 1million.txt | redis-cli -h 192.168.56.5 --pipe
-}}}
-
-Random 하게 100000개의 Key를 읽어서 걸린 시간을 측정하는 프로그램을 만들었다. 
-{{{#!plain
-require 'redis'
-require 'time'
-
-class Test
-    @redis = nil
-    def initialize
-        @redis = Redis.new(:host=>"192.168.56.5")
-    end
-    def run num
-        r = Random.new
-        for i in (0..num)
-            id = r.rand(0..1000000)
-            s = Time.now
-            @redis.get "key:#{id}"
-            e = Time.now
-            puts "%8s\t%.6f " % [id, (e.to_f - s.to_f)]
-        end
-    end
-end
-
-test = Test.new
-test.run 100000
-}}}
-1000 레코드를 가진 데이터 파일이 만들어졌다. 랜덤하다 보니까 중복되는 것도 있을 텐데, 그건 무시한다.
-{{{#!plain
-   58033        0.000745                                                                                   
-  461187        0.000166                                                                                   
-  254008        0.000214                                                                                   
-  632646        0.000250                                                                                   
-  802061        0.000223                                                                                   
-  256017        0.000208                                                                                   
-  886816        0.000195                                                                                   
-  313491        0.000173                                                                                   
-  ....
-}}}
-이 데이터를 gnuplot를 이용해서 시각화 했다.
-{{{#!html
-<div class="row">
-	<div class="large-12 columns">
-		<div class="large-6 columns"> 
-			<a href="#" data-reveal-id="firstModal">
-			<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s400/redis_get.png">
-			</a>
-		</div>
-		<div class="large-6 columns"> 
-			<a href="#" data-reveal-id="secondModal">
-			<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s400/redis_10million.png">
-			</a>
-		</div>
-	</div>
-</div>
-<div id="firstModal" class="reveal-modal" data-reveal>
-<img src="https://lh5.googleusercontent.com/-8U8P1SMZWhQ/VKUwgKHzw4I/AAAAAAAAEpU/yAa8gXCajtE/s800/redis_get.png">
-<a class="close-reveal-modal">&#215;</a>
-</div>
-
-<div id="secondModal" class="reveal-modal" data-reveal>
-<img src="https://lh3.googleusercontent.com/-NQolN5TrQlY/VKU3vW3kJbI/AAAAAAAAEpk/mo-7cwW5kAM/s800/redis_10million.png">
-<a class="close-reveal-modal">&#215;</a>
-</div>
-}}}
-
 == 문서 ==
  * [wiki:man/12/REDIS/IntroDataType Redis 설치 와 데이터 타입 테스트]
  * [wiki:man/12/REDIS/Pipelining Pipelining] 
  * [wiki:man/12/REDIS/PubSub Redis PUB/Sub 커뮤니케이션]
  * [wiki:man/12/REDIS/Commands REDIS Commands]
- * [wiki:man/12/REDIS/DataModeling Redis 데이터 모델링 응용 예제] : 작업중
+ * [wiki:man/12/REDIS/DataModeling Redis 데이터 모델링 응용 예제]
+ * [wiki:man/12/REDIS/PerfTest REDIS 성능 테스트] : 작업 중

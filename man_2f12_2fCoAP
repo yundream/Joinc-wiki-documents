@@ -1,0 +1,69 @@
+#title Constrained Application Protocol
+[[TableOfContents]]
+== CoAP ==
+'''Constrained Application Protocol'''은 간단한 전자 기기들의 인터넷 통신을 지원하기 위해 만든 프로토콜이다. 특별히 저전력 센서, 스위치, 밸브 등의 기기를 표준적인 인터넷 환경에서 제어하기 위한 목적으로 만들어졌다. CoAP는 WSN(Wireless sensor network) 노드들 처럼 제한된 자원의 인터넷 연결을 지원한다.  
+
+CoAP는 HTTP를 이용 하기 때문에 REST와 같은 웹 애플리케이션 아키텍처의 적용이 수월하다. 또한 UDP 멀티캐스트(multicast)를 지원하는데, IoT와 M2M 디바이스와 같은 환경에서 오버헤드를 줄일 수 있다. 
+
+== 특징 ==
+  * [wiki:man/12/HTTP HTTP] 기반으로 [wiki:man/12/rest REST] 아키텍처를 적용할 수 있다. 
+  * 간단하게 파싱할 수 있는 헤더 
+  * [wiki:man/12/URI URI]와 content-type 지원
+  * 리소스 디스커버리 지원  
+  * Push notification 지원
+  * max-age 기반의 간단한 캐시 지원
+
+== Web of Things Protocol ==
+웹을 이용해서 클라이언트와 기기를 연결한다는 관점에서 WoT 프로토콜이라고 부르기도 한다. 아래와 같이 묘사할 수 있다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Nuux6ycZaKaptMZWkAmGTPm2I5oCpKNYpSafBlbIXJ4/pub?w=899&amp;h=392">
+}}}
+  * 로컬네트워크에서 각 기기들은 CoAP로 서로 연결된다.  
+  * 인터넷을 통해서 클라이언트와 연결하려면 프락시를 거쳐야 한다. 
+  * 또한 Server와 CoAP로 직접연결할 수 있다. 
+로컬에서의 사용성은 괜찮지만, 프락시를 이용한 원격(인터넷)의 사용성은 고민이 필요하다. Server를 경유해서 데이터를 요구(HTTP GET)하는 건 문제가 없는데, push 데이터를 받기는 애매모호 하다. 결국 [wiki:man/12/websocket websocket] 혹은 [wiki:man/12/MQTT MQTT]와 같은 다른 어떤 프로토콜과 함께 사용해야 한다.
+
+서버와 기기가 직접연결하는 것도 문제다. 이 경우 기기에서 서버로 Push 메시지를 보낼 수 있겠지만, Server에서 기기로 메시지를 보내기는 힘들다. '''인터넷으로 연결하려면 MQTT가 더 나을 것 같다.''' 
+
+== REST ==
+REST 아키텍처와 자연스럽게 융합할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1i5jgkeMKzsWcTvwr3pKs_bpOrjs2MhhdSEPsSgsuN2g/pub?w=527&amp;h=267">
+}}}
+
+센서 정보들은 계층적으로 구성할 수 있을 건데, REST의 사상과 딱 들어 맞는다. 전원 On/Off를 위한 URI는 '''POST /power/on'''가 될 것이다.
+
+== Observable Resources ==
+HTTP 이지만 '''push notifications''' 서비스를 이용 할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/16JrUzfmc8WtsmNO2qgm43_mcOdZco0e39_VariOvbPw/pub?w=447&amp;h=377">
+}}}
+
+CoAP는 '''OBSERVER''' 옵션을 이용해서 관심있는 리소스를 등록할 수 있다. 옵저버로 정보를 읽기를 원한다면 Observer 과 Token 값을 채워서 보내면 된다.
+
+== Resource discovery ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1aXczfzCxp7FTylJPr7lvgaoaELQx9lONm_JlnKS4r_c/pub?w=436&amp;h=159">
+}}}
+
+멀티캐스트 채널로 찾을려는 자원에 대한 정보를 뿌린다. 자원을 가지고 있는 녀석들이 응답한다.
+
+== MQTT vs CoAP ==
+MQTT는 PUB/SUB 기반으로 중앙에 있는 브로커를 기반으로 n:n(혹은 many to many)으로 연결된다. 메시지는 브로커로 모여서 구독자에게 메시지를 복사해서 전달한다. 그리고 persistent 한 연결을 지원한다. 실시간 데이터를 전달하는데 적당한 솔류션이다.  
+
+CoAP는 기본적으로 하나의 서버와 하나의 클라이언트가 참여하는 1:1 프로토콜이다. 비록 자원을 observing 할 수 있기는 하지만 이벤트 기반 데이터 통신에는 적당하지는 않다. 분산환경에서의 상태정보에 적당한 프로토콜이다.  
+
+MQTT는 TCP/IP 기반 프로토콜로 서버(브로커)와 persistent 한 연결을 맺는다. 따라서 NAT와 같은 환경에서 문제없이 작동한다. CoAP는 UDP 패킷만을 사용하기 때문에, NAT 환경에서 사용하기가 껄끄럽다. NAT 환경에서 사용하려면 터널링을 하거나 포트 포워딩(port forwarding)을 해야 한다. 
+
+CoAP는 서비스 discovery 기능을 기본으로 지원하기 때문에, 어떤 형식의 데이터를 사용해야 할지를 알고 있다. MQTT 서비스 discovery 기능이 없기 때문에 DNS-SD, SSDP의 도움이 필요하다.  
+
+== 평가 ==
+나에게는 MQTT가 맞는 프로토콜인 것 같다. CoAP는 선택하기가 애매모호하다. 인터넷 플랫폼과 연결하려면, MQTT 같은 프로토콜을 사용해야 하는데, 그럴거면 MQTT와 통일하는게 나은 거 같다. 
+
+MQTT는 REST 아키텍처를 적용하기가 애모모호 한 점이 맘에 걸릴 수 있겠는데, Topic을 REST하게 구축하면 되니 이 것 역시 큰 문제는 아니다.
+
+== 참고 ==
+ * [http://www.google.co.kr/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CB4QFjAA&url=http%3A%2F%2Fwww.coapsharp.com%2F%3Fwpdmact%3Dprocess%26did%3DMjEuaG90bGluaw%3D%3D&ei=cQbCVLulE4Pq8gXAuYH4BQ&usg=AFQjCNFE-TbL4Y4B3Ay41Mk33r7KkkbVhw&sig2=jL8gBsZaFcwUaLjmSzTYow&bvm=bv.84349003,d.dGc Understanding Constrained Application Protocol]

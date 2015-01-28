@@ -1,10 +1,80 @@
-head	1.15;
+head	1.29;
 access;
 symbols;
 locks
-	root:1.15; strict;
+	root:1.29; strict;
 comment	@# @;
 
+
+1.29
+date	2015.01.08.01.35.37;	author root;	state Exp;
+branches;
+next	1.28;
+
+1.28
+date	2015.01.07.06.44.41;	author root;	state Exp;
+branches;
+next	1.27;
+
+1.27
+date	2015.01.06.08.40.18;	author root;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2015.01.05.14.48.31;	author root;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2015.01.05.07.57.04;	author root;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2015.01.05.07.56.48;	author root;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2015.01.05.07.50.42;	author root;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2015.01.05.06.55.10;	author root;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2015.01.03.13.48.30;	author root;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2015.01.03.13.38.29;	author root;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2015.01.03.07.21.55;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2015.01.02.15.14.09;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2015.01.02.08.48.31;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2015.01.01.15.45.32;	author root;	state Exp;
+branches;
+next	1.15;
 
 1.15
 date	2015.01.01.07.23.22;	author root;	state Exp;
@@ -87,19 +157,20 @@ desc
 @
 
 
-1.15
+1.29
 log
-@119.64.102.68;;yundream;;
+@1.214.223.250;;yundream;;
 @
 text
 @#title REDIS 데이터 모델링 예제들
 [[TableOfContents]]
-== Message Box ==
+== 데이터 모델들 ==
+=== Message Box ===
 메신저 서비스를 개발하고 있다. 메시지를 보냈는데, 수신 대상이 연결하지 않은 상태일 수도 있다. 이 경우에 메시지는 '''메시지 함(Message Box)'''에 저장하기로 했다. 유저가 연결하면, 메시지 함에서 메시지를 읽어온다. 
 
 메시지 함의 크기는 메시지에 대한 정책에 따라 달라질 수 있다. 나는 '''"모든 메시지는 중요하다."'''는 관점에서 기능을 구현하기로 했다. REDIS는 메모리 기반 데이터베이스이다. 무한정 REDIS에 데이터를 쌓을 수는 없는 노릇이다. 그래서 REDIS에는 '''최근 도착한 메시지 N개'''를 저장하고, 그 보다 오랜 메시지는 공간 제약이 없는 다른 영역(예컨데 RDBMS)에 저장하기로 했다. 
 
-Capped List는 REDIS의 LPUSH와 LTRIM 를 이용해서 구현하기로 했다. 
+Capped List는 REDIS의 LPUSH와 [wiki:man/12/REDIS/Commands/LTRIM LTRIM]를 이용해서 구현하기로 했다. 
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1CQBEpakm4pBQwk2FHRlkJGQ5tM_Wwb55pTiY0ZhM444/pub?w=368&amp;h=198">
@@ -124,7 +195,7 @@ Capped List 기능을 가진 Message Box의 전체 구성이다.
 
 유저가 접근하면, 메시지 함에 있는 메시지를 전부 보여주고 TRIM을 수행한다. 메시지 함을 초과해서 다른 저장소에 저장된 메시지들은 '''더 보기''' 명령을 이용해서 네비게이션 할 수 있도록 하면 되겠다. 메시지는 휘발성 이므로 클라이언트에 전달된 메시지는 서버에서 무조건 삭제한다.  
 
-== Item 별 방문 카운트 ==
+=== Item 별 방문 카운트 ===
 item(상품)별 방문 카운트는 관리자에게는 웹 서비스 최적화를 위한 정보를 제공해 준다. 이 정보들을 꾸준히 저장하면, 고객의 동선과 구매 패턴을 파악하는 기초자료로 사용할 수 있다. 유저별로 page 방문 기록을 저장할 수도 있는데, 이 기록을 이용하면 유저의 기호를 기반으로 하는 추천 시스템 개발에 응용할 수 있을 것이다.
 
 {{{#!plain
@@ -154,9 +225,9 @@ Item 별 방문 카운트를 약간 응용해보자. A회사는 음악 서비스
 > INCR user.category:50.1
 > INCR user.category:50.1
 }}}
-하지만 이 방법이 괜찮을지 확신이 서질 않는다. 천만명의 Active한 유저를 관리해야 하면, key만 1억이다. 샤딩을 해서 키를 분산하는 방법도 있겠는데, 어쨋든 키가 많아지는게 불만이다. Key가 많아지면 색인 테이블의 크기가 커질테고 키가 많아질 수도록 성능은 점점 떨어질 것이다. 시간 복잡를 줄일 수 있는 방법을 찾아보기로 했다. 
+하지만 이 방법이 괜찮을지 확신이 서질 않는다. 천만명의 Active한 유저를 관리해야 하면, key만 1억이다. 샤딩을 해서 키를 분산하는 방법도 있겠는데, 어쨋든 키가 많아지는게 불만이다. REDIS는 separate chainning hash를 사용해서 [wiki:man/12/REDIS/PerfTest 키가 늘어나더라도 성능을 유지]할 수 있다. 메모리를 더 사용해야 한다는 점이 맘에 걸리기는 하지만 큰 문제는 없을 것이다. 
 
-'''SETRANGE'''를 사용하기로 했다. User 마다 10byte의 고정된 공간을 제공하고, 이 공간에 count 하는 방식이다. 유저 ID는 고정된 integer 값이므로 유저의 카운트 정보가 저장된 위치(offset)을 구할 수 있다. 
+메모리를 아껴보자는 생각에서 '''SETRANGE'''를 사용해 보기로 했다. User 마다 10byte의 고정된 공간을 제공하고, 이 공간에 count 하는 방식이다. 유저 ID는 고정된 integer 값이므로 유저의 카운트 정보가 저장된 위치(offset)을 구할 수 있다. 
 {{{#!plain
 OFFSET = USER_ID * 10 
 }}}
@@ -199,7 +270,7 @@ counter.incr :user_id=>user_id, :category=>0
 }}}
 시간 복잡도가 O(1)이다. GET, SET 연산의 복잡도도 O(1)이니, 이 정도면 쓸만하지 싶다. string의 최대 크기는 512M 이고 유저 한명이 차지하는 공간이 10byte라면, key 하나에 5천만 정도의 유저 count를 저장할 수 있다.   
 
-== API 호출 제한 ==
+=== API 호출 제한 ===
 OpenAPI 서비스를 하다보면, 일정시간에 호출할 수 있는 최대 API 갯수에 제한을 걸어야 할 때가 있다. 
 
 간단하게 유저 ID와 날짜를 조합해서 key로 만들고, 이 Key 에 대해서 INCR 하는 방법이 있다. INCR 연산 후에 값(count)을 반환한다. 이 반환 값을 허용한 최대 크기와 비교하면 된다.
@@ -209,7 +280,7 @@ OpenAPI 서비스를 하다보면, 일정시간에 호출할 수 있는 최대 A
 }}}
 일 단위로 카운팅을 하니, 사용하지 않는 키는 배치작업을 이용해서 주기적으로 삭제해야 한다는 귀찮음이 있다.  
 
-'''EXPIRE'''와 조합하는 것으로 이 문제를 해결 할 수 있다. EXPIRE한 key에 대해서 '''set''', '''getset'''을 적용하면, EXPIRE 값이 사라진다는 걸 알고 있을 것이다. INCL 연산 대해서는 EXPIRE가 사라지지 않는다.
+'''[wiki:man/12/REDIS/Commands/Expire EXPIRE]'''와 조합하는 것으로 이 문제를 해결 할 수 있다. EXPIRE한 key에 대해서 '''set''', '''getset'''을 적용하면, EXPIRE 값이 사라진다는 걸 알고 있을 것이다. INCL 연산 대해서는 EXPIRE가 사라지지 않는다.
 {{{#!plain
 require 'redis'
 
@@ -256,8 +327,8 @@ end
 
 키가 많아지는 경우를 고민해야 할 수도 있겠는데, 일반적으로 "개발자 등록을 마친 유저"에 대해서 API 호출을 허용할 테니, 크게 걱정하지 않아도 될 것 같다.
 
-== Tag 검색 ==
-책 판매 사이트에 Tag 기반 검색을 추가하기로 했다. 아래와 같이 책 정보를 만들고, SADD 명령으로 tag 정보를 만들었다.  
+=== Tag 검색 ===
+책 판매 사이트에 Tag 기반 검색을 추가하기로 했다. 아래와 같이 책 정보를 만들고, [wiki:man/12/REDIS/Commands/SADD SADD] 명령으로 tag 정보를 만들었다.  
 {{{#!plain
 > SET book:1 "{'title' : 'Diving into Python', 'author': 'Mark Pilgrim'}"
 > SET book:2 "{'title' : 'Programing Erlang', 'author': 'Joe Armstrong'}"
@@ -297,7 +368,7 @@ redis.sdiff('tag:programming', 'tag:haskell').each do | book |
 end
 }}}
 
-== Log aggregation ==
+=== Log aggregation ===
 시스템에서 발생하는 로그들을 중앙에 저장해서 관리하려고 한다.
 
 {{{#!html
@@ -314,10 +385,9 @@ loop do
     puts item[1]
 end
 }}}
-
 REDIS PUB/SUB로도 구현할 수 있지 않을까 ? 라는 생각을 해봤지만 Subscribe가 뻗어버려서 메시지를 소비할 녀석이 없을 경우 메시지를 '''버려버리는''' 문제 때문에 사용하기 힘들 것 같다.  
 
-== Pub/Sub Communication ==
+=== Pub/Sub Communication ===
 Pub/Sub 시스템으로도 사용할 수 있다.
 
 {{{#!html
@@ -329,7 +399,7 @@ Pub/Sub 시스템으로도 사용할 수 있다.
 }}}
 PUB 메시지는 큐등에 쌓이지 않는다. Subscriber가 없다면, 메시지를 잃어 버릴 수 있다는 의미다. 따라서 PUB/SUB 시스템은 분실되도 큰 상관 없는 곳에 사용해야 한다. 예를 들어 서버 점검을 클라이언트에게 알려주기 위한 알람 용도로의 사용이다. WoW(World of warcraft)의 경우 서버 점검 1시간 전 10 분전 5분전에 알람 메시지를 줘서 유저가 미리 대비할 수 있게 한다. 
 
-== shopping cart 관리 ==
+=== shopping cart 관리 ===
 쇼핑 카트를 관리해 보자. 이 서비스의 기능요소들은 아래와 같다. 
   1. 유저는 쇼핑 카트를 만들 수 있다.
   1. 쇼핑카트에는 하나 이상의 상품을 담을 수 있다.
@@ -396,7 +466,7 @@ cart.allItem 1
 }}}
 웹 애플리케이션의 경우 유저 세션이 만료되는 시점을 알 수 없다. 다음번 방문했을 때, 이전 카트가 보인다거나 하는 문제도 있고, 메모리를 낭비하는 문제도 있으니, 카트 만료시간을 정해줘야 한다. 간단하게 EXPIRE를 이용해서 만료시간을 정하자. 카트 메서드를 호출 할 때마다, 만료시간을 재설정 하면 되겠다. 
 
-== Atomic Get and Delete ==
+=== Atomic Get and Delete ===
 GET과 DELETE를 원자적으로(atomically) 수행하고 싶다면, MULTI-EXEC 명령을 이용하면 되겠다. 
 {{{#!plain
 > SET toto 1
@@ -410,7 +480,7 @@ QUEUED
 2) (integer) 1
 }}}
 
-== Simple social graph ==
+=== Simple social graph ===
 친구의 친구의 친구의 친구의 친구.. 관계를 그래프로 표현하면 소셜 그래프라고 된다고 하더라. 이 관계는 follows와 followers, block의 리스트로 정의 할 수 있다. 아래와 같은 소셜 그래프를 REDIS에 저장해 보자.
 
 {{{#!html
@@ -511,9 +581,79 @@ QUEUED
 > SADD user.friend:1 3.6
 > SADD user.friend:3 1.6
 }}}
-가중치가 1을 넘지만 않게 조절한다면, 첫 번째 방법보다 효율적으로 동작할 거다. 가중치외에 다른 부가적인 정보를 넣고 싶다면 첫번째 방법을 사용하면 된다. 추천 알고리즘을 만드는 건 따로 고민을 하고, 여기에서는 이정도로 넘어가야 겠다.
+가중치가 1을 넘지만 않게 조절한다면, 첫 번째 방법보다 효율적으로 동작할 거다. 가중치외에 다른 부가적인 정보를 넣고 싶다면 첫번째 방법을 사용하면 된다.
 
-== FIFO Queue ==
+'''ZADD'''를 이용해서 구현 할 수도 있다. ZADD는 "정렬을 위한 추가적인 값이 필요" 하다는 것을 제외하면 SADD와 동일하다. ZADD로 데이터를 다시 만들어봤다. 
+{{{#!plain
+# 1과 2의 관계
+> ZADD user.follower:1 2 2
+> ZADD user.following:2 2 1
+
+# 1과 3의 관계
+> ZADD user.friend:1 6 3 
+> ZADD user.friend:3 6 1 
+
+# 3과 4의 관계
+> ZADD user.following:3 2 4
+> ZADD user.follower:4 2 3
+
+# 2와 4의 관계
+> ZADD user.following:2 1 4
+> ZADD user.follower:4 1 2
+
+# 3과 5의 관계
+> ZADD user.following:3 4 5
+> ZADD user.follower:5 4 3
+}}}
+
+테스트 코드
+{{{#!plain
+require 'redis'
+
+class Friend
+    @@id = nil
+    @@redis = nil
+    def initialize id
+        @@redis = Redis.new(:host=>"192.168.56.5")
+        @@id = id
+    end
+    def follower
+        @@redis.zrange "user.follower:#{@@id}", 0, -1, :with_scores => true
+    end
+
+    def following
+        @@redis.zrange "user.following:#{@@id}", 0, -1, :with_scores => true
+    end
+
+    def friend
+        @@redis.zrange "user.friend:#{@@id}", 0, -1, :with_scores => true
+    end
+end
+
+id = ARGV[0]
+my = Friend.new id
+
+my.follower.each do | v |
+    puts "#{v[0]} : #{v[1]}"
+end
+
+my.following.each do | v |
+    puts "#{v[0]} : #{v[1]}"
+end
+
+my.friend.each do | v |
+    puts "#{v[0]} : #{v[1]}"
+end
+}}}
+가중치는 아래의 서비스에 이용할 수 있을 거다.
+  * 이웃(친구의 친구) 추천 : 높은 가중치를 가지는 친구의 이웃을 추천하는게 적중도가 높겠다.
+  * 컨텐츠 추천 : 가중치가 높은 친구는 컨텐츠에 대한 기호가 비슷할 확률이 높다. 컨텐츠 소비 데이터와 함께 사용한다면, 정교한 추천이 가능할거다. 
+
+이 예제에서 가중치는 follower, following 두 개 요소로만 계산하고 있다. Like, 메시지 전송등과 같은 요소들을 이용해서 정교한 가중치 모델을 만들어 보는 것도 재미있겠다. 
+
+소셜 그래프의 응용은 따로 문서를 만들어서 고민해봐야 겠다.
+
+=== FIFO Queue ===
 REDIS는 '''List''' 데이터타입을 지원한다. LPUSH와 RPOP를 이용해서 LIST 데이터에 대한 큐를 만들 수 있다.  
 
 {{{#!plain
@@ -534,7 +674,7 @@ REDIS는 '''List''' 데이터타입을 지원한다. LPUSH와 RPOP를 이용해�
 <img src="https://docs.google.com/drawings/d/1kJYWf9y3J0Dw92P8V3jTtvxX6ae7x3S5iRbYphWng_o/pub?w=546&amp;h=148">
 }}}
 
-REDIS는 RPUSH, LPUSH, LPOP, RPOP를 이용해서 데이터를 넣고 뺄 수 있다. 또한 '''blocking pop'''도 지원한다. 이들 연산의 시간 복잡도는 모두 O(1)로, 자료의 크기에 상관없이 동일하게 빠른 성능을 뽑아낼 수 있다. 
+REDIS는 [wiki:man/12/REDIS/Commands/RPUSH RPUSH], LPUSH, LPOP, RPOP를 이용해서 데이터를 넣고 뺄 수 있다. 또한 '''blocking pop'''도 지원한다. 이들 연산의 시간 복잡도는 모두 O(1)로, 자료의 크기에 상관없이 동일하게 빠른 성능을 뽑아낼 수 있다. 
 {{{#!plain
 require 'redis'
 
@@ -571,7 +711,7 @@ puts queue.pop
 puts queue.pop
 }}}
 
-== Session Storage ==
+=== Session Storage ===
 HTTP 기반의 모든 웹 애플리케이션들은 '''session'''을 이용해서 상태를 관리한다. 세션정보는 데이터베이스 혹은 공유파일 시스템을 이용해서, 모든 웹(혹은 WAS)서버들이 공유해야 한다. REDIS를 이용해서 세션 저장소를 만들어 보려고 한다. 
 
 세션 저장소는 아래의 기능을 가지고 있어야 한다. 
@@ -585,16 +725,387 @@ HTTP 기반의 모든 웹 애플리케이션들은 '''session'''을 이용해서
 <img src="https://docs.google.com/drawings/d/1Dsyn4xdKnuZFuF6LEopk2eunw7kc_quvoGYcGbzqkGM/pub?w=414&amp;h=189">
 }}}
 
+세션이름을 Key로 하고 데이터로 string을 저장한다. Gc는 EXPIRE 명령으로 구현한다.
+{{{#!plain
+require 'redis'
 
+class Session
+    @@r = nil
+    @@ttl = nil
+    def initialize ttl
+        @@r = Redis.new(:host=>"192.168.56.5")
+        @@ttl = ttl
+    end
 
-== Auto Complete ==
+    def create
+        r = Random.new
+        id = r.rand(0..10000)
+        session = "session:#{id}"
+        @@r.expire session, @@ttl
+        @@r.set session, "{'id':'#{id}'}"
+        return session
+    end
 
+    def read session_id
+        if @@r.exists session_id
+            @@r.expire session_id, @@ttl
+            return @@r.get(session_id)
+        end
+    end
+
+    def write session_id, data
+        if @@r.exists session_id
+            @@r.expire session_id, @@ttl
+            return @@r.set(session_id, data)
+        end
+    end
+end
+
+session = Session.new(3600)
+session_id = session.create
+session_data = session.read session_id
+puts session_data
+
+session.write(session_id, "hello world")
+session_data = session.read session_id
+puts session_data
+}}}
+=== Auto Complete ===
+영어사전 서비스에 자동완성 기능을 제공하려고 한다. 나는 단어들을 계층(Tree)적으로 구성하기로 했다.   
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/10mfRXhOOVlaHgFoZR0A7_EA71r23MdwdwcZkay69Mjg/pub?w=387&amp;h=165">
+}}}
+
+단어의 경로를 단지 계층적으로만 구성하면, 수많은 단어들 중에서 적절한 단어를 추천할 수 없을 것이다. 자동완성 서비스의 품질을 높이기 위해서는 적절한 단어를 추천하기 위한 알고리즘이 필요하다. 그래서 각 경로에 가중치(weight)를 주기로 했다. 이 알고리즘은 아래와 같이 작동한다. 
+
+유저가 단어를 선택했다면, 단어의 경로를 계산할 수 있다. 위 그림에서 유저가 "apple"를 선택했다면, 경로는 a -> ap -> app -> apple 이 된다. 그러면 모든 경로에 대해서 가중치를 +1 한다. 이제 유저가 "a"를 선택하면, 가중치가 높은 "ap"가 높은 우선순위로 추천될 것이다. 유저가 입력하는 모든 단어에 대해서 이 연산을 수행하면 된다. (물론 유저마다 관심분야가 다르기 때문에, 제대로 서비스하려면 개인화 해야 한다. 고수준 응용은 따로 고민해서 정리해야 겠다. 여기에서는 모델을 단순화 한다.) 
+
+{{{#!plain
+ZADD term.next:a  0 ac
+ZADD term.next:a  0 ap
+ZADD term.next:a  0 agree
+
+ZADD term.next:ap  0 app
+ZADD term.next:ap  0 apoint
+
+ZADD term.next:app 0 apply
+ZADD term.next:app 0 apple
+ZADD term.next:app 0 application
+}}}
+
+유저가 apple를 입력하면, a와의 경로에 있는 모든 단어에 대해서 가중치를 높여야 한다. 단어가 선택될 때마다 경로를 찾는 건 너무 비효율적이라고 생각해서, LIST에 정리하기로 했다.    
+{{{#!plain
+LPUSH term.route:apple apple app ap a
+LPUSH term.route:apply apply app ap a
+LPUSH term.route:application application app ap a
+LPUSH term.route:apoint apoint ap a
+LPUSH term.route:ac ac a
+LPUSH term.route:agree agree a
+}}}
+app나 ap 등의 경로는 apple, apply, application에서 이미 만들어졌다. 따라서 굳이 경로 정보를 추가할 필요 없이 '''SCAN''' 명령으로 찾을 수 있다. 
+{{{#!plain
+> SCAN 0 MATCH term.route:app* COUNT 3
+1) "0"
+2) 1) "term.route:apple"
+
+> LRANGE term.route:apple 0 -1
+1) "a"
+2) "ap"
+3) "app"
+}}}
+
+테스트 코드
+{{{#!plain
+require 'redis'
+
+class AutoComplete
+    @@redis = nil
+    def initialize
+        @@redis = Redis.new(:host=>"192.168.56.5")
+    end
+
+    # 유저가 term을 입력했을 때, 추천 할 단어들의 모든 목록을 가져온다.
+    # zrevrange 명령을 이용해서 score로 정렬한다.   
+    def next term
+        @@redis.zrevrange "term.next:#{term}", 0, -1
+    end
+
+    # term의 경로에 있는 모든 단어를 가져온다.
+    def route term
+        @@redis.lrange "term.route:#{term}", 0, -1
+    end
+
+    # 유저가 term을 submit 하면, 
+    # 경로에 있는 모든 단어들에 +1의 가중치를 더한다.
+    def addWeight term
+        i = 0
+        items = route(term)
+        items.each do | v |
+            if items[i+1] != nil
+                @@redis.zincrby "term.next:#{v}", 1, items[i+1]
+                i = i+1
+            end
+        end
+    end
+end
+
+ac = AutoComplete.new
+
+ac.addWeight "apple"
+puts ac.next a
+}}}
+  1. 유저가 "apple" 단어를 입력했다.
+  1. addWeight "apple" 메서드가 호출 된다.
+  1. 이제 a <-> ap <-> app <-> apple 는 모두 +1의 가중치가 적용된다.
+  1. 유저가 "a"를 입력하면, ap, ac, agree를 추천한다. 추천은 내림차순으로 정리되므로 ap가 가장 높은 우선순위로 추천된다.
+  1. 유저가 "ap"를 입력하면, '''app'''이 높은 우선순위로 추천된다. 
+  1. app를 입력하면 '''apple'''를 추천한다 
+
+구글 검색 서비스의 '''검색어 추천'''을 보면, 두 단계 혹은 세 단계로 확장해서 검색어를 추천하는 걸 볼 수 있다. 예를 들어 "a"를 입력했을 때, 위의 코드는 "ap, ac, agree"에서만 추천하지만, 구글의 경우에는  "a, ac, ap, agree, app, apoint"등으로 범위를 넓혀서 추천한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/152C1-qMSCG4cJighvbalj2Hknl6r9mGPu5hKOivR0YE/pub?w=407&amp;h=190">
+}}}
+
+2단계까지 범위를 넓히면 a를 입력했을 때 "ap > app > ac > agree == apoint" 순으로 추천이 가능하다. 단어 추천 품질이 더 높아질 거다. (성능도 고려해야 하기 때문에)구현이 복잡해 지는게 단점이다. 고민해 볼만한 재미있는 주제이지만, 여기에서는 다루지 않는다. 
+
+=== 검색어 추천 ===
+Auto Complete와 비슷하지만 다른 점이 있다. 위의 auto complete 데이터 구조는 "한 단어"를 대상으로 한다. 반면 검색어의 경우 두 개 이상의 단어로 이루어지는 경우가 있는데, 여기에는 적용하기가 힘들다. 단순하게 구현하자면 각 단어에 대해서 auto complete 알고리즘을 적용하면 되겠지만, 서비스 품질을 보장하기 힘들 거다. 서비스 품질을 보장하려면 "단어와 단어 사이에도 가중치"를 둬야 한다.
+
+예를 들어 "Linux"라는 단어에 대해서는 "Apple" 보다는 "Torvalds"가 더 높은 가중치를 가질 것이니, Torvalds를 추천하는게 합리적이다. 
+
+... 정리 중 
+== 기타 고려해야 할 것들 ==
+=== 메시지 정리 ===
+Log aggregation처럼 중앙에 메시지를 수집하기 위해서 REDIS를 사용하는 경우, REDIS 테이터베이스가 꽉 차는 경우에 대한 대비가 필요하다. 
+
+REDIS가 꽉 찰 경우 capped list하는 방법이 있겠으나 상당히 위험한 방법이다. REDIS 인스턴스의 메모리 혹은 list/key의 갯수를 모니터링 해서, 임계치를 초과 할 경우 관리자에게 알려줘서 처리하도록 하는게 안전할 것 같다. 
+
+Info를 이용하면 '''keyspace'''에서 각 데이터베이스별 key 크기를 확인할 수 있다.
+{{{#!plain
+used_cpu_sys_children:0.00
+used_cpu_user_children:0.00
+
+# Keyspace
+db0:keys=10,expires=1,avg_ttl=45761
+db1:keys=20,expires=0,avg_ttl=45761
+}}}
+  * keys : expires 설정된 키를 포함한 모든 키의 갯수 
+  * expires : expires 설정된 키. 
+Expires는 '''keys'''중에서 '''expires'''가 설정된 키의 갯수를 의미한다. 예를 들어 db0의 keys는 10개다. Expires 설정된 키가 삭제되면 keys는 9가 될 것이다. 
+
+dbsize로 가져올 수도 있다. info처럼 상세한 정보를 출력하지는 않으며, select한 db의 정보만 가져온다.
+{{{#!plain
+> select 1
+> dbsize
+(integer) 20 
+> select 0
+> dbsize 
+(integer) 10 
+}}}
+리스트 크기는 '''LLEN'''으로 가져올 수 있다.
+
+이들 정보를 수집했다면, 임계치를 정해서 alert 메시지를 발생하도록 설정한다. 임계치의 70%는 일반 경고 메시지, 90%는 크리티컬 경고 메시지를 발생하게 해서 적절한 조치(POP하는 인스턴스가 제대로 작동하는지 확인 혹은 POP 하는 인스턴스를 늘리는 등의)를 취하면 된다. 나는 zabbix를 이용해서 모니터링 시스템을 구축했다. 
+
+== 클라이언트 연결 테이블 관리 ==
 == 참고 ==
  * http://www.scribd.com/doc/33531219/Redis-Presentation 
  * http://oldblog.antirez.com/post/autocomplete-with-redis.html  
  * http://www.slideshare.net/jinojjan/node-js-redis
  * http://www.slideshare.net/Byungwook/redis-data-modeling-examples
  * http://openmymind.net/Data-Modeling-In-Redis/
+@
+
+
+1.28
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d709 6
+@
+
+
+1.27
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d491 1
+@
+
+
+1.26
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 2
+a4 1
+== Message Box ==
+d34 1
+a34 1
+== Item 별 방문 카운트 ==
+d109 1
+a109 1
+== API 호출 제한 ==
+d166 1
+a166 1
+== Tag 검색 ==
+d207 1
+a207 1
+== Log aggregation ==
+d226 1
+a226 1
+== Pub/Sub Communication ==
+d238 1
+a238 1
+== shopping cart 관리 ==
+d305 1
+a305 1
+== Atomic Get and Delete ==
+d319 1
+a319 1
+== Simple social graph ==
+d491 1
+a491 1
+== FIFO Queue ==
+d549 1
+a549 1
+== Session Storage ==
+d608 1
+a608 1
+== Auto Complete ==
+d708 1
+@
+
+
+1.25
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d166 1
+a166 1
+책 판매 사이트에 Tag 기반 검색을 추가하기로 했다. 아래와 같이 책 정보를 만들고, SADD 명령으로 tag 정보를 만들었다.  
+@
+
+
+1.24
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d738 1
+a738 1
+=== 클라이언트 연결 테이블 관리 ===
+@
+
+
+1.23
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d8 1
+a8 1
+Capped List는 REDIS의 LPUSH와 LTRIM 를 이용해서 구현하기로 했다. 
+d118 1
+a118 1
+'''EXPIRE'''와 조합하는 것으로 이 문제를 해결 할 수 있다. EXPIRE한 key에 대해서 '''set''', '''getset'''을 적용하면, EXPIRE 값이 사라진다는 걸 알고 있을 것이다. INCL 연산 대해서는 EXPIRE가 사라지지 않는다.
+d511 1
+a511 1
+REDIS는 RPUSH, LPUSH, LPOP, RPOP를 이용해서 데이터를 넣고 뺄 수 있다. 또한 '''blocking pop'''도 지원한다. 이들 연산의 시간 복잡도는 모두 O(1)로, 자료의 크기에 상관없이 동일하게 빠른 성능을 뽑아낼 수 있다. 
+d738 1
+@
+
+
+1.22
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a222 1
+
+d707 31
+@
+
+
+1.21
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d63 1
+a63 1
+하지만 이 방법이 괜찮을지 확신이 서질 않는다. 천만명의 Active한 유저를 관리해야 하면, key만 1억이다. 샤딩을 해서 키를 분산하는 방법도 있겠는데, 어쨋든 키가 많아지는게 불만이다. Key가 많아지면 색인 테이블의 크기가 커질테고 키가 많아질 수도록 성능은 점점 떨어질 것이다. 시간 복잡를 줄일 수 있는 방법을 찾아보기로 했다. 
+d65 1
+a65 1
+'''SETRANGE'''를 사용하기로 했다. User 마다 10byte의 고정된 공간을 제공하고, 이 공간에 count 하는 방식이다. 유저 ID는 고정된 integer 값이므로 유저의 카운트 정보가 저장된 위치(offset)을 구할 수 있다. 
+@
+
+
+1.20
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d700 8
+@
+
+
+1.19
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d653 46
+@
+
+
+1.18
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d619 35
+@
+
+
+1.17
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d420 1
+a420 1
+가중치가 1을 넘지만 않게 조절한다면, 첫 번째 방법보다 효율적으로 동작할 거다. 가중치외에 다른 부가적인 정보를 넣고 싶다면 첫번째 방법을 사용하면 된다. 추천 알고리즘을 만드는 건, 이 문서의 범위가 아니다. 다른 문서에서 고민해봐야 겠다. 
+d445 3
+d449 42
+d609 9
+@
+
+
+1.16
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d420 25
+a444 1
+가중치가 1을 넘지만 않게 조절한다면, 첫 번째 방법보다 효율적으로 동작할 거다. 가중치외에 다른 부가적인 정보를 넣고 싶다면 첫번째 방법을 사용하면 된다. 추천 알고리즘을 만드는 건 따로 고민을 하고, 여기에서는 이정도로 넘어가야 겠다.
+@
+
+
+1.15
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d494 3
+d498 7
+d506 33
 @
 
 

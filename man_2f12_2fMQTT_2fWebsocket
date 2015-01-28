@@ -1,0 +1,90 @@
+#title MQTT websocket
+
+== MQTT Websocket 인터페이스 ==
+나는 IoT에서의 데이터 통신을 위해서 MQTT를 선택했다. IoT에서 데이터는 제어와 센서(이벤트 포함) 정보로 나눌 수 있을 것이다. 제어는 제어 토픽에 PUB하고, 센서는 센서 토픽에 SUB 하면 되니까. MQTT로 통신 인터페이스를 통일할 수도 있을 것 같다. 하지만 "다양한 디바이스가 붙을 수 있다"는 IoT의 특성 때문에, 인터페이스를 통일하는 것은 현실적으로 어렵다. 에컨데 웹 애플리케이션으로 IoT 기기와 통신하려면, HTTP 프로토콜을 이용해야 한다.
+
+그래서 IoT를 위한 프로토콜에 HTTP를 추가하기로 했다. 
+
+=== 환경 ===
+  * MQTT Broker : 모스키토(mosquitto) 브로커는 websocket을 지원한다. 단 1.4 버전부터 지원하는데, 아직 우분투 패키지 형태로 제공하지는 않는다. ([[Date(2015-01-09T08:37:11)]])현재 우분투 14.10의 모스키토 버전은 1.3.5다. 따라서 직접 빌드 해야 한다. 
+  * MQTT Server 운영체제 : Virtualbox위에서 테스트 한다. 우분투 리눅스 서버 14.10 버전을 사용했다.  
+
+=== 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1dAp48ipJxN887XjfQyNg_LmG6071Ps_StkyNAw-X9i8/pub?w=665&amp;h=214">
+}}}
+  1. Web Server : Web application을 이용한 UI를 제공한다. 
+  1. MQTT Broker : Web application과 센서 디바이스 사이의 토픽을 중계한다.
+  1. Sensor Device : 가상의 센서 디바이스를 만든다.
+
+=== 모스키토 브로커 빌드 === 
+아직 우분투 패키지가 없어서 부득이 하게 직접 빌드했다.
+
+==== libwebsockets 설치 ====
+우분투 패키지를 설치하면 컴파일 실패한다. 직접 빌드했다.
+{{{#!plain
+# apt-get install cmake libssl-dev
+# wget http://git.warmcat.com/cgi-bin/cgit/libwebsockets/snapshot/libwebsockets-1.3-chrome37-firefox30.tar.gz
+# tar -xzvf libwebsockets-1.3-chrome37-firefox30.tar.gz
+# cd libwebsockets-1.3-chrome37-firefox30/
+# mkdir build
+# cd build
+# cmake .. -DOPENSSL_ROOT_DIR=/usr/bin/openssl
+# make
+# sudo make install
+}}}
+
+==== Mercurial Tools ====
+Git이 아니고  (귀찮게) mercurial로 관리한다.  
+{{{#!plain
+# apt-get install mercurial
+}}}
+
+==== 컴파일 ====
+{{{#!plain
+# hg clone ssh://hg@bitbucket.org/oojah/mosquitto
+# cd mosquitto/
+# hg pull && hg update 1.4
+}}}
+
+웹 소켓을 지원하도록 config.mk 파일을 수정한다. 
+{{{#!plain
+WITH_WEBSOCKETS:=yes
+}}}
+
+컴파일 하기 전에 아래의 패키지들을 설치하자.
+{{{#!plain
+# apt-get install uuid-dev xsltproc docbook-xsl
+}}}
+
+컴파일
+{{{#!plain
+# make
+# make test
+# make install
+}}}
+
+mosquitto 유저도 필요하다.
+{{{#!plain
+# useradd -r -m -d /var/lib/mosquitto -s /usr/sbin/nologin -g nogroup mosquitto
+}}}
+
+==== 설정 및 실행 ====
+/etc/mosquitto/mosquitto.conf 파일을 수정한다.
+{{{#!plain
+listener 8080 0.0.0.0
+protocol websockets
+}}}
+서버를 실행한다.
+{{{#!plain
+# mosquitto -c /etc/mosquitto/mosquitto.conf -d
+1420878861: mosquitto version 1.4 (build date 2015-01-10 16:07:02+0900) starting
+1420878861: Config loaded from /etc/mosquitto/mosquitto.conf.
+1420878861: Opening ipv4 listen socket on port 8080.
+1420878861: Opening ipv4 listen socket on port 1883.
+1420878861: Opening ipv6 listen socket on port 1883.
+}}}
+8080 포트와 1883 포트로 뜨는 걸 확인 할 수 있다.
+
+=== 테스트 ===
+테스트를 위해서 웹서버를 올렸다. 이 웹서버는 MQTT 서버 정보와 토픽정보를 입력하는 인터페이스, 그리고 MQTT websocket 통신을 위한 자바스크립트를 서비스 한다. Ruby sinatra로 웹 서버를 구축했다.

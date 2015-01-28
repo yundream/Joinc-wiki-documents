@@ -1,10 +1,30 @@
-head	1.1;
+head	1.5;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.5; strict;
 comment	@# @;
 
+
+1.5
+date	2015.01.24.01.22.29;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.01.24.01.03.36;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.01.24.01.02.12;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.01.24.00.56.30;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2014.09.27.06.02.40;	author root;	state Exp;
@@ -17,7 +37,7 @@ desc
 @
 
 
-1.1
+1.5
 log
 @119.64.102.68;;yundream;;
 @
@@ -34,7 +54,16 @@ text
 해서 REST 기반의 웹 애플리케이션 서버를 만들게 됐는데, 만들다 보니 정리가 필요하다는 생각이 든다. 나는 웹 애플리케이션 분야 전문가는 아니다. 이 문서는 공부하면서 정리하는 수준이 될거다. 
 
 == REST ==
-REST(Representational State Transfer)은 WWW(World Wide Web)과 같은 분산 시스템을 위한 소프트웨어 아키텍쳐로 특히, 웹 API 디자인을 위한 지배적인 모델로 각광받고 있다. 
+REST(Representational State Transfer)은 WWW(World Wide Web)과 같은 분산 시스템을 위한 소프트웨어 아키텍쳐로 특히, 웹 API 디자인을 위한 지배적인 모델로 각광받고 있다. 아키텍처의 특징은 다음과 같다. 
+  * Performance
+  * 확장성(Scalability) : 많은 수의 컴포넌트로 이루어진 시스템에서 HTTP를 기반으로 하는 REST는 특히 확장성 측면에서 뚜렷한 강점을 보인다. 
+    {{{#!cite Roy Fielding 
+REST's client–server separation of concerns simplifies component implementation, reduces the complexity of connector semantics, improves the effectiveness of performance tuning, and increases the scalability of pure server components. Layered system constraints allow intermediaries—proxies, gateways, and firewalls—to be introduced at various points in the communication without changing the interfaces between components, thus allowing them to assist in communication translation or improve performance via large-scale, shared caching. REST enables intermediate processing by constraining messages to be self-descriptive: interaction is stateless between requests, standard methods and media types are used to indicate semantics and exchange information, and responses explicitly indicate cacheability.
+}}}
+  * 인터페이스의 단순화 
+  * 필요한 컴포넌트만 수정할 수 있다. (애플리케이션 실행 중에도 가능하다.)  
+  * 프로그램 코드와 데이터의 컴포넌트화로 높은 이식성 
+  * 시스템 실패에 대한 강력한 저항성.   
 
 === REST 이전에 ===
 REST도 결국은 네트워크 상에서 HTTP를 기반으로 정보를 제어하기 위한 방법론 중 하나다. 비교적 최근에 등장한 방법론인데, 이전에는 어떤 방법들이 있었는지 살펴보자. 
@@ -53,8 +82,7 @@ REST도 결국은 네트워크 상에서 HTTP를 기반으로 정보를 제어�
   * 상호운용성이 나쁘다. 거대 벤더들이 만든 방법들의 대부분이 그렇듯이, "강력하지만 복잡한 경우"가 많다. 복잡하면 상호운용성이 떨어지기 마련이다.    
   * 벤더에 종속적이다. 물론 툴을 개발한 벤더는 누구나 사용할 수 있는 방법이라고 설명을 하긴한다. 하지만 대게는 "운영체제에 종속적이거나", "복잡해서 벤더의 지원이 없으면 제대로된 애플리케이션 개발이 힘들다거나" 등등의 이유로 사실상 벤더에 종속되는 경우가 많다.
   * 바퀴를 만들기 위해서 바퀴를 만들어야 한다. 복잡하다는 이야기다. 
-
-해서 만들어진게 REST다.
+등의 문제가 발견됐다. 이러한 문제들을 해결하기 위해서 REST를 만들었다. 
 
 === HTTP와 REST === 
 REST에 대한 복잡한 설명이 많은데, 다음과 같이 요약할 수 있다.
@@ -202,7 +230,8 @@ REST의 장점을 정리했다.
 REST의 단점은 다음과 같다.
  1. REST는 point-to-point 통신모델을 기반으로 한다. 서버와 클라이언트가 연결을 맺고 상호작용해야하는 어플리케이션의 개발에는 적당하지 않다.  
  1. REST는 URI, HTTP 를 이용한 아키텍처링 방법에 대한 내용만을 담고 있다. 보안과 통신규약 정책 같은 것은 전혀다루지 않는다. 따라서 개발자는 통신과 정책에 대한 설계와 구현을 도맡아서 진행해야 한다. 
- 1. HTTP에 의존적이다. HTTP이기 때문에 가지는 장점도 있지만, HTTP이기 때문에 가지는 단점도 있다. 예컨데, HTTP는 상태를 저장하지 않기 때문에(stateless) 상호연동하는 프로그램의 개발에 적합하지 않다. 
+ 1. HTTP에 (상당히)의존적이다. REST는 설계 원리이기 때문에 HTTP와는 상관없이 다른 프로토콜에서도 구현할 수 있기는 하지만 자연스럽게 녹여내기가 쉽지 않을 수 있다. 대부분의 서비스가 웹으로 통합되는 상황에 비춰볼때 큰 단점은 아닌 것 같다. 
+ 1. CRUD의 4가지 메서드만 제공한다. 대부분의 일들을 처리할 수 있기는 한데, 4가지 메서드 만으로 처리하기엔 모호한 표현들이 있다. 
 
 == REST 개발 패턴 ==
 === Sinatra ===
@@ -225,9 +254,6 @@ end
 === Flask ===
 Sinatra와 비슷한 python 진영의 경량 프레임워크다.
 
-=== PHP ===
-
-
 == 참고 ==
   * http://ko.wikipedia.org/wiki/REST
   * http://en.wikipedia.org/wiki/Representational_state_transfer 
@@ -236,4 +262,57 @@ Sinatra와 비슷한 python 진영의 경량 프레임워크다.
   * [http://greatkim91.tistory.com/13 ROA에 대하여] 
   * [http://www.slideshare.net/aknahs/soap-vs-rest-11863700 Soap vs rest]
   * [http://coreymaynard.com/blog/creating-a-restful-api-with-php/ Creating a restful api with php]
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d189 2
+a190 1
+ 1. HTTP에 (상당히)의존적이다. REST는 설계 원리이기 때문에 HTTP와는 상관없이 다른 프로토콜에서도 구현할 수 있기는 하지만 자연스럽게 녹여내기가 쉽지 않을 수 있다. 
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d41 1
+a41 2
+
+해서 만들어진게 REST다.
+a211 3
+=== PHP ===
+
+
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a23 3
+== REST의 제약 ==
+
+
+d190 1
+a190 1
+ 1. HTTP에 의존적이다. HTTP이기 때문에 가지는 장점도 있지만, HTTP이기 때문에 가지는 단점도 있다. 예컨데, HTTP는 상태를 저장하지 않기 때문에(stateless) 상호연동하는 프로그램의 개발에 적합하지 않다. 
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d13 13
+a25 1
+REST(Representational State Transfer)은 WWW(World Wide Web)과 같은 분산 시스템을 위한 소프트웨어 아키텍쳐로 특히, 웹 API 디자인을 위한 지배적인 모델로 각광받고 있다. 
 @

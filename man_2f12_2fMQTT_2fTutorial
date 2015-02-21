@@ -117,9 +117,8 @@ MQTT 전용 브로커로 매우 가벼우며, MQTT 브로커가 가져야 할 �
 ([[Date(2015-01-10T04:02:07)]])현재 최신 안정 버전 1.3.5는 아직 WebSocket을 지원하지 않는다. 1.4에서 지원하는데, 직접 빌드해서 사용해야 한다. 클러스터를 지원하지 않는 것도 단점이다. 대규모의 메시징 시스템을 구축하려면 노가다를 뛰어야 한다. 메시징 서비스 인프라에 고가용성은 필수 요소이기 때문에 중요한 문제가 될 수 있다. 
 
 === RabbitMQ === 
-AMQP를 지원하는 메시지 큐 서버로 플러그인(Plug-in)방식으로 MQTT를 지원한다. AMQP를 이용한 범용 메시징 서버라서 좀 무겁기는 하지만 클러스터링을 지원하고 다양한 플러그인을 이용해서 기능을 확장할 수 있다. STOMP, 웹 소켓, HTTP(S)등 다양한 통신 프로토콜을 지원하기 때문에, 메시징 서버 인프라의 개발에 적합한 소프트웨어다.
+AMQP를 지원하는 메시지 큐 서버로 플러그인(Plug-in)방식으로 MQTT를 지원한다. AMQP를 이용한 범용 메시징 서버라서 좀 무겁기는 하지만 클러스터링을 지원하고 다양한 플러그인을 이용해서 기능을 확장할 수 있다. STOMP, [wiki:man/12/websocket 웹 소켓], [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP(S)]등 다양한 통신 프로토콜을 지원하기 때문에, 메시징 서버 인프라의 개발에 적합한 소프트웨어다.
 
-로컬 네트워크에서의 기기간 메시지 교환에는 가벼운 모스키토, 서버는 RabbitMQ로 구성하는게 좋을 것 같다.  
 ==== MQTT Plugin 실행 ====
 RabbitMQ를 설치하면 20개 정도의 플러그인들도 함께 깔린다. rabbitmq-plugins를 이용해서 간단하게 mqtt를 올릴 수 있다.  
 {{{#!plain
@@ -210,9 +209,74 @@ mqtt.connect do |client|
 end
 }}}
 
+== MQTT 포맷 분석 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1uOrzv7SOGaQYoGdptFi1u-Lufi0vetXJwbGk8VGNWcI/pub?w=704&amp;h=259">
+}}}
+
+헤더를 위한 2바이트가 필수 정보고, 나머지는 옵션이다.   
+=== Fixed Header ===
+두 개의 바이트로 구성된다.
+==== Message Type ====
+0에서 3, 4개의 비트를 이용해서 메시지 타입을 정의 한다. 2^4, 총 16개의 데이터 타입을 정의할 수 있다. 
+||Mnemonic       ||Enumeration        ||Description                         ||
+||Reserved       ||0                  ||Reserved                            ||
+||CONNECT        ||1                  ||Client request to connect to Server ||
+||CONNACK        ||2                  ||Connect Acknowledgment              ||
+||PUBLISH        ||3                  ||Publish message                     ||
+||PUBACK         ||4                  ||Publish Acknoledgment               ||
+||PUBREC         ||5                  ||Publish Received (assured delivery part 1)   ||
+||PUBREL         ||6                  ||Publish Received (assured delivery part 2)   ||
+||PUBCOMP        ||7                  ||Publish Complete (assured delivery part 3)   ||
+||SUBSCRIBE      ||8                  ||Client Subscribe request                     ||
+||SUBACK         ||9                  ||Subscribe Acknoledgment                      ||
+||UNSUBSCRIBE    ||10                 ||Unsubscribe Acknoledgment                    ||
+||UNSUBACK       ||11                 ||Unsubscribe Acknoledgment                    ||
+||PINGREQ        ||12                 ||PING Request                                 ||
+||PINGRESP       ||13                 ||PING Response                                ||
+||DISCONNECT     ||14                 ||Client is Disconnecting                      ||
+||Reserved       ||15                 ||Reserved                                     ||
+
+==== Flags ====
+||Bit position   ||Name               ||Description          ||
+||3              ||DUP                ||Duplicate delivery   ||
+||2-1            ||QoS                ||Quality of Service   ||
+||0              ||RETAIN             ||RETAIN flag          ||
+==== QoS ====
+MQTT는 PUBLISH 메시지를 보낼 때, QoS를 조절할 수 있다. 2개의 bit를 조합해서 QoS 레벨을 조정한다.
+||QoS value    ||bit 2  ||bit 1   ||Description      ||||||
+||0            ||0      ||0       ||최대 한번        ||Fire and Forget        || <=1    ||
+||1            ||0      ||1       ||적어도 한번      ||Acknowledged delivery  || >=1    ||
+||2            ||1      ||0       ||정확히 한번      ||Fire and Forget        || <=1    ||
+||3            ||1      ||1       ||최대한번         ||Fire and Forget        || <=1    ||
+||4            ||1      ||1       ||Reserved         ||||||
+
+==== Remaining Length ====
+Remaining Length는 variable header를 포함한 전체 메시지의 크기를 계산하기 위해서 사용한다. 1에서 부터 4바이트를 사용하는데, 데이터의 크기에 따라서 가변적이다. 1바이트라도 아끼기 위한 눈물겨운 노력의 결정체라고 볼 수 있겠다.    
+
+1byte는 255까지 저장할 수 있다. 이중 첫 번째 bit를 "다음 remaining byte를 사용할 건지 결정하기 위해서" 사용한다. 
+  * Byte 2만 사용할 경우 127 byte 크기의 메시지를 다룰 수 있다. 만약 127 byte를 초과 한다면
+  * Byte 3를 사용해야 한다. 마찬가지로 1개 bit는 reamining byte를 사용할 건지 결정하기 위해서 남겨둬야 한다. 전체 2바이트 에서 2개의 비트를 예약 했으니 16383까지 표현할 수 있다.  
+  * Byte 4도 같은 방법으로 계산 하면 2,097,151 까지 표현할 수 있다.
+  * Byte 5는 최대 268,435,455를 사용할 수 있다. 4개의 비트를 사용할 수 없으니 '''2^28 - 1 = 268435455'''이다.
+MQTT가 다룰 수 있는 최대 메시지의 크기가 '''256M'''로 제한되는 이유다. 작은 크기의 센서 데이터를 다루는 MQTT의 목적에 비추어 생각해 보면, 합리적인 선택이라고 할 수 있다.
+
+=== Variable header  ===
+어떤 MQTT 명령들은 가변(variable) 헤더 요소를 포함한다. 가변 헤더는 고정 헤더와 페이로드(payload) 사이에 위치한다. 
+
+==== protocol name ====
+프로토콜 이름은 '''MQTT CONNECT'''메시지에서 사용한다. UTF-8 인코딩된 프로토콜 이름이 사용된다. 
+
+==== Protocol version ====
+'''MQTT CONNECT'''메시지와 함께 사용한다. 8bit unsigned 값을 이용해서 프로토콜 버전을 설정할 수 있다. ([[Date(2015-01-30T15:00:16)]])현재 프로토콜 버전은 3(0x03)  이다.
+
+==== Topic name ====
+토픽 이름은 MQTT PUBLISH 메시지에 포함된다. 토픽 이름은 payload에 포함된 데이터를 published 할 때 사용하는 채널의 이름이다. 토픽 이름은 UTF 인코딩된 값을 사용한다. 토픽 이름은 32,767의 길이 제한을 가진다. 
+
 == 참고 ==
-  * http://mosquitto.org/man/mqtt-7.html
   * http://madalanarayana.wordpress.com/2014/03/25/learnings-on-publish-subscribe-mqtt-mosquitto/
   * [https://www.facebook.com/notes/facebook-engineering/building-facebook-messenger/10150259350998920 Building FaceBook messenger] 
   * [http://www.irse.org/knowledge/publicdocuments/3.09%20Wood%20-%20Message%20broker%20technology%20for%20flexible%20signalling%20control.pdf Message Broker Technology for flexible signalling control] 
   * [https://github.com/mqtt/mqtt.github.io/wiki/server-support MQTT 브로커 기능 비교]
+  * [http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html MQTT V3.1 Protocol Specification]
+  * [http://mosquitto.org/man/mqtt-7.html MQTT man page]

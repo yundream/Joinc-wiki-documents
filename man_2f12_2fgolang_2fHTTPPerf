@@ -1,0 +1,235 @@
+#title Go HTTP 패키지 성능 측정
+[[TableOfContents]]
+== 소개 ==
+메시지 드리븐 방식의 웹 기반 API 서버를 개발해야 하는 요구 사항이 생겼다. 백엔드는 [wiki:man/12/MQTT MQTT], [wiki:man/12/REDIS REDIS] 등의 고성능 소프트웨어(혹은 프로토콜을 사용하는)로 구성할 계획이라서, '''웹 API 서버'''가 버틀랙이 될 것으로 예상하고 있다. 요즘에는 AWS로 인프라를 구축하고 있는데, '''성능은 scale-out으로 해결'''한다는 기본 방향을 가지고 있다. 하지만 요구사항이 요구사항인지라 이번에는 다른 플랫폼과 프레임워크의 도입을 검토해 보기로 했다. 
+
+[https://www.techempower.com/benchmarks/#section=data-r9&hw=ec2&test=db Web Framework Benchmarks]의 데이터를 기준으로 C++, Java, Go 정도가 가능한 선택지였다. 이 중 Go를 선택해서 테스트 해보기로 했다.
+
+== 비교 대상 ==
+원래 Go/HTTP 패키지와 NginX만 비교해서 테스트하려 했으나, NginX, Ruby Sinatra, Node.js, Ruby Rack와 비교 테스트 하게 됐다. 이들 애플리케이션들은 일대일로 비교하기에는 성격에 차이가 있다. 예컨데, NginX는 웹서버, Go와 노드는 플랫폼, Sinatra는 마이크로 프레임워크, Revel은 풀 프레임워크, Rack은 웹 서버 인터페이스다. 애초에 직접 비교하기에는 무리가 있을 수 있는 것들을 비교했으니, 판단은 각자 기준에 따라서 알아서 해야 할 것이다.
+
+== 비교 요소 ==
+동접을 늘려가면서, 초당 요청수(Requests/sec)와 응답시간(Latency)를 측정한다.
+
+== 테스트 ==
+=== 테스트 환경  ===
+EC2 인스턴스위에서 테스트한다. 
+  * 테스트 인스턴스 사양 : EC2 C4.large 
+  * 운영체제 : 우분투 리눅스 14.04
+  * Go 언어 버전 : 1.4.1 
+  * 웹 서버 : NginX
+  * 트래픽 발생기 : wrk
+=== 테스트 환경 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1LfhAD96K57dp6xp7JWuh4gAcSau4HFBlHwPhGUv_pv0/pub?w=551&amp;h=225">
+}}}
+
+트래픽 발생서버에서 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 트래픽을 만들어서 HTTP Server를 테스트 한다. HTTP Server에는 Go, NginX, 노드 등이 올라간다. 
+
+=== wrk 설치 및 사용 ===
+wrk는 ab와 같은 벤치마크 툴이다. 루아 스크립트를 이용해서 다양한 테스트가 가능하다는 장점이 있다.  
+{{{#!plain
+# git clone https://github.com/wg/wrk.git
+# cd wrk
+# make
+# cp wrk /usr/local/bin
+}}}
+
+테스트 방법
+{{{#!plain
+# wrk -t 16 -c 64 -d10s http://10.100.1.62:8080/
+Running 10s test @ http://10.100.1.62:8080/
+  16 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     8.41ms   73.74ms   1.63s    98.79%
+    Req/Sec     3.29k     1.33k   12.11k    68.95%
+  499469 requests in 9.99s, 60.97MB read
+Requests/sec:  49991.66
+Transfer/sec:      6.10MB
+}}}
+t는 스레드의 갯수, c는 동시접속 갯수, d는 테스트 시간이다. 위 예제의 경우 16개의 스레드를 이용해서 64개의 동접 상황을 만들어서 10초 동안 테스트한다. 위 결과에서 '''Latency'''와 '''Requests/sec''' 정보를 수집한다.
+
+'''동접'''이라는 것에 대해서 정의하고 넘어가야 겠다. 여기에서 동접은 netstat를 찍었을 때 '''ESTABLISHED'''상태인 연결의 갯수를 의미한다. -c 64라는 것은 64개의 ESTABLISHED 연결을 유지한다는 의미가 되겠다. wrk는 16개의 스레드를 유지하면서 64개의 연결을 유지한다. 만약 하나의 연결이 종료가 되면, 즉시 새로운 연결을 만들어서 64개를 계속 유지하는 방식으로 작동한다. 
+
+=== 테스트 스크립트 ===
+wrk 테스트 결과는 GNUPlot 으로 시각화 한다. 이를 위해서 wrk의 출력결과를 GNUPlot 형식으로 만들어주는 간단한 스크립트를 만들었다. 
+{{{#!plain
+import os
+import re
+import time
+
+def report(c, lines):
+    rtv = []
+    for str in lines:
+        str=re.sub("^[ \t]+",'', str)
+        if str.find("Latency") == 0 or str.find("Requests/sec") == 0:
+            token = re.split("[ \t]+", str)
+            value = re.sub("[^0-9\.]", '', token[1])
+            if re.match("[0-9\.]+us", token[1]):
+                rtv.append(float(value)/1000)
+            elif re.match("[0-9\.]+s", token[1]):
+                rtv.append(float(value)*1000)
+            else:
+                rtv.append(float(value))
+    print c,"\t", rtv[0],"\t",rtv[1]
+
+def run(cmd):
+    stdin, stdout, stderr = os.popen3(cmd)
+    return stdout.readlines()
+
+offset = 5
+maxConcurrency = offset * 61
+duration = 10
+for num in range(1, maxConcurrency/offset):
+    concurrency = num * offset
+    thread = 16 if concurrency > 16 else concurrency
+    cmd = ("wrk -t %d -c %d -d %ds http://10.100.1.62:8080" % (thread, concurrency, duration))
+    result =run(cmd)
+    report(concurrency, result)
+    time.sleep(5)
+}}}
+실행 결과
+{{{#!plain
+5       0.16345         30205.66
+10      0.21071         48597.58
+15      0.38523         50011.98
+20      0.4249          50039.27
+25      0.41185         50069.66
+30      0.45189         50044.11
+35      0.72995         50081.43
+40      0.71449         50073.36
+45      0.73107         50097.2
+50      10.41           50024.7
+55      16.69           50039.07
+60      12.05           50061.65
+65      61.78           49949.86
+70      80.24           50003.17
+75      73.18           49970.52
+80      109.59          49912.44
+}}}
+
+=== Go 웹 서버 ===
+{{{#!plain
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"runtime"
+)
+
+func main() {
+	runtime.GOMAXPROCS(4)
+	fmt.Println("GOMAXPROCS=", runtime.GOMAXPROCS(-1))
+	fmt.Println("NumCPU=", runtime.NumCPU())
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "Hello World")
+	})
+	http.ListenAndServe(":8080", nil)
+}
+}}}
+Hello World를 출력하는 간단한 프로그램이다. GOMAXPROCS를 이용해서 4개의 CPU를 시뮬레이션 했다. GOMAXPROCS를 4로 했을 때 성능이 가장 좋았다. C4.large의 NumCPU는 2개다(/proc/cpuinfo에 나오는 CPU 갯수). 
+
+=== NginX 설정 ===
+{{{#!plain
+worker_processes  4    # 보통 4로 잡는다.
+worker_connection 768  # uname -a 보다 작게 잡으면 되겠다. 
+}}}
+한 마디로 기본 설정 그대로다.
+
+=== Node.js ===
+{{{#!plain
+var http = require('http');
+
+http.createServer(function (request, response) {
+	response.writeHead(200, {'Content-Type': 'text/plain'});
+    response.end('Hello World\n');
+}).listen(8080);
+
+console.log('Server started');
+}}}
+기본적으로 노드는 하나의 스레드로 작동한다. C4.lage 인스턴스는 2개의 CPU를 제공하므로, 이렇게 해서는 CPU 자원을 모두 사용할 수 없다. 아래의 코드로도 테스트 했다.   
+{{{#!plain
+ivar cluster = require('cluster');
+var http = require('http');
+var numCPUs = require('os').cpus().length;
+console.log(numCPUs)
+if (cluster.isMaster) {
+  // Fork workers.
+  for (var i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+
+  cluster.on('exit', function(worker, code, signal) {
+    console.log('worker ' + worker.process.pid + ' died');
+  });
+} else {
+  // Workers can share any TCP connection
+  // In this case its a HTTP server
+  http.createServer(function(req, res) {
+    res.writeHead(200);
+    res.end("hello world\n");
+  }).listen(8080);
+}
+}}}
+=== Ruby Thin Sinatra ===
+Thin + Sinatra 기반으로 테스트를 진행했다. 
+{{{#!plain
+require 'sinatra'
+set :logging, false
+
+get '/' do
+    'Hello World!'
+	end
+}}}
+
+=== Revel ===
+Revel은 Go로 만든 풀 프레임워크 애플리케이션이다. 아래와 같은 컨트롤러 코드를 만들었다. 테스트의 공정함을 위해서 굳이 파일에서 읽지 않고, 직접 출력하도록 복잡한 코드를 만들었다.
+{{{#!plain
+package controllers
+import "github.com/revel/revel"
+import "net/http"
+
+type App struct {
+    *revel.Controller
+}
+
+type Html string
+
+func (r Html) Apply(req *revel.Request, resp *revel.Response) {
+    resp.WriteHeader(http.StatusOK, "text/html")
+    resp.Out.Write([]byte(r))
+}
+
+func (c *App) Index() revel.Result {
+    return Html("Hello World")
+}
+}}}
+
+=== 테스트 결과 ===
+{{{#!html
+<div class="row">
+    <div class="large-6 columns">
+        <img src="https://lh5.googleusercontent.com/-lid7C0i6Ls4/VOYBo8XPScI/AAAAAAAAEyY/wSMm5VAjusE/s800/latency.png">
+    </div>
+    <div class="large-6 columns">
+       <img src="https://lh3.googleusercontent.com/-1CSSS3T7ipI/VOYBoplCyCI/AAAAAAAAEyY/sJMxAbbq6nQ/s800/request.png">
+    </div>
+</div>
+}}}
+  * Nginx와 Go 모두 대략 초당 50000정도의 요청을 처리할 수 잇다. 
+  * 동시접속이 늘어날 수도록 응답시간이 길어진다. 유저가 참을 수 있는 응답지연을 400ms라고 할 때, NgiX와 GO 모두 동접 150 정도에서 무난하게 돌아간다.  
+  * Node.js는 약간 다르다. 동접과 상관없이 일정한 지연과 초당 처리 건수를 보여준다. 스레드를 두 개로 했을 때는 (당연히) 더 많은 요청을 처리한다. 4개의 쓰레드에 대해서도 테스트 했는데, 큰 차이가 없어서 테스트 결과에 포함하지는 않았다.
+  * Sinatra는 느리다. RoR도 큰 차이는 없을 것으로 보인다.
+  * Revel은 풀 프레임워크라서 그런지, 꽤 느리다. 
+
+== 정리 ==
+Go/HTTP의 성능은 매우 좋긴 하지만, HTTP 패키지 만으로 생산성을 확보할 수 있을지는 걱정이 되는 부분이다. 다행?인 점은 (아마도 구글에서 만든 언어라서 그런거겠지만) HTTP 패키지가 매우 강력하다는 점이다. HTTP 패키지만으로도 웹 애플리케이션을 개발하는 데, 부족함이 없다. 
+
+물론 그렇다고 해서 풀 프레임워크 만큼의 생산성을 보장해주는 건 아니다. MVC 모델이 필요한 복잡한 웹 애플리케이션이라면 풀 프레임워크로 개발을 하는게 맞을 것이다. 반면 REST API 서버 등에서는 특히 성능 측면에서 충분한 장점을 가지고 있다. Goji, martini와 같은 마이크로 프레임워크를 선택하는 것도 방법이다. 
+
+== 테스트 결과 데이터 ==
+ * [https://drive.google.com/open?id=0B6p_m8EvqxeuYW9DS01wNW9YTVk&authuser=0 Go HTTP 테스트 결과]
+ * [https://drive.google.com/open?id=0B6p_m8EvqxeuUTNlNWI4NVFITG8&authuser=0 NginX 테스트 결과] 
+ * [https://drive.google.com/open?id=0B6p_m8EvqxeuRmtMcnlxVVNjd0E&authuser=0 Node.js one thread 테스트 결과]
+ * [https://drive.google.com/open?id=0B6p_m8EvqxeuUHg3S21IQUNlX28&authuser=0 Node.js two thread 테스트 결과]

@@ -1,0 +1,106 @@
+#title AWS CloudWatch
+[[TableOfContents]]
+== 소개 ==
+AWS Cloudwatch를 살펴보려고 한다. 이 문서는 레퍼런스가 아니다. 레퍼런스 문서는 그냥 AWS 사이트에서 읽으면 된다. 워낙 잘 돼 있기도 해서 굳이 정리 할 필요가 없다. 
+
+나는 클라우드와치의 활용 측면에서 장점과 단점, 한계 그리고 이를 보완하기 위한 방법들 위주로 살펴보려 한다.
+== CloudWatch 의 장점과 단점 == 
+CloudWatch의 장점은 다른 모니터링 시스템을 설치할 필요 없이, 기본적인 정보를 수집할 수 있다는데 있다. 하지만 장점은 여기 까지다. 좀 더 자세한 메트릭 정보를 얻어거나 더 빠른 주기로 정보를 수집하려고 하면, 추가적인 비용을 지불해야 한다.
+
+모니터링 시스템을 사용하는 목적은 현재 발생하는 장애를 처리하기 위함도 있지만 중장기적인 품질관리를 위한 기초 자료로 사용하기 위한 목적도 있다. 이를 위해서는 모니터링 정보를 장기간 보관해서 분석을 해야 한다. 이런 일들을 하기 위해서는 장기간 데이터를 저장하기 위한 스토리지와 스토리지에 저장된 데이터를 분석하기 위한 컴포팅 파워가 필요하다. 클라우드와치는 이런 기능을 제공하지 않는다.
+
+기본으로 (무료로)제공하는 클라우드와치의 최대 주기는 1분이고, 최대 2주까지의 데이터만 확인할 수 있다. 당장의 이슈에는 대응할 수 있겠지만, 중/장기적인 계획을 세우기에는 턱 없이 부족한 정보다. 모니터링 매트릭도 제한적이다. 하드웨어 레벨에서의 모니터링이기 때문에, 소프트웨어와 운영체제 영역의 정보들 - 프로세스/쓰레드 모니터링, 각종 로그 모니터링, 서비스 포트, 메모리 -과 서비스영역의 모니터링 - HTTP 클라이언트등을 이용한 - 모니터링은 할 수 없다. 
+
+방법이 있긴 하다. 클라우드워치는 커스텀(custom) 매트릭 추가 기능을 제공한다. 유저는 클라우드와치 API를 호출하는 간단한 프로그램을 만들어서, 인스턴스에 올리는 방법으로 자신의 매트릭을 추가할 수 있다. 물론 공짜는 아니다.
+
+그리고 전문 모니터링 시스템이 아니라서, 정책설정과 대쉬보드 구성 등 여러 측면에서 부족한 점이 많다. 아래는 Cloudwatch 제한에 대한 AWS의 공개 문서다.
+
+CloudWatch has the following limits:
+    * You get 10 CloudWatch metrics, 10 alarms, 1,000,000 API requests, and 1,000 Amazon SNS email notifications per customer per month for free.
+    * There is no limit on the number of custom metrics you can create.
+    * The maximum period you can specify is one day (86,400 seconds).
+    * You can assign up to 10 dimensions per metric.
+    * You can create up to 5000 alarms per AWS account.
+    * You can assign up to 5 actions per alarm.
+    * Metric data is kept for 2 weeks.
+    * The size of a PutMetricData request is limited to 8KB for HTTP GET requests and 40KB for HTTP POST requests.
+    * You can include a maximum of 20 MetricDatum items in one PutMetricData request. A MetricDatum can contain a single value or a StatisticSet representing many values.
+CloudWatch Logs has the following limits:
+    * Up to 5GB of incoming data for free.
+    * Up to 5GB of data archiving for free.
+    * The maximum number of log groups per AWS account is 500.
+    * The maximum number of metric filters is 100 per log group.
+    * The maximum event size is 256KB.
+    * The maximum batch size is 1MB.
+    * The maximum rate of a PutLogEvents request is 5 requests per second per log stream. Since the maximum batch size of a PutLogEvents request is 32KB, this means that uploads to a single log stream are limited to a maximum rate of 160KB/s.
+    * The maximum rate of a GetLogEvents request is 10 requests per second per AWS account.
+나름 정리하자면, 클라우드와치는 지원 도구라는 이야기. 
+== 자빅스를 이용한 클라우드와치 정보 수집 ==
+이런 저런 문제, 특히 데이터에 대한 장기간 보관이 안된다는 제한 때문에, 전문 모니터링 솔류션인 자빅스를 이용해서 모니터링 시스템을 구축하기로 했다. 클라우드 와치는 매트릭 정보를 얻는 용도로만 사용한다. 그리고 자빅스 에이전트로 모니터링이 불가능한 몇몇 매트릭(ELB와 Elastic Cache등)을 제외하고 가능한 자빅스 에이전트를 이용해서 매트릭 정보를 수집하기로 했다. 
+
+=== Python Boto로 CloudWatch API 사용 ===
+AWS Ruby SDK를 사용해 본적은 있는데, 이번엔 python으로 접근해 보기로 했다. python 버전은 2.7.8이다. 
+
+pip로 설치하는게 제일 간단하다고 하더라.
+{{{#!plain
+# pip install boto
+}}}
+
+access key와 secret access key를 만든 다음 ~/.aws/credentials 파일을 설정했다.
+{{{#!plain
+[default]
+aws_access_key_id=XXXXXXXXXXXXXXXXXXXXXXXX
+aws_secret_access_key=XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+}}}
+
+Tokyo 리전에 있는 EC2 인스턴스 한 녀석을 선택해서 CPU 평균 값을 가져오는 코드를 만들었다.
+{{{#!plain
+import boto.ec2.cloudwatch
+import datetime
+
+c = boto.ec2.cloudwatch.connect_to_region('ap-northeast-1')
+
+# 최근 30분간의 데이터를 가져오고 싶다.
+end = datetime.datetime.utcnow()
+start = end - datetime.timedelta(minutes=30)
+
+dimensions={'InstanceId':'i-xxxxxxxx'}
+metric_name = 'CPUUtilization'
+namespace = 'AWS/EC2'
+statistics = ['Average']
+unit = 'Percent'
+
+datapoints = c.get_metric_statistics(300, start, end, metric_name,namespace , statistics, dimensions, unit);
+
+for item in datapoints:
+     print item['Average']
+}}}
+
+실행했더니, 값은 잘 가져온다.
+{{{#!plain
+0.034
+0.034
+0.0
+0.032
+0.0
+}}}
+
+몇 가지 생소한 용어들이 있어서 정리를 해야 할 것 같다.
+  * metrics : 자원을 측정하기 위한 측정 기준 명. CPUUtilization(CPU 사용율), NetworkIn(네트워크 입력 트래픽)등이 metric이다. 
+  * dimensions : metrics을 어느 기준(차원)으로 찾을 것인지를 설정하기 위해서 사용한다. 예를들어 EC2 매트릭은 ImageID, InstanceID, InstanceType등 다양한 기준으로 찾을 수 있다.  
+
+=== 모니터링 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1HAZtm9IJJDr81u6rzS51SFuTDi3siBQXydpsdqwbOWk/pub?w=636&amp;h=176">
+}}}
+ 1. Zabbix 서버를 이용해서 모니터링한다.
+ 1. Zabbix Agent는 CloudWatch API를 이용해서 주기적으로 각 매트릭을 수집한다.
+
+=== SQS 모니터링 ===
+SQS를 모니터링 하는 Zabbix 에이전트를 개발한다. SQS의 모니터링 매트릭은 아래와 같다. 
+  * NumberOfMessageSent : 큐에 추가되는 메시지 갯수
+  * SentMessageSize : 큐에 추가된 메시지의 데이터 크기  
+  * NumberOfMessgeReceves  : 삭제한 메시지
+  * ApproximateNumberOfMessagesDelayed :  
+  * ApproximateNumberOfMessagesVisible :
+  * approximateNumberOfMessageNotVisible :

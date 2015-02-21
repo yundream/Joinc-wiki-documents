@@ -1,0 +1,293 @@
+head	1.11;
+access;
+symbols;
+locks
+	root:1.11; strict;
+comment	@# @;
+
+
+1.11
+date	2015.01.30.07.52.56;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2015.01.30.07.38.30;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2015.01.30.06.17.18;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2015.01.30.05.59.55;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2015.01.30.05.59.29;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.01.30.05.57.08;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.01.30.02.19.23;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.01.29.05.34.37;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.01.29.04.32.23;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.01.28.16.16.29;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.01.28.16.00.58;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fMQTT_2fRest
+@
+
+
+1.11
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title MQTT와 REST 아키텍처링
+미완성 ..
+[[TableOfContents]]
+== MQTT 와 REST 아키텍처링 ==
+[wiki:man/12/rest REST]는 [wiki:Site/Network_Programing/AdvancedComm/HTTP HTTP] 기반의 아키텍처링 모델로 널리 알려져 있다. 워낙 REST가 HTTP의 [wiki:man/12/URI URI]를 기준으로 사용을 하는 경우가 많기 때문일 것이다. 하지만 REST는 프로토콜들에 독립적인 아키텍처링 모델이다. 대상이 HTTP이건 다른 어떤 것이든지 간에 일반적으로 적용할 수 있는 아키텍처링 모델이다.    
+
+REST를 이용하면 얻을 수 있는 장점은 다음과 같다.
+  1. URI(URI가 아니더라도 상관 없다.)를 이용해서 자원의 위치와 인터페이스, 매개변수등을 지정할 수 있다. 
+  1. HTTP Method를 이용해서 CRUD를 표현할 수 있다.  
+
+== 메시징 서비스에서의 REST ==
+MQTT를 이용한 메시징 서비스에서 REST가 어떤 장점을 가질 수 있는지 살펴보려 한다. 아래와 같은 메시징 서비스 인프라가 있다고 가정해 보자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/16yAI_PKEBOjVKZp5qYd351P6WPNEMkitoMp5QIfPU6k/pub?w=653&amp;h=217">
+}}}
+
+유저 A는 유저 B로 메시지를 보내려고 한다. 일반 텍스트 메시지는 아니고 윙크를 날리는 스티커 메시지다. 예컨데 '''윙크''' 기능을 호출하는 걸로 보면 되겠다. 이 메시징 인프라는 수많은 유저가 연결된 MQTT 클러스터로 구성이되 있다. 따라서 메시지를 목적지 까지 라우팅 하기 위한 라우터 기능이 필요하다. 라우터가 작동을 하려면 "From"과 "To"를 알아야 한다.
+
+JSON-RPC를 이용하는 고전적인 방법을 사용해 보자. 대략 아래와 같이 기술할 수 있을 것이다.(JSON-RPC 규격을 따지지는 말자. 그냥 의사코드 수준이다.) 
+{{{#!plain
+{
+  "from": "A",
+  "to": "B",
+  "function": "WINK" 
+}
+}}}
+PUB 토픽의 이름은 /pub/user_id, SUB 토픽의 이름은 /sub/user_id를 사용하기로 했다. A유저는 /pub/a, /sub/a 두개의 토픽을 가진다. A 유저는 /pub/user_id 로 위의 JSON 테이터를 전송한다. 메시지를 받은 MQTT 브로커는 라우터로 메시지를 전송 한다.   
+
+라우터는 '''역직렬화'''해서, '''B'''유저에게 향하는 메시지라는 걸 확인한다. 이제 유저가 어느 MQTT 노드에 연결해 있느니를 확인해서(연결 테이블을 어디선가 관리해야 할 거다. 여기에서는 논하지 않는다.) MQTT 노드의 /sub/a로 메시지를 전송한다. B 유저는 /sub/a로 부터 메시지를 읽은 후, 다시 '''역직렬화'''를 해서 '''WINK''' 기능을 호출했다는 것을 확인하고 WINK 이미지를 출력한다.
+
+이 방식은 아래의 문제점을 가지고 있다.
+  * 목적지를 찾기 위해서 데이터를 역직렬화 해야 한다. 
+  * 어떤 기능을 호출했는지 확인하기 위해서 데이터를 역직렬화 해야 한다. 
+REST 아키텍처를 이용해서 이 문제를 해결 해 보자.
+
+== REST를 적용해 보자. ==
+REST를 사용해서 위의 문제점을 해결하려 한다. 핵심은 PUB/SUB 토픽을 REST하게 구성해서, 토픽 이름만으로 자원의 위치와 메서드, 매개변수, 상태 정보를 얻게 하는데 있다.
+ * 위치 : 유저 이름 혹은 유저의 이름을 가져올 수 있는 Key
+ * 메서드 : 어떤 기능을 호출할지 알 수 있어야 한다.
+ * 매개변수 : 메서드에 대한 매개변수가 필요할 수도 있다.
+ * 시그널 : online, sleep, busy등의 정보를 push하기 위해서 사용한다.
+
+=== 메시지 전송 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1TKMzr6BYc_l_9B8lqi8QToacK0FwTihciKRWWICy4AU/pub?w=792&amp;h=200">
+}}}
+
+유저는 두 개의 토픽을 가진다. PUB 토픽은 메시지를 전송하기 위해서 사용한다. 목적지 정보가 들어가기 때문에 토픽 이름은 그때 그때 변경된다. User B에게 메시지를 보내야 한다면, 토픽 이름은 /user/B 가된다. 여기에 호출할 기능 이름을 조합해서 토픽을 만들고 메시지를 전송한다. 이 경우 토픽이름만으로 모든 정보를 전달할 수 있기 때문에 비어있는 메시지를 전송할 것이다.
+
+MQTT 브로커는 User B를 처리하는 노드를 찾은 다음 /user/b/method/wink 토픽으로 메시지를 전송한다. 이 메시지는 User B의 subscribe 토픽은 /user/B로 publishing 된다. 메시지를 받은 User B의 애플리케이션은 wink 메서드를 실행한다. 응답은 반대 방향으로 진행된다.
+  * MQTT 브로커들은 메시지의 내용 확인 없이 토픽주소만으로 목적지를 찾을 수 있다.
+  * 토픽 주소만으로 기능을 실행할 수 있다.
+물론 메시지가 복잡해지면, 토픽 구성에 고민이 필요하다. wink 기능의 경우에는 매개변수가 필요 없지만, 매개변수가 필요한 기능도 있을 것이다. 예를 들어 유저에게 디지털 화폐로 사용하는 start를 보낸다고 가정해 보자. 이 start는 start 타입(silver start인지 gold start 인지)과 start 갯수 두개의 매개 변수를 필요로 한다. 몇 개의 표현 방식을 고민할 수 있다. 
+   1. /user/B/method/star/0/5
+   1. /user/B/method/start?type=0&num=5
+   1. /user/B/method/star 까지만 명시하고 데이터는 메시지로 보낸다.
+1번은 간단하긴 한데, 명시적이지 않다. 2번은 명시적이긴 한데, 깔끔하지가 않다. 3번은 굉장히 깔끔해 보이지만, 자원이 명확하지 않다. 여기에서 star는 온라인 화폐개념이기 때문에, 서버에서 연산이 필요하다. 1, 2는 토픽만으로 연산이 가능하지만, 3번은 메시지를 역직렬화 해야하는 문제가 있다.
+
+개인적으로 1번 방법이 제일 나은 것 같은데, "method/1번째 매개변수/2번째 매개변수"이런 식의 규칙을 만들 수 있기 때문. 정보가 자기 서술적이지 않다는 문제가 있긴 하지만, 기능은 "기능 이름 + 매개변수"의 조합에서 벗어나진 않을 테니, 이 정도로 충분하다고 생각한다.
+
+이제
+  1. MQTT 브로커는 토픽 주소만을 이용해서, 목적지를 찾을 수 있다.  
+  1. 비지니스 로직이 필요한 (모든 경우는 아닐거다)경우에도 토픽 주소만을 이용해서 로직을 수행할 수 있다. 
+  1. 데이터 수신측도 토픽 주소만을 이용해서, 필요한 작업을 수행할 수 있다. 
+텍스트나 이미지 데이터등을 포함할 수 있지만, 어차피 이들 정보는 애플리케이션 레이어에서 담당하는 녀석들이니 MQTT 메시지 인프라에서는 신경 쓸 필요가 없다.
+
+이를테면, 레이어(layer)를 둬서, 각 애플리케이션 별로 필요한 레이어만 참조하도록 하겠다라는 거다. TCP/IP의 경우에는 스택을 올리는 것으로 이 문제를 해결했는데, 여기에서는 REST로 해결해 보자는 시도다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1fuh-vJCYHBfXXRrxGY1yIM4j1DjdV-0-bFb-75wmHPk/pub?w=843&amp;h=440">
+}}}
+
+== 테스트 ==
+업무에서 나의 역할은 설계자에 가깝다. 코드를 만드는 것보다는 그림을 그리는 경우가 더 많은데, 그러다 보면 감이 떨어질 수 있다. 그래서 비록 프로토타입 수준이라고 하더라도 가능하면 코드로 검증을 하려 한다. 
+
+=== 구성 ===
+구성은 아래와 같다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1KMTdKic9wFrgmkNZLcVfP8VKMObA-6IaCKj3PFIxnrQ/pub?w=734&amp;h=323">
+}}}
+  * User App : 테스트에 사용할 클라이언트 애플리케이션 
+  * MQTT Proxy : User App을 MQTT Broker로 로드 밸런싱하고, 연결정보를 REDIS에 기록한다.
+  * MQTT Broker : Musquitto를 사용한다.
+  * MQTT Router : REDIS의 연결정보를 이용해서 MQTT 메시지를 적당한 브로커로 라우팅한다.
+
+=== 환경 ===
+ * 호스트 운영체제 : User App을 실행 할 운영체제. 우분투 리눅스 14.10
+ * 게스트 운영체제 : MQTT Proxy, Broker, Router를 실행 할 운영체제. 우분투 리눅스 14.10 
+ * MQTT 브로커 : Mosquitto
+ * 개발언어 : Go 
+굳이 개발 언어를 go로 하는 이유는 심심해서다.
+
+=== REDIS 연결 테이블 유지 ===
+연결 테이블로 관리하는 정보들이다.
+  1. 유저 연결 여부 : 유저가 연결한 상태인지 확인한다.  
+  1. 유저 & Broker 노드 테이블 : 유저가 연결 상태일 경우, 어느 브로커에 연결 했는지 확인한다.  
+
+=== MQTT Proxy ===
+
+=== MQTT Router  ===
+@
+
+
+1.10
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d93 1
+d96 4
+d101 1
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d68 6
+a87 5
+이를테면, 레이어(layer)를 둬서, 각 애플리케이션 별로 필요한 레이어만 참조하도록 하겠다라는 거다. TCP/IP의 경우에는 스택을 올리는 것으로 이 문제를 해결했는데, 여기에서는 REST로 해결해 보자는 시도다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1fuh-vJCYHBfXXRrxGY1yIM4j1DjdV-0-bFb-75wmHPk/pub?w=843&amp;h=440">
+}}}
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d85 1
+a85 1
+<img src="https://docs.google.com/drawings/d/1fuh-vJCYHBfXXRrxGY1yIM4j1DjdV-0-bFb-75wmHPk/pub?w=764&amp;h=348">
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d73 1
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d83 1
+a83 1
+{{{html
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d74 1
+a74 1
+https://docs.google.com/drawings/d/1KMTdKic9wFrgmkNZLcVfP8VKMObA-6IaCKj3PFIxnrQ/pub?w=734&h=323
+a79 1
+MQTT Proxy와 MQTT Router는 모두 Go 언어를 사용한다. 심심해서. 
+d81 5
+@
+
+
+1.4
+log
+@27.122.242.71;;yundream;;
+@
+text
+@d3 1
+d60 31
+a90 1
+개인적으로 1번 방법이 제일 나은 것 같은데, "method/1번째 매개변수/2번째 매개변수"이런 식의 규칙을 만들 수 있기 때문이다. 정보가 완전히 자기 서술적이지 않다는 문제가 있긴 하지만, 기능은 "기능 이름 + 매개변수"의 조합에서 벗어나진 않을 테니, 이 정도로 충분하다고 생각한다.
+@
+
+
+1.3
+log
+@27.122.242.71;;yundream;;
+@
+text
+@d42 18
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d37 5
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d27 8
+a34 1
+PUB 토픽의 이름은 /pub/user_id, SUB 토픽의 이름은 /sub/user_id를 사용하기로 했다. A유저는 /pub/a, /pub/b 두개의 토픽을 가진다. A 유저는 /pub/user_id 로 위의 JSON 테이터를 전송한다. 메시지를 받은 MQTT 브로커는라우터로 메시지를 전송 한다.   
+d36 1
+@

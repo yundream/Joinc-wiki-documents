@@ -1,0 +1,107 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2015.02.09.08.10.31;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.02.09.08.05.03;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.02.09.02.14.39;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fSTOMP
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title STOMP - Simple Text Oriented Messaging Protocol 
+[[TableOfContents]]
+== STOMP ==
+STOMP는 스트리밍 텍스트 기반의 간단한 스트리밍 메시지 프로토콜이다. HTTP로 부터 영감을 받은 디자인 덕분에 읽고 쓰기가 매우 쉽다는 장점이 있다. 단순하며, 읽고 쓰기가 쉽다는 것은 클라이언트 측에서는 당연한 장점이긴 한데, 대신 서버측에서 구현해야 할게 많아진다.(서버는 알아서 잘 만들어 주겠지) 
+
+== 프로토콜 Overview ==
+TCP 기반으로 작동하며, HTTP와 유사한 디자인을 사용하고 있다. 아래의 명령들을 사용할 수 있다. 
+  * CONNECT
+  * SEND
+  * SUBSCRIBE
+  * UNSUBSCRIBE
+  * BEGIN
+  * COMMIT
+  * ABORT
+  * ACK
+  * NACK
+  * DISCONNECT
+HTTP와 마찬가지로 프레임(frame) 기반의 프로토콜이다.(프레임이란 주소와 명령, 명령 수행을 위한 데이터가 모두 포함된 데이터를 의미한다.) 이 프레임은 명령(command)와 추가적인 헤더와 추가적인 바디(body)로 구성이 된다. 기본적으로는 텍스트 기반 통신을 사용하지만, 바이너리 기반 통신도 지원한다. 
+
+STOMP는 메시지를 수신 할 대상 집합을 관리하는 일을 한다. STOMP는 메시지에 대한 스팩만을 정의하고 있기 때문에, 기능 구현은 전적으로 서버에 맡긴다. 
+=== STOMP Frames ===
+STOMP 프레임 구조는 아래와 같다.
+{{{#!plain
+COMMAND
+header1:value1
+header2:value2
+
+Body^@@
+}}}
+프레임은 Command로 시작한다. '''Command'''의 끝은 캐리지 리턴과 라인피드를 포함하는 EOL(end-of-line)로 구분할 수 있다. 프레임은 <key>:<value> 형식을 따르는 하나 이상의 옵션들을 가질 수 있다. 각 옵션은 EOL로 끝나며, 공백 줄을 하나 더 추가하는 것으로 헤더의 끝을 설정할 수 있다. 데이터는 Body에 위치하는데, 끝은 NULL 문자로 설정한다.
+
+=== STOMP 구현 ===
+핵심은 메시지 브로커의 구현이다. 직접 구현하는 경우와 만들어져 있는 메시지 브로커에 STOMP 기능을 확장하는 방식이 있다. 프로토콜이 단순하며, command 셋도 일반적인 PUB/SUB 모델 브로커 기능의 서브셋이기 때문에(간단하다는 MQTT 보다 명령어셋이 더 작다.) 어뎁터 개발이 용이하다. 
+
+STOMP 서버 
+||Apache ActiveMQ   ||오픈소스 기반의 메시징 서버    ||
+||Apache Apollo     ||ActiveMQ를 재 디자인한 서버    ||
+||CoilMQ            ||Python기반의 STOMP 브로커      ||
+||Gozirra           ||Java기반의 STOMP 브로커        ||
+||RabbitMQ          ||Erlang 기반의 멀티프로토콜 브로커  ||
+||StompServer       ||Ruby 기반의 STOMP 서버             ||
+
+== 테스트 ==
+=== RabbitMQ ===
+RabbitMQ는 플러그인 방식으로 STOMP를 지원한다. RabbitMQ를 이용해서 STOMP를 테스트한다.
+
+=== STOMP를 이용한 웹 메시지 서비스 구현 ===
+STOMP를 이용해서 웹 브라우저와 RabbitMQ 백엔드사이에 메시지를 주고 받는 간단한 응용을 만들어 본다.
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d43 6
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d32 11
+a42 2
+=== 응용 ===
+Publish/Subscribe 기반의 메시징 응용에 적합한 모델이다. AMQP, MQTT를 사용하는 웹 애플리케이션의 구현에 적합하다.   
+@

@@ -1,0 +1,191 @@
+#title Consistent hashing
+[[TableOfContents]]
+== Consistent hash ==
+Consistent hashing는 Key의 집합을 ''K'', 슬롯의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 대부분의 키들이 슬롯을 그대로 사용할 수 있는 해싱 기법을 의미한다. 슬롯이 추가되거나 삭제됐을 때, K/n만큼만 조정된다. 추가된 노드만큼 재 조정되는 것이니, consistent 하다고 할 수 있다. 다른 해쉬들은 슬롯을 변경할 경우 거의 대부부분의 key들을 재 조정 해야 한다.
+
+=== Consistent hash가 필요한 경우 ===
+N개의 캐시머신이 구성돼 있다고 가정해보자. 이 경우 해쉬 함수는 hash(0) mod ''n''으로 나타낼 수 있다. 잘 작동하지만 캐시가 추가되거나 삭제되서 n 이 변경될 경우 거의 모든 객체의 위치도 함께 변경, hash가 무용지물이 된다. 결국 처음부터 다시 캐시를 구축해야 하는데, 이미 캐시 요청이 빗발치고 있다면 시스템에 문제가 생길 수 있다. Consistent 해시를 이용해서 이러한 문제를 극복할 수 있다. 
+
+=== 구현 아이디어 ===
+==== Hash ring ====
+'''Consistent'''라는 용어의 해석에 주의해야 한다. Consistent는 모든 경우에 consistent가 아닌, '''가능한 consistent'''를 유지한다는 의미다. 노드의 추가 삭제가 발생할 경우, 변경 분에 대한 밸런싱을 해줘야 하기 때문에, 컨텐츠의 재배치는 피할 수 없다. 물론 k/n은 만족해야 한다.  
+
+Consistent 해시의 핵심 아이디어는 캐시 노드를 하나 이상의 value가 가리키도록 설정하는데 있다. 아래 그림을 보자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1a1ItR6SDsbMwb-RME_Pld6t-VuvP2FWI6JX0cxk0YuU/pub?w=634&amp;h=206">
+}}}
+
+Hash ring에는 4개의 노드가 있다. Key는 비트 오퍼레이션을 이용해서 어느 노드로 향할지를 결정할 수 있다. 
+
+==== 노드 제거 - Fail ====
+위 그림에서 노드 1이 빠지는 경우를 생각해보자. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1o0faggF7FVAIfpQs7ELVKvJQukSZL3PuDZmEU-2CXK4/pub?w=467&amp;h=391">
+}}}
+
+1번 노드가 사라지면, 0001(0101, 1101 등도 함께)은 2번으로 향한다. 깔끔한 것 같지만, 2번 노드에 트래픽이 몰린다는 단점이 있다. 각 노드가 60%씩의 부하를 처리하고 있었다면, 2번에 120%가 몰리는 셈이다.   
+
+이 문제는 가상의 노드를 배치하는 것으로 해결 할 수 있다. (해시를 한 번 더 돌리는 방법도 있는데, 굳이 언급할 필요는 없겠다.)
+
+==== 가상 노드 ====
+전체 hash ring에 하나 이상의 가상 노드를 배치하는 것으로 노드가 실패했을 때의 문제를 해결할 수 있다. 2^32의 크기를 가지는 hash ring이 있다고 가정해 보자. 여기에 4개의 노드가 있는데, 각 노드를 추가 할 때 마다 4개의 가상 노드를 hash ring에 배치한다.    
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1TMLQQUiQtwgnzu7FLLesKaPmV81PKmlgSDc9Lieato8/pub?w=405&amp;h=385">
+}}}
+
+이렇게 하면, 요청이 가상 노드의 갯수 만큼 hash ring 전체에 분산되는 효과를 얻을 수 있다. 가상 노드들은 랜덤함수, 해시, CRC32와 같은 알고리즘을 이용해서 무작위로 hash ring에 배치를 한다. 무작위로 배치가 된다면 (이론적으로) 현재 노드 N-1다음에 N-2가 올 확률은 '''1/Node 갯수''' 이 된다. 
+
+노란 색 노드가 실패 한 경우를 가정해 보자. Hash ring 상에서 모든 노란 색노드가 삭제되고, 노란 색 노드로 향하는 key들은 노란 색 노드의 다음(next)노드로 향한다. 노란색 노드 다음에 특정 노드가 올 확률은 1/4 이므로, KEY는 1/4 만큼 남아 있는 노드로 분배될 것이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1JKt9tO59ROXoS30Je7rl-_xBAwvNnLwWhtLsV_PsVzk/pub?w=405&amp;h=385">
+}}}
+
+노드 추가 알고리즘은 아래와 같다.
+{{{#!plain
+// NodeName : 노드 이름
+// virtualNodeNum : 가상 노드의 갯수
+func Hash.AddNode(NodeName, virtualNodeNum) {
+   for i := 0 ; i < virtualNodeNum ; i++ {
+       NodeTable[ Hash.Get(NodeName) ] = NodeName
+   }
+}
+}}}
+알고리즘을 돌리면 대략 아래와 같은 노드 테이블이 만들어질 거다.
+|| Node ID || Node Name      ||
+|| 2311    || Node-1         ||
+|| 4571    || Node-2         ||
+|| 6190    || Node-1         ||
+|| 8188    || Node-4         ||
+|| 9549    || Node-2         ||
+|| 9549    || Node-1         ||
+|| 10012   || Node-3         ||
+|| 11810   || Node-2         ||
+|| 12245   || Node-1         ||
+|| 13296   || Node-3         ||
+해시에 client-1을 적용해서 얻은 값이 3121 이라면 '''2311 < 3121 <= 4571'''에 따라서 Node-2를 리턴한다.
+
+==== 노드 변경과 Key 재분배 ====
+노드를 추가하면 하나 이상의 가상노드를 만들어서 hash ring에 배치한다는 것을 확인했다. 노드가 추가되면, Key를 재 분배 해서 로드를 분산해야 한다. 
+
+이 재분배작업은 '''K*1/N'''을 만족해야 한다. K는 전체 Key의 갯수이고, N은 노드의 갯수다. 4개의 노드가 있고, key가 100개인 hash ring에 노드 하나가 추가 될 경우, 기존의 노드에서 100 * 1/5 = 20 이 재분배 된다. 노드 하나로 계산하면 5개씩이 추가된 노드로 이동해서 20씩 분산된다.  
+
+재 분배되는 key에서는 데이터를 옮기는 작업도 진행해야 한다. 캐시 서버라면, 캐시 파일을 옮겨야 할테고, 통신 연결(connection)이라면, 연결을 끊어줘야 한다.
+
+== Jump consistent hash  ==
+=== 소개 ===
+Google에서 공개한 해쉬 알고리즘이다. 표어가 '''A Fast, Minimal Memory, Consistent hash Algorithm'''. 비범한 것 같아서 살펴보기로 했다. 
+
+알고리즘은 단 5줄...
+{{{#!plain
+int32 _t JumpConsistentHash(uint64_t key, int32_t num_buckets) { 
+	int64_t b =­-1, j = 0; 
+	while (j < num_buckets) { 
+		b = j; 
+		key = key * 2862933555777941757ULL + 1; 
+		j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1)); 
+	} 
+	return b; 
+}  
+}}}
+
+간단한 코드를 하나 만들어서 돌렸다. 8개의 버킷에 100,000개의 키를 입력했다.
+{{{#!plain
+#include <iostream>
+#include <stdint.h>
+#include <map>
+
+using namespace std;
+
+int32_t JumpConsistentHash(uint64_t key, int32_t num_buckets) {
+	uint64_t b =-1, j = 0;
+	while (j < num_buckets) {
+		b = j;
+		key = key * 2862933555777941757ULL + 1;
+		j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+	}
+	return b;
+}
+int main(int argc, char **argv) {
+	map<int, int> map1;
+	map<int, int>::iterator mi;
+	int32_t v;
+	for (uint64_t i = 0; i < 100000; i++) {
+		v = JumpConsistentHash(i, 8);
+		mi = map1.find(v);
+		if (mi == map1.end()) {
+			map1[v] = 1;
+		} else {
+			mi->second++;
+		}
+	}
+	for (mi=map1.begin(); mi !=map1.end(); ++mi) {
+		cout << mi->first << " : " << mi->second << endl;
+	}
+}
+}}}
+
+실행 결과.
+{{{#!plain
+0 : 12496
+1 : 12498
+2 : 12503
+3 : 12501
+4 : 12470
+5 : 12478
+6 : 12496
+7 : 12558
+}}}
+굉장히 잘 작동한다. 버킷값을 조정할 경우 '''K/N'''도 만족하는 걸 확인했다. 어떻게 작동하는지 생각해 보기로 했다.
+
+아래는 jump consistent hash의 작동방식을 묘사한 그림이다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/11HkrOmJfsgpnNNqOVfnlmggW-Fz2o5y7DVT2sd6MPZw/pub?w=704&amp;h=210">
+}}}
+
+말판 놀이를 한다고 가정해보자. Bucket size는 목적지까지의 거리다. Key는 말이다. 특수하게 제작된 주사위를 던져서 말을 앞으로 전진 시켜서, 몇 번만에 목적지를 뛰어넘는지를 계산한다. 물론 멀리 뛸 확률은 점점 줄어든다. 이 확률을 1/N(거리)로 맞추면, 공정한 게임판을 만들 수 있다. 목적지까지의 거리(버킷 크기)가 4라면 1, 1/2, 1/3, 1/4 의 확률을 가진다. 이 주사위를 매 판마다 던지면 된다.
+
+이 말판 놀이의 핵심은 '''주사위 설계'''에 있다. 이 주사위는 대략 아래와 같은 모습을 가질 거다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1oZjrsLA3wVz0GWTiFxcaa3UTvvRTNKyEqKyA07D0xsA/pub?w=549&amp;h=172">
+}}}
+
+1을 만나기 전까지 0의 갯수가 전진 할 수 있는 칸의 숫자다.(반대로 해도 상관 없다.) 마작과 비슷한 느낌이 되려나 ? 그리고 0칸 이동(제자리)가 나올 경우에 한칸을 이동할 수 있도록 규칙을 추가한다. 그러면 가장 재수 없는 경우에도 N(거리)만큼 주사위를 던지는 걸로 목적지에 도착할 수 있을 거다. 이 주사위를 여러번 던지면, Jump 시퀀스를 만들 수 있다.
+
+위의 5줄 짜리 코드는 앞선 설명의 구현체다. 코드를 보자.
+{{{#!plain
+uint64_t b =-1, j = 0;
+while (j < num_buckets) {
+	b = j;
+	key = key * 2862933555777941757ULL + 1;
+	j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+}
+return b;
+}}}
+ * '''num_buckets''' : 버켓의 크기다. 
+ * '''while j < num_buckets''' : 점프를 했는데, 버켓의 크기를 넘어갔다면 현재 위치를 반환한다. 이 값이 클라이언트가 향할 노드의 위치다. 
+ * '''key = key * 2862933555777941757ULL + 1''' : unsigned long long 64bit 데이터다. 이녀석을 2진수로 변환하면 
+      {{{#!plain
+10011110111011001011101110011010000111101100001011000011111101
+}}}
+    이 된다. 2862933555777941757은 2^63보다 더 큰 값이기 때문에, 이 연산은 (대부분의 경우)오버플로우 된다. 요녀석을 double((key >> 33)) 연산을 해서, double로 형변환을 하면, 랜덤한 값을 얻을 수 있다. 이 값을 분모로 해서 나누기 연산을 하면, 1/N로 확률이 감소하는 주사위를 얻을 수 있다. 
+ * b는 이전 칸의 위치다. 
+버킷이 1 늘어날 경우, 기존의 Key들이 새로운 버킷으로 할당될 확률은 1/N이 되기 때문에, Consistent hash의 조건을 만족한다. 
+
+=== 운용 ===
+'''Jump Consistent Hash'''는 아래와 같이 운용할 수 있을 거다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1MhDluk0ghqrFhESJPG3mX4B92NhHlNJbEcKhIOSF_xk/pub?w=599&amp;h=321">
+}}}
+
+Proxy 서버가 Key를 해시함수로 돌려서 버킷을 찾아서 중계한다. 버킷의 수가 늘어날 수록 연산이 늘어날 수 있으므로(버켓이 N일 때 최대 N 번의 연산, 평균 N/2 연산), 캐쉬해두는게 좋을 것이다.
+
+클라이언트도 proxy와 같은 해시 함수를 가지고 있으면, 버킷크기를 아는 것으로 클라이언트는 자신이 연결해야 할 버킷을 알 수 있다. Proxy는 클라이언트가 요청한 버킷 정보가 올바른지 검사해서 중계하면 된다. 이 방법은 해시 연산을 클라이언트에 분산할 수 있다는 장점이 있다. 반면, 버킷을 늘이거나 줄일 경우 K/N 만큼의 클라이언트에 대해서, 바뀐 버킷 값을 알려줘야 하는 단점이 있다. 
+
+== 참고 ==
+  * [http://www.google.co.kr/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CCQQFjAA&url=http%3A%2F%2Farxiv.org%2Fpdf%2F1406.2294&ei=jqMYVdXAHcOA8gXTgYLQAQ&usg=AFQjCNGW8DXWCwkfbhLkkdpSqu1hvAt3CQ&sig2=dlmc5D_jQmwkZhJNyzZ2bg&bvm=bv.89381419,d.dGc A Fast, Minimal memory, Consistent Hash Algorithm]
+  * [http://en.wikipedia.org/wiki/Consistent_hashing Consistent hashing - wikipedia]

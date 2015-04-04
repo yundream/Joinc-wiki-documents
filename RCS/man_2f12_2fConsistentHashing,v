@@ -1,10 +1,55 @@
-head	1.1;
+head	1.10;
 access;
 symbols;
 locks
-	root:1.1; strict;
+	root:1.10; strict;
 comment	@# @;
 
+
+1.10
+date	2015.03.28.02.04.25;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2015.03.28.01.46.58;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2015.03.28.01.18.35;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2015.03.28.00.19.17;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.03.27.10.13.05;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.03.26.15.40.25;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.03.26.08.36.11;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.03.26.02.58.20;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.03.24.09.49.30;	author root;	state Exp;
+branches;
+next	1.1;
 
 1.1
 date	2014.12.30.05.06.21;	author root;	state Exp;
@@ -17,15 +62,18 @@ desc
 @
 
 
-1.1
+1.10
 log
-@1.214.223.250;;yundream;;
+@119.64.102.68;;yundream;;
 @
 text
 @#title Consistent hashing
 [[TableOfContents]]
-== Consistent hashing ==
-아래 그림은 hashing(해싱)의 기본 개념을 묘사하고 있다. 
+<!> Hash는 나중에 따로 빼야 할 듯.... 제대로 살펴봐야 겠다는 생각이 마구 들고 있다.
+== Hash ==
+Hash 함수는 임의의 길이를 가지는 데이터를 고정된 길이의 데이터로 맵핑하는 알고리즘이다. 해쉬 함수는 Hash(k) = V 로 표현할 수 있다. 함수 hash()에 K를 입력하면, 값 V가 출력된다. 이때 K가 같으면 항상 같은 V가 출력된다. 
+
+아래 그림은 해싱의 기본 개념을 묘사하고 있다. 
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/18F4U2Jl7OsYo7QRdBUM3OlXNZA1kQPIMU0RIEo1yXZU/pub?w=439&amp;h=314">
@@ -33,58 +81,436 @@ text
 
 해쉬 함수는 매우 큰 범위의 입력 데이터를 hash 함수를 이용해서, 고정된 크기의 디지털 데이터에 맵핑하기 위한 목적으로 사용한다. 어떤 해싱함수를 사용하느냐에 따라서 다양한 응용이 가능하다.
 
-Consistent hashing는 Values의 집합을 ''K'', 해쉬 테이블의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 동일한 해쉬값을 보장하는 해싱함수를 사용하는 기술을 의미한다.
+=== 응용 ===
+==== Hash Table ====
+'''해시 테이블(Hash tables)'''구성은 해시를 사용하는 가장 큰 이유다. 많은 양의 데이터를 저장하고 있을 때, 저장하고 있는 데이터의 위치를 빠르게 찾기 위해서 사용한다. Hash 함수에 key를 넣으면, 값 v를 리턴하는데, 이 v를 인덱스(index)로 해서 keY에 대한 값이 저장된 위치를 찾는식이다. 
 
-Conssitent hashing은 분산처리 시스템에서, 클라이언트 요청을 분산하기 위한 목적으로 널리 사용하고 있다. 아래와 같은 분산 시스템이 있다고 가정해 보자. 
+간단한 예제다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Zt61DTtIH_ZGISuHRnO8S0oFDa1sIVyOU0d3sThBxkg/pub?w=464&amp;h=298">
+}}}
+
+크기가 4인 해시 테이블이 있다. 이 해시 테이블을 관리하는 해시함수 Hash(k)에 key를 입력하면, 해시 테이블에 있는 값들 중 하나를 반환한다. 이 반환 값은 실제 k가 저장된 위치에 대한 색인이다. 
+
+==== Cache ====
+하드디스크와 같은 느린 미디어에 저장된 대량의 데이터에서 원하는 데이터를 빠르게 읽기 위해서 일반적으로 Cache를 사용한다.
+
+ARP(Address Resolution Protocol)이 캐시를 이용해서 성능을 올리는 대표적인 예다. ARP는 로컬네트워크 상에서 IP에 대한 MAC 주소를 찾기 위해서 사용하는 프로토콜이다. 로컬 네트워크에서 데이터 통신을 하기 위해서는 IP에 대한 MAC 주소가 일치해야 하기 때문에, 운영체제는 ARP를 이용해서 상대편 컴퓨터의 MAC과 IP 주소를 먼저 수집한다. arp 명령을 이용하면, 이러한 방법으로 수집한 ARP 테이블을 확인할 수 있다.(ARP 주소는 수정했다.) 
+{{{#!plain
+# apr -a
+(192.168.11.21) at bc:5f:f4:00:00:01 [ether] on em1
+(192.168.11.1) at 00:08:9f:00:00:02 [ether] on em1
+(192.168.11.18) at 00:08:9f:00:00:03 [ether] on em1
+(192.168.11.94) at bc:5f:f4:00:00:04 [ether] on em1
+(192.168.11.33) at 00:08:9f:00:00:05 [ether] on em1
+}}}
+이 정보를 통신을 할 때마다 수집하는 것은 매우 비효율 적이다. 네트워킹을 위해 사용하는 매체는 매우 느리기 때문이다. 해서 운영체제는 수집한 ARP 정보를 상대적으로 빠른 로컬 메모리에 저장해서 사용한다. 그리고 수정되는 정보만 갱신한다. 
+
+Cache는 웹 서비스의 성능을 올리기 위해서도 널리 사용한다. 어떤 데이터(예를 들어 웹 문서)가 디스크에 저장돼 있다면, 자주 읽는 문서를 메모리에 캐시해서 속도를 높이는 식이다. 이 경우 모든 (비용 등 여러 가지 문제로)데이터를 메모리에 올릴 수 없기 때문에, 자주 접근하는 데이터를 Cache에 올리기 마련이다. 그렇다면 유저가 어떤 데이터를 요청했을 때, 그 데이터가 캐시에 있는지를 빠르게 찾아야 하는데, 이때 해시를 이용할 수 있다. 
+
+==== Protection data ====
+보안이 필요한 정보에 대한 유일한 확인을 위해서 해시 값을 사용할 수 있다. 해시 함수는 같은 입력에 대해서는 항상 같은 출력이 나온다. 만약 데이터가 변조 됐다면, 다른 해쉬 값이 나올테고, 원래 해쉬값과 비교하는 것으로 데이터 변조 여부를 확인할 수 있다.   
+
+문제는 서로 다른 데이터들에 대해서 같은 해쉬 값이 나올(해쉬 값 충돌 - collision) 확률이 존재한다는 거다. 이 문제는 근본적으로 해결 할 수 없고, 해쉬 값을 크게 해서 확률을 낮추는 방향으로 해결하고 있다. 암호화에 널리 사용하는 SHA-1도 해쉬 함수로 구현한다.
+
+==== Finding similar records ====
+중복(거의 동일한)데이터를 찾는데 사용할 수 있다. 예컨데, 대량의 오디오 파일에서 비슷한 소리를 찾는다거나, 대량의 문서파일에서 비슷한 문서를 찾는 애플리케이션의 개발이 가능하다.
+
+==== Geometric hashing ====
+
+==== Finding similar substring ====
+== Consistent hash ==
+Consistent hashing는 Key의 집합을 ''K'', 슬롯의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 대부분의 키들이 슬롯을 그대로 사용할 수 있는 해싱 기법을 의미한다. 슬록이 추가되거나 삭제됐을 때, K/n만큼만 조정된다. 추가된 노드만큼 재 조정되는 것이니, consistent 하다고 할 수 있다. 다른 해쉬들은 슬롯을 변경할 경우 거의 대부부분의 key들을 재 조정 해야 한다.
+
+=== Consistent hash가 필요한 경우 ===
+N개의 캐시머신이 구성돼 있다고 가정해보자. 이 경우 해쉬 함수는 hash(0) mod ''n''으로 나타낼 수 있다. 잘 작동하지만 캐시가 추가되거나 삭제되서 n 이 변경될 경우 거의 모든 객체의 위치도 함께 변경, hash가 무용지물이 된다. 결국 처음부터 다시 캐시를 구축해야 하는데, 이미 캐시 요청이 빗발치고 있는 경우 재앙이 될 수 있다. Consistent 해시를 이용해서 이러한 문제를 극복할 수 있다. 
+
+=== 구현 아이디어 ===
+==== Hash ring ====
+'''Consistent'''라는 용어의 해석에 주의해야 한다. Consistent는 모든 경우에 consistent가 아닌, '''가능한 consistent'''를 유지한다는 의미다. 노드의 추가 삭제가 발생할 경우, 변경 분에 대한 밸런싱을 해줘야 하기 때문에, 컨텐츠의 재배치는 피할 수 없다. 물론 k/n은 만족해야 한다.  
+
+Consistent 해시의 핵심 아이디어는 캐시 노드를 하나 이상의 value가 가리키도록 설정하는데 있다. 아래 그림을 보자.
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1a1ItR6SDsbMwb-RME_Pld6t-VuvP2FWI6JX0cxk0YuU/pub?w=634&amp;h=206">
 }}}
 
-Client Request는 Proxy를 거쳐서 노드로 분산된다. 노드가 클라이언트의 상태(state)를 저장해야 하는 경우 클라이언트 요청이 고정된 노드로 향하게 해야 한다. '''Client ID(IP등) % N'''으로 간단하게 목적 노드를 고정할 수 있을 거다.
+Hash ring에는 4개의 노드가 있다. Key는 비트 오퍼레이션을 이용해서 어느 노드로 향할지를 결정할 수 있다. 
 
-문제는 노드가 빠지거나 추가될 때 발생한다. 노드-2가 빠졌다고 가정을 해보자. Proxy는 Node-2를 제외한 나머지 노드로 분산을 해야 하는데, '''Client ID % N == 2'''인 요청을 어디로 보내야 할지 알 수 없게 된다.
-
-문제의 원인은 '''선택을 할 수 없다''는데 있다. 그러므로 선택을 할 수 있게 만들어주면 된다. 선택을 할 수 없는 이유는 등호(=)만 있기 때문이니 부등호(<, >)를 만들어 주면 된다. 여러 구간을 가진 슬롯을 만들어 주면 된다. 
-
-
-이렇게 해서 등장하는게 '''Hashring'''이다. 4개의 노드가 있을 때의 hashring은 아래와 같이 구성할 수 있을 거다. 
+==== 노드 제거 - Fail ====
+위 그림에서 노드 1이 빠지는 경우를 생각해보자. 
 
 {{{#!html
-<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=441&amp;h=378">
+<img src="https://docs.google.com/drawings/d/1o0faggF7FVAIfpQs7ELVKvJQukSZL3PuDZmEU-2CXK4/pub?w=467&amp;h=391">
 }}}
 
-1, 2, 3, 4는 노드다. 이전에는 각 노드 사이에 하나의 구간만 있었는데, 그 구간을 몇개로 나누었다. 이제 ''K''는 1.1, 2.3 와 같은 값으로 해싱이 된다. 이제 ''k''는 시계방향 쪽으로 가장 가까운 노드에서 처리한다. K=1.1은 노드-2가 K=2.3은 노드-3가 처리한다. 
+1번 노드가 사라지면, 0001(0101, 1101 등도 함께)은 2번으로 향한다. 깔끔한 것 같지만, 2번 노드에 트래픽이 몰린다는 단점이 있다. 각 노드가 60%씩의 부하를 처리하고 있었다면, 2번에 120%가 몰리는 셈이다.   
+
+이 문제는 가상의 노드를 배치하는 것으로 해결 할 수 있다. (해시를 한 번 더 돌리는 방법도 있는데, 굳이 언급할 필요는 없겠다.)
+
+==== 가상 노드 ====
+전체 hash ring에 하나 이상의 가상 노드를 배치하는 것으로 노드가 실패했을 때의 문제를 해결할 수 있다. 2^32의 크기를 가지는 hash ring이 있다고 가정해 보자. 여기에 4개의 노드가 있는데, 각 노드를 추가 할 때 마다 4개의 가상 노드를 hash ring에 배치한다.    
 
 {{{#!html
-<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=467&amp;h=391">
+<img src="https://docs.google.com/drawings/d/1TMLQQUiQtwgnzu7FLLesKaPmV81PKmlgSDc9Lieato8/pub?w=405&amp;h=385">
 }}}
 
-2가 빠지는 경우를 생각해 보자. 노드-2에서 처리해야 했던 '''1.1 < K <= 3''' 는 모두 노드-3에서 처리하게 된다. 다른 노드들에서 처리하던 K는 변함이 없으므로 깔끔하게 해결할 수 있다.
+이렇게 하면, 요청이 가상 노드의 갯수 만큼 hash ring 전체에 분산되는 효과를 얻을 수 있다. 가상 노드들은 랜덤함수, 해시, CRC32와 같은 알고리즘을 이용해서 무작위로 hash ring에 배치를 한다. 무작위로 배치가 된다면 (이론적으로) 현재 노드 N-1다음에 N-2가 올 확률은 '''1/Node 갯수''' 이 된다. 
+
+노란 색 노드가 실패 한 경우를 가정해 보자. Hash ring 상에서 모든 노란 색노드가 삭제되고, 노란 색 노드로 향하는 key들은 노란 색 노드의 다음(next)노드로 향한다. 노란색 노드 다음에 특정 노드가 올 확률은 1/4 이므로, KEY는 1/4 만큼 남아 있는 노드로 분배될 것이다. 
 
 {{{#!html
-<img src="https://docs.google.com/drawings/d/1SWL75ZRuwCiGwUNWaXbuxyB29z3Llgr_ijTrtI71yt4/pub?w=467&amp;h=391">
+<img src="https://docs.google.com/drawings/d/1JKt9tO59ROXoS30Je7rl-_xBAwvNnLwWhtLsV_PsVzk/pub?w=405&amp;h=385">
 }}}
 
-위 모델은 노드에 문제가 생겼을 경우, 다른 노드에서 서비스를 계속하게 하는 효과는 있지만, '''1.1 < K <= 2''' 구간의 트래픽이 모두 노드-3으로 몰린다는 단점이 있다. 
+노드 추가 알고리즘은 아래와 같다.
+{{{#!plain
+// NodeName : 노드 이름
+// virtualNodeNum : 가상 노드의 갯수
+func Hash.AddNode(NodeName, virtualNodeNum) {
+   for i := 0 ; i < virtualNodeNum ; i++ {
+       NodeTable[ Hash.Get(NodeName) ] = NodeName
+   }
+}
+}}}
+알고리즘을 돌리면 대략 아래와 같은 노드 테이블이 만들어질 거다.
+|| Node ID || Node Name      ||
+|| 2311    || Node-1         ||
+|| 4571    || Node-2         ||
+|| 6190    || Node-1         ||
+|| 8188    || Node-4         ||
+|| 9549    || Node-2         ||
+|| 9549    || Node-1         ||
+|| 10012   || Node-3         ||
+|| 11810   || Node-2         ||
+|| 12245   || Node-1         ||
+|| 13296   || Node-3         ||
+해시에 client-1을 적용해서 얻은 값이 3121 이라면 '''2311 < 3121 <= 4571'''에 따라서 Node-2를 리턴한다.
 
-단점은 두 가지 방법으로 해결할 수 있다.
-  1. 빠르게 fail-over 한다.  
-  1. 문제가 발생한 2번 노드로 향하는 K에 대해서 한번 더 hashing 한다.   
-1번은 당연히 해야 하는 거니 2번 문제를 고민 하면 되겠다. K에 대한 해싱 결과가 전체 슬롯에 분배되는 해싱 알고리즘을 만들면 될테다. 알고리즘은 상황에 따라 달라질 테니 만드는 건 패스. 
+==== 노드 변경과 Key 재분배 ====
+노드를 추가하면 하나 이상의 가상노드를 만들어서 hash ring에 배치한다는 것을 확인했다. 노드가 추가되면, Key를 재 분배 해서 로드를 분산해야 한다. 
 
-노드 추가도 비슷한 문제가 있다. ? 노드가 하나 추가됐다고 가정해 보자.  
+이 재분배작업은 '''K*1/N'''을 만족해야 한다. K는 전체 Key의 갯수이고, N은 노드의 갯수다. 4개의 노드가 있고, key가 100개인 hash ring에 노드 하나가 추가 될 경우, 기존의 노드에서 100 * 1/5 = 20 이 재분배 된다. 노드 하나로 계산하면 5개씩이 추가된 노드로 이동해서 20씩 분산된다.  
+
+재 분배되는 key에서는 데이터를 옮기는 작업도 진행해야 한다. 캐시 서버라면, 캐시 파일을 옮겨야 할테고, 통신 연결(connection)이라면, 연결을 끊어줘야 한다.
+
+== Jump consistent hash  ==
+=== 소개 ===
+Google에서 공개한 해쉬 알고리즘이다. 표어가 '''A Fast, Minimal Memory, Consistent hash Algorithm'''. 비범한 것 같아서 살펴보기로 했다. 
+
+알고리즘은 단 5줄...
+{{{#!plain
+int32 _t JumpConsistentHash(uint64_t key, int32_t num_buckets) { 
+	int64_t b =­-1, j = 0; 
+	while (j < num_buckets) { 
+		b = j; 
+		key = key * 2862933555777941757ULL + 1; 
+		j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1)); 
+	} 
+	return b; 
+}  
+}}}
+
+간단한 코드를 하나 만들어서 돌렸다. 8개의 버킷에 100,000개의 키를 입력했다.
+{{{#!plain
+#include <iostream>
+#include <stdint.h>
+#include <map>
+
+using namespace std;
+
+int32_t JumpConsistentHash(uint64_t key, int32_t num_buckets) {
+	uint64_t b =-1, j = 0;
+	while (j < num_buckets) {
+		b = j;
+		key = key * 2862933555777941757ULL + 1;
+		j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+	}
+	return b;
+}
+int main(int argc, char **argv) {
+	map<int, int> map1;
+	map<int, int>::iterator mi;
+	int32_t v;
+	for (uint64_t i = 0; i < 100000; i++) {
+		v = JumpConsistentHash(i, 8);
+		mi = map1.find(v);
+		if (mi == map1.end()) {
+			map1[v] = 1;
+		} else {
+			mi->second++;
+		}
+	}
+	for (mi=map1.begin(); mi !=map1.end(); ++mi) {
+		cout << mi->first << " : " << mi->second << endl;
+	}
+}
+}}}
+
+실행 결과.
+{{{#!plain
+0 : 12496
+1 : 12498
+2 : 12503
+3 : 12501
+4 : 12470
+5 : 12478
+6 : 12496
+7 : 12558
+}}}
+굉장히 잘 작동한다. 버킷값을 조정할 경우 '''K/N'''도 만족하는 걸 확인했다. 어떻게 작동하는지 생각해 보기로 했다.
+
+아래는 jump consistent hash의 작동방식을 묘사한 그림이다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/11HkrOmJfsgpnNNqOVfnlmggW-Fz2o5y7DVT2sd6MPZw/pub?w=704&amp;h=210">
+}}}
+
+말판 놀이를 한다고 가정해보자. Bucket size는 목적지까지의 거리다. Key는 말이다. 특수하게 제작된 주사위를 던져서 말을 앞으로 전진 시켜서, 몇 번만에 목적지를 뛰어넘는지를 계산한다. 물론 멀리 뛸 확률은 점점 줄어든다. 이 확률을 1/N(거리)로 맞추면, 공정한 게임판을 만들 수 있다. 목적지까지의 거리(버킷 크기)가 4라면 1, 1/2, 1/3, 1/4 의 확률을 가진다. 이 주사위를 매 판마다 던지면 된다.
+
+이 말판 놀이의 핵심은 '''주사위 설계'''에 있다. 이 주사위는 대략 아래와 같은 모습을 가질 거다. 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1oZjrsLA3wVz0GWTiFxcaa3UTvvRTNKyEqKyA07D0xsA/pub?w=549&amp;h=172">
+}}}
+
+1을 만나기 전까지 0의 갯수가 전진 할 수 있는 칸의 숫자다.(반대로 해도 상관 없다.) 마작과 비슷한 느낌이 되려나 ? 그리고 0칸 이동(제자리)가 나올 경우에 한칸을 이동할 수 있도록 규칙을 추가한다. 그러면 가장 재수 없는 경우에도 N(거리)만큼 주사위를 던지는 걸로 목적지에 도착할 수 있을 거다. 이 주사위를 여러번 던지면, Jump 시퀀스를 만들 수 있다.
+
+위의 5줄 짜리 코드는 앞선 설명의 구현체다. 코드를 보자.
+{{{#!plain
+uint64_t b =-1, j = 0;
+while (j < num_buckets) {
+	b = j;
+	key = key * 2862933555777941757ULL + 1;
+	j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+}
+return b;
+}}}
+'''num_buckets''' : 버켓의 크기다. 
+'''while j < num_buckets''' : 점프를 했는데, 버켓의 크기를 넘어갔다면 현재 위치를 반환한다. 
+'''key = key * 2862933555777941757ULL + 1''' : unsigned long long 64bit 데이터다. 이녀석을 2진수로 변환하면 
+{{{#!plain
+10011110111011001011101110011010000111101100001011000011111101
+}}}
+이 된다. 2862933555777941757은 2^63보다 더 큰 값이기 때문에, (많은 경우)오버플로우 된다. 이 값을 가지고 double((key >> 33)) 연산을 하면, 랜덤한 값을 얻을 수 있다. 이 값을 분모로 해서 나누기 연산을 하면, 1/N으로 확률이 감소하는 주사위를 얻을 수 있다. b는 이전 칸의 위치다. 
+
+버킷이 1 늘어날 경우, 기존의 Key들이 새로운 버킷으로 할당될 확률은 1/N이 되기 때문에, Consistent hash의 조건을 만족한다.  
+
+=== 운용 ===
+Jump Consistent Hash(이하 JCH)는 아래와 같이 운용할 수 있을 거다.
 
 {{{#!html
-<img src="https://docs.google.com/drawings/d/1bd0PNCKVSylBJ2SDLdYoHSd95rK_YU_7ei8X7mZEtqk/pub?w=467&amp;h=391">
+<img src="https://docs.google.com/drawings/d/1MhDluk0ghqrFhESJPG3mX4B92NhHlNJbEcKhIOSF_xk/pub?w=599&amp;h=321">
 }}}
 
-결국 2로 가는 요청만 나누어서 처리하게 된다. 역시 해쉬를 한번 더 하는 걸로 문제를 해결할 수 있을 거다. 
+Proxy 서버가 Key를 입력받아서 버킷을 찾아서 중계한다. 버킷의 수가 늘어날 수록 연산이 늘어날 수 있으므로(버켓이 N일 때 최대 N 번의 연산, 평균 N/2 연산), 캐쉬해두는게 좋을 것이다. 
 
+버킷을 키로 하고, 버킷에서 관리하는 key들을 값으로 관리하는 방법도 생각해 볼 수 있다. 클라이언트도 proxy와 같은 해시 함수를 가지고 있다고 가정하면, 버킷의 갯수만 알면, 클라이언트에서 자신의 버킷정보를 포함해서 proxy에 연결할 수 있다. proxy는 클라이언트가 요청한 버킷 정보가 올바른지 한번 검사한다.
+
+상대적으로 비싼 해시 연산을 클라이언트에 분산할 수 있다는 장점이 있다. 반면, 버킷을 늘이거나 줄일 경우 K/N 만큼의 클라이언트에 대해서, 바뀐 버킷 값을 알려줘야 하는 단점이 있다. 
+
+... 계속
 == 참고 문서 ==
   * [https://github.com/twitter/twemproxy consistent hashing을 지원하는 경량 proxy]
   * [http://www.stephenbroeker.com/2012/06/13/openstack-swift-storage-rings-explained/ OpenStack swift storage rings explained] 
   * [http://www.mimul.com/pebble/default/2012/05/04/1336102052449.html Consistent Hashing] 
   * [http://www.audioscrobbler.net/development/ketama/ ketama consistent hashing C 라이브러리]
   * [https://charsyam.wordpress.com/2011/11/25/memcached-%EC%97%90%EC%84%9C%EC%9D%98-consistent-hashing/ memcached 에서의 consistent hashing]
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+a3 1
+<!> Hash는 나중에 따로 빼야 할 듯.
+d238 4
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d232 3
+d236 3
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d129 2
+a130 1
+=== Jump consistent hash  ===
+d207 1
+a207 1
+1을 만나기 전까지 0의 갯수가 전진 할 수 있는 칸의 숫자다.(반대로 해도 상관 없다.) 마작과 비슷한 느낌이 되려나 ? 그리고 0칸 이동(제자리)가 나올 경우에 한칸을 이동할 수 있도록 규칙을 추가한다. 그러면 가장 재수 없는 경우에도 N(거리)만큼 주사위를 던지는 걸로 목적지에 도착할 수 있을 거다.
+a219 1
+
+a220 1
+
+d225 6
+a230 1
+이 된다. 이 값을 key와 곱해준 다음 (b + 1) * (double(1LL << 31) / double((key >> 33) + 1)) 연산을 한다. double((key >> 33)+1)이녀석이 핵심이다. 1은 분모가 0이 안되도록 막는 장치니까 무시하자.  
+a231 1
+.... 계속
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d195 1
+a195 1
+{{{#!plain
+d202 1
+a202 1
+{{{#!plain
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d192 37
+a228 1
+굉장히 잘 작동한다. 버킷값을 조정할 경우 '''K/N'''도 만족하는 걸 확인했다. 어떻게 이럴 수 있는지 분석해 보기로 했다. 
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+a121 2
+
+
+d125 1
+a125 1
+이 재분배작업은 '''K*1/N'''을 만족해야 한다. K는 전체 Key의 갯수이고, N은 노드의 갯수다. 4개의 노드가 있고, key가 100개인 hash ring에 노드 하나가 추가 될 경우, 기존의 노드에서 100 * 1/5 = 20 이 재분배 된다. 노드 하나로 계산하면 5개씩이 추가된 노드로 이동해서 20씩 골고르 분산된다.  
+d127 1
+a127 1
+재 분배되는 key에서는 데이터를 옮기는 작업도 진행해야 한다. 캐시 서버라면, 캐시 파일을 옮겨야 할테고, 통신 연결(connection)이라면, 연결을 끊어줘야 한다. 
+d130 63
+a192 1
+Google에서 공개한 해쉬 알고리즘이다. 표어가 '''A Fast, Minimal Memory, Consistent hash Algorithm''' 
+a193 1
+... 계속
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d119 1
+a119 1
+해시에 client-1을 적용해서 얻은 값이 3121 이라면 Node-2를 리턴할 것이다.
+d121 3
+a123 1
+==== 노드 추가와 Key 재분배 ====
+d130 3
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d80 1
+a80 1
+한번 더 해쉬하는 것으로 비교적 간단하게 문제를 해결할 수 있다. 정상상태일 때는 하위 비트를 이용해서 해쉬하고, 빠진 노드로 향하는 Key들은 상위 비트를 이용해서 해쉬하는 식이다. 해쉬의 특성상 key는 각 노드에 1/4 만큼씩 분배될 것이다. 단 2번 노드에는 1번으로 다시 할당되는 1/4이 추가되는 문제가 있기는 하다. 추가되는 부담은 1/N(노드의 갯수)라서 노드가 많아지면 별 문제가 되지 않는다. 사소한 문제라고 할 수 있다. 굳이 완전하게 분배하고 싶다면, 알고리즘을 보완하는 건 그리 어렵지 ㅇ낳을 것이다. 
+d82 2
+a83 2
+==== 노드 추가 ====
+노드를 추가하는 경우를 생각해보자. 노드를 추가할 경우 리 밸런싱작업이 필요한데, '''k/N'''을 만족해야 한다. 예를들어 4개의 노드로 구성된 해시링에 1개가 추가됐다고 가정해보자. 각 노드가 250개의 key를 가지고 있다면, 노드 하나는 '''250 * (1/5) = 50'''만큼의 key를 재분배 해야 한다. 재분배 후에는 5개의 노드 모두 200개씩의 key를 처리하게 된다.
+d85 44
+a128 1
+.... 계속
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 4
+a6 2
+== Consistent hashing ==
+아래 그림은 hashing(해싱)의 기본 개념을 묘사하고 있다. 
+d14 3
+a16 1
+Consistent hashing는 Values의 집합을 ''K'', 해쉬 테이블의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 동일한 해쉬값을 보장하는 해싱함수를 사용하는 기술을 의미한다.
+d18 1
+a18 1
+Conssitent hashing은 분산처리 시스템에서, 클라이언트 요청을 분산하기 위한 목적으로 널리 사용하고 있다. 아래와 같은 분산 시스템이 있다고 가정해 보자. 
+d21 16
+a36 1
+<img src="https://docs.google.com/drawings/d/1a1ItR6SDsbMwb-RME_Pld6t-VuvP2FWI6JX0cxk0YuU/pub?w=634&amp;h=206">
+d38 1
+d40 1
+a40 1
+Client Request는 Proxy를 거쳐서 노드로 분산된다. 노드가 클라이언트의 상태(state)를 저장해야 하는 경우 클라이언트 요청이 고정된 노드로 향하게 해야 한다. '''Client ID(IP등) % N'''으로 간단하게 목적 노드를 고정할 수 있을 거다.
+d42 2
+a43 1
+문제는 노드가 빠지거나 추가될 때 발생한다. 노드-2가 빠졌다고 가정을 해보자. Proxy는 Node-2를 제외한 나머지 노드로 분산을 해야 하는데, '''Client ID % N == 2'''인 요청을 어디로 보내야 할지 알 수 없게 된다.
+d45 1
+a45 1
+문제의 원인은 '''선택을 할 수 없다''는데 있다. 그러므로 선택을 할 수 있게 만들어주면 된다. 선택을 할 수 없는 이유는 등호(=)만 있기 때문이니 부등호(<, >)를 만들어 주면 된다. 여러 구간을 가진 슬롯을 만들어 주면 된다. 
+d47 2
+d50 1
+a50 1
+이렇게 해서 등장하는게 '''Hashring'''이다. 4개의 노드가 있을 때의 hashring은 아래와 같이 구성할 수 있을 거다. 
+d52 3
+a54 3
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=441&amp;h=378">
+}}}
+d56 2
+a57 1
+1, 2, 3, 4는 노드다. 이전에는 각 노드 사이에 하나의 구간만 있었는데, 그 구간을 몇개로 나누었다. 이제 ''K''는 1.1, 2.3 와 같은 값으로 해싱이 된다. 이제 ''k''는 시계방향 쪽으로 가장 가까운 노드에서 처리한다. K=1.1은 노드-2가 K=2.3은 노드-3가 처리한다. 
+d59 3
+a61 3
+{{{#!html
+<img src="https://docs.google.com/drawings/d/14mexPedMJgTYNn_FzdSSEr32lCYbuPqpHOS2Hi_oaG8/pub?w=467&amp;h=391">
+}}}
+d63 1
+a63 1
+2가 빠지는 경우를 생각해 보자. 노드-2에서 처리해야 했던 '''1.1 < K <= 3''' 는 모두 노드-3에서 처리하게 된다. 다른 노드들에서 처리하던 K는 변함이 없으므로 깔끔하게 해결할 수 있다.
+d66 1
+a66 1
+<img src="https://docs.google.com/drawings/d/1SWL75ZRuwCiGwUNWaXbuxyB29z3Llgr_ijTrtI71yt4/pub?w=467&amp;h=391">
+d69 1
+a69 1
+위 모델은 노드에 문제가 생겼을 경우, 다른 노드에서 서비스를 계속하게 하는 효과는 있지만, '''1.1 < K <= 2''' 구간의 트래픽이 모두 노드-3으로 몰린다는 단점이 있다. 
+d71 2
+a72 6
+단점은 두 가지 방법으로 해결할 수 있다.
+  1. 빠르게 fail-over 한다.  
+  1. 문제가 발생한 2번 노드로 향하는 K에 대해서 한번 더 hashing 한다.   
+1번은 당연히 해야 하는 거니 2번 문제를 고민 하면 되겠다. K에 대한 해싱 결과가 전체 슬롯에 분배되는 해싱 알고리즘을 만들면 될테다. 알고리즘은 상황에 따라 달라질 테니 만드는 건 패스. 
+
+노드 추가도 비슷한 문제가 있다. ? 노드가 하나 추가됐다고 가정해 보자.  
+d75 1
+a75 1
+<img src="https://docs.google.com/drawings/d/1bd0PNCKVSylBJ2SDLdYoHSd95rK_YU_7ei8X7mZEtqk/pub?w=467&amp;h=391">
+d78 6
+a83 1
+결국 2로 가는 요청만 나누어서 처리하게 된다. 역시 해쉬를 한번 더 하는 걸로 문제를 해결할 수 있을 거다. 
+d85 1
 @

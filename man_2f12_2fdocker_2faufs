@@ -1,0 +1,137 @@
+#title AUFS와 Docker 파일 시스템
+[[TableOfContents]]
+== AUFS ==
+aufs(advanced multi layered unification filesystem)은 리눅스 파일 시스템의 union mount를 구현하기 위해서 시작한 프로젝트다. 2006년 junjiro Okajima가 개발을 시작했으며, '''UnionFS'''를 완전히 새로 만들었다. 안정성과 성능을 향상시키는 이외에도 '''writable branch balancing'''와 같은 새로운 기능도 포함하고 있다. 
+
+== 테스트 ==
+우분투 리눅스 15.04에서 테스트 한다.
+=== 설치 ===
+우분투 리눅스는 aufs-tools를 기본으로 포함하고 있다. 
+{{{#!plain
+# apt-get install aufs-tools
+}}}
+
+=== 예제 - 1 : AuFS 작동방식 이해 ===
+아래 예제는 aufs가 어떻게 작동하는지를 보여준다.
+{{{#!plain
+# adduser aufs01
+# mkdir /tmp/dir1
+# mkdir /tmp/aufs-root
+# mount -t aufs -o br=/tmp/dir1:/home/aufs01 none /tmp/aufs-root/
+}}}
+테스트를 위해서 aufs01 계정을 만들었다. aufs01 계정의 홈디렉토리는 /home/aufs01이다. 마운트를 위한 2개의 디렉토리를 만들었다.
+
+마운트 명령은 /tmp/dir1과 /home/aufs01 디렉토리에 대한 유니온 마운트 포인트인 /tmp/aufs-root를 설정한다. 이후 /tmp/aufs-root 디렉토리에는 /tmp/dir1과 /home/aufs01내용이 모두 보이게 된다. 마운트 옵션을 살펴보자. 
+  * -o : 파일 시스템에 옵션을 설정한다. 
+  * br : 브랜치를 설정한다. 각 브랜치는 콜론(:)으로 구분한다. 브랜치는 일반 디렉토리다.
+
+이제 /home/aufs01과 /tmp/dir1에 파일을 만든다음 '''ls -1'''로 각 디렉토리의 상태를 확인해 보자.
+{{{#!plain
+# touch /home/aufs01/file_in_home_dir1
+# touch /tmp/dir1/file_in_tmp_dir
+# ls -l /tmp/aufs-root/
+합계 0
+-rw-r--r-- 1 root root 0  5월  6 17:48 file_in_home_dir1
+-rw-r--r-- 1 root root 0  5월  6 17:48 file_in_tmp_dir
+}}}
+권한을 설정하지 않을 경우, 첫번째 브랜치는 쓰기가능으로 열리고 나머지 브랜치는 읽기전용으로 열린다. 
+
+이제 "/tmp/aufs-root/"에 파일을 만들면, 쓰기전용 브랜치인 /tmp/dir1에도 파일이 만들어진다. /tmp/aufs-root에서 file_in_home_dir1을 수정해 보자.  
+{{{#!plain
+# echo "hello world" >> /tmp/aufs-root/file_in_home_dir1
+}}}
+/home/aufs01/file_in_home_dir1 의 (읽기 전용이기 때문에)파일은 변경되지 않는다. /tmp/dir1에는 hello world를 포함한 file_in_home_dir1이 만들어지는 걸 확인 할 수 있다.
+
+==== 도커에서의 응용 ====
+도커에서 활용을 하고 있다. 도커는 '''도커 이미지'''로 부터 컨테이너를 실행하는데, 이 도커 이미지는 읽기 전용으로만 사용한다. 따라서 여러 유저가 도커 이미지를 사용하더라도, 동일한 버전의 컨테이너를 실행 할 수 있다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1ca4suVMXP96lwNoExjqqLKSM2qeEJ5-hpLuy9AYug7c/pub?w=486&amp;h=287">
+}}}
+
+컨테이너에서의 작업내용은 각 유저의 "쓰기전용" 브랜치에 기록이 되기 때문에, 다른 유저의 영향을 받지 않는 격리된 환경에서 작업을 수행 할 수 있다.
+
+컨테이너를 종료하면, 기존의 작업내용이 모두 사라진다. 만약 이전 작업내용을 유지하고 싶다면, "쓰기전용" 브랜치의 내용과 Docker image의 내용을 merge 해서 새로운 버전의 도커 이미지를 만들어야 한다. 
+
+=== 디렉토리에 대한 통합 뷰 ===
+많은 유저를 관리해야 하는 시스템 관리자의 경우, home 디렉토리에 대한 모니터링이 필요하다. 루트(root) 계정으로 모니터링 하는 방법도 있겠으나 루트계정으로 모니터링 하는 것은 여러모로 좋지 않다. aufs를 이용해서 뷰 전용 브랜치를 만들어서 관리 할 수 있다. 
+
+이번 예제에서는 '''/home''' 밑에 있는 디렉토리를 관리하기로 했다. /home 디렉토리 밑에는 user01과 user02 2개의 디렉토리가 있다.
+
+{{{#!plain
+# mount -t aufs -o br=/home=rw -o udba=reval none /common
+# ls -l /common/
+drwxr-xr-x  2 root      root       4096  5월  6 23:27 user01
+drwxr-xr-x  2 root      root       4096  5월  6 23:11 user02
+}}}
+
+udba(User's Direct Branch Access)라는 추가 옵션이 있는데, 이 옵션을 이용해서 브랜치에서 발생하는 파일 생성/업데이터등의 사건을 AuFS에 동기화하는 방법을 변경할 수 있다. 
+  * udba=none : AuFS는 매우 빠르게 작동한다. 하지만 데이터가 올바로 동기화 되지않는다. 예를들어 /home/user01 디렉토리 밑에 파일을 추가하면, /common/밑에 (즉시)파일이 보이지 않는 것을 확인할 수 있다. 일정 시간이 지나야지 파일이 보인다. 
+  * udba=reval : 브랜치의 업데이트 상황을 즉시 반영한다.
+  * udba=notify : '''inotify'''를 이용해서 브랜치 디렉토리의 변경사항을 알려준다. AuFS의 성능에 영향을 준다.
+'''notify''' 옵션의 기능이 재미있는 것 같아서 테스트를 했으나 잘못된 옵션이라며 마운트가 되지 않았다. 이유를 찾고 있는 중인데, 아직 찾지 못했다. 
+{{{#!plain
+# mount -t aufs -o br=/home=rw -o udba=notify none /common/
+mount: wrong fs type, bad option, bad superblock on none,
+       missing codepage or helper program, or other error
+
+       In some cases useful info is found in syslog - try
+       dmesg | tail or so.
+
+# dmesg | tail 
+[  781.421865] aufs au_opts_parse:1208:mount[24357]: wrong value, udba=notify
+}}}
+
+각 브랜치는 read/write가 가능하게 했다. 따라서 /common 밑에서 파일을 만들면, 실제 파일 시스템에도 만들어진다. 
+{{{#!plain
+# touch /common/user01/hello_world.txt
+# ls /home/user01
+hello_world.txt
+}}}
+
+=== 브랜치별로 다른 권한을 주기 ===
+마운트 할 때, 브랜치별로 다른 권한을 줄 수 있다.
+{{{#!plain
+# mount -t aufs -o br=/tmp/dir1=rw:/home/aufs01=ro -o udba=reval none /tmp/aufs-root/
+}}}
+/tmp/dir1은 읽기/쓰기 모드 브랜치로, /home/aufs01은 읽기전용 브랜치로 /tmp/aufs-root에 마운트된다. '''/tmp/aufs-root'''에 변경 내용은 /tmp/dir1 에도 적용되며, /tmp/dir1의 변경 내용도 /tmp/aufs-root에 적용된다.
+{{{#!plain
+# echo "This is a new file" >> /home/aufs01/1.txt
+# cat /tmp/aufs-root/1.txt
+This is a new file
+
+# echo "This is a new Line" >> /tmp/aufs-root/1.txt
+# cat /tmp/dir1/1.txt
+This is a new file
+This is a new Line
+}}}
+  * /home/aufs01 디렉토리 밑에 1.txt 파일을 만들었다. 
+  * 변경된 내용은 udba=retval 옵션에 의해서 마운트된 디렉토리(/tmp/aufs-root)에 즉시 반영된다.
+  * 변경된 파일을 /tmp/aufs-root에서 확인할 수 있다. 
+  * /tmp/aufs-root/1.txt 파일의 내용을 업데이트 한다. 
+  * 업데이트한 내용은 읽기/쓰기 브랜치인 /tmp/dir1에 반영된다.
+
+=== 파일에 Round Robin 정책 적용하기 ===
+2개이상의 쓰기 가능 브랜치를 만들 경우, create 옵션을 이용해서 쓰기 정책을 설정할 수 있다. 
+{{{#!plain
+# mount -t aufs -o br=/tmp/dir1=rw:/home/aufs01=rw -o udba=reval -o create=rr none /tmp/aufs-root/
+}}}
+create 옵션으로 rr(round robin)을 설정했다. 이제 /tmp/aufs-root에 파일을 만들면, 파일들은 round robin하게 브랜치에 배치된다. 예를들어 4개의 파일을 만들었다면 각 브랜치에 2개씩이 배치된다.
+{{{#!plain
+# touch /tmp/aufs-root/first-round-robin
+# touch /tmp/aufs-root/second-round-robin
+# ls -l /tmp/dir
+합계 0
+-rw-r--r-- 1 root root 0  5월  7 01:01 first-round-robin
+# ls -l /home/aufs01/
+합계 0
+-rw-r--r-- 1 root root 0  5월  7 01:01 second-round-robin
+}}}
+rr외에 mfs, mfsrr, pmfs 등을 사용할 수 있다. 자세한 건 man page를 참고하자. 중요한 것은 이 기능을 어디에 응용할 수 있는지에 대한 건데, 파일의 분산 저장? 외에는 아직 별 생각이 없다. 두개 이상의 쓰기 가능 브랜치를 NFS로 마운트 하면, 파일을 분산해서 처리 할 수 있겠는데, 이게 제대로된 응용일지 감이 오지 않는다. 기타 다른 응용이 가능할지는 좀 고민을 해봐야 겠다. 
+
+== 응용 ==
+  * Knoppix live CD 리눅스 배포판
+  * Gentoo Linux Live DVD 11.0, 11.2, 12.0
+  * Puppy Linux
+  * Debian 6.0 Live media
+  * Xnadros 리눅스 배포판

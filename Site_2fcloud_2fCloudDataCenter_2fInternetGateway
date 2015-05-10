@@ -1,0 +1,42 @@
+#title Internet Gateway
+[[TableOfContents]]
+== Internet Gateway ==
+=== 문제정의 ===
+  * 클라우드는 기본적으로 Private Network로 인터넷으로 부터 격리된다. 모든 인스턴스는 사설 IP를 가지고 있다.   
+  * 이들 인스턴스는 인터넷에서 접근할 수 있어야 한다.
+  * 가용성과 확장성을 모두 확보할 수 있어야 한다.
+  * IP Pool을 유지해야 한다.
+
+== 패턴 == 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1BT8hpc4_XRB5dMeqp4zNQUBhunn4P3fd4zGESCeDwDc/pub?w=668&amp;h=397">
+}}}
+  1. 인스턴스는 Private IP만 가지고 있다. 인터넷으로 나가기 위해서는 IP를 요청해야 한다. 
+  1. IP 요청 API를 호출한다.
+  1. Internet Gateway는 NAT로 작동한다. IP Pool로 부터 IP를 선택후, 해당 인스턴스의 Private IP와 맵핑한다.  
+  1. EIP가 인스턴스의 private ip에 매핑된다. 인스턴스의 설정변경은 없다.
+  1. 인터넷으로 향하는 인스턴스의 트래픽은 Internet Gateway로 흐른다. 
+  1. Internet Gateway는 SNAT해서 인터넷으로 보낸다.
+
+== 구현 ==
+패턴은 단순하지만, Intrnet Gateway 만들기 위해서는 고민이 필요하다. 
+  1. Stateless NAT : 확장성을 위해서
+  1. 각 IP별 카운팅 : 과금을 위해서 
+네트워크 장비를 때려 박는 방법도 있는데, 범용 네트워크 장비에서 stateless NAT 만 사용한다면, 비용대비 효과가 의심 스러울 수 밖에 없다. Stateless NAT으로 할 경우 클러스터링도 비교적 쉬울 건데, 리눅스를 기반으로 하는 NAT 전용 장비를 직접 만드는 것도 고려해볼 만 하다.
+
+=== NAT Cluster ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1fgs0gtZDrIlD8KG7IQ_APs2n5DbOf9ypoqZ38qcDLIo/pub?w=658&amp;h=471">
+}}}
+
+Stateless NAT는 conntrack을 공유 할 필요는 없다. 대신 NAT를 위해서 Instance ip와 EIP의 목록으로 구성된 '''NAT 테이블'''을 유지해야 한다. Router는 라운드로빈하게 NAT Node로 패킷을 보내기 때문에,  모든 NAT 노드가 동일한 정보를 유지하고 있어야 한다. Zookeeper를 이용해서 NAT 테이블 정보를 동기화 한다. 
+
+기타 Stateless NAT에 대한 내용은 [wiki:Site/cloud/AWS/EIP 이 문서]를 참고한다.
+
+=== InterNet Gateway ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1LKz09meAPJR9RrdGQ9DKhLuGzIz1rZGFetjPqXkzNUw/pub?w=627&amp;h=644">
+}}}
+  1. 0.0.0.0/0으로 향하는 패킷은 NAT Cluster로 향하게 한다.  
+  1. NAT Cluster는 SNAT해서 인터넷으로 전송한다.
+Public 트래픽과 Private 트래픽을 위한 인터페이스를 독립하는 방법, 하나의 인터페이스로 보내는 방법이 있겠다.

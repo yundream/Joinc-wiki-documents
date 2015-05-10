@@ -1,0 +1,233 @@
+#title OpenVSwitch
+[[TableOfContents]]
+== Open vSwitch ==
+우선 여기에 정리하고, 나중에 옮긴다.
+=== Virtual Switch에 대해서 ===
+가상 스위치(Virtual Switch)란 가상 네트워크(Virtual Network)에서 VM을 위해서 제공되는 스위치를 의미한다. 이 스위치는 호스트 운영체제에서 소프트웨어 적으로 제공하기 때문에, 가상 스위치라고 부른다. 이 가상 스위치는 물리적 스위치와 연결된다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1GmXT8nWxdgGlPzPQw7GJYFdCR3SPIN61uGPguwAtou0/pub?w=554&amp;h=358">
+}}}
+  1. vSwitch가 VM들을 L2에서 모두 묶는다. 
+  1. 호스트 OS가 제공하는 물리닉도 함께 vSwitch에 묶이며, 이 경우 vSwitch의 uplink port가 된다.
+
+=== Open vSwitch에 대하여 ===
+소프트웨어 기반의 vSwitch다. 클라우드 환경에서 VM들간의 트래픽의 통합, 격리, 보안을 위한 여러가지 기능들을 제공한다. 소프트웨어 기반이기 때문에, 탄력적으로 네트워크 환경을 설정할 수 있다.  
+
+=== 기능들 ===
+  * NetFlow, sFlow, IPFIX, SPAN, RSPAN 등 일반 가상 머신간의 통신을 위한 프로토콜
+  * GRE(Generic Routing Encapsulation) 등의 터널링 프로토콜
+  * [wiki:man/12/LinkAggregation LACP](Link Aggregation Control Protocol, IEEE 802.1AX-2008)
+  * 표준 802.1Q [wiki:man/12/VLAN Virtual LAN(VLAN)]과 [[footnoot(하나의 네트워크 링크에 여러 개의 VLAN 트래픽을 수용하는 기술)trunking]] 지원
+  * BFD(Bidirectional Forwarding)와 802.1ag link 모니터링
+  * [wiki:man/12/stp STP(Spanning Tree Protocol)]
+  * 유저, 애플리케이션, 데이터 플로우 별 Fine-grained QoS(Quality of service)제어
+  * HFSC(Hierarchical fair-service curve) qdisc(Queuing discipline)
+  * 가상 머신 인터페이스의 별 Traffic policing 
+  * 소스 맥 어드레스 기반의 NIC bonding, active backup, L4 해싱
+  * OpenFlow 프로토콜 지원 
+  * IPv6 지원
+  * GRE, VXLAN(Virtual Extensible LAN), IPSec(Internet Protocol Security), VXLAN over IPsec
+  * 리모트 콘트롤을 위한 C, Python 바인딩
+  * Kernel space와 User space에서의 패킷 포워딩 엔진
+
+=== 주요 구성 요소 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1fawrSs6rHAo5Sh6tChQSc1fp1uwHgP4su0LUtTSkcOg/pub?w=546&amp;h=410">
+}}}
+
+=== 설치 ===
+설치 환경은 다음과 같다.
+{{{#!plain
+# tail -1 /etc/lsb-release 
+DISTRIB_DESCRIPTION="Ubuntu 14.10"
+
+# uname -ri
+3.16.0-34-generic x86_64
+
+# kvm --version
+QEMU emulator version 2.1.0 (Debian 2.1+dfsg-4ubuntu6.4)
+}}}
+
+OVS를 설치한다.
+{{{#!plain
+# apt-get install openvswitch-switch
+}}}
+
+제대로 설치됐는지 확인한다. ovs-vsctl은 ovs-vswitchd를 설정하기 위한 CLI 유틸리티다.
+{{{#!plain
+# ovs-vsctl show
+41683821-59d5-4443-8cc5-c95dae7deaae
+    ovs_version: "2.3.1"
+yundream@yundream:~$ ps -ea | grep ovs 
+ 1096 ?        00:00:00 ovsdb-server
+ 1218 ?        00:00:00 ovs-vswitchd
+}}}
+
+== OVS 네트워크 구성 ==
+ovs 브릿지를 만든다.
+{{{#!plain
+# ovs-vsctl add-br br-int 
+# ovs-vsctl list-br 
+br-int
+}}}
+
+현재 eth0의 네트워크를 삭제한다.
+{{{#!plain
+# ifconfig eth0 0.0.0.0
+# ifconfig eth0 
+eth0      Link encap:Ethernet  HWaddr e0:3f:49:45:49:ec  
+          inet6 addr: fe80::e23f:49ff:fe45:49ec/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:297594 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:212790 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:380124109 (380.1 MB)  TX bytes:20937802 (20.9 MB)
+}}}
+
+'''br-int'''에 포트를 추가하고 여기에 eth0을 링크한다. 
+{{{#!plain
+# ovs-vsctl add-port br-int eth0
+# ovs-vsctl list-ports br-int 
+eth0
+}}}
+
+네트워크 설정을 한다.
+{{{#!plain
+# cat /etc/network/interfaces 
+iface br-int inet dhcp
+# ifup br-int 
+Internet Systems Consortium DHCP Client 4.3.1
+Copyright 2004-2014 Internet Systems Consortium.
+All rights reserved.
+For info, please visit https://www.isc.org/software/dhcp/
+
+Listening on LPF/br-int/e0:3f:49:45:49:ec
+Sending on   LPF/br-int/e0:3f:49:45:49:ec
+Sending on   Socket/fallback
+DHCPDISCOVER on br-int to 255.255.255.255 port 67 interval 3 (xid=0x4fe98d6c)
+DHCPREQUEST of 192.168.219.176 on br-int to 255.255.255.255 port 67 (xid=0x4fe98
+d6c)
+DHCPOFFER of 192.168.219.176 from 192.168.219.1
+DHCPACK of 192.168.219.176 from 192.168.219.1
+bound to 192.168.219.176 -- renewal in 38277 seconds.
+}}}
+
+네트워크 설정을 확인. 
+{{{#!plain
+# ifconfig br-int 
+br-int    Link encap:Ethernet  HWaddr e0:3f:49:45:49:ec  
+          inet addr:192.168.219.176  Bcast:192.168.219.255  Mask:255.255.255.0
+          inet6 addr: fe80::e23f:49ff:fe45:49ec/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:25516 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:17174 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:34891466 (34.8 MB)  TX bytes:1351063 (1.3 MB)
+
+# route -n 
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.219.1   0.0.0.0         UG    0      0        0 br-int
+0.0.0.0         192.168.219.1   0.0.0.0         UG    1024   0        0 eth0
+169.254.0.0     0.0.0.0         255.255.0.0     U     1000   0        0 br-int
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+192.168.219.0   0.0.0.0         255.255.255.0   U     0      0        0 br-int
+192.168.219.1   0.0.0.0         255.255.255.255 UH    1024   0        0 eth0
+}}}
+br-int의 네트워크 설정이 끝났다. 이제 0.0.0.0/0으로 향하는 트래픽은 br-int로 흐르고 eth0을 경유해서 인터넷으로 나간다. 
+
+OVS 스위치를 제어하기 위해서 floodlight '''OpenFlow network controller'''를 설치했다.
+{{{#!plain
+# apt-get install floodlight  
+# /etc/init.d/floodlight start
+}}}
+
+floodlight 로그파일을 보면, 기본 컨트롤러 포트인 6633이 올라오는 걸 확인할 수 있다.
+{{{#!plain
+# tail -f /var/log/floodlight/floodlight.log
+INFO [net.floodlightcontroller.core.internal.Controller:main] Controller role set to null
+INFO [net.floodlightcontroller.core.internal.Controller:main] Listening for switch connections on 0.0.0.0/0.0.0.0:6633
+}}}
+
+앞서 만든 '''br-int'''를 '''configured controller'''에 연결한다.
+{{{#!plain
+# ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 
+}}}
+
+floodlight로그로 br-int가 연결된 것을 확인할 수 있다.
+{{{#!plain
+INFO [net.floodlightcontroller.core.internal.Controller:New I/O server worker #1-1] New switch connection from /127.0.0.1:57686
+}}}
+
+ovs 정보를 살펴보자
+{{{#!plain
+# ovs-vsctl show 
+41683821-59d5-4443-8cc5-c95dae7deaae
+    Bridge br-int
+        Controller "tcp:127.0.0.1:6633"
+            is_connected: true
+        Port br-int
+            Interface br-int
+                type: internal
+        Port "eth0"
+            Interface "eth0"
+    ovs_version: "2.3.1"
+}}}
+
+=== Flat 네트워크 구성 ===
+KVM을 이용해서 가상 네트워크를 구성해 보기로 했다. 구성할 네트워크의 구성은 아래와 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1KcPsYk4nd-bAvWIzvYkQ9kw0MNsYuWmHEJ5gyKoMDqE/pub?w=411&amp;h=315">
+}}}
+
+가상 머신이 사용할 tap 네트워크 인터페이스 설정을 위해서 두 개의 스크립트를 준비했다.
+{{{#!plain
+# cat /etc/ovs-ifup
+#!/bin/sh
+switch='br-int'
+/sbin/ifconfig $1 0.0.0.0 up
+ovs-vsctl add-port ${switch} $1
+
+# cat /etc/ovs-ifdown
+#!/bin/sh
+switch='br-int'
+/sbin/ifconfig $1 0.0.0.0 down
+ovs-vsctl del-port ${switch} $1
+}}}
+스트립트 파일은 실행권한(chmod +x)을 줘야 한다.
+ * VM1
+   {{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:01 -net tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown vdisk1.img
+}}}
+ * VM2
+   {{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:02 -net tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown vdisk2.img
+}}}
+
+브릿지 상태를 확인해 보자.
+{{{#!plain
+# ovs-vsctl show 
+41683821-59d5-4443-8cc5-c95dae7deaae
+    Bridge br-int
+        Controller "tcp:127.0.0.1:6633"
+            is_connected: true
+        Port "tap1"
+            Interface "tap1"
+        Port br-int
+            Interface br-int
+                type: internal
+        Port "eth0"
+            Interface "eth0"
+        Port "tap0"
+            Interface "tap0"
+    ovs_version: "2.3.1"
+}}}
+
+tap0과 tap1 인터페이스를 확인할 수 있다.
+=== VXLAN Overlay Network ===
+
+== 참고 ==
+  * [http://networkstatic.net/openflow-openvswitch-lab Getting Started OpenFlow OpenvSwitch Tutorial Lab : Setup] 
+  * [http://www.slideshare.net/teyenliu/the-basic-introduction-of-open-vswitch The basic introduction of open vswitch]

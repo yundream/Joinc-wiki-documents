@@ -1,0 +1,56 @@
+#title Elastic volume service
+[[TableOfContents]]
+== Elastic Volume service ==
+=== 문제정의 ===
+  * Volume pool을 구성 해야 한다. 
+  * 유저는 자유롭게 볼륨을 요청하고 할당 받을 수 있어야 한다. 
+  * Cloud manager는 유저가 사용중인 볼륨을 모니터링 할 수 있어야 한다.
+  * 인스턴스와 볼륨은 서로 독립적으로 구성할 수 있어야 한다. 인스턴스 호스트에 문제가 생기더라도, 다른 호스트에서 인스턴스를 실행하는 것으로 볼륨을 재 사용 할 수 있어야 한다.
+  * 장애 내성(Fault-tolerant) : 장애를 허용해도 정상적으로 기능을 수행할 수 있어야 한다.
+
+=== 패턴 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1gzOMxlIw47Ta5WjPlGYSoUUSAuvtItdYowkvCTPUEBA/pub?w=987&amp;h=423">
+}}}
+ 1. 유저는 web console을 이용해서 디스크 할당을 요청한다. 
+ 1. API를 호출
+ 1. Cloud manager는 Storage pool에 볼퓸 공간을 만든다.
+ 1. 유저는 할당받은 볼륨을 Instance에 Attach 하기 위한 API를 호출한다.
+ 1. Cloud manager는 볼륨을 Instance에 Attach 한다.  
+
+== 솔류션 ==
+나는 GlusterFS나 Ceph와 같은 분산 블럭 스토리지에 대한 경험이 없다. ZFS와 관련된 경험만 가지고 있을 뿐이다. 이런 이유로 여기에서는 ZFS를 이용한 솔류션만을 정리한다. 언젠가 glusterfs나 ceph와 같은 분산 스토리지를 경험할 일이 생긴다면 그때 내용을 추가하도록 한다.
+
+=== ZFS ===
+파일시스템이 아니다. 파일시스템과 [wiki:Site/System_management/LVM LVM(Logical volume manager)], 소프트웨어 레이드 기능까지를 포함하고 있는 볼륨메니저다.  
+
+클라우드를 위한 블럭 스토리지로 사용할 수 있는 기능들을 가지고 있다. 
+  * 증분 스냅샷 
+  * RAIDZ과 RAIDZ2 : ZFS에서 제공하는 비표준 [wiki:man/12/raid RAID] 시스템이다. 분산 [wiki:man/12/parity parity]와 striped 지원한다. RAIDZ은 one parity, RAIDZ2는 double parity. 
+  * Copy on write clones 
+  * continuous integrity checking
+  * automatic repaire
+  * Dedplication & Compression
+  * 온라인 상태에서의 resilvering
+  * [wiki:man/12/iSCSI iSCSI], NFS등의 네트워크 인터페이스 제공
+
+=== ZFS를 이용한 Cloud Storage 패턴 ===
+ZFS에 대한 자세한 내용은 [wiki:Site/cloud/Storage/ZFS ZFS]문서를 참고한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/18eQK-wf-KZ6CzXlaYz6bIXjMfjTZdRCNDqAsNnalGCg/pub?w=659&amp;h=289">
+}}}
+  * Storage를 위한 독립적인 네트워크 구성
+  * RAIDZ2의 분산 double parity를 이용 한다. JBOD 하나가 날아가더라도 서비스를 할 수 있다. 
+  * Storage Node는 Master-Slave로 구성, 고가용성을 확보한다. 
+
+=== ZFS Volume 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1iW7D_ECQU7MQn4963JdAFZr758Ul_iQOTnRguAB9gSI/pub?w=803&amp;h=552">
+}}}
+  * SNODE는 Active-StandBy 타입으로 HA 구성을 한다.
+  * [wiki:man/12/JBOD ZBOD]는 독립적으로 구성한다. 
+  * REIDZ2 - Double parity : 하나의 zpool에서 2개의 disk가 실패하더라도 복구할 수 있다. 3개가 동시에 실패하면 복구할 수 없다. 디스크가 실패하면 spare(그림의 S)가 즉시 복구하기 때문에, 3개의 디스크가 동시에 실패하는 일은 거의 발생하지 않을 거다.  
+  * 하나의 zpool은 7개의 디스크로 구성한다. : zpool을 구성하는 7개의 디스크가 하나의 JBOD에 최대 2개만 배치되게 하는게 핵심이다. ZBOD 하나가 박살이 나더라도(컨트롤러 이상, 전원 문제 등) 데이터를 복구할 수 있다.
+  * SNODE와 ZBOD는 분리된 전원계통으로 부터 전기를 공급받는다.
+지역적인 재앙으로 데이터센터 전체가 실패할 수도 있다. 이런 문제는 가용성 존(Avalibility zone)과 같은 논리적인 구성으로 대응해야 한다. 가용성 존 패턴은 따로 다룬다.  

@@ -1,10 +1,15 @@
-head	1.3;
+head	1.4;
 access;
 symbols;
 locks
-	root:1.3; strict;
+	root:1.4; strict;
 comment	@# @;
 
+
+1.4
+date	2015.04.15.09.13.40;	author root;	state Exp;
+branches;
+next	1.3;
 
 1.3
 date	2015.03.09.06.53.09;	author root;	state Exp;
@@ -27,27 +32,20 @@ desc
 @
 
 
-1.3
+1.4
 log
 @1.214.223.250;;yundream;;
 @
 text
 @#title 예제로 배우는 Go Interface
 
+... 작업중
 == 소개 ==
 예제로 배우는 Go 인터페이스라기 보다는, 예제로 공부하는 Go 인터페이스라고 해야 정확할 것 같다. 나도 배우는 입장이라서... 
 
 와우의 캐릭터를 Go 인터페이스로 차근차근 구현해 보려고 한다.
 
 == Interface ==
-인터페이스는 "메서드의 모음"으로 간단히 정의 할 수 있다. 인터페이스를 이용해서 객체를 위한 속성과 입력값 출력값을 정의 한다. 예컨데, 사양을 정의한 스펙 문서 같은 거다. 개발자는 인터페이스의 사양대로 구현을 하면 된다. 
-
-나는 WoW의 캐릭터를 구현하려고 한다. 와우는 모두 12개의 종족이 있다. 이들 종족은 인간형 종족으로 SayHi와 Dance와 같은 공통 메서드를 가지고 있다. SayHi는 종족별 인사, Dance는 종족별 춤이다. 비록 이들은 모두 인간형 종족이지만 고유의 종특도 가지고 있다. 예컨데, 고블린(Goblin)은 '''RocketJump'''와 '''TimeIsMoney'''이라는 고유의 메서드를 가지며, 트롤은 '''Berserking'''와 '''Regeneration'''이라는 고유의 메서드를 가진다.(와우에서는 이를 종특이라 부른다.) 
-
-이제 각 종종별 메서들을 가지는 인터페이스를 만들면 된다. '''Hello'''와 '''Dance'''와 같은 종특은 공통 메서드로 구현하면 되지만, RocketJump와 TimeIsMoney는 고블린, Berserking, Regeneration은 트롤만 구현을 해야 한다. 
-
-== 캐릭터 인터페이스 생성 ==
-캐릭터는 이름, 레벨, 종족과 같은 데이터와 Hello(), Dance(), Attack()와 같은 메서드로 구현 할 수 있다. 종족은 종족이름, 종특, 고향(HomeWorld)와 같은 데이터를 가지는 구조체로 표현할 수 있을 것이다. 이들 구조체와 메서드를 이용해서 간단한 캐릭터 생성 프로그램을 만들었다.
 {{{#!plain
 package main
 
@@ -56,16 +54,25 @@ import (
 )
 
 // 캐릭터 일반 특성
-type Character struct {
-	name       string
-	level      int
-	RaceInform Race
+type Human struct {
+	name  string
+	level int
+}
+
+type Race struct {
+	name      string
+	homeworld string
 }
 
 // 종족 특성
-type Race struct {
-	Rname     string
-	HomeWorld string
+type Worgen struct {
+	Human
+	Race
+}
+
+type Pandaren struct {
+	Human
+	Race
 }
 
 // 인터페이스 메서드
@@ -76,6 +83,57 @@ type Instance interface {
 	Information()
 }
 
+func (c Worgen) Hello() {
+	fmt.Printf("%s : Hello everybody i'm worgen\n", c.Human.name)
+}
+
+func (c Pandaren) Hello() {
+	fmt.Printf("%s : Good morning, Good afternoon, Gooe evening\n", c.Human.name)
+}
+
+func main() {
+	Yundream := Worgen{Human{name: "yundream", level: 95},
+		Race{name: "Worgen", homeworld: "seoul"}}
+	Yundream.Hello()
+
+	Dragona := Pandaren{Human{name: "Dragona", level: 80},
+		Race{name: "Pandaren", homeworld: "NewYork"}}
+	Dragona.Hello()
+}
+}}}
+
+== Empty Interface ==
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+a9 8
+인터페이스는 "메서드의 모음"으로 간단히 정의 할 수 있다. 인터페이스를 이용해서 객체를 위한 속성과 입력값 출력값을 정의 한다. 예컨데, 사양을 정의한 스펙 문서 같은 거다. 개발자는 인터페이스의 사양대로 구현을 하면 된다. 
+
+나는 WoW의 캐릭터를 구현하려고 한다. 와우는 모두 12개의 종족이 있다. 이들 종족은 인간형 종족으로 SayHi와 Dance와 같은 공통 메서드를 가지고 있다. SayHi는 종족별 인사, Dance는 종족별 춤이다. 비록 이들은 모두 인간형 종족이지만 고유의 종특도 가지고 있다. 예컨데, 고블린(Goblin)은 '''RocketJump'''와 '''TimeIsMoney'''이라는 고유의 메서드를 가지며, 트롤은 '''Berserking'''와 '''Regeneration'''이라는 고유의 메서드를 가진다.(와우에서는 이를 종특이라 부른다.) 
+
+이제 각 종종별 메서들을 가지는 인터페이스를 만들면 된다. '''Hello'''와 '''Dance'''와 같은 종특은 공통 메서드로 구현하면 되지만, RocketJump와 TimeIsMoney는 고블린, Berserking, Regeneration은 트롤만 구현을 해야 한다. 
+
+== 캐릭터 인터페이스 생성 ==
+캐릭터는 이름, 레벨, 종족과 같은 데이터와 Hello(), Dance(), Attack()와 같은 메서드로 구현 할 수 있다. 종족은 종족이름, 종특, 고향(HomeWorld)와 같은 데이터를 가지는 구조체로 표현할 수 있을 것이다. 이들 구조체와 메서드를 이용해서 간단한 캐릭터 생성 프로그램을 만들었다.
+d18 8
+a25 4
+type Character struct {
+	name       string
+	level      int
+	RaceInform Race
+d29 8
+a36 3
+type Race struct {
+	Rname     string
+	HomeWorld string
+d47 2
+a48 23
 var (
 	Worgen   = Race{"worgen", "Gilneas City"}
 	Pandaren = Race{"pandaren", "The Wandering Isle"}
@@ -99,31 +157,26 @@ func (c Character) Dance() {
 
 func (c Character) Attack(damage int) {
 	fmt.Printf("%s : Attack (%d)\n", c.name, damage)
-}
-
+d51 2
+a52 6
 // 캐릭터와 메서드 인터페이스를 결합해서
 // 유저 인스턴스를 만든다. 
 func MakeUserInstance(user Character) Instance {
 	var NewIns Instance
 	NewIns = user
 	return NewIns
-}
-
-func main() {
+d56 2
+a57 6
 	Yundream := MakeUserInstance(
        Character{name: "yundream", level: 95, RaceInform: Worgen})
 	DrakeDog := MakeUserInstance(
        Character{name: "DrakeDog", level: 12, RaceInform: Pandaren})
 	Yundream.Information()
 	Yundream.Attack(52)
-	Yundream.Hello()
-
+d60 3
+a62 2
 	DrakeDog.Information()
 	DrakeDog.Hello()
-}
-}}}
-
-== Empty Interface ==
 @
 
 

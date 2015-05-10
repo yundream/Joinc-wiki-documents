@@ -1,10 +1,35 @@
-head	1.5;
+head	1.10;
 access;
 symbols;
 locks
-	root:1.5; strict;
+	root:1.10; strict;
 comment	@# @;
 
+
+1.10
+date	2015.04.17.03.48.54;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2015.04.17.03.47.39;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2015.04.16.08.05.48;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2015.04.16.06.22.24;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.04.15.05.24.56;	author root;	state Exp;
+branches;
+next	1.5;
 
 1.5
 date	2015.03.30.02.53.25;	author root;	state Exp;
@@ -37,15 +62,17 @@ desc
 @
 
 
-1.5
+1.10
 log
 @1.214.223.250;;yundream;;
 @
 text
 @#title Consistent hashing
 [[TableOfContents]]
-== Consistent hash ==
+== Karger Consistent hash ==
 Consistent hashing는 Key의 집합을 ''K'', 슬롯의 크기를 ''N''라고 했을 때, '''N의 갯수가 바뀌더라도''' 대부분의 키들이 슬롯을 그대로 사용할 수 있는 해싱 기법을 의미한다. 슬롯이 추가되거나 삭제됐을 때, K/n만큼만 조정된다. 추가된 노드만큼 재 조정되는 것이니, consistent 하다고 할 수 있다. 다른 해쉬들은 슬롯을 변경할 경우 거의 대부부분의 key들을 재 조정 해야 한다.
+
+Consistent hash 알고리즘은 1997년 '''Karger'''가 개발했다. 웹 캐시를 구현하기 위해서 개발 했는데, 캐시 노드의 추가와 삭제에 관계없이 높은 수준의 웹 히트율을 보장한다. 분산 캐시, 분산 스토리지, 라우팅, 분산 요청 처리 등 다양한 영역에서 사용하고 있는 '''성공한''' 알고리즘이다. 
 
 === Consistent hash가 필요한 경우 ===
 N개의 캐시머신이 구성돼 있다고 가정해보자. 이 경우 해쉬 함수는 hash(0) mod ''n''으로 나타낼 수 있다. 잘 작동하지만 캐시가 추가되거나 삭제되서 n 이 변경될 경우 거의 모든 객체의 위치도 함께 변경, hash가 무용지물이 된다. 결국 처음부터 다시 캐시를 구축해야 하는데, 이미 캐시 요청이 빗발치고 있다면 시스템에 문제가 생길 수 있다. Consistent 해시를 이용해서 이러한 문제를 극복할 수 있다. 
@@ -119,6 +146,31 @@ func Hash.AddNode(NodeName, virtualNodeNum) {
 
 재 분배되는 key에서는 데이터를 옮기는 작업도 진행해야 한다. 캐시 서버라면, 캐시 파일을 옮겨야 할테고, 통신 연결(connection)이라면, 연결을 끊어줘야 한다.
 
+=== 구현 ===
+==== Openstack Swift ====
+오픈스택 Swift는 파이선으로 만들어진 오브젝트 스토리지(Object storage)다. 수시로 변하는 스토리지 노드에서 오브젝트를 효과적으로 분산하고, 빠르게 찾기 위해서 consistent hash를 사용한다. Karger consistent hash 알고리즘을 기반으로, (좀 더 효율적으로 작동하도록)수정해서 사용하고 있다. 
+===== 알고리즘 =====
+Hash ring은 가상노드를 배치해서 요청이 몰리는 것을 막는다. 이 방식의 단점은 sorted map을 구성해야 한다는 점이다. 모든 요청에 대해서 해시 테이블을 검색해야 한다. swift의 경우 해시 값으로 "파일의 이름"을 사용하므로, 모든 파일에 대해서 해시 테이블을 검색하는 삽질을 해야 한다. 하나의 노드가 100개의 가상노드를 가진다면, 해시 테이블의 검색에도 무시할 수 없는 비용이 추가된다.  
+
+오픈스택은 Hash ring을 이용 파티션(partition)을 만들어서 이 문제를 해결 하고 있다.(Replica는 고려하지 않았다.)  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1KYsjs9Om0lgO0qxcKLL2RY6qV3YAJcddnzckW70catA/pub?w=898&amp;h=176">
+}}}
+
+개념은 간단하다. 기존 방식으로 Hash ring을 만든 다음, 이 정보를 기반으로 인덱싱을 한 새로운 Hash ring을 만든다. 기존의 Hash ring의 경우 검색을 해야 하지만, 인덱싱한 hash ring은 O(1) 연산으로 자신의 노드를 찾을 수 있다.   
+
+효율적으로 오브젝트를 찾을 수 있는 대신
+  1. 노드가 추가되면 hash ring을 새로 빌드 해야 한다.
+  1. Hash ring을 구축하기 위해서 많은 메모리가 필요하다. 
+는 단점이 있다. 메모리를 소비해서 성능을 높이는 방식이라고 보면 되겠다.
+
+===== 시스템 구성 =====
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Dh8GDU35u8qT9Uc9bsIytnFuIJ8q9GBpe439_3nYHnc/pub?w=625&amp;h=302">
+}}}
+  * Hash ring Builder : Hash ring을 새로 만들고 배포하는 소프트웨어
+  * Proxy : Hash ring을 이용해서, 유저의 요청에 응답한다.   
 == Jump consistent hash  ==
 === 소개 ===
 Google에서 공개한 해쉬 알고리즘이다. 표어가 '''A Fast, Minimal Memory, Consistent hash Algorithm'''. 비범한 것 같아서 살펴보기로 했다. 
@@ -219,8 +271,8 @@ return b;
  * b는 이전 칸의 위치다. 
 버킷이 1 늘어날 경우, 기존의 Key들이 새로운 버킷으로 할당될 확률은 1/N이 되기 때문에, Consistent hash의 조건을 만족한다. 
 
-=== 운용 ===
-'''Jump Consistent Hash'''는 아래와 같이 운용할 수 있을 거다.
+=== 구현 ===
+'''Jump Consistent Hash'''는 아래와 같이 구현 할 수 있을 거다.
 
 {{{#!html
 <img src="https://docs.google.com/drawings/d/1MhDluk0ghqrFhESJPG3mX4B92NhHlNJbEcKhIOSF_xk/pub?w=599&amp;h=321">
@@ -230,9 +282,91 @@ Proxy 서버가 Key를 해시함수로 돌려서 버킷을 찾아서 중계한�
 
 클라이언트도 proxy와 같은 해시 함수를 가지고 있으면, 버킷크기를 아는 것으로 클라이언트는 자신이 연결해야 할 버킷을 알 수 있다. Proxy는 클라이언트가 요청한 버킷 정보가 올바른지 검사해서 중계하면 된다. 이 방법은 해시 연산을 클라이언트에 분산할 수 있다는 장점이 있다. 반면, 버킷을 늘이거나 줄일 경우 K/N 만큼의 클라이언트에 대해서, 바뀐 버킷 값을 알려줘야 하는 단점이 있다. 
 
+== 응용 ==
+=== Web Cache ===
+웹 캐시는 웹 서비스 품질을 높이려고 할 때, 가장 먼저 고려하는 요소다. CSS, 자바스크립트, 이미지, HTML과 같은 정적인 페이지를 고성능의 서버에 캐시하고 있다가 웹 서버 대신 응답해 주는 일을 한다. 캐시하기 힘든 동적인 페이지, 혹은 캐시 실패한 요청만 웹 서버로 전달된다.
+
+Consistent hash를 이용하면, 분산 웹 캐시 시스템을 만들 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/18JT-sYkIFEFd1SgZABTGhRHOhuGAh0oYMnsVAAxuJJc/pub?w=579&amp;h=340">
+}}}
+  1. 유저의 요청은 먼저 Proxy server로 향한다.
+  1. Proxy 서버는 유저가 요청한 자원(URL)이 해시테이블에 있는지 확인한다.
+  1. 해시테이블에 있다면, Cache Server에 요청한다.
+  1. 해시테이블에 없거나, 캐시에서 가져오는게 실패했다면 Web Server에 요청한다.
+Consistent hash로 구성하면, (관리 없이)자유롭게 캐시를 늘리거나 줄일 수 있다. 대량의 멀티미디어 파일을 서비스에 특히 유용하게 써먹을 수 있을 거다.
+
+=== 샤딩 ===
+데이터베이스 샤드(Shard)는 검색이나 데이터베이스에서 사용하는 horizontal partition기법이다. 데이터베이스의 내용이 여러 서버 인스턴스로 저장하는 방식으로 로드를 분산한다. 
+
+Key-Value 기반의 NoSQL 데이터베이스에서 consistent hash를 이용해서 샤딩을 구현하는 경우가 많다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Ze9PeEbkVSA5r-l68PvuLYsufu0UhdBvNlrAAqTiPaI/pub?w=579&amp;h=366">
+}}}
+
 == 참고 ==
   * [http://www.google.co.kr/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CCQQFjAA&url=http%3A%2F%2Farxiv.org%2Fpdf%2F1406.2294&ei=jqMYVdXAHcOA8gXTgYLQAQ&usg=AFQjCNGW8DXWCwkfbhLkkdpSqu1hvAt3CQ&sig2=dlmc5D_jQmwkZhJNyzZ2bg&bvm=bv.89381419,d.dGc A Fast, Minimal memory, Consistent Hash Algorithm]
   * [http://en.wikipedia.org/wiki/Consistent_hashing Consistent hashing - wikipedia]
+  * [http://leoh0.blogspot.kr/2014/04/ring-swift.html 모두를 위한 ring 가이드 - swift는 어떻게 사용자의 데이터를 분산해서 저장하는가?] 
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d236 1
+a236 1
+{{{#!plain
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d231 8
+a238 1
+=== 데이터 파티셔닝 ===
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d216 17
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d205 2
+a206 2
+=== 운용 ===
+'''Jump Consistent Hash'''는 아래와 같이 운용할 수 있을 거다.
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d3 1
+a3 1
+== Consistent hash ==
+d6 2
+d80 25
+d219 1
 @
 
 

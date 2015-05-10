@@ -1,0 +1,221 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2015.04.20.16.26.08;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fSystem_5fmanagement_2fLVM
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title LVM - Logical Volume Manager
+
+[[TableofContents]]
+== LVM에 관심을 가지게된 이유 ==
+LVM은 별 관심이 없는 기술이었다. 시스템관리자에게나 필요한 기술이지, 나 같은 소프트웨어 개발자에게 필요한 기술은 아니기 때문이다. 알고 있으면 도움이 되겠으나, 몰라도 크게 상관 없는 그런 기술이었다.
+
+요즘(2012년) 클라우드 관련일을 하면서 LVM에 관심을 가지게 됐다. 클라우드의 장점은 자원의 탄력적인 운용이다. 스토리지 역시 이러한 요구사항을 만족해야 했다. 분산 스토리지, ZFS와 같은 볼륨 메니저, (소프트웨어 혹은 하드웨어)RAID등 다양한 기술들이 있는데, 그중 LVM을 먼저 살펴보기로 했다.
+
+=== LVM 구조 ===
+리눅스 시스템에서 Volume를 만드는 일반적인 방법은 블록 디바이스에 파일 시스템을 만들어서 마운트하는 거다. 대략 아래와 같이 묘사할 수 있다. 
+. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1J1dPlGsEURadwLRRBZnDR_Vam1p4AMedB8SfYg89Mco&amp;w=258&amp;h=209">
+}}}
+
+블럭 장치인 /dev/sda1, /dev/sda2를 파일 시스템에 마운트 해서 사용하고 잇다.
+
+만약 /dev/sda1 을 /mnt/ftp에 마운트 해서 사용하고 싶다면 아래와 같이 작업을 하면 된다. 
+{{{#!plain
+# mkfs -t ext4 /dev/sda1                 # 포맷 하구요
+# mount -t ext4 /dev/sda2 /usr/data/ftp  # 마운트 합니다.
+}}}
+
+이 방식은 파일 시스템과 장치가 직접 맵핑되기 때문에 사용이 직관적이고 구성이 쉽다는 장점이 있다. 반면 '''유연하지 않다'''는 단점이 있다. 처음 /dev/sda1의 크기를 10G로 잡았는데, 용량이 부족해서 늘려야 할 경우도 있다. 장치를 새로 마련하는 방법이 있겠는데, 장치를 여러개 묶어서 크기를 늘리는 것도 쉬운일이 아니다. 혹은 파티션을 나눠야 하는 등 해야 할게 많아진다. 
+
+특히 대량의 데이터를 사용하는 일이 많은 요즘에는 disk를 함께 묶어서 storage pool를 구성해야 할 필요성이 늘어나고 있다. 물리적인 볼륨을 논리적인 볼륨으로 구성할 수 있어야 한다. 
+
+LVM을 이용해서 논리적인 볼륨을 구성 할 수 있다. LVM은 File System과 블럭 디바이스를 추상화 한다. 아래의 그림을 보자.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=1WUZ9yu749btuq8WcP8LXM4D9k8XMVgDXXmDKjL5_2j0&amp;w=341&amp;h=298">
+}}}
+
+논리적인 볼륨을 하나 만들어서 블럭 장치들을 하나로 묶어 버린다. 그리고 나서 적절한 크기로 나눠서 사용한다. 논리적이니 만큼 볼륨을 새로 만들거나 기존 볼륨의 크기를 늘리거나 하는 일을 자유롭게할 수 있다. 
+
+LVM를 좀 더 자세히 살펴 보자. LVM의 가장 밑에는 물리적 볼륨이 있다. 이것을 PV(Physical Volume)라고 한다. 위 그림은 2개의 PV로 구성돼 있다. 그리고 PV는 PE라는 블럭의 모음으로 구성된다. PE는 Physical Extents의 줄임말 이다. 
+
+PV위에는 VG가 있다. Volume Group의 줄임말인데, PV를 논리적으로 묶은 볼륨 그룹이다. 이제 LVM에 Volume를 요청하면, 요청한 크기만큼 LV를 돌려준다. 이 LV를 (/mnt/ftp 등에)마운트 해서 사용하면 된다. 만약 /mnt/ftp의 볼륨크기를 키울려면 남는 PE를 요청해서 LV크기를 늘리면 된다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/pub?id=10XKYaHmA_K_zQA5A5gNT4nrYjN_v6bOpixxkVCC0nmw&amp;w=526&amp;h=358">
+}}}
+
+== LVM으로 할 수 있는 것들 ==
+  1. 새로운 블럭 장치가 추가 할 경우, 기존 파일시스템의 변경 없이 볼륨의 크기를 키울 수 있다.
+  1. 간단하게 LV를 확장할 수 있다.
+  1. LV로 부터 읽기 전용의 snapshot를 만들 수 있다.
+  1. RAID 0처럼 PV를 2개 이상 엮어서 데이터를 읽고 쓸 수 있다. 
+  1. RAID 1처럼 mirror 구성을 할 수 있다.
+=== Linear Mapping LV 와 Striped Mapping LV ===
+RAID0처럼 PV를 묵어서 대역폭을 늘려보자.
+
+{{{#!html
+<table>
+<tr>
+<td>
+<img src="https://docs.google.com/drawings/pub?id=1jSefkW1X9_iKyJTwNGO0lQQ3jYG2nA0jHWXIXhe5b2Y&amp;w=341&amp;h=671">
+</td>
+<td>
+<img src="https://docs.google.com/drawings/pub?id=1RCbeoUYvJ4m4UQ-xvTmuPWaiqTSVP8HeaejsbNPxcEg&amp;w=341&amp;h=671">
+</td>
+</tr>
+</table>
+}}}
+  * Linear Mapping LV 일반적인 방식이다. 블럭 장치에 데이터를 쓰듯이 순차적으로 슨다.
+  * Striped Mapping LV : 두 개의 PV를 striping해서 사용한다. PV의 PE는 적당한 크기의 조각들로 나누어지는데, LVM은 데이터를 두 PV에 분산하여 할당을 한다. 그래서 두개의 PV에서 동시에 데이터를 읽고 쓸수 있게 해서 대역폭을 늘릴 수 있다.
+
+=== snapshot LV ===
+서비스의 중지 없이 백업을 하려고 할때 특히 신경써야 하는게, 백업 도중 데이터 변경이다. 이 문제는 Snapshot LV를 이용해서 해결할 수 있다. 이 기능을 이용하면 특정 시점의 데이터 상태를 고정할 수 있다. 고정하기 원하는 LV를 복사해서 읽기 전용의 새로운 LV를 만드는 방식이다.
+
+== Linux LVM ==
+Linux에서 LVM을 테스트 해보기로 했다. 지금 사용하고 있는 리눅스 박스에는 LVM을 테스트할 더 이상의 공간이 없기 때문에, VirtualBox를 이용해서 테스트 하기로 했다. 장치를 추가할 수 있기 때문에 간단히 테스트 환경을 구축할 수 있다. 두 개의 SATA 디바이스를 추가했다. 이름은 PV1 PV2, 크기는 2G byte로 했다.
+{{{#!html
+<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/AiVLzFpbmwplvKcv46FEsw?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-NzRJ9O3tR48/Tl7ccWlYWbI/AAAAAAAABw8/yHtZ3OTuuP0/s800/lvnubuntu3.png" height="475" width="618" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
+}}}
+
+=== 현재 장치 상태 확인 ===
+VM을 실행한 다음 fdisk로 장치 상태를 확인했다.
+{{{#!plain
+# fdisk -l
+....
+Disk /dev/sdb: 2147 MB, 2147483648 bytes
+255 heads, 63 sectors/track, 261 cylinders
+Units = cylinders of 16065 * 512 = 8225280 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk identifier: 0x00000000
+
+Disk /dev/sdb doesn't contain a valid partition table
+
+Disk /dev/sdc: 2147 MB, 2147483648 bytes
+255 heads, 63 sectors/track, 261 cylinders
+Units = cylinders of 16065 * 512 = 8225280 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk identifier: 0x00000000
+}}}
+/dev/sdb, /dev/sdc 2G byte 크기의 블럭 장치를 확인할 수 있다. 
+
+=== pv 확인하기 ===
+현재 시스템의 physical volume을 확인해 보자.
+{{{#!plain
+# pvscan 
+No matching physical volumes found
+}}}
+아직은 PV가 없다.
+
+=== pv 만들기 ===
+이제 pv를 만든다.
+{{{#!plain
+# pvcreate /dev/sdb /dev/sdc
+  Physical volume "/dev/sdb" successfully created
+  Physical volume "/dev/sdc" successfully created
+}}}
+
+pvscan으로 확인
+{{{#!plain
+# pvscan
+  PV /dev/sdb                      lvm2 [2.00 GiB]
+  PV /dev/sdc                      lvm2 [2.00 GiB]
+  Total: 2 [4.00 GiB] / in use: 0 [0   ] / in no VG: 2 [4.00 GiB]
+}}}
+
+=== vg 만들기 ===
+이제 vg를 만든다. /dev/sdb, /dev/sdc를 vg로 묶었다. 
+{{{#!plain
+# vgcreate myVG /dev/sdb /dev/sdc
+  Volume group "myVG" successfully created
+}}}
+
+=== lv 만들기 ===
+myVG에 1기가 짜리LV를 요청한다. 
+{{{#!plain
+# lvcreate -L 1000M myVG
+  Logical volume "lvol0" created
+}}}
+
+lvdisplay로 lv 정보를 확인할 수 있다. 
+{{{#!plain
+#lvdisplay 
+  --- Logical volume ---
+  LV Name                /dev/myVG/lvol0
+  VG Name                myVG
+  LV UUID                fxc9Lm-MmRh-JTg2-rt6u-2shi-KvPN-udIS73
+  LV Write Access        read/write
+  LV Status              available
+  # open                 0
+  LV Size                1000.00 MiB
+  Current LE             250
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           252:0
+}}}
+
+=== mount해서 잘 사용하기 ===
+이제 파일 시스템사용 하듯이 마운트 해서 사용하면 된다. 
+{{{#!plain
+# mkfs.ext4 /dev/myVG/lvol0 
+# mount -t ext4 /dev/myVG/lvol0 /mnt/ftp/
+# mount | grep mnt
+/dev/mapper/myVG-lvo10 /mnt/ftp  type ext4 (rw)
+}}}
+마운트 성공
+
+=== Volume 관리하기 ===
+==== 볼륨 크기 키우기 ====
+사용하다 보니 볼륨이 꽉찰 지경에 이르렀다. 그래서 LV의 크기를 500M만큼 키우기로 했다. 
+{{{#!plain
+# lvextend -L+500M /dev/myVG/lvol0 /dev/sdb /dev/sdc 
+  Extending logical volume lvol0 to 1.46 GiB
+  Logical volume lvol0 successfully resized
+}}}
+LV 크기가 확장된 걸 확인 할 수 있다.
+
+하지만 지금은 볼륨만 커진 상태로 실제 파일시스템이 커진 상태는 아니다. 이를테면 1.5GB 중 1기가 바이트를 사용하고 있는 상태다.
+{{{#!plain
+# df -h
+/dev/mapper/myVG-lvol0  985M   18M  918M   2% /mnt/ftp
+}}}
+
+resize2fs를 이용하면 포맷하지 않고 파티션의 크기를 조절할 수 잇다.
+{{{#!plain
+# resize2fs /dev/myVG/lvol0
+resize2fs 1.41.14 (22-Dec-2010)
+Filesystem at /dev/myVG/lvol0 is mounted on /mnt/ftp; on-line resizing required
+old desc_blocks = 1, new_desc_blocks = 1
+Performing an on-line resize of /dev/myVG/lvol0 to 384000 (4k) blocks.
+The filesystem on /dev/myVG/lvol0 is now 384000 blocks long.
+}}}
+
+=== LVM과 iSCSI ===
+ * [wiki:Site/System_management/iSCSI iSCSI를 이용해서 원격으로 Volume에 접근]
+
+@

@@ -1,0 +1,48 @@
+#title Simple Vlan Network
+[[TableOfContents]]
+== Simple VLAN Network ==
+=== 문제정의 ===
+  * Public Cloude가 아닌 Private Cloud에서의 Internal 네트워크 구성
+  * [wiki:man/12/VLAN VLAN]을 이용한 네트워크 격리 
+  * 관리/스토리지/Guest망 분리  
+
+== Switch 영역에서의 패턴 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Lzwl3t4bJFOxjBumwwjfNGClvTpLhocOlpw-vghHRNk/pub?w=862&amp;h=449">
+}}}
+  * Mgmt Network, Storage Network, Guest Network로 구성된다. 
+  * Mgmt Network는 내부 관리망이다. 클라우드 시스템을 관리하기 위한 트래픽들이 흐른다. 여기에는 API 트래픽, 모니터링 트래픽, 관리자 접속 트래픽이 포함된다. 
+  * Guest Network는 Trunked VLAN 된다. 이 Trunked VLAN에서 VLAN ID로 유저 네트워크를 격리한다. 
+  * Public Network는 인터넷으로 향하는 트래픽을 처리한다. 여기에서는 Public Network와 Guest Network를 분리했다.
+
+== Local Host 영역에서의 패턴 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1YQtypmJccDMm3M0qr5WtnwsIi9UWYrLEhW76W2JZ8PE/pub?w=982&amp;h=408">
+}}}
+  * 리눅스 브릿지(Bridge)까지 내려온 트래픽은 태그가 제거된 뒤, 각 인스턴스로 전달된다. 
+
+=== Single VLAN 구현 프로토타이핑 ===
+테스트하기 쉬운 Single VLAN 으로 구현한다. 두 개이상의 VLAN은 어차피 네트워크 인터페이스에 vlan 태깅하면 되는 것이니, Single VLAN을 이해하면 쉽게 구현할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1FvkxFr9PbmbvbBrimisrYPTOoQdyL6ud3Jgw35eJf0I/pub?w=705&amp;h=519">
+}}}
+  1. 브릿지 어댑터를 만들어서 네트워크 설정을 하고, 물리 인터페이스와 링크한다.
+  1. VM을 위한 가상 디바이스를 만들어서 브릿지에 연결한다. 
+  1. 각 VM는 가상 디바이스를 물고 올라간다.
+  1. VLAN의 DHCP 서버가 각 VM의 네트워크 설정 정보를 업로드한다.
+실제 테스트는 [wiki:Site/cloud/Qemu/Network#s-5.3 Qemu Bridge Network 구성]을 참고한다.
+
+=== VLAN 구현 프로토타이핑 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1T3xVrSOCZqLSbcc1XktzNIdiM8gSDaXOQTOlK4Bp63g/pub?w=612&amp;h=406">
+}}}
+  1. VLAN 갯수 만큼 브릿지를 만든다.
+  1. 네트워크 인터페이스역시 VLAN 갯수 만큼 만들어서, 각 브릿지에 링크한다. 
+
+== 장점과 단점 ==
+간단하게 구성할 수 있다. 프라이빗 네트워크를 구축한다면, 고려해 볼만 하다.
+
+확장성에 문제가 있다. VLAN은 12bit크기로 4096개의 VLAN을 만들 수 있다. 4096은 퍼블릭 클라우드 서비스를 하기엔 부족한 숫자다. 대기업에서 전사 차원에서 사용하거나 퍼블릭 클라우드를 서비스 하기에는 좋은 선택이 아니다. 여러 개의 VLAN 존을 구축한 다음, 통합하는 방법도 있긴 한데, 안티패턴이 아닌지 고려해야 한다.
+
+확정성 있는 클라우드 네트워크를 지원할 수 있는 솔류션을 찾는다면 '''VXLAN'''을 선택하자.

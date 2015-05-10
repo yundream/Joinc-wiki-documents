@@ -1,0 +1,352 @@
+#title docker Tutorial 
+
+[[TableOfContents]]
+== 용어 ==
+진행하기 전에 용어는 정리해야 겠다.
+ * VM : Hypervisor 위에 올라가는 Virtual machine.
+ * Dock Image : 줄여서 이미지. Dock의 최소 관리 단위. 이 이미지로 부터 컨테이너가 실행된다. 
+ * Dock 컨테이너 : 줄여서 컨테이너. 이미지로 부터 만들어진 실행중인 dock 프로세스   
+ * Docker : 위의 이미지와 컨테이너를 관리하는 소프트웨어
+ * Ubuntu 14.04 : 문서의 내용은 Ubuntu 14.04를 기준으로 테스트했다.
+ * CoreOS : --고려OS--. Docker에 최적화한 리눅스 운영체제(배포판)이라고 한다. 소개만 한다.
+ * 버박 : [wiki:Site/cloud/virtualbox VirtualBox] 
+ * 노가다 : 난 노가다(직접 설치하고 테스트하고, 실패도 하면서)를 뛰면서 그 결과로 문서를 만든다.
+ * 호스트 운영체제 : docker 이미지와 컨테이너를 관리하는 native 운영체제 
+ * [wiki:Site/cloud/AWS AWS] : Amazon Web Service.
+
+== Docker에 대해서 ==
+Docker는 애플리케이션을 개발하고 빌드하고 배포하기 위한 애플리케이션 영역에서 작동하는 가상화 플랫폼이다. 개발자와 시스템관리자는 docker를 이용해서 빠르고 쉽게 그들이 개발한 소프트웨어들을 격리된 운영체제 환경에서 테스트하고 배포할 수 있다.
+
+물론 VM(가상머신)이라고 부르는 도구들을 이용해서 이런 일들을 할 수 있다. AWS와 같은 서비스를 이용한다면, (소프트웨어까지 모두 포함한)운영체제의 스냅샷을 떠서 배포할 수 있다. [wiki:Site/cloud/automation/ChefDeventWithVB vagrant]와 같은 가상화 기반 도구를 이용하면, 통합된 개발환경을 만들 수 있다. 
+
+실제 docker의 기본 개념의 기존의 가상화와 크게 다르지 않다. 단 접근방식에 있어 차이가 있다. 기존의 가상화라고 하면, 하드웨어와 그위에 올라가는 운영체제까지 한번에 띄우는 운영체제 가상화를 의미한다. 이런 방식의 가상화는 (기본적로 하드웨어+소프트웨어 조합이라서)이해하기가 쉽다는 장점과 (독립된 운영체제이기 때문에)격리가 매우 쉽다는 장점이 있다. 격리가 쉽다는 이야기는 달리 말하자면, 관리가 쉽고(근본적으로 물리적 서버 관리하는 것과 차이가 없다.) 시스템/네트워크/유저/보안정책을 적용하기 쉽다는 이야기다. 
+
+반면 다음과 같은 단점이 있다.
+
+VM 방식의 경우 APM(Apache+PHP+Mysql)으로 구성된 간단한 웹서버를 배포하려면, 운영체제까지 전부 배포해야 한다. 3개의 소프트웨어와 약간의 하드디스크, 메모리 공간이 필요할 뿐인데, 운영체제까지 모두 포함한 거대한 이미지를 배포해야 한다는 것은 엄청난 낭비다. 
+
+=== 컨테이너 vs VMs ===
+Docker는 리눅스 '''컨테이너(Container)''' 시스템인 libcontainer[[FootNote(처음에는 LXC를 사용하다가 libcontainer로 갈아탔다.)]]를 이용해서 하나의 운영체제위에서 격리된 컴퓨팅 환경을 운영할 수 있도록 도와주는 '''애플리케이션 레벨 가상화 소프트웨어'''다.  
+
+Docker는 '''AUFS'''라는 파일 시스템을 사용하는데, 읽기 전용 부분과 쓰기 부분이 따로 있고 이들을 병합할 수 있다. 해서 읽기 전용으로는 공통으로 배포되는 정보를 저장해서 다른 개발자들과 공유할 수 있다. 예를들어 Ruby on Rails 환경을 만들었다면, ROR은 읽기 전용 공간에 저장해서 다른 개발자들에게 배포한 후, 쓰기 공간을 이용해서 프로그래밍하는 식의 개발이 가능하다. 
+
+VM과 컨테이너 방식을 비교한 그림이다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1334jQ6ZaKiYwyS1yI_eTnEx0MxE1iCDk_sDdnuGTGNw/pub?w=719&amp;h=397">
+}}}
+
+컨테이너 방식이 훨씬 효율적이라는 걸 예상할 수 있다. VM 보다 더 가볍고, 더 빠르고, 더 작은 공간만을 필요로 한다. 기본적으로 프로세스 단위로 작동하기 때문에, 수백개이상의 컨테이너를 별 어려움 없이 돌릴 수 있다.
+
+Full virtualized 방식의 가상화 시스템에서 VM을 실행하려면, 수분의 시간이 걸린다. 컨테이너 방식에서는 (운영체제가 올라오는게 아니기 때문에)수초면 된다. --앞으론 virtualbox 이용하지 않으련다.-- 
+
+=== Dock 이미지 관리 ===
+한장의 그림으로 Dock 이미지 관리를 설명할 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1Hs-nhPPfsB4EnHKwUpQsSAPgHketK7_Jhfdvhpe6NtU/pub?w=876&amp;h=334">
+}}}
+  1. Docker Public Registery : 공개 Dock 이미지 저장소다. 다양한 종류의 애플리케이션을 탑재한 이미지들이 등록돼 있다.   
+  1. Pull Image : 개발자는 공개 Dock 이미지 저장소로 부터, 원하는 이미지를 찾은(search)다음 개발 PC로 pull해서 개발한다.
+  1. Image commit : 개발하면서 변경된 부분이 있다면, commit을 한다.
+  1. Docker Private Registery : 개발이 끝난 이미지는 private dock 이미지 저장소에 Push 한다. 
+  1. 마지막으로 서비스 시스템에서 이미지를 pull해서 실행하면 배포가끝난다.  
+Git을 이용한 소프트웨어 개발/배포 과정과 매우 유사하다.
+
+== Docker 개발 Tutorial ==
+=== 환경 ===
+'''Ubuntu Linux 14.04'''가 설치된 개인 노트북에서 테스트를 진행했다.
+=== 프로젝트 시나리오 ===
+Docker 개발을 위한 나름대로의 간단한 시나리오를 만들었다. 이 시나리오에 따라서 Docker 테스트를 진행한다.
+  * Apache+PHP5 기반의 웹서비스를 개발하기로 했다. 
+  * 서비스의 이름은 "HelloWorld"로 Hello world를 출력하는 하는 php 파일을 하나 가지고 있다. 
+  * 웹 서비스를 위해 필요한 것들만 배포하고 싶다. 해서 기본적인 기능만 담고 있는 작은 우분투 이미지를 pull해서 개발한다.  
+  * Apache, php5, Mysql을 설치하고 Commit한다. 이 이미지의 이름은 "my_app"이다.
+  * my_app 이미지를 Docker private registery에 등록 한다.  
+  * 이제 개발자들은 my_app을 pull해서, 애플리케이션을 개발할 수 있다. 
+  * '''HelloWorld''' API 개발을 끝냈다면, 서비스 서버에서 pull한다.
+이 경우 Apache+PHP5 까지를 이미지로 떠서 배포를 하고, HelloWorld 애플리케이션은 "git"으로 관리하는 방법을 사용할 수 있겠으나, docker 사용성을 테스트하는게 목적이니 그냥 HelloWorld까지 이미지로 만든다음 pull해서 서비스 하기로 했다.
+
+=== 설치 ===
+docker를 설치한다.
+{{{#!plain
+# apt-get install docker.io
+}}}
+
+docker daemon 실행
+{{{#!plain
+# /etc/init.d/docker.io start
+}}}
+
+docker 정보 확인
+{{{#!plain
+# docker.io info
+Containers: 0
+Images: 0
+Storage Driver: aufs
+ Root Dir: /var/lib/docker/aufs
+ Dirs: 0
+Execution Driver: native-0.1
+Kernel Version: 3.13.0-30-generic
+WARNING: No swap limit support
+}}}
+
+=== 컨테이너 실행 ===
+프로젝트에 사용할 이미지를 선택하기 위해서 Docker public Registery에 등록된 공개 이미지를 검색했다. 우분투 기반운영체제로 찾을 거라서 '''ubuntu'''를 키워드로 검색
+{{{#!plain
+# docker search ubuntu
+}}}
+엄청나게 많은 image 목록을 확인할 수 있다. 유저가 자신의 목적에 맞게 커스터마이징한 수많은 image가 올라가 있기 때문이다. 
+
+나는 ubuntu 이미지를 다운로드 하기로 했다. pull로 이미지를 다운로드 할 수 있다.  
+{{{#!plain
+# docker.io pull ubuntu
+Pulling repository ubuntu
+c5881f11ded9: Download complete 
+463ff6be4238: Download complete 
+195eb90b5349: Download complete 
+3db9c44f4520: Download complete 
+58faa899733f: Download complete 
+}}}
+
+이미지를 실행해서 컨테이너를 만든 후 운영체제 정보를 확인했다.
+{{{#!plain
+# docker.io run -i -t ubuntu /bin/bash
+WARNING: Local (127.0.0.1) DNS resolver found in resolv.conf and containers can't use it. Using default external servers : [8.8.8.8 8.8.4.4]
+root@1e29e208fffe:/# cat /etc/lsb-release 
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=14.04
+DISTRIB_CODENAME=trusty
+DISTRIB_DESCRIPTION="Ubuntu 14.04 LTS"
+}}}
+
+컨테이너 정보를 확인해보자.
+{{{#!plain
+# docker.io ps
+CONTAINER ID    IMAGE           COMMAND       CREATED          STATUS          PORTS     NAMES
+1e29e208fffe    ubuntu:14.04    /bin/bash     35 seconds ago   Up 35 seconds             angry_albattani
+}}}
+
+
+컨테이너의 네트워크 정보를 확인했다.
+{{{#!plain
+root@1e29e208fffe:/# ifconfig
+eth0      Link encap:Ethernet  HWaddr 2e:8c:7a:2a:b5:a2  
+          inet addr:172.17.0.2  Bcast:0.0.0.0  Mask:255.255.0.0
+          inet6 addr: fe80::2c8c:7aff:fe2a:b5a2/64 Scope:Link
+          UP BROADCAST RUNNING  MTU:1500  Metric:1
+          RX packets:8 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:10 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:648 (648.0 B)  TX bytes:828 (828.0 B)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+}}}
+172.17.0.2이라는 IP가 할당됐다.
+
+컨테이너의 네트워크는 어떻게 관리되는 되는 건지 궁금해서 호스트 운영체제에서 확인해봤다.
+{{{#!plain
+# ifconfig 
+docker0   Link encap:Ethernet  HWaddr be:bd:3e:84:50:83  
+          inet addr:172.17.42.1  Bcast:0.0.0.0  Mask:255.255.0.0
+          inet6 addr: fe80::8494:5cff:fed3:640e/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:10 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:688 (688.0 B)  TX bytes:648 (648.0 B)
+# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.11.1    0.0.0.0         UG    0      0        0 wlan0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+}}}
+
+docker를 위한 브릿지 인터페이스를 확인할 수 있다. 시간이 되면 docker 네트워크에 대해서 자세히 살펴봐야 겠다. 
+{{{#!plain
+# brctl show
+bridge name     bridge id               STP enabled     interfaces
+docker0         8000.bebd3e845083       no              vethbf4c
+}}}
+
+현재 설치한 우분투 이미지는 최소한의 패키지만 가지고 있다. 예컨데 ssh 같은 것도 설치되있지 않다. 하여, ssh를 설치하기로 했다. 
+{{{#!plain
+root@1e29e208fffe:/# apt-get install ssh
+}}}
+
+1e29e208fffe는 현재 ssh를 설치했다. 이 컨테이너를 두고두고 써먹기 위해서 my_img로 commit(저장)한다.
+{{{#!plain
+# docker.io commit 1e29e208fffe my_img
+1f19ac8d36e3c1666331f0260cba13b41cc20145e86e92759e9578ffe3af1cab
+}}}
+
+이미지가 저장됐는지 확인해보자. 이미지의 이름은 my_app, 아이디 1f19ac8d36e3로 저장된걸 확인할 수 있다.. 
+{{{#!plain
+# docker.io images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+my_app              latest              1f19ac8d36e3        14 seconds ago      323.1 MB
+ubuntu              utopic              58faa899733f        6 days ago          196 MB
+...
+}}}
+
+내가 만든 이미지 my_app를 실행했다. 컨테이너 아이디가 e47eb44c6c99인 컨터이너가 실행됐다.
+{{{#!plain
+# docker.io run -i -t 1f19ac8d36e3 /bin/bash
+WARNING: Local (127.0.0.1) DNS resolver found in resolv.conf and containers can't use it. Using default external servers : [8.8.8.8 8.8.4.4]
+root@e47eb44c6c99:/#
+}}}
+
+다음으로 넘어가기 전에 내가 한일을 간단히 정리해 보자.
+  1. Public docker registry에서 ubuntu image를 pull 했다.
+  1. pull한 이미지로 부터 컨테이너를 만들었다.
+  1. 깡통 컨테이너다. 적어도 ssh는 설치해야지..
+  1. 변경사항(ssh 설치)를 적용한 새로운 이미지를 commit 했다.
+이제 Apache와 PHP를 설치한 HelloWorld 프로젝트를 위한 이미지를 만들면 된다.
+=== Apache, PHP5 설치 ===
+my_app 이미지로 컨테이너를 띄운다음 apache와 php를 설치한다.
+{{{#!plain
+root@e47eb44c6c99:/# apt-get install apache2
+root@e47eb44c6c99:/# apt-get install php5 
+}}}
+
+Hello world를 서비스하기 위해서 index.php 파일 추가.
+{{{#!plain
+# cat /var/www/html/index.php
+<?php
+  echo "Hello World.";
+?>
+}}}
+이걸로 HelloWorld 프로젝트용 이미지를 만들었다.
+
+=== 현재 컨테이너를 이미지로 commit 하기 ===
+commit 명령을 이용해서 현재 컨테이너의 상태를 저장할 수 있다.
+{{{#!plain
+# docker.io commit 315657d3cd9f my_app
+f6899ddd85761637834727d5512548976920449a4f5d59a0a5d8e42d0e37d30b
+}}}
+
+Image 목록을 확인해보면, my_app 이라는 이름으로 현재 컨테이너가 저장된걸 확인할 수 있을 거다.
+{{{#!plain
+# docker.io images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+my_app              latest              f6899ddd8576        45 seconds ago      316.2 MB
+}}}
+
+새로 만든 이미지로 컨테이너를 만들어보자.
+{{{#!plain
+# docker.io run -i -t my_app /bin/bash
+WARNING: Local (127.0.0.1) DNS resolver found in resolv.conf and containers can't use it. Using default external servers : [8.8.8.8 8.8.4.4]
+}}}
+
+굳.. 잘 되네.. apache와 php까지 떠 있다. 이제 개발자들이 지금 만든 이미지를 공유해서 사용할 수 있도록 '''Private Registery'''에 등록하면 되겠다.   
+
+=== Private Registery를 이용한 docker 이미지 배포 ===
+==== Docker Registery에 등록하기 ====
+Register 서버를 만들기 위한 삽질을 또 어떻게 해야 하나 고민을 했는데, 다행히 public docker registery에 registy 이미지가 있었다. 
+{{{#!plain
+# docker.io pull registry:latest
+}}}
+
+설치된 이미지를 확인했다.
+{{{#!plain
+# docker.io images | grep registry
+registry            latest              6e526128fd5b        2 weeks ago         553.1 MB
+}}}
+
+registry이미지를 이용해서 컨테이너를 실행한다.
+{{{#!plain
+# docker.io run --name private-registry -d -p 5000:5000 registry
+WARNING: Local (127.0.0.1) DNS resolver found in resolv.conf and containers can't use it. Using default external servers : [8.8.8.8 8.8.4.4]
+}}}
+  1. --name : 컨테이너의 이름은 private-registry다.
+  1. -d : 데몬모드로 실행했다.
+  1. -p : 포트포워딩. localhost:5000을 컨테이너:5000으로 포트포워딩 했다.  
+
+컨테이너 정보를 확인
+{{{#!plain
+# docker.io ps 
+CONTAINER ID  IMAGE             COMMAND                CREATED         STATUS         PORTS                   NAMES
+f3a4296938db  registry:latest   /bin/sh -c exec dock   3 seconds ago   Up 3 seconds   0.0.0.0:5000->5000/tcp  private-registry
+}}}
+
+private-registry가 떳는지 [wiki:Site/Tip/curl curl]로 확인했다.
+{{{#!plain
+~# curl -v localhost:5000
+* Rebuilt URL to: localhost:5000/
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 5000 (#0)
+> GET / HTTP/1.1
+> User-Agent: curl/7.35.0
+> Host: localhost:5000
+> Accept: */*
+> 
+< HTTP/1.1 200 OK
+* Server gunicorn/18.0 is not blacklisted
+< Server: gunicorn/18.0
+< Date: Mon, 07 Jul 2014 15:24:31 GMT
+< Connection: keep-alive
+< Expires: -1
+< Content-Type: application/json
+< Pragma: no-cache
+< Cache-Control: no-cache
+< Content-Length: 39
+< X-Docker-Registry-Version: 0.7.3
+< X-Docker-Registry-Config: dev
+< 
+* Connection #0 to host localhost left intact
+}}}
+
+my_app 이미지를 push해보자. Push하기전에 이미지에 이름을 붙여줘야 한다. 이미지 이름은 my_app_demo로 설정했다.
+{{{#!plain
+# docker.io tag my_app localhost:5000/my_app_demo
+# docker.io images | grep my_app_demo
+localhost:5000/my_app_demo   latest              f6899ddd8576        About an hour ago   316.2 MB
+}}}
+
+Private registery에 이미지를 push 한다.
+{{{#!plain
+# docker.io push localhost:5000/my_app_demo
+The push refers to a repository [localhost:5000/my_app_demo] (len: 1)
+Sending image list
+Pushing repository localhost:5000/my_app_demo (1 tags)
+511136ea3c5a: Image successfully pushed 
+d7ac5e4f1812: Image successfully pushed 
+2f4b4d6a4a06: Image successfully pushed 
+83ff768040a0: Image successfully pushed 
+6c37f792ddac: Image successfully pushed 
+e54ca5efa2e9: Image successfully pushed 
+f6899ddd8576: Image successfully pushed 
+Pushing tag for rev [f6899ddd8576] on {http://localhost:5000/v1/repositories/my_app_demo/tags/latest}
+}}}
+
+이미지가 제대로 등록됐는지 확인해 보자.
+{{{#!plain
+# curl http://localhost:5000/v1/repositories/my_app_demo/tags/latest
+"f6899ddd85761637834727d5512548976920449a4f5d59a0a5d8e42d0e37d30b"
+}}}
+
+==== Registery에 있는 이미지에서 컨테이너 만들기 ====
+이제 Private registery에 있는 이미지로 컨테이너를 만들면 된다.
+{{{#!plain
+# docker.io run -i -t localhost:5000/my_app_demo /bin/bash
+WARNING: Local (127.0.0.1) DNS resolver found in resolv.conf and containers can't use it. Using default external servers : [8.8.8.8 8.8.4.4]
+root@309eff26360d:/#
+}}}
+
+== 앞으로 할일 ==
+우선순위 별로
+  1. Docker cheat sheet 작성
+  1. Docker 네트워크 환경 구축
+  1. [wiki:Site/cloud/automation Chef]와 docker를 이용한 배포 자동화
+  1. S3에 Private registery 구축하기
+
+== 참고 ==
+  * http://xmodulo.com/2014/05/manage-linux-containers-docker-ubuntu.html

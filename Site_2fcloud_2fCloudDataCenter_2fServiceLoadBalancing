@@ -1,0 +1,23 @@
+#title 서비스 로드밸런싱
+
+== 서비스 로드밸런싱 ==
+=== 문제정의 ===
+ * 클라우드는 오류를 허용한다. 이런 시스템에서 하나의 인스턴스로는 서비스 가용성을 확보할 수 없다. 
+ * 클라우드는 시스템과 네트워크 자원을 다른 인스턴스와 공유하며, 경쟁한다. 하나의 인스턴스로는 원하는 네트워크 대역폭과 성능을 확보할 수 없다.
+
+=== 패턴 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/13aRZMTZ82lqujoi3SA3uMyL7fngH0kmLNF1a1kMaSc0/pub?w=824&amp;h=405">
+}}}
+  * Instance 앞단에 로드밸런서(Load balancer)를 배치 트래픽을 인스턴스에 배치한다.
+  * LB Manager를 이용해서 인스턴스 그룹을 만들고 헬스체크등을 이용 그룹을 관리한다. 
+  * 유저는 User web console을 이용해서 LB Manager를 조작한다. 
+
+=== Scaling ===
+로드밸런서에 대한 스케일링이 가능해야 한다. 로드밸런서 인스턴스는 scale-out/in 방식으로 대역폭을 늘려야 한다. 가상화를 지원하는 로드밸런서들은 내부적으로 LB 인스턴스를 만들고, LB 인스턴스의 갯수를 늘리고 줄이는 것으로 스케일링을 한다. 물론 이런 장비들은 비싸며, 강력한 CPU 및 네트워크 대역폭을 제공한다.  
+
+소프트웨어적으로 구현하는 걸 고려하자. LVS 혹은 Haproxy등의 소프트웨어를 이용 클러스터를 구성한다. 대역폭을 확보하기 위해서 두 개 이상의 인스턴스에 로드밸런서가 나뉠 수도 있는데, DNS(GSLB등)을 이용해서 묶는다. 
+
+Elastic 로드밸런서 구성에 관한 내용은 아래 문서들을 참고하자.
+  * [wiki:Site/cloud/AWS/ELB ELB 서비스 분석]
+  * [wiki:Site/cloud/ClusterLBWithOpenSource Haproxy를 이용한 LB Cluster 구성]

@@ -1,0 +1,120 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2015.05.08.05.33.46;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fNetworkNamespace
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title Network Namespace
+[[TableOfContents]]
+== Network Namespace ==
+리눅스 시스템에서 네트워크는 단지 하나만(single)존재하는 글로벌 자원이다. 네트워크 인터페이스, 라우팅테이블 등은 하나만 있으며 모든 계정이 이 자원을 공유해서 사용한다. 만약 누군가(보통 루트계정) 네트워크 정보를 변경하면, 시스템 전체에 영향이 미친다.
+
+네트워크 네임스페이스를 이용하면, 격리된 네트워크 환경을 구축할 수 있다.
+== 테스트 환경 ==
+  * 우분투 리눅스 15.04 LTS : 우분투 리눅스는 네트워크 네임스페이스를 기본지원한다.
+  * KVM + Docker : Docker를 위한 가상 인터페이스를 만들어 본다.
+
+== 네트워크 네임스페이스 만들기 ==
+ip 명령은 네트워크 인터페이스, 라우팅, 터널을 관리하기 위한 범용 네트워크 도구다. ip 명령을 이용해서 네임스페이스를 관리할 수 있다. add 명령을 이용해서 '''blue'''이름의 네임스페이스를 만들었다. 
+{{{#!plain
+# ip netns add blue
+}}}
+
+list 명령으로 네임스페이스 목록을 확인할 수 있다.
+{{{#!plain
+# ip netns list blue
+}}}
+
+각 네임스페이스는 독립적인 네트워크 인터페이스, 라우팅테이블, 방호벽정책(iptables)를 가질 수 있다.
+== 네트워크 네임스페이스에 인터페이스 할당 ==
+이렇게 만든 네임스페이스는 말그대로 "이름 공간"으로, 지금은 텅비어 있다. 여기에 인터페이스를 추가하고 네트워크를 설정해서 다른 네임스페이스와 통신하도록 해야 한다. '''blue'''에는 물리적인 인터페이스가 없는데, 어떻게 물리적인 통신이 가능할지를 중점적으로 살펴보면 되겠다.
+
+네트워크 네임스페이스에는 단지 virtual Ethernet(veth)만 할당할 수 있다. 가상 이더넷은 독특한 성질을 가지고 있는데, 이들은 마치 튜브와 같이 항상 쌍(pairs)으로 만들어진다. 한쪽에서 입력된 데이터는 다른쪽에서 수신할 수 있다. 반대로 다른 한쪽에서 입력한 데이터의 수신도 가능하다. 일종의 양방향 파이프인 셈이다. 
+
+그러므로 쌍으로 만들어진 veth의 한쪽은 네임스페이스에 두고, 다른 한쪽을 다른 네임스페이스에 두는 것으로 네임스페이스간에 통신이 가능하다. 혹은 다른 한쪽을 물리적인 네트워크 인터페이스가 있는 공간에 두면, 물리적인 통신도 가능할 것이다. 
+
+veth 쌍을 만들자.
+{{{#!plain
+# ip link add veth0 type veth peer name veth1
+}}}
+link 명령으로 추가된 veth 쌍을 확인할 수 있다.
+{{{#!plain
+# ip link list
+....
+3: veth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether fa:c2:99:1c:a7:ac brd ff:ff:ff:ff:ff:ff
+4: veth0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether ae:91:2a:45:dc:b3 brd ff:ff:ff:ff:ff:ff
+}}}
+이들 veth 인터페이스는 글로벌 공간에 있다. veth1을 blue 네임 스페이스에 추가하자.
+{{{#!plain
+# ip link set veth1 netns blue
+}}}
+다시 '''ip link list'''를 실행해보면, 목록에서 veth1을 찾을 수 없을 것이다. 글로벌 공간에서 blue 공간으로 이동했기 때문이다. blue 공간에서 확인해 보자.
+{{{#!plain
+# ip netns exec blue ip link list
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+3: veth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether fa:c2:99:1c:a7:ac brd ff:ff:ff:ff:ff:ff
+}}}
+  * '''ip netns exec''' : 네트워크 네임스페이스에 대한 명령을 시작한다.
+  * 명령을 실행 할 네임스페이스 이름을 준다.  
+  * 마지막으로 네임스페이스에 대한 명령 '''ip link list'''를 실행한다.
+실행 결과 루프백과 veth1 인터페이스를 확인할 수 있을 것이다.
+
+=== 네트워크 네임스페이스에 있는 인터페이스 설정 ===
+blue 네임스페이스의 veth1는 '''DOWN'''상태로 아직 네트워크 설정이 되지 않았다. '''ip netns exec'''로 네트워크를 설정하자.
+{{{#!plain
+# ip netns exec blue ifconfig veth1 10.1.1.1/24 up
+}}}
+ifconfig를 이용해서 네트워크를 설정했다. (ip addr, ip route, ip link 등을 이용해서 설정할 수도 있다.) 네트워크 정보를 확인해 보자.
+{{{#!plain
+# ip netns exec blue ifconfig
+veth1     Link encap:Ethernet  HWaddr fa:c2:99:1c:a7:ac  
+          inet addr:10.1.1.1  Bcast:10.1.1.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+}}}
+이 설정은 blue 네임스페이스에 격리된 정보이기 때문에 글로벌 영역에서는 보이지 않는다. 따라서 글로벌 영역과의 통신도 할 수 없는데, ping 10.1.1.1을 하면 도달하지 않는 걸 확인할 수 있을 것이다. 
+
+글로벌 영역과의 연결은 veth1의 쌍인 (글로벌 영역에 있는)veth0을 통해서 가능하다. veth0의 네트워크를 설정하자. 
+{{{#!plain
+# ifconfig veth0 10.1.1.2/24 up
+# ping 10.1.1.1
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+64 bytes from 10.1.1.1: icmp_seq=1 ttl=64 time=0.077 ms
+}}}
+veth1과 통신이 되는 걸 확인할 수 있다. 지금의 구성 그림으로 그려봤다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/194vuKPIkCEYlm-MjUq9fr_ilLx1PVi_RBNENCaJ-XII/pub?w=641&amp;h=192">
+}}}
+
+... 계속
+== 참고 ==
+ * [http://www.opencloudblog.com/?p=42 opencloudblog - Linux Network Namespaces]
+ * [https://lwn.net/Articles/580893/ Namespace in operation part 7 : Network namespaces]
+ * [http://blog.scottlowe.org/2013/09/04/introducing-linux-network-namespaces/ Introducing linux network namespaces]
+@

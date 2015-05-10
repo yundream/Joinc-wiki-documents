@@ -1,0 +1,136 @@
+#title Bridge
+[[TableOfContents]]
+== 브릿지 ==
+브릿지(Bridge)는 두 개의 이더넷 세그먼트를 연결하기 위해서 사용한다. 브릿지에서 패킷은 IP주소가 아닌, 이더넷 주소를 기반으로 전송된다. 패킷은 L2영역에서 이루어지기 때문에, 프로토콜에 상관 없이 투명하게 다룰 수 있다. 
+
+리눅스 브릿지 코드는 ANSI/IEEE 802.1d 표준의 서브셋을 구현한다.
+
+=== 브릿지와 방화벽 ===
+리눅스 브릿지는 트래픽을 제어할 수 있기 때문에, 하드웨어 브릿지 보다 더 많은 기능을 수행할 수 있다. 리눅스 브릿지는 방화벽 프로그램인 ebtables 과 함께 사용한다. 
+
+== 브릿지 사용 ==
+ * 우분투 리눅스 14.10
+=== 모듈 로딩 ===
+우분투 리눅스에서 브릿지(bridge)는 기본 모듈로 올라온다. 특별한 설정이 없더라도 brctl 명령을 사용할 수 있다. brctl 명령을 찾을 수 없다면 bridge-utils 패키지를 인스톨 하자.
+{{{#!plain
+# apt-get install bridge-utils
+}}}
+brctl 명령을 실행.
+{{{#!plain
+# brctl 
+Usage: brctl [commands]
+commands:
+        addbr         <bridge>        add bridge
+        delbr         <bridge>        delete bridge
+        addif         <bridge> <device>    add interface to bridge
+        delif         <bridge> <device>    delete interface from bridge
+        hairpin       <bridge> <port> {on|off}    turn hairpin on/off
+        setageing     <bridge> <time>        set ageing time
+        setbridgeprio    <bridge> <prio>        set bridge priority
+        setfd         <bridge> <time>        set bridge forward delay
+        sethello      <bridge> <time>        set hello time
+        setmaxage     <bridge> <time>        set max message age
+        setpathcost    <bridge> <port> <cost>    set path cost
+        setportprio    <bridge> <port> <prio>    set port priority
+        show          [ <bridge> ]        show a list of bridges
+        showmacs      <bridge>        show a list of mac addrs
+        showstp       <bridge>        show bridge stp info
+        stp           <bridge> {on|off}    turn stp on/off
+}}}
+
+=== 브릿지 디바이스 만들기 ===
+{{{#!plain
+# brctl addbr "bridgename"
+}}}
+bridgename을 이름으로 하는 논리적인 브릿지 인스턴스를 만든다. 브릿지 디바이스는 네트워크 인터페이스 처럼 작동하며, 때문에 ifconfig로 확인 할 수 있다.
+
+delbr로 브릿지 디바이스를 제거할 수 있다.
+{{{#!plain
+# brctl delbr "bridgename"
+}}}
+
+=== 브릿지에 디바이스 추가하기 ===
+{{{#!plain
+# brctl addif bridgename device
+}}}
+bridgename  브릿지 디바이스에 네트워크 디바이스들을 연결한다. 브릿지는 네트워크를 L2영역에서 통합하는 일을 하기 때문에, 물려있는 모든 디바이스들은 하나의 커다란 동일 네트워크에 묶인 것 처럼 행동한다. 디바이스는 하나의 브릿지 디바이스에만 추가할 수 있다. 
+
+delif 옵션으로 디바이스를 제거할 수 있다.
+{{{#!plain
+# brctl delif bridgename device
+}}}
+
+=== 브릿지에 연결된 디바이스 확인 ===
+show 명령을 이용해서 브릿지에 연결된 디바이스의 목록을 확인할 수 있다. 브릿지를 하나 만들어서 테스트를 해보자.
+
+{{{#!plain
+# brctl addbr br549
+# brctl addif br549 eth0
+# brctl addif br549 eth1 
+# brctl show
+bridge name  bridge id           STP enabled    interfaces
+br549        8000.5a2f6ffa5b2c   no             tap1
+                                                tap2
+}}}
+네트워크 인터페이스가 브릿지에 성공적으로 연결됐다면, '''showmacs'''를 이용해서 인터페이스 정보를 확인 할 수 있다.
+{{{#!plain
+# brctl showmacs br549
+port no mac addr                is local?       ageing timer
+   1     00:00:4c:9f:0b:ae       no                17.84
+   1     00:00:4c:9f:0b:d2       yes                0.00
+   2     00:00:4c:9f:0b:d3       yes                0.00
+   1     00:02:55:1a:35:09       no                53.84
+   1     00:02:55:1a:82:87       no                11.53
+}}}
+브릿지는 패킷을 받으면, 패킷의 MAC을 일정시간 저장한다. 그리고 MAC 테이블이 가득 차는 걸 방지하기 위해서 일정 시간마다 MAC주소를 삭제하는데, 이를 ageing timer이라고 한다. setageing 명령을 이용해서 ageing time 시간을 변경할 수 있다. time의 단위는 초(second)다.
+{{{#!plain
+# brctl setageing bridgename time
+}}}
+
+=== Spanning Tree protocol ===
+여러 개 혹은 중복(redundant) 브릿지를 설치하는 경우, 루프를 방지하기 위해서 [wiki:man/12/stp STP]를 활성화 해야 한다. 
+{{{#!plain
+# brctl stp br549 on
+}}}
+
+showstp로 STP 값들을 볼 수 있다. 
+{{{#!plain
+# brctl showstp br549
+ br549
+  bridge id              8000.00004c9f0bd2
+  designated root        0000.000480295a00
+  root port                 1                    path cost                104
+  max age                  20.00                 bridge max age           200.00
+  hello time                2.00                 bridge hello time         20.00
+  forward delay           150.00                 bridge forward delay      15.00
+  ageing time             300.00                 gc interval                0.00
+  hello timer               0.00                 tcn timer                  0.00
+  topology change timer     0.00                 gc timer                   0.33
+  flags
+ 
+ eth0 (1)
+  port id                8001                    state                   forwarding
+  designated root        0000.000480295a00       path cost                100
+  designated bridge      001e.00048026b901       message age timer         17.84
+  designated port        80c1                    forward delay timer        0.00
+  designated cost           4                    hold timer                 0.00
+  flags
+ 
+ eth1 (2)
+  port id                8002                    state                   disabled
+  designated root        8000.00004c9f0bd2       path cost                100
+  designated bridge      8000.00004c9f0bd2       message age timer          0.00
+  designated port        8002                    forward delay timer        0.00
+  designated cost           0                    hold timer                 0.00
+  flags
+}}}
+
+=== Multicast(IGMP) snooping ===
+IGMP는 멀티캐스팅을 지원하는 라우터에게 멀티캐스트 트래픽을 요청하기 위해서 사용하는 IP 기반의 프로토콜이다. L2 네트워크에서 멀티캐스트를 처리하려면, L3계층의 IGMP의 패킷 내용을 읽어야 한다. 리눅스 브릿지나 iproute2는 Multicast snooping를 지원하지 않지만 '''sysfs'''인터페이스를 이용해서 제어할 수 있다. 브릿지 '''brN'''에 대한 sysfs 파일의 위치는 /sys/devices/virtual/net/brN/bridge 밑에 있다. 
+
+== 설정 예제 ==
+=== KVM에서 브릿지 네트워크 구성 ===
+ * [wiki:Site/cloud/Qemu/Network#s-5.3 Qemu Network 참고]
+== 참고 ==
+  * [http://www.linuxfoundation.org/collaborate/workgroups/networking/bridge 원문 - Bridge]
+  * [http://www.netmanias.com/ko/post/blog/5673/iptv-igmp-snooping-igmp/igmp-snooping-for-iptv-service igmp snooping for iptv service]

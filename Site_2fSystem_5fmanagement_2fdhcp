@@ -3,62 +3,44 @@
 [[TableOfContents]]
 == DHCP 설치 ==
 === DHCP 란 ===
-Dynamic Host Configuration Protocol의 줄임말입니다. 자동으로 네트워크 환경을 설정하기 위해서 사용하는 프로토콜이란 의미가 되겠네요. 
+Dynamic Host Configuration Protocol의 줄임말로, 자동으로 네트워크 환경을 설정하기 위해서 사용하는 프로토콜이다.
 
-네트워크 정보를 모르더라도 간단하게 네트워크 설정을 할 수 있습니다. LAN 영역에 있는 DHCP 서버에 요청을 해서 IP 주소, subnetmask, gateway, dns 등을 자동으로 설정해주는 방식이죠. 
+네트워크에 참여하는 노드는 네트워크 정보를 모르더라도 간단하게 네트워크 설정을 할 수 있다. LAN 영역에 있는 DHCP 서버에 요청을 해서 IP 주소, subnetmask, gateway, dns 등을 자동으로 설정해주는 방식이다.
 
-저는 그 동안 단순히 DHCP 서버를 사용하기만 해왔습니다. 소프트웨어 개발자이다 보니, 굳이 DHCP 서버를 구축해야할 필요가 없었던 거죠. 그러다가 DHCP 서버를 직접 구성해야할 일이 생겼습니다. kickstart 환경을 구축하려다 보니 자연 스럽게 dhcp서버를 구성해야 되더군요. 
+나는 그 동안 단순히 DHCP 서버를 사용하기만 했다. 소프트웨어 개발자이다 보니, 굳이 DHCP 서버를 구축해야할 필요가 없었던 거다. 그러다가 kickstart 환경을 구축 하면서 자연 스럽게 dhcp서버를 구성해야 하는 필요가 생겼다. 
 
-그래서 이번 기회에 dhcp 서버를 직접 구성해보기로 했습니다.
-
-제대로 하면 생각해야 할게 많을 건데요. 우선은 홈 네트워크환경에서 간단하게 구성했습니다. 언젠가 자세히 살펴볼 그날이 오면, 그때 복잡하게 생각하죠.
-
+그래서 이번 기회에 dhcp 서버를 직접 구성해보기로 했다.
 === dhcp server 설치 환경 ===
-제 리눅스 박스에 dhcp server를 설치하기로 했습니다. 제 리눅스 박스에는 Ubuntu 11.10이 설치돼 있습니다.
+내 리눅스 박스에 dhcp server를 설치하기로 했습니다. 사용하고 있는 배포판은 '''우분투 리눅스 11.10'''이다. 
 
-dhcp 서버를 설치한 다음, Virtualbox(:12)로 centos vm을 만들어서 dhcp 작동여부를 테스트 하기로 했습니다. centos vm이 dhcp 클라이언트가 되는 거죠. centos vm의 eth0를 dhcp로 설정했을때 ubuntu dhcp server로 부터 네트워크 정보를 잘 가져오는지를 확인하면 됩니다. 테스트 환경을 그림으로 그렸습니다.
+dhcp 서버를 설치한 다음, [wiki:Site/cloud/virtualbox Virtualbox]로 centos vm을 만들어서 dhcp 작동여부를 테스트 하기로 했다. centos vm이 dhcp 클라이언트로 작동하는 그림이다.. centos vm의 eth0를 dhcp로 설정하고, ubuntu dhcp server로 부터 네트워크 정보를 잘 가져와서 네트워크를 설정하고, 통신이 되는지 확인하면 된다.
 
 {{{#!html
 <img src="https://docs.google.com/drawings/pub?id=101metMq3iQkmXbpF_8sOh2HguX495mhndgaScTRhQH4&amp;w=609&amp;h=268">
 }}}
 
-테스트는 제 집에서 이루어졌습니다. 무선 공유기를 통해서 인터넷에 접속하고 있습니다. Ubunt 리눅스가 DHCP 서버의 역할을 하고 Centos가 클라이언트 역할을 합니다. 무선 공유기가 게이트 웨이 역할을 하며, IP는 172.30.1.254입니다.
-
-무선 공유기에 DHCP가 활성화 돼 있는데요. 이 경우 CentOS가 무선 공유기에서 DHCP 정보를 받아오므로 무선 공유기의 DHCP를 비활성화 해야 합니다.
-
-웹을 이용해서 공유기 관리자 페이지에 접근을 했습니다. 그런데 패스워드를 모르겠네요 쩝. 공유기 메뉴얼에 있긴 하겠지만 분명히 버렸을 듯하고 찾기도 귀찮아서, 네이버에서 찾았더니 초기 패스워드를 알려주네요.
-
-{{{#!html
-<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/2uJVFSJ9bOIGvKfbJYu61Q?feat=embedwebsite"><img src="https://lh3.googleusercontent.com/-0HvbgF5WuB8/TrSMh5Pv2YI/AAAAAAAAB40/13UazedluKk/s400/kt01.png" height="400" width="305" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
-}}}
-
-대충 메뉴를 찾아서 DHCP를 비활성화 모드로 변경했습니다.
-{{{#!html
-<table style="width:auto;"><tr><td><a href="https://picasaweb.google.com/lh/photo/ScM9K9lFXn6DLYyHlJtlGQ?feat=embedwebsite"><img src="https://lh4.googleusercontent.com/-AUx4Dq19vsU/TrSMlGjzD8I/AAAAAAAAB48/h3YUWpiyVwE/s400/kt02.png" height="400" width="305" /></a></td></tr><tr><td style="font-family:arial,sans-serif; font-size:11px; text-align:right">보낸 사람 <a href="https://picasaweb.google.com/yundream/Linux?authuser=0&feat=embedwebsite">Linux</a></td></tr></table>
-}}}
+내 집에서 테스트를 진행했다. 무선 공유기를 통해서 인터넷에 접속하고 있다. 굳이 무선 공유기를 그림에 넣은 이유는 공유기의 DHCP 서버가 테스트 환경에 영향을 줄 수 있기 때문이다. DHCP는 브로드 캐스팅이 되는데, 두 개의 DHCP 서버가 있을 경우 두 서버 모두 DHCP 응답을 하기 때문에 네트워크 설정이 꼬일 수 있다. 그래서 무선 공유기의 DHCP 설정을 비활성화 했다. 
 
 === dhcp server 설치와 설정 ===
-아래와 같이 테스트 환경을 만들었습니다.
+아래와 같이 테스트 환경을 만들었다.
 
 {{{#!html
 <img src="https://docs.google.com/drawings/pub?id=1F-f0I2JVhNKYEASFydkDUPPJtDXVSU_Zp_hOY9n4j0A&amp;w=563&amp;h=296">
 }}}
   * dhcp server : 제 리눅스 박스 입니다. 
-  * guest vm : virtualbox(:12)로 guest vm을 만들었습니다. guest vm 운영체제는 CentOS 6.2 입니다. 
+  * guest vm : virtualbox로 guest vm을 만들었습니다. guest vm 운영체제는 CentOS 6.2 입니다. 
 
 ==== 동적으로 임의의 IP 주소 할당하기 ====
-네트워크 주소를 요청하는 호스트에 할당된 네트워크 범위내에서 임의의 IP 주소를 할당하는 설정입니다.
-
-dhcp server 설치. isc-dhcp-server를 설치하기로 했습니다.
+네트워크 주소를 요청하는 호스트에 할당된 네트워크 범위내에서 임의의 IP 주소를 할당하는 설정이다.  dhcp server 설치. isc-dhcp-server를 설치하기로 했다.
 {{{#!plain
 # sudo apt-get install isc-dhcp-server
 }}}
 
-이제 dhcp 설정파일을 만들어야 겠죠. 설정 파일을 만들기 전에 dhcp로 서비스할 네트워크 환경을 계획하기로 했습니다. 
-  * IP 주소 대역 : dhcp 클라이언트에 할당할 IP 대역으로 192.168.56.2 ~ 192.168.56.254을 할당하기로 했습니다.
+이제 dhcp 설정파일을 만들어야 겠다. 설정 파일을 만들기 전에 dhcp로 서비스할 네트워크 환경을 계획하기로 했다.
+  * IP 주소 대역 : dhcp 클라이언트에 할당할 IP 대역으로 192.168.56.2 ~ 192.168.56.254을 할당한다.
   * subnet mask : 255.255.255.0
-  * dns server : 외기 쉬운 google dns 서버를 사용하기로 했습니다. 8.8.8.8 과 8.8.6.6 입니다.
-이 정보를 dhcp 설정파일에 써주면 됩니다. dhcp 설정파일의 위치는 /etc/dhcp/dhcpd.conf 입니다. 
+  * dns server : google dns 서버를 사용하기로 했습니다. 8.8.8.8 과 8.8.6.6 이다. 
+이 정보를 dhcp 설정파일에 쓰면된다. dhcp 설정파일의 위치는 /etc/dhcp/dhcpd.conf 다. 
 {{{#!plain
 ddns-update-style none;
 

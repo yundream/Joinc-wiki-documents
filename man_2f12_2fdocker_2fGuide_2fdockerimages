@@ -1,0 +1,141 @@
+#title 도커 이미지 작업 
+[[TableOfContents]]
+== 도커 이미지 작업 ==
+도커 컨테이너는 도커 이미지로 부터 만들어진다. 도커를 이용한 모든 작업의 기본이 되는 녀석이다.
+
+도커는 먼저 로컬에 있는 도커 이미지를 이용해서 작업을 한다. 만약 로컬에 찾는 이미지가 없다면, '''Docker Hub Registry'''에서 찾아서 로컬에 복사한 다음 작업을 한다.
+
+이번 문서에서 다룰 내용들이다.
+  * 도커 호스트에 있는 이미지들의 관리 
+  * 이미지 만들기
+  * Docker Hub Registry에 이미지 올리기
+
+== 호스트에 있는 이미지 목록 확인 ==
+'''docker images'''명령으로 로컬 호스트에 설치된 이미지 목록을 확인할 수 있다.
+{{{#!plain
+# docker images
+REPOSITORY          TAG                IMAGE ID            CREATED             VIRTUAL SIZE
+training/webapp     latest             02a8815912ca        24 hours ago        348.8 MB
+ubuntu              15.04              ef8182f3c943        3 weeks ago         131.3 MB
+ubuntu              vivid              ef8182f3c943        3 weeks ago         131.3 MB
+ubuntu              vivid-20150421     ef8182f3c943        3 weeks ago         131.3 MB
+ubuntu              14.10              0b79d1c2df16        3 weeks ago         194.5 MB
+ubuntu              utopic             0b79d1c2df16        3 weeks ago         194.5 MB
+.....
+}}}
+이미지 목록에서 우리는 아래의 중요한 정보를 얻을 수 있다.
+  * REPOSITORY : 어느 저장소로 부터 왔는지
+  * 각 이미지의 버전 
+  * 이미지의 고유 아이디 
+저장소는 이미지의 여러 변형을 보유할 수 있다. '''ubuntu'''이미지의 경우 배포버전을 기준으로 10.04, 12.04. 12.10. 13.04, 14.04 등의 여러 변형을 가지고 있다. 이들 변형은 태그(TAG)로 식별할 수 있으며, 아래와 같이 태그를 이용해서 변형 중 하나를 특정 할 수 있다. 
+{{{#!plain
+ubuntu:14.04
+}}}
+그래서 아래와 같이 컨테이너를 만들 수 있다. 
+{{{#!plain
+# docker run -t -i ubuntu:14.04 /bin/bash
+root@d9b330cb0f05:/# cat /etc/issue
+Ubuntu 14.04.2 LTS \n \l
+}}}
+만약 태그를 이용하지 않고 '''ubuntu'''만 사용 할 경우, 도커는 '''ubuntu:latest'''이미지를 선택한다.
+
+== 새 이미지 가져오기 ==
+도커는 먼저 로컬에서 이미지를 찾고, 찾는 이미지가 없을 경우 자동으로 다운로드 받아서 저장한다. 따라서 대부분의 굳이 새 이미지를 미리 다운로드 할 필요는 없다. 하지만 다운로드에 걸리는 시간과 트래픽을 아끼기 위해서 미리 다운로드를 해야 하는 경우가 있다. '''docker pull''' 명령을 이용해서 '''centos'''를 다운로드 하는 예제다. 
+{{{#!plain
+# docker pull centos
+Pulling repository centos
+b7de3133ff98: Pulling dependent layers
+5cc9e91966f7: Pulling fs layer
+511136ea3c5a: Download complete
+ef52fb1fe610: Download complete
+. . .
+
+Status: Downloaded newer image for centos
+}}}
+이렇게 다운로드한 이미지는 로컬 호스트에 저장이되고, 즉시 실행 할 수 있게된다. 
+
+== 이미지 찾기 ==
+도커는 다양한 목적으로 사용 할 수 있는 '''이미 만들어져 있는 도커 이미지'''를 사용 할 수 있는 수단을 제공한다. '''[https://registry.hub.docker.com/ Docker Hub]'''에서 검색할 수 있으며, 직접 만든 도커 이미지를 업로드해서 공유할 수도 있다.
+
+https://docs.docker.com/userguide/search.png
+
+로컬 호스트에서 '''docker search'''명령으로 찾는 방법도 있다. Ruby + Sinatra 기반의 웹 애플리케이션을 개발한다고 가정해 보자. 팀원 모두가 동일한 개발 환경을 갖춰야 할 것이다. 해서 '''sinatra''' 키워드를 이용해서 쓸만한 이미지를 찾기로 했다.
+{{{#!plain
+# docker search sinatra
+NAME                            DESCRIPTION                 STARS     OFFICIAL   AUTOMATED
+training/sinatra                                            5 
+shaoheshan/sinatra                                          0                    [OK]
+zoomix/sinatra-galleria                                     0                    [OK]
+llamashoes/docker-sinatra                                   0                    [OK]
+......
+}}}
+많은 종류의 sinatra 이미지를 확인할 수 있다.
+  * '''NAME''' : 이미지의 이름
+  * '''DESCRIPTION''' : 이미지에 대한 설명
+  * '''STARTS''' : 누구나 이미지를 올릴 수 있는 만큼, 판단의 기준이 필요하다. 페이스북의 '''좋아요'''개념.  
+  * '''OFFICIAL''' : 신중한 검토가 이루어진 공식 이미지. Ubuntu나 CentOS와 같이 이미지를 만들 때, 기본이 되는 중요 배포판 이미지들, 인기있는 프로그래밍 언어, 데이터베이스를 포함함 이미지들이 있다. 
+  * '''AUTOMATED''' : 자동화된 저장소는 이미지의 소스와 컨텐츠를 검증 할 수 있도록 빌드한다고 한다. 어떤 의미인지는 아직 모르겠다. 
+보통 이들 이미지는 '''ubuntu'''나 '''centos'''와 같은 기본 이미지(혹은 루트 이미지라고 부른다)로 부터 만든다. 이들 베이스 이미지들은 '''Docker Inc'''에 의해서 검증이 되며, 업데이트를 지원한다.  
+
+== 이미지 가져오기 ==
+'''docker pull''' 명령으로 '''training/sinatra''' 이미지를 다운로드 할 수 있다.
+{{{#!plain
+# docker pull training/sinatra
+}}}
+팀원들은 다운로드한 이미지로 부터 컨테이너를 실행할 수 있다.
+{{{#!plain
+root@docker-01:~# docker run -t -i training/sinatra /bin/bash
+root@5de6755856c7:/# 
+}}}
+== 이미지 만들기 ==
+'''training/sinatra'''이미지는 당장 사용하기에 유용하기는 하지만, 우리가 필요로 하는 몇 가지 기능들이 빠져서 이미지를 변경하기로 했다. 이미지는 두 가지 방법으로 만들 수 있다. 
+  1. 원본 이미지로 부터 컨테이너를 만들고, 수정을 한뒤에 '''commit'''명령을 이용해서 새로운 이미지를 만든다. 
+  1. '''Dockerfile'''을 이용해서 이미지를 만든다.
+=== 이미지의 변경 내용을 committing 하기 ===
+'''training/sinatra'''를 이용해서 프로젝트를 진행하려고 한다. 아래와 같이 컨테이너를 실행했다.
+{{{#!plain
+root@docker-01:~# docker run -t -i training/sinatra /bin/bash
+root@5de6755856c7:/# 
+}}}
+우리의 웹 애플리케이션은 JSON 형태의 데이터를 다룬다. 그런데 ruby json 패키지가 설치되지 않았다. 아래와 같이 json 패키지를 설치했다.
+{{{#!plain
+root@5de6755856c7:/# gem install json
+Fetching: json-1.8.2.gem (100%)
+Building native extensions.  This could take a while...
+Successfully installed json-1.8.2
+1 gem installed
+Installing ri documentation for json-1.8.2...
+Installing RDoc documentation for json-1.8.2...
+}}}
+exit를 입력해서 컨테이너를 종료한 후, '''docker commit'''명령을 이용해서 변경된 내용을 '''commit'''한다.
+{{{#!plain
+# docker commit -m "Added json gem" -a "yundream" 5de6755856c7 joinc/sinatra:v2
+9db77a364e543bf6e9c726828493f8b93b234033f56139e0ccf92987a6a969cc
+}}}
+'''docker commit'''명령을 이용해서 변경된 내용을 commit 한다. '''-m''' 플래그는 커밋 메시지를 저장하기 위해서 사용한다. '''-a'''는 작업자(AUTHOR)를 알려주기 위해서 사용한다. Git과 같은 버전 관리 시스템의 commit과 매우 비슷하게 작동 함을 알 수 있다.
+
+'''5de6755856c7'''는 커밋할 컨테이너의 ID, '''joinc/sinatra:v2'''는 저장 할 이미지의 이름이다. 커밋한 이미지는 docker images로 확인 할 수 있다. 
+{{{#!plain
+# docker images
+REPOSITORY          TAG                   IMAGE ID            CREATED             VIRTUAL SIZE
+joinc/sinatra       v2                    9db77a364e54        21 minutes ago      452.1 MB
+training/webapp     latest                02a8815912ca        43 hours ago        348.8 MB
+}}}
+새로 만든 이미지를 이용해서 컨테이너를 실행해 보자.
+{{{#!plain
+root@docker-01:~# docker run -i -t joinc/sinatra:v2 /bin/bash
+root@e97c70747cae:/# gem list
+*** LOCAL GEMS ***
+backports (3.6.0)
+bundler (1.6.2)
+faker (1.3.0)
+i18n (0.6.9)
+json (1.8.2)
+....
+}}}
+=== Dockerfile로 부터 이미지 만들기 ===
+== 이미지에 태깅하기 ==
+
+== 이미지 올리기 ==
+
+== 이미지 삭제 ==

@@ -1,0 +1,64 @@
+#title 도커 애플리케이션 개발 - Hello World
+[[TableOfContents]]
+== Docking Application : "Hello World" ==
+'''docker run'''으로 도커 컨테이너를 만들 때, 애플리케이션을 실행 할 수 있다. 
+=== Hello World ===
+{{{#!plain
+# docker run ubuntu /bin/echo "hello World"
+hello World
+}}}
+  1. '''docker'''가 실행 되면 '''run'''명령을 수행한다. '''docker run'''은 다음에 오는 도커이미지를 실행한다.  
+  1. '''ubuntu'''는 실행할 도커 이미지 이름이다. 
+  1. 이미지 이름을 설정하면, 먼저 도커는 로컬 도커 호스트로 부터 이미지를 찾는다. 만약 찾을 수 없다면, '''public image registry'''(Docker Hub)에 있는 이미지를 이용한다. 
+  1. 실행된 컨테이너에서 다음 명령을 실행한다. 
+   {{{#!plain
+/bin/echo "Hello world" 
+}}}
+컨테이너는 자신의 시스템 경로에 있는 "/bin/echo" 명령을 찾아서 실행한다. 그 결과 "Hello World"메시지를 출력한다. 메시지를 출력한 컨테이너는 종료한다.
+
+=== Interactive Container ===
+도커에서 작업을 하고 싶다면 '''docker run'''시 /bin/bash를 띄우면 된다. 그러면 bash 쉘을 빠져나가기 전까지, 컨테이너에서 작업을 수행 할 수 있다.
+{{{#!plain
+# docker run -t -i ubuntu /bin/bash
+root@327568642c19:/# 
+}}}
+  * -t : 새로운 컨테이너에 터미널을 할당한다. 
+  * -i : 표준입력을 컨테이너에 전달한다.
+컨테이너는 /bin/bash를 실행하는 데, 실행 결과는 터미널에 출력되며, 표준입력을 이용해서 /bin/bash와 상호작용 할 수 있다. 그 결과 마치 컨테이너에 접속한 것과 같은 환경에서 작업을 할 수 있다.
+{{{#!plain
+root@327568642c19:/# pwd
+/
+root@327568642c19:/# ls
+bin   dev  home  lib64  mnt  proc  run   srv  tmp  var
+boot  etc  lib   media  opt  root  sbin  sys  usr
+}}}
+exit 혹은 '''Ctrl+D'''를 입력해서 쉘을 빠져나오면, 컨테이너도 종료된다.
+
+=== 데몬 ===
+애플리케이션 실행이 끝난 후 컨테이너가 종료되는 것도 유용하게 사용 할 수 있기는 하지만 터미널을 점유해 버려서 사용이 귀찮다. '''-d'''를 이용하면 데몬 형태로 백그라운드에서 작동하도록 할 수 있다.
+{{{#!plain
+# docker run -d ubuntu /bin/sh -c "while true; do echo hello world; sleep 1; done"
+aa26447cd5cbd26bcc850447ddaf43a9b1b8e61ea83e3076c2e0a302b722ca6e
+}}}
+출력하는 값은 '''컨테이너 아이디(container ID)'''다. 아무리 기달려도 '''hello world'''가 출력되지는 않을 거다.
+
+'''docker ps'''명령으로 컨테이너 목록을 확인해 보자. 앞서 실행한 컨테이너가 여전히 작동 중인 걸 확인 할 수 있다.
+{{{#!plain
+# docker ps
+CONTAINER ID   IMAGE          COMMAND                CREATED          STATUS          PORTS      NAMES
+aa26447cd5cb   ubuntu:14.04   "/bin/sh -c 'while t   10 minutes ago   Up 10 minutes              nostalgic_hoover    
+}}}
+
+돌아가는 것 같기는 한데, 화면에 출력되는 정보가 없어서 제대로 돌아가는지 알 수가 없다. '''docker logs''' 명령을 실행해서 컨테이너 내부에서 실행 중인 명령의 결과를 표준출력 할 수 있다. 이 경우 '''hello world'''를 출력할 거다. 
+{{{#!plain
+# docker logs aa26447cd5cb
+hello world
+hello world
+....
+}}}
+이 것으로 컨테이너를 이용해서 "hello world" 애플리케이션을 실행했다. 
+
+데몬 형태로 실행 중인 컨테이너는 '''docker stop'''으로 종료할 수 있다.
+{{{#!plain
+# docker stop aa26447cd5cb
+}}}

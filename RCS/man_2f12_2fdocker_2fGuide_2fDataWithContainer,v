@@ -1,0 +1,124 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2015.05.16.17.01.27;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fdocker_2fGuide_2fDataWithContainer
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title 도커 컨테이너 데이터 관리
+[[TableOfContents]]
+== 컨테이너 데이터 관리 ==
+=== 데이터 볼륨 ===
+데이터 볼륨은 '''Union File System''' 형식을 따른다. 따라서 하나 이상의 컨테이너가 사용 할 수 있다. 데이터 볼륨은 데이터 공유와 영구적 데이터 보관을 위한 유용한 기능을 제공한다.  
+  * 볼륨은 컨테이너가 만들어 질 때, 초기화 된다. 컨테이너가 실행될 때, 데이터 볼륨이 포함되는 경우 새로운 볼륨으로 복사된다. 
+  * 데이터 볼륨은 재사용 가능하며, 컨테이너들 간에 공유 할 수 있다.
+  * 데이터 볼륨은 직접 수정할 수 있다.  
+  * 데이터 볼륨은 컨테이너가 삭제되도 계속 유지된다.
+데이터 볼륨은 컨테이너의 주기와는 독립적으로 작동하며, 데이터를 유지(persist data)하기 위해서 사용한다. 도커는 컨테이너를 삭제 할 때, 자동으로 볼륨을 삭제하지 않는다. 더 이상 사용하지 않는 볼륨은 '''gargabe collect''' 해줘야 한다. 
+=== 데이터 볼륨 추가 ===
+도커 컨테이너를 만들 때(docker run), '''-v'''옵션을 이용해서 컨테이너에 데이터 볼륨을 추가 할 수 있다. '''-v''' 뒤에 마운트할 볼륨을 나열하면 된다. 하나의 데이터 볼륨을 포함하는 컨테이너를 만들어보자. 
+{{{#!plain
+# docker run -i -t -v /webapp ubuntu /bin/bash
+}}}
+컨테이너에 '''/webapp''' 디렉토리가 만들어진 걸 확인 할 수 있다. 이제 호스트에 마운트 포인터를 만들고, '''/webapp'''와 마운트하면 호스트와 연결되는 컨테이너 볼륨을 만들 수 있다. '''/webapp'''에 데이터를 쓰면, 호스트에 저장되기 때문에 persistent 한 데이터 사용이 가능하다.
+
+=== 데이터 볼륨의 마운트 디렉토리 설정 ===
+볼륨을 마운트 할 때, 컨테이너의 특정 디렉토리로 마운트 포인트를 설정 할 수 있다.
+{{{#!plain
+# docker run -i -t -v /webapp:/opt/webapp ubuntu /bin/bash
+root@@2db13a7152ea:/# cd /opt/
+root@@2db13a7152ea:/opt# ls
+webapp
+}}}
+이제 /opt/webapp아래서 작업한 내용은 /webapp에 저장이 되며, 컨테이너를 종료하더라도 데이터를 계속 유지 할 수 있다.
+
+=== 단일 파일 마운트 ===
+
+=== 데이터 볼륨 컨테이너 ===
+컨테이너가 가지고 있는 persistent 데이터를 다른 컨테이너와 공유 할 수도 있다. 다른 컨테이너와 공유하려면 이름(Name)이 있어야한다. 도커에서 제공하는 네임드 데이터 볼륨 컨테이너(Named data volume container)를 이용해서 공유 할 수 있다. 
+
+'''joincapp'''라는 이름의 볼륨을 만들어서 공유하기로 했다.  
+{{{#!plain
+# docker create -v /joincapp --name joincapp ubuntu /bin/true
+8103966e331a20c707708cd70f62698fb6335f8baaf5881457a754686210e1b4
+}}}
+반환 하는 값은 볼륨 컨테이너의 ID로 /var/lib/docker/containers/<conainer_id>에서 확인 할 수 있다. 컨테이너의 설정 정보는 config.json 이 가지고 있다. 
+{{{#!plain
+# cat config.json | json_pp 
+{
+   "State" : {
+      "Restarting" : false,
+      "OOMKilled" : false,
+      "Running" : false,
+      "ExitCode" : 0,
+      "StartedAt" : "0001-01-01T00:00:00Z",
+      "FinishedAt" : "0001-01-01T00:00:00Z",
+      "Pid" : 0,
+      "Paused" : false,
+      "Error" : ""
+   },
+   "AppArmorProfile" : "",
+   "ResolvConfPath" : "",
+   "HostsPath" : "",
+   "Image" : "07f8e8c5e66084bef8f848877857537ffe1c47edd01a93af27e7161672ad0e95",
+   "Created" : "2015-05-13T07:24:32.524168199Z",
+   "Volumes" : {
+      "/joincapp" : "/var/lib/docker/vfs/dir/1d709224a3642c60b0a2c3ec3842357065461185797c6c14daad939846648635"
+   },
+....
+}}}
+주요 값들을 살펴보자.
+  * Volumes : 컨테이너가 사용하는 볼륨의 목록을 가지고 있다. 앞서 만든 /joincapp 볼륨을 확인할 수 있다. /joincapp 에서 작업한 내용들은 이 경로에 저장된다.   
+  * ID : 컨테이너의 아이디  
+  * Name : 컨테이너 이름
+  * VolumesRW : 읽기/쓰기가 가능한 볼륨의 목록을 가지고 있다. /joincapp은 true로 설정된다.
+
+이렇게 만든 볼륨 컨테이너는 '''--volumes-from'''을 이용해서 공유할 수 있다.
+{{{#!plain
+# docker run -it --volumes-from joincapp ubuntu /bin/bash
+}}}
+/joincapp 디렉토리 밑에서 작업을 해보자. Volumes 설정의 디렉토리에 작업내용이 반영되는 걸 확인할 수 있을 거다. 사실상 Volumes 설정된 디렉토리를 컨테이너들이 공유하는 거라고 보면 된다.    
+
+도커는 사용하지 않는 볼륨컨테이너에 대한 가비지 컬랙션 기능을 제공하지 않는다. 메뉴얼하게 직접 삭제해야 한다. 관리 애플리케이션을 만들어야 한다는 이야기. 
+
+도커의 볼륨 컨테이너는 좋은 기능이긴 하지만 호스트에 종속적이다. 개인이 사용할 때는 문제가 없지만, 도커 기반의 클라우드 인프라를 구축 할 경우 문제가 될 수 있다. 원격에 볼륨을 만들어서 마운트 후 사용하는 등의 방법을 사용해야 한다. NFS나 iSCSI등을 활용 하면 되겠다. 서비스 하기에는 iSCSI가 더 적당할 것 같다.
+=== 백업, 복구, 마이그레이션 ===
+또 다른 유용한 기능으로 백업,복구,마이그레이션이 있다. --volumes-from 옵션을 이용해서 마운트된 볼륨을 백업할 수 있다.
+{{{#!plain
+# docker run --volumes-from dbdata -v /backup:/backup \
+  ubuntu tar cvzf /backup/backup.tar.gz /dbdata
+}}}
+  * --volumes-from 으로 dbdata를 컨테이너에 
+  * 로컬의 /backup을 컨테이너의 /backup으로 마운트 한다.
+  * tar 명령을 이용해서 /dbdata 볼륨을 /backup/backup.tar.gz으로 백업한다. 
+복구하는 방법이다. 
+{{{#!plain
+# docker run --volumes-from dbdata2 -v /backup:/backup ubuntu \
+  tar xvzf /backup/backup.tar.gz
+}}}
+  * dbdata2 볼륨으로 컨테이너를 실행한다. 복구한 파일의 정보는 dbdata2 볼륨에 저장돼서 다른 컨테이너에서 사용 할 수 있다.
+  * 로컬의 /backup을 컨테이너의 /backup으로 마운트 한다. 
+  * tar 명령을 이용해서 backup.tar.gz의 압축을 푼다. 
+복구한 데이터 볼륨으로 컨테이너를 실행했다.
+{{{#!plain
+# docker run --volumes-from dbdata2 -it ubuntu /bin/bash
+}}}
+
+@

@@ -1,0 +1,131 @@
+#title 도커 세미나 자료 - 네트워크 중심
+[[TableOfContents]]
+== 소개 ==
+오프라인 세미나를 목적으로 만든 문서다. 문서내용 만으로는 맥락을 이해하기 힘들 것이다. 
+=== Docker ===
+  * 컨테이너 기반의 가상화 툴 
+  * 가상머신 : 운영체제를 가상화 한다. 운영체제를 가상화 하기 위해서, 컴퓨터 시스템을 애뮬래이션 한다.(ex. QEMU) 
+  * 컨테이너 : 애플리케이션 레벨의 가상화. namespaces와 cgroups, unioning filesystesm을 기반으로 소프트웨어, 파일 시스템, 네트워크를 격리한다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1334jQ6ZaKiYwyS1yI_eTnEx0MxE1iCDk_sDdnuGTGNw/pub?w=719&amp;h=397">
+}}}
+=== Docker 기술의 장점 ===
+  * 자원의 효율적인 사용 : 운영체제를 공유한다.
+  * 프로세스 모델 : 독립적인 네트워크, 디스크, 유저그룹을 가진 프로세스라고 볼 수 있다. 
+  * 빠르다. : 운영체제 추상화 과정이 없으므로..
+
+==== 가상 머신과 비교 ====
+Docker는 자주 가상머신 기반의 가상화와 비교된다.
+  * 손쉬운 패키징 : 패키징이 쉽긴 하지만, 가상머신과 비교하자면 독특한 특징이라고 할 수는 없다. 패키징 방법에 있어서 가상머신과 근본적인 차이가 없다.
+  * 모든 개발자가 동일한 개발 환경을 사용할 수 있다. : 가상 머신 역시 이미지를 배포하면 된다. 특별한 특징이라고 보기 힘들다.
+  * '''자원의 효율적인 사용과 빠른 배포 및 실행이 가장 큰 장점'''
+==== 장점에 대한 평가 ====
+자원의 효율적인 사용과 빠른 배포의 장점이 가져다주는 가치에 주목할 필요가 있다.
+  * Paas : 개발에서 배포까지의 싸이클을 단축 할 수 있다. 마치 프로그램을 컴파일 하고 실행하는 기분이다. 
+
+== 선행 지식 ==
+=== Linux Bridge ===
+  * [wiki:man/12/bridge Linux bridge]
+  * 소프트웨어 L2 스위치
+  * MAC 테이블을 유지하며, MAC으로만 작동한다.
+=== Open vSwitch ===
+  * [wiki:man/12/OpenVSwitch Open vSwitch]
+  * 소프트웨어 L2 스위치
+  * VLAN 및 VLAN trunk
+  * GRE, QoS, VXLAN, sFlow, NetFlow, IPv6, IPSec, VXLAN over IPSec  
+  * OpenFlow
+  * 인터페이스별 Traffic policing
+  * NIC bonding, active backup, L4 해싱
+=== KVM ===
+  * 리눅스 커널기반의 가상화 툴
+  * 낮은 수준에서 접근해야 하지만, 다양한 구성을 할 수 있어서 테스트 용으로 선택.
+=== KVM에서 테스트 환경 ===
+{{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:01 -net \
+tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown ubuntu01.vdisk -hdb add01.vdisk
+}}}
+
+OVS 브릿지 생성
+{{{#!plain
+# ovs-vsctl add-br br0
+}}}
+
+OVS 브릿지에 포트 추가 
+{{{#!plain
+# ovs-vsctl add-br br0 tap0
+}}}
+
+OVS 브릿지에서 MAC 주소 확인
+{{{#!plain
+# ovs-appctl fdb/show br0
+port  VLAN  MAC                Age
+2     0  00:00:00:00:10:01    1
+}}}
+
+br0을 Gateway로 설정. 인스턴스는 gateway를 통해서 인터넷으로 패킷을 보낼 수 있다. NAT 설정 필요.
+{{{#!plain
+# ifconfig br0 192.168.5.1/24 up
+}}}
+
+테스트를 위한 KVM인스턴스를 하나 더 실행
+{{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:02 -net tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown ubuntu02.vdisk
+}}}
+
+== Docker 컨테이너 관리 ==
+=== Docker 이미지와 컨테이너 ===
+  * [wiki:man/12/docker/aufs AUFS]
+    * 파일 시스템을 공유해서 사용.
+    * 읽기와 쓰기의 분리
+  * [wiki:man/12/docker/Guide/dockerimages Docker image 관리]
+    * 컨테이너를 만드는 데이터 파일들   
+    * 하나의 이미지에서 여러 개의 컨테이너를 만들 수 있다.
+    * 하나의 프로그램 파일에서 여러 개의 프로세스를 만들 수 있는 것과 비슷한 개념.
+  * 도커 컨테이너
+    * 도커 이미지로 부터 만들어지는 실행 인스턴스 
+    * 이미지는 읽기 전용이다.
+    * 쓰는 데이터는 쓰기 전용 파일시스템에 저장
+    * 따라서 누구든지 동일한 버전의 이미지를 사용할 수 있다.
+  * 도커 이미지 & 컨테이너의 라이프 사이클
+    * 이미지로 부터 컨테이너 생성 
+    * 데이터 쓰기 
+    * commit를 이용해서 변경된 정보를 merge한 새로운 이미지 생성
+    * 이미지 배포
+
+== Docker 볼륨 관리 ==
+ * 데이터 볼륨 컨테이너 : 읽기/쓰기를 모두 할 수 있는 컨테이너 타입
+ * [wiki:man/12/docker/withiSCSI iSCSI를 이용한 볼륨 관리]
+
+== Docker 네트워크 ==
+=== OVS를 이용한 Docker 네트워크 구성 ===
+  * [wiki:man/12/docker/DefaultNetwork Docker 기본 네트워크]
+    * Linux Bridge 기반
+    * 호스트로 부터 독립된 네트워크를 구축  
+    * SNAT을 이용해서 인터넷과 연결
+    * Port forwarding으로 서비스
+  * L3 Flat Network
+    * [wiki:man/12/docker/KVM#s-3.2 Flat Network] 
+	* 투명 브릿지로 설정
+  * Open vSwitch는 현재([[Date(2015-06-09T13:31:03)]]) OVS를 지원하지 않는다.
+     * 리눅스 Bridge위에 OVS 브릿지를 연결하거나
+     * 리눅스 네트워크 네임스페이스를 이용
+=== VXLAN ===
+  * OVS를 이용
+  * [wiki:man/12/vxlan vxlan] 
+    * L3 네트워크 위에, L2 네트워크를 구성하는 기술
+    * VLAN을 L3로 확장
+    * VLAN의 한계 극복
+  * Packet Over UDP로 OpenVPN과 같은 터널링 기술
+  * [wiki:man/12/OpenVSwitch/VXLAN OpenVSwitch VXLAN 구축]
+    * [wiki:man/12/NetworkNamespace 네트워크 네임스페이스]를 이용. 
+
+=== None 브릿지 네트워크 ===
+Network Namespace를 이용한 구성
+  * veth(Virtual Ethernet device) pair 생성
+  * 도커 컨테이너의 프로세스에 네트워크 네임스페이스로 veth를 할당.  
+  * Static routing을 조작 인터넷 연결 
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1kbWIBWCaey8XBPgsg5pWpZTBRYEGgGJhCN7iIDH8jOg/pub?w=358&amp;h=187">
+}}}
+

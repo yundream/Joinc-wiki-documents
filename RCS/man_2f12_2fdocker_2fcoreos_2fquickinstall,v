@@ -1,0 +1,62 @@
+head	1.1;
+access;
+symbols;
+locks
+	root:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2015.05.21.12.08.21;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fdocker_2fcoreos_2fquickinstall
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title coreos 간단 설치
+== 설치 ==
+=== 설치 환경 ===
+설치 환경은 아래와 같다.
+  * 우분투 리눅스 15.04
+  * KVM : 자유롭게 할 수 있는게 많아서 선택했다. 
+=== 스크립트 다운로드 ===
+CoreOS는 stable, beta, alpha 3개 채널로 릴리즈를 배포한다. 나는 stable 버전을 설치하기로 했다. 
+{{{#!plain
+# mkdir coreos; cd coreos
+# wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_qemu.sh
+# wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2 
+# bunzip2 coreos_production_qemu_image.img.bz2
+# chmod +x coreos_production_qemu.sh 
+}}}
+실행
+{{{#!plain
+# ./coreos_production_qemu.sh -nographic 
+}}}
+실행 해 보면 알겠지만, 로그인할 방법이 없다..
+
+=== SSK Keys ===
+SSH key pair을 만들어서 복사하는 방법을 사용해야 한다. kvm는 '''fsdev''' 옵션을 이용해서 로컬파일을 가상머신과 공유 할 수 있다. 이 기능을 이용해서 ssh public key를 복사한다. '''ssh-keygen'''으로 ssh key를 만든다.
+{{{#!plain
+# ssh-keygen -t rsa
+}}}
+~/.ssh 디렉토리 밑에 id_rsa.pub, id_rsa 파일 쌍이 만들어진다. 이 정보는 kvm의 fsdev를 이용해서 가상머신과 공유 할 수 있다. 스크립트가 알아서 해주니 고민 할 필요 없다. 작동방식이 궁금하면 스크립트 파일을 분석해보자. id_rsa.pub를 authorized_keys로 복사 한 다음 스크립트를 실행한다. 
+{{{#!plain
+# ./coreos_production_qemu.sh -a ~/.ssh/authorized_keys -- -nographic
+}}}
+스크립트는 가상머신을 만들 때, localhost:2222을 ssh로 포워딩 한다. ssh를 이용 2222번 포트로 접근하자.
+{{{#!plain
+# ssh -l core -p 2222 localhost
+Last login: Thu May 21 11:58:09 2015 from 10.0.2.2
+CoreOS stable (647.0.0)
+core@@coreos_production_qemu-647-0-0 ~ $ 
+}}}
+@

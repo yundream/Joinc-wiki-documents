@@ -134,8 +134,95 @@ json (1.8.2)
 ....
 }}}
 === Dockerfile로 부터 이미지 만들기 ===
+'''training/sinatra'''이미지를 만들어서 배포하는 건 유용하긴 하지만, 상당히 큰 이미지 파일을 다운로드 해야 하는 불편함이 있다. 이미지를 만드는 대신에 "이 이미지를 만들기 위해서 이러이러한 환경이 필요하다"라는 정보만 서로 공유하면 어떨까 ? 일종의 빌드 파일만 공유하는 거다. 작동 방식은 아래와 같다. 
+  1. 이미지 개발자는 이미지의 사양을 적은 '''Dockerfile'''을 개발해서 배포 한다.  1. 팀원들은 '''docker build'''를 이용해서 Dockerfile로 부터 이미지를 만든다.
+
+호스트에 '''Dockerfile'''을 위한 디렉토리를 만든다. 
+{{{#!plain
+# mkdir sinatra
+# cd sinatra
+# touch Dockerfile
+}}}
+'''Dockerfile'''의 내용을 작성한다. 베이스 이미지 파일, 관리자 정보 실행할 명령어들을 설정한다.
+{{{#!plain
+# This is a comment
+FROM ubuntu:14.04
+MAINTAINER yundream <yundream@gmail.com>
+RUN apt-get update && apt-get install -y ruby ruby-dev
+RUN gem install sinatra
+}}}
+  * '''FROM''' : 이미지를 만들 베이스 이미지다. Ubuntu 14.04 이미지를 기반으로 만들기로 했다. 
+  * '''MAINTAINER''' : 이미지를 만든 사람의 정보
+  * '''RUN''' : 실행할 명령들이다. '''ruby'''와 '''sinatra'''를 설치했다.
+이제 '''docker build'''를 실행하면 '''Dockerfile'''의 내용으로 이미지를 빌드한다.
+{{{#!plain
+# docker build -t joinc/sinatra:v2 ./
+Sending build context to Docker daemon 2.048 kB
+Sending build context to Docker daemon 
+Step 0 : FROM ubuntu:14.04
+ ---> e54ca5efa2e9
+Step 1 : MAINTAINER Kate Smith <ksmith@example.com>
+ ---> Using cache
+ ---> 851baf55332b
+Step 2 : RUN apt-get update && apt-get install -y ruby ruby-dev
+ ---> Running in 3a2558904e9b
+Selecting previously unselected package libasan0:amd64.
+(Reading database ... 11518 files and directories currently installed.)
+....
+}}}
+-t로 이미지의 이름과 태그를 설정했다. 조직(혹은 유저이름)은 joinc이고 저장소의 이름은 sinatra, 태그는 v2다. "./"는 Dockerfile이 있는 위치를 설정하기 위해서 사용했다.
+
+명령을 실행하면, 이미지 빌드 과정을 지켜볼 수 있을 거다.
+
+새로운 이미지로 부터 컨테이너를 만들어보자.
+{{{#!plain
+# docker run -t -i joinc/sinatra:v2 /bin/bash
+root@3df5b03403e1:/# gem list
+
+*** LOCAL GEMS ***
+
+rack (1.6.1)
+rack-protection (1.5.3)
+sinatra (1.4.6)
+tilt (2.0.1)
+}}}
 == 이미지에 태깅하기 ==
+빌드한 이미지에 태깅을 할 수 있다. 태그한 정보는 이미지를 검색하거나 분류하기 위한 용도로 사용한다. '''joinc/sinatra''' 이미지에 새로운 태그를 붙였다.
+{{{#!plain
+# docker tag a39bf6457225 joinc/sinatra:devel
+# docker images joinc/sinatra
+}}}
+이미지 ID가 '''a39bf6457225'''인 이미지에 대해서 '''joinc/sinatra:devel'''을 태깅했다. '''docker images'''로 태깅 정보를 확인해 보자.
+{{{#!plain
+# docker images joinc/sinatra
+REPOSITORY     TAG       IMAGE ID         CREATED             VIRTUAL SIZE
+joinc/sinatra  v2        a39bf6457225     8 minutes ago       317.7 MB
+joinc/sinatra  devel    a39bf6457225      8 minutes ago       317.7 MB
+}}}
 
 == 이미지 올리기 ==
+개발한 이미지는 '''docker push'''를 이용해서 Docker Hub에 올릴 수 있다. 이미지는 public영역에 올려서 모두가 공유하거나, [https://registry.hub.docker.com/plans/ private 영역]에 올려서 제한된 사람들만 사용하도록 할 수 있다. 이미지를 올리기 위해서는 docker.com에 계정을 만들어야 한다.
+{{{#!plain
+# docker push joinc/sinatra
+The push refers to a repository [yundream/sinatra] (len: 1)
+Sending image list
+Pushing repository joinc/sinatra (1 tags)
+e9e06b06e14c: Image already pushed, skipping 
+a82efea989f9: Image already pushed, skipping 
+37bea4ee0c81: Image already pushed, skipping 
+07f8e8c5e660: Image already pushed, skipping 
+e6ff8095636e: Image successfully pushed 
+1a27f08f6267: Image successfully pushed 
+a39bf6457225: Image successfully pushed 
+Pushing tag for rev [a39bf6457225] on {https://cdn-registry-1.docker.io/v1/repositories/joinc/sinatra/tags/v2}
+}}}
 
 == 이미지 삭제 ==
+'''docker rmi'''로 로컬 호스트에 있는 이미지를 삭제할 수 있다.
+{{{#!plain
+# docker rmi training/sinatra
+Untagged: training/sinatra:latest
+Deleted: 5bc342fa0b91cabf65246837015197eecfa24b2213ed6a51a8974ae250fedd8d
+Deleted: ed0fffdcdae5eb2c3a55549857a8be7fc8bc4241fb19ad714364cbfd7a56b22f
+Deleted: 5c58979d73ae448df5af1d8142436d81116187a7633082650549c52c3a2418f0
+}}}

@@ -1,0 +1,50 @@
+#title AppArmor
+
+== AppArmor ==
+'''AppArmor'''(Application Armor)은 GNU 라이센스를 따르는 리눅스의 시큐리티 모듈(Security module)이다. 시스템 관리자는 apparmor을 이용해서 애플리케이션 별로 기능을 제한할 수 있다. AppArmor는 [wiki:man/12/MandatoryAccessControl MAC](mandatory access control)구현으로 DAC(discretionary access control)방식의 접근 제어를 보완한다. 커널 2.6.36 버전에 포함되었다. 
+
+== 예제 profile ==
+우분투 리눅스 15.04의 tcpdump에 대한 프로파일이다. 
+{{{#!plain
+# cat /etc/apparmor.d/usr.sbin.tcpdump
+#include <tunables/global>
+
+/usr/sbin/tcpdump {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/user-tmp>
+
+  capability net_raw,
+  capability setuid,
+  capability setgid,
+  capability dac_override,
+  network raw,
+  network packet,
+
+  # for -D
+  capability sys_module,
+  @{PROC}/bus/usb/ r,
+  @{PROC}/bus/usb/** r,
+
+  # for -F and -w
+  audit deny @{HOME}/.* mrwkl,
+  audit deny @{HOME}/.*/ rw,
+  audit deny @{HOME}/.*/** mrwkl,
+  audit deny @{HOME}/bin/ rw,
+  audit deny @{HOME}/bin/** mrwkl,
+  @{HOME}/ r,
+  @{HOME}/** rw,
+
+  /usr/sbin/tcpdump r,
+}
+}}}
+  * profile은 텍스트 파일로 구성한다.
+  * 주석을 지원한다.
+  * 파일의 경로를 지정 할 때 glob 패턴(*.log와 같은)을 사용할 수 있다.
+  * r(read), w(write), m(memory map), k(file locking), l(create hard link)등 파일에 대한 다양한 접근 제어가 가능하다.  
+  * 네트워크에 대한 접근 제어  
+  * capability에 대한 제어
+  * #include를 이용해서 외부 프로파일을 사용할 수 있다.
+
+== 테스트 ==
+그냥 봐서는 잘 이해가 안되고, 테스트를 해봐야 겠다.

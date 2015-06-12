@@ -1,0 +1,282 @@
+#title 컨테이너 기반 클라우드를 위한 도커 데이터 볼륨 관리 
+[[TableOfContents]]
+== 클라우드에서의 도커 데이터 볼륨 관리 == 
+도커는 데이터를 persistent 하게 저장하기 위해서 데이터 볼륨을 만든다. 실제 애플리케이션에서 만들어지는 데이터의 대부분은 데이터 볼륨에 저장이 된다. 애플리케이션이 만드는 로그나 데이터베이스의 데이터파일, 유저가 업로드한 파일등등이 모두 여기에 해당한다.
+
+컨테이너 볼륨은 읽기 전용으로, 보통 수백메가 내외의 최소한의 파일들만을 포함한다. 로컬 호스트에서 문제가 생기더라도 다른 호스트에서 동일한 이미지로 컨테이너를 올리면 된다. 따라서 로컬 스토리지에서 볼륨을 관리해도 별 문제가 없다. 
+
+하지만 도커 데이터 볼륨은 아래의 특징들 때문에 로컬 스토리지에서 관리하기가 쉽지 않다. 
+  1. 대량의 읽기와 쓰기가 발생 할 확률이 높다. 로컬 스토리지로는 대량의 I/O를 처리 하기가 쉽지 않다. 
+  1. 데이터에 대한 리플리카나 패리티연산을 이용한 복구가 가능해야 한다. 
+  1. 복구가 이루어지는 동안 시스템 중단이 최소화 해야 한다. 
+원격에 Storage Node를 만들어서 컨테이너와 데이터 볼륨을 분리하는게 깔끔하겠다.
+== 가정 ==
+  * [wiki:Site/cloud/Qemu/Basic kvm]으로 인스턴스를 띄울 수 있다. kvm에 익숙하지 않다면 virtualbox로 테스트 해도 된다. 
+  * Linux [wiki:Site/System_management/LVM LVM]을 사용 할 수 있다.
+  * [wiki:Site/System_management/iSCSI iSCSI]를 설치하고 운용할 수 있다.
+== iSCSI를 이용한 데이터 볼륨 제공 ==
+그래서 데이터 볼륨은 별도의 Storage Node(SNODE)를 이용해서 제공하기로 했다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1cOcIpIaBM7O3Ic_Fptf1gDM5xV_uM53ed3BcbFZ53tg/pub?w=683&amp;h=340">
+}}}
+
+데이터 볼륨은 물리적으로 분리돼 있으며, storage network로 호스트와 연결돼 있다. 컨테이너가 볼륨을 요구하면, iSCSI를 이용해서 볼륨을 할당 받아서 컨테이너에 넘겨주는 방식이다.
+
+데이터 볼륨 컨테이너를 만들면 컨테이너 ID를 반환한다. '''/var/lib/docker/containers/<container_id>/config.json'''에서 볼륨의 위치를 확인 할 수 있다. 
+    {{{#!plain
+# cat /var/lib/docker/containers/<conainer_id>/config.json
+{
+  "State" : {
+    "Restarting" : false,
+    "OOMKilled" : false,
+  .....
+  "Volumes" : {
+      "/volumename" : "/var/lib/docker/vfs/dir/1d709224a364...."
+   },
+   ....
+}
+}}}
+Volumes의 볼륨이름으로 iSCSI 볼륨을 마운트 하면 된다. 아래와 같이 묘사할 수 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1MfDVnB7zzHuOVic0CTk6d0hzLNXe5BI1aj3BqVfLE1s/pub?w=653&amp;h=206">
+}}}
+  1. 유저가 볼륨을 요청한다. 
+  1. 볼륨 컨테이너를 만들고, '''볼륨 경로'''를 확인한다. 
+  1. SNODE에 유저가 요청한 만큼의 볼륨을 만든다.
+  1. iSCSI 클라이언트 프로그램을 이용 볼륨을 attach 한다. 
+  1. attach한 볼륨을 포맷하고, '''볼륨 경로'''에 마운트 한다.
+  1. 해당 볼륨과 함께 컨테이너를 실행한다. 
+
+=== 테스트 환경 ===
+테스트 환경이다.
+  * 호스트 : 도커를 띄우는 호스트 시스템이다. KVM위에 우분투 리눅스를 올렸다. 
+  * SNODE : KVM 기반의 우분투 리눅스 운영체제 
+
+=== SNODE 만들기 ===
+iSCSI로 볼륨을 서비스할 SNODE를 만든다. SNODE는 kvm 인스턴스로 실행된다. kvm 인스턴스를 위한 추가 볼륨을 만들었다.  
+{{{#!plain
+# qemu-img create -f qcow2 add01.img 4G
+}}}
+kvm 인스턴스를 추가한 볼륨과 함께 실행한다.
+{{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:01 \
+-net tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown ubuntu01.vdisk -\
+hdb add01.vdisk
+}}}
+볼륨이 잘 올라왔는지 확인한다.
+{{{#!plain
+# fdisk -l
+
+Disk /dev/sda: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xfdba8efe
+
+Device     Boot  Start      End  Sectors  Size Id Type
+/dev/sda1  *      2048   499711   497664  243M 83 Linux
+/dev/sda2       501758 20969471 20467714  9.8G  5 Extended
+/dev/sda5       501760 20969471 20467712  9.8G 8e Linux LVM
+
+Disk /dev/sdb: 4 GiB, 4294967296 bytes, 8388608 sectors
+Units: sectors of 1 * 512 = 512 bytes
+}}}
+pv를 만든다.
+{{{#!plain
+# pvcreate /dev/sdb 
+  Physical volume "/dev/sdb" successfully created
+}}}
+vg(볼륨그룹)을 만든다.
+{{{#!plain
+# vgcreate myVG /dev/sdb
+  Volume group "myVG" successfully created
+}}}
+1G짜리 볼륨을 만들었다.
+{{{#!plain
+# lvcreate -L 1000M myVG
+  Logical volume "lvol0" created
+# lvdisplay 
+  --- Logical volume ---
+  LV Path                /dev/myVG/lvol0
+  LV Name                lvol0
+  VG Name                myVG
+  LV UUID                TtOcGe-LqqS-EEdD-J2R2-7t2j-x9z8-UMqAm6
+  LV Write Access        read/write
+  LV Creation host, time ubuntu, 2015-05-18 16:38:20 +0900
+  LV Status              available
+  # open                 0
+  LV Size                1000.00 MiB
+  Current LE             250
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           252:2
+}}}
+
+이제 iSCSI 설정을 한다. iqn을 만든다. 
+{{{#!plain
+# tgtadm --lld iscsi --op new --mode target --tid 1 -T iqn.joinc.com.example:storage.disk1
+# tgtadm --lld iscsi --op show --mode target
+Target 1: iqn.joinc.com.example:storage.disk1
+    System information:
+        Driver: iscsi
+        State: ready
+    I_T nexus information:
+    LUN information:
+        LUN: 0
+            Type: controller
+            SCSI ID: IET     00010000
+            SCSI SN: beaf10
+            Size: 0 MB, Block size: 1
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: null
+            Backing store path: None
+            Backing store flags: 
+    Account information:
+    ACL information:
+root@ubuntu:~# 
+}}}
+Target에 앞서 만든 볼륨 '''lvol0'''을 매핑한다.
+{{{#!plain
+# tgtadm --lld iscsi --op new --mode logicalunit --tid 1 --lun 1 -b /dev/myVG/lvol0
+# tgtadm --lld iscsi --op show --mode target
+Target 1: iqn.joinc.com.example:storage.disk1
+    System information:
+        Driver: iscsi
+        State: ready
+    I_T nexus information:
+    LUN information:
+        LUN: 0
+            Type: controller
+            SCSI ID: IET     00010000
+            SCSI SN: beaf10
+            Size: 0 MB, Block size: 1
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: null
+            Backing store path: None
+            Backing store flags: 
+        LUN: 1
+            Type: disk
+            SCSI ID: IET     00010001
+            SCSI SN: beaf11
+            Size: 1049 MB, Block size: 512
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: rdwr
+            Backing store path: /dev/myVG/lvol0
+            Backing store flags: 
+    Account information:
+    ACL information:
+}}}
+외부에서 iSCSI Target에 접근할 수 있도록 bind 한다.
+{{{#!plain
+# tgtadm --lld iscsi --op bind --mode target --tid 1 -I ALL
+}}}
+
+=== 도커를 올리기 위한 kvm 인스턴스 실행 ===
+kvm 인스턴스를 실행한다. 이 kvm 인스턴스에서 도커를 실행한다.
+{{{#!plain
+# kvm -m 512 -net nic,macaddr=00:00:00:00:10:02 -net tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown ubuntu02.vdisk
+}}}
+iscsi 클라이언트 패키지를 설치한다.
+{{{#!plain
+# apt-get install open-iscsi
+}}}
+iSCSI 타겟을 찾는다(discovery).
+{{{#!plain
+# iscsiadm --mode discovery --type sendtargets --portal 192.168.5.2
+192.168.5.2:3260,1 iqn.joinc.com.example:storage.disk1
+}}}
+찾은 iSCSI타겟을 붙인다.
+{{{#!plain
+# iscsiadm --mode node --targetname iqn.joinc.com.example:storage.disk1 --portal 192.168.5.2 --login
+Logging in to [iface: default, target: iqn.joinc.com.example:storage.disk1, portal: 192.168.5.2,3260] (multiple)
+Login to [iface: default, target: iqn.joinc.com.example:storage.disk1, portal: 192.168.5.2,3260] successful.
+}}}
+fdisk로 확인.
+{{{#!plain
+# fdisk -l
+...
+Disk /dev/sdb: 1000 MiB, 1048576000 bytes, 2048000 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+...
+}}}
+포맷하는 것으로 준비를 끝냈다.
+{{{#!plain
+# mkfs.ext4 /dev/sdb
+mke2fs 1.42.12 (29-Aug-2014)
+Creating filesystem with 256000 4k blocks and 64000 inodes
+Filesystem UUID: f218ce56-d151-45c3-8413-7b31a0094482
+Superblock backups stored on blocks: 
+    32768, 98304, 163840, 229376
+...
+# fdisk -l /dev/sdb
+Disk /dev/sdb: 1000 MiB, 1048576000 bytes, 2048000 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+}}}
+
+=== iSCSI 볼륨을 도커 데이터 볼륨으로 올리기 ===
+'''myvolume''' 이라는 이름의 컨테이너 볼륨을 만든다.
+{{{#!plain
+# docker create -v /myvolume --name myvolume ubuntu /bin/true 
+2160ab6b0d3c9148b13af6509e8a1212febbfb3438c119da153a5a6abd5539bd
+}}}
+컨테이너 아이디에 대한 볼륨정보를 확인한다.
+{{{#!plain
+# cat /var/lib/docker/containers/2160ab6.../config.json | json_pp
+...
+   "Volumes" : {
+      "/myvolume" : "/var/lib/docker/vfs/dir/82bff8483ec1f9a2b6f1936e2cc840ebdf08d533ca84a6448624e0d519abb91d"
+   },
+}}}
+/dev/sdb를 /myvolume에 마운트 한다.
+{{{#!plain
+# mount /dev/sdb /var/lib/docker/vfs/dir/82b....
+}}}
+도커 컨테이너를 실행한다.
+{{{#!plain
+# docker run -it --volumes-from myvolume ubuntu /bin/bash
+# ls
+bin   dev  home  lib64  mnt       opt   root  sbin  sys  usr
+boot  etc  lib   media  myvolume  proc  run   srv   tmp  var
+}}}
+myvolume를 확인 할 수 있다.
+
+== 클라우드 인프라에서의 스토리지 서비스 구성 ==
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1WaiQ7HhlhaWSfy_OlBKwVoNZjX0qLnVuuo9fXWK1gPY/pub?w=903&amp;h=402">
+}}}
+  * SNODE의 대역폭은 48G이라고 가정하자.
+  * CNODE의 NIC이 1G다. 가용성을 위해서 [wiki:man/12/MPIO MPIO]로 NIC을 묶는 다면, 하나의 CNODE는 2G의 대역폭을 가진다. 대략 20개의 CNODE를 구성하면 되겠다. 풀랙 기준 20 * 2U 하면 40U로 8U가 남는다. 스위치 포트의 갯수(50 포트)와 랙 크기를 감안하면 20개 정도가 적당하지 싶다.
+ * 20대의 CNODE의 총 대역폭은 40G다.  
+ * 스위치간 단일 포트의 대역폭 10G다. 두 대의 스위치를 사용했으니 총 20G다. 이렇게 해서는 CNODE와 SNODE의 대역폭을 다 채우지 못한다. LACP로 스위치간 포트를 묶어서 대역폭을 확보한다. 
+난 스토리지/네트워크 장비 전문가는 아니다. 일단 풍월로 들은 정보로 대략 구성을 해봤다. 신뢰하지는 말자.
+
+== 정리 == 
+  * 도커 볼륨 컨테이너를 만들고, 이 컨테이너의 볼륨을 iSCSI에 마운트 하는 것으로 원격 스토리지의 볼륨을 가져다 사용할 수 있다. 
+  * 볼륨 서비스가 불리됨으로, AWS의 EBS와 같은 유연한 볼륨 서비스를 만들 수 있다.
+  * 호스트와 상관없이 컨테이너를 실행해도 동일한 볼륨 서비스를 받을 수 있다. 
+  * 호스트(혹은 컨테이너가)가 맛이 가더라도, 다른 호스트에서 컨테이너를 띄우는 것으로 빠르게 컨테이너를 복구 할 수 있다.
+  * 호스트와 별개로 SNODE의 가용성과 확장성을 확보하기 위한 활동을 할 수 있다.  

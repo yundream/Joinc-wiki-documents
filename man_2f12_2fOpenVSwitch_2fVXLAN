@@ -1,0 +1,293 @@
+#title Open vSwitch with VXLAN
+[[TableOfContents]]
+== Open vSwitch를 이용한 오버레이 네트워크 구성 ==
+[wiki:man/12/vxlan VXLAN]을 이용한 오버레이 네트워크를 구성해 보려고 한다. 
+
+클라우드 인프라를 위한 네트워크 모델을 고민하고 있다. 일단은 단순한 '''L3 Flat Network'''를 생각하고 있지만, AWS VPC와 같은 격리된 (그리고 복잡한)네트워크 구성의 확장 가능성은 열어두려고 한다. 어차피 L3 Flat Network 모델이라면, 이 위에서 오버레이 네트워크 모델을 만드는 건 크게 어려운 일은 아닐 것이다. 오버레이 네트워크 기술을 이해하면, 확장 가능한 L3 Flat Network 구성 설게에 도움이 될 것이다. 
+
+== 구성 ==
+KVM과 Docker를 기반으로 테스트 한다.
+  * KVM 인스턴스가 호스트 컴퓨터에 대응한다.
+  * KVM 인스턴스 위에 도커 네트워크를 구성한다.
+  * 다른 KVM에 있는 도커들이 통신 하도록 VXLAN으로 오버레이 네트워크를 구성한다.
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1035XBGrdBpExNcr3yGxHirVuiXA-fOKtGAE1Ui4ViaQ/pub?w=685&amp;h=407">
+}}}
+  1. Host-1 : 192.168.5.2  
+  1. Host-2 : 192.168.5.3
+Open vSwitch 네트워크는 양쪽 모두 172.17.42.0/24로 했다. 가상머신 올리는 방법은 [wiki:man/12/OpenVSwitch#s-2.1 OVS를 이용한 KVM네트워크 구성]을 참고하자. KVM이 익숙하지 않다면, VirtualBox등 (사용이 쉬운)가상화 툴을 이용해도 상관 없다. Host-1과 Host-2가 서로 통신할 수 있으면 된다.
+
+=== Host-1의 도커 네트워크 설정 ===
+Host-1과 Host-2에 Docker 네트워크를 구성하고, 컨테이너를 실행 했다. 도커의 기본 브로커는 '''docker-0'''인데, VXLAN 설정을 위해서 OVS 브릿지로 구성을 했다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1JYGM3_i86xHEzejz1lKVjKKGWCMEkCgvStWj0Dfwte8/pub?w=265&amp;h=251">
+}}}
+
+설정 방법은 [wiki:man/12/docker/KVM#s-4 Docker 레퍼런스 네트워크]를 참고한다. 172.17.42.2와 172.17.42.3 두 개의 컨테이너를 만들었다. 도커 컨테이너에 네트워크를 할당하기 위한 스크립트를 만들었다. '''Docker 레퍼런스 네트워크'''에 있는 네트워크 설정 과정을 코드화 했다. [https://bitbucket.org/dream_yun/joinc/src/07e1de49fe39d281617193f067a3bdc8f19b4f71/docker/ovs_work.sh?at=master 다운로드] ovs_work.sh 스크립트는 VXLAN 설정은 빠져있다. 일단은 도커 네트워크를 만든 다음에 수작업으로 VXLAN을 설정한다.
+
+먼저 OVS 브릿지를 만들고 네트워크를 설정한다. 
+{{{#!plain
+# ovs-vsctl add-br br0
+# ifconfig br0 172.17.42.1/24 up
+}}}
+도커 컨테이너를 만든다.
+{{{#!plain
+# docker run --net=none -i -t ubuntu /bin/bash 
+root@1eaa0000bf9f:/# 
+}}}
+컨테이너 "1eaa0000bf9f"에 대한 네트워크를 설정한다. 네트워크 주소는 172.17.42.2로 하자.
+{{{#!plain
+# ./work_net.sh -d 1eaa0000bf9f  -i 172.17.42.2
+VETH pair : veth1658-a & veth1658-b
+BRIDGE : br0
+}}}
+ping등을 이용해서 컨테이너에서 Host-1, Host-2로 네트워크 연결을 테스트한다.(연결이 안된다면, NAT 설정 문제일 확률이 높다.) 지금까지의 br0 정보를 확인해 보자.
+{{{#!plain
+# ovs-vsctl show 
+6800c940-93e9-4bf6-b719-558afbf05506
+    Bridge "br0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+        Port "veth1658-a"
+            Interface "veth1658-a"
+    ovs_version: "2.3.1"
+}}}
+
+이제 VXLAN 설정을 한다. 먼저 L3에서 오버레이 네트워크를 구성할 인터페이스를 만든다. 
+{{{#!plain
+# ovs-vsctl add-port br0 vxlan0 tag=100 \
+  -- set interface vxlan0 type=vxlan options:key=100 options:remote_ip=192.168.5.3
+}}}
+vxlan0 인터페이스를 추가 했다. 이 인터페이스의 VNID는 100이며, Host-2와 연결된다.  
+
+'''veth16850-a'''에 tag 100을 붙인다. 
+{{{#!plain
+# ovs-vsctl set Port veth1658-a 100
+# ovs-vsctl show
+6800c940-93e9-4bf6-b719-558afbf05506
+    Bridge "br0"
+        Port "veth1658-a"
+            tag: 100
+            Interface "veth1658-a"
+        Port "vxlan0"
+            tag: 100
+            Interface "vxlan0"
+                type: vxlan
+                options: {key="100", remote_ip="192.168.5.3"}
+        Port "br0"
+            Interface "br0"
+                type: internal
+    ovs_version: "2.3.1"
+}}}
+각 컨테이너들끼리는 VXLAN을 이용해서 통신을 할 수 있지만, 게이트웨이(172.17.42.1)로는 통신이 안된다. arp 테이블을 보면 172.17.42.1에 대한 ARP 테이블을 완료하지 못했음을 알 수 있다. 현재 '''br0''' 포트가 게이트웨이 역할을 하고 있는데, tag를 붙여주지 않았기 때문이다. br0에 태깅한다. 
+{{{#!plain
+# ovs-vsctl set Port br0 tag=100
+# ovs-vsctl show 
+        ......
+        Port "br0"
+            tag: 100
+            Interface "br0"
+                type: internal
+    ovs_version: "2.1.3"
+}}}
+이제 게이트웨이에 대한 arp 테이블을 완료되고, 외부와 통신이 되는 걸 확인할 수 있을 것이다.
+{{{#!plain
+# arp -n
+Address                  HWtype  HWaddress           Flags Mask            Iface
+172.17.42.1              ether   f6:3e:f8:73:38:47   C                     eth0
+172.17.42.10             ether   02:c2:69:f5:86:c4   C                     eth0
+}}}
+
+=== Host-2의 도커 네트워크 설정 ===
+Host-1과 동일하다. 도커 컨테이너의 IP를 172.17.42.10으로 설정했다. 두 개의 컨테이너 172.17.42.10간에 네트워크 통신이 되면 성공이다. 
+Host-2의 ovs 설정은 아래와 같다.
+{{{#!plain
+# ovs-vsctl show
+d5385b9e-582c-4f1b-b483-b74ad3d33cb9
+    Bridge "br0"
+        Port "vxlan0"
+            tag: 100
+            Interface "vxlan0"
+                type: vxlan
+                options: {key="100", remote_ip="192.168.5.2"}
+        Port "br0"
+            Interface "br0"
+                type: internal
+        Port "veth1398-a"
+            tag: 100
+            Interface "veth1398-a"
+    ovs_version: "2.3.1"
+}}}
+VNID를 100으로 하고, remote_ip를 192.168.5.2로 했다. 이제 두 개의 컨테이너가 통신이 되는지 확인하면 된다. 현재의 구성은 아래와 같이 묘사할 수 있겠다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1UW-v8C3dMsQSZGdXTaj-FSGjMWJ4wgIeo0uZpNN2LtI/pub?w=701&amp;h=255">
+}}}
+
+=== 테스트 ===
+Host-2 컨테이너(172.17.42.10)에서 Host-1 컨테이너(172.17.42.2)로 ICMP 패킷을 전송했다. Host-1에서는 tcpdump를 이용해서 패킷을 덤프받았다.
+{{{#!plain
+# tcpdump -v -i eth0 -s 0 -w vxlan.pcap port not 22
+}}}
+덤프 받은 패킷을 wireshark로 분석했다.
+
+https://lh3.googleusercontent.com/-gyFcSEUSCk8/VWf2f8mrUsI/AAAAAAAAF2A/q6RQG8VnwZ0/s800/vxlan02.png
+  1. Host-1과 Host-2의 [wiki:man/12/MAC MAC] 주소다.  
+  1. IPv4 패킷으로 출발지는 192.168.5.3 목적지는 192.168.5.2다.
+  1. VXLAN 패킷이다. 즉 여기까지의 패킷은 Host-1과 Host-2간의 L3 통신이다. 이 위에 [wiki:man/12/ICMP ICMP] 패킷을 실어 나른다. 
+  1. 컨테이너의 MAC 주소다. 
+  1. IPv4 통신으로, 출발지는 172.17.42.10 목적지는 172.17.42.2다. 
+  1. ICMP 패킷이다.
+(패킷 위에 패킷을 전송하는)전형적인 터널링 기술을 사용하고 있음을 알 수 있다.
+
+Host-1 컨테이너의 [wiki:man/12/ARP arp] 테이블 내용이다.
+{{{#!plain
+# arp -n
+172.17.42.10             ether   02:e6:e0:7d:70:75   C                     eth0
+172.17.42.1                      (incomplete)                              eth0
+}}}
+L2 네트워크 처럼 작동하고 있음을 알 수 있다.
+
+
+=== 멀티 터넌트 ===
+유저별로 VNID를 다르게 하는 것으로 멀티 터넌트를 서비스 할 수 있다. 위의 구성에 VNID-200을 추가해서 테스트를 진행했다. 
+{{{#!plain
+# Host-1의 ovs 설정
+# ovs-vsctl show
+6800c940-93e9-4bf6-b719-558afbf05506
+    Bridge "br0"
+        Port "vxlan1"
+            tag: 200
+            Interface "vxlan1"
+                type: vxlan
+                options: {key="200", remote_ip="192.168.5.3"}
+        Port "veth1658-a"
+            tag: 100
+            Interface "veth1658-a"
+        Port "vxlan0"
+            tag: 100
+            Interface "vxlan0"
+                type: vxlan
+                options: {key="100", remote_ip="192.168.5.3"}
+        Port "br0"
+            Interface "br0"
+                type: internal
+        Port "veth2046-a"
+            tag: 200
+            Interface "veth2046-a"
+    ovs_version: "2.3.1"
+
+# Host-2의 ovs 설정
+# ovs-vsctl show
+d5385b9e-582c-4f1b-b483-b74ad3d33cb9
+    Bridge "br0"
+        Port "vxlan0"
+            tag: 100
+            Interface "vxlan0"
+                type: vxlan
+                options: {key="100", remote_ip="192.168.5.2"}
+        Port "br0"
+            Interface "br0"
+                type: internal
+        Port "vxlan1"
+            tag: 200
+            Interface "vxlan1"
+                type: vxlan
+                options: {key="200", remote_ip="192.168.5.2"}
+        Port "veth1398-a"
+            tag: 100
+            Interface "veth1398-a"
+        Port "veth1995-a"
+            tag: 200
+            Interface "veth1995-a"
+    ovs_version: "2.3.1"
+}}}
+같은 VNID끼리만 통신되는 걸 확인할 수 있다.
+
+=== NAT 구성 ===
+이렇게 해서 도커들은 L3 로컬 네트워크 상에서 격리된 네트워크를 구성하고, 서로 통신할 수 있게 됐다. 
+
+NAT를 통한 인터넷으로의 접근 역시 가능하다. 단 구성을 약간 바꿔야 한다. 인터넷으로 향하는 패킷은 br0로 보내야 하며, 이를 위해서 br0에도 veth와 같은 태그를 붙여줘야 한다. 하지만 br0 인터페이스에는 단지 하나의 태그만 가능하다.
+
+그래서 나는 vxlan 별로 브릿지를 만들기로 했다. VNID 100은 br0, VNID 200은 br1을 가지도록 네트워크를 다시 구성했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/17hqQFd2PN9kXkt0j4pd9_m746HkGXp_KqMMHCQdN3vQ/pub?w=956&amp;h=550">
+}}}
+  1. 두 개의 vxlan을 위해서 독립된 브릿지 br0, br1을 만들었다. 
+  1. 두 개의 브릿지들도 태깅을 했다. 
+이제 0.0.0.0/0으로 향하는 패킷은 태깅된 브릿지로 포트를 통해서 인터넷으로 나가게 된다. 아래와 같이 브릿지 포트에 태깅하면 된다.
+
+br1브릿지를 만든다.
+{{{#!plain
+# ovs-vsctl add-br br1 
+# ifconfig br1 172.17.50.1/24 up
+}}}
+
+br1을 200으로 태깅한다.
+{{{#!plain
+# ovs-vsctl set Port br1 tag=200
+# ovs-vsctl show 
+3e95bbe3-88b3-4b4d-b39f-b9a24cb53a8e
+    Bridge "br1"
+        Port "br1"
+            tag: 200
+            Interface "br1"
+                type: internal
+}}}
+
+vxlan인터페이스를 만든다.
+{{{#!plain
+# ovs-vsctl add-port br1 vxlan1 tag=200 \
+  -- set interface vxlan1 type=vxlan options:key=200 options:remote_ip=192.168.5.3
+}}}
+
+테스트를 위해서 도커 컨테이너를 하나 만들었다. 현재 브릿지의 상태는 아래와 같다. 
+{{{#!plain
+# ovs-vsctl show 
+3e95bbe3-88b3-4b4d-b39f-b9a24cb53a8e
+    Bridge "br1"
+        Port "veth2093-a"
+            tag: 200
+            Interface "veth2093-a"
+        Port "br1"
+            tag: 200
+            Interface "br1"
+                type: internal
+        Port "vxlan1"
+            tag: 200
+            Interface "vxlan1"
+                type: vxlan
+                options: {key="200", remote_ip="192.168.5.3"}
+}}}
+이 상태에서 도커 컨테이너가 인터넷과 통신을 하려면, 각 Host에서의 SNAT(마스커레이딩)설정이 필요하다. 결과적으로 두 번의 SNAT을 통해서 인터넷과 통신하게 된다.  
+
+=== 인터넷 게이트웨이 - IGW ===
+인터넷에서 컨테이너로 접근하는 문제를 해결해보자.
+==== 2중 NAT ====
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1wSP0yUvJleVIS7JY2L7UO7eYqssTM_ajIItIS2ue0oo/pub?w=721&amp;h=459">
+}}}
+
+컨테이너(Ins-1)에 대해서 1.22.3.5 주소로 접근하기를 원한다면, 컨테이너로의 NAT를 위한 NAT-IP를 하나 할당한다. 스위치는 컨테이너의 퍼블릭 아이피를 NAT-IP에 매핑한다. 이렇게 하면 두 번의 NAT로 인스턴스를 찾아갈 수 있다. 
+
+이 방식은 DHCP와 같은 네트워크 관리 프로토콜을 사용하기 어렵다는 단점이 있다.
+
+(Stateless NAT를 하면 되니) 스케일링이 용이하고, 트래픽을 완전히 분산할 수 있으며, 고가용성 구성이 용이하다는 장점이 있다.
+==== 중앙 IGW ====
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1TPzxGxD98f869w4TxzCTSp1wOnl6qEMgy1NKwp_fYNw/pub?w=721&amp;h=459">
+}}}
+
+각 호스트에 분산돼 있던 게이트웨이를 중앙에서 관리하는 방법도 있다. 이 방식의 장점은 아래와 같다. 
+  1. IGW가 DHCP 서버 역할을 수행할 수 있다. 2중 NAT의 경우 IGW가 분산돼 있기 때문에, DHCP와 같이 컨테이너 네트워크가 전역적으로 공유해야할 정보의 관리가 쉽지 않다.  
+  1. 내부의 모든 트래픽이 VXLAN상에서 흐르기 때문에 일관성이 있다. 
+모든 트래픽이 오버레이 되므로 2중 NAT에 비해서 성능의 희생이 있을 수 있다는 점과 고가용성, 고확장성 시스템의 구성이 좀 더 까다롭다는 단점이 있다. 
+==== 테스트 ====
+이건 GNS3로 테스트 해야 겠다. 노가다가 될 것 같은 느낌..
+
+=== 관련 툴 ===
+  * [wiki:https://github.com/coreos/flannel CoreOS flannel]
+

@@ -1,0 +1,180 @@
+head	1.6;
+access;
+symbols;
+locks
+	root:1.6; strict;
+comment	@# @;
+
+
+1.6
+date	2015.05.25.15.53.13;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.05.25.15.22.41;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.05.25.06.20.29;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.05.22.05.45.10;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.05.21.15.47.40;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.05.21.14.08.39;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fdocker_2fcoreos_2fetcd
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title etcd
+== etcd ==
+etcd는 오픈소스 기반의 분산 key&value 저장 소프트웨어로 CoreOS 클러스터에서 서비스의 발견과 설정정보의 공유를 서비스 한다. Zookeeper, Consul 등과 비슷한 일을 하는 녀석이다. etcd는 클러스트의 각 머신에서 실행이 되며, 네트워크 파티션에서 선거를 통해서 마스터를 뽑아서, 정보를 조율한다.  
+
+etcd는 HTTP 기반의 API를 제공한다. 여기에서는 '''etcdctl'''과 '''curl'''을 이용해서 데이터를 처리하는 법을 테스트 한다.
+
+== etcd api ==
+ * [wiki:man/12/docker/coreos/etcd/api etcd api]참고
+
+== etcd 클러스터링 ==
+일단 여기에 정리하고 옮긴다.
+=== 테스트 환경 ===
+정적(statically) etcd 설정을 하려면, 각 멤버가 클러스터의 다른 멤버들을 알고 있어야 한다. 테스트를 위해서 kvm 으로 3개의 coreos 가상 머신을 만들었다. 이들 coreos 클러스터의 네트워크는 OVS(OpenVSwitch)로 구성했다.
+
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a1 1
+<!> 미완성
+d14 1
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d13 2
+a14 2
+=== 개요 ===
+정적(statically) etcd 설정을 하려면, 각 멤버가 클러스터의 다른 멤버들을 알고 있어야 한다.
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d8 7
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a7 61
+== etcd API ==
+=== 테스트 환경 ===
+KVM 위에 CoreOS를 실행했다. 실행 방법은 [wiki:man/12/docker/coreos/quickinstall Coreos quick install] 문서를 참고 한다. etcd를 위한 4001 포트를 추가적으로 포워딩해야 한다. 그래서 '''coreos_production_qemu.sh'''스크립트를 수정했다. 
+{{{#!plain
+...
+SSH_PORT=2222
+ETCD_PORT=4444
+...
+while [ $# -ge 1 ]; do
+   case "$1" in
+     ...
+     -p|-ssh-port)
+        SSH_PORT="$2"
+        shift 2 ;;
+     -e|-etcd-port)
+        ETCD_PORT="$2"
+        shift 2 ;;
+...
+qemu-system-x86_64 \
+    -name "$VM_NAME" \
+    -m ${VM_MEMORY} \
+    -net nic,vlan=0,model=virtio \
+    -net user,vlan=0,hostfwd=tcp::"${SSH_PORT}"-:22,hostfwd=tcp::"${ETCD_PORT}"-:4001,hostname="${VM_NAME}" \
+    "$@@"
+...
+}}}
+localhost:4444를 4001로 포워딩해서 테스트를 진행한다.
+=== Running a Single Machine Cluster ===
+etcd API를 테스트한다. 테스트 하기 편하게 하나의 머신으로 구성된 클러스터로 테스트 했다. CoreOS에서 etcd를 실행한다.  
+{{{#!plain
+$ etcd -data-dir machine0 -name machine0
+[etcd] May 21 13:56:36.671 INFO      | Peer URLs in log:  / machine0 (http://127.0.0.1:7001)
+[etcd] May 21 13:56:36.672 INFO      | etcd server [name machine0, listen on :4001, advertised url http://127.0.0.1:4001]
+[etcd] May 21 13:56:36.672 INFO      | peer server [name machine0, listen on :7001, advertised url http://127.0.0.1:7001]
+[etcd] May 21 13:56:36.672 INFO      | machine0 starting in peer mode
+[etcd] May 21 13:56:36.672 INFO      | machine0: state changed from 'initialized' to 'follower'.
+}}}
+
+=== etcd 버전 가져오기 ===
+'''/version'''을 이용해서 etcd의 버전을 가져올 수 있다.
+{{{#!plain
+$ curl -L http://localhost:4444/version
+etcd 0.4.9
+}}}
+
+=== Key Space Operations ===
+etcd의 가장 중요한 API는 계층적인 키 공간의 관리다. 키 공간(key space)는 디렉토리 형식으로 구성되며, "nodes"에서 관리한다. 
+==== 키와 값을 설정하기 ====
+'''/message'''키를 만들고 여기에 '''Hello world'''값을 설정한다.
+{{{#!plain
+$ curl -L http://localhost:4444/v2/keys/message -XPUT -d value="Hello world"
+{
+   "action" : "set",
+   "node" : {
+       "modifiedIndex" : 3,
+       "key" : "/message",
+       "createdIndex" : 3,
+       "value" : "Hello world"
+   }
+}
+}}}
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d55 1
+a55 1
+==== 키와 값을 설정하기 ===
+@

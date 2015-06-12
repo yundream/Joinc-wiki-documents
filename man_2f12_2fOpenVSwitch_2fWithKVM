@@ -1,0 +1,75 @@
+#title KVM과 Open vSwitch 
+[[TableOfContents]]
+== KVM과 Open vSwitch ==
+KVM(kernel based Virtual Machine)을 위한 OVS 네트워크 구성에 대해서 알아본다. 테스트 환경은 다음과 같다.
+  * 우분투 리눅스 15.04
+  * Open vSwitch 2.3.1
+
+== 설정 == 
+KVM은 tunctl을 이용해서 브릿지 모드의 여러 기능들을 통제한다. apt-get을 이용해서 설치하자.  
+{{{#!plain
+# apt-get install uml-utilities
+}}}
+KVM은 이미지 생성시 네트워크 스크립트를 이용해서, 네트워크 인터페이스를 올리거나 내릴 수 있다. 이때 사용할 네트워크 스크립트를 만들자. 이 스크립트는 이 문서 전체에서 반복 사용한다.
+
+{{{#!plain
+# cat /etc/ovs-ifup
+switch='br0'
+/sbin/ifconfig $1 0.0.0.0 up
+ovs-vsctl add-port ${switch} $1
+
+# cat /etc/ovs-ifdown
+switch='br0'
+/sbin/ifconfig $1 0.0.0.0 down 
+ovs-vsctl del-port ${switch $1}
+}}}
+ovs 브릿지를 만들어 보자.
+{{{#!plain
+# ovs-vsctl add-br br0
+# ovs-vsctl show
+269457f7-8c1e-48bd-b080-4a75d4017857
+    Bridge "br0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    ovs_version: "2.3.1"
+}}}
+만약 VM들이 eth0으로 직접 패킷을 보내게 하고 싶다면, ovs 브릿지에 eth0을 추가해야 한다.
+{{{#!plain
+# ovs-vsctl add-port br0 eth0
+}}}
+
+ovs 브릿지에 VM 인스턴스의 네트워크와 연결해 보자.  
+{{{#!plain
+# kvm -m 512 -net nic,macaddr=00:11:22:EE:EE:EE -net \
+    tap,script=/etc/ovs-ifup,downscript=/etc/ovs-ifdown -drive \
+    file=/path/to/disk-image,boot=on
+}}}
+kvm이 시작 할 때, /etc/ovs-ifup을 실행 해서 네트워크 인터페이스를 br0에 add 한다. kvm이 종료 할 때는 /etc/ovs-ifcown을 실행 해서 네트워크 인터페이스를 제거한다. 
+ovs-dpctl과 ovs-ofctl을 이용해서 OVS의 디버깅 정보를 얻을 수 있다.
+{{{#!plain
+# ovs-dpctl show
+system@ovs-system:
+	lookups: hit:3 missed:5 lost:0
+	flows: 0
+	masks: hit:5 total:0 hit/pkt:0.62
+	port 0: ovs-system (internal)
+	port 1: br0 (internal)
+	port 2: tap0
+# ovs-ofctl show br0
+ovs-ofctl show br0
+OFPT_FEATURES_REPLY (xid=0x2): dpid:00007ebb14496e48
+n_tables:254, n_buffers:256
+capabilities: FLOW_STATS TABLE_STATS PORT_STATS QUEUE_STATS ARP_MATCH_IP
+actions: OUTPUT SET_VLAN_VID SET_VLAN_PCP STRIP_VLAN SET_DL_SRC SET_DL_DST ... 
+ 1(tap0): addr:ba:5a:79:fa:a3:b2
+     config:     0
+     state:      0
+     current:    10MB-FD COPPER
+     speed: 10 Mbps now, 0 Mbps max
+ LOCAL(br0): addr:7e:bb:14:49:6e:48
+     config:     0
+     state:      0
+     speed: 0 Mbps now, 0 Mbps max
+OFPT_GET_CONFIG_REPLY (xid=0x4): frags=normal miss_send_len=0
+}}}

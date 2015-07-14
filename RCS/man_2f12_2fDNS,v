@@ -1,0 +1,339 @@
+head	1.11;
+access;
+symbols;
+locks
+	root:1.11; strict;
+comment	@# @;
+
+
+1.11
+date	2015.06.17.03.51.17;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2015.06.17.03.46.30;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2015.06.17.02.33.59;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2015.06.17.02.04.44;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2015.06.17.02.00.45;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.06.16.08.09.55;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.06.15.05.11.18;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.06.15.05.10.47;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.06.15.04.17.52;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.06.15.03.31.04;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.06.15.03.28.01;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fDNS
+@
+
+
+1.11
+log
+@1.214.223.250;;yundream;;
+@
+text
+@#title DNS - Domain Name System
+[[TableOfContents]]
+== Domain Name System ==
+DNS(Domain Name System)은 인터넷이나 사설망(private network)에서 컴퓨터나 서비스 등의 리소스를 위한 '''계층적 분산 네이밍 시스템'''이다. 가장 두드러진 사용 목적은 컴퓨터와 서비스를 식별하기 위해서 사용하는 IP 주소를 사람이 쉽게 인지할 수 있는 '''도메인 이름 서비스'''다. 예를들어 www.example.com을 입력하면, 이에 대한 IP주소 111.111.111.111을 반환한다. DNS는 인터넷에서 사용하는 디렉토리 서비스로, 인터넷의 필수 구성요소다.  
+
+DNS는 각 도메인 이름을 서비스할 권한을 가진 '''authoritative name server'''를 분산 지정한다. Authoriative 네임서버는 그들이 지원하는 도메인 이름을 서비스 할 수 있을 뿐만 아니라, 하위 도메인을 관리하기 위한 네임 서버를 위임할 수도 있다. 이렇게 DNS는 도메인 별로 서비스와 데이터베이스가 분산됨으로써, 장애내성을 가질 수 있다.
+
+'''데이터베이스 기능'''은 DNS의 핵심 요소다. DNS 프로토콜은 네임 서비스를 위한 데이터 교환에 필요한 데이터 구조를 상세하게 정의하고 있다. 오랜 역사를 가진 인터넷 서비스들이 대게 그러하듯, DNS는 확장성과 대량의 요청을 처리하기 위한 목적으로 설계하지는 않았다. 텍스트 파일을 기반으로 하고 있으며, 글로벌 하게 사용할 것을 염두에 두지는 않았다. DNS는 1980년대 부터 널리 사용하기 시작했다.      
+
+인터넷은 '''도메인 이름 계층'''과 '''IP 주소공간'''의 중요한 두 개의 이름공간(namespace)으로 관리된다. DNS는 도메인 이름 계층과 IP 주소공간 사이의 변환 정보를 관리한다. 네임서버(Name server)는 DNS의 통신 프로토콜의 구현이다. DNS 네임서버는 도메인 이름을 위한 DNS 레코드를 저장하고 있다가 클라이언트의 요청을 받으면, 데이터베이스에서 도메인 이름에 대한 IP 주소를 찾아서 반환한다. 
+
+DNS 데이터베이스에서 주요 레코드들로는 DNS zone authority(SOA), IP addresses(A, AAAA), SMTP mail exchangers(MX), name servers(NS), Reverse DNS lookups(PTR), domain name aliases(CNAME) 등이 있다. 비록 DNS가 범용 데이터베이스를 목적으로 하고 있지는 않지만, DNSSEC 레코드나 RP 레코드등을 이용해서 다른 타입의 데이터를 저장할 수도 있다. DNS는 real-time blackhole list를 저장할 수 있는데, 이를 이용해서 spam(unsolicited email)에 대항할 수 있다. 이름 변환과 관련된 일반적인 서비스들에 대한 정보는 '''zone file'''구조체에 담겨있다.    
+
+== 주요 기능 ==
+DNS는 IP 주소를 사람이 쉽게 인지할 수 있는 이름으로 바꿔준다는 점 때문에, 인터넷 상의 '''전화번호부'''에 비유되고는 한다. 어떤 서비스의 주소가 93.184.216.119 라고 가정해 보자. 이 주소를 사람이 기억하기는 쉽지 않을 거다. 반면 www.example.com은 기억하기가 쉽다. 
+
+== 구조 ==
+=== Domain name space ===
+도메인 이름 공간은 도메인 이름의 트리(tree)로 구성된다. 트리를 구성하는 노드나 leaf는 도메인 이름을 구성하는 정보의 집합체인 0개 혹은 하나 이상의 '''resource record'''를 가지고 있다. 트리는 '''root zone'''에서 부터 시작된다.
+
+'''DNS Zone'''은 단지 하나의 도메인으로 구성될 수 있으며, 관리자가 위임한 권한에 따라서 여러 개의 도메인과 서브 도메인으로 구성될 수도 있다.
+
+=== 도메인 이름 규칙 ===
+도메인 이름(domain name)의 표현에 대한 규칙은 RFC 1035, RFC 1123, RFC 2181에 정의돼 있다. 도메인 이름은 기술적으로 ''labels''라고 부르는 하나 이상의 영역으로 구성이 되며, example.com과 같이 "."으로 각 영역을 구분한다. 
+  * 가장 오른쪽에 있는 라벨은 '''Top-level domain'''이다. www.example.com의 경우 '''com'''이 top-level domain이다.
+  * 오른쪽에서 왼쪽으로 계층적으로 구성이 된다. 이들은 오른쪽에 있는 도메인의 서브 도메인으로 분류된다. www.example.com의 경우 example는 com의 서브도메인 이며, www는 example.com의 서브도메인이 된다. 서브도메인으로 구성되는 트리는 127 레벨 까지 확장할 수 있다.
+  * 각 라벨은 63개의 문자로 구성된다. 풀 도메인 이름은 보통 253를 초과하지 않도록 한다.
+  * 기술적으로는 옥텟(Octet)로 표현할 수 있는 모든 문자를 사용할 수 있다. 그렇지만 ASCII의 서브셋인 a-z, A-Z, 9-9와 하이픈 문자로 구성하는 걸 권장한다. 이 룰은 LDH(Letters, digits, hyphen)으로 알려져 있다. 도메인 이름은 대소문자를 구분하지 않는다. 라벨은 하이픈으로 시작하거나 끝날 수 없다.
+  * 호스트 이름은 도메인 이름과 IP 주소의 조합으로 구성한다. 예를들어 도메인 이름이 www.example.com과 example.com은 호스트 이름으로 구성할 수도 있다.
+
+=== 도메인 이름의 국제화 ===
+도메인 이름은 ASCII에서 허용한 이외의 다양한 언어의 알파벳의 사용을 막고 있다. 이를 가능하게 하기 위해서, ICANN은 IDNA(Internationalizaing Domain Name in Application)를 이용, (웹 브라우저와 같은)유저 애플리케이션 레벨에서 유니코드를 이용할 수 있도록 허가하고 있다. 
+
+=== 네임 서버 ===
+DNS 시스템은 서버-클라이언트 모델을 따르는 분산 데이터베이스 시스템으로 관리된다. 각 데이터 베이스 노드는 네임서버가 관리한다. 각 도메인은 도메인과 하위 도메인에 대한 하나 이상의 '''authoritative DNS 서버'''를 가지고 있다.
+==== Authoritative name server ==== 
+네임서버에 설정된, 도메인 존의 데이터를 참조해서 응답하는 네임서버를 의미한다. 즉, 캐시에 저장된 도메인 데이터를 참조하지 않고 직접 설정된 데이터를 이용, 다이나믹하게 응답한다. 
+
+=== 네임 서비스 매커니즘 ===
+==== Recursive name server ====
+Recursive는 요청에 대한 응답 레코드를 가지고 있지 않으며, 다른 도메인요청에 대한 응답을 수행할 수 있다. 요청에 대한 응답 레코드가 없으므로, Root 네임서버와 Top-level - Second Level 네임 서버에 요청을 보내서, IP주소를 찾아내서 반환 한다. 유저의 요청을 대행하는 느낌이라고 보면 되겠다. 
+
+각 가정의 ISP에서 제공하는 네임서버가 Recursive 네임서버다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1AcDIkSSpAsWWHzFfbxMtXcHY39E2SVxvJTlDbnyeS_I/pub?w=816&h=370">
+}}}
+
+다음과 같이 작동한다.
+  1. 가정에서 웹 브라우저를 이용해서, www.example.com 을 입력한다. 
+  1. 웹 브라우저는 자신의 캐시에 www.example.com에 대한 IP가 저장돼 있는지 확인한다.
+  1. 없다면, 운영체제 캐시에 확인한다.
+  1. 운영체제에도 없다면 ISP에서 제공한 Recursing Name Server에 요청한다. 
+  1. Recursing Name Server는 루트 네임 서버에 ".com" 도메인을 관리하는 Authoritative 네임서버정보를 요청한다.
+  1. example.com을 관리하는 Authoritative 네임서버에 www.example.com 을 요청한다. 
+  1. 응답 받은 IP주소를 웹 브라우저에게 반환한다. 
+Authoritative 네임서버는 Recursive 네임서버의 역할까지 수행하므로, 기능으로 분류하는 건 별의미가 없다.
+==== 캐싱 네임 서버 ====
+이론적으로 authoritative 네임서버만으로도 인터넷 서비스를 담당할 수 있다. 하지만 authoritative 네임 서버만으로 구성이 되면, 모든 DNS 쿼리에 대해서 recurisive 네임서버를 통해서 루트 도메인 서버를 경유 해야 한다. 
+
+=== DNS resolvers ===
+클라이언트측에서는 DNS resolver를 이용해서, 네임 서비스를 요청할 네임서버를 찾는다. 리눅스 운영체제의 경우 /etc/resolv.conf에 DNS resolve를 위한 네임서버의 목록을 설정한다. 
+{{{#!plain
+# cat /etc/resolv.conf
+nanemserver 8.8.8.8
+nanemserver 8.8.6.6
+}}}
+위 설정에서 유저의 DNS서버는 8.8.8.8과 8.8.6.6이다. 애플리케이션에서 DNS 질의를 보내면 운영체제는 위에 설정된 네임서버로 질의를 전달한다.  
+
+DNS resolver은 Recursive, Iterative 의 2가지 방식이 있다. 
+==== Recursive ====
+리졸버는 애플리케이션의 질의를 /etc/resolv.conf에 설정된 네임서버에 던진다. 이후 루트 네임서버와 Top level 네임서버를 경유해서 응답을 받는 모든 과정을 네임서버에 맡긴다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1mPDE3Er1o9a8kDeWW7nM05SC_453pG2GHyYojlT51YI/pub?w=769&amp;h=271">
+}}}
+
+==== Iterative ==== 
+리졸버가 recursive 네임서버로의 역할을 한다. 즉 애플리케이션이 DNS 질의를 하면, 리졸버가 루트네임서버와 Top level 네임서버를 직접 경유해서 응답을 받아온다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1wfTo_B7aT8btruJ4kdaVPITW-Ct6ftjzlxpD33lWbk4/pub?w=582&amp;h=269">
+}}}
+
+=== Circular dependencies and glue records ===
+=== Record caching ===
+=== Reverse Lookup ===
+
+=== Client Lookup ===
+일반적으로 유저는 DNS resolver과 직접 통신하지 않는다. 대신 웹 브라우저와 이메일 클라이언트와 같은 인터넷 응용프로그램들이 DNS 확인 작업을 처리한다. 애플리케이션이 도메인 네임 룩업(lookup)을 요청은 로컬 운영체제가 가지고 있는 DNS resolver로 전달되고, DNS 요청을 대신 수행한다. 
+
+DNS 리졸버는 최근 조회한 DNS 이름을 캐시하고 있다. 만약 요청에 대한 응답정보가 이미 캐싱돼 있다면, 리졸버는 즉시 응답을 반환한다. 캐쉬에 응답이 없을 경우에는 하나 이상의 지정된 DNS 서버에 요청을 전송한다.      
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1rY0WGXy4-FDx4lkyWQwn3F_GWSSwE7V0Ic7SF1jTD2w/pub?w=838&amp;h=212">
+}}}
+
+일반 가정의 경우, ISP에서 제공하는 DNS 서버를 사용한다. 개인 PC에서의 DNS질의는 ISP에서 제공하는 DNS 서버로 향하고, ISP DNS가 recursive DNS 서버로 요청을 보낸다.
+==== Broken resolvers ====
+
+=== 다른 응용들 ===
+
+== DNS 메시지 포멧 ==
+DNS는 질의와 응답으로 구성되며, 둘다 같은 포멧을 사용한다. 각 메시지는 헤더와 "Question, Answer RRs, Authority RRS, Additional RRs" 4개의 섹션으로 구성된다. 
+
+헤더는 '''Identification, Flags, Number of Question, Number of answers, Number of authority resource records(RRs), Number of additional RRS'''의 필드를 가지고 있다.
+
+https://lh3.googleusercontent.com/-rMbByAS0Y5Y/VYDOQ0J6kJI/AAAAAAAAGN8/u0IQsMYIxA8/s800/vxlan03.png
+  * Identification(16bit) : 질의를 식별하기 위한 식별값이 들어간다. 클라이언트는 이 식별값을 이용해서, 어떤 요청에 대한 응답인지를 확인한다. 
+  * QR : 질의(Query)인지 응답(Response)를 구분한다.
+  * OPCODE : Operation Code. 
+  * AA : Authoritative Answer. 신뢰할 수 있는 Authoritative 서버의 응답일 경우 응답에 AA 비트를 설정해서 전송한다. 
+  * TC : Truncated
+  * RD : Recursion Desired
+  * RA : Recursing Available
+  * Z : Zero (Reserved)
+  * AD : Authenticated Data
+  * CD : Checking Disabled
+  * RCODE : Return Code
+== DNS resource records ==
+=== wildcard dns records ===
+
+== 프로토콜 확장 ==
+
+== 다이나믹 존 업데이트 ==
+
+== 보안 이슈 ==
+== 도메인 이름 등록 ==
+
+== 참조 ==
+ * [http://www.kisa.or.kr/uploadfile/201310/201310071959231513.pdf DNS의 이해와 DNS 보안]
+ * [https://en.wikipedia.org/wiki/Domain_Name_System Domain Name System - wikipedia]
+@
+
+
+1.10
+log
+@1.214.223.250;;yundream;;
+@
+text
+@a77 7
+화이어샤크를 이용해서 테스트를 했다.
+{{{#!plain
+# cat /etc/resolv.conf
+nameserver 127.0.1.1 
+}}}
+테스트 중..
+
+a84 11
+와이어샤크를 이용해서 테스트를 했다.
+{{{#!plain
+# cat /etc/resolv.conf
+nameserver 8.8.8.8
+
+# tcpdump -i eth0 -s 65536 port 53 -w dns8888.dat
+}}}
+https://lh3.googleusercontent.com/-Oyx8QIwCosc/VYDriYNBcaI/AAAAAAAAGOM/aNyvzuLERoU/s640/dns01.png
+
+요청과 응답 두개의 과정으로 이루어지는 걸 확인할 수 있다.
+
+@
+
+
+1.9
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d77 8
+d91 12
+@
+
+
+1.8
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d62 21
+a82 3
+클라이언트측에서는 DNS resolver를 이용해서, 네임 서비스를 요청할 네임서버를 찾는다. 두 가지 접근 방식이 있다.
+  * Recursive 접근 : 다른 DNS 서버를 조회할 수 있는 DNS 서버에 요청을 보낸다. 예를 들어, 홈 라우터에서 실행 중인 간단한 resolver는 유저의 ISP에서 제공하는 DNS에 recusive 질의를 한다.   
+  * iterative 접근 :  
+@
+
+
+1.7
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d88 1
+a88 1
+https://lh3.googleusercontent.com/-rMbByAS0Y5Y/VYDOQ0J6kJI/AAAAAAAAGN8/u0IQsMYIxA8/s640/vxlan03.png
+@
+
+
+1.6
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d70 9
+d86 14
+@
+
+
+1.5
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d75 1
+@
+
+
+1.4
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d88 1
+@
+
+
+1.3
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d62 3
+d68 1
+@
+
+
+1.2
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d37 1
+a38 1
+== 작동 ==
+d40 20
+a59 1
+==== Recursive and Caching 네임 서버 ====
+a61 1
+
+a62 1
+
+a63 1
+
+a64 1
+
+d81 3
+@
+
+
+1.1
+log
+@1.214.223.250;;yundream;;
+@
+text
+@d38 1
+@

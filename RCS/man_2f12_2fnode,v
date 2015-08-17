@@ -1,0 +1,133 @@
+head	1.4;
+access;
+symbols;
+locks
+	root:1.4; strict;
+comment	@# @;
+
+
+1.4
+date	2015.08.17.14.09.37;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.08.17.13.49.19;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.08.17.13.47.42;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.08.17.07.34.05;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fnode
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Node.JS
+
+== Node.js ==
+Node.js에 대한 내용을 다룬다. 왜 ? Node.js 기반의 플랫폼을 분석해야 할 일이 생겼다.
+ * [wiki:man/12/node/about Node.js 에 대해서]
+ * [wiki:man/12/node/SimpleServer 간단한 서버 예제]
+ * Socket.IO
+ * Express 프레임워크
+ * RESTful API Server 개발
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d6 4
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 3
+a5 1
+ * Node.js 에 대해서
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d3 1
+a3 54
+[[TableOfContents]]
+== Node.js ==
+Node.js는 크롬(chrome)의 자바스크립트 런타임을 내장한 개발 플랫폼이다. 이벤트 드리븐(event-driven), non-blocking I/O 모델을 사용한다. 덕분에 가볍고 빠른 작동이 가능하며 특히 실시간 성이 중요한 애플리케이션 개발에 강점을 보인다.
+
+자바스크립트라고 하면 클라이언트에서 작동하는 것을 생각해 왔는데, 서버 애플리케이션 개발을 위한 목적으로 사용 할 수 있다. 이를 위해서 HTTP, DNS, TCP 등과 같은 주요 서버 애플리케이션을 위한 기능들을 가지고 있다. 주요 특징들은 다음과 같다.  
+
+== V8 엔진 ==
+Chrome V8 엔진은 구글에서 개발한 자바스크립트 엔진으로 C++로 개발됐다. 구글의 크롬 브라우저를 위한 자바스크립트 엔진으로 개발했는데, 노드도 이 엔진을 사용하고 있다. V8 엔진은 "Automatic GC", "JS to Machine Code compilation", "Hidden Class transitions"등의 기술을 지원하며, 가장 빠른 자바스크립트 엔진중의 하나다.
+
+== Event-driven, non-blocking I/O ==
+많은 요청을(scalable) 빠르게 처리하기 위해서 흔히 멀티 스레드 프로그래밍 기술을 사용한다. 현대에 멀티 스레드 프로그래밍 기술은 매우 중요하기 때문에 거의 모든 프로그래밍 언어에서 지원한다. V8은 멀티 스레드 프로그래밍 기술 대신에 비동기 I/O를 이용해서, 멀티 스레드와 비슷한 목적을 달성한다.
+
+멀티 스레드 프로그램은 유저가 연결(connect 함수를 호출 할 때), 이를 처리하기 위한 새로운 스레드를 만든다. 이 스레드는 유저로 부터 데이터의 "입력을 기다리다가 데이터가 준비되면 read 함수를 호출"해서 데이터를 읽어서 처리한다. 이 과정을 반복하는 것으로 유저 데이터를 처리한다.
+
+여기에서 "입력을 기다린다"는 부분에 주목 할 필요가 있다. 보통 read 함수를 이용해서 입력을 기다리는데, 스레드 입장에서 기다린 다는 것은 "블럭킹(blocking)"되는 것을 의미한다. 일반적인 멀티 스레드 프로그램은 모두 블럭킹 모드로 작동한다고 보면 된다. 
+
+반면 노드는 하나의 스레드에서 하나 이상의 요청을 처리한다. 이를 위해서는 블럭킹 영역이 없어야 한다. 예를들어 클라이언트가 연결 했다고 해서, read 함수에서 응답을 기다리면 하나 이상의 클라이언트를 처리 할 수 없게 될 것이다.
+
+'''노드는 읽을 데이터를 기다리지 않는다.''' 대신, 데이터가 준비가 되면 어느 소켓으로 부터 읽을 데이터가 준비됐다는 이벤트를 만든다. 프로그램은 발생한 이벤트의 정보를 기반으로 소켓으로 부터 데이터를 읽어서 처리를 한다. 각 소켓별로 read 함수를 호출하면서 블럭킹 할 필요가 없기 때문에, 하나의 스레드로 여러 개의 클라이언트를 처리 할 수 있다.
+=== 장점 및 단점 ===
+논-블럭킹 방식은 스레드를 만들기 않기 때문에, 처리속도가 빠르며 메모리 및 CPU를 효율적으로 사용할 수 있다는 장점이 있다. 논-블럭킹 방식의 NginX와 멀티 스레드 방식의 Apache 웹 서버의 성능 차이를 보여준다.
+
+http://blog.cloudfoundry.org/wp-content/uploads/2012/04/Screen-Shot-2012-04-24-at-3.31.58-PM.png
+
+http://blog.cloudfoundry.org/wp-content/uploads/2012/04/Screen-Shot-2012-04-24-at-3.34.07-PM.png
+
+장점만 있는 건 아니다. 하나의 스레드만 사용하기 때문에 CPU 코어를 제대로 활용 할 수 없다는 문제가 있다. 노드는 클러스터링을 이용해서 이 문제를 해결하고 있다.  
+
+
+== 커뮤니티 ==
+가장 핫한 언어인 javascript를 기반으로 하고 있다. http://githut.info/ 에서 언어별 사용율을 볼 수 있다. github 기준이며, 특성상 웹 애플리케이션이 많이 올라온다는 것을 감안하더라도 가장 인기있는 언어라는 것은 의심의 여지가 없다. 수많은 개발자들이 노드 관련 모듈을 개발하고 있으며, 수천개의 훌륭한 라이브러리들이 공개돼 있다. 오늘 ([[Date(2015-08-17T07:34:05)]]) 등록된 모듈의 갯수가 [https://www.npmjs.com 175,261개]다.
+
+== 노드는 만능인가 == 
+물론 그럴리는 없다. 강점을 보이는 영역이 있는가 하면 그렇지 않은 영역도 있다.
+
+강점을 보이는 영역
+  1. 트위터나 채팅 앱같은 (soft)실시간 애플리케이션의 개발.
+  1. Proxy server와 Paas, 데이터베이스와 같은 high-performance, high I/O가 필요한 애플리케이션 개발
+  1. 백엔드 로그처리 및 프로세싱 앱
+  1. vmc-tool과 같은 CLI앱 및 ant와 make 같은 빌드 툴
+  1. RESTful API 웹 서버
+적당하지 않은 영역
+  1. Hard real-time 애플리케이션 
+  1. real-time과 high-performance가 중요하지 않은 (그보다는 견고함, 안정성 등이 더 중요한) CRUD 애플리케이션 
+  1. 엔터프라이즈 애플리케이션. 기업형 애플리케이션을 개발하려면 Java와 같은 언어가 더 많은 기능을 지원할 거다.  
+== 노드와 함께 볼만한 다른 언어(혹은 도구)들 ==
+  1. [http://vertx.io/ vertx.io]
+  1. [http://www.erlang.org/ Erlang]
+  1. [http://twistedmatrix.com/trac/ Twisted] : Python 기반의 event-driven 네트워킹 엔진
+  1. [http://rubyeventmachine.com/ EventMachine] : Ruby에서 사용하는 event-driven I/O 라이브러리  
+  1. Scala
+  1. Dart
+  1. [http://golang.org/ Go] 
+
+@

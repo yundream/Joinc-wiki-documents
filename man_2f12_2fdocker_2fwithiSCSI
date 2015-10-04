@@ -14,6 +14,49 @@
   * [wiki:Site/cloud/Qemu/Basic kvm]으로 인스턴스를 띄울 수 있다. kvm에 익숙하지 않다면 virtualbox로 테스트 해도 된다. 
   * Linux [wiki:Site/System_management/LVM LVM]을 사용 할 수 있다.
   * [wiki:Site/System_management/iSCSI iSCSI]를 설치하고 운용할 수 있다.
+
+== 로컬 호스트에서의 데이터 볼륨 제공 ==
+iSCSI 볼륨을 테스트 하기전에 로컬에서 간단히 테스트를 해보자. -v 옵션을 이용해서 간단하게 호스트 볼륨을 도커 볼륨으로 만들 수 있다. 로컬 디스크에 myvolume 디렉터리를 만들어서 볼륨으로 제공했다. 
+{{{#!plain
+# docker run -v /root/myvolume:/webapp -i -t ubuntu /bin/bash 
+df -h Filesystem                                              Size  Used Avail Use% Mounted on
+none                                                     78G   64G  9.9G  87% /
+tmpfs                                                   3.9G     0  3.9G   0% /dev
+shm                                                      64M     0   64M   0% /dev/shm
+/dev/disk/by-uuid/8c5d05ee-9c82-4f01-83fb-a4903f940111   78G   64G  9.9G  87% /webapp
+tmpfs                                                   3.9G     0  3.9G   0% /proc/kcore
+}}}
+/webapp 디렉토리로 마운트 된 걸 확인 할 수 있다. 내 리눅스가 사용하는 ext4는 디스크 쿼터를 지원하지 않는다. 해서 전체 디스크 공간 78G 전체가 데이터 볼륨으로 잡혀 버렸다. 다음과 같은 방법으로 볼륨의 크기를 제한 할 수 있다.
+{{{#!plain
+# dd if=/dev/zero of=harddrive.img count=512 bs=1M
+# mkfs.ext4 harddrive.img
+# fdisk -l harddrive.img
+Disk harddrive.img: 512 MiB, 536870912 bytes, 1048576 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+}}}
+
+만들어진 이미지 파일을 myvolume 디렉터리로 마운트한다.
+{{{#!plain
+# mkdir /root/myvolume
+# mount -o loop harddrive.img myvolume/
+}}}
+
+마운트 디렉터리를 데이터 볼륨으로 설정해서 실행한다.
+{{{#!plain
+# docker run -v /root/myvolume:/webapp -i -t ubuntu /bin/bash
+# df -h
+Filesystem                                              Size  Used Avail Use% Mounted on
+none                                                     78G   64G  9.9G  87% /
+tmpfs                                                   3.9G     0  3.9G   0% /dev
+shm                                                      64M     0   64M   0% /dev/shm
+/dev/disk/by-uuid/8c5d05ee-9c82-4f01-83fb-a4903f940111   78G   64G  9.9G  87% /etc/hosts
+/dev/loop0                                              488M  396K  452M   1% /webapp
+}}}
+/dev/loop0 디바이스로 마운트 된 걸 확인 할 수 있다.
+
+iSCSI라고 해도 달라질건 없다. 원격에 있는 볼륨을 마운트 한 후, 도커 볼륨으로 제공하면 된다.
 == iSCSI를 이용한 데이터 볼륨 제공 ==
 그래서 데이터 볼륨은 별도의 Storage Node(SNODE)를 이용해서 제공하기로 했다. 
 

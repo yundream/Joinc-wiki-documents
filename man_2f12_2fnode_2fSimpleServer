@@ -1,7 +1,8 @@
 #title 간단한 node.js 서버 
 
+[[TableOfContents]]
 == Hello World HTTP 서버 ==
-helloworld.js
+=== 간단 버전 ===
 {{{#!plain
 var http = require('http');
 
@@ -18,6 +19,29 @@ console.log('Server started')
 # nodejs helloworld.js
 # curl localhost:8000 
 }}}
+
+=== 모듈화 버전 ===
+{{{#!plain
+# cat hello.js
+var http = require('http');
+
+function start() {
+	function onRequest(request, response) {
+		response.writeHead(200, {'Content-Type': 'text/plain'});
+		response.write("Hello World!!");
+		response.end();
+	}
+	http.createServer(onRequest).listen(5555);
+	console.log("Server has started.");
+}
+
+exports.run = start;
+
+# cat app.js
+var app = require('./hello.js')
+app.run()
+}}}
+  * exports 객체와 모듈 
 
 == Echo 서버 ==
 {{{#!plain
@@ -42,3 +66,30 @@ Ok
 }}}
 
 == Chat 서버 ==
+{{{#!plain
+Array.prototype.remove = function(from, to) {
+	var rest = this.slice((to || from) + 1 || this.length);
+	this.length = from < 0 ? this.length + from : from;
+	return this.push.apply(this, rest);
+};
+
+var net=require('net');
+var sockets = []
+
+net.createServer(function(socket) {
+	sockets.push(socket);
+	socket.write("Hello !!\n");
+	socket.on('data', function(data) {
+		var i;
+		for (i = 0; i < sockets.length; i++) {
+			if (sockets[i] === socket ) continue;
+			sockets[i].write(data.toString());
+		}
+	});
+	socket.on('end', function() {
+		var i = sockets.indexOf(socket);
+		sockets.remove(i);
+	});
+}).listen(1234)
+}}}
+  * 객체와 메서드 

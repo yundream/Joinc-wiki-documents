@@ -1,0 +1,45 @@
+#title ELB에서의 Websocket 지원
+[[TableOfContents]]
+== ELB에서의 WebScoket == 
+ELB는 서비스의 고가용성과 높은 확장성을 위해서 널리 사용한다. 특히 HTTP와 HTTPS 프로토콜에서 널리 사용하고 있다.
+
+[wiki:man/12/websocket 웹 소켓]은 HTTP와 함께 사용하는 기술이긴 하지만, HTTP와는 관련이 없는 기술이다. 예를 들어 웹 소켓 서비스에 접근 할 경우에는 http:// 를 사용하는 대신 ws://를 사용한다. 따라서 HTTP 기반의 애플리케이션(웹 서버, 로드 밸런스, 프락시 서버  등)에서 웹 소켓을 지원하려면 웹 소켓만을 위한 처리가 들어가야 한다.  
+
+문제는 ELB의 HTTP는 websocket을 지원하지 않는 다는 점이다. 해서 TCP를 이용해서 웹 소켓 연결을 처리해야 한다. 
+
+== 테스트 환경 ==
+=== 인스턴스 설치 ===
+프리티어 계정으로 VPC 만들고 밑에, 인스턴스 붙여서 테스트 한다.  
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1_ErgDqBqMU1tdsp8fwRcPSBsIntuns2Lv1pQLAfoM44/pub?w=544&amp;h=463">
+}}}
+
+10.1.0.0/16 네트워크 VPC를 만들고, 10.1.1.0/24, 10.1.2.0/24 2개의 서브넷을 만들었다. 반드시 서로 다른 가용성 존에 만들어야 한다. 각 서브넷에 인스턴스를 올리고 여기에 [https://github.com/yudai/gotty gotty]를 올린다. gotty는 웹 소켓으로 터미널을 서비스 하는 간단한 웹 애플리케이션이다. 인스턴스의 호스트 이름은 '''server01''', '''server02'''다. 
+
+두 개의 인스턴스에서 8000번 포트로 gotty를 실행 했다.
+{{{#!plain
+server01# ./gotty --port 8000 -w /bin/bash
+2015/09/23 12:21:32 Permitting clients to write input to the PTY.
+2015/09/23 12:21:32 Server is starting with command: /bin/bash
+2015/09/23 12:21:32 URL: http://127.0.0.1:8000/
+2015/09/23 12:21:32 URL: http://[::1]:8000/
+2015/09/23 12:21:32 URL: http://10.1.1.81:8000/
+}}}
+
+=== ELB 설치 및 설정 ===
+Load Balancer Port는 80, Instance Port는 8000인 ELB를 만들었다. 헬스 체크를 위한 Ping Path를 설정해야 하는데, /auth_token.js를 체크페이지로 한 후, 앞서 만든 두 개의 인스턴스를 연결했다. 
+
+https://lh3.googleusercontent.com/-eh6wU9Xge2U/VgKq3TDEaUI/AAAAAAAAGxY/3g-fSTP9PKM/s640-Ic42/TCP80.png
+
+인스턴스에 대한 헬스 체크가 '''InService'''가 된 것을 확인 하고, ELB endpoint 도메인 주소로 테스트를 했다.
+
+https://lh3.googleusercontent.com/-ANzj07Jk9fw/VgKu21nf9II/AAAAAAAAGxk/Z3kKVztevPU/s640-Ic42/TCP81.png
+
+프로토콜로 HTTP가 아닌 TCP를 사용 했다는 것에 주의해야 한다. HTTP로 할 경우 웹 소켓 Upgrade 시도에서 실패 한다. HTTP와 웹 소켓은 상관 없는 프로토콜이기 때문이다. 파이어폭스 개발자 도구를 이용해서 네트워크 상황을 모니터링 했다.
+
+https://lh3.googleusercontent.com/-eRln6-ivqqg/VgKwVvTCqxI/AAAAAAAAGx0/BIx8QkLoLEs/s640-Ic42/TCP82.png
+
+'''ws'''에서 "101 Switching Protocol upgrade Webscoket" 한 것을 확인 할 수 있다. ELB는 Protocol upgrade를 지원하지 못하기 때문에, 여기에서 실패 한다. 
+
+

@@ -1,0 +1,122 @@
+#title 애플리케이션 배포를 위한 커스텀 docker 이미지 만들기 
+[[TableOfContents]]
+== 소개 ==
+애플리케이션을 배포하기 위한 개인 도커 이미지를 만들어 보려고 한다. 만들려는 이유는 다음과 같다.
+  * 애플리케이션 환경에 맞게 도커 이미지를 커스터마이징.
+  * 일반적으로 사용하는 우분투 도커 이미지는 다양한 기능들을 가지고 있어서 편하긴 하지만 너무 크다. 우분투 14.04 이미지는 크기만 188M가 넘어간다. 필요한 일만 하는 효율적인 애플리케이션 전용 이미지를 만들어서 배포한다.
+
+== Dockerfile ==
+도커는 이미지에 대한 명세가 적힌 '''Dockerfile'''를 읽어서, 자동으로 이미지를 만들어주는 기능을 제공한다. '''Dickerfile'''의 모든 명세는 줄 단위로 해석 할 수 있는 간단한 스크립트로 작성할 수 있다. 이 Dockerfile을 이용해서 커스텀 도커 이미지를 만들 수 있다. 
+
+== Dockerfile 사용 ==
+=== build ===
+'''docker build''' 명령을 실행하면 '''Dockerfile'''을 읽어서 이미지를 만든다. 이 명령을 실행 할 때는 Dockerfile의 경로만 정해주면 된다. 현재 디렉토리에 Dockerfile있다면, 아래와 같이 명령을 내리면 된다.
+{{{#!plain
+# docker build .
+Sending build context to Docker daemon 6.51 MB
+}}}
+build 명령을 내리면 도커는 줄 단위로 명령을 해석한다. 예를 들어 '''COPY'''를 만나면 파일을 복사하는 일을 수행한다. 그리고 '''-t''' 옵션을 이용해서 이미지 이름을 설정 할 수 있다. 예를 들어 scratch로 부터 새로운 이미지를 만들었다면 아래와 같이 이름을 붙이면 된다. 
+{{{#!plain
+# docker build -t hello/scratch .
+}}}
+
+=== 형식 ===
+{{{#!plain
+# Comment : 주석
+INSTRUCTION arguments
+}}}
+
+=== 주요 Instruction ===
+=== FROM ===
+{{{#!plain
+FROM <image> 
+}}}
+도커의 이미지들은 '''Base Image'''로 부터 만들어진다. 어떤 이미지로 부터 만들어질지를 설정한다. 
+
+==== MAINTAINER ====
+{{{#!plain
+MAINTAINER <name>
+}}}
+도커 이미지를 만든 사람
+
+==== RUN ====
+두 가지 형식이 있다.
+{{{#!plain
+RUN <command> : /bin/sh -c
+RUN ["executable", "param1", "param2"] : exec 형식
+}}}
+이미지를 빌드 할 때, RUN에 설정된 명령이 실행되고 그 결과가 이미지에 commit 된다. 이미지에 특정 패키지를 설치하려고 할 때, 사용 할 수 있다. 
+
+==== CMD ===
+=== Hello world 도커 이미지 만들기 ===
+'''Hello world'''웹 애플리케이션을 위한 도커 이미지를 만들어 보자. Go 언어로 hello world 프로그램을 만들었다. Go 프로그램은 하나의 파일로 작동하는 소프트웨어를 만들 수 있으므로 특히 컨테이너와 궁합이 잘 맞는다고 할 수 있다. 프로그램의 이름은 hello.go다.
+{{{#!plain
+package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+func helloWorld(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintln(w, "Hello world from Go in minimal docker container")
+}   
+
+func main() {
+    http.HandleFunc("/", helloWorld)
+    err := http.ListenAndServe("0.0.0.0:8000", nil)
+    if err != nil {
+        panic("ListenAndServer :" + err.Error())
+    }   
+}   
+}}}
+
+go 코드를 컴파일 한다.
+{{{#!plain
+# CGO_ENABLED=0 GOOS=linux go build 
+}}}
+
+이제 '''scratch'''를 이용해서 도커 이미지로 만들기로 했다. scratch는 도커에서 제공하는 minimal 이미지다. Dockerfile이다.  
+{{{#!plain
+FROM scratch
+ADD hello / 
+CMD ["/hello"]
+}}}
+  * FROM scratch : scratch로 부터 이미지를 만들기로 했다. 
+  * ADD hello / : 컴파일 한 실행 파일 hello를 루트 디렉토리에 추가한다.  
+  * CMD : 컨테이너가 시작 할 때 기본으로 실행하는 명령 
+build 명령으로 도커 이미지를 만들자.
+{{{#!plain
+# docker build -t hello/scratch .
+Sending build context to Docker daemon 6.621 MB
+Step 0 : FROM scratch
+ ---> 
+Step 1 : ADD hello /
+ ---> 86a3275110a0
+Removing intermediate container 33cbd3c89d00
+Step 2 : ENTRYPOINT /hello
+ ---> Running in 4d7cd53a4aae
+ ---> 84aa6eed96e3
+Removing intermediate container 4d7cd53a4aae
+Successfully built 84aa6eed96e3
+}}}
+
+hello/scratch 이미지를 확인 할 수 있다. 6.604 MB 크기의 초소형 이미지다. 
+{{{#!plain
+# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+hello/scratch       latest              84aa6eed96e3        40 seconds ago      6.604 MB
+goorm-ssh-proxy     0.1                 ab8778c4436b        27 hours ago        208.2 MB
+}}}
+
+컨테이너를 만들어보자. 
+{{{#!plain
+# docker run -d -p 8000:8000 hello/scratch
+35ca7534b2dc3158ab442a12ba697253171036d794f08669a3798e308faf9da2
+}}}
+  * -d : 백그라운드(detach) 모드로 실행한다.
+  * -p : 웹 서비스를 위해서 포트포워딩을 했다.
+{{{#!plain
+# curl 192.168.56.50:8000
+Hello world from Go in minimal docker container
+}}}

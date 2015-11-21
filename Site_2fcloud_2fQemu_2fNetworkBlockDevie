@@ -1,0 +1,116 @@
+#title QEMU Network Block Device
+[[TableOfContents]]
+== Network Block Device ==
+물리적인 디바이스를 네트워크에서 사용할 수 있도록 해주는 기능이다. 예컨데, 원격에 있는 하드 디스크를 로컬에서 사용 할 수 있도록 해준다고 보면 된다. [wiki:man/12/iSCSI iSCSI]와 매우 비슷한 녀석이라서 어느 녀석을 써야 할지 헷갈릴 수 있겠다. 굉장히 최신의 기술일 것 같지만 1997년에 개발된 거의 20년이 다되가는 기술이다. 리눅스도 커널 2.1.55 부터 지원하는 역사와 전통에 빛나는 기능이다. 오래된 만큼 믿고 쓸 수 있다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/13fB6NB496p__z1Ti4Cg1k9od9p5Y7TiRNZiY4zm8XFU/pub?w=711&amp;h=274">
+}}}
+
+== KVM 가상화에서의 NBD ==
+가상화 환경에서 인스턴스와 스토리지는 네트워크로 분리되는게 일반적이다. NBD를 이용해서, 가상환경을 구성하는 법에 대해서 살펴본다.   
+
+=== QEMU Image를 NBD로 서비스하기 ===
+가상화와 클라우드에서는 [wiki:Site/System_management/LVM LVM] 등으로 블럭 디바이스를 나누어서 서비스 한다. QEMU는 블럭 디바이스를 이미지로 만들 수 있는데, 이 이미지를 NDB로 서비스 할 수 있다. QEMU 이미지는 qemu-img 명령으로 만들 수 있다. raw, qcow2, rdb, parallels 등 다양한 가상 이미지를 만들 수 있는데, qcow2로 테스트 하기로 했다. 
+10G 짜리 qcow2 이미지를 만들었다.
+{{{#!plain
+# qemu-img create -f qcow2 test01.img 10G
+Formatting 'test01.img', fmt=qcow2 size=10737418240 encryption=off cluster_size=65536 lazy_refcounts=off 
+
+# qemu-img info test01.img 
+image: test01.img
+file format: qcow2
+virtual size: 10G (10737418240 bytes)
+disk size: 196K
+cluster_size: 65536
+Format specific information:
+   compat: 1.1
+   lazy refcounts: false
+   corrupt: false
+}}}
+
+qcow2 이미지는 사용하는 만큼만 이미지가 늘어나는 동적 할당을 지원한다. 파티셔닝 작업을 끝내도 100M 정도의 크기만 차지한다. 이렇게 만든 test01.img를 ndb 디바이스에 연결하자. 연결하기 전에 ndb 커널 모듈을 올리자.
+{{{#!plain
+# modprobe nbd max_part=8
+# lsmod | grep nbd
+nbd               20480   0
+}}}
+max_part는 블럭 디바이스 하나가 가질 수 있는 파티션의 개수다. /dev 디렉토리 밑에 nbd 디바이스 파일이 있는지 확인해 보자.
+{{{#!plain
+# ls -al /dev/nbd*
+/dev/nbd0  /dev/nbd10  /dev/nbd12 ... 
+/dev/nbd1  /dev/nbd11  /dev/nbd13 ...
+}}}
+
+qemu-nbd를 이용해서 test01.img를 ndb 디바이스에 연결한다. 
+{{{#!plain
+qemu-nbd -c /dev/nbd0 test01.img -f qcow2
+}}}
+
+test01.img에 연결된 블럭디바이스 /dev/ndb0이 만들어졌다. fdisk로 파티션 정보를 보자.
+{{{#!plain
+# fdisk  -l /dev/nbd0 
+
+Disk /dev/nbd0: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+}}}
+
+fdisk로 파티션 작업을 하자. 파티션을 만드는 과정은 생략 한다. 파티션 작업을 하고 파일 시스템을 만들어줘야 한다. ext4로 만들었다. 작업을 마친 디바이스의 모습이다. 참고로 fdisk는 /dev/ndb를 대상으로 해야 한다. fdisk는 qcow를 지원하지 않기 때문에, 이미지 파일에 직접하면 제대로 작업이 되지 않는다. 
+{{{#!plain
+# fdisk -l /dev/nbd0 
+
+Disk /dev/nbd0: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x1df95d35
+
+Device      Boot   Start      End  Sectors Size Id Type
+/dev/nbd0p1         2048  8390655  8388608   4G 83 Linux
+/dev/nbd0p2      8390656 20971519 12580864   6G 83 Linux
+
+# mkfs.ext4 /dev/nbd0p1
+# mkfs.ext4 /dev/nbd0p2
+}}}
+
+이제 이미지를 네트워크에 바인드 하자.
+{{{#!plain
+# qemu-nbd --bind=0.0.0.0 --port=4000 test01.img
+# netstate -na | grep 4000
+tcp        0      0 0.0.0.0:4000            0.0.0.0:*               LISTEN     
+}}}
+
+=== NBD를 원격에서 마운트 ===
+테스트를 위해서 virtualbox 인스턴스를 하나 만들었다. 이 인스턴스에서 호스트에 있는 블럭 디바이스를 마운트해서 사용하기로 했다. nbd 모듈이 올라와 있는지 확인한다.
+{{{#!plain
+# lsmod | grep nbd
+nbd        20480  0
+}}}
+nbd 서버에 연결하기 위해서 nbd-client를 설치하고, 원격 이미지를 블럭디바이스에 연결했다.
+{{{#!plain
+# nbd-client 192.168.56.1 4000 /dev/nbd0 
+Negotiation: ..size = 10240MB
+bs=1024, sz=10737418240 bytes
+}}}
+이제 블럭디바이스를 디렉터리에 마운트해서 사용하면 된다.
+{{{#!plain
+# fdisk -l /dev/nbd0
+Disk /dev/nbd0: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x1df95d35
+
+Device      Boot   Start      End  Sectors Size Id Type
+/dev/nbd0p1         2048  8390655  8388608   4G 83 Linux
+/dev/nbd0p2      8390656 20971519 12580864   6G 83 Linux
+# mount /dev/nbd0p1 /mnt/test1
+# mount /dev/nbd0p2 /mnt/test2
+}}}
+
+== iscsi와 NDB ==
+성능 테스트와 사용성 테스트를 해보고 싶다. 언젠가는

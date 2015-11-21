@@ -1,0 +1,144 @@
+head	1.3;
+access;
+symbols;
+locks
+	root:1.3; strict;
+comment	@# @;
+
+
+1.3
+date	2015.08.25.05.31.04;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.08.25.05.16.57;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.08.24.13.58.56;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fgolang_2ferror
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Golang error 처리
+[[TableOfContents]]
+=== Go 언어에서의 error ===
+Go로 프로그램을 개발하다보면, 내장된 '''error'''타입을 이용해서 에러를 처리하게 된다. 이 타입은 에러의 상태를 알려주기 위해서 사용한다. os.Open 함수의 경우 파일 열기에 실패했다면 '''nil'''이 아닌 error 값을 반환한다. os.Open의 선언을 보자.
+{{{#!plain
+func Open(name string) (*File, error)
+}}}
+파일 디스크립터인 '''File''', error 타입을 반환하는 걸 확인 할 수 있다. 실제 프로그램에서는 아래와 같이 사용한다.
+{{{#!plain
+f, err := os.Open("filename.txt")
+if err != nil {
+	log.Println(err.Error())
+	return
+}
+// 파일처리
+}}}
+
+=== Error 인터페이스와 errorString 구조체 ===
+'''error'''는 인터페이스 타입으로 언어에서 [http://golang.org/pkg/builtin 직접 지원]한다.
+{{{#!plain
+type error interface {
+	Error() string
+}
+}}}
+error는 '''Error'''이라는 하나의 메서드만 선언되 있다. 이 메서드는 에러 정보를 담고 있는 '''string'''을 반환한다. 따라서 Error()메서드만 구현하는 것 만으로 모든 코드에서의 사용이 가능하다.
+
+Go는 표준 라이브러리 형식으로 '''errorString''' 구조체 타입을 제공한다. 이 구조체는 errors 패키지에 선언돼 있다.
+{{{#!plain
+type errorString struct {
+	s string
+}
+}}}
+errorString는 string 타입의 '''s''' 필드만 가지고 있다. 이 필드는 '''unexported'''[[FootNote(첫 문자가 소문자면 unexported, 대문자면 exported 타입이다. unexported 타입은 메서드를 이용해서 접근 할 수 있다. 클래스의 Public, private와 비슷하게 작동한다.)]] 이므로 바로 접근 할 수 없다. Error() 메서드를 이용해서 '''s'''값을 가져올 수 있다.   
+{{{#!plain
+func (e *errorString) Error() string {
+    return e.s
+}
+}}}
+
+=== Error 값만들기 ===
+errors 패키지의 '''New'''함수를 이용해서 errorString 포인터를 만들 수 있다.
+{{{#!plain
+import "errors"
+var ErrInvalidParam = errors.New("Mypackage: invalid parameter")
+}}}
+New 함수를 호출하면 아래와 같이 errorString에 값을 설정하고, 포인터를 반환한다.
+{{{#!plain
+func New(text string) error {
+	return &errorString(text)
+}
+}}}
+
+fmt.Errorf를 이용하면, 형식화된 에러메시지를 만들 수 있다.
+{{{#!plain
+var ErrInvalidParam = fmt.Errorf("Invalid parameter [%s]", param)
+}}}
+
+=== Error 값 비교하기 ===
+bufio와 같은 표준 라이브러리에 있는 패키지를 보면, errors를 이용해서 에러들을 정의한 것을 확인 할 수 있다.
+{{{#!plain
+var {
+    ErrInvalidUnreadByte = errors.New("bufio: invalid use of UnreadByte")
+    ErrInvalidUnreadRune = errors.New("bufio: invalid use of UnreadRune")
+    ErrBufferFull        = errors.New("bufio: buffer full") 
+    ErrNegativeCount     = errors.New("bufio: nagative count") 
+}
+}}}
+bufio 패키지의 메서드들은 에러가 발생했을 때, 위에 정의된 error 들을 반환한다. bufio 메서드를 호출한 코드에서는 위에 선언된 값들을 직접 비교하는 것으로 에러를 분기 할 수 있다. 
+{{{#!plain
+data, err := b.Peek(1)
+if err != nil {
+    switch err {
+    case bufio.ErrNegativeCount:
+        // 에러처리 코드 
+        return
+    case bufio.ErrBufferFull:
+        // 에러처리 코드 
+        return
+    default:
+        // 일반적인 에러처리 코드
+        return
+	}
+}
+}}}
+위 예제를 보자. Peek 메서드는 '''bufio.Reader''' 포인터를 반환한다. 어떤 이유로 실패 할 경우, err을 nil이 아닌 값으로 설정한다. 코드에서는 ErrNegativeCount 등의 error와 비교해서 에러의 종류를 확인 할 수 있다.
+
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d58 1
+a58 1
+== Error 값 비교하기 ===
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d33 54
+@

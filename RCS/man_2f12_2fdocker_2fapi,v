@@ -1,0 +1,731 @@
+head	1.7;
+access;
+symbols;
+locks
+	root:1.7; strict;
+comment	@# @;
+
+
+1.7
+date	2015.10.23.14.54.35;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.10.17.00.50.48;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.10.16.16.54.42;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.10.11.14.46.14;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.10.10.10.08.53;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.10.10.08.24.44;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.10.10.08.04.43;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fdocker_2fapi
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title Docke Remote API
+[[TableOfContents]]
+== Docker Remote API ==
+=== 환경 설정 ===
+도커는 기본적으로 유닉스 도메인 소켓을 이용해서 통신을 한다. 소켓의 주소는 unix:///var/run/docker.socket 으로 root만 사용할 수 있다. 
+{{{#!plain
+# ls -al /var/run/docker.sock 
+srw-rw---- 1 root docker 0 Oct 10 10:04 /var/run/docker.sock
+}}}
+도커 API를 원격에서 사용하고 싶다면, 인터넷 주소에 바인드 하도록 설정을 변경하면 된다. CLI상에서는 '''-H tcp://0.0.0.0:4000'''을 주고 실행하면 되지만, 설정으로 관리하는게 편하다. /lib/systemd/system/docker.server를 수정했다.
+{{{#!plain
+# cat /lib/systemd/system/docker.service
+....
+[Service]
+Type=notify
+ExecStart=/usr/bin/docker daemon -H fd:// -H tcp://0.0.0.0:4000
+....
+}}}
+
+변경 한 다음 systemctl로 서비스를 재 시작했다.
+{{{#!plain
+# systemctl start docker.service
+# netstat -na | grep 4000
+tcp6       0      0 :::4000                 :::*                    LISTEN     
+}}}
+
+curl로 확인
+{{{#!plain
+# curl -L http://192.168.56.50:4000/version | json_pp
+{
+    "GitCommit" : "0a8c2e3",
+    "KernelVersion" : "3.19.0-15-generic",
+    "GoVersion" : "go1.4.2",
+    "ApiVersion" : "1.20",
+    "Arch" : "amd64",
+    "Version" : "1.8.2",
+    "Os" : "linux",
+    "BuildTime" : "Thu Sep 10 19:21:21 UTC 2015"
+}
+}}}
+
+== 컨테이너 ==
+=== 컨테이너 목록 ===
+{{{#!plain
+GET /containers/json 
+}}}
+
+예제
+{{{#!plain
+# curl -L http://192.168.56.50:4000/containers/json?all=1
+[
+   {
+      "Labels" : null,
+      "HostConfig" : {
+         "NetworkMode" : "default"
+      },
+      "Image" : "ubuntu",
+      "Status" : "Exited (0) 16 hours ago",
+      "Ports" : [],
+      "Command" : "/bin/bash",
+      "Id" : "528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa",
+      "Created" : 1444393004,
+      "Names" : [
+         "/yundream74"
+      ]
+   },
+   {
+      "Labels" : null,
+      "HostConfig" : {},
+      "Image" : "ubuntu",
+      "Status" : "Created",
+      "Ports" : [],
+      "Command" : "/bin/bash",
+      "Id" : "c86c05009275c50a5ca74e86040359fd4851b592d02e254425fcb63714a80417",
+      "Created" : 1444391366,
+      "Names" : [
+         "/yundream84"
+      ]
+   },
+   {
+      "Status" : "Created",
+      "Labels" : {},
+      "HostConfig" : {
+         "NetworkMode" : "default"
+      },
+      "Image" : "ubuntu",
+      "Id" : "a936892f043b16b3769270f87f449958640a76205bfd508b1323e6109443daae",
+      "Names" : [
+         "/modest_lumiere"
+      ],
+      "Created" : 1443838880,
+      "Ports" : [],
+      "Command" : "--name container01 /bin/bash"
+   }
+]
+}}}
+쿼리 파라메타
+  * all - 1/True/true를 설정하면 모든 컨테이너를 출력한다. 0/False/false를 설정하면 현재 실행 중인 컨테이너만 출력한다. 
+  * limit
+  * since : '''id''' 이후에 만들어진 컨테이너만 보여준다.
+  * before : '''id''' 이전에 만들어진 컨테이너만 보여준다.
+  * size : 1/True/true를 설정하면 컨테이너의 루트 파일 시스템의 크기를 출력한다. 0/False/false이면 출력하지 않는다.
+  * filter : 아래 설정한 값들로 컨테이너를 필터링 할 수 있다.
+    * exited=<int> - 컨테이너의 종료 코드
+    * status=(created|restarting|running|paused|exited)
+    * label=key 혹은 label="key=value" 혹은 컨테이너 레벨
+
+=== 컨테이너 생성 ===
+{{{#!plin
+POST /containers/create
+}}}
+
+예제
+{{{#!plain
+# curl -X POST http://192.168.56.50:4000/containers/create
+# data.json
+{
+       "Hostname": "",
+       "Domainname": "",
+       "User": "",
+       "AttachStdin": false,
+       "AttachStdout": true,
+       "AttachStderr": true,
+       "Tty": false,
+       "OpenStdin": false,
+       "StdinOnce": false,
+       "Env": null,
+       "Cmd": [
+               "date"
+       ],
+       "Entrypoint": "",
+       "Image": "ubuntu",
+       "Labels": {
+               "com.example.vendor": "Acme",
+               "com.example.license": "GPL",
+               "com.example.version": "1.0"
+       },
+       "Mounts": [
+         {
+           "Source": "/data",
+           "Destination": "/data",
+           "Mode": "ro,Z",
+           "RW": false
+         }
+       ],
+       "WorkingDir": "",
+       "NetworkDisabled": false,
+       "MacAddress": "12:34:56:78:9a:bc",
+       "ExposedPorts": {
+               "22/tcp": {}
+       },
+       "HostConfig": {
+         "Binds": ["/tmp:/tmp"],
+         "Links": ["redis3:redis"],
+         "LxcConf": {"lxc.utsname":"docker"},
+         "Memory": 0,
+         "MemorySwap": 0,
+         "CpuShares": 512,
+         "CpuPeriod": 100000,
+         "CpusetCpus": "0,1",
+         "CpusetMems": "0,1",
+         "BlkioWeight": 300,
+         "MemorySwappiness": 60,
+         "OomKillDisable": false,
+         "PortBindings": { "22/tcp": [{ "HostPort": "11022" }] },
+         "PublishAllPorts": false,
+         "Privileged": false,
+         "ReadonlyRootfs": false,
+         "Dns": ["8.8.8.8"],
+         "DnsSearch": [""],
+         "ExtraHosts": null,
+         "VolumesFrom": ["parent", "other:ro"],
+         "CapAdd": ["NET_ADMIN"],
+         "CapDrop": ["MKNOD"],
+         "RestartPolicy": { "Name": "", "MaximumRetryCount": 0 },
+         "NetworkMode": "bridge",
+         "Devices": [],
+         "Ulimits": [{}],
+         "LogConfig": { "Type": "json-file", "Config": {} },
+         "SecurityOpt": [""],
+         "CgroupParent": ""
+      }
+  }
+}}}
+응답
+{{{#!plain
+  HTTP/1.1 201 Created
+  Content-Type: application/json
+
+  {
+       "Id":"e90e34656806"
+       "Warnings":[]
+  }
+}}}
+Json 파라메터가 엄청나게 많을 뿐더러, 잘 모르는 것들 투성이다. 하나씩 살펴봐야 하겠다. 
+  * Hostname : 컨테이너가 사용 할 호스트 이름
+  * Domainname : 컨테이너가 사용 할 도메인 이름 
+  * User : 
+  * Memory : 컨테이너의 메모리 제한
+  * MemorySwap : 메모리와 swap를 합한 메모리 크기. -1일 경우 swap은 disable 된다. 반드시 '''Memory'''보다 크게 설정해야 한다. 
+  * CpuShares : 컨테이너의 CPU 공유 가중치
+  * CpuPeriod : CPU period의 길이. 단위는 마이크로초
+  * Cpuset
+  * CpusetCpus
+  * CpusetMems
+  * BlkioWeight
+  * MemorySwappiness
+  * OomKillDiable
+  * AttachStdin : 표준입력을 attach 할 것인지. true/false
+  * AttachStdout : 표준아웃을 attach 할 것인지. true/false
+  * AttachStderr : 표준에러를 attach 할 것인지. true/false 
+  * Tty : 표준입력(stdin)을 포함한 표준 스트림을 위한 tty를 attach 할 것인지. true/false
+  * OpenStdin
+  * StdinOnce
+  * Env : 컨테이너에 넘길 환경 변수
+  * Labels : 컨테이너 라벨 설정. {"key":"value"[, "key2":"value2"]} 
+  * Cmd : 컨테이너에서 실행할 명령어들의 목록
+  * EntryPoint
+  * Image : 컨테이너가 사용할 이미지의 이름
+  * Mounts : 컨테이너가 사용할 마운트 포인트 목록
+  * WorkingDir 
+  * NetworkDisable
+  * ExposedPorts
+  * HostConfig
+    * Binds - 컨테이너 시작시 bind 할 볼륨  
+      * container_path
+	  * host_path:container_path
+	  * host_path:container_path:ro
+	* Links :
+	* LxcConf
+	* PortBindings
+	* PublishAllPorts
+	* Privileged
+	* ReadonlyRootfs
+	* Dns
+	* DnsSearch
+	* ExtraHosts
+	* VolumesFrom
+	* CapAdd
+	* CapDrop
+	* RestartPolicy
+	* NetworkMode
+	* Devices
+	* Ulimits
+	* SecurityOpt
+	* LogConfig
+	* CgroupParent
+응답 코드들
+  * 201 : 성공
+  * 404 : 컨테이너를 찾을 수 없음
+  * 406 : 컨테이너를 실행할 수 없음 
+  * 500 : 서버 에러
+=== Inspect 컨테이너 ===
+{{{#!plain
+GET /containers/(id)/json
+}}}
+컨테이너의 상세 정보를 반환한다.
+{{{#!plain
+# curl -L http://192.168.56.50:4000/containers/528f507ccfa6/json 
+{
+   "ExecIDs" : null,
+   "Mounts" : [
+      {
+         "RW" : true,
+         "Mode" : "",
+         "Destination" : "/workspace",
+         "Source" : "/volumes/yundream74/workspace"
+      }
+   ],
+   "MountLabel" : "",
+   "NetworkSettings" : {
+      "PortMapping" : null,
+      "LinkLocalIPv6Address" : "",
+      "IPAddress" : "",
+      "SandboxKey" : "",
+      "GlobalIPv6Address" : "",
+      "HairpinMode" : false,
+      "GlobalIPv6PrefixLen" : 0,
+      "Ports" : null,
+      "EndpointID" : "",
+      "IPPrefixLen" : 0,
+      "IPv6Gateway" : "",
+      "SecondaryIPv6Addresses" : null,
+      "SecondaryIPAddresses" : null,
+      "NetworkID" : "",
+      "Gateway" : "",
+      "Bridge" : "",
+      "LinkLocalIPv6PrefixLen" : 0,
+      "MacAddress" : ""
+   },
+   "Path" : "/bin/bash",
+   "ExecDriver" : "native-0.2",
+   "RestartCount" : 0,
+   "ProcessLabel" : "",
+   "LogPath" : "/var/lib/docker/containers/528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa/528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa-json.log",
+   "GraphDriver" : {
+      "Data" : null,
+      "Name" : "aufs"
+   },
+   "Name" : "/yundream74",
+   "HostnamePath" : "/var/lib/docker/containers/528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa/hostname",
+   "ResolvConfPath" : "/var/lib/docker/containers/528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa/resolv.conf",
+   "Image" : "91e54dfb11794fad694460162bf0cb0a4fa710cfa3f60979c177d920813e267c",
+   "Config" : {
+      "OnBuild" : null,
+      "Env" : null,
+      "AttachStderr" : true,
+      "VolumeDriver" : "",
+      "Hostname" : "528f507ccfa6",
+      "Labels" : null,
+      "Domainname" : "",
+      "StdinOnce" : false,
+      "OpenStdin" : false,
+      "PublishService" : "",
+      "ExposedPorts" : null,
+      "MacAddress" : "",
+      "AttachStdout" : true,
+      "NetworkDisabled" : false,
+      "Volumes" : null,
+      "AttachStdin" : false,
+      "User" : "root",
+      "Image" : "ubuntu",
+      "Entrypoint" : null,
+      "Tty" : true,
+      "WorkingDir" : "",
+      "Cmd" : [
+         "/bin/bash"
+      ]
+   },
+   "Driver" : "aufs",
+   "AppArmorProfile" : "",
+   "Args" : [],
+   "Id" : "528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa",
+   "HostConfig" : {
+      "LxcConf" : null,
+      "Dns" : null,
+      "VolumesFrom" : null,
+      "SecurityOpt" : null,
+      "Memory" : 0,
+      "LogConfig" : {
+         "Config" : {},
+         "Type" : "json-file"
+      },
+      "ExtraHosts" : null,
+      "ContainerIDFile" : "",
+      "Devices" : null,
+      "CgroupParent" : "",
+      "RestartPolicy" : {
+         "Name" : "",
+         "MaximumRetryCount" : 0
+      },
+      "BlkioWeight" : 0,
+      "PidMode" : "",
+      "Binds" : [
+         "/volumes/yundream74/workspace:/workspace"
+      ],
+      "DnsSearch" : null,
+      "OomKillDisable" : false,
+      "GroupAdd" : null,
+      "CpuPeriod" : 0,
+      "CpuQuota" : 0,
+      "ReadonlyRootfs" : false,
+      "PortBindings" : null,
+      "CpusetCpus" : "",
+      "MemorySwap" : 0,
+      "Ulimits" : null,
+      "CapAdd" : [
+         "NET_ADMIN"
+      ],
+      "UTSMode" : "",
+      "IpcMode" : "",
+      "PublishAllPorts" : false,
+      "NetworkMode" : "default",
+      "Privileged" : false,
+      "CpusetMems" : "",
+      "ConsoleSize" : [
+         0,
+         0
+      ],
+      "CapDrop" : [
+         "MKNOD"
+      ],
+      "Links" : null,
+      "CpuShares" : 0,
+      "MemorySwappiness" : null
+   },
+   "Created" : "2015-10-09T12:16:44.609380457Z",
+   "HostsPath" : "/var/lib/docker/containers/528f507ccfa6ac6fe5a4750917c534baa8e05529a23b647eae467f954f9f62aa/hosts",
+   "State" : {
+      "Dead" : false,
+      "Restarting" : false,
+      "FinishedAt" : "2015-10-09T12:18:17.019078028Z",
+      "Error" : "",
+      "ExitCode" : 0,
+      "Paused" : false,
+      "Pid" : 0,
+      "Running" : false,
+      "OOMKilled" : false,
+      "StartedAt" : "2015-10-09T12:17:05.995285929Z"
+   }
+}
+}}}
+에러코드
+  * 200 : 성공
+  * 404 : 컨테이너를 찾지 못했음
+  * 500 : 서버에러
+=== 컨테이너에서 실행 중인 프로세스 목록 ===
+{{{#!plain
+GET /containers/(id)/top
+}}}
+id 컨테이너에서 실행 중인 프로세스의 목록을 가져온다.
+
+{{{#!plain
+# curl -X GET http://192.168.56.50:4000/containers/c86c05009275/top 
+{
+   "Titles" : [
+      "UID",
+      "PID",
+      "PPID",
+      "C",
+      "STIME",
+      "TTY",
+      "TIME",
+      "CMD"
+   ],
+   "Processes" : [
+      [ "root", "9793", "952", "0", "20:14", "pts/1", "00:00:00", "/bin/bash" ], 
+      [ "root", "17954", "952", "0", "23:29", "pts/4", "00:00:00", "/bin/bash" ] 
+   ]
+}
+}}}
+
+== 이미지 ==
+=== export ===
+{{{#!plain
+GET /containers/(id)/export
+}}}
+id 컨테이너를 tar 형식으로 export 한다.
+
+{{{#!plain
+# curl -X GET http://192.168.56.50:4000/containers/c86c05009275/export > mycontainer.tar
+혹은 
+# curl -X GET http://192.168.56.50:4000/containers/c86c05009275/export -o mycontainer.tar 
+}}}
+아래와 같이 export한 tar 파일로 부터 이미지를 만들 수 있다.
+{{{#!plain
+# cat container01.tar | docker import - ubuntu-2-export:latest
+# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED              VIRTUAL SIZE
+ubuntu-2-export     latest              dc3aa0df9eab        About a minute ago   259.8 MB
+...
+}}}
+
+=== 이미지 만들기 === 
+export한 tar 파일 혹은 다른 이미지로 부터 새로운 이미지를 만들 수 있다.
+{{{#!plain
+POST /images/create?fromImage=ubuntu HTTP/1.1
+}}}
+쿼리 파라미터
+  * fromImage : pull 할 이미지의 이름
+  * fromSrc : 파일로 부터 import 한다. URL을 이용해서 원격에 있는 파일을 import 할 수 있다. 
+  * repo : Repository 이름
+  * tag : 태그
+  * registry
+
+앞서 export한 container01.tar 파일로 부터 새로운 이미지를 만들어보자.
+{{{#!plain
+# curl -XPOST http://localhost:4000/images/create?fromSrc=http://localhost/container01.tar\&repo=ubuntu-10-export\&tag=latest
+# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+ubuntu-10-export    latest              945d73fe9249        6 seconds ago       259.8 MB
+}}}
+
+=== 이미지 목록 === 
+{{{#!plain
+# curl -XGET http://localhost:4000/images/json
+[
+   {
+      "Created" : 1445012842,
+      "VirtualSize" : 259816161,
+      "ParentId" : "",
+      "Id" : "dc3aa0df9eab01b6684ada025d430198d65f3f8c14150b365794069452bbd22d",
+      "RepoTags" : [
+         "ubuntu-2-export:latest"
+      ],
+      "Labels" : null,
+      "Size" : 259816161,
+      "RepoDigests" : []
+   },
+   {
+      "Size" : 259816161,
+      "Labels" : null,
+      "RepoDigests" : [],
+      "RepoTags" : [
+         "ubuntu-1-export:latest"
+      ],
+      "Id" : "d991a0fdaf6b93ce48e5046b5c17e2a05ff25b2b2eeaf4e4cb50e36b72dce162",
+      "Created" : 1445012629,
+      "VirtualSize" : 259816161,
+      "ParentId" : ""
+   
+]
+}}}
+
+=== 이미지 상세 정보 === 
+{{{#!plain
+GET /images/ubuntu/json HTTP/1.1
+}}}
+
+{{{#!plain
+# curl -X GET http://localhost:4000/images/ubuntu-10-export/json
+{
+   "Config" : {
+      "Env" : null,
+      "Volumes" : null,
+      "Tty" : false,
+      "PublishService" : "",
+      "StdinOnce" : false,
+      "NetworkDisabled" : false,
+      "MacAddress" : "",
+      "AttachStdout" : false,
+      "Domainname" : "",
+      "Entrypoint" : null,
+      "Image" : "",
+      "WorkingDir" : "",
+      "User" : "",
+      "ExposedPorts" : null,
+      "OpenStdin" : false,
+      "Hostname" : "",
+      "AttachStdin" : false,
+      "AttachStderr" : false,
+      "Cmd" : null,
+      "VolumeDriver" : "",
+      "OnBuild" : null,
+      "Labels" : null
+   },
+   "GraphDriver" : {
+      "Data" : null,
+      "Name" : "aufs"
+   },
+   "DockerVersion" : "1.8.2",
+   "Container" : "",
+   "Os" : "linux",
+   "ContainerConfig" : {
+      "NetworkDisabled" : false,
+      "PublishService" : "",
+      "StdinOnce" : false,
+      "Tty" : false,
+      "Volumes" : null,
+      "Env" : null,
+      "MacAddress" : "",
+      "Domainname" : "",
+      "AttachStdout" : false,
+      "User" : "",
+      "WorkingDir" : "",
+      "Image" : "",
+      "Entrypoint" : null,
+      "ExposedPorts" : null,
+      "OpenStdin" : false,
+      "AttachStdin" : false,
+      "Hostname" : "",
+      "OnBuild" : null,
+      "VolumeDriver" : "",
+      "Cmd" : null,
+      "AttachStderr" : false,
+      "Labels" : null
+   },
+   "Author" : "",
+   "Id" : "27f3e12f385ea9f4f4b5af5cefa2457274b8da77671ec97b32b9a2c42cd41f7d",
+   "Created" : "2015-10-16T16:54:23.716059412Z",
+   "VirtualSize" : 259816161,
+   "Architecture" : "amd64",
+   "Comment" : "Imported from http://localhost/container01.tar",
+   "Parent" : "",
+   "Size" : 259816161
+}
+}}}
+
+=== 컨테이녀 start ===
+{{{#!plain
+POST /containers/(id)/start
+}}}
+컨테이너 아이디가 '''id'''인 컨테이너를 실행한다.
+
+{{{#!plain
+# curl -v -X POST localhost:4000/containers/23e9251030c0/start
+HTTP/1.1 204 No Content
+* Server Docker/1.8.2 (linux) is not blacklisted
+Server: Docker/1.8.2 (linux)
+Date: Fri, 23 Oct 2015 14:52:38 GMT
+}}}
+
+=== 컨테이너 stop ===
+{{{#!plain
+POST /containers/(id)/stop
+}}}
+컨테이너 아이디가 '''id'''인 컨테이너를 stop 시킨다.
+
+{{{#!plain
+# curl -v -X POST localhost:4000/containers/23e9251030c0/stop
+HTTP/1.1 204 No Content
+* Server Docker/1.8.2 (linux) is not blacklisted
+Server: Docker/1.8.2 (linux)
+Date: Fri, 23 Oct 2015 14:56:22 GMT
+}}}
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d579 27
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d433 1
+d474 32
+a505 1
+=== Inspect 이미지 === 
+d578 1
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d433 1
+a433 1
+=== 컨테이너 export ===
+d440 11
+a450 1
+# curl -X GET http://192.168.56.50:4000/containers/c86c05009275/export > last.tar
+d453 93
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d413 30
+a442 1
+... 계속
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d195 1
+d197 217
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d115 69
+d185 11
+@

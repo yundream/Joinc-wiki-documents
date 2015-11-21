@@ -1,0 +1,94 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2015.11.16.14.58.26;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.10.27.15.10.13;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fsshfs
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title sshfs
+[[TableOfContents]]
+== 소개 ==
+  * 일반 클라이언트가 자신의 파일시스템을 sshfs로 마운트해서 사용하는 시나리오가 아니다. 
+  * 컨테이너 기반의 가상화 환경에서 파일 시스템에 대한 공유와 접근 제어등까지를 고려한 시나리오다. Github와 비슷한 목적으로의 사용이라고 보면 되겠다. 소스코드 대신 파일 시스템의 공유한다는 차이가 있다. 여러 유저들이 활동하고 있으므로 유저에 대한 인증과 권한(읽기/쓰기) 설정이 가능해야 한다.
+  * 먼저 sshfs의 기본적인 사용 방법을 살펴보고, 가상화 환경에서 파일 시스템을 공유하기 위한 방법을 찾아본다. 
+  * 중요한 점 하나. 오브젝트 파일을 공유하는게 아니고 파일 시스템을 공유한다. 이를테면 특정 디렉토리를 공유하는 것에 대해서 다룬다.
+== sshfs ==
+sshfs(SSH Filesystem)은 ssh를 이용해서 원격 서버나 워크스테이션의 파일 시스템을 마운팅하는 파일시스템 클라이언트 프로그램이다. 클라이언트는 SFTP(SSH File Transfer Protocol)를 이용해서 파일에 접근 할 수 있다. 지금의 SSHFS는 '''FUSE'''를 기반으로 작동한다. 
+
+== 사용 ==
+=== 환경 ===
+서버와 클라이언트 모두 Ubuntu 리눅스 15.04에서 테스트 했다. 호스트 이름은 server01과 client01이다. client01에서 server01의 디렉토리를 마운트한다.
+=== 설치 및 기본 사용 ===
+ssh 서버를 기반으로 작동한다. 대부분의 리눅스 배포판들이 ssh 서버를 사용하고 있어서, 쉽게 사용 할 수 있다는 장점이 있다. 클라이언트측에서는 sshfs 패키지를 설치해야 한다. client01에 sshfs를 설치했다. server01에는 ssh 서버 설치가 끝난 걸로 가정한다. ssh 서버 버전은 "OpenSSH_6.7p1"이다.
+{{{#!plain
+# apt-get install sshfs
+}}}
+sshfs는 ssh를 이용하므로 리눅스 계정이 필요하다. 테스트를 위해서 server01에 yundream 계정을 만들었다. 우선은 패스워드로 로그인 하도록 설정했다.
+
+/home/yundream을 마운트해보자.
+{{{#!plain
+# sshfs yundream@@server01:/home/yundream yundream
+The authenticity of host 'server01 (192.168.56.51)' can't be established.
+ECDSA key fingerprint is 22:6b:b5:4e:ad:59:d6:9e:1c:d1:3b:24:fa:fb:85:49.
+Are you sure you want to continue connecting (yes/no)? yes
+yundream@@server01's password: 
+}}}
+
+client01에서 mount 정보를 확인해 봤다.
+{{{#!plain
+# mount
+yundream@@server01:/home/yundream on /mount/yundream type fuse.sshfs (rw,nosuid,nodev,relatime,user_id=0,group_id=0)
+}}}
+
+=== 인증 및 권한 설정 ===
+  * -o rw : 읽기/쓰기 
+  * -o ro : 읽기 전용
+기본 설정은 rw다. 
+{{{#!plain
+# sshfs -o ro yundream@@server01:/home/yundream yundream
+}}}
+간단 하지만 공유 서비스 용도로 사용하기는 애매모호 하다. 보통 "ro" 옵션을 주는 것은 원본 파일에 대한 수정을 막기 위함이다. 이 목적을 달성하려면 서버측에서 접속하는 유저단위로 권한을 줄 수 있어야 한다. 단순히 클라이언트에서 읽기/쓰기 권한을 설정하는 방식으로는 목적을 달성할 수 없다.
+
+권한 설정이전에 유저 인증방식을 어떻게 할지 결정해야 한다. 패스워드 방식의 사용을 생각 할 수 있는데, 여러 유저의 파일 시스템을 공유하려고 할 경우 패스워드를 설정하고 기록해야 하기 때문에 좋은 방식이 아니다. 이 방식은 버린다. ssh-key를 이용하는 방식이 제일 무난 하다. 
+  1. 유저를 만들때 ssh key pair를 만든다. 
+  1. 다른 유저에게 파일 시스템을 공유하고 싶다면, public key를 등록해서 접근 하도록 한다. 
+
+... 계속
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d46 4
+a49 2
+  1. 유저를 만들때 ssk key pair를 만든다. 
+  1. 다른 유저에게 파일 시스템을 공유하고 싶다면
+@

@@ -1,0 +1,59 @@
+#title GoLang 정규표현
+
+=== 언제나 새로운 정규표현 ===
+위키 엔진을 개발하고 있다. 위키 문법을 해석해서 HTML로 재현하는게 엔진의 핵심 기능이다. 정규표현식을 사용 할 수 밖에 없다. 그런데 '''너무 새롭다'''. 해서 go 언어를 기반으로 정규표현을 다시 정리해 보기로 했다. 개발하면서 고민했던 것들을 예제로 다시 작성해보려 한다.  
+
+=== 기본 정규표현 문법들 ===
+==== 단일 문자 ====
+{{{#!plain
+.        뉴라인(newline)을 포함한 모든 문자에 일치
+[xyz]    x,y,z 중 하나에 일치 
+[^xyz]   x,y,z 을 제외한 모든 문자에 일치
+\d       숫자에 일치 
+\D       숫자가 아닌 문자에 일치
+[[:alpha:]]   ASCII 알파벳 문자(a-zA-Z)에 일치 
+[[:^alpha:]]  ASCII 알파벳 이 아닌 문자가 있어야 일치
+\pN
+\p{Greek}   유니코드 문자에 일치. 한글이라면 \p{Hangul} 
+\P{Greek}   유니코드 문자를 제외한 모든 문자.
+}}}
+
+예제
+{{{#!plain
+re = regexp.MustCompile(".")
+fmt.Println(re.MatchString("a1234b"))        // true
+
+re = regexp.MustCompile("[az1]")
+fmt.Println(re.MatchString("Hello z model")) // true
+fmt.Println(re.MatchString("Hello world 2")) // false 
+
+re = regexp.MustCompile("\\d")
+fmt.Println(re.MatchString("abcde"))   // false
+fmt.Println(re.MatchString("abcdea9")) // true
+
+re = regexp.MustCompile("\\D")
+fmt.Println(re.MatchString("740123056")) // false
+fmt.Println(re.MatchString("740123-56")) // true
+
+re = regexp.MustCompile("[[:alpha:]]")
+fmt.Println(re.MatchString("740123-56")) // false
+fmt.Println(re.MatchString("740123Z56")) // true
+
+re = regexp.MustCompile("[[:^alpha:]]")
+fmt.Println(re.MatchString("740123-56"))   // true
+fmt.Println(re.MatchString("HelloWorld"))  // false
+fmt.Println(re.MatchString("Hello World")) // true
+
+re = regexp.MustCompile("\\p{Hangul}")
+fmt.Println(re.MatchString("a-01-cd"))    // false
+fmt.Println(re.MatchString("안녕 World")) // true 
+
+}}}
+
+
+==== 조합 ====
+{{{#!plain
+xy     x 뒤에 y가 와야 일치 
+x|y    x 혹은 y가 오면 일치 
+}}}
+==== ====

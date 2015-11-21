@@ -1,0 +1,1088 @@
+head	1.14;
+access;
+symbols;
+locks
+	root:1.14; strict;
+comment	@# @;
+
+
+1.14
+date	2015.10.06.16.22.52;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2015.10.06.16.09.54;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2015.10.04.15.14.47;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2015.10.04.09.50.40;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2015.10.04.09.05.30;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2015.10.04.07.29.47;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2015.10.04.07.13.15;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2015.10.04.07.12.21;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2015.10.04.06.50.32;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2015.10.03.14.05.09;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2015.10.03.11.08.59;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.10.03.07.18.31;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.10.03.06.15.22;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.10.03.04.27.29;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/man_2f12_2fetcd
+@
+
+
+1.14
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title etcd
+[[TableOfContents]]
+== etcd ==
+etcd는 분산 key-value store다. CoreOS에서 coreos 인스턴스의 클러스터를 관리하기 위해서 사용했으며, 구글의 클러스터 컨테이너 관리프로그램인 Kubernetes의 백엔드 시스템으로 사용하면서 더 유명해 졌다. 
+
+== 환경 ==
+우분투 리눅스 15.04 서버 버전 호스트 운영체제로 사용했다. VirtualBox를 이용해서 두 개의 우분투 리눅스를 실행 해서 클러스터링을 테스트 한다. 호스트의 이름은 etcd01, etcd02다. 
+
+== 설치 및 기본 사용 ==
+=== etcd 설치 ===
+[https://github.com/coreos/etcd/releases/tag/v2.0.9 Coreos Github]에서 tar.gz을 다운로드 받아서 설치했다. 압축을 푼 다음 etcd와 etcdctl을 /usr/local/bin에 복사한다.
+{{{#!plain
+# echo $PATH
+/usr/local/sbin:/usr/local/bin:...
+}}}
+
+=== etcd 실행 ===
+single-member 클러스터를 실행했다. 이 클러스터에는 '''etcd01''' 호스트만 참가한다.
+{{{#!plain
+# etcd -addr 0.0.0.0:4001 -data-dir default.etcd/ -name etcd01
+}}}
+  1. -addr : 클라이언트와의 통신을 위한 bind 주소다. 기본 값은 127.0.0.1:4001이다.
+  1. -data-dir : key-value를 저장하는 디렉토리. 기본디렉토리는 default.etcd 다.
+  1. -name : etcd 서버의 이름
+etcd는 클라이언트와의 통신을 위해서 4001 포트, 서버와의 통신을 위해서 7001 포트를 사용한다. curl을 이용해서 첫번째 key-value를 저장했다. mykey에 "Hello World"를 저장한다.
+{{{#!plain
+# curl -L http://localhost:4001/v2/keys/mykey -XPUT -d value="Hello World"
+{"action":"set","node":{"key":"/mykey","value":"Hello World","modifiedIndex":3,"createdIndex":3}}
+}}}
+mykey의 값을 읽어온다.
+{{{#!plain
+# curl -L http://localhost:4001/v2/keys/mykey
+{"action":"get","node":{"key":"/mykey","value":"Hello World","modifiedIndex":3,"createdIndex":3}}
+}}}
+JSON 형태의 값을 반환한다. 여기에는 action과 node 두개의 어트리뷰트가 있다. action은 호출한 API, node에는 API에 대한 응답 값들이 있다.
+
+
+=== etcdctl ===
+etcd에서 제공하는 API를 간단히 사용할 수 있도록 '''etcdctl'''이라는 CLI 툴을 제공한다. 
+{{{#!plain
+# etcdctl get /mykey
+Hello World
+# etcdctl set /yourkey 
+# etcdctl rm /yourkey 
+# etcdctl get /yourkey
+Error:  100: Key not found (/yourkey) [5]
+}}}
+
+== etcd API ==
+=== 버전 확인 ===
+'''/version'''을 이용해서 etcd의 버전을 가져올 수 있다.
+{{{#!plain
+$ curl -L http://localhost:4444/version
+etcd 0.4.9
+}}}
+
+=== 키와 값을 설정하기 ===
+'''/message'''키를 만들고 여기에 '''Hello world'''값을 설정한다.
+{{{#!plain
+$ curl -L http://localhost:4444/v2/keys/message -XPUT -d value="Hello world"
+{
+   "action" : "set",
+   "node" : {
+       "modifiedIndex" : 3,
+       "key" : "/message",
+       "createdIndex" : 3,
+       "value" : "Hello world"
+   }
+}
+}}}
+  * '''action : action은 업데이트 혹은 추가 요청시에만 사용한다. HTTP의 PUT메서드가 이에 해당하며, nove.key의 값을 node.value로 설정한다. 
+  * node.key : 키의 경로다. URL 형식으로 표현 할 수 있다. 위 예제에서는 /message가 key다. 
+  * node.value : key에 저장된 값이다. 이 경우 /message 키에 "Hello world"가 저장된다.
+  * createIndex : 
+  * node.modifiedIndex : 
+
+=== 응답 헤더 ===
+curl을 이용해서 응답헤더를 분석해 보자. /message 키에 "Hello world"를 저장하는 예제다.
+{{{#!plain
+$ curl -L http://localhost:4444/v2/keys/message -XPUT -d value="Hello world" -v
+.... 요청 헤더는 생략 ....
+* upload completely sent off: 17 out of 17 bytes
+< HTTP/1.1 200 OK
+< Content-Type: application/json
+< X-Etcd-Index: 5
+< X-Raft-Index: 5460
+< X-Raft-Term: 2
+< Date: Fri, 22 May 2015 08:10:34 GMT
+< Transfer-Encoding: chunked
+}}}
+  * X-Etcd-Index : 현재 etcd index 
+  * X-Raft-Index : is similar to the etcd index but is for the underlying raft protocol
+  * X-Raft-Term : is an integer that will increase whenever an etcd master election happens in the cluster. If this number is increasing rapidly, you may need to tune the election timeout. See the tuning section for details.
+
+=== Key로 부터 값 읽기 ===
+GET을 이용해서 Key 값을 가져올 수 있다. /message 에 저장되 값을 읽었다. 
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/message -XGET | json_pp 
+{
+   "node" : {
+      "createdIndex" : 6,
+      "modifiedIndex" : 6,
+      "value" : "Hello world",
+      "key" : "/message"
+   },
+   "action" : "get"
+}
+}}}
+
+=== Key의 값 변경 ===
+같은 이름의 Key에 대해서 PUT 할 경우, 데이터를 덮어쓴다.
+{{{#!plain
+$ curl -L http://localhost:4444/v2/keys/message -XPUT -d value="Hello etcd" | json_pp
+{
+   "action" : "set",
+   "node" : {
+      "modifiedIndex" : 9,
+      "key" : "/message",
+      "createdIndex" : 9,
+      "value" : "Hello etcd"
+   },
+   "prevNode" : {
+      "value" : "Hello ok world",
+      "createdIndex" : 8,
+      "key" : "/message",
+      "modifiedIndex" : 8
+   }
+}
+}}}
+'''prevNode'''를 주목하자. '''node'''와 동일한 포멧으로, 변경되기 이전 값을 보여준다.
+
+=== Delete key ===
+{{{#!plain
+$ curl -L http://localhost:4444/v2/keys/message -XDELETE | json_pp 
+{
+   "node" : {
+      "createdIndex" : 9,
+      "modifiedIndex" : 10,
+      "key" : "/message"
+   },
+   "action" : "delete",
+   "prevNode" : {
+      "modifiedIndex" : 9,
+      "key" : "/message",
+      "createdIndex" : 9,
+      "value" : "Hello etcd"
+   }
+}
+}}}
+=== Key 만료기간 설정 ===
+초 단위로 키에 대한 만료기간을 설정할 수 있다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo -XPUT -d value=bar -d ttl=5
+{
+   "node" : {
+      "key" : "/foo",
+      "modifiedIndex" : 13,
+      "expiration" : "2015-05-22T09:00:00.145871124Z",
+      "createdIndex" : 13,
+      "value" : "bar",
+      "ttl" : 5
+   },
+   "action" : "set"
+}
+}}}
+응답에 새로운 두 개의 필드가 보인다.
+  1. expiration : 키가 만료되는 시간. 키를 만든 지금시간 + ttl 이다.  
+  1. ttl : 키의 유효 시간 
+Key에 대한 만료일은 클러스터 리더만이 설정할 수 있다. 따라서 클러스터로의 연결이 끊긴다면, 키는 (rejoin 시점까지)계속 남아있게 된다.
+
+TTL이 지난 후에는 키가 지워지고, 이때 요청을 하면 에러 코드 100을 반환한다.
+{{{#!plain
+{
+   "index" : 18,
+   "cause" : "/foo",
+   "errorCode" : 100,
+   "message" : "Key not found"
+}
+}}}
+Key를 업데이트 할 경우 TTL은 사라진다.
+{{{#!plain
+{
+   "action" : "set",
+   "node" : {
+      "value" : "150",
+      "key" : "/foo",
+      "modifiedIndex" : 25,
+      "createdIndex" : 25
+   },
+   "prevNode" : {
+      "createdIndex" : 24,
+      "ttl" : 3589,
+      "modifiedIndex" : 24,
+      "key" : "/foo",
+      "expiration" : "2015-05-22T13:15:50.328425279Z",
+      "value" : "3600"
+   }
+}
+}}}
+=== 이벤트 기다리기 ===
+키의 값이 변할 경우 알람을 받을 수 있다. 만약 모든 자식키들에 대한 알람을 받고 싶다면 '''recursive=true'''를 설정하면 된다. long polling으로 기다린다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo?wait=true
+}}}
+이제 '''/foo''' 키의 값이 변할 때까지 기다린다. /foo 값이 변경되면, 기다리던 녀석은 값을 출력하고 리턴한다. 
+{{{#!plain
+{
+   "node" : {
+      "modifiedIndex" : 27,
+      "key" : "/foo",
+      "createdIndex" : 27,
+      "value" : "150"
+   },
+   "prevNode" : {
+      "key" : "/foo",
+      "createdIndex" : 26,
+      "modifiedIndex" : 26,
+      "value" : "1234"
+   },
+   "action" : "set"
+}
+}}}
+HTTP long polling로 기다리기 때문에, 알람을 받으면 즉시 종료해 버린다. Key를 계속 체크하고 싶다면, 다시 wait를 호출해야 한다. wait를 재 호출하는 약간의 간격에 값이 변경될 수도 있으므로, etcd index로 기다리는 포인트를 설정해줘야 한다.
+{{{#!plain
+curl -L 'http://127.0.0.1:4001/v2/keys/foo?wait=true&waitIndex=27'
+}}}
+27부터 기다리는 것으로 설정했다. 이 경우 위 예제와 동일한 값을 반환한다. 실제 환경에서는 28에서 기다리면 되겠다. 
+
+=== Automically Creating in-order keys ===
+'''POST'''로 key(디렉토리)를 만들 때, 이름에 증가 값을 설정할 수 있다. 이것은 queue등의 구현에 유용하게 사용할 수 있다.
+{{{#!plain
+{
+    "node" : {
+        "modifiedIndex" : 32,
+        "value" : "Job1",
+        "createdIndex" : 32,
+        "key" : "/queue/32"
+    },
+    "action" : "create"
+}
+}}}
+"sorted" 매개변수를 이용해서 정렬할 수 있다.
+{{{#!plain
+{
+   "node" : {
+      "modifiedIndex" : 32,
+      "dir" : true,
+      "nodes" : [
+         {
+            "createdIndex" : 32,
+            "key" : "/queue/32",
+            "modifiedIndex" : 32,
+            "value" : "Job1"
+         },
+         {
+            "value" : "Job2",
+            "modifiedIndex" : 33,
+            "key" : "/queue/33",
+            "createdIndex" : 33
+         },
+         {
+            "key" : "/queue/34",
+            "createdIndex" : 34,
+            "value" : "Job3",
+            "modifiedIndex" : 34
+         }
+      ],
+      "createdIndex" : 32,
+      "key" : "/queue"
+   },
+   "action" : "get"
+}
+}}}
+
+=== 디렉토리에 TTL 설정하기 ===
+etcd에서 키는 디렉토리 형식으로 나타낼 수 있다. 그리고 디렉토리에 대해서 TTL을 설정할 수 있다. 
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/dir -XPUT -d ttl=30 -d dir=true
+{
+    "action" : "set",
+    "node" : {
+        "key" : "/dir",
+        "dir" : true,
+        "ttl" : 30,
+        "expiration" : "2015-05-23T00:12:53.236156415Z",
+        "createdIndex" : 39,
+        "modifiedIndex" : 39
+    }
+}
+}}}
+존재하는 key에 대해서 ttl을 적용할 경우 에러를 반환한다. '''prevExist=true'''를 이용해서 존재하는 key에 대해서 ttl을 재설정 할 수 있다. 
+{{{#!plain
+#  curl -L http://localhost:4444/v2/keys/queue -XPUT -d ttl=30 -d dir=true -d prevExist=true
+{
+   "prevNode" : {
+      "dir" : true,
+      "key" : "/queue",
+      "createdIndex" : 32,
+      "modifiedIndex" : 32
+   },
+   "node" : {
+      "key" : "/queue",
+      "ttl" : 30,
+      "dir" : true,
+      "createdIndex" : 32,
+      "expiration" : "2015-05-23T00:17:29.061195706Z",
+      "modifiedIndex" : 45
+   },
+   "action" : "update"
+}
+}}}
+이미 ttl이 설정돼 있다면, ttl 값이 업데이트 된다. ttl이 지난 후에는 key의 하위디렉토리 key들까지 모두 삭제된다. 
+
+=== Atomic Compare and Swap ===
+etcd는 클러스트에 대한 코디네이터(coordination)서비스를 제공한다. etcd의 CAS(CompareandSwap) 를 이용해서 분산잠금 서비스를 이용할 수 있다.
+
+클라이언트가 어떤 요청을 할 경우 아래의 상태들을 검사 한 후, 요청을 수행할지 에러를 리턴할지를 결정한다.
+  * prevValue : 키의 이전 값과 비교한다. 
+  * prevIndex : 키의 이전 '''modified Index'''과 비교 한다.
+  * prevExist : 이전 키가 존재하는지 검사한다. 마약 '''prevExist'''가 true라면 '''update'''를 수행한다. prevExist가 '''false'''라면 '''create'''를 수행한다.
+
+테스트를 위해서 '''foo=one'''을 만들었다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo -XPUT -d value=one
+}}}
+만들어진 key에 대해서 '''prevExist=false'''로 업데이트를 요청해보자.
+{{{#!plain
+# curl -L 'http://localhost:4444/v2/keys/foo?prevExist=false' -XPUT -d value=three
+{
+    "index" : 61,
+    "cause" : "/foo",
+    "message" : "Key already exists",
+    "errorCode" : 105
+}
+}}}
+/foo 키가 이미 존재하고 있으므로 에러를 반환한다.
+
+'''prevValue'''를 이용한 예제다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo?prevValue=two -XPUT -d value=three
+{
+    "cause" : "[two != one]",
+    "index" : 61,
+    "errorCode" : 101,
+    "message" : "Compare failed"
+}
+}}}
+prevValue에 '''two'''가 없기 때문에 에러가 발생한다. 
+
+prevValue를 one으로 해서 다시 요청해보자. 
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo?prevValue=one -XPUT -d value=two
+{
+    "action" : "compareAndSwap",
+    "prevNode" : {
+        "createdIndex" : 60,
+        "modifiedIndex" : 60,
+        "key" : "/foo",
+        "value" : "one"
+    },
+    "node" : {
+        "key" : "/foo",
+        "value" : "two",
+        "createdIndex" : 60,
+        "modifiedIndex" : 62
+    }
+}
+}}}
+prevValue가 일치해서 업데이트에 성공했다.
+
+=== Automic Compare-and-Delete ===
+Atomic CAS와 비슷하다. 이전 상태와 비교해서 삭제여부를 결정한다. 검사할 수 있는 상태값은 아래와 같다.
+  1. '''prevValue''' : 이전 값
+  1. '''prevIndex''' : 이전 modifiedIndex를 비교한다.
+테스트를 위해서 키를 하나 만들었다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo -XPUT -d value=one
+}}}
+이제 '''CompareAndDelete'''명령을 수행하자. 이전 값이 "two"일 경우 삭제를 요청했다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo?prevValue=two -XDELETE
+{
+    "errorCode" : 101,
+    "cause" : "[two != one]",
+    "message" : "Compare failed",
+    "index" : 66
+}
+}}}
+'''preIndex'''값이 일치하지 않아서 삭제 실패했다.
+
+제대로 지워보자.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/foo?prevValue=one -XDELETE 
+{
+    "action" : "compareAndDelete",
+    "node" : {
+        "modifiedIndex" : 67,
+        "createdIndex" : 66,
+        "key" : "/foo"
+    },
+    "prevNode" : {
+        "modifiedIndex" : 66,
+        "createdIndex" : 66,
+        "key" : "/foo",
+        "value" : "one"
+    }
+}
+}}}
+
+=== 디렉토리 만들기 ===
+아래와 같이 key를 만들어 보자.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/dir/one -XPUT
+}}}
+dir의 속성이 디렉토리임을 확인할 수 있다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/dir
+{
+   "action" : "get",
+   "node" : {
+      "modifiedIndex" : 75,
+      "createdIndex" : 75,
+      "dir" : true,
+      "key" : "/dir"
+      "nodes" : [
+         {
+            "modifiedIndex" : 75,
+            "value" : "",
+            "createdIndex" : 75,
+            "key" : "/dir/one"
+         }
+      ],
+   }
+}
+}}}
+만약 디렉토리만 만들기를 원한다면, '''dir=true''' 매개변수를 설정해야 한다. 그렇지 않으면 일반 key가 만들어진다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/mydir -XPUT -d dir=true
+{
+   "action" : "set",
+   "node" : {
+      "modifiedIndex" : 76,
+      "key" : "/mydir",
+      "createdIndex" : 76,
+      "dir" : true
+   }
+}
+}}}
+
+=== 디렉토리 목록 ===
+디렉토리 이름 끝에 '''/'''을 추가해서 GET 요청을 하면, 하위 디렉토리의 목록을 보여준다. 루트 디렉토리의 목록을 확인해 보자.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/ 
+{
+   "node" : {
+      "key" : "/",
+      "dir" : true,
+      "nodes" : [
+         {
+            "key" : "/dir",
+            "dir" : true,
+            "createdIndex" : 75,
+            "modifiedIndex" : 75
+         },
+         {
+            "key" : "/mydir",
+            "createdIndex" : 76,
+            "modifiedIndex" : 76,
+            "dir" : true
+         },
+         {
+            "createdIndex" : 74,
+            "dir" : true,
+            "modifiedIndex" : 74,
+            "key" : "/foodir"
+         }
+      ]
+   },
+   "action" : "get"
+}
+}}}
+
+=== 디렉토리 삭제 ===
+'''/mydir'''을 지워보자.
+{{{#!plain
+# curl -L 'http://localhost:4444/v2/keys/mydir?dir=true' -XDELETE 
+{
+   "cause" : "/mydir",
+   "message" : "Directory not empty",
+   "index" : 77,
+   "errorCode" : 108
+}
+}}}
+디렉토리를 비우지 않아서 지울 수 없다고 한다. 그냥 지우고 싶다면, '''recursive=true'''를 이용하면 된다. '''rm -rf'''와 비슷한 효과이니 주의 해야 하겠다.
+{{{#!plain
+# curl -L 'http://localhost:4444/v2/keys/mydir?recursive=true' -XDELETE 
+{
+   "action" : "delete",
+   "prevNode" : {
+      "modifiedIndex" : 76,
+      "dir" : true,
+      "createdIndex" : 76,
+      "key" : "/mydir"
+   },
+   "node" : {
+      "key" : "/mydir",
+      "createdIndex" : 76,
+      "dir" : true,
+      "modifiedIndex" : 78
+   }
+}
+yundream@@yundream:~$ kx 
+}}}
+
+=== hidden 노드 만들기 ===
+디렉토리나 key앞에 "_"를 붙이면, hidden 노드를 만들 수 있다. hidden 노드는 목록에 나오지 않는다. 
+
+히든 노드 '''/_message'''를 만들었다.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/_message -XPUT -d value="Hello hidden world" 
+{
+   "action" : "set",
+   "node" : {
+      "key" : "/_message",
+      "value" : "Hello hidden world",
+      "createdIndex" : 83,
+      "modifiedIndex" : 83
+   }
+}
+}}}
+루트 디렉토리의 목록을 확인해 보자.
+{{{#!plain
+# curl -L http://localhost:4444/v2/keys/ | json_pp  
+100   274    0   274    0     0   202k      0 --:--:-- --:--:-- --:--:--  267k
+{
+   "node" : {
+      "key" : "/",
+      "nodes" : [
+         {
+            "dir" : true,
+            "key" : "/foodir",
+            "createdIndex" : 74,
+            "modifiedIndex" : 74
+         },
+         {
+            "dir" : true,
+            "key" : "/dir",
+            "modifiedIndex" : 75,
+            "createdIndex" : 75
+         }
+      ],
+      "dir" : true
+   },
+   "action" : "get"
+}
+}}}
+
+=== 파일로 부터 키를 설정하기 ===
+파일로 부터 키를 설정할 수도 있다.
+{{{#!plain
+# cat test.json
+{"data":"news","id":12000}
+
+# curl -L http://localhost:4444/v2/keys/afile -XPUT --data-urlencode value@@test.json
+{
+   "action" : "set",
+   "node" : {
+      "key" : "/afile",
+      "value" : "{\"data\":\"news\",\"id\":12000}\n",
+      "createdIndex" : 84,
+      "modifiedIndex" : 84
+   }
+}
+}}}
+
+=== 통계 ===
+
+=== 클러스터 설정 ===
+{{{#!plain
+$ curl -L http://localhost:7777/v2/admin/config -XPUT -d '{"activeSize":3, "removeDelay":1800,"syncInterval":5}'
+{
+    "activeSize":3,
+    "removeDelay":1800,
+    "syncInterval":5
+}
+}}}
+  * activeSize : 클러스터에 참여 할 수 있는 peer의 총 갯수 
+  * removeDelay : 설정된 시간동안 peer가 응답하지 않을 경우 제거한다.  
+=== 클러스터 설정 읽기 ===
+{{{#!plain
+$ curl -L http://localhost:7777/v2/admin/config
+{
+   "syncInterval" : 5,
+   "activeSize" : 3,
+   "removeDelay" : 1800
+}
+}}}
+
+== etcd 클러스터 == 
+
+== 응용 ==
+도커 서비스 컨테이너를 관리하는 응용을 하나 만들어봐야 겠다. 
+
+=== 개요 ===
+Infra01, Infra02, Infra03 3개의 인스턴스가 있다. 이 인스턴스 서비스를 위한 도커 컨테이너를 실행한다. 관리해야 할 요소는 아래와 같다. 모든 기능을 다 구현하지 않는다.
+  1. 각 인스턴스에 몇 개의 컨테이너가 실행 됐는지 확인해야 한다. 인스턴스 디렉터리를 만들고 컨테이너 데이터를 저장하면 된다. 구현한다.
+  1. 각 인스턴스의 가용 자원을 알고 있어야 한다. 인스턴스의 자원을 모니터링 하면서 인스턴스 정보를 업데이트하는 에이전트를 개발 해야 한다. 구현하지 않는다.
+  1. 유저가 컨테이너를 요청하면, 적당한 인스턴스를 선택해서 실행한다. 구현하지 않는다.
+  1. 컨테이너가 실행되면, 포트포워딩 기반의 네트워크를 설정한다. 컨테이너가 start 되면, iptable로 포트포워딩을 한다.  
+  1. 포트포워딩까지 끝나면, 컨테이너 데이터를 저장하고 유저에게 메시지를 보낸다. 포워딩한 포트를 다른 컨테이너가 사용하면 안되니, 포트 정보도 함께 저장한다. 
+
+=== 구성 ===
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1yp1AgDP4npN1XAHUgPxRa9LcErvhDWPYmqhPjdSEWN4/pub?w=918&amp;h=462">
+}}}
+
+왠지 Mesos와 비슷하게 보이는 것은 기분 탓이 아닐 거다. 사람의 생각이라는게 결국은 비슷 비슷하니까. 굳이 다시 그려보는 이유는 Mesos가 지금 내 환경에는 적합하지 않아 보이기 때문이다. 범용적인 툴이라는게 어떤 목적에는 맞지 않을 수도 있는 거라서.. 
+  1. 유저가 API Server에 컨테이너를 요청한다. 
+  1. API 서버는 Container manager에게 어떤 Instance를 사용해야 할지를 묻는다. 
+  1. API 서버는 할당 받은 Instance의 RESTFul 서버에 컨테이너 생성(혹은 stop, start, network 설정) 요청한다. 
+  1. RESTFul 서버는 컨테이너를 생성한다. 컨테이너의 상태 변화는 etcd single cluster에 저장한다.
+  1. 세부적인 상태변화는 etcd single cluster에 저장하고, 자원의 생석/삭제와 같은 정보만 etcd cluster에 저장한다.
+  1. Watcher이 etcd single cluster의 상태가 변경되면, message queue를 통해서 유저에게 상태를 알려준다.
+Resource Monitor는 가용 자원을 저장한다. 저장한 정보는 Container Manater가 Instance를 할당하는 근거 자료로 사용한다. 가용자원을 계산하는 방법은 단순하다.
+
+Instance는 CPU와 메모리의 크기를 이용해서 Point를 만든다. 예컨데, 메모리 10M당 1포인트를 할당해서 8G 메모리를 가진 인스턴스는 800 포인트를 부여한다. 처음 만들어지는 컨테이너는 기본 메모리 사용량이 정해져 있을 거다. 200M를 사용하면, 20 포인트를 차감을 한다. 인스턴스의 메모리 포인트가 20보다 크다면, 이 인스턴스는 컨테이너를 할당 할 수 있다. 어떤 컨테이너는 이런 저런 애플리케이션들이 설치가 되서 50 포인트가 필요할 수 있을 거다. Container Manager는 50포인트 이상의 여유를 가진 인스턴스를 찾아서 할당하면 된다.    
+
+실제로는 가장 많은 포인트를 가진 인스턴스를 되돌려 줄텐데, REDIS의 ZADD를 이용하면 간단하게 구현 할 수 있을 것이다. 라고 말 하고 싶지만 실제 구현은 꽤 복잡할 것이다. 메모리, 디스크, CPU, 네트워크 까지 고려해서 알고리즘을 만들어야 하기 때문이다.
+@
+
+
+1.13
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d612 1
+a612 22
+=== 구성 설계 ===
+아래와 같이 설계하기로 했다.
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1qT9EFCatRfTcq4pdHeilPSQXgJAluKTw7QLmXkezdBc/pub?w=753&amp;h=395">
+}}}
+  1. 유저가 Container 생성을 요청한다.
+  1. etcd cluster에 container이름을 key로 만든다. 이 key가 컨테이너 이름이 된다.
+  1. Cloud Agent에 container 실행 명령을 전송한다.   
+  1. Cloud Agent는 컨테이너를 만든다.
+  1. 컨테이너를 만들면서 몇 번의 상태 변화가 있을 거다. 이 데이터를 etcd cluster에 쓴다.
+  1. 업데이트 정보는 watcher를 통해서 유저에게 통지 된다. watcher 대신에 Message Queue로 유저에게 통지 할 수도 있다.  
+
+=== Cloud Agent ===
+명령을 실행하고 etcd 정보를 업데이트하는 소프트웨어다. 아래의 일들을 수행한다.
+  1. API Server가 요청한 명령을 실행한다. 
+  1. 명령 수행 결과는 etcd 에 저장한다.
+  1. CPU, Memory, 컨테이너 갯수, 마운트된 볼륨, 바인드 포트등의 정보도 주기적으로(혹은 다른 알고리즘으로) 업데이트 한다.
+이들 정보는 전체 인프라를 관리하는 메니저 프로그램이 이용한다. 컨테이너를 배치할 인스턴스의 선택, 새로운 인스턴스의 추가, 볼륨 관리 등의 일을 한다.  
+
+Cloud Agent로 어떤 소프트웨어를 사용할지를 고민 해야 한다. 간단한 RESTful 서버를 개발하는 방법이 있다. API Server의 요청을 받아서 자원을 생성하고 etcd를 업데이트 한다. 여기에 자원을 모니터링 하다가 변화가 생기면 etcd를 업데이트 하는 기능도 가지고 있어야 하겠다. 대략 아래와 같은 구성이 될 거다. 
+
+@
+
+
+1.12
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d632 1
+a632 1
+Cloud Agent로 어떤 소프트웨어를 사용할지를 고민 해야 한다. 간단한 RESTful 서버를 개발하는 방법이 있다. API Server의 요청을 받아서 자원을 생성하고 etcd를 업데이트 한다. 여기에 자원을 모니터링 하다가 변화가 생기면 etcd를 업데이트 하는 기능도 가지고 있어야 하겠다. 대략 아래와 같은 구성이 될 거다.
+d638 12
+a649 1
+... 계속
+@
+
+
+1.11
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d632 1
+a632 1
+Cloud Agent로 어떤 소프트웨어를 사용할지를 고민 해야 한다. 간단한 RESTful 서버를 개발하는 방법이 있다. API Server의 요청을 받아서 자원을 생성하고 etcd를 업데이트 한다. 여기에 자원을 모니터링 하다가 변화가 생기면 etcd를 업데이트 하는 기능도 가지고 있어야 하겠다. 
+d634 5
+a638 1
+Cloud Agent를 etcd로 개발하는 방법도 있다. etcd를 싱글 클러스터 모드로 실행하고, API Server는 인스턴스에 있는 etcd의 데이터를 업데이트하는 식이다. 여기에 watcher를 붙여서 적당한 코드를 실행하면 된다. etcd로 개발 할 경우, etcd cluster에는 컨테이너 목록 정보를 유지하고, 각 컨테이너의 상세 정보는 인스턴스의 etcd에서 관리하게 한다. 세부정보도 etcd cluster에 업데이트 하는 방법도 있기는 한데, 데이터 동기화가 짜증 날 것 같다. 
+@
+
+
+1.10
+log
+@119.64.102.68;;yundream;;
+@
+text
+@a598 1
+
+a600 1
+
+@
+
+
+1.9
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d51 1
+d53 2
+a54 1
+# curl -L http://localhost:4001/version
+d56 175
+a230 3
+=== Key 다루기 ===
+==== Key에 Value 설정하기 ====
+/mydata 키에 '''Hello World'''를 저장했다.
+a231 1
+# curl -L http://etcd01:4001/v2/keys/mydata -XPUT -d value="Hello World"
+a232 1
+    "action" : "set",
+d234 38
+a271 5
+        "createdIndex" : 56,
+        "value" : "Hello World",
+        "modifiedIndex" : 56,
+        "key" : "/mydata"
+    }
+a273 5
+  1. action : 요청에 사용한 메서드다. HTTP PUT의 경우 '''set'''이 설정된다.
+  1. node.key : 요청 데이터의 패스다. '''/mydata'''에 '''Hello World'''를 설정하라는 정보를 확인할 수 있다.
+  1. node.value : '''key'''에 저장할 값.
+  1. node.createIndex : 유니크한 인덱스 값이다. etcd의 내용이 업데이트 될 때마다 증가하며, key가 아닌 etcd 전체에서 유일하다.
+  1. node.modifiedIndex : set, delete, update, create, compareAndSwap등 key가 바뀔 때마다 증가한다. get, watch API에 대해서는 바뀌지 않는다. 
+d275 2
+a276 1
+==== Key의 값 가져오기 ====
+d278 1
+a278 1
+# curl -L http://etcd01:4001/v2/keys/mydata
+d280 1
+a280 1
+    "action" : "get",
+d282 6
+a287 4
+        "createdIndex" : 56,
+        "key" : "/mydata",
+        "value" : "Hello World",
+        "modifiedIndex" : 56
+d291 22
+d314 2
+a315 1
+==== Key 값 변경하기 ====
+d317 4
+a320 2
+=== 디렉터리 ===
+etcd를 이용해서 컨테이너를 관리한다면, 디렉터리를 만들고 이 디렉터리 밑에 컨테이너들을 관리하면 된다.
+d322 13
+a334 2
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1x9g-GrksKpoHv5Kuyszdujz8t3aiJyrTc4RwkzalxXU/pub?w=461&amp;h=127">
+d336 3
+a338 4
+  1. my-service를 위한 컨테이너들을 관리하려고 한다.
+  1. my-service 디렉터리를 만든다. 이 디렉터리 밑에 컨테이너들이 계층(hierarchy)하게 배치된다.
+  1. container01, container02를 배치했다.  
+my-service 디렉터리를 만들었다. 
+d340 7
+a346 1
+# etcdctl mkdir /my-service
+d348 3
+a350 1
+my-service 밑에 container01과 container02를 만들었다.  
+d352 16
+a367 2
+# etcdctl set /my-service/container01 "localhost:8000"
+# etcdctl set /my-service/container02 "localhost:8000"
+d369 7
+a375 1
+'''my-service'''디렉터리의 내용을 확인해보자.
+d377 1
+a377 3
+# etcdctl ls /my-service
+/my-service/container01
+/my-service/container02
+d379 1
+d381 7
+a387 2
+# etcdctl get /my-service/container01
+localhost:8000
+d389 3
+a391 2
+==== 디렉터리 TTL ====
+Key와는 달리 디렉터리는 초 단위로 만료시간을 설정할 수 있다. 
+d393 1
+a393 1
+# curl -L http://etcd01:4001/v2/keys/ttldir -XPUT -d ttl=30 -d dir=true
+d395 1
+d397 3
+a399 6
+        "ttl" : 30,
+        "dir" : true,
+        "expiration" : "2015-10-04T07:08:26.391872782Z",
+        "modifiedIndex" : 51,
+        "createdIndex" : 51,
+        "key" : "/ttldir"
+d401 46
+a446 1
+    "action" : "set"
+d449 3
+a451 1
+이 디렉터리는 ttl 시간 후에 삭제된다. 디렉터리를 읽을 때, ttl 값도 확인 할 수 있다.
+d453 1
+a453 1
+# curl -L http://etcd01:4001/v2/keys/ttldir | json_pp
+d455 25
+a479 9
+    "action" : "get",
+    "node" : {
+        "dir" : true,
+        "ttl" : 22,
+        "modifiedIndex" : 51,
+        "expiration" : "2015-10-04T07:08:26.391872782Z",
+        "createdIndex" : 51,
+        "key" : "/ttldir"
+    }
+a481 1
+'''prevExist=true'''를 설정하면, 디렉터리가 업데이트 될 때마다 TTL을 재 설정 할 수 있다.
+d483 2
+a484 2
+== Watching ==
+이제 '''my-service'''를 바라보다가 변화가 생기면, 적절한 코드를 실행하면 된다.
+d486 27
+a512 1
+# etcdctl watch --recursive /my-service
+d515 4
+a518 4
+etcd02 호스트에서 아래의 시나리오로 데이터를 변경하기로 했다.
+  1. etcd02 호스트에서 container02를 start 했다.
+  1. container02의 서비스 포트는 80으로, etcd02의 8001 포트로 포트 포워딩 된다. 
+현재 container02의 데이터는 다음과 같다.
+d520 10
+a529 2
+# curl -L http://etcd01:4001/v2/keys/my-service/container02
+{"action":"get","node":{"key":"/my-service/container02","value":"localhost:8000","modifiedIndex":10,"createdIndex":10}}
+d531 1
+a531 1
+데이터를 변경했다.
+d533 23
+a555 2
+# curl -L http://etcd01:4001/v2/keys/my-service/container02 -X PUT -d value="etcd02:8001"
+{"action":"set","node":{"key":"/my-service/container02","value":"etcd02:8001","modifiedIndex":14,"createdIndex":14},"prevNode":{"key":"/my-service/container02","value":"localhost:8000","modifiedIndex":10,"createdIndex":10}}
+d557 3
+a559 1
+watch는 변경사항을 출력하고 종료한다.
+d561 13
+a573 2
+#etcdctl watch --recursive /my-service
+etcd02:8001
+d576 3
+a578 2
+=== Watching이 발생하면 스크립트 실행하기 ===
+디렉터리의 데이터가 변경시 코드를 실행 할 수도 있다. 예를 들어 컨테이너의 포트 정보가 변경됐다면, 이 정보를 데이터베이스나 큐로 전송해서 애플리케이션들이 참고하게 만들 수 있다. 
+d580 6
+a585 1
+$ etcdctl exec-watch --recursive /foo-service -- bash -c 'echo "\"$ETCD_WATCH_KEY\" key was updated to \"$ETCD_WATCH_VALUE\" value by \"$ETCD_WATCH_ACTION\" action"'
+d587 12
+@
+
+
+1.8
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d49 43
+a91 1
+== 디렉터리 ==
+d119 1
+a119 1
+=== 디렉터리 TTL ===
+@
+
+
+1.7
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d9 1
+a9 1
+== Tutorial ==
+a109 1
+
+a134 1
+
+@
+
+
+1.6
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d77 35
+a111 1
+=== 디렉터리 Watching ===
+d136 1
+d144 1
+a144 1
+이건 나중에
+@
+
+
+1.5
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d126 1
+a126 1
+<img src="https://docs.google.com/drawings/d/1rWhl4ODuA_skm2H28nwVBt8dlQtcMkCAqRni16wtfvk/pub?w=679&amp;h=289">
+d128 6
+d135 6
+a140 7
+etcd 클러스터를 만든다. 컨테이너 방식으로 올릴 수도 있겠는데, 그냥 호스트 운영체제에서 운용 한다. 컨테이너를 실행하는 각 호스트들에는 etcd client가 올라간다. etcd client가 하는 일은 아래와 같다. 
+  * exec-watcher : 호스트에 해당하는 etcd 파일을 watch 하다가 정보가 변경되면, 코드를 실행한다. 예를 들어, 컨테이너가 추가되면 컨테이너를 만들어서 start 한다.  
+  * etcd 데이터 업데이트 : 호스트와 컨테이너의 상태가 변경되면 업데이트 한다. 컨테이너의 create, start, stop, 기타 설정 변경등을 업데이트 한다.    
+이 방식으로 아래의 기능들을 수행할 수 있다.
+  * 컨테이너의 배치와 상태 확인 : etcd 클러스터의 정보를 업데이트 하는 것으로 컨테이너를 추가 할 수 있다. watch로 정보 변경을 확인한 호스트는 컨테이너를 만드는 코드를 실행한다. 이때 컨테이너의 상태는 pending일 것이다. 컨테이너를 만들고 나면, etcd client를 이용해서 start로 상태를 변경하고, 유저에게 완료 메시지를 전달 한다.  
+  * 컨테이너 상태 변화 : 컨테이너가 stop 되면, etcd client로 업데이트 한다. 관리자와 유저는 컨테이너의 상태를 확인 할 수 있다. 
+  * 호스트의 자원 : 일정 주기로 호스트의 cpu, memory, disk와 같은 주요 정보를 업데이트 한다. 이 정보는 컨테이너를 적절한 호스트에 배치하기 위한 자료로 활용된다. 
+d142 3
+a144 1
+... 계속
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d122 3
+a124 1
+=== 디렉터리 구조 계획 ===
+d126 1
+a126 1
+<img src="https://docs.google.com/drawings/d/1vBnhdAh6vwbgBePCeO9HQsx2GtOd920j3DE0tbqCFBQ/pub?w=583&amp;h=168">
+d129 7
+a135 7
+service01 디렉터리 밑에 인스턴스 정보와 컨테이너 정보를 저장하기 위한 디렉터리를 만든다. 각각의 디렉터리 밑에 인프라이름과 컨테이너 이름의 파일을 만들고 value를 저장한다. value는 json 타입을 이용해서, 여러 정보를 저장 할 수 있도록 한다. 인스턴스에는 인스턴스가 관리하는 컨테이너 목록과 사용중인 포트 목록등을 저장한다. 컨테이너 디렉터리에는 컨테이너가 실행된 인스턴스와 컨테이너가 사용 중인 서비스 포트의 목록을 저장한다.
+{{{#!plain
+# /instance/infra01에 저장되는 정보 
+{
+    "containers":["container001", "container002"],
+    "posts":[10004,10005, 10006]
+}
+d137 1
+a137 6
+#/container/001에 저장되는 데이터
+{
+    "container":"infra01"
+    "port"":[10004,10005, 10006]
+}
+}}}
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d107 34
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d78 1
+a78 1
+이제 proxy는 '''my-service'''를 바라보다가 변화가 생기면, 적절한 코드를 실행하면 된다.
+d82 25
+@

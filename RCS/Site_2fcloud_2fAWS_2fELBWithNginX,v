@@ -1,0 +1,166 @@
+head	1.4;
+access;
+symbols;
+locks
+	root:1.4; strict;
+comment	@# @;
+
+
+1.4
+date	2015.09.25.14.49.22;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2015.09.25.14.38.30;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2015.09.24.14.51.28;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2015.09.23.15.20.47;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@./data/text/Site_2fcloud_2fAWS_2fELBWithNginX
+@
+
+
+1.4
+log
+@119.64.102.68;;yundream;;
+@
+text
+@#title ELB 환경에서 NginX를 이용한 reverse proxy 구성
+[[TableOfContents]]
+== ELB 환경에서 NginX를 이용한 reverse proxy 구성 ==
+이미 ELB를 이용해서 reverse proxy기반의 로드밸런싱 환경을 만들었는데, 여기에 다시 NginX(혹은 HAProxy)로 revere proxy를 할 이유가 있는지에 대해서 먼저 생각해보자.
+
+예상 외로 이런 구성은 어렵잖게 찾아 볼 수 있다. 가장 널리 사용하는 예는 "Consistent Hash"를 위한 프락시 서버의 구성일 것이다. 캐시(혹은 객체)에 대한 적중을 consist 하게 유지 하려면 알고리즘을 돌려야 하는데, ELB로는 이런 일을 할 수 없다. 결국 프락시 서버를 구성해야 한다. 
+
+외부에서 접근해야 할 서버를 결정해줘야 하는 경우도 있다. Consistent Hash를 이용해서 내부에서 결정 하면 되잖느냐고 할 수도 있겠으나 Consisten hash를 가진 프락시 서버를 구축하기 위해서는 상당한 비용을 투자해야 한다. 그냥 외부의 자원관리 서버에게 어떤 서버에 연결할지를 요청한 다음, Nginx에서 요청내용 그대로 프락시 하면 더 쉽게 구현 할 수 있는 종류의 서비스들도 있다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1pP51GN4HBlIrkKHRXvhzDjgkC8sngCYmTr26Ey7JdIs/pub?w=720&amp;h=245">
+}}}
+
+유저는 1.server.local 서버에 접근을 해야 한다.(이 서버에 접근하라는 정보는 다른 서버가 알려줬을 테다) NginX는 URL 정보를 이용해서 HTTP 요청을 프락시 할 수 있다. 
+
+== 테스트 환경 구성 ==
+외부에서 접근해야 할 내부 서버의 정보를 알려주면, NginX가 프록시 해주는 시스템을 구축하려고 한다. 위 그림에 있는 구성이다.
+
+테스트를 위해서, '''2대의 NginX'''와 2대의 '''웹 서버'''를 만들기로 했다. 그 위에 ELB를 붙인다. 구성은 아래와 같다. 
+
+{{{#!html
+<img src="https://docs.google.com/drawings/d/1jFKi3NUkddjgSKVKGWmIGlMBihkM_h-vFNtT9KX0PTo/pub?w=496&amp;h=495">
+}}}
+
+유저는 ELB의 endpoint 주소에 내부 웹 서버의 주소를 함께 보낸다. ELB의 주소가 joinc-elb.aws.com 이고, 웹 서버의 주소가 ip-10-2-0-5.aws.local 이라고 하면 joinc-elb.aws.com/proxy/ip-10-2-0-5.aws.local 를 요청한다.
+
+하지만.. 돈이 없는 관계로 NginX와 웹 서버 각 한대씩으로 제한하기로 했다. 
+
+== NginX 설정 ==
+{{{#!plain
+location ~ /p/(.*)/(.*) {
+    rewrite /p/(.*)/(.*)  /$1 break;
+    proxy_pass  http://$1:$2;
+}
+}}}
+Nginx에는 Proxy_pass에 대한 정규표현식을 지원한다. /p/(.*)/(.*)에 일치하는 요청이 들어오면 proxy_pass의 주소를 치환해서 프락시 한다. /p/1.1.1.1/8000 이라면 http://1.1.1.1:8000 으로 프락시 된다. 
+
+== 웹 서버에서 테스트 ==
+웹 서버를 설치해서 테스트를 한다. 아파치 웹 서버를 설치하는 대신에 nc를 이용해서 간단한 웹 서버를 만들었다. 
+{{{#!plain
+# cat index.html
+<h1>Hello World</h1>
+# while true; do { echo -e 'HTTP/1.1 200 OK\r\n'; cat index.html; } | nc -l 8000; done
+}}}
+
+curl을 이용해서 ELB로 요청을 했다.
+{{{#!plain
+# curl http://test-elb-19xxxxxxx.ap-northeast-1.elb.amazonaws.com/p/10.1.2.41/8000?t=1234
+<h1>Hello World!!</h1>
+}}}
+
+nc는 아래의 값을 출력했다.
+{{{#!plain
+GET /10.1.2.41?t=1234 HTTP/1.0
+Host: 10.1.2.41:8000
+Connection: close
+Accept: */*
+User-Agent: curl/7.38.0
+X-Forwarded-For: 119.64.102.68
+X-Forwarded-Port: 80
+X-Forwarded-Proto: http
+}}}
+
+== 헤더 설정 하기 ==
+리버스 프락시를 운영하다 보면, 헤더값을 재 설정해야 하는 경우가 있다. proxy_set_header를 이용해서 헤더 값을 설정 할 수 있다.  Nginx의 설정을 변경했다.
+{{{#!plain
+location ~ /p/(.*)/(.*) {
+    rewrite /p/(.*)/(.*)  /$1 break;
+    proxy_pass  http://$1:$2;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+}}}
+
+curl로 테스트를 했다.
+{{{#!plain
+GET /10.1.2.41?t=1234 HTTP/1.0
+HOST: test-elb-19xxxxxx.ap-northeast-1.elb.amazonaws.com
+X-Real-IP: 10.1.2.163
+Connection: close
+Accept: */*
+User-Agent: curl/7.38.0
+X-Forwarded-For: 119.64.102.68
+X-Forwarded-Port: 80
+X-Forwarded-Proto: http
+}}}
+  * X-Real-IP :  
+  * X-Forwarded-For : HTTP 요청을 한 클라이언트의 IP를 설정한다.
+  * X-Forwarded-Port : 클라이언트의 HTTP 요청 포트를 설정한다. X-Forwarded-For와 함께 클라이언트의 정보를 확인 하기 위한 용도로 사용 할 수 있다. 
+  * X-Real-IP : 프락시 서버에 요청을 한 서버 즉 ELB 인스턴스의 주소가 설정된다.  
+@
+
+
+1.3
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d64 28
+@
+
+
+1.2
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d2 1
+a2 1
+
+d15 1
+d28 1
+d30 34
+@
+
+
+1.1
+log
+@119.64.102.68;;yundream;;
+@
+text
+@d15 2
+d18 10
+a27 1
+... 계속
+@

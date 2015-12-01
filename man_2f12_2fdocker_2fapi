@@ -196,11 +196,12 @@ Json 파라메터가 엄청나게 많을 뿐더러, 잘 모르는 것들 투성�
   * Hostname : 컨테이너가 사용 할 호스트 이름
   * Domainname : 컨테이너가 사용 할 도메인 이름 
   * User : 
-  * Memory : 컨테이너의 메모리 제한
-  * MemorySwap : 메모리와 swap를 합한 메모리 크기. -1일 경우 swap은 disable 된다. 반드시 '''Memory'''보다 크게 설정해야 한다. 
-  * CpuShares : 컨테이너의 CPU 공유 가중치
-  * CpuPeriod : CPU period의 길이. 단위는 마이크로초
-  * Cpuset
+  * Memory : 컨테이너에 할당할 물리적인 메모리의 크기 
+  * MemorySwap : 메모리와 swap를 합한 메모리 크기. 당연하지만 반드시 '''Memory'''보다 크게 설정해야 한다. 
+  * CpuShares : 컨테이너의 CPU 공유 가중치. 잘 모르겟다.
+  * CpuPeriod : CPU period. 100000이 기본 값이다.
+  * CpuQuota : CPU 쿼터로 CpuPeriod와 함께 사용한다. 자세한 내용은 [wiki:man/12/docker/limits cpu & memory 쿼터 설정] 참고
+  * Cpuset : 컨테이너에 할당할 cpu core를 특정 할 수 있다. 
   * CpusetCpus
   * CpusetMems
   * BlkioWeight
@@ -576,7 +577,7 @@ GET /images/ubuntu/json HTTP/1.1
 }
 }}}
 
-=== 컨테이녀 start ===
+=== 컨테이너 start ===
 {{{#!plain
 POST /containers/(id)/start
 }}}
@@ -603,3 +604,31 @@ HTTP/1.1 204 No Content
 Server: Docker/1.8.2 (linux)
 Date: Fri, 23 Oct 2015 14:56:22 GMT
 }}}
+
+=== 컨테이너 restart ===
+{{{#!plain
+POST /containers/e90e34656806/restart?t=5 HTTP/1.1
+}}}
+컨테이너를 리스타트 한다.
+
+{{{#!plain
+# curl -XPOST localhost:9000/containers/75ff3ba38728/restart?t=5
+....
+< HTTP/1.1 204 No Content
+....
+}}}
+성공하면 204 No Contnet 메시지를 출력한다.
+
+=== 컨테이너 kill ===
+{{{#!plain
+POST /containers/e90e34656806/kill HTTP/1.1
+}}}
+실행중인 컨테이너에 '''SIGINT''' 시그널을 보낸다. 
+{{{#!plain
+# curl -XPOST localhost:9000/containers/75ff3ba38728/kill -v
+< HTTP/1.1 204 No Content
+* Connection #0 to host localhost left intact
+}}}
+  * 204 : 성공
+  * 404 : 컨테이너가 없음
+  * 500 : 서버 에러
